@@ -1,0 +1,8 @@
+{
+  "entities": {
+    "pump": {
+      "price": [64],
+      "priceExponent": 1.1
+    }
+  }
+}

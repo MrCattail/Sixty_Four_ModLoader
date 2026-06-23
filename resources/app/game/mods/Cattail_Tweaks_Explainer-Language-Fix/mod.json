@@ -1,0 +1,8 @@
+{
+  "id": "Cattail_Tweaks_Explainer-Language-Fix",
+  "name": "Dynamic Explainer Language",
+  "version": "0.1.0",
+  "loaderVersion": ">=0.1.0",
+  "entry": "scripts/main.js",
+  "description": "Refreshes the current pulsing explainer hint immediately after changing language."
+}

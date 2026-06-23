@@ -1,0 +1,10 @@
+{
+  "my-lang": {
+    "entities": {
+      "pump": {
+        "name": "My Pump Name",
+        "description": "My translated pump description."
+      }
+    }
+  }
+}

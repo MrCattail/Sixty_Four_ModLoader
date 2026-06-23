@@ -1,0 +1,73 @@
+﻿# Sixty Four ModLoader Installer
+
+Run these scripts from PowerShell. `GameRoot` is the game's `win-unpacked`
+folder, for example:
+
+```text
+D:\Steam\steamapps\common\Sixty Four\win-unpacked
+```
+
+
+## Easy Double-Click Install
+
+For most players:
+
+1. Extract the ModLoader zip into the Sixty Four `win-unpacked` folder.
+2. Open `modloader-installer`.
+3. Double-click `Install ModLoader.cmd`.
+4. Start the game and press `Ctrl+M`.
+
+Use `modloader-installer\Uninstall ModLoader.cmd` to restore the latest install backup, or
+`modloader-installer\Verify ModLoader.cmd` to check the loader hooks.
+
+## Install
+
+From the package root:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\modloader-installer\install.ps1 -GameRoot "D:\Steam\steamapps\common\Sixty Four\win-unpacked"
+```
+
+The installer:
+
+- backs up core files to `resources/app/game/modloader/state/install-backups/`
+- copies loader-integrated core files
+- copies `modloader/`
+- copies mod folders and templates
+- keeps an existing `mods/enabled.json`
+- runs `verify.ps1`
+
+If ModLoader is already installed, add `-Force` to reinstall after backup:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\modloader-installer\install.ps1 -GameRoot "D:\Steam\steamapps\common\Sixty Four\win-unpacked" -Force
+```
+
+## Uninstall
+
+Restore the latest install backup:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\modloader-installer\uninstall.ps1 -GameRoot "D:\Steam\steamapps\common\Sixty Four\win-unpacked" -ConfirmUninstall
+```
+
+Restore a specific backup:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\modloader-installer\uninstall.ps1 -GameRoot "D:\Steam\steamapps\common\Sixty Four\win-unpacked" -BackupId 20260621-220538 -ConfirmUninstall
+```
+
+By default, uninstall restores backed-up core files and leaves `modloader/`
+and `mods/` in place. Add `-RemoveModloaderFiles` only if you want to delete
+the loader tools too.
+When testing the installer from an already-installed development folder,
+source and target files may be the same. The installer skips identical source
+and target files, but still creates a backup and runs verification.
+To build a zip with no example mods enabled:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\modloader-installer\build-package.ps1 -Clean -CleanEnabled
+```
+
+`-CleanEnabled` only changes the generated zip/staging copy. It does not modify
+your current game directory's `mods/enabled.json`.

@@ -1,0 +1,45 @@
+{
+  "id": "example-building",
+  "name": "Example Building",
+  "version": "0.1.0",
+  "loaderVersion": ">=0.1.0",
+  "entry": "scripts/main.js",
+  "description": "Registers a tiny configurable example building. Disabled by default.",
+  "config": {
+    "enabledInShop": {
+      "type": "boolean",
+      "label": "Show Soul Lamp in shop",
+      "default": true
+    },
+    "basePrice": {
+      "type": "number",
+      "label": "Soul Lamp base price",
+      "default": 64,
+      "min": 1
+    },
+    "priceExponent": {
+      "type": "number",
+      "label": "Soul Lamp price exponent",
+      "default": 1.15,
+      "min": 1
+    }
+  },
+  "words": {
+    "en": {
+      "entities": {
+        "mod_soul_lamp": {
+          "name": "Soul Lamp",
+          "description": "A small modded building used to test entity registration, shop display, placement, saves, and config."
+        }
+      }
+    },
+    "zh-cn": {
+      "entities": {
+        "mod_soul_lamp": {
+          "name": "\u7075\u9b42\u706f",
+          "description": "\u7528\u4e8e\u6d4b\u8bd5\u5efa\u7b51\u6ce8\u518c\u3001\u5546\u5e97\u663e\u793a\u3001\u653e\u7f6e\u3001\u5b58\u6863\u548c\u914d\u7f6e\u7684 mod \u793a\u4f8b\u5efa\u7b51\u3002"
+        }
+      }
+    }
+  }
+}
