@@ -36,31 +36,79 @@
 		state.log.push({ level: 'info', args })
 	}
 
+	const ensureStatusStyle = function () {
+		if (document.getElementById('modloader-status-style')) return
+		const style = document.createElement('style')
+		style.id = 'modloader-status-style'
+		style.textContent = `
+			#modloader-status { position: fixed; left: 10px; bottom: 10px; z-index: 2147483647; display: inline-flex; align-items: center; gap: 7px; max-width: calc(100vw - 20px); box-sizing: border-box; padding: 6px 8px; border-radius: 7px; background: rgba(0, 0, 0, .62); color: rgba(255, 255, 255, .92); box-shadow: 0 6px 20px rgba(0,0,0,.18); font: 12px/1.35 Montserrat, Arial, sans-serif; pointer-events: auto; user-select: none; white-space: nowrap; }
+			#modloader-status .modloader-status-logo { width: 18px; height: 18px; flex: 0 0 auto; border-radius: 4px; object-fit: cover; }
+			#modloader-status .modloader-status-title { font-weight: 600; }
+			#modloader-status .modloader-status-version { color: rgba(255,255,255,.68); }
+			#modloader-status .modloader-status-separator { color: rgba(255,255,255,.36); }
+			#modloader-status .modloader-status-hotkey { color: rgba(255,255,255,.8); }
+			#modloader-status .modloader-status-mods { position: relative; display: inline-flex; align-items: center; min-width: 18px; max-width: 18px; overflow: hidden; color: rgba(255,255,255,.78); transition: max-width .14s ease-in; }
+			#modloader-status .modloader-status-mod-names { display: block; max-width: min(58vw, 720px); overflow: hidden; text-overflow: ellipsis; opacity: 0; transform: translateX(-14px); transition: opacity .11s ease-in, transform .14s ease-in; }
+			#modloader-status .modloader-status-dots { position: absolute; right: 5px; top: 50%; display: inline-flex; flex-direction: column; gap: 2px; transform: translateY(-50%); opacity: 1; transition: opacity .1s ease-in, transform .14s ease-in; }
+			#modloader-status .modloader-status-dot { width: 3px; height: 3px; border-radius: 50%; background: rgba(190,190,190,.72); }
+			#modloader-status:hover .modloader-status-mods, #modloader-status:focus .modloader-status-mods, #modloader-status:focus-within .modloader-status-mods { max-width: min(58vw, 720px); transition: max-width .2s ease-out; }
+			#modloader-status:hover .modloader-status-mod-names, #modloader-status:focus .modloader-status-mod-names, #modloader-status:focus-within .modloader-status-mod-names { opacity: 1; transform: translateX(0); transition: opacity .14s ease-out .04s, transform .18s ease-out; }
+			#modloader-status:hover .modloader-status-dots, #modloader-status:focus .modloader-status-dots, #modloader-status:focus-within .modloader-status-dots { opacity: 0; transform: translate(8px, -50%); }
+		`
+		document.head.appendChild(style)
+	}
+
+	const appendStatusText = function (parent, className, text) {
+		const span = document.createElement('span')
+		if (className) span.className = className
+		span.textContent = text
+		parent.appendChild(span)
+		return span
+	}
+
 	const showStatus = function () {
 		if (!document.body) return
+		ensureStatusStyle()
 
 		let el = document.getElementById('modloader-status')
 		if (!el) {
 			el = document.createElement('div')
 			el.id = 'modloader-status'
-			el.style.position = 'fixed'
-			el.style.left = '10px'
-			el.style.bottom = '10px'
-			el.style.zIndex = '2147483647'
-			el.style.padding = '6px 8px'
-			el.style.borderRadius = '6px'
-			el.style.background = 'rgba(0, 0, 0, .58)'
-			el.style.color = 'rgba(255, 255, 255, .9)'
-			el.style.font = '12px/1.35 Montserrat, Arial, sans-serif'
-			el.style.pointerEvents = 'none'
-			el.style.userSelect = 'none'
+			el.tabIndex = 0
 			document.body.appendChild(el)
 		}
 
-		const names = state.mods.map(function (mod) { return mod.id }).join(', ')
-		el.textContent = `ModLoader ${state.version} | mods: ${state.mods.length}${state.issues.length ? ' | issues: ' + state.issues.length : ''}${names ? ' | ' + names : ''} | Ctrl+M`
-	}
+		const names = state.mods.map(function (mod) { return mod.manifest?.name || mod.id }).join(', ') || 'No mods'
+		el.title = `Cattail's ModLoader ${state.version} | mod: ${state.mods.length} | Ctrl+M | ${names}`
+		el.innerHTML = ''
 
+		const logo = document.createElement('img')
+		logo.className = 'modloader-status-logo'
+		logo.src = '../appIcon.png'
+		logo.alt = ''
+		el.appendChild(logo)
+
+		appendStatusText(el, 'modloader-status-title', "Cattail's ModLoader")
+		appendStatusText(el, 'modloader-status-version', state.version)
+		appendStatusText(el, 'modloader-status-separator', '|')
+		appendStatusText(el, 'modloader-status-count', `mod: ${state.mods.length}`)
+		appendStatusText(el, 'modloader-status-separator', '|')
+		appendStatusText(el, 'modloader-status-hotkey', 'Ctrl+M')
+		appendStatusText(el, 'modloader-status-separator', '|')
+
+		const mods = document.createElement('span')
+		mods.className = 'modloader-status-mods'
+		appendStatusText(mods, 'modloader-status-mod-names', names)
+		const dots = document.createElement('span')
+		dots.className = 'modloader-status-dots'
+		for (let i = 0; i < 3; i++) {
+			const dot = document.createElement('span')
+			dot.className = 'modloader-status-dot'
+			dots.appendChild(dot)
+		}
+		mods.appendChild(dots)
+		el.appendChild(mods)
+	}
 	const element = function (tag, className, text) {
 		const el = document.createElement(tag)
 		if (className) el.className = className
@@ -193,6 +241,12 @@
 	const clone = function (value) {
 		if (!isObject(value) && !Array.isArray(value)) return value
 		return JSON.parse(JSON.stringify(value))
+	}
+
+	const saveSafeText = function (value) {
+		return String(value).replace(/[^\x20-\x7e]/g, function (char) {
+			return char.split('').map(function (part) { return '\\u' + part.charCodeAt(0).toString(16).padStart(4, '0') }).join('')
+		})
 	}
 
 	const deepMerge = function (target, patch) {
@@ -567,7 +621,7 @@
 			save.modloader = save.modloader || {}
 			save.modloader.version = state.version
 			save.modloader.enabledMods = {}
-			for (const mod of state.mods) save.modloader.enabledMods[mod.id] = mod.manifest.version || true
+			for (const mod of state.mods) save.modloader.enabledMods[saveSafeText(mod.id)] = saveSafeText(mod.manifest.version || true)
 			if (state.orphanEntities.length) save.modloader.orphanEntities = state.orphanEntities.slice()
 			return runHookSync('beforeSaveWrite', save, game)
 		},

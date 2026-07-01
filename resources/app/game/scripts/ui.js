@@ -1054,8 +1054,8 @@ class Cloud {
 
 		const gradeHint = document.createElement(`div`)
 		gradeHint.classList.add(`gradeHint`)
-		// gradeHint.innerHTML = grade === 2 ? `<span><span style="transform:scale(1,.5)">�?/span><span style="transform:scale(1,.75)">�?/span><span style="transform:scale(1,1)">�?/span></span>` : grade === 1 ? `<span><span style="transform:scale(1,.5)">�?/span><span style="transform:scale(1,.75)">�?/span></span><span style="opacity:.2"><span style="transform:scale(1,1)">�?/span></span>` : `<span><span style="transform:scale(1,.5)">�?/span></span><span style="opacity:.2"><span style="transform:scale(1,.75)">�?/span><span style="transform:scale(1,1)">�?/span></span>`
-		gradeHint.innerHTML = grade === 2 ? `<span>★★�?/span>` : grade === 1 ? `<span>★★<span style="opacity:.2">�?/span></span>` : `<span>�?span style="opacity:.2">★★</span></span>`
+		// gradeHint.innerHTML = grade === 2 ? `<span><span style="transform:scale(1,.5)">▎</span><span style="transform:scale(1,.75)">▎</span><span style="transform:scale(1,1)">▎</span></span>` : grade === 1 ? `<span><span style="transform:scale(1,.5)">▎</span><span style="transform:scale(1,.75)">▎</span></span><span style="opacity:.2"><span style="transform:scale(1,1)">▎</span></span>` : `<span><span style="transform:scale(1,.5)">▎</span></span><span style="opacity:.2"><span style="transform:scale(1,.75)">▎</span><span style="transform:scale(1,1)">▎</span></span>`
+		gradeHint.innerHTML = grade === 2 ? `<span>★★★</span>` : grade === 1 ? `<span>★★<span style="opacity:.2">★</span></span>` : `<span>★<span style="opacity:.2">★★</span></span>`
 		const color = this.master.codex.resources[type].triplet[2]
 		gradeHint.style.color = color
 		wrap.append(gradeHint)

@@ -21,6 +21,15 @@ ModLoader.register({
 					return result
 				}
 			})
+			api.patch(Game.prototype, 'saveGame', function (original) {
+				return function (...args) {
+					const before = localStorage.getItem(autoKey(this))
+					const result = original.apply(this, args)
+					if (!this.preventSaving && localStorage.getItem(autoKey(this)) === before) writeAutoSave(this)
+					refreshOpenSlotsPage(this)
+					return result
+				}
+			})
 		})
 
 		function patchSplash(api, methodName) {
@@ -78,6 +87,7 @@ ModLoader.register({
 		}
 
 		function showSlotsPage(splash) {
+			ensureAutoSave(splash.master)
 			let page = splash.element.querySelector('.cattail-save-slots-page')
 			if (!page) {
 				page = document.createElement('div')
@@ -96,6 +106,26 @@ ModLoader.register({
 			splash.element.classList.remove('cattail-save-slots-active')
 			splash.element.querySelector('.cattail-save-slots-page')?.remove()
 			if (activeSplash === splash) activeSplash = null
+		}
+
+		function ensureAutoSave(game) {
+			writeAutoSave(game)
+		}
+
+		function writeAutoSave(game) {
+			if (!game || game.preventSaving || typeof game.assembleSave !== 'function') return null
+			const data = game.assembleSave()
+			localStorage.setItem(autoKey(game), data)
+			game.spaceport?.send('save', data)
+			return data
+		}
+
+		function refreshOpenSlotsPage(game) {
+			if (!activeSplash || activeSplash.master !== game) return
+			if (!activeSplash.element?.classList.contains('cattail-save-slots-active')) return
+			const page = activeSplash.element.querySelector('.cattail-save-slots-page')
+			if (!page || page.querySelector('.cattail-save-slots-name-input') || pendingConfirmation) return
+			renderSlotsPage(activeSplash, page)
 		}
 
 		function handleEscape(event) {
@@ -422,9 +452,7 @@ ModLoader.register({
 				alert(game.pronounce?.('random', 'toolate') || text(game, 'cannotSave'))
 				return
 			}
-			const data = game.assembleSave()
-			localStorage.setItem(autoKey(game), data)
-			game.spaceport?.send('save', data)
+			writeAutoSave(game)
 		}
 
 		function loadSlot(game, data) {
