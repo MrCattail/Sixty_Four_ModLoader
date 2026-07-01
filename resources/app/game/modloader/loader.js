@@ -78,7 +78,7 @@
 			document.body.appendChild(el)
 		}
 
-		const names = state.mods.map(function (mod) { return mod.manifest?.name || mod.id }).join(', ') || 'No mods'
+		const names = state.mods.map(function (mod) { return mod.path || mod.id }).join(', ') || 'No mods'
 		el.title = `Cattail's ModLoader ${state.version} | mod: ${state.mods.length} | Ctrl+M | ${names}`
 		el.innerHTML = ''
 
