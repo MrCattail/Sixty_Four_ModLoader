@@ -251,6 +251,7 @@ ModLoader.register({
 				return function (...args) {
 					const result = original.apply(this, args)
 					attachToggle(this)
+					syncToggleVisibility(this)
 					resetPanel(this)
 					setCompressed(this, readCompressedState(this), { silent: true, skipStorage: true })
 					return result
@@ -261,6 +262,7 @@ ModLoader.register({
 				return function (...args) {
 					const result = original.apply(this, args)
 					attachToggle(this)
+					syncToggleVisibility(this)
 					if (isCompressed(this)) renderCompressedShop(this)
 					return result
 				}
@@ -295,6 +297,7 @@ ModLoader.register({
 			if (!shop?.vessel || !shop.shopToggle) return
 			if (shop[toggleKey]) {
 				updateToggleLabel(shop)
+				syncToggleVisibility(shop)
 				return
 			}
 
@@ -305,6 +308,7 @@ ModLoader.register({
 			document.body.append(toggle)
 			shop[toggleKey] = toggle
 			updateToggleLabel(shop)
+			syncToggleVisibility(shop)
 
 			const activate = function (event) {
 				event?.preventDefault()
@@ -336,6 +340,7 @@ ModLoader.register({
 			shop.vessel.classList.toggle('cattail-shop-compressed', next)
 			shop[toggleKey]?.classList.toggle('cattail-shop-compact-active', next)
 			shop[toggleKey]?.setAttribute('aria-pressed', next ? 'true' : 'false')
+			syncToggleVisibility(shop)
 			if (!options.skipStorage) localStorage.setItem(storageKey, next ? '1' : '0')
 			if (next) renderCompressedShop(shop, true)
 			else if (shop[panelKey]) shop[panelKey].classList.add('cattail-shop-category-panel-hidden')
@@ -564,6 +569,13 @@ ModLoader.register({
 			const label = localizedToggleText(shop)
 			toggle.title = label
 			toggle.setAttribute('aria-label', label)
+		}
+
+		function syncToggleVisibility(shop) {
+			const toggle = shop?.[toggleKey]
+			if (!toggle) return
+			const vanillaHidden = shop.shopToggle && getComputedStyle(shop.shopToggle).display === 'none'
+			toggle.style.display = (shop.master?.pinhole || vanillaHidden) ? 'none' : 'block'
 		}
 
 		function localizedToggleText(shop) {
