@@ -22,12 +22,15 @@ ModLoader.register({
 		const resourceSourceLineResourceKey = '_cattailDynamicResourceSourceLineResource'
 		const resourceSourceGpuLineModeKey = '_cattailDynamicResourceSourceGpuLineMode'
 		const resourceSourceGpuRendererKey = '_cattailDynamicResourceSourceGpuRenderer'
+		const resourceSourceSuppressTransferKey = '_cattailDynamicResourceSourceSuppressTransfer'
+		const resourceSourceActiveCubeKey = '_cattailDynamicResourceSourceActiveCube'
+		const resourceSourceProducerKey = '_cattailDynamicResourceSourceProducer'
 		const cubeResourceSourcePumpKey = '_cattailDynamicCubeSourcePump'
 		const resourceSourceWindowMs = 30000
 		const resourceSourceMinAmount = 0.0001
 		const resourceSourceSummaryCacheMs = 350
 		const resourceSourceMaxLinks = Number.POSITIVE_INFINITY
-		const resourceSourceGpuCurveSegments = 24
+		const resourceSourceGpuCurveSegments = 72
 		const resourceSourceConsumeColor = '#7a2b2b'
 		const resourceSourceImageCache = new Map()
 		const buildCountdownStateKey = '_cattailShopBuildCountdownState'
@@ -404,10 +407,8 @@ ModLoader.register({
 			return !!(
 				game &&
 				event?.button === 1 &&
-				(event.altKey || game.altActive) &&
-				(event.shiftKey || game.shiftPressed) &&
-				isResourceSourceControlContext(game) &&
-				Number.isInteger(getResourceSourceSelectedResourceId(game))
+				isResourceSourceContext(game) &&
+				Number.isInteger(game.hoveredResource)
 			)
 		}
 
@@ -1646,12 +1647,22 @@ ModLoader.register({
 
 			installResourceSourceGpuLineToggle()
 			patchCubeResourceSourceAttribution()
+			patchMinedCubeResourceSourceAttribution()
+			patchGeneralDecayResourceSourceAttribution()
+			patchResourceSourceProducerContexts()
+
+			api.patch(Game.prototype, 'switchPlane', function (original) {
+				return function (...args) {
+					clearResourceSourceGpuLines(this)
+					return original.apply(this, args)
+				}
+			})
 
 			api.patch(Game.prototype, 'createResourceTransfer', function (original) {
 				return function (resources, source, destination, onfinish, visibility, skip) {
 					const result = original.apply(this, arguments)
-					if (!skip && !onfinish && hasAnyTrackedResource(resources)) {
-						recordResourceSourceEvent(this, 'gain', resources, identifyResourceSourceFromScreen(this, source))
+					if (!skip && !onfinish && hasAnyTrackedResource(resources) && !shouldSuppressResourceSourceTransferFromScreen(this, source)) {
+						recordResourceSourceEvent(this, 'gain', resources, identifyResourceSourceForGain(this, resources, source, visibility))
 					}
 					return result
 				}
@@ -1661,7 +1672,7 @@ ModLoader.register({
 				return function (resources, source, destination, onfinish, visibility, color) {
 					const result = original.apply(this, arguments)
 					if (!onfinish && hasAnyTrackedResource(resources)) {
-						recordResourceSourceEvent(this, 'gain', resources, identifyResourceSourceFromScreen(this, source))
+						recordResourceSourceEvent(this, 'gain', resources, identifyResourceSourceForGain(this, resources, source, visibility))
 					}
 					return result
 				}
@@ -1672,7 +1683,9 @@ ModLoader.register({
 					const result = original.apply(this, arguments)
 					if (!onfinish && hasAnyTrackedResource(resources) && Array.isArray(path) && path.length) {
 						const source = Array.isArray(path[0]) ? this.uvToXYUntranslated(path[0]) : null
-						recordResourceSourceEvent(this, 'gain', resources, identifyResourceSourceFromScreen(this, source))
+						if (!shouldSuppressResourceSourceTransferFromScreen(this, source)) {
+							recordResourceSourceEvent(this, 'gain', resources, identifyResourceSourceForGain(this, resources, source, visibility))
+						}
 					}
 					return result
 				}
@@ -1703,6 +1716,10 @@ ModLoader.register({
 			api.patch(Game.prototype, 'renderResources', function (original) {
 				return function (...args) {
 					trimResourceSourceEvents(getResourceSourceState(this), performance.now())
+					if (this.plane) {
+						clearResourceSourceGpuLines(this)
+						return original.apply(this, args)
+					}
 					const previousHoveredResource = this.hoveredResource
 					const virtualHoveredResource = getResourceSourceVirtualHoveredResourceId(this)
 					const useVirtualHover = Number.isInteger(virtualHoveredResource) && !Number.isInteger(previousHoveredResource)
@@ -1787,6 +1804,7 @@ ModLoader.register({
 			const state = getResourceSourceState(game)
 			trimResourceSourceEvents(state, now)
 			const normalizedSource = normalizeResourceSource(game, source)
+			if (type === 'gain' && normalizedSource.kind === 'unknown') return
 
 			for (let i = 0; i < resources.length; i++) {
 				const amount = Math.abs(Number(resources[i]) || 0)
@@ -1816,6 +1834,122 @@ ModLoader.register({
 					return original.call(this, cube, ...args)
 				}
 			})
+		}
+
+		function patchMinedCubeResourceSourceAttribution() {
+			if (typeof Cube === 'undefined' || !Cube.prototype?.onmousedown || Cube.prototype._cattailDynamicResourceSourcePatched) return
+			Cube.prototype._cattailDynamicResourceSourcePatched = true
+			api.patch(Cube.prototype, 'onmousedown', function (original) {
+				return function (...args) {
+					const game = this.master
+					const previous = game?.[resourceSourceActiveCubeKey]
+					if (game && this.state === 2) game[resourceSourceActiveCubeKey] = this
+					try {
+						return original.apply(this, args)
+					} finally {
+						if (game) {
+							if (previous) game[resourceSourceActiveCubeKey] = previous
+							else delete game[resourceSourceActiveCubeKey]
+						}
+					}
+				}
+			})
+		}
+
+		function patchGeneralDecayResourceSourceAttribution() {
+			if (typeof Generaldecay === 'undefined' || !Generaldecay.prototype?.consume || Generaldecay.prototype._cattailDynamicResourceSourcePatched) return
+			Generaldecay.prototype._cattailDynamicResourceSourcePatched = true
+			api.patch(Generaldecay.prototype, 'consume', function (original) {
+				return function (resources, ...args) {
+					if (Array.isArray(resources)) recordResourceSourceEvent(this.master, 'gain', resources, { kind: 'resource', resourceId: 5 })
+					const previousSuppress = this[resourceSourceSuppressTransferKey]
+					this[resourceSourceSuppressTransferKey] = true
+					try {
+						return original.call(this, resources, ...args)
+					} finally {
+						if (previousSuppress) this[resourceSourceSuppressTransferKey] = previousSuppress
+						else delete this[resourceSourceSuppressTransferKey]
+					}
+				}
+			})
+		}
+
+		function patchResourceSourceProducerContexts() {
+			patchEntityResourceSourceProducer(typeof Consumer !== 'undefined' ? Consumer : null, 'release')
+			patchEntityResourceSourceProducer(typeof Converter32 !== 'undefined' ? Converter32 : null, 'harvest')
+			patchEntityResourceSourceProducer(typeof Converter13 !== 'undefined' ? Converter13 : null, 'harvest')
+			patchEntityResourceSourceProducer(typeof Converter41 !== 'undefined' ? Converter41 : null, 'harvest')
+			patchEntityResourceSourceProducer(typeof Converter76 !== 'undefined' ? Converter76 : null, 'harvest')
+			patchEntityResourceSourceProducer(typeof Converter64 !== 'undefined' ? Converter64 : null, 'update')
+			patchEntityResourceSourceProducer(typeof Gradient !== 'undefined' ? Gradient : null, 'tap')
+			patchEntityResourceSourceProducer(typeof Annihilator !== 'undefined' ? Annihilator : null, 'tap')
+			patchEntityResourceSourceProducer(typeof Hollow !== 'undefined' ? Hollow : null, 'onmousedown')
+			patchEntityResourceSourceProducer(typeof Fruit !== 'undefined' ? Fruit : null, 'update')
+			patchEntityResourceSourceProducer(typeof Fruit !== 'undefined' ? Fruit : null, 'onmousedown')
+		}
+
+		function patchEntityResourceSourceProducer(ClassRef, methodName) {
+			const proto = ClassRef?.prototype
+			if (!proto || typeof proto[methodName] !== 'function') return
+			const marker = '_cattailDynamicResourceSourceProducerPatched_' + methodName
+			if (proto[marker]) return
+			proto[marker] = true
+			api.patch(proto, methodName, function (original) {
+				return function (...args) {
+					return withResourceSourceProducer(this?.master, { kind: 'entity', entity: this }, () => original.apply(this, args))
+				}
+			})
+		}
+
+		function withResourceSourceProducer(game, source, callback) {
+			if (!game) return callback()
+			const previous = game[resourceSourceProducerKey]
+			game[resourceSourceProducerKey] = source
+			try {
+				return callback()
+			} finally {
+				if (previous !== undefined) game[resourceSourceProducerKey] = previous
+				else delete game[resourceSourceProducerKey]
+			}
+		}
+
+		function getActiveResourceSourceProducer(game) {
+			const source = game?.[resourceSourceProducerKey]
+			if (!source) return null
+			if (source.kind === 'entity' && source.entity?.name) return source
+			if (source.kind === 'resource' && Number.isInteger(Number(source.resourceId))) return source
+			if (source.name) return source
+			return null
+		}
+		function shouldSuppressResourceSourceTransferFromScreen(game, point) {
+			if (!game || !Array.isArray(point)) return false
+			return !!findEntityNearScreenPoint(game, point)?.[resourceSourceSuppressTransferKey]
+		}
+
+		function identifyResourceSourceForGain(game, resources, source, visibility) {
+			if (isRealitySoulCollection(game, resources, visibility)) return { kind: 'entity', entity: game.voidsculpture }
+			const producer = getActiveResourceSourceProducer(game)
+			if (producer) return producer
+			const minedCube = getActiveMinedCubeResourceSource(game)
+			if (minedCube) return minedCube
+			const resourceId = findResourceHomeAtPoint(game, source)
+			if (resourceId !== null) return { kind: 'resource', resourceId }
+			return { kind: 'unknown' }
+		}
+
+		function getActiveMinedCubeResourceSource(game) {
+			const cube = game?.[resourceSourceActiveCubeKey]
+			return cube?.name === 'cube' ? { kind: 'entity', entity: cube } : null
+		}
+
+		function isRealitySoulCollection(game, resources, visibility) {
+			if (!game?.voidsculpture || !Array.isArray(resources) || !Array.isArray(visibility)) return false
+			if (visibility[0] !== 0 || visibility[1] !== 1) return false
+			if ((Number(resources[9]) || 0) <= 0) return false
+			for (let i = 0; i < resources.length; i++) {
+				if (i !== 9 && Math.abs(Number(resources[i]) || 0) >= resourceSourceMinAmount) return false
+			}
+			return true
 		}
 
 		function normalizeResourceSource(game, source) {
@@ -1934,12 +2068,26 @@ ModLoader.register({
 		}
 
 		function findEntityNearScreenPoint(game, point) {
+			const direct = findEntityAtScreenPoint(game, point)
+			if (direct) return direct
+			return findCubeNearScreenPoint(game, point)
+		}
+
+		function findEntityAtScreenPoint(game, point) {
+			if (!game || !Array.isArray(point) || typeof game.xyToUV !== 'function') return null
+			const ratio = game.pixelRatio || 1
+			const uv = game.xyToUV([point[0] / ratio, point[1] / ratio])
+			const cell = [Math.floor(uv[0]), Math.floor(uv[1])]
+			return game.entityAtCoordinates?.(cell) || null
+		}
+
+		function findCubeNearScreenPoint(game, point) {
 			if (!Array.isArray(game?.stuff)) return null
 			const threshold = Math.max((game.unit || 1) * 1.25, (game.screenUnit || 1) * 0.7)
 			let best = null
 			let bestDistance = threshold * threshold
 			for (const entity of game.stuff) {
-				if (!entity?.position) continue
+				if (entity?.name !== 'cube' || !entity.position) continue
 				const xy = game.uvToXYUntranslated(entity.position)
 				const dx = xy[0] - point[0]
 				const dy = xy[1] - point[1]
