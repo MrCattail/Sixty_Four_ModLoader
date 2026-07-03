@@ -15,6 +15,21 @@ ModLoader.register({
 		const opacityMin = 0.25
 		const opacityMax = 1
 		const opacityStep = 0.1
+		const resourceSourceStateKey = '_cattailDynamicResourceSourceState'
+		const resourceSourceLastResourceKey = '_cattailDynamicResourceSourceLastResource'
+		const resourceSourceToggleKey = '_cattailDynamicResourceSourceToggle'
+		const resourceSourceLineLockKey = '_cattailDynamicResourceSourceLineLock'
+		const resourceSourceLineResourceKey = '_cattailDynamicResourceSourceLineResource'
+		const resourceSourceGpuLineModeKey = '_cattailDynamicResourceSourceGpuLineMode'
+		const resourceSourceGpuRendererKey = '_cattailDynamicResourceSourceGpuRenderer'
+		const cubeResourceSourcePumpKey = '_cattailDynamicCubeSourcePump'
+		const resourceSourceWindowMs = 30000
+		const resourceSourceMinAmount = 0.0001
+		const resourceSourceSummaryCacheMs = 350
+		const resourceSourceMaxLinks = Number.POSITIVE_INFINITY
+		const resourceSourceGpuCurveSegments = 24
+		const resourceSourceConsumeColor = '#7a2b2b'
+		const resourceSourceImageCache = new Map()
 		const buildCountdownStateKey = '_cattailShopBuildCountdownState'
 		const buildCountdownElementKey = '_cattailShopBuildCountdownElement'
 		const buildCountdownNextRefreshKey = '_cattailShopBuildCountdownNextRefresh'
@@ -48,6 +63,7 @@ ModLoader.register({
 			installDetailToggle()
 			installOpacityControls()
 			patchTransientCubeHints()
+			installResourceSourceTracking()
 			installBuildCountdown()
 		})
 
@@ -274,7 +290,13 @@ ModLoader.register({
 				if (!isDetailToggleEvent(event) || event.repeat) return
 				const game = lastGame
 				if (!game) return
-				setDetailToggle(game, !isDetailToggleActive(game))
+				if (isResourceSourceContext(game)) {
+					setResourceSourceToggle(game, !isResourceSourceToggleActive(game))
+				} else if (isBuildingDetailContext(game)) {
+					setDetailToggle(game, !isDetailToggleActive(game))
+				} else {
+					return
+				}
 				event.preventDefault()
 				event.stopImmediatePropagation()
 			}, true)
@@ -292,10 +314,28 @@ ModLoader.register({
 			return !!game?.[detailToggleKey]
 		}
 
+		function isResourceSourceToggleActive(game) {
+			return !!game?.[resourceSourceToggleKey]
+		}
+
+		function isResourceSourceContext(game) {
+			return Number.isInteger(game?.hoveredResource)
+		}
+
+		function isBuildingDetailContext(game) {
+			return !!(game?.hoveredEntity || shouldUseTransientCubeHint(game))
+		}
+
 		function setDetailToggle(game, active) {
 			game[detailToggleKey] = !!active
 			document.body.classList.toggle('cattail-dynamic-details-locked', !!active)
 			if (!active && !game.altActive) game.removeHint?.()
+		}
+
+		function setResourceSourceToggle(game, active) {
+			if (!game) return
+			game[resourceSourceToggleKey] = !!active
+			if (active && Number.isInteger(game.hoveredResource)) game[resourceSourceLastResourceKey] = game.hoveredResource
 		}
 
 		function installOpacityControls() {
@@ -310,13 +350,22 @@ ModLoader.register({
 				if (isOpacityKey(event)) zPressed = true
 			}, true)
 			addEventListener('mousedown', function (event) {
-				if (!isOpacityInfoToggleMouseEvent(event) || !lastGame) return
+				if (isResourceSourceLineLockToggleMouseEvent(event, lastGame)) {
+					toggleResourceSourceLineLock(lastGame)
+					event.preventDefault()
+					event.stopImmediatePropagation()
+					return
+				}
+				if (!isOpacityInfoToggleMouseEvent(event) || !lastGame || !isBuildingDetailContext(lastGame)) return
 				setHintInfoOpaque(!hintInfoOpaque)
 				event.preventDefault()
 				event.stopImmediatePropagation()
 			}, true)
 			addEventListener('auxclick', function (event) {
-				if (!isOpacityInfoToggleMouseEvent(event)) return
+				const game = lastGame
+				const handlesResourceLines = isResourceSourceLineLockToggleMouseEvent(event, game)
+				const handlesOpacityMode = isOpacityInfoToggleMouseEvent(event) && game && isBuildingDetailContext(game)
+				if (!handlesResourceLines && !handlesOpacityMode) return
 				event.preventDefault()
 				event.stopImmediatePropagation()
 			}, true)
@@ -351,8 +400,23 @@ ModLoader.register({
 			return event?.button === 1
 		}
 
+		function isResourceSourceLineLockToggleMouseEvent(event, game) {
+			return !!(
+				game &&
+				event?.button === 1 &&
+				(event.altKey || game.altActive) &&
+				(event.shiftKey || game.shiftPressed) &&
+				isResourceSourceControlContext(game) &&
+				Number.isInteger(getResourceSourceSelectedResourceId(game))
+			)
+		}
+
+		function isResourceSourceControlContext(game) {
+			return !!(isResourceSourceContext(game) || (isResourceSourceToggleActive(game) && !isBuildingDetailContext(game)))
+		}
+
 		function isOpacityWheelActive(game, event) {
-			return !!(isDetailToggleActive(game) || event?.altKey || game?.altActive)
+			return !!(!isResourceSourceControlContext(game) && (isDetailToggleActive(game) || event?.altKey || game?.altActive))
 		}
 
 		function loadHintOpacity() {
@@ -1576,6 +1640,941 @@ ModLoader.register({
 			return Math.round(number * 10000) / 10000
 		}
 
+
+		function installResourceSourceTracking() {
+			if (typeof Game === 'undefined' || !Game.prototype) return
+
+			installResourceSourceGpuLineToggle()
+			patchCubeResourceSourceAttribution()
+
+			api.patch(Game.prototype, 'createResourceTransfer', function (original) {
+				return function (resources, source, destination, onfinish, visibility, skip) {
+					const result = original.apply(this, arguments)
+					if (!skip && !onfinish && hasAnyTrackedResource(resources)) {
+						recordResourceSourceEvent(this, 'gain', resources, identifyResourceSourceFromScreen(this, source))
+					}
+					return result
+				}
+			})
+
+			api.patch(Game.prototype, 'createLightning', function (original) {
+				return function (resources, source, destination, onfinish, visibility, color) {
+					const result = original.apply(this, arguments)
+					if (!onfinish && hasAnyTrackedResource(resources)) {
+						recordResourceSourceEvent(this, 'gain', resources, identifyResourceSourceFromScreen(this, source))
+					}
+					return result
+				}
+			})
+
+			api.patch(Game.prototype, 'createChasmTransfer', function (original) {
+				return function (resources, path, onfinish, visibility, skipIndex) {
+					const result = original.apply(this, arguments)
+					if (!onfinish && hasAnyTrackedResource(resources) && Array.isArray(path) && path.length) {
+						const source = Array.isArray(path[0]) ? this.uvToXYUntranslated(path[0]) : null
+						recordResourceSourceEvent(this, 'gain', resources, identifyResourceSourceFromScreen(this, source))
+					}
+					return result
+				}
+			})
+
+			api.patch(Game.prototype, 'requestResources', function (original) {
+				return function (resources, destination, onfinish, skip) {
+					const before = normalizeResourceArray(this.resources || [], (this.resources || []).length)
+					const result = original.apply(this, arguments)
+					if (result && !skip) {
+						recordResourceSourceEvent(this, 'consume', diffConsumedResources(before, this.resources || []), identifyResourceSourceFromCell(this, destination))
+					}
+					return result
+				}
+			})
+
+			api.patch(Game.prototype, 'askForResources', function (original) {
+				return function (resources, destination, onfinish, skip) {
+					const before = normalizeResourceArray(this.resources || [], (this.resources || []).length)
+					const result = original.apply(this, arguments)
+					if (result && !skip) {
+						recordResourceSourceEvent(this, 'consume', diffConsumedResources(before, this.resources || []), identifyResourceSourceFromCell(this, destination))
+					}
+					return result
+				}
+			})
+
+			api.patch(Game.prototype, 'renderResources', function (original) {
+				return function (...args) {
+					trimResourceSourceEvents(getResourceSourceState(this), performance.now())
+					const previousHoveredResource = this.hoveredResource
+					const virtualHoveredResource = getResourceSourceVirtualHoveredResourceId(this)
+					const useVirtualHover = Number.isInteger(virtualHoveredResource) && !Number.isInteger(previousHoveredResource)
+					if (useVirtualHover) this.hoveredResource = virtualHoveredResource
+					try {
+						renderResourceSourceLinks(this)
+						const result = original.apply(this, args)
+						renderResourceSourcePanels(this)
+						return result
+					} finally {
+						if (useVirtualHover) this.hoveredResource = previousHoveredResource
+					}
+				}
+			})
+		}
+
+		function installResourceSourceGpuLineToggle() {
+			if (window._cattailDynamicResourceSourceGpuLineToggleInstalled) return
+			window._cattailDynamicResourceSourceGpuLineToggleInstalled = true
+			addEventListener('keydown', function (event) {
+				if (!isResourceSourceGpuLineToggleEvent(event) || event.repeat) return
+				const game = lastGame
+				if (!game) return
+				setResourceSourceGpuLineMode(game, !isResourceSourceGpuLineModeActive(game))
+				event.preventDefault()
+				event.stopImmediatePropagation()
+			}, true)
+		}
+
+		function isResourceSourceGpuLineToggleEvent(event) {
+			const key = String(event?.key || '').toLowerCase()
+			return key === 'o' || event?.code === 'KeyO' || event?.keyCode === 79
+		}
+
+		function isResourceSourceGpuLineModeActive(game) {
+			return !!game?.[resourceSourceGpuLineModeKey]
+		}
+
+		function setResourceSourceGpuLineMode(game, active) {
+			if (!game) return
+			game[resourceSourceGpuLineModeKey] = !!active
+			if (!active) clearResourceSourceGpuLines(game)
+		}
+
+		function getResourceSourceVirtualHoveredResourceId(game) {
+			if (!isResourceSourceToggleActive(game)) return null
+			const resourceId = getResourceSourceFocusResourceId(game)
+			return Number.isInteger(resourceId) ? resourceId : null
+		}
+
+		function hasAnyTrackedResource(resources) {
+			return Array.isArray(resources) && resources.some((value) => Math.abs(Number(value) || 0) >= resourceSourceMinAmount)
+		}
+
+		function diffConsumedResources(before, after) {
+			const length = Math.max(before?.length || 0, after?.length || 0)
+			const result = new Array(length).fill(0)
+			for (let i = 0; i < length; i++) {
+				const delta = (Number(before?.[i]) || 0) - (Number(after?.[i]) || 0)
+				if (delta > resourceSourceMinAmount) result[i] = delta
+			}
+			return result
+		}
+
+		function getResourceSourceState(game) {
+			if (!game) return { events: [], startedAt: performance.now() }
+			if (!game[resourceSourceStateKey]) {
+				Object.defineProperty(game, resourceSourceStateKey, {
+					configurable: true,
+					value: { events: [], startedAt: performance.now(), summaryCache: Object.create(null) }
+				})
+			}
+			const state = game[resourceSourceStateKey]
+			if (!Array.isArray(state.events)) state.events = []
+			if (!state.startedAt) state.startedAt = performance.now()
+			if (!state.summaryCache) state.summaryCache = Object.create(null)
+			return state
+		}
+
+		function recordResourceSourceEvent(game, type, resources, source, now = performance.now()) {
+			if (!game || !hasAnyTrackedResource(resources)) return
+			const state = getResourceSourceState(game)
+			trimResourceSourceEvents(state, now)
+			const normalizedSource = normalizeResourceSource(game, source)
+
+			for (let i = 0; i < resources.length; i++) {
+				const amount = Math.abs(Number(resources[i]) || 0)
+				if (amount < resourceSourceMinAmount) continue
+				state.events.push({
+					time: now,
+					type,
+					resourceId: i,
+					amount,
+					source: normalizedSource
+				})
+			}
+		}
+
+		function trimResourceSourceEvents(state, now) {
+			if (!state || !Array.isArray(state.events)) return
+			const cutoff = now - resourceSourceWindowMs
+			while (state.events.length && state.events[0].time < cutoff) state.events.shift()
+		}
+
+		function patchCubeResourceSourceAttribution() {
+			if (typeof Pump === 'undefined' || !Pump.prototype?.pumpTo || Pump.prototype._cattailDynamicCubeSourcePatched) return
+			Pump.prototype._cattailDynamicCubeSourcePatched = true
+			api.patch(Pump.prototype, 'pumpTo', function (original) {
+				return function (cube, ...args) {
+					if (cube?.name === 'cube') cube[cubeResourceSourcePumpKey] = this
+					return original.call(this, cube, ...args)
+				}
+			})
+		}
+
+		function normalizeResourceSource(game, source) {
+			if (source?.kind === 'resource') {
+				const resourceId = Number(source.resourceId)
+				return {
+					kind: 'resource',
+					resourceId,
+					groupKey: 'resource:' + resourceId,
+					instanceKey: 'resource:' + resourceId
+				}
+			}
+
+			const entity = getResourceSourceAttributionEntity(game, source?.entity)
+			if (entity?.name) {
+				const position = Array.isArray(entity.position) ? entity.position.slice() : (Array.isArray(source.position) ? source.position.slice() : null)
+				return {
+					kind: 'entity',
+					name: entity.name,
+					entity,
+					position,
+					groupKey: 'entity:' + entity.name,
+					instanceKey: 'entity:' + entity.name + ':' + (position ? cellKey(position) : String(Math.random()))
+				}
+			}
+
+			if (source?.name) {
+				const position = Array.isArray(source.position) ? source.position.slice() : null
+				return {
+					kind: 'entity',
+					name: source.name,
+					position,
+					groupKey: 'entity:' + source.name,
+					instanceKey: 'entity:' + source.name + ':' + (position ? cellKey(position) : 'unknown')
+				}
+			}
+
+			return {
+				kind: 'unknown',
+				groupKey: 'unknown',
+				instanceKey: 'unknown'
+			}
+		}
+
+		function identifyResourceSourceFromScreen(game, point) {
+			if (!game || !Array.isArray(point)) return null
+			const resourceId = findResourceHomeAtPoint(game, point)
+			if (resourceId !== null) return { kind: 'resource', resourceId }
+			const entity = getResourceSourceAttributionEntity(game, findEntityNearScreenPoint(game, point))
+			return entity ? { kind: 'entity', entity } : { kind: 'unknown' }
+		}
+
+		function identifyResourceSourceFromCell(game, cell) {
+			if (!game || !Array.isArray(cell)) return null
+			const entity = getResourceSourceAttributionEntity(game, game.entityAtCoordinates?.([Math.floor(cell[0]), Math.floor(cell[1])]))
+			if (entity) return { kind: 'entity', entity }
+			return { kind: 'unknown', position: cell.slice() }
+		}
+
+		function getResourceSourceAttributionEntity(game, entity) {
+			if (!entity || entity.name !== 'cube') return entity
+			return getCubeResourceSourcePump(game, entity) || entity
+		}
+
+		function getCubeResourceSourcePump(game, cube) {
+			if (!cube || cube.name !== 'cube') return null
+			if (isResourceSourcePumpEntity(cube[cubeResourceSourcePumpKey])) return cube[cubeResourceSourcePumpKey]
+			if (isResourceSourcePumpEntity(cube.pump)) {
+				cube[cubeResourceSourcePumpKey] = cube.pump
+				return cube.pump
+			}
+			if (!Array.isArray(cube.position) || !Array.isArray(game?.stuff)) return null
+			for (const entity of game.stuff) {
+				if (!isResourceSourcePumpEntity(entity) || !Array.isArray(entity.position)) continue
+				if (!isCellInPumpRange(entity, cube.position)) continue
+				cube[cubeResourceSourcePumpKey] = entity
+				return entity
+			}
+			return null
+		}
+
+		function isResourceSourcePumpEntity(entity) {
+			return entity?.name === 'pump' || entity?.name === 'pump2'
+		}
+
+		function isCellInPumpRange(pump, cell) {
+			const ranges = []
+			if (Array.isArray(pump.soi)) ranges.push(pump.soi)
+			if (Array.isArray(pump.soe)) ranges.push(pump.soe)
+			for (const range of ranges) {
+				for (const offset of range) {
+					if (!Array.isArray(offset)) continue
+					if (pump.position[0] + offset[0] === cell[0] && pump.position[1] + offset[1] === cell[1]) return true
+				}
+			}
+			return false
+		}
+
+		function findResourceHomeAtPoint(game, point) {
+			if (!Array.isArray(game?.resourceHomes)) return null
+			const threshold = Math.max(6 * (game.pixelRatio || 1), (game.screenUnit || game.unit || 1) * 0.26)
+			let best = null
+			let bestDistance = threshold * threshold
+			for (let i = 0; i < game.resourceHomes.length; i++) {
+				const home = game.resourceHomes[i]
+				if (!Array.isArray(home)) continue
+				const dx = home[0] - point[0]
+				const dy = home[1] - point[1]
+				const distance = dx * dx + dy * dy
+				if (distance <= bestDistance) {
+					best = i
+					bestDistance = distance
+				}
+			}
+			return best
+		}
+
+		function findEntityNearScreenPoint(game, point) {
+			if (!Array.isArray(game?.stuff)) return null
+			const threshold = Math.max((game.unit || 1) * 1.25, (game.screenUnit || 1) * 0.7)
+			let best = null
+			let bestDistance = threshold * threshold
+			for (const entity of game.stuff) {
+				if (!entity?.position) continue
+				const xy = game.uvToXYUntranslated(entity.position)
+				const dx = xy[0] - point[0]
+				const dy = xy[1] - point[1]
+				const distance = dx * dx + dy * dy
+				if (distance <= bestDistance) {
+					best = entity
+					bestDistance = distance
+				}
+			}
+			return best
+		}
+
+		function isResourceSourcePanelActive(game) {
+			return !!(game && (game.altActive || isResourceSourceToggleActive(game)))
+		}
+
+		function isResourceSourceLinkActive(game) {
+			if (!game) return false
+			if (isResourceSourceLineLockActive(game)) return Number.isInteger(getResourceSourceLineResourceId(game))
+			return !!(
+				game.shiftPressed &&
+				(game.altActive || isResourceSourceToggleActive(game)) &&
+				Number.isInteger(getResourceSourceFocusResourceId(game))
+			)
+		}
+
+		function getResourceSourceSelectedResourceId(game) {
+			if (!game) return null
+			if (Number.isInteger(game.hoveredResource)) {
+				game[resourceSourceLastResourceKey] = game.hoveredResource
+				return game.hoveredResource
+			}
+			return Number.isInteger(game[resourceSourceLastResourceKey]) ? game[resourceSourceLastResourceKey] : null
+		}
+
+		function getResourceSourceFocusResourceId(game) {
+			if (!game) return null
+			if (Number.isInteger(game.hoveredResource)) {
+				game[resourceSourceLastResourceKey] = game.hoveredResource
+				return game.hoveredResource
+			}
+			if (isResourceSourceToggleActive(game) && Number.isInteger(game[resourceSourceLastResourceKey])) return game[resourceSourceLastResourceKey]
+			return null
+		}
+
+		function isResourceSourceLineLockActive(game) {
+			return !!game?.[resourceSourceLineLockKey]
+		}
+
+		function getResourceSourceLineResourceId(game) {
+			if (!game) return null
+			if (Number.isInteger(game[resourceSourceLineResourceKey])) return game[resourceSourceLineResourceKey]
+			return getResourceSourceSelectedResourceId(game)
+		}
+
+		function toggleResourceSourceLineLock(game) {
+			if (!game) return
+			const selected = getResourceSourceSelectedResourceId(game)
+			if (!Number.isInteger(selected)) return
+			const sameResourceLocked = isResourceSourceLineLockActive(game) && game[resourceSourceLineResourceKey] === selected
+			game[resourceSourceLineLockKey] = !sameResourceLocked
+			game[resourceSourceLineResourceKey] = selected
+		}
+
+		function renderResourceSourceLinks(game) {
+			if (!isResourceSourceLinkActive(game)) {
+				clearResourceSourceGpuLines(game)
+				return
+			}
+			const resourceId = isResourceSourceLineLockActive(game) ? getResourceSourceLineResourceId(game) : getResourceSourceFocusResourceId(game)
+			if (!Number.isInteger(resourceId)) {
+				clearResourceSourceGpuLines(game)
+				return
+			}
+
+			const segments = collectResourceSourceLinkSegmentsForResource(game, resourceId)
+			if (isResourceSourceGpuLineModeActive(game)) {
+				renderResourceSourceGpuLines(game, segments)
+				return
+			}
+
+			clearResourceSourceGpuLines(game)
+			drawResourceSourceLinkSegments(game, segments)
+		}
+
+		function collectResourceSourceLinkSegmentsForResource(game, resourceId) {
+			const summary = getResourceSourceSummary(game, resourceId)
+			const target = game.resourceHomes?.[resourceId]
+			if ((!summary.gain.length && !summary.consume.length) || !Array.isArray(target)) return []
+
+			const segments = []
+			const budget = { remaining: resourceSourceMaxLinks }
+			const gainColor = game.codex?.resources?.[resourceId]?.triplet?.[2] || game.codex?.resources?.[resourceId]?.triplet?.[0] || '#778'
+			collectResourceSourceGroupLinkSegments(game, summary.gain, target, gainColor, budget, segments)
+			collectResourceSourceGroupLinkSegments(game, summary.consume, target, resourceSourceConsumeColor, budget, segments)
+			return segments
+		}
+
+		function collectResourceSourceGroupLinkSegments(game, groups, target, color, budget, segments) {
+			for (const group of groups) {
+				if (budget.remaining <= 0) return
+				for (const source of group.sources) {
+					if (budget.remaining <= 0) return
+					const sourcePoint = getResourceSourceScreenPoint(game, source)
+					if (!sourcePoint) continue
+					segments.push({ source: sourcePoint, target, color })
+					budget.remaining--
+				}
+			}
+		}
+
+		function drawResourceSourceLinkSegments(game, segments) {
+			for (const segment of segments) drawResourceSourceLink(game, segment.source, segment.target, segment.color)
+		}
+
+		function drawResourceSourceLink(game, source, target, color) {
+			const ctx = game.ctx
+			const bend = Math.max(game.unit || 1, Math.abs(target[1] - source[1]) * 0.28)
+			ctx.save()
+			ctx.globalAlpha = 0.72
+			ctx.strokeStyle = color
+			ctx.lineWidth = Math.max(1, (game.unit || 1) * 0.025)
+			ctx.lineCap = 'round'
+			ctx.beginPath()
+			ctx.moveTo(source[0], source[1])
+			ctx.bezierCurveTo(source[0], source[1] - bend, target[0], target[1] + bend, target[0], target[1])
+			ctx.stroke()
+			ctx.fillStyle = color
+			ctx.beginPath()
+			ctx.arc(source[0], source[1], Math.max(2, (game.unit || 1) * 0.045), 0, Math.PI * 2)
+			ctx.fill()
+			ctx.restore()
+		}
+
+		function renderResourceSourceGpuLines(game, segments) {
+			const renderer = getResourceSourceGpuRenderer(game)
+			if (!renderer) {
+				drawResourceSourceLinkSegments(game, segments)
+				return
+			}
+			syncResourceSourceGpuCanvas(renderer, game)
+			const gl = renderer.gl
+			gl.viewport(0, 0, renderer.canvas.width, renderer.canvas.height)
+			gl.clearColor(0, 0, 0, 0)
+			gl.clear(gl.COLOR_BUFFER_BIT)
+			if (!segments.length) return
+
+			const lineData = buildResourceSourceGpuLineData(game, segments)
+			gl.bindBuffer(gl.ARRAY_BUFFER, renderer.lineBuffer)
+			gl.bufferData(gl.ARRAY_BUFFER, lineData, gl.DYNAMIC_DRAW)
+
+			gl.enable(gl.BLEND)
+			gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA)
+			gl.useProgram(renderer.lineProgram)
+			gl.uniform2f(renderer.lineUniforms.resolution, renderer.canvas.width, renderer.canvas.height)
+			gl.uniform1f(renderer.lineUniforms.unit, game.unit || 1)
+			bindResourceSourceGpuLineAttributes(gl, renderer.lineProgram, renderer.lineBuffer)
+			gl.drawArraysInstanced(gl.TRIANGLES, 0, resourceSourceGpuCurveSegments * 6, segments.length)
+
+			gl.useProgram(renderer.pointProgram)
+			gl.uniform2f(renderer.pointUniforms.resolution, renderer.canvas.width, renderer.canvas.height)
+			gl.uniform1f(renderer.pointUniforms.size, Math.max(4, (game.unit || 1) * 0.09))
+			bindResourceSourceGpuPointAttributes(gl, renderer.pointProgram, renderer.lineBuffer)
+			gl.drawArraysInstanced(gl.POINTS, 0, 1, segments.length)
+		}
+
+		function buildResourceSourceGpuLineData(game, segments) {
+			const lineWidth = Math.max(1, (game.unit || 1) * 0.025)
+			const data = new Float32Array(segments.length * 9)
+			for (let i = 0; i < segments.length; i++) {
+				const segment = segments[i]
+				const color = parseResourceSourceColor(segment.color, 0.72)
+				const offset = i * 9
+				data[offset] = segment.source[0]
+				data[offset + 1] = segment.source[1]
+				data[offset + 2] = segment.target[0]
+				data[offset + 3] = segment.target[1]
+				data[offset + 4] = color[0]
+				data[offset + 5] = color[1]
+				data[offset + 6] = color[2]
+				data[offset + 7] = color[3]
+				data[offset + 8] = lineWidth
+			}
+			return data
+		}
+
+		function getResourceSourceGpuRenderer(game) {
+			if (!game) return null
+			if (game[resourceSourceGpuRendererKey]?.gl) return game[resourceSourceGpuRendererKey]
+			const canvas = document.createElement('canvas')
+			canvas.className = 'cattail-resource-source-gpu-lines'
+			canvas.style.position = 'fixed'
+			canvas.style.pointerEvents = 'none'
+			canvas.style.zIndex = '1'
+			canvas.style.display = 'none'
+			const gl = canvas.getContext('webgl2', { alpha: true, premultipliedAlpha: false, antialias: true })
+			if (!gl) return null
+			try {
+				const renderer = {
+					canvas,
+					gl,
+					lineBuffer: gl.createBuffer(),
+					lineProgram: createResourceSourceGpuProgram(gl, getResourceSourceGpuLineVertexShader(), getResourceSourceGpuLineFragmentShader()),
+					pointProgram: createResourceSourceGpuProgram(gl, getResourceSourceGpuPointVertexShader(), getResourceSourceGpuPointFragmentShader()),
+					lineUniforms: {},
+					pointUniforms: {}
+				}
+				renderer.lineUniforms.resolution = gl.getUniformLocation(renderer.lineProgram, 'u_resolution')
+				renderer.lineUniforms.unit = gl.getUniformLocation(renderer.lineProgram, 'u_unit')
+				renderer.pointUniforms.resolution = gl.getUniformLocation(renderer.pointProgram, 'u_resolution')
+				renderer.pointUniforms.size = gl.getUniformLocation(renderer.pointProgram, 'u_size')
+				game.canvas?.insertAdjacentElement?.('afterend', canvas)
+				game[resourceSourceGpuRendererKey] = renderer
+				return renderer
+			} catch (error) {
+				canvas.remove()
+				game[resourceSourceGpuLineModeKey] = false
+				return null
+			}
+		}
+
+		function syncResourceSourceGpuCanvas(renderer, game) {
+			const rect = game.canvas.getBoundingClientRect()
+			if (renderer.canvas.width !== game.w) renderer.canvas.width = game.w
+			if (renderer.canvas.height !== game.h) renderer.canvas.height = game.h
+			renderer.canvas.style.display = 'block'
+			renderer.canvas.style.left = rect.left + 'px'
+			renderer.canvas.style.top = rect.top + 'px'
+			renderer.canvas.style.width = rect.width + 'px'
+			renderer.canvas.style.height = rect.height + 'px'
+		}
+
+		function clearResourceSourceGpuLines(game) {
+			const renderer = game?.[resourceSourceGpuRendererKey]
+			if (!renderer?.gl) return
+			renderer.gl.viewport(0, 0, renderer.canvas.width, renderer.canvas.height)
+			renderer.gl.clearColor(0, 0, 0, 0)
+			renderer.gl.clear(renderer.gl.COLOR_BUFFER_BIT)
+			renderer.canvas.style.display = 'none'
+		}
+
+		function bindResourceSourceGpuLineAttributes(gl, program, buffer) {
+			const stride = 9 * 4
+			gl.bindBuffer(gl.ARRAY_BUFFER, buffer)
+			bindResourceSourceGpuAttribute(gl, program, 'a_source', 2, stride, 0)
+			bindResourceSourceGpuAttribute(gl, program, 'a_target', 2, stride, 2 * 4)
+			bindResourceSourceGpuAttribute(gl, program, 'a_color', 4, stride, 4 * 4)
+			bindResourceSourceGpuAttribute(gl, program, 'a_width', 1, stride, 8 * 4)
+		}
+
+		function bindResourceSourceGpuPointAttributes(gl, program, buffer) {
+			const stride = 9 * 4
+			gl.bindBuffer(gl.ARRAY_BUFFER, buffer)
+			bindResourceSourceGpuAttribute(gl, program, 'a_source', 2, stride, 0)
+			bindResourceSourceGpuAttribute(gl, program, 'a_color', 4, stride, 4 * 4)
+		}
+
+		function bindResourceSourceGpuAttribute(gl, program, name, size, stride, offset) {
+			const location = gl.getAttribLocation(program, name)
+			if (location < 0) return
+			gl.enableVertexAttribArray(location)
+			gl.vertexAttribPointer(location, size, gl.FLOAT, false, stride, offset)
+			gl.vertexAttribDivisor(location, 1)
+		}
+
+		function createResourceSourceGpuProgram(gl, vertexSource, fragmentSource) {
+			const vertex = createResourceSourceGpuShader(gl, gl.VERTEX_SHADER, vertexSource)
+			const fragment = createResourceSourceGpuShader(gl, gl.FRAGMENT_SHADER, fragmentSource)
+			const program = gl.createProgram()
+			gl.attachShader(program, vertex)
+			gl.attachShader(program, fragment)
+			gl.linkProgram(program)
+			if (!gl.getProgramParameter(program, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(program) || 'Resource source WebGL link failed')
+			return program
+		}
+
+		function createResourceSourceGpuShader(gl, type, source) {
+			const shader = gl.createShader(type)
+			gl.shaderSource(shader, source)
+			gl.compileShader(shader)
+			if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(shader) || 'Resource source WebGL compile failed')
+			return shader
+		}
+
+		function getResourceSourceGpuLineVertexShader() {
+			return `#version 300 es
+			in vec2 a_source;
+			in vec2 a_target;
+			in vec4 a_color;
+			in float a_width;
+			uniform vec2 u_resolution;
+			uniform float u_unit;
+			out vec4 v_color;
+			const int SEGMENTS = ${resourceSourceGpuCurveSegments};
+			vec2 cubicPoint(float t) {
+				float bend = max(u_unit, abs(a_target.y - a_source.y) * 0.28);
+				vec2 p0 = a_source;
+				vec2 p1 = a_source + vec2(0.0, -bend);
+				vec2 p2 = a_target + vec2(0.0, bend);
+				vec2 p3 = a_target;
+				float nt = 1.0 - t;
+				return nt * nt * nt * p0 + 3.0 * nt * nt * t * p1 + 3.0 * nt * t * t * p2 + t * t * t * p3;
+			}
+			vec2 cubicDerivative(float t) {
+				float bend = max(u_unit, abs(a_target.y - a_source.y) * 0.28);
+				vec2 p0 = a_source;
+				vec2 p1 = a_source + vec2(0.0, -bend);
+				vec2 p2 = a_target + vec2(0.0, bend);
+				vec2 p3 = a_target;
+				float nt = 1.0 - t;
+				return 3.0 * nt * nt * (p1 - p0) + 6.0 * nt * t * (p2 - p1) + 3.0 * t * t * (p3 - p2);
+			}
+			void main() {
+				int localVertex = gl_VertexID % 6;
+				int segmentId = gl_VertexID / 6;
+				float t0 = float(segmentId) / float(SEGMENTS);
+				float t1 = float(segmentId + 1) / float(SEGMENTS);
+				float t = (localVertex == 0 || localVertex == 1 || localVertex == 4) ? t0 : t1;
+				float side = (localVertex == 0 || localVertex == 2 || localVertex == 3) ? -1.0 : 1.0;
+				vec2 tangent = normalize(cubicDerivative(t));
+				vec2 normal = vec2(-tangent.y, tangent.x);
+				vec2 point = cubicPoint(t) + normal * side * a_width * 0.5;
+				vec2 clip = point / u_resolution * 2.0 - 1.0;
+				gl_Position = vec4(clip.x, -clip.y, 0.0, 1.0);
+				v_color = a_color;
+			}`
+		}
+
+		function getResourceSourceGpuLineFragmentShader() {
+			return `#version 300 es
+			precision mediump float;
+			in vec4 v_color;
+			out vec4 outColor;
+			void main() {
+				outColor = v_color;
+			}`
+		}
+
+		function getResourceSourceGpuPointVertexShader() {
+			return `#version 300 es
+			in vec2 a_source;
+			in vec4 a_color;
+			uniform vec2 u_resolution;
+			uniform float u_size;
+			out vec4 v_color;
+			void main() {
+				vec2 clip = a_source / u_resolution * 2.0 - 1.0;
+				gl_Position = vec4(clip.x, -clip.y, 0.0, 1.0);
+				gl_PointSize = u_size;
+				v_color = a_color;
+			}`
+		}
+
+		function getResourceSourceGpuPointFragmentShader() {
+			return `#version 300 es
+			precision mediump float;
+			in vec4 v_color;
+			out vec4 outColor;
+			void main() {
+				vec2 delta = gl_PointCoord - vec2(0.5);
+				float distance = length(delta);
+				if (distance > 0.5) discard;
+				outColor = v_color;
+			}`
+		}
+
+		function parseResourceSourceColor(color, alpha = 1) {
+			const textValue = String(color || '').trim()
+			const hex = textValue[0] === '#' ? textValue.slice(1) : textValue
+			if (hex.length === 3 || hex.length === 4) {
+				const r = parseInt(hex[0] + hex[0], 16)
+				const g = parseInt(hex[1] + hex[1], 16)
+				const b = parseInt(hex[2] + hex[2], 16)
+				const a = hex.length === 4 ? parseInt(hex[3] + hex[3], 16) / 255 : alpha
+				return [r / 255, g / 255, b / 255, a]
+			}
+			if (hex.length === 6 || hex.length === 8) {
+				const r = parseInt(hex.slice(0, 2), 16)
+				const g = parseInt(hex.slice(2, 4), 16)
+				const b = parseInt(hex.slice(4, 6), 16)
+				const a = hex.length === 8 ? parseInt(hex.slice(6, 8), 16) / 255 : alpha
+				return [r / 255, g / 255, b / 255, a]
+			}
+			return [0.47, 0.47, 0.53, alpha]
+		}
+		function renderResourceSourcePanels(game) {
+			if (!isResourceSourcePanelActive(game)) return
+			const resourceId = getResourceSourceFocusResourceId(game)
+			if (!Number.isInteger(resourceId)) return
+			renderResourceSourcePanel(game, resourceId)
+		}
+
+		function renderResourceSourcePanel(game, resourceId) {
+			const summary = getResourceSourceSummary(game, resourceId)
+			const gainRows = summary.gain.map((group) => ({ type: 'gain', group }))
+			const consumeRows = summary.consume.map((group) => ({ type: 'consume', group }))
+			if (!gainRows.length && !consumeRows.length) return
+
+			const ctx = game.ctx
+			const pixelRatio = game.pixelRatio || 1
+			const unit = game.screenUnit || game.unit || 1
+			const fontSize = Math.max(10 * pixelRatio, unit * 0.15)
+			const countFontSize = Math.max(9 * pixelRatio, fontSize * 0.86)
+			const rowHeight = Math.max(16 * pixelRatio, unit * 0.28)
+			const iconSize = Math.max(12 * pixelRatio, unit * 0.2)
+			const padX = Math.max(5 * pixelRatio, unit * 0.08)
+			const padY = Math.max(4 * pixelRatio, unit * 0.06)
+			const gap = Math.max(4 * pixelRatio, unit * 0.055)
+			const columnGap = Math.max(12 * pixelRatio, unit * 0.18)
+
+			ctx.save()
+			const gainWidth = measureResourceSourceRows(ctx, game, gainRows, iconSize, gap, fontSize, countFontSize)
+			const consumeWidth = measureResourceSourceRows(ctx, game, consumeRows, iconSize, gap, fontSize, countFontSize)
+			const hasBothColumns = gainRows.length && consumeRows.length
+			const contentWidth = hasBothColumns ? gainWidth + columnGap + consumeWidth : Math.max(gainWidth, consumeWidth)
+			const rowCount = Math.max(gainRows.length, consumeRows.length)
+			const width = contentWidth + padX * 2
+			const height = padY * 2 + rowCount * rowHeight
+			const home = game.resourceHomes?.[resourceId]
+			if (!Array.isArray(home)) {
+				ctx.restore()
+				return
+			}
+
+			const x = clampNumber(home[0] - width / 2, 4 * pixelRatio, game.w - width - 4 * pixelRatio)
+			const y = getResourceSourcePanelY(game, resourceId, height)
+			drawResourceSourcePanelBack(ctx, x, y, width, height, pixelRatio)
+
+			if (hasBothColumns) {
+				const gainX = x + padX
+				const consumeX = gainX + gainWidth + columnGap
+				drawResourceSourceRows(game, gainRows, resourceId, gainX, y + padY, rowHeight, iconSize, gap, fontSize, countFontSize)
+				drawResourceSourceRows(game, consumeRows, resourceId, consumeX, y + padY, rowHeight, iconSize, gap, fontSize, countFontSize)
+				drawResourceSourceColumnDivider(ctx, gainX + gainWidth + columnGap / 2, y + padY, height - padY * 2, pixelRatio)
+			} else {
+				const rows = gainRows.length ? gainRows : consumeRows
+				const columnWidth = gainRows.length ? gainWidth : consumeWidth
+				const columnX = x + padX + Math.max(0, contentWidth - columnWidth) / 2
+				drawResourceSourceRows(game, rows, resourceId, columnX, y + padY, rowHeight, iconSize, gap, fontSize, countFontSize)
+			}
+			ctx.restore()
+		}
+
+		function measureResourceSourceRows(ctx, game, rows, iconSize, gap, fontSize, countFontSize) {
+			let width = 0
+			for (const row of rows) {
+				ctx.font = '500 ' + countFontSize + 'px Montserrat, Arial, sans-serif'
+				const countWidth = ctx.measureText(String(row.group.count)).width
+				ctx.font = '500 ' + fontSize + 'px Montserrat, Arial, sans-serif'
+				const rateWidth = ctx.measureText(formatResourceSourceRate(game, row)).width
+				width = Math.max(width, iconSize + gap + countWidth + gap + rateWidth)
+			}
+			return width
+		}
+
+		function drawResourceSourceRows(game, rows, resourceId, x, y, rowHeight, iconSize, gap, fontSize, countFontSize) {
+			for (let i = 0; i < rows.length; i++) {
+				drawResourceSourceRow(game, rows[i], resourceId, x, y + i * rowHeight + rowHeight / 2, iconSize, gap, fontSize, countFontSize)
+			}
+		}
+
+		function drawResourceSourceRow(game, row, resourceId, x, centerY, iconSize, gap, fontSize, countFontSize) {
+			const ctx = game.ctx
+			drawResourceSourceIcon(game, row.group.source, x + iconSize / 2, centerY, iconSize)
+			ctx.textBaseline = 'middle'
+			ctx.textAlign = 'left'
+			ctx.font = '500 ' + countFontSize + 'px Montserrat, Arial, sans-serif'
+			ctx.fillStyle = '#99a'
+			const countX = x + iconSize + gap
+			ctx.fillText(String(row.group.count), countX, centerY)
+			const countWidth = ctx.measureText(String(row.group.count)).width
+			ctx.font = '500 ' + fontSize + 'px Montserrat, Arial, sans-serif'
+			ctx.fillStyle = row.type === 'consume' ? resourceSourceConsumeColor : (game.codex?.resources?.[resourceId]?.triplet?.[2] || '#4f8f5f')
+			ctx.fillText(formatResourceSourceRate(game, row), countX + countWidth + gap, centerY)
+		}
+
+		function drawResourceSourceColumnDivider(ctx, x, y, height, pixelRatio) {
+			ctx.strokeStyle = '#dde'
+			ctx.lineWidth = Math.max(1, pixelRatio)
+			ctx.beginPath()
+			ctx.moveTo(x, y)
+			ctx.lineTo(x, y + height)
+			ctx.stroke()
+		}
+		function drawResourceSourcePanelBack(ctx, x, y, width, height, pixelRatio) {
+			ctx.fillStyle = '#fffffff4'
+			if (ctx.roundRect) {
+				ctx.beginPath()
+				ctx.roundRect(x, y, width, height, Math.max(2, pixelRatio * 3))
+				ctx.closePath()
+				ctx.fill()
+			} else {
+				ctx.fillRect(x, y, width, height)
+			}
+		}
+
+		function getResourceSourcePanelY(game, resourceId, height) {
+			const unit = game.screenUnit || game.unit || 1
+			const home = game.resourceHomes?.[resourceId] || [0, unit]
+			let y = home[1] + unit * ((game.entitiesInGame?.mega1 || game.entitiesInGame?.mega1a || game.entitiesInGame?.mega1b) ? 1.02 : 0.68)
+			if (game.entitiesInGame?.mega1b && game.analytics?.graphs?.[resourceId]?.canvas) {
+				y = Math.max(y, (game.resourceHomes?.[0]?.[1] || home[1]) * 2 + game.analytics.graphs[resourceId].canvas.height + unit * 0.18)
+			}
+			return clampNumber(y, 2, Math.max(2, game.h - height - 2))
+		}
+
+		function getResourceSourceSummary(game, resourceId) {
+			const now = performance.now()
+			const state = getResourceSourceState(game)
+			trimResourceSourceEvents(state, now)
+			const cacheKey = String(resourceId)
+			const cached = state.summaryCache?.[cacheKey]
+			if (cached && now - cached.time < resourceSourceSummaryCacheMs) return cached.summary
+
+			const seconds = Math.max(1, Math.min(resourceSourceWindowMs, now - state.startedAt) / 1000)
+			const summary = {
+				gain: aggregateResourceSourceEvents(state.events, resourceId, 'gain', seconds),
+				consume: aggregateResourceSourceEvents(state.events, resourceId, 'consume', seconds)
+			}
+			state.summaryCache[cacheKey] = { time: now, summary }
+			return summary
+		}
+
+		function aggregateResourceSourceEvents(events, resourceId, type, seconds) {
+			const groups = new Map()
+			for (const event of events) {
+				if (!event || event.resourceId !== resourceId || event.type !== type) continue
+				const source = event.source || { kind: 'unknown', groupKey: 'unknown', instanceKey: 'unknown' }
+				const key = source.groupKey || source.kind || 'unknown'
+				let group = groups.get(key)
+				if (!group) {
+					group = { key, source, sources: new Map(), amount: 0, count: 0, rate: 0 }
+					groups.set(key, group)
+				}
+				group.amount += Number(event.amount) || 0
+				group.sources.set(source.instanceKey || key, source)
+			}
+
+			return Array.from(groups.values()).map((group) => {
+				group.sources = Array.from(group.sources.values())
+				group.count = group.source.kind === 'resource' ? 1 : Math.max(1, group.sources.length)
+				group.rate = group.amount / seconds
+				return group
+			}).filter((group) => group.rate >= resourceSourceMinAmount).sort((a, b) => b.rate - a.rate)
+		}
+
+		function formatResourceSourceRate(game, row) {
+			const sign = row.type === 'consume' ? '-' : '+'
+			return sign + formatNumber(game, row.group.rate) + '/s'
+		}
+
+		function drawResourceSourceIcon(game, source, x, y, size) {
+			if (source?.kind === 'resource') {
+				drawResourceSourceResourceIcon(game, source.resourceId, x, y, size)
+				return
+			}
+
+			if (source?.kind === 'entity' && source.name) {
+				if (drawResourceSourceShopIcon(game, source.name, x, y, size)) return
+				if (source.entity?.sprite) {
+					game.ctx.save()
+					clipIconRect(game.ctx, x, y, size)
+					source.entity.sprite.renderXY([x, y + size * 0.22], 0, false, Math.max(0.12, size / Math.max(1, (game.unit || 1) * 1.65)))
+					game.ctx.restore()
+					return
+				}
+			}
+
+			drawResourceSourcePlaceholder(game, x, y, size)
+		}
+
+		function drawResourceSourceResourceIcon(game, resourceId, x, y, size) {
+			const sprite = game.resourcesSprites?.[resourceId]
+			if (!sprite) {
+				drawResourceSourcePlaceholder(game, x, y, size)
+				return
+			}
+			game.ctx.save()
+			clipIconRect(game.ctx, x, y, size)
+			sprite.renderXY([x, y], 0, false, Math.max(0.1, size / Math.max(1, (game.unit || 1) * 1.65)))
+			game.ctx.restore()
+		}
+
+		function drawResourceSourceShopIcon(game, name, x, y, size) {
+			const img = getResourceSourceShopImage(game, name)
+			if (!img || !img.complete || !img.naturalWidth) return false
+			const ctx = game.ctx
+			ctx.save()
+			clipIconRect(ctx, x, y, size)
+			ctx.drawImage(img, x - size / 2, y - size / 2, size, size)
+			ctx.restore()
+			return true
+		}
+
+		function getResourceSourceShopImage(game, name) {
+			const entityData = game?.codex?.entities?.[name]
+			const src = entityData?.shopImage || ('img/shop/' + name + '.jpg')
+			const resolved = window.ModLoader?.resolveAsset(src) || src
+			let img = resourceSourceImageCache.get(resolved)
+			if (!img) {
+				img = new Image()
+				img.src = resolved
+				resourceSourceImageCache.set(resolved, img)
+			}
+			return img
+		}
+
+		function drawResourceSourcePlaceholder(game, x, y, size) {
+			const ctx = game.ctx
+			ctx.save()
+			ctx.fillStyle = '#ccd'
+			ctx.beginPath()
+			ctx.arc(x, y, size * 0.32, 0, Math.PI * 2)
+			ctx.fill()
+			ctx.restore()
+		}
+
+		function clipIconRect(ctx, x, y, size) {
+			ctx.beginPath()
+			if (ctx.roundRect) ctx.roundRect(x - size / 2, y - size / 2, size, size, Math.max(2, size * 0.18))
+			else ctx.rect(x - size / 2, y - size / 2, size, size)
+			ctx.clip()
+		}
+
+		function getResourceSourceScreenPoint(game, source) {
+			if (source?.kind === 'resource' && Array.isArray(game.resourceHomes?.[source.resourceId])) return game.resourceHomes[source.resourceId]
+			if (source?.entity?.position) return game.uvToXYUntranslated(source.entity.position)
+			if (Array.isArray(source?.position)) return game.uvToXYUntranslated(source.position)
+			return null
+		}
+
+
+		function clampNumber(value, min, max) {
+			return Math.max(min, Math.min(max, value))
+		}
 		function installBuildCountdown() {
 			if (typeof Shop === 'undefined') return
 
@@ -1601,6 +2600,7 @@ ModLoader.register({
 
 			api.patch(Shop.prototype, 'check', function (original) {
 			  return function () {
+			    prepareCompressedCountdownSignature(this)
 			    const result = original.apply(this, arguments)
 			    sampleResourceSnapshot(this.master)
 			    updateShopCountdowns(this, false)
@@ -1643,8 +2643,8 @@ ModLoader.register({
 		      margin-top: calc(var(--unit) * 0.32);
 		      text-align: center;
 		      color: rgba(120, 120, 130, 0.95);
-		      font-size: calc(var(--unit) * 0.68);
-		      font-weight: 600;
+		      font-size: calc(var(--unit) * 0.6);
+		      font-weight: 500;
 		      line-height: 1.25;
 		      white-space: nowrap;
 		    }
@@ -1665,7 +2665,7 @@ ModLoader.register({
 		    }
 		    .shop.mobile .shopItem .itemPrice .${buildCountdownClass} {
 		      margin-top: calc(var(--munit) * 0.24);
-		      font-size: calc(var(--munit) * 1.05);
+		      font-size: calc(var(--munit) * 0.95);
 		    }
 		    .cattail-shop-category-item-meta .itemPrice.${buildCountdownActivePriceClass} {
 		      width: 100%;
@@ -1674,6 +2674,8 @@ ModLoader.register({
 		      width: 100%;
 		      margin-top: calc(var(--unit) * 0.18);
 		      text-align: center;
+		      font-size: calc(var(--unit) * 0.6);
+		      font-weight: 500;
 		    }
 		    .shop.minimized .cattail-shop-category-item-meta .${buildCountdownClass} {
 		      display: none;
@@ -1697,6 +2699,7 @@ ModLoader.register({
 		  const now = performance.now()
 		  const affordable = isAffordable(shop.master, item)
 		  if (!force && item[buildCountdownNextRefreshKey] && now < item[buildCountdownNextRefreshKey] && item[buildCountdownLastAffordableKey] === affordable) {
+		    syncCountdownText(shop, item, element, item[buildCountdownLastTextKey] || '')
 		    return
 		  }
 		  item[buildCountdownNextRefreshKey] = now + buildCountdownRefreshMs
@@ -1704,17 +2707,17 @@ ModLoader.register({
 
 		  const seconds = affordable ? 0 : getCountdownSeconds(shop.master, item)
 		  if (affordable) {
-		    setCountdownText(item, element, '')
+		    setCountdownText(shop, item, element, '')
 		    return
 		  }
 
 		  const label = translate(shop.master, 'buildableIn')
 		  if (seconds === null || !Number.isFinite(seconds) || seconds <= 0) {
-		    setCountdownText(item, element, label + ': --')
+		    setCountdownText(shop, item, element, label + ': --')
 		    return
 		  }
 
-		  setCountdownText(item, element, label + ': ' + formatBuildCountdownDuration(seconds))
+		  setCountdownText(shop, item, element, label + ': ' + formatBuildCountdownDuration(seconds))
 		}
 
 		function ensureCountdownElement(item) {
@@ -1732,16 +2735,78 @@ ModLoader.register({
 		  return element
 		}
 
-		function setCountdownText(item, element, text) {
+		function setCountdownText(shop, item, element, text) {
 		  const nextText = text || ''
-		  if (item[buildCountdownLastTextKey] !== nextText) {
-		    element.textContent = nextText
-		    item[buildCountdownLastTextKey] = nextText
+		  item[buildCountdownLastTextKey] = nextText
+		  syncCountdownText(shop, item, element, nextText)
+		}
+
+		function syncCountdownText(shop, item, element, text) {
+		  const nextText = text || ''
+		  if (isShopCategoriesCompressed(shop)) {
+		    clearOriginalCountdownElement(item, element)
+		    syncCategoryCountdownText(shop, item, nextText)
+		    return
 		  }
+
+		  if (element.textContent !== nextText) element.textContent = nextText
 		  element.classList.toggle('active', Boolean(nextText))
 		  if (item.priceHtml) {
 		    item.priceHtml.classList.toggle(buildCountdownActivePriceClass, Boolean(nextText))
 		  }
+		}
+
+		function prepareCompressedCountdownSignature(shop) {
+		  if (!isShopCategoriesCompressed(shop) || !Array.isArray(shop.items)) return
+		  for (const item of shop.items) {
+		    const element = item?.priceHtml?.querySelector?.('.' + buildCountdownClass)
+		    clearOriginalCountdownElement(item, element)
+		  }
+		}
+
+		function clearOriginalCountdownElement(item, element) {
+		  if (element) {
+		    if (element.textContent) element.textContent = ''
+		    element.classList.remove('active')
+		  }
+		  item?.priceHtml?.classList?.remove(buildCountdownActivePriceClass)
+		}
+
+		function syncCategoryCountdownText(shop, item, text) {
+		  const panel = getShopCategoryPanel(shop)
+		  if (!panel || !item?.name) return
+		  const selector = '[data-shop-item="' + buildCountdownCssEscape(item.name) + '"]'
+		  for (const row of panel.querySelectorAll(selector)) {
+		    const price = row.querySelector('.cattail-shop-category-item-meta .itemPrice')
+		    if (!price) continue
+		    let element = price.querySelector('.' + buildCountdownClass)
+		    if (!element && text) {
+		      element = document.createElement('div')
+		      element.className = buildCountdownClass
+		      price.appendChild(element)
+		    }
+		    if (!element) {
+		      price.classList.remove(buildCountdownActivePriceClass)
+		      continue
+		    }
+		    if (element.textContent !== text) element.textContent = text
+		    element.classList.toggle('active', Boolean(text))
+		    price.classList.toggle(buildCountdownActivePriceClass, Boolean(text))
+		  }
+		}
+
+		function getShopCategoryPanel(shop) {
+		  return shop?.vessel?.querySelector?.('.cattail-shop-category-panel:not(.cattail-shop-category-panel-hidden)') || null
+		}
+
+		function isShopCategoriesCompressed(shop) {
+		  return !!shop?.vessel?.classList?.contains('cattail-shop-compressed')
+		}
+
+		function buildCountdownCssEscape(value) {
+		  const stringValue = String(value || '')
+		  if (typeof CSS !== 'undefined' && typeof CSS.escape === 'function') return CSS.escape(stringValue)
+		  return stringValue.replace(/["\\]/g, '\\$&')
 		}
 
 		function isAffordable(game, item) {
