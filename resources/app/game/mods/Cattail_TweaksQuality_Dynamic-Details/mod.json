@@ -1,0 +1,11 @@
+{
+  "id": "Cattail_TweaksQuality_Dynamic-Details",
+  "name": "Dynamic Building Details",
+  "version": "0.1.0",
+  "loaderVersion": ">=0.1.0",
+  "entry": "scripts/main.js",
+  "locale": [
+    "locale/dynamic-details.json"
+  ],
+  "description": "Adds Alt+Shift dynamic building detail panels and shop build-availability countdowns without modifying vanilla scripts."
+}

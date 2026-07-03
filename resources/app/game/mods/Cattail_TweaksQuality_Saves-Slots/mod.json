@@ -1,7 +1,7 @@
 {
-  "id": "Cattail_Updates_Saves-Slots",
+  "id": "Cattail_TweaksQuality_Saves-Slots",
   "name": "Save Slots",
-  "version": "0.3.10",
+  "version": "0.3.11",
   "loaderVersion": ">=0.1.0",
   "entry": "scripts/main.js",
   "description": "Adds a localized in-game save-slot page with auto save, manual saves, rename, and delete actions."

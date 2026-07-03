@@ -1,7 +1,8 @@
 ModLoader.register({
-	id: 'Cattail_Updates_Saves-Slots',
+	id: 'Cattail_TweaksQuality_Saves-Slots',
 	init(api) {
 		const manualSlotCount = 10
+		const autoConfirmationIndex = 'auto'
 		let activeSplash = null
 		let pendingConfirmation = null
 
@@ -186,19 +187,41 @@ ModLoader.register({
 		}
 
 		function renderAutoSlot(splash, page, autoSlot) {
-			const actions = [
-				{ key: 'load', disabled: !autoSlot.data, run: function () { loadSlot(splash.master, autoSlot.data) } },
-				{ key: 'overwrite', run: function () { overwriteAutoSlot(splash.master); renderSlotsPage(splash, page) } },
-				{ key: 'rename', disabled: true },
-				{ key: 'delete', disabled: true }
-			]
+			const confirmation = pendingConfirmation?.index === autoConfirmationIndex ? pendingConfirmation : null
+			const actions = []
+			if (autoSlot.data && confirmation) {
+				actions.push({
+					key: 'load',
+					confirm: true,
+					ok: function () {
+						pendingConfirmation = null
+						loadSlot(splash.master, autoSlot.data)
+					},
+					cancel: function () {
+						pendingConfirmation = null
+						renderSlotsPage(splash, page)
+					}
+				})
+			} else {
+				actions.push({ key: 'load', disabled: !autoSlot.data, run: function () {
+					pendingConfirmation = { type: 'load', index: autoConfirmationIndex }
+					renderSlotsPage(splash, page)
+				} })
+				actions.push({ key: 'overwrite', run: function () { overwriteAutoSlot(splash.master); renderSlotsPage(splash, page) } })
+				actions.push({ key: 'rename', disabled: true })
+				actions.push({ key: 'delete', disabled: true })
+			}
 			return renderSlotRow({
 				game: splash.master,
 				slot: autoSlot.data ? autoSlot : null,
 				isAuto: true,
 				title: autoSlot.data ? text(splash.master, 'autoSlotName') : text(splash.master, 'autoEmpty'),
 				time: autoSlot.timestamp,
-				onPrimary: function () { if (autoSlot.data) loadSlot(splash.master, autoSlot.data) },
+				onPrimary: function () {
+					if (!autoSlot.data) return
+					pendingConfirmation = { type: 'load', index: autoConfirmationIndex }
+					renderSlotsPage(splash, page)
+				},
 				actions
 			})
 		}
@@ -213,6 +236,11 @@ ModLoader.register({
 						key: confirmation.type,
 						confirm: true,
 						ok: function () {
+							if (confirmation.type === 'load') {
+								pendingConfirmation = null
+								loadSlot(splash.master, slot.data)
+								return
+							}
 							if (confirmation.type === 'overwrite') saveManualSlot(splash.master, slots, index, slot.name)
 							if (confirmation.type === 'delete') {
 								slots[index] = null
@@ -227,7 +255,10 @@ ModLoader.register({
 						}
 					})
 				} else {
-					actions.push({ key: 'load', run: function () { loadSlot(splash.master, slot.data) } })
+					actions.push({ key: 'load', run: function () {
+						pendingConfirmation = { type: 'load', index }
+						renderSlotsPage(splash, page)
+					} })
 					actions.push({ key: 'overwrite', run: function () {
 						pendingConfirmation = { type: 'overwrite', index }
 						renderSlotsPage(splash, page)
@@ -252,8 +283,10 @@ ModLoader.register({
 				title: slot ? slotTitle(splash.master, slot, index) : text(splash.master, 'emptySlot', { index: index + 1 }),
 				time: slot?.timestamp || slot?.updatedAt,
 				onPrimary: function () {
-					if (slot) loadSlot(splash.master, slot.data)
-					else {
+					if (slot) {
+						pendingConfirmation = { type: 'load', index }
+						renderSlotsPage(splash, page)
+					} else {
 						saveManualSlot(splash.master, slots, index)
 						renderSlotsPage(splash, page)
 					}

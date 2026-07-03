@@ -1,8 +1,0 @@
-{
-  "id": "Cattail_Tweaks_Grade-Hint-Fix",
-  "name": "Grade Hint Fix",
-  "version": "0.1.0",
-  "loaderVersion": ">=0.1.0",
-  "entry": "scripts/main.js",
-  "description": "Fixes corrupted stabilizer surge grade hint markup by rendering grade stars with DOM nodes."
-}
