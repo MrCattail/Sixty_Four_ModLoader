@@ -22,13 +22,21 @@ ModLoader.register({
 		const resourceSourceLineResourceKey = '_cattailDynamicResourceSourceLineResource'
 		const resourceSourceGpuLineModeKey = '_cattailDynamicResourceSourceGpuLineMode'
 		const resourceSourceGpuRendererKey = '_cattailDynamicResourceSourceGpuRenderer'
+		const resourceSourceWarmupKey = '_cattailDynamicResourceSourceWarmup'
 		const resourceSourceSuppressTransferKey = '_cattailDynamicResourceSourceSuppressTransfer'
 		const resourceSourceActiveCubeKey = '_cattailDynamicResourceSourceActiveCube'
 		const resourceSourceProducerKey = '_cattailDynamicResourceSourceProducer'
+		const resourceSourcePrefsLoadedKey = '_cattailDynamicResourceSourcePrefsLoaded'
 		const cubeResourceSourcePumpKey = '_cattailDynamicCubeSourcePump'
+		const resourceSourceToggleStorageKey = 'cattailDynamicResourceSourceToggle'
+		const resourceSourceLastResourceStorageKey = 'cattailDynamicResourceSourceLastResource'
+		const resourceSourceLineLockStorageKey = 'cattailDynamicResourceSourceLineLock'
+		const resourceSourceLineResourceStorageKey = 'cattailDynamicResourceSourceLineResource'
+		const resourceSourceGpuLineModeStorageKey = 'cattailDynamicResourceSourceGpuLineMode'
 		const resourceSourceWindowMs = 30000
 		const resourceSourceMinAmount = 0.0001
 		const resourceSourceSummaryCacheMs = 350
+		const resourceSourceEventBucketMs = 250
 		const resourceSourceMaxLinks = Number.POSITIVE_INFINITY
 		const resourceSourceGpuCurveSegments = 72
 		const resourceSourceConsumeColor = '#7a2b2b'
@@ -318,6 +326,7 @@ ModLoader.register({
 		}
 
 		function isResourceSourceToggleActive(game) {
+			initializeResourceSourcePreferences(game)
 			return !!game?.[resourceSourceToggleKey]
 		}
 
@@ -337,8 +346,27 @@ ModLoader.register({
 
 		function setResourceSourceToggle(game, active) {
 			if (!game) return
+			initializeResourceSourcePreferences(game)
 			game[resourceSourceToggleKey] = !!active
-			if (active && Number.isInteger(game.hoveredResource)) game[resourceSourceLastResourceKey] = game.hoveredResource
+			if (active && Number.isInteger(game.hoveredResource)) {
+				game[resourceSourceLastResourceKey] = game.hoveredResource
+				saveStoredInteger(resourceSourceLastResourceStorageKey, game.hoveredResource)
+			}
+			saveStoredBoolean(resourceSourceToggleStorageKey, !!active)
+		}
+
+		function initializeResourceSourcePreferences(game) {
+			if (!game || game[resourceSourcePrefsLoadedKey]) return
+			game[resourceSourcePrefsLoadedKey] = true
+			game[resourceSourceToggleKey] = loadStoredBoolean(resourceSourceToggleStorageKey, false)
+			game[resourceSourceLineLockKey] = loadStoredBoolean(resourceSourceLineLockStorageKey, false)
+			game[resourceSourceGpuLineModeKey] = loadStoredBoolean(resourceSourceGpuLineModeStorageKey, true)
+			const lastResource = loadStoredInteger(resourceSourceLastResourceStorageKey)
+			const lineResource = loadStoredInteger(resourceSourceLineResourceStorageKey)
+			if (Number.isInteger(lastResource)) game[resourceSourceLastResourceKey] = lastResource
+			if (Number.isInteger(lineResource)) game[resourceSourceLineResourceKey] = lineResource
+			if (!Number.isInteger(game[resourceSourceLastResourceKey]) && Number.isInteger(lineResource)) game[resourceSourceLastResourceKey] = lineResource
+			if (game[resourceSourceLineLockKey] && !Number.isInteger(game[resourceSourceLineResourceKey]) && Number.isInteger(lastResource)) game[resourceSourceLineResourceKey] = lastResource
 		}
 
 		function installOpacityControls() {
@@ -447,6 +475,37 @@ ModLoader.register({
 			} catch (error) {}
 		}
 
+		function loadStoredBoolean(key, fallback = false) {
+			try {
+				const value = localStorage.getItem(key)
+				if (value === '1') return true
+				if (value === '0') return false
+			} catch (error) {}
+			return fallback
+		}
+
+		function saveStoredBoolean(key, value) {
+			try {
+				localStorage.setItem(key, value ? '1' : '0')
+			} catch (error) {}
+		}
+
+		function loadStoredInteger(key) {
+			try {
+				const stored = localStorage.getItem(key)
+				if (stored === null || stored === '') return null
+				const value = Number(stored)
+				if (Number.isInteger(value)) return value
+			} catch (error) {}
+			return null
+		}
+
+		function saveStoredInteger(key, value) {
+			try {
+				if (Number.isInteger(value)) localStorage.setItem(key, String(value))
+				else localStorage.removeItem(key)
+			} catch (error) {}
+		}
 		function setHintInfoOpaque(active) {
 			hintInfoOpaque = !!active
 			saveHintInfoOpaque(hintInfoOpaque)
@@ -1715,6 +1774,7 @@ ModLoader.register({
 
 			api.patch(Game.prototype, 'renderResources', function (original) {
 				return function (...args) {
+					scheduleResourceSourceWarmup(this)
 					trimResourceSourceEvents(getResourceSourceState(this), performance.now())
 					if (this.plane) {
 						clearResourceSourceGpuLines(this)
@@ -1755,12 +1815,15 @@ ModLoader.register({
 		}
 
 		function isResourceSourceGpuLineModeActive(game) {
+			initializeResourceSourcePreferences(game)
 			return !!game?.[resourceSourceGpuLineModeKey]
 		}
 
 		function setResourceSourceGpuLineMode(game, active) {
 			if (!game) return
+			initializeResourceSourcePreferences(game)
 			game[resourceSourceGpuLineModeKey] = !!active
+			saveStoredBoolean(resourceSourceGpuLineModeStorageKey, !!active)
 			if (!active) clearResourceSourceGpuLines(game)
 		}
 
@@ -1785,17 +1848,19 @@ ModLoader.register({
 		}
 
 		function getResourceSourceState(game) {
-			if (!game) return { events: [], startedAt: performance.now() }
+			if (!game) return { events: [], startedAt: performance.now(), eventBuckets: new Map() }
+			initializeResourceSourcePreferences(game)
 			if (!game[resourceSourceStateKey]) {
 				Object.defineProperty(game, resourceSourceStateKey, {
 					configurable: true,
-					value: { events: [], startedAt: performance.now(), summaryCache: Object.create(null) }
+					value: { events: [], startedAt: performance.now(), summaryCache: Object.create(null), eventBuckets: new Map() }
 				})
 			}
 			const state = game[resourceSourceStateKey]
 			if (!Array.isArray(state.events)) state.events = []
 			if (!state.startedAt) state.startedAt = performance.now()
 			if (!state.summaryCache) state.summaryCache = Object.create(null)
+			if (!(state.eventBuckets instanceof Map)) state.eventBuckets = new Map()
 			return state
 		}
 
@@ -1809,20 +1874,43 @@ ModLoader.register({
 			for (let i = 0; i < resources.length; i++) {
 				const amount = Math.abs(Number(resources[i]) || 0)
 				if (amount < resourceSourceMinAmount) continue
-				state.events.push({
-					time: now,
-					type,
-					resourceId: i,
-					amount,
-					source: normalizedSource
-				})
+				appendResourceSourceEvent(state, type, i, amount, normalizedSource, now)
 			}
+		}
+
+		function appendResourceSourceEvent(state, type, resourceId, amount, source, now) {
+			const bucketTime = Math.floor(now / resourceSourceEventBucketMs) * resourceSourceEventBucketMs
+			const sourceKey = source.instanceKey || source.groupKey || source.kind || 'unknown'
+			const bucketKey = bucketTime + '|' + type + '|' + resourceId + '|' + sourceKey
+			const existing = state.eventBuckets.get(bucketKey)
+			if (existing) {
+				existing.amount += amount
+				return
+			}
+			const event = {
+				time: bucketTime,
+				bucketKey,
+				type,
+				resourceId,
+				amount,
+				source
+			}
+			state.events.push(event)
+			state.eventBuckets.set(bucketKey, event)
 		}
 
 		function trimResourceSourceEvents(state, now) {
 			if (!state || !Array.isArray(state.events)) return
 			const cutoff = now - resourceSourceWindowMs
-			while (state.events.length && state.events[0].time < cutoff) state.events.shift()
+			let removeCount = 0
+			while (removeCount < state.events.length && state.events[removeCount].time < cutoff) removeCount++
+			if (!removeCount) return
+			const removed = state.events.splice(0, removeCount)
+			if (state.eventBuckets instanceof Map) {
+				for (const event of removed) {
+					if (event?.bucketKey) state.eventBuckets.delete(event.bucketKey)
+				}
+			}
 		}
 
 		function patchCubeResourceSourceAttribution() {
@@ -1862,13 +1950,16 @@ ModLoader.register({
 			api.patch(Generaldecay.prototype, 'consume', function (original) {
 				return function (resources, ...args) {
 					if (Array.isArray(resources)) recordResourceSourceEvent(this.master, 'gain', resources, { kind: 'resource', resourceId: 5 })
-					const previousSuppress = this[resourceSourceSuppressTransferKey]
-					this[resourceSourceSuppressTransferKey] = true
+					const game = this.master
+					const previousSuppress = game?.[resourceSourceSuppressTransferKey]
+					if (game) game[resourceSourceSuppressTransferKey] = true
 					try {
 						return original.call(this, resources, ...args)
 					} finally {
-						if (previousSuppress) this[resourceSourceSuppressTransferKey] = previousSuppress
-						else delete this[resourceSourceSuppressTransferKey]
+						if (game) {
+							if (previousSuppress) game[resourceSourceSuppressTransferKey] = previousSuppress
+							else delete game[resourceSourceSuppressTransferKey]
+						}
 					}
 				}
 			})
@@ -1922,8 +2013,7 @@ ModLoader.register({
 			return null
 		}
 		function shouldSuppressResourceSourceTransferFromScreen(game, point) {
-			if (!game || !Array.isArray(point)) return false
-			return !!findEntityNearScreenPoint(game, point)?.[resourceSourceSuppressTransferKey]
+			return !!game?.[resourceSourceSuppressTransferKey]
 		}
 
 		function identifyResourceSourceForGain(game, resources, source, visibility) {
@@ -2114,10 +2204,16 @@ ModLoader.register({
 			)
 		}
 
+		function rememberResourceSourceResource(game, resourceId) {
+			if (!game || !Number.isInteger(resourceId)) return
+			if (game[resourceSourceLastResourceKey] === resourceId) return
+			game[resourceSourceLastResourceKey] = resourceId
+			saveStoredInteger(resourceSourceLastResourceStorageKey, resourceId)
+		}
 		function getResourceSourceSelectedResourceId(game) {
 			if (!game) return null
 			if (Number.isInteger(game.hoveredResource)) {
-				game[resourceSourceLastResourceKey] = game.hoveredResource
+				rememberResourceSourceResource(game, game.hoveredResource)
 				return game.hoveredResource
 			}
 			return Number.isInteger(game[resourceSourceLastResourceKey]) ? game[resourceSourceLastResourceKey] : null
@@ -2126,7 +2222,7 @@ ModLoader.register({
 		function getResourceSourceFocusResourceId(game) {
 			if (!game) return null
 			if (Number.isInteger(game.hoveredResource)) {
-				game[resourceSourceLastResourceKey] = game.hoveredResource
+				rememberResourceSourceResource(game, game.hoveredResource)
 				return game.hoveredResource
 			}
 			if (isResourceSourceToggleActive(game) && Number.isInteger(game[resourceSourceLastResourceKey])) return game[resourceSourceLastResourceKey]
@@ -2134,6 +2230,7 @@ ModLoader.register({
 		}
 
 		function isResourceSourceLineLockActive(game) {
+			initializeResourceSourcePreferences(game)
 			return !!game?.[resourceSourceLineLockKey]
 		}
 
@@ -2145,13 +2242,70 @@ ModLoader.register({
 
 		function toggleResourceSourceLineLock(game) {
 			if (!game) return
+			initializeResourceSourcePreferences(game)
 			const selected = getResourceSourceSelectedResourceId(game)
 			if (!Number.isInteger(selected)) return
 			const sameResourceLocked = isResourceSourceLineLockActive(game) && game[resourceSourceLineResourceKey] === selected
-			game[resourceSourceLineLockKey] = !sameResourceLocked
+			const active = !sameResourceLocked
+			game[resourceSourceLineLockKey] = active
 			game[resourceSourceLineResourceKey] = selected
+			saveStoredBoolean(resourceSourceLineLockStorageKey, active)
+			saveStoredInteger(resourceSourceLineResourceStorageKey, selected)
+			saveStoredInteger(resourceSourceLastResourceStorageKey, selected)
 		}
 
+		function scheduleResourceSourceWarmup(game) {
+			if (!game || game[resourceSourceWarmupKey]) return
+			game[resourceSourceWarmupKey] = true
+			scheduleResourceSourceIdle(() => {
+				warmResourceSourceImages(game)
+				if (isResourceSourceGpuLineModeActive(game)) {
+					const renderer = getResourceSourceGpuRenderer(game)
+					if (renderer) clearResourceSourceGpuLines(game)
+				}
+			}, 2000)
+		}
+
+		function warmResourceSourceImages(game) {
+			const names = collectResourceSourceWarmupNames(game)
+			let index = 0
+			const step = (deadline) => {
+				const start = performance.now()
+				while (index < names.length && hasResourceSourceIdleBudget(deadline, start)) {
+					getResourceSourceShopImage(game, names[index++])
+				}
+				if (index < names.length) scheduleResourceSourceIdle(step, 1000)
+			}
+			step(null)
+		}
+
+		function collectResourceSourceWarmupNames(game) {
+			const names = new Set()
+			const entities = game?.codex?.entities || {}
+			for (const name in entities) {
+				if (entities[name]?.shopImage) names.add(name)
+			}
+			const state = game?.[resourceSourceStateKey]
+			if (Array.isArray(state?.events)) {
+				for (const event of state.events) {
+					if (event?.source?.kind === 'entity' && event.source.name) names.add(event.source.name)
+				}
+			}
+			return Array.from(names)
+		}
+
+		function scheduleResourceSourceIdle(callback, timeout = 1000) {
+			if (typeof requestIdleCallback === 'function') {
+				requestIdleCallback(callback, { timeout })
+			} else {
+				setTimeout(() => callback(null), 80)
+			}
+		}
+
+		function hasResourceSourceIdleBudget(deadline, start) {
+			if (deadline && typeof deadline.timeRemaining === 'function') return deadline.timeRemaining() > 3
+			return performance.now() - start < 6
+		}
 		function renderResourceSourceLinks(game) {
 			if (!isResourceSourceLinkActive(game)) {
 				clearResourceSourceGpuLines(game)
@@ -2665,15 +2819,16 @@ ModLoader.register({
 				drawResourceSourcePlaceholder(game, x, y, size)
 				return
 			}
+			const drawSize = size * 0.74
 			game.ctx.save()
 			clipIconRect(game.ctx, x, y, size)
-			sprite.renderXY([x, y], 0, false, Math.max(0.1, size / Math.max(1, (game.unit || 1) * 1.65)))
+			sprite.renderXY([x, y], 0, false, Math.max(0.08, drawSize / Math.max(1, (game.unit || 1) * 1.65)))
 			game.ctx.restore()
 		}
 
 		function drawResourceSourceShopIcon(game, name, x, y, size) {
 			const img = getResourceSourceShopImage(game, name)
-			if (!img || !img.complete || !img.naturalWidth) return false
+			if (!isResourceSourceImageReady(img)) return false
 			const ctx = game.ctx
 			ctx.save()
 			clipIconRect(ctx, x, y, size)
@@ -2689,10 +2844,45 @@ ModLoader.register({
 			let img = resourceSourceImageCache.get(resolved)
 			if (!img) {
 				img = new Image()
+				img.decoding = 'async'
+				img._cattailResourceSourceReady = false
+				img._cattailResourceSourceDecoding = false
+				img._cattailResourceSourceFailed = false
+				img.onload = () => requestResourceSourceImageDecode(img)
+				img.onerror = () => {
+					img._cattailResourceSourceFailed = true
+				}
 				img.src = resolved
 				resourceSourceImageCache.set(resolved, img)
 			}
+			requestResourceSourceImageDecode(img)
 			return img
+		}
+
+		function requestResourceSourceImageDecode(img) {
+			if (!img || img._cattailResourceSourceReady || img._cattailResourceSourceDecoding || img._cattailResourceSourceFailed) return
+			if (!img.complete) return
+			if (!img.naturalWidth) {
+				img._cattailResourceSourceFailed = true
+				return
+			}
+			if (typeof img.decode !== 'function') {
+				img._cattailResourceSourceReady = true
+				return
+			}
+			img._cattailResourceSourceDecoding = true
+			img.decode().then(() => {
+				img._cattailResourceSourceReady = true
+			}).catch(() => {
+				if (img.complete && img.naturalWidth) img._cattailResourceSourceReady = true
+				else img._cattailResourceSourceFailed = true
+			}).finally(() => {
+				img._cattailResourceSourceDecoding = false
+			})
+		}
+
+		function isResourceSourceImageReady(img) {
+			return !!(img && img._cattailResourceSourceReady && img.complete && img.naturalWidth)
 		}
 
 		function drawResourceSourcePlaceholder(game, x, y, size) {
