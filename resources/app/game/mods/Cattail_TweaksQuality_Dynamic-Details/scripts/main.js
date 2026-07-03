@@ -28,6 +28,8 @@ ModLoader.register({
 		const buildCountdownRateCacheMs = 500
 		const buildCountdownRefreshMs = 1000
 		const buildCountdownSnapshotSampleMs = 1000
+		const buildCountdownRateSmoothRise = 0.45
+		const buildCountdownRateSmoothFall = 0.2
 		const rates = new WeakMap()
 		const events = new WeakMap()
 		let lastGame = null
@@ -1578,7 +1580,7 @@ ModLoader.register({
 			if (typeof Shop === 'undefined') return
 
 			installBuildCountdownStyles()
-
+			installBuildCountdownResourceEvents()
 			api.patch(Shop.prototype, 'updatePrice', function (original) {
 			  return function (item) {
 			    const result = original.call(this, item)
@@ -1604,6 +1606,28 @@ ModLoader.register({
 			    updateShopCountdowns(this, false)
 			    return result
 			  }
+			})
+		}
+
+		function installBuildCountdownResourceEvents() {
+			if (typeof Game === 'undefined' || !Game.prototype) return
+			patchBuildCountdownResourceEventMethod('addResourcesFromArray')
+			patchBuildCountdownResourceEventMethod('substractResourcesFromArray')
+		}
+
+		function patchBuildCountdownResourceEventMethod(methodName) {
+			if (typeof Game.prototype[methodName] !== 'function') return
+			api.patch(Game.prototype, methodName, function (original) {
+				return function (resourceDelta, skipAnalytics) {
+					if (skipAnalytics || !Array.isArray(resourceDelta) || !Array.isArray(this.resources)) {
+						return original.apply(this, arguments)
+					}
+
+					const before = normalizeResourceArray(this.resources, this.resources.length)
+					const result = original.apply(this, arguments)
+					recordBuildCountdownResourceDelta(this, before, this.resources)
+					return result
+				}
 			})
 		}
 
@@ -1757,14 +1781,24 @@ ModLoader.register({
 		      configurable: true,
 		      value: {
 		        snapshots: [],
+		        resourceEvents: [],
+		        eventStartedAt: performance.now(),
 		        lastSnapshotAt: 0,
 		        cachedRates: [],
 		        cachedRateAt: 0,
-		        cachedRateLength: 0
+		        cachedRateLength: 0,
+		        smoothedRates: [],
+		        smoothedRateAt: 0
 		      }
 		    })
 		  }
-		  return game[buildCountdownStateKey]
+
+		  const state = game[buildCountdownStateKey]
+		  if (!Array.isArray(state.snapshots)) state.snapshots = []
+		  if (!Array.isArray(state.resourceEvents)) state.resourceEvents = []
+		  if (!state.eventStartedAt) state.eventStartedAt = performance.now()
+		  if (!Array.isArray(state.smoothedRates)) state.smoothedRates = []
+		  return state
 		}
 
 		function sampleResourceSnapshot(game, now = performance.now(), force = false) {
@@ -1784,16 +1818,100 @@ ModLoader.register({
 		  const state = getState(game)
 		  sampleResourceSnapshot(game, now)
 		  trimBuildCountdownSnapshots(state, now)
+		  trimBuildCountdownResourceEvents(state, now)
 
 		  if (state.cachedRates && state.cachedRateLength >= length && now - state.cachedRateAt < buildCountdownRateCacheMs) {
 		    return state.cachedRates
 		  }
 
-		  const rates = calculateNetSnapshotRates(game, state.snapshots, length)
+		  const snapshotRates = calculateNetSnapshotRates(game, state.snapshots, length)
+		  const eventRates = calculateEventRates(game, state, length, now)
+		  const rawRates = eventRates.ready ? eventRates.rates : snapshotRates.slice()
+		  if (eventRates.ready) {
+		    for (let i = 0; i < length; i++) {
+		      if (!eventRates.touched[i] && Math.abs(snapshotRates[i] || 0) > 0.000001) rawRates[i] = snapshotRates[i]
+		    }
+		  }
+
+		  const rates = smoothBuildCountdownRates(state, rawRates, length, now)
 		  state.cachedRates = rates
 		  state.cachedRateAt = now
 		  state.cachedRateLength = length
 		  return rates
+		}
+
+		function recordBuildCountdownResourceDelta(game, before, after, now = performance.now()) {
+		  if (!game || !Array.isArray(before) || !Array.isArray(after)) return
+		  const state = getState(game)
+		  const length = Math.max(before.length, after.length)
+		  const resources = new Array(length).fill(0)
+		  let hasDelta = false
+
+		  for (let i = 0; i < length; i++) {
+		    const delta = (Number(after[i]) || 0) - (Number(before[i]) || 0)
+		    if (Math.abs(delta) <= 0.0000001) continue
+		    resources[i] = delta
+		    hasDelta = true
+		  }
+
+		  if (!hasDelta) return
+		  state.resourceEvents.push({ time: now, resources })
+		  trimBuildCountdownResourceEvents(state, now)
+		  state.cachedRateAt = 0
+		}
+
+		function calculateEventRates(game, state, length, now) {
+		  const rates = new Array(length).fill(0)
+		  const touched = new Array(length).fill(false)
+		  const ageMs = Math.min(buildCountdownSampleWindowMs, Math.max(0, now - (state.eventStartedAt || now)))
+		  if (ageMs < buildCountdownSampleMinAgeMs) return { rates, touched, ready: false }
+
+		  const cutoff = now - buildCountdownSampleWindowMs
+		  for (const event of state.resourceEvents || []) {
+		    if (!event || event.time < cutoff) continue
+		    const resources = event.resources || []
+		    for (let i = 0; i < length; i++) {
+		      const delta = Number(resources[i]) || 0
+		      if (!delta) continue
+		      rates[i] += delta
+		      touched[i] = true
+		    }
+		  }
+
+		  const seconds = ageMs / 1000
+		  for (let i = 0; i < length; i++) {
+		    const rate = rates[i] / seconds
+		    rates[i] = isStorageBoundOscillation(game, state.snapshots, i, rate) ? 0 : rate
+		  }
+
+		  return { rates, touched, ready: true }
+		}
+
+		function smoothBuildCountdownRates(state, rates, length, now) {
+		  if (!Array.isArray(state.smoothedRates) || state.smoothedRates.length < length || !state.smoothedRateAt) {
+		    state.smoothedRates = copyRateArray(rates, length)
+		    state.smoothedRateAt = now
+		    return state.smoothedRates
+		  }
+
+		  const smoothed = new Array(length).fill(0)
+		  for (let i = 0; i < length; i++) {
+		    const previous = Number(state.smoothedRates[i]) || 0
+		    const next = Number(rates[i]) || 0
+		    const alpha = (next <= 0 && previous > 0) || Math.abs(next) > Math.abs(previous) ? buildCountdownRateSmoothRise : buildCountdownRateSmoothFall
+		    const value = previous + (next - previous) * alpha
+		    smoothed[i] = Math.abs(value) <= 0.000001 ? 0 : value
+		  }
+
+		  state.smoothedRates = smoothed
+		  state.smoothedRateAt = now
+		  return smoothed
+		}
+
+		function copyRateArray(values, length) {
+		  const result = new Array(length).fill(0)
+		  for (let i = 0; i < length; i++) result[i] = Number(values?.[i]) || 0
+		  return result
 		}
 
 		function calculateNetSnapshotRates(game, snapshots, length) {
@@ -1870,6 +1988,15 @@ ModLoader.register({
 		  const cutoff = now - buildCountdownSampleWindowMs
 		  while (snapshots.length > 2 && snapshots[1].time < cutoff) {
 		    snapshots.shift()
+		  }
+		}
+
+		function trimBuildCountdownResourceEvents(state, now) {
+		  const events = state.resourceEvents
+		  if (!Array.isArray(events)) return
+		  const cutoff = now - buildCountdownSampleWindowMs
+		  while (events.length && events[0].time < cutoff) {
+		    events.shift()
 		  }
 		}
 
