@@ -54,9 +54,9 @@
 			#modloader-status .modloader-status-mod-names { display: block; max-width: min(58vw, 720px); overflow: hidden; text-overflow: ellipsis; opacity: 0; transform: translateX(-14px); transition: opacity .11s ease-in, transform .14s ease-in; }
 			#modloader-status .modloader-status-dots { position: absolute; right: 5px; top: 50%; display: inline-flex; flex-direction: column; gap: 2px; transform: translateY(-50%); opacity: 1; transition: opacity .1s ease-in, transform .14s ease-in; }
 			#modloader-status .modloader-status-dot { width: 3px; height: 3px; border-radius: 50%; background: rgba(190,190,190,.72); }
-			#modloader-status:hover .modloader-status-mods, #modloader-status:focus .modloader-status-mods, #modloader-status:focus-within .modloader-status-mods { max-width: min(58vw, 720px); transition: max-width .2s ease-out; }
-			#modloader-status:hover .modloader-status-mod-names, #modloader-status:focus .modloader-status-mod-names, #modloader-status:focus-within .modloader-status-mod-names { opacity: 1; transform: translateX(0); transition: opacity .14s ease-out .04s, transform .18s ease-out; }
-			#modloader-status:hover .modloader-status-dots, #modloader-status:focus .modloader-status-dots, #modloader-status:focus-within .modloader-status-dots { opacity: 0; transform: translate(8px, -50%); }
+			#modloader-status:hover .modloader-status-mods { max-width: min(58vw, 720px); transition: max-width .2s ease-out; }
+			#modloader-status:hover .modloader-status-mod-names { opacity: 1; transform: translateX(0); transition: opacity .14s ease-out .04s, transform .18s ease-out; }
+			#modloader-status:hover .modloader-status-dots { opacity: 0; transform: translate(8px, -50%); }
 		`
 		document.head.appendChild(style)
 	}
@@ -115,7 +115,6 @@
 		if (!el) {
 			el = document.createElement('div')
 			el.id = 'modloader-status'
-			el.tabIndex = 0
 			document.body.appendChild(el)
 		}
 
@@ -269,6 +268,10 @@
 		if (panel) panel.remove()
 		else renderPanel()
 	}
+
+	document.addEventListener('keydown', function (event) {
+		if (event.key === 'Tab' || event.keyCode === 9) event.preventDefault()
+	}, true)
 
 	document.addEventListener('keydown', function (event) {
 		if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'm') {
