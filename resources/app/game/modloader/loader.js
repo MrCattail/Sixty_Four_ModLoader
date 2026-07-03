@@ -19,7 +19,9 @@
 		configs: {},
 		assetReplacements: {},
 		sounds: {},
-		music: {}
+		music: {},
+		statusLogoIndex: -1,
+		statusLogoTimer: null
 	}
 
 	const addIssue = function (level, code, message, details) {
@@ -42,7 +44,8 @@
 		style.id = 'modloader-status-style'
 		style.textContent = `
 			#modloader-status { position: fixed; left: 10px; bottom: 10px; z-index: 2147483647; display: inline-flex; align-items: center; gap: 7px; max-width: calc(100vw - 20px); box-sizing: border-box; padding: 6px 8px; border-radius: 7px; background: rgba(0, 0, 0, .62); color: rgba(255, 255, 255, .92); box-shadow: 0 6px 20px rgba(0,0,0,.18); font: 12px/1.35 Montserrat, Arial, sans-serif; pointer-events: auto; user-select: none; white-space: nowrap; }
-			#modloader-status .modloader-status-logo { width: 18px; height: 18px; flex: 0 0 auto; border-radius: 4px; object-fit: cover; }
+			#modloader-status .modloader-status-logo { width: 18px; height: 18px; flex: 0 0 auto; border-radius: 4px; background: url('img/logo/sheet.png'); background-size: 400% 200%; box-shadow: inset 0 0 0 1px rgba(255,255,255,.12); opacity: 1; transition: opacity .32s ease, filter .32s ease; }
+			#modloader-status .modloader-status-logo-changing { opacity: .2; filter: saturate(.7); }
 			#modloader-status .modloader-status-title { font-weight: 600; }
 			#modloader-status .modloader-status-version { color: rgba(255,255,255,.68); }
 			#modloader-status .modloader-status-separator { color: rgba(255,255,255,.36); }
@@ -66,6 +69,44 @@
 		return span
 	}
 
+	const chooseStatusLogoFrame = function () {
+		const frameCount = 8
+		let next = Math.floor(Math.random() * frameCount)
+		if (frameCount > 1 && next === state.statusLogoIndex) next = (next + 1) % frameCount
+		state.statusLogoIndex = next
+		return next
+	}
+
+	const setStatusLogoFrame = function (logo, index) {
+		const x = index % 4
+		const y = Math.floor(index / 4)
+		logo.style.backgroundPosition = `${100 / 3 * x}% ${100 * y}%`
+	}
+
+	const rotateStatusLogo = function (animated) {
+		const logo = document.querySelector('#modloader-status .modloader-status-logo')
+		if (!logo) return
+		const next = chooseStatusLogoFrame()
+		if (!animated) {
+			setStatusLogoFrame(logo, next)
+			return
+		}
+		logo.classList.add('modloader-status-logo-changing')
+		setTimeout(function () {
+			setStatusLogoFrame(logo, next)
+			requestAnimationFrame(function () {
+				logo.classList.remove('modloader-status-logo-changing')
+			})
+		}, 320)
+	}
+
+	const ensureStatusLogoTimer = function () {
+		if (state.statusLogoTimer) return
+		state.statusLogoTimer = setInterval(function () {
+			rotateStatusLogo(true)
+		}, 60000)
+	}
+
 	const showStatus = function () {
 		if (!document.body) return
 		ensureStatusStyle()
@@ -82,11 +123,13 @@
 		el.title = `Cattail's ModLoader ${state.version} | mod: ${state.mods.length} | Ctrl+M | ${names}`
 		el.innerHTML = ''
 
-		const logo = document.createElement('img')
+		const logo = document.createElement('span')
 		logo.className = 'modloader-status-logo'
-		logo.src = '../appIcon.png'
-		logo.alt = ''
+		logo.setAttribute('aria-hidden', 'true')
+		if (state.statusLogoIndex < 0) chooseStatusLogoFrame()
+		setStatusLogoFrame(logo, state.statusLogoIndex)
 		el.appendChild(logo)
+		ensureStatusLogoTimer()
 
 		appendStatusText(el, 'modloader-status-title', "Cattail's ModLoader")
 		appendStatusText(el, 'modloader-status-version', state.version)
