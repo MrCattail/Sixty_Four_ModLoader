@@ -5,6 +5,10 @@ ModLoader.register({
 		const styleId = 'cattail-ending-skip-style'
 		const buttonClass = 'cattail-ending-skip-button'
 		const hiddenClass = 'cattail-ending-skip-hidden'
+		const movieSkippedKey = '__cattailEndingSkipMovieSkipped'
+		const creditOffsetKey = '__cattailEndingSkipCreditOffset'
+		const creditScrollSpeed = .02
+		const fallbackMovieOffset = 1000
 
 		const installStyle = function () {
 			if (document.getElementById(styleId)) return
@@ -79,6 +83,11 @@ ModLoader.register({
 	margin-left: 1px;
 }
 
+.cattail-ending-skip-credit-offset {
+	position: relative;
+	will-change: transform;
+}
+
 @media (max-width: 700px) {
 	.${buttonClass} {
 		right: max(14px, env(safe-area-inset-right));
@@ -119,6 +128,64 @@ ModLoader.register({
 			return !!(game && (game.credits || game.pinhole || game.entitiesInGame?.pinhole > 0))
 		}
 
+		const getCreditMovie = function (game) {
+			return game?.creditImage?.tagName === 'VIDEO' ? game.creditImage : null
+		}
+
+		const isCreditMovieActive = function (game) {
+			const movie = getCreditMovie(game)
+			if (!game?.credits || !movie || game[movieSkippedKey]) return false
+			if (movie.ended) return false
+
+			const duration = Number(movie.duration)
+			const currentTime = Number(movie.currentTime) || 0
+			if (Number.isFinite(duration) && duration > 0 && currentTime >= duration - .25) return false
+
+			return true
+		}
+
+		const getRemainingMovieOffset = function (movie) {
+			if (!movie) return fallbackMovieOffset
+
+			const duration = Number(movie.duration)
+			const currentTime = Number(movie.currentTime) || 0
+			if (Number.isFinite(duration) && duration > currentTime) {
+				return Math.max(0, (duration - currentTime) * 1000 * creditScrollSpeed)
+			}
+
+			return fallbackMovieOffset
+		}
+
+		const applyCreditOffset = function (game, offset) {
+			const pillar = game?.creditPillar
+			if (!pillar || game[creditOffsetKey]) return
+
+			const wrapper = document.createElement('div')
+			wrapper.className = 'cattail-ending-skip-credit-offset'
+			wrapper.style.transform = 'translate(0,-' + Math.round(offset) + 'px)'
+			pillar.parentNode.insertBefore(wrapper, pillar)
+			wrapper.appendChild(pillar)
+			game[creditOffsetKey] = wrapper
+		}
+
+		const skipCreditMovie = function (game) {
+			const movie = getCreditMovie(game)
+			const offset = getRemainingMovieOffset(movie)
+			game[movieSkippedKey] = true
+
+			if (movie) {
+				try { movie.pause() } catch (error) {}
+				movie.style.transition = 'none'
+				movie.style.opacity = 0
+				movie.style.display = 'none'
+				try {
+					if (Number.isFinite(movie.duration) && movie.duration > 0) movie.currentTime = movie.duration
+				} catch (error) {}
+			}
+
+			applyCreditOffset(game, offset)
+		}
+
 		const skipCredits = function () {
 			location.reload()
 		}
@@ -141,12 +208,12 @@ ModLoader.register({
 
 			const sync = function () {
 				const visible = isEndingVisible(game)
-				const mode = game.credits ? 'credits' : visible ? 'ending' : 'hidden'
+				const mode = game.credits ? (isCreditMovieActive(game) ? 'movie' : 'credits') : visible ? 'ending' : 'hidden'
 
 				if (mode !== controller.mode) {
 					controller.mode = mode
 					controller.button.classList.toggle(hiddenClass, mode === 'hidden')
-					controller.button.setAttribute('aria-label', mode === 'credits' ? 'Skip credits' : 'Skip ending')
+					controller.button.setAttribute('aria-label', mode === 'movie' ? 'Skip movie' : mode === 'credits' ? 'Skip credits' : 'Skip ending')
 				}
 
 				controller.raf = requestAnimationFrame(sync)
@@ -157,7 +224,11 @@ ModLoader.register({
 				event.stopPropagation()
 
 				if (game.credits) {
-					skipCredits()
+					if (isCreditMovieActive(game)) {
+						skipCreditMovie(game)
+					} else {
+						skipCredits()
+					}
 					return
 				}
 
