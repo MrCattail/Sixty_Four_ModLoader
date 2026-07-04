@@ -198,7 +198,11 @@
 			#modloader-panel .modloader-save-button { border: 0; border-radius: 6px; padding: 7px 10px; background: #f2f2ed; color: #111; cursor: pointer; }
 			#modloader-panel .modloader-save-button:disabled { cursor: default; opacity: .45; }
 			#modloader-panel .modloader-panel-error { margin: 8px 0; padding: 8px; border-radius: 6px; background: rgba(255, 96, 96, .14); color: #ffb0b0; }
-			#modloader-panel .modloader-mod-manager { display: grid; gap: 6px; }
+			#modloader-panel .modloader-mod-manager { display: grid; gap: 6px; max-height: min(48vh, 460px); overflow-x: hidden; overflow-y: auto; padding-right: 5px; scrollbar-gutter: stable; scrollbar-width: thin; scrollbar-color: rgba(185,185,185,.48) transparent; }
+			#modloader-panel .modloader-mod-manager::-webkit-scrollbar { width: 4px; }
+			#modloader-panel .modloader-mod-manager::-webkit-scrollbar-track { background: transparent; }
+			#modloader-panel .modloader-mod-manager::-webkit-scrollbar-thumb { border-radius: 999px; background: rgba(185,185,185,.48); }
+			#modloader-panel .modloader-mod-manager::-webkit-scrollbar-thumb:hover { background: rgba(210,210,210,.62); }
 			#modloader-panel .modloader-mod-row { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 10px; align-items: flex-start; padding: 9px; border: 1px solid rgba(255,255,255,.1); border-radius: 7px; background: rgba(255,255,255,.045); }
 			#modloader-panel .modloader-mod-row-selected { border-color: rgba(174, 231, 160, .42); background: rgba(120, 190, 120, .08); }
 			#modloader-panel .modloader-mod-row-problem { border-color: rgba(255, 196, 87, .48); }
