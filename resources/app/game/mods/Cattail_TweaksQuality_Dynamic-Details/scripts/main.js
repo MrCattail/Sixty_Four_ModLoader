@@ -6,6 +6,7 @@ ModLoader.register({
 		const cubeProbeKey = '_cattailDynamicCubeProbe'
 		const cubeMemoryKey = '_cattailDynamicCubeMemory'
 		const detailToggleKey = '_cattailDynamicDetailsToggle'
+		const coordinateToggleKey = '_cattailDynamicCoordinateToggle'
 		const widthStateKey = '_cattailDynamicWidthState'
 		const cubeMemoryTtl = 15000
 		const stableWidthTtl = 10000
@@ -37,10 +38,31 @@ ModLoader.register({
 		const resourceSourceMinAmount = 0.0001
 		const resourceSourceSummaryCacheMs = 350
 		const resourceSourceEventBucketMs = 250
+		const resourceSourceMaxEvents = 12000
 		const resourceSourceMaxLinks = Number.POSITIVE_INFINITY
 		const resourceSourceGpuCurveSegments = 72
 		const resourceSourceConsumeColor = '#7a2b2b'
+		const resourceSourceProfilerStorageKey = 'cattailDynamicResourceSourceProfiler'
+		const resourceSourceProfilerSlowMs = 8
+		const resourceSourceProfilerVerySlowMs = 25
+		const resourceSourceProfilerThrottleMs = 1000
+		const resourceSourceFrameStallMs = 120
+		const resourceSourceFrameStallCooldownMs = 1000
+		const resourceSourceLongTaskMinMs = 50
+		const resourceSourceProfilerSampleLimit = 12
+		const resourceSourceProfilerTraceLimit = 48
 		const resourceSourceImageCache = new Map()
+		const resourceSourceProfilerStats = new Map()
+		const resourceSourceProfilerSamples = []
+		const resourceSourceProfilerTrace = []
+		const resourceSourceProfilerActiveStack = []
+		const resourceSourceImageDecodeQueue = []
+		let resourceSourceImageDecodeActive = false
+		let resourceSourceFrameProbeStarted = false
+		let resourceSourceLongTaskObserverStarted = false
+		let resourceSourceLongTaskObserver = null
+		let resourceSourceFrameLastTime = 0
+		let resourceSourceFrameLastLog = 0
 		const buildCountdownStateKey = '_cattailShopBuildCountdownState'
 		const buildCountdownElementKey = '_cattailShopBuildCountdownElement'
 		const buildCountdownNextRefreshKey = '_cattailShopBuildCountdownNextRefresh'
@@ -50,6 +72,8 @@ ModLoader.register({
 		const buildCountdownActivePriceClass = 'cattail-has-active-build-countdown'
 		const buildCountdownStyleId = 'cattail-dynamic-build-countdown-style'
 		const buildCountdownSampleWindowMs = 30000
+		const buildCountdownEventBucketMs = 250
+		const buildCountdownMaxResourceEvents = 160
 		const buildCountdownSampleMinAgeMs = 2000
 		const buildCountdownRateCacheMs = 500
 		const buildCountdownRefreshMs = 1000
@@ -62,6 +86,7 @@ ModLoader.register({
 		let zPressed = false
 		let hintOpacity = 1
 		let hintInfoOpaque = false
+		let resourceSourceProfilerEnabled = false
 
 		api.on('afterVanillaScripts', function () {
 			if (typeof Cloud === 'undefined' || typeof Entity === 'undefined') return
@@ -72,6 +97,7 @@ ModLoader.register({
 			patchHintProducers()
 			patchMeasuredOutputs()
 			installDetailToggle()
+			installCoordinateToggle()
 			installOpacityControls()
 			patchTransientCubeHints()
 			installResourceSourceTracking()
@@ -338,6 +364,31 @@ ModLoader.register({
 			return !!(game?.hoveredEntity || shouldUseTransientCubeHint(game))
 		}
 
+		function installCoordinateToggle() {
+			if (window._cattailDynamicCoordinateToggleInstalled) return
+			window._cattailDynamicCoordinateToggleInstalled = true
+			addEventListener('keydown', function (event) {
+				if (!isCoordinateToggleEvent(event) || event.repeat) return
+				const game = lastGame
+				if (!game) return
+				setCoordinateToggle(game, !isCoordinateToggleActive(game))
+				event.preventDefault()
+				event.stopImmediatePropagation()
+			}, true)
+		}
+
+		function isCoordinateToggleEvent(event) {
+			const key = String(event?.key || '').toLowerCase()
+			return !!(event?.altKey && (key === 'c' || event?.code === 'KeyC' || event?.keyCode === 67))
+		}
+		function isCoordinateToggleActive(game) {
+			return !!game?.[coordinateToggleKey]
+		}
+
+		function setCoordinateToggle(game, active) {
+			if (game) game[coordinateToggleKey] = !!active
+		}
+
 		function setDetailToggle(game, active) {
 			game[detailToggleKey] = !!active
 			document.body.classList.toggle('cattail-dynamic-details-locked', !!active)
@@ -544,12 +595,13 @@ ModLoader.register({
 						this.shiftPressed = true
 					}
 
+					let result
 					try {
 						if (shouldUseTransientCubeHint(this)) {
 							probe = getTransientCubeProbe(this)
 							if (probe) this.hoveredEntity = probe
 						}
-						return original.apply(this, args)
+						result = original.apply(this, args)
 					} finally {
 						if (probe && this.hoveredEntity === probe) this.hoveredEntity = previousHovered
 						if (locked) {
@@ -557,10 +609,87 @@ ModLoader.register({
 							this.shiftPressed = previousShift
 						}
 					}
+					renderCoordinateOverlay(this)
+					return result
 				}
 			})
 		}
 
+		function renderCoordinateOverlay(game) {
+			if (!shouldShowCoordinateOverlay(game)) return
+			const cell = game.hoveredCell
+			const text = 'X: ' + cell[0] + ' Y: ' + cell[1]
+			const ctx = game.ctx
+			const pixelRatio = game.pixelRatio || 1
+			const unit = game.screenUnit || game.unit || 1
+			const fontSize = Math.max(9 * pixelRatio, unit * 0.105)
+			const gap = Math.max(8 * pixelRatio, fontSize * 0.85)
+			const margin = Math.max(4 * pixelRatio, fontSize * 0.35)
+
+			ctx.save()
+			ctx.font = '400 ' + fontSize + 'px Montserrat, Arial, sans-serif'
+			ctx.textBaseline = 'top'
+			ctx.textAlign = 'left'
+			const textWidth = ctx.measureText(text).width
+			const height = fontSize * 1.18
+			const point = getCoordinateOverlayPosition(game, textWidth, height, gap, margin)
+
+			ctx.shadowColor = 'rgba(255, 255, 255, 0.72)'
+			ctx.shadowBlur = Math.max(1, pixelRatio * 1.6)
+			ctx.fillStyle = 'rgba(45, 52, 64, 0.82)'
+			ctx.fillText(text, point.x, point.y)
+			ctx.restore()
+		}
+
+		function getCoordinateOverlayPosition(game, width, height, gap, margin) {
+			const hintRect = getCurrentHintCanvasRect(game)
+			if (hintRect) {
+				const x = clampNumber(hintRect.x + hintRect.width / 2 - width / 2, margin, Math.max(margin, game.w - width - margin))
+				let y = hintRect.y - height - gap
+				if (y < margin) y = hintRect.y + hintRect.height + gap
+				y = clampNumber(y, margin, Math.max(margin, game.h - height - margin))
+				return { x, y }
+			}
+
+			const mouse = game.mouse?.xy || [0, 0]
+			const offsetX = Math.max(10 * (game.pixelRatio || 1), width * 0.12)
+			const offsetY = Math.max(12 * (game.pixelRatio || 1), height * 1.05)
+			return {
+				x: clampNumber(mouse[0] + offsetX, margin, Math.max(margin, game.w - width - margin)),
+				y: clampNumber(mouse[1] - offsetY - height, margin, Math.max(margin, game.h - height - margin))
+			}
+		}
+
+		function getCurrentHintCanvasRect(game) {
+			const element = game?.currentHint?.element
+			if (!element || !document.body.contains(element)) return null
+			if (Array.isArray(game.mouse?.offsetxy)) {
+				element.style.left = game.mouse.offsetxy[0] + 'px'
+				element.style.top = game.mouse.offsetxy[1] + 'px'
+			}
+			const rect = element.getBoundingClientRect?.()
+			if (!rect || !rect.width || !rect.height) return null
+			const canvasRect = game.canvas?.getBoundingClientRect?.()
+			const canvasLeft = canvasRect?.left || 0
+			const canvasTop = canvasRect?.top || 0
+			const scaleX = canvasRect?.width ? game.w / canvasRect.width : (game.pixelRatio || 1)
+			const scaleY = canvasRect?.height ? game.h / canvasRect.height : (game.pixelRatio || 1)
+			return {
+				x: (rect.left - canvasLeft) * scaleX,
+				y: (rect.top - canvasTop) * scaleY,
+				width: rect.width * scaleX,
+				height: rect.height * scaleY
+			}
+		}
+
+		function shouldShowCoordinateOverlay(game) {
+			return !!(
+				game &&
+				(game.mouse?.cursorVisible !== false) &&
+				Array.isArray(game.hoveredCell) &&
+				(game.altActive || isCoordinateToggleActive(game))
+			)
+		}
 		function shouldUseTransientCubeHint(game) {
 			return !!(
 				game &&
@@ -1705,6 +1834,7 @@ ModLoader.register({
 			if (typeof Game === 'undefined' || !Game.prototype) return
 
 			installResourceSourceGpuLineToggle()
+			installResourceSourceProfilerToggle()
 			patchCubeResourceSourceAttribution()
 			patchMinedCubeResourceSourceAttribution()
 			patchGeneralDecayResourceSourceAttribution()
@@ -1774,8 +1904,8 @@ ModLoader.register({
 
 			api.patch(Game.prototype, 'renderResources', function (original) {
 				return function (...args) {
-					scheduleResourceSourceWarmup(this)
-					trimResourceSourceEvents(getResourceSourceState(this), performance.now())
+					profileResourceSource('resource.warmup.schedule', () => scheduleResourceSourceWarmup(this), () => getResourceSourceProfileDetail(this, getResourceSourceFocusResourceId(this)))
+					profileResourceSource('resource.events.trim.render', () => trimResourceSourceEvents(getResourceSourceState(this), performance.now()), () => getResourceSourceProfileDetail(this, getResourceSourceFocusResourceId(this)))
 					if (this.plane) {
 						clearResourceSourceGpuLines(this)
 						return original.apply(this, args)
@@ -1785,9 +1915,21 @@ ModLoader.register({
 					const useVirtualHover = Number.isInteger(virtualHoveredResource) && !Number.isInteger(previousHoveredResource)
 					if (useVirtualHover) this.hoveredResource = virtualHoveredResource
 					try {
-						renderResourceSourceLinks(this)
-						const result = original.apply(this, args)
-						renderResourceSourcePanels(this)
+						profileResourceSource(
+							'resource.links.total',
+							() => renderResourceSourceLinks(this),
+							() => getResourceSourceProfileDetail(this, getResourceSourceFocusResourceId(this))
+						)
+						const result = profileResourceSource(
+							'resource.vanilla.renderResources',
+							() => original.apply(this, args),
+							() => getResourceSourceProfileDetail(this, getResourceSourceFocusResourceId(this))
+						)
+						profileResourceSource(
+							'resource.panel.phase',
+							() => renderResourceSourcePanels(this),
+							() => getResourceSourceProfileDetail(this, getResourceSourceFocusResourceId(this))
+						)
 						return result
 					} finally {
 						if (useVirtualHover) this.hoveredResource = previousHoveredResource
@@ -1809,6 +1951,263 @@ ModLoader.register({
 			}, true)
 		}
 
+		function installResourceSourceProfilerToggle() {
+			if (window._cattailDynamicResourceSourceProfilerInstalled) return
+			window._cattailDynamicResourceSourceProfilerInstalled = true
+			resourceSourceProfilerEnabled = loadStoredBoolean(resourceSourceProfilerStorageKey, false)
+			startResourceSourceFrameStallDetector()
+			startResourceSourceLongTaskObserver()
+			if (resourceSourceProfilerEnabled) console.info('[Cattail Dynamic Details] Resource source profiler enabled. Press F8 to toggle.')
+			window.cattailResourceSourceProfiler = {
+				enable() { setResourceSourceProfilerEnabled(true) },
+				disable() { setResourceSourceProfilerEnabled(false) },
+				isEnabled() { return resourceSourceProfilerEnabled }
+			}
+			addEventListener('keydown', function (event) {
+				if (!isResourceSourceProfilerToggleEvent(event) || event.repeat) return
+				setResourceSourceProfilerEnabled(!resourceSourceProfilerEnabled)
+				event.preventDefault()
+				event.stopImmediatePropagation()
+			}, true)
+		}
+
+		function isResourceSourceProfilerToggleEvent(event) {
+			return event?.key === 'F8' || event?.code === 'F8' || event?.keyCode === 119
+		}
+
+		function setResourceSourceProfilerEnabled(active) {
+			resourceSourceProfilerEnabled = !!active
+			saveStoredBoolean(resourceSourceProfilerStorageKey, resourceSourceProfilerEnabled)
+			console.info('[Cattail Dynamic Details] Resource source profiler ' + (resourceSourceProfilerEnabled ? 'enabled' : 'disabled') + '. Press F8 to toggle.')
+		}
+
+		function startResourceSourceFrameStallDetector() {
+			if (resourceSourceFrameProbeStarted) return
+			resourceSourceFrameProbeStarted = true
+			const step = (now) => {
+				if (resourceSourceFrameLastTime && resourceSourceProfilerEnabled) {
+					const gap = now - resourceSourceFrameLastTime
+					if (gap >= resourceSourceFrameStallMs && now - resourceSourceFrameLastLog >= resourceSourceFrameStallCooldownMs) {
+						resourceSourceFrameLastLog = now
+						console.warn('[Cattail Dynamic Details][ResourceSource] frame.stall ' + gap.toFixed(2) + 'ms' + formatResourceSourceLogDetail(getResourceSourceFrameStallDetail(gap)))
+					}
+				}
+				resourceSourceFrameLastTime = now
+				requestAnimationFrame(step)
+			}
+			requestAnimationFrame(step)
+		}
+
+		function startResourceSourceLongTaskObserver() {
+			if (resourceSourceLongTaskObserverStarted) return
+			resourceSourceLongTaskObserverStarted = true
+			if (typeof PerformanceObserver !== 'function') return
+			try {
+				const observer = new PerformanceObserver((list) => {
+					if (!resourceSourceProfilerEnabled) return
+					for (const entry of list.getEntries()) {
+						if (!entry || entry.duration < resourceSourceLongTaskMinMs) continue
+						console.warn('[Cattail Dynamic Details][ResourceSource] longtask ' + entry.duration.toFixed(2) + 'ms' + formatResourceSourceLogDetail(getResourceSourceLongTaskDetail(entry)))
+					}
+				})
+				resourceSourceLongTaskObserver = observer
+				observer.observe({ type: 'longtask', buffered: true })
+			} catch (error) {
+				if (resourceSourceProfilerEnabled) {
+					console.info('[Cattail Dynamic Details][ResourceSource]', 'longtask unsupported', String(error?.message || error))
+				}
+			}
+		}
+
+		function formatResourceSourceLogDetail(detail) {
+			if (!detail) return ''
+			try {
+				const seen = new WeakSet()
+				return String.fromCharCode(10) + JSON.stringify(detail, (key, value) => {
+					if (typeof value === 'function') return '[function]'
+					if (typeof value === 'number' && !Number.isFinite(value)) return String(value)
+					if (value && typeof value === 'object') {
+						if (seen.has(value)) return '[circular]'
+						seen.add(value)
+						if (typeof HTMLImageElement !== 'undefined' && value instanceof HTMLImageElement) {
+							return {
+								src: value.src,
+								complete: value.complete,
+								naturalWidth: value.naturalWidth,
+								naturalHeight: value.naturalHeight
+							}
+						}
+						if (typeof Element !== 'undefined' && value instanceof Element) return '[element ' + value.tagName + ']'
+					}
+					return value
+				}, 2)
+			} catch (error) {
+				return String.fromCharCode(10) + String(error?.message || error)
+			}
+		}
+		function getResourceSourceFrameStallDetail(gap) {
+			const game = lastGame
+			const state = game?.[resourceSourceStateKey]
+			const buildState = game?.[buildCountdownStateKey]
+			let focusResource = null
+			try {
+				focusResource = getResourceSourceFocusResourceId(game)
+			} catch (error) {}
+			return {
+				gap: Math.round(gap * 100) / 100,
+				resourceId: focusResource,
+				hoveredResource: Number.isInteger(game?.hoveredResource) ? game.hoveredResource : null,
+				lineLocked: !!game?.[resourceSourceLineLockKey],
+				lineResource: Number.isInteger(game?.[resourceSourceLineResourceKey]) ? game[resourceSourceLineResourceKey] : null,
+				panelActive: isResourceSourcePanelActive(game),
+				linkActive: isResourceSourceLinkActive(game),
+				gpu: !!game?.[resourceSourceGpuLineModeKey],
+				events: Array.isArray(state?.events) ? state.events.length : 0,
+				images: resourceSourceImageCache.size,
+				buildEvents: Array.isArray(buildState?.resourceEvents) ? buildState.resourceEvents.length : 0,
+				buildSnapshots: Array.isArray(buildState?.snapshots) ? buildState.snapshots.length : 0,
+				decodeQueue: resourceSourceImageDecodeQueue.length,
+				decodeActive: resourceSourceImageDecodeActive,
+				plane: game?.plane || 0,
+				alt: !!game?.altActive,
+				shift: !!game?.shiftPressed,
+				lastSamples: resourceSourceProfilerSamples.slice(-resourceSourceProfilerSampleLimit),
+				activeStack: resourceSourceProfilerActiveStack.slice(),
+				lastTrace: resourceSourceProfilerTrace.slice(-16)
+			}
+		}
+
+		function getResourceSourceLongTaskDetail(entry) {
+			const game = lastGame
+			const state = game?.[resourceSourceStateKey]
+			const buildState = game?.[buildCountdownStateKey]
+			let focusResource = null
+			try {
+				focusResource = getResourceSourceFocusResourceId(game)
+			} catch (error) {}
+			return {
+				duration: Math.round(entry.duration * 100) / 100,
+				startTime: Math.round(entry.startTime),
+				name: entry.name || '',
+				resourceId: focusResource,
+				hoveredResource: Number.isInteger(game?.hoveredResource) ? game.hoveredResource : null,
+				lineLocked: !!game?.[resourceSourceLineLockKey],
+				lineResource: Number.isInteger(game?.[resourceSourceLineResourceKey]) ? game[resourceSourceLineResourceKey] : null,
+				panelActive: isResourceSourcePanelActive(game),
+				linkActive: isResourceSourceLinkActive(game),
+				gpu: !!game?.[resourceSourceGpuLineModeKey],
+				events: Array.isArray(state?.events) ? state.events.length : 0,
+				images: resourceSourceImageCache.size,
+				buildEvents: Array.isArray(buildState?.resourceEvents) ? buildState.resourceEvents.length : 0,
+				buildSnapshots: Array.isArray(buildState?.snapshots) ? buildState.snapshots.length : 0,
+				decodeQueue: resourceSourceImageDecodeQueue.length,
+				decodeActive: resourceSourceImageDecodeActive,
+				plane: game?.plane || 0,
+				alt: !!game?.altActive,
+				shift: !!game?.shiftPressed,
+				attribution: Array.from(entry.attribution || []).map((item) => ({
+					name: item.name,
+					entryType: item.entryType,
+					containerType: item.containerType,
+					containerName: item.containerName,
+					containerSrc: item.containerSrc
+				})),
+				lastSamples: resourceSourceProfilerSamples.slice(-resourceSourceProfilerSampleLimit),
+				activeStack: resourceSourceProfilerActiveStack.slice(),
+				lastTrace: resourceSourceProfilerTrace.slice(-16)
+			}
+		}
+		function rememberResourceSourceProfileTrace(label, phase, detail) {
+			if (!resourceSourceProfilerEnabled) return
+			resourceSourceProfilerTrace.push({
+				label,
+				phase,
+				time: Math.round(performance.now()),
+				detail
+			})
+			while (resourceSourceProfilerTrace.length > resourceSourceProfilerTraceLimit) resourceSourceProfilerTrace.shift()
+		}
+
+		function rememberResourceSourceProfileSample(label, duration, detail) {
+			resourceSourceProfilerSamples.push({
+				label,
+				duration: Math.round(duration * 100) / 100,
+				time: Math.round(performance.now()),
+				detail
+			})
+			while (resourceSourceProfilerSamples.length > resourceSourceProfilerSampleLimit) resourceSourceProfilerSamples.shift()
+		}
+		function profileResourceSource(label, callback, detail) {
+			if (!resourceSourceProfilerEnabled) return callback()
+			const start = performance.now()
+			const stackIndex = resourceSourceProfilerActiveStack.length
+			resourceSourceProfilerActiveStack.push(label)
+			rememberResourceSourceProfileTrace(label, 'start')
+			try {
+				return callback()
+			} finally {
+				const duration = performance.now() - start
+				resourceSourceProfilerActiveStack.length = stackIndex
+				rememberResourceSourceProfileTrace(label, 'end', { duration: Math.round(duration * 100) / 100 })
+				logResourceSourceProfile(label, duration, detail)
+			}
+		}
+
+		function logResourceSourceProfile(label, duration, detail) {
+			if (!resourceSourceProfilerEnabled || duration < resourceSourceProfilerSlowMs) return
+			let resolvedDetail = detail
+			if (typeof detail === 'function') {
+				try {
+					resolvedDetail = detail()
+				} catch (error) {
+					resolvedDetail = { detailError: String(error?.message || error) }
+				}
+			}
+			rememberResourceSourceProfileSample(label, duration, resolvedDetail)
+			if (duration >= resourceSourceProfilerVerySlowMs) {
+				console.warn('[Cattail Dynamic Details][ResourceSource] ' + label + ' ' + duration.toFixed(2) + 'ms' + formatResourceSourceLogDetail(resolvedDetail))
+				return
+			}
+			logResourceSourceProfileThrottled(label, duration, resolvedDetail)
+		}
+
+		function logResourceSourceProfileThrottled(label, duration, detail) {
+			const now = performance.now()
+			let stat = resourceSourceProfilerStats.get(label)
+			if (!stat) {
+				stat = { count: 0, total: 0, max: 0, last: 0, detail: null }
+				resourceSourceProfilerStats.set(label, stat)
+			}
+			stat.count++
+			stat.total += duration
+			if (duration >= stat.max) {
+				stat.max = duration
+				stat.detail = detail
+			}
+			if (now - stat.last < resourceSourceProfilerThrottleMs) return
+			stat.last = now
+			const average = stat.total / Math.max(1, stat.count)
+			console.info('[Cattail Dynamic Details][ResourceSource] ' + label + ' avg ' + average.toFixed(2) + 'ms max ' + stat.max.toFixed(2) + 'ms x' + stat.count + formatResourceSourceLogDetail(stat.detail))
+			stat.count = 0
+			stat.total = 0
+			stat.max = 0
+			stat.detail = null
+		}
+
+		function logResourceSourceAsyncProfile(label, duration, detail) {
+			if (!resourceSourceProfilerEnabled || duration < resourceSourceProfilerSlowMs) return
+			const resolvedDetail = Object.assign({ asyncElapsed: true }, detail || {})
+			rememberResourceSourceProfileSample(label, duration, resolvedDetail)
+			logResourceSourceProfileThrottled(label, duration, resolvedDetail)
+		}
+		function getResourceSourceProfileDetail(game, resourceId, extra = {}) {
+			const state = game?.[resourceSourceStateKey]
+			return Object.assign({
+				resourceId,
+				events: Array.isArray(state?.events) ? state.events.length : 0,
+				gpu: !!game?.[resourceSourceGpuLineModeKey]
+			}, extra)
+		}
 		function isResourceSourceGpuLineToggleEvent(event) {
 			const key = String(event?.key || '').toLowerCase()
 			return key === 'o' || event?.code === 'KeyO' || event?.keyCode === 79
@@ -1904,8 +2303,13 @@ ModLoader.register({
 			const cutoff = now - resourceSourceWindowMs
 			let removeCount = 0
 			while (removeCount < state.events.length && state.events[removeCount].time < cutoff) removeCount++
-			if (!removeCount) return
-			const removed = state.events.splice(0, removeCount)
+			if (removeCount) removeResourceSourceEvents(state, removeCount)
+			const overflow = state.events.length - resourceSourceMaxEvents
+			if (overflow > 0) removeResourceSourceEvents(state, overflow)
+		}
+
+		function removeResourceSourceEvents(state, count) {
+			const removed = state.events.splice(0, count)
 			if (state.eventBuckets instanceof Map) {
 				for (const event of removed) {
 					if (event?.bucketKey) state.eventBuckets.delete(event.bucketKey)
@@ -2059,10 +2463,9 @@ ModLoader.register({
 				return {
 					kind: 'entity',
 					name: entity.name,
-					entity,
 					position,
 					groupKey: 'entity:' + entity.name,
-					instanceKey: 'entity:' + entity.name + ':' + (position ? cellKey(position) : String(Math.random()))
+					instanceKey: 'entity:' + entity.name + ':' + (position ? cellKey(position) : 'unknown')
 				}
 			}
 
@@ -2258,40 +2661,11 @@ ModLoader.register({
 			if (!game || game[resourceSourceWarmupKey]) return
 			game[resourceSourceWarmupKey] = true
 			scheduleResourceSourceIdle(() => {
-				warmResourceSourceImages(game)
 				if (isResourceSourceGpuLineModeActive(game)) {
-					const renderer = getResourceSourceGpuRenderer(game)
-					if (renderer) clearResourceSourceGpuLines(game)
+					const renderer = profileResourceSource('resource.warmup.webgl.renderer', () => getResourceSourceGpuRenderer(game), () => getResourceSourceProfileDetail(game, getResourceSourceFocusResourceId(game)))
+					if (renderer) profileResourceSource('resource.warmup.webgl.clear', () => clearResourceSourceGpuLines(game), () => getResourceSourceProfileDetail(game, getResourceSourceFocusResourceId(game)))
 				}
 			}, 2000)
-		}
-
-		function warmResourceSourceImages(game) {
-			const names = collectResourceSourceWarmupNames(game)
-			let index = 0
-			const step = (deadline) => {
-				const start = performance.now()
-				while (index < names.length && hasResourceSourceIdleBudget(deadline, start)) {
-					getResourceSourceShopImage(game, names[index++])
-				}
-				if (index < names.length) scheduleResourceSourceIdle(step, 1000)
-			}
-			step(null)
-		}
-
-		function collectResourceSourceWarmupNames(game) {
-			const names = new Set()
-			const entities = game?.codex?.entities || {}
-			for (const name in entities) {
-				if (entities[name]?.shopImage) names.add(name)
-			}
-			const state = game?.[resourceSourceStateKey]
-			if (Array.isArray(state?.events)) {
-				for (const event of state.events) {
-					if (event?.source?.kind === 'entity' && event.source.name) names.add(event.source.name)
-				}
-			}
-			return Array.from(names)
 		}
 
 		function scheduleResourceSourceIdle(callback, timeout = 1000) {
@@ -2317,14 +2691,26 @@ ModLoader.register({
 				return
 			}
 
-			const segments = collectResourceSourceLinkSegmentsForResource(game, resourceId)
+			const segments = profileResourceSource(
+				'resource.links.collect',
+				() => collectResourceSourceLinkSegmentsForResource(game, resourceId),
+				() => getResourceSourceProfileDetail(game, resourceId)
+			)
 			if (isResourceSourceGpuLineModeActive(game)) {
-				renderResourceSourceGpuLines(game, segments)
+				profileResourceSource(
+					'resource.links.webgl.render',
+					() => renderResourceSourceGpuLines(game, segments),
+					() => getResourceSourceProfileDetail(game, resourceId, { segments: segments.length })
+				)
 				return
 			}
 
 			clearResourceSourceGpuLines(game)
-			drawResourceSourceLinkSegments(game, segments)
+			profileResourceSource(
+				'resource.links.canvas.render',
+				() => drawResourceSourceLinkSegments(game, segments),
+				() => getResourceSourceProfileDetail(game, resourceId, { segments: segments.length })
+			)
 		}
 
 		function collectResourceSourceLinkSegmentsForResource(game, resourceId) {
@@ -2377,7 +2763,7 @@ ModLoader.register({
 		}
 
 		function renderResourceSourceGpuLines(game, segments) {
-			const renderer = getResourceSourceGpuRenderer(game)
+			const renderer = profileResourceSource('resource.links.webgl.renderer', () => getResourceSourceGpuRenderer(game), () => ({ segments: segments.length }))
 			if (!renderer) {
 				drawResourceSourceLinkSegments(game, segments)
 				return
@@ -2389,7 +2775,7 @@ ModLoader.register({
 			gl.clear(gl.COLOR_BUFFER_BIT)
 			if (!segments.length) return
 
-			const lineData = buildResourceSourceGpuLineData(game, segments)
+			const lineData = profileResourceSource('resource.links.webgl.data', () => buildResourceSourceGpuLineData(game, segments), () => ({ segments: segments.length }))
 			gl.bindBuffer(gl.ARRAY_BUFFER, renderer.lineBuffer)
 			gl.bufferData(gl.ARRAY_BUFFER, lineData, gl.DYNAMIC_DRAW)
 
@@ -2437,15 +2823,17 @@ ModLoader.register({
 			canvas.style.pointerEvents = 'none'
 			canvas.style.zIndex = '1'
 			canvas.style.display = 'none'
-			const gl = canvas.getContext('webgl2', { alpha: true, premultipliedAlpha: false, antialias: true })
+			const gl = profileResourceSource('resource.links.webgl.context', () => canvas.getContext('webgl2', { alpha: true, premultipliedAlpha: false, antialias: true }), () => getResourceSourceProfileDetail(game, getResourceSourceFocusResourceId(game)))
 			if (!gl) return null
 			try {
+				const lineProgram = profileResourceSource('resource.links.webgl.lineProgram', () => createResourceSourceGpuProgram(gl, getResourceSourceGpuLineVertexShader(), getResourceSourceGpuLineFragmentShader()), () => getResourceSourceProfileDetail(game, getResourceSourceFocusResourceId(game)))
+				const pointProgram = profileResourceSource('resource.links.webgl.pointProgram', () => createResourceSourceGpuProgram(gl, getResourceSourceGpuPointVertexShader(), getResourceSourceGpuPointFragmentShader()), () => getResourceSourceProfileDetail(game, getResourceSourceFocusResourceId(game)))
 				const renderer = {
 					canvas,
 					gl,
 					lineBuffer: gl.createBuffer(),
-					lineProgram: createResourceSourceGpuProgram(gl, getResourceSourceGpuLineVertexShader(), getResourceSourceGpuLineFragmentShader()),
-					pointProgram: createResourceSourceGpuProgram(gl, getResourceSourceGpuPointVertexShader(), getResourceSourceGpuPointFragmentShader()),
+					lineProgram,
+					pointProgram,
 					lineUniforms: {},
 					pointUniforms: {}
 				}
@@ -2631,7 +3019,11 @@ ModLoader.register({
 			if (!isResourceSourcePanelActive(game)) return
 			const resourceId = getResourceSourceFocusResourceId(game)
 			if (!Number.isInteger(resourceId)) return
-			renderResourceSourcePanel(game, resourceId)
+			profileResourceSource(
+				'resource.panel.total',
+				() => renderResourceSourcePanel(game, resourceId),
+				() => getResourceSourceProfileDetail(game, resourceId)
+			)
 		}
 
 		function renderResourceSourcePanel(game, resourceId) {
@@ -2653,8 +3045,8 @@ ModLoader.register({
 			const columnGap = Math.max(12 * pixelRatio, unit * 0.18)
 
 			ctx.save()
-			const gainWidth = measureResourceSourceRows(ctx, game, gainRows, iconSize, gap, fontSize, countFontSize)
-			const consumeWidth = measureResourceSourceRows(ctx, game, consumeRows, iconSize, gap, fontSize, countFontSize)
+			const gainWidth = profileResourceSource('resource.panel.measure.gain', () => measureResourceSourceRows(ctx, game, gainRows, iconSize, gap, fontSize, countFontSize), () => getResourceSourceProfileDetail(game, resourceId, { rows: gainRows.length }))
+			const consumeWidth = profileResourceSource('resource.panel.measure.consume', () => measureResourceSourceRows(ctx, game, consumeRows, iconSize, gap, fontSize, countFontSize), () => getResourceSourceProfileDetail(game, resourceId, { rows: consumeRows.length }))
 			const hasBothColumns = gainRows.length && consumeRows.length
 			const contentWidth = hasBothColumns ? gainWidth + columnGap + consumeWidth : Math.max(gainWidth, consumeWidth)
 			const rowCount = Math.max(gainRows.length, consumeRows.length)
@@ -2751,15 +3143,23 @@ ModLoader.register({
 		function getResourceSourceSummary(game, resourceId) {
 			const now = performance.now()
 			const state = getResourceSourceState(game)
-			trimResourceSourceEvents(state, now)
+			profileResourceSource('resource.events.trim.summary', () => trimResourceSourceEvents(state, now), () => getResourceSourceProfileDetail(game, resourceId))
 			const cacheKey = String(resourceId)
 			const cached = state.summaryCache?.[cacheKey]
 			if (cached && now - cached.time < resourceSourceSummaryCacheMs) return cached.summary
 
 			const seconds = Math.max(1, Math.min(resourceSourceWindowMs, now - state.startedAt) / 1000)
 			const summary = {
-				gain: aggregateResourceSourceEvents(state.events, resourceId, 'gain', seconds),
-				consume: aggregateResourceSourceEvents(state.events, resourceId, 'consume', seconds)
+				gain: profileResourceSource(
+					'resource.summary.aggregate.gain',
+					() => aggregateResourceSourceEvents(state.events, resourceId, 'gain', seconds),
+					() => getResourceSourceProfileDetail(game, resourceId, { seconds: Math.round(seconds * 100) / 100 })
+				),
+				consume: profileResourceSource(
+					'resource.summary.aggregate.consume',
+					() => aggregateResourceSourceEvents(state.events, resourceId, 'consume', seconds),
+					() => getResourceSourceProfileDetail(game, resourceId, { seconds: Math.round(seconds * 100) / 100 })
+				)
 			}
 			state.summaryCache[cacheKey] = { time: now, summary }
 			return summary
@@ -2804,7 +3204,7 @@ ModLoader.register({
 				if (source.entity?.sprite) {
 					game.ctx.save()
 					clipIconRect(game.ctx, x, y, size)
-					source.entity.sprite.renderXY([x, y + size * 0.22], 0, false, Math.max(0.12, size / Math.max(1, (game.unit || 1) * 1.65)))
+					profileResourceSource('resource.icon.entitySprite.render', () => source.entity.sprite.renderXY([x, y + size * 0.22], 0, false, Math.max(0.12, size / Math.max(1, (game.unit || 1) * 1.65))), () => ({ name: source.name, size: Math.round(size * 100) / 100 }))
 					game.ctx.restore()
 					return
 				}
@@ -2822,7 +3222,7 @@ ModLoader.register({
 			const drawSize = size * 0.74
 			game.ctx.save()
 			clipIconRect(game.ctx, x, y, size)
-			sprite.renderXY([x, y], 0, false, Math.max(0.08, drawSize / Math.max(1, (game.unit || 1) * 1.65)))
+			profileResourceSource('resource.icon.resourceSprite.render', () => sprite.renderXY([x, y], 0, false, Math.max(0.08, drawSize / Math.max(1, (game.unit || 1) * 1.65))), () => ({ resourceId, size: Math.round(size * 100) / 100 }))
 			game.ctx.restore()
 		}
 
@@ -2832,7 +3232,7 @@ ModLoader.register({
 			const ctx = game.ctx
 			ctx.save()
 			clipIconRect(ctx, x, y, size)
-			ctx.drawImage(img, x - size / 2, y - size / 2, size, size)
+			profileResourceSource('resource.icon.drawImage', () => ctx.drawImage(img, x - size / 2, y - size / 2, size, size), () => ({ name, size: Math.round(size * 100) / 100, src: img.src }))
 			ctx.restore()
 			return true
 		}
@@ -2848,37 +3248,25 @@ ModLoader.register({
 				img._cattailResourceSourceReady = false
 				img._cattailResourceSourceDecoding = false
 				img._cattailResourceSourceFailed = false
-				img.onload = () => requestResourceSourceImageDecode(img)
+				img.onload = () => markResourceSourceImageLoaded(img)
 				img.onerror = () => {
 					img._cattailResourceSourceFailed = true
 				}
 				img.src = resolved
 				resourceSourceImageCache.set(resolved, img)
 			}
-			requestResourceSourceImageDecode(img)
+			markResourceSourceImageLoaded(img)
 			return img
 		}
 
-		function requestResourceSourceImageDecode(img) {
-			if (!img || img._cattailResourceSourceReady || img._cattailResourceSourceDecoding || img._cattailResourceSourceFailed) return
+		function markResourceSourceImageLoaded(img) {
+			if (!img || img._cattailResourceSourceReady || img._cattailResourceSourceFailed) return
 			if (!img.complete) return
 			if (!img.naturalWidth) {
 				img._cattailResourceSourceFailed = true
 				return
 			}
-			if (typeof img.decode !== 'function') {
-				img._cattailResourceSourceReady = true
-				return
-			}
-			img._cattailResourceSourceDecoding = true
-			img.decode().then(() => {
-				img._cattailResourceSourceReady = true
-			}).catch(() => {
-				if (img.complete && img.naturalWidth) img._cattailResourceSourceReady = true
-				else img._cattailResourceSourceFailed = true
-			}).finally(() => {
-				img._cattailResourceSourceDecoding = false
-			})
+			img._cattailResourceSourceReady = true
 		}
 
 		function isResourceSourceImageReady(img) {
@@ -3258,11 +3646,23 @@ ModLoader.register({
 		  }
 
 		  if (!hasDelta) return
-		  state.resourceEvents.push({ time: now, resources })
+		  appendBuildCountdownResourceEvent(state, now, resources)
 		  trimBuildCountdownResourceEvents(state, now)
 		  state.cachedRateAt = 0
 		}
 
+		function appendBuildCountdownResourceEvent(state, now, resources) {
+		  const bucketTime = Math.floor(now / buildCountdownEventBucketMs) * buildCountdownEventBucketMs
+		  const last = state.resourceEvents[state.resourceEvents.length - 1]
+		  if (last && last.time === bucketTime && Array.isArray(last.resources)) {
+		    const length = Math.max(last.resources.length, resources.length)
+		    for (let i = 0; i < length; i++) {
+		      last.resources[i] = (Number(last.resources[i]) || 0) + (Number(resources[i]) || 0)
+		    }
+		    return
+		  }
+		  state.resourceEvents.push({ time: bucketTime, resources })
+		}
 		function calculateEventRates(game, state, length, now) {
 		  const rates = new Array(length).fill(0)
 		  const touched = new Array(length).fill(false)
@@ -3389,18 +3789,20 @@ ModLoader.register({
 		function trimBuildCountdownSnapshots(state, now) {
 		  const snapshots = state.snapshots
 		  const cutoff = now - buildCountdownSampleWindowMs
-		  while (snapshots.length > 2 && snapshots[1].time < cutoff) {
-		    snapshots.shift()
-		  }
+		  let removeCount = 0
+		  while (snapshots.length - removeCount > 2 && snapshots[removeCount + 1].time < cutoff) removeCount++
+		  if (removeCount > 0) snapshots.splice(0, removeCount)
 		}
 
 		function trimBuildCountdownResourceEvents(state, now) {
 		  const events = state.resourceEvents
 		  if (!Array.isArray(events)) return
 		  const cutoff = now - buildCountdownSampleWindowMs
-		  while (events.length && events[0].time < cutoff) {
-		    events.shift()
-		  }
+		  let removeCount = 0
+		  while (removeCount < events.length && events[removeCount].time < cutoff) removeCount++
+		  if (removeCount > 0) events.splice(0, removeCount)
+		  const overflow = events.length - buildCountdownMaxResourceEvents
+		  if (overflow > 0) events.splice(0, overflow)
 		}
 
 		function normalizeResourceArray(resources, length) {
