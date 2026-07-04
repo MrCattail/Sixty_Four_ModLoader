@@ -232,8 +232,8 @@
 			#modloader-panel .modloader-action-icon { position: relative; display: inline-block; width: 15px; height: 15px; flex: 0 0 auto; color: currentColor; }
 			#modloader-panel .modloader-action-icon-plus:before, #modloader-panel .modloader-action-icon-plus:after { content: ''; position: absolute; left: 50%; top: 50%; width: 13px; height: 2px; border-radius: 999px; background: currentColor; transform: translate(-50%, -50%); }
 			#modloader-panel .modloader-action-icon-plus:after { transform: translate(-50%, -50%) rotate(90deg); }
-			#modloader-panel .modloader-action-icon-folder { width: 16px; height: 12px; margin-top: 2px; border-radius: 3px; background: currentColor; }
-			#modloader-panel .modloader-action-icon-folder:before { content: ''; position: absolute; left: 1px; top: -4px; width: 8px; height: 5px; border-radius: 3px 3px 0 0; background: currentColor; }
+			#modloader-panel .modloader-action-icon-folder { width: 16px; height: 12px; margin-top: 3px; border-radius: 3px; background: currentColor; }
+			#modloader-panel .modloader-action-icon-folder:before { content: ''; position: absolute; left: 2px; top: -2px; width: 6px; height: 3px; border-radius: 2px 2px 0 0; background: currentColor; }
 			#modloader-panel .modloader-panel-error { margin: 8px 0; padding: 8px; border-radius: 6px; background: rgba(255, 96, 96, .14); color: #ffb0b0; }
 			#modloader-panel .modloader-import-zone { display: grid; place-items: center; min-height: 0; max-height: 0; opacity: 0; overflow: hidden; border: 1px solid transparent; border-radius: 7px; background: rgba(0,0,0,.16); box-shadow: inset 0 1px 18px rgba(0,0,0,.28); transform: translateY(-8px); transition: max-height .22s ease, min-height .22s ease, opacity .16s ease, transform .22s ease, border-color .16s ease; }
 			#modloader-panel .modloader-import-zone.active { min-height: 220px; max-height: 320px; opacity: 1; transform: translateY(0); border-color: rgba(255,255,255,.09); }
@@ -314,7 +314,12 @@
 			const os = require('os')
 			const childProcess = require('child_process')
 			let shell = null
-			try { shell = require('electron')?.shell || null } catch (error) {}
+			let clipboard = null
+			try {
+				const electron = require('electron')
+				shell = electron?.shell || null
+				clipboard = electron?.clipboard || null
+			} catch (error) {}
 			const gameRoot = path.dirname(url.fileURLToPath(window.location.href))
 			state.modFileTools = {
 				fs,
@@ -323,6 +328,7 @@
 				os,
 				childProcess,
 				shell,
+				clipboard,
 				gameRoot,
 				modsDir: path.join(gameRoot, 'mods'),
 				enabledPath: path.join(gameRoot, 'mods', 'enabled.json')
@@ -614,6 +620,58 @@
 		return String(name || 'imported-mod').replace(/[<>:"/\\|?*\x00-\x1f]/g, '_').replace(/[. ]+$/g, '').trim() || 'imported-mod'
 	}
 
+	const getZipPathFromText = function (text) {
+		const tools = getModFileTools()
+		for (const raw of String(text || '').split(/\r?\n/)) {
+			let value = raw.trim()
+			if (!value || value.startsWith('#')) continue
+			if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) value = value.slice(1, -1)
+			if (/^file:/i.test(value)) {
+				try { value = tools?.url.fileURLToPath(value) || value } catch (error) {}
+			}
+			if (/\.zip$/i.test(value)) return value
+		}
+		return ''
+	}
+
+	const getZipPathFromFiles = function (files) {
+		for (const file of Array.from(files || [])) {
+			const name = file.path || file.name || ''
+			if (/\.zip$/i.test(name)) return file.path || ''
+		}
+		return ''
+	}
+
+	const getZipPathFromClipboardEvent = function (event) {
+		const fromFiles = getZipPathFromFiles(event?.clipboardData?.files)
+		if (fromFiles) return fromFiles
+		const eventText = event?.clipboardData?.getData?.('text/uri-list') || event?.clipboardData?.getData?.('text/plain') || event?.clipboardData?.getData?.('text') || ''
+		const fromEventText = getZipPathFromText(eventText)
+		if (fromEventText) return fromEventText
+
+		const tools = getModFileTools()
+		const clipboard = tools?.clipboard
+		if (!clipboard) return ''
+		const fromClipboardText = getZipPathFromText(clipboard.readText?.() || '')
+		if (fromClipboardText) return fromClipboardText
+
+		const formats = new Set([ 'FileNameW', 'FileName', 'text/uri-list', 'text/plain' ])
+		try {
+			for (const format of clipboard.availableFormats?.() || []) formats.add(format)
+		} catch (error) {}
+		for (const format of formats) {
+			try {
+				const buffer = clipboard.readBuffer?.(format)
+				if (!buffer?.length) continue
+				const utf16Path = getZipPathFromText(buffer.toString('utf16le').replace(/\0+/g, '\n'))
+				if (utf16Path) return utf16Path
+				const utf8Path = getZipPathFromText(buffer.toString('utf8').replace(/\0+/g, '\n'))
+				if (utf8Path) return utf8Path
+			} catch (error) {}
+		}
+		return ''
+	}
+
 	const collectModRoots = function (directory, depth, out) {
 		const tools = getModFileTools()
 		if (tools.fs.existsSync(tools.path.join(directory, 'mod.json'))) {
@@ -633,18 +691,29 @@
 		const importRoot = tools.path.join(tools.gameRoot, 'modloader', 'state', 'imports')
 		tools.fs.mkdirSync(importRoot, { recursive: true })
 		const tempDir = tools.fs.mkdtempSync(tools.path.join(importRoot, 'zip-'))
+		const extractDir = tools.path.join(tempDir, 'contents')
+		tools.fs.mkdirSync(extractDir, { recursive: true })
+		const scriptPath = tools.path.join(tempDir, 'extract.ps1')
+		tools.fs.writeFileSync(scriptPath, [
+			'param(',
+			'  [Parameter(Mandatory=$true)][string]$ZipPath,',
+			'  [Parameter(Mandatory=$true)][string]$DestinationPath',
+			')',
+			"$ErrorActionPreference = 'Stop'",
+			'[Console]::OutputEncoding = [System.Text.UTF8Encoding]::new()',
+			'Expand-Archive -LiteralPath $ZipPath -DestinationPath $DestinationPath -Force'
+		].join(tools.os.EOL), 'utf8')
 		const result = tools.childProcess.spawnSync('powershell.exe', [
-			'-NoProfile', '-ExecutionPolicy', 'Bypass', '-Command',
-			'Expand-Archive -LiteralPath $args[0] -DestinationPath $args[1] -Force',
-			zipPath, tempDir
+			'-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File',
+			scriptPath, '-ZipPath', zipPath, '-DestinationPath', extractDir
 		], { encoding: 'utf8', windowsHide: true })
 		if (result.error || result.status) {
-			const message = result.error?.message || result.stderr || result.stdout || String(result.status)
+			const message = [ result.error?.message, result.stderr, result.stdout, result.status ? String(result.status) : '' ].filter(Boolean).join('\n')
 			tools.fs.rmSync(tempDir, { recursive: true, force: true })
 			throw new Error(t('zipExtractFailed', { value: message.trim() }))
 		}
 		const roots = []
-		collectModRoots(tempDir, 0, roots)
+		collectModRoots(extractDir, 0, roots)
 		if (!roots.length) {
 			tools.fs.rmSync(tempDir, { recursive: true, force: true })
 			throw new Error(t('zipNoMod'))
@@ -654,7 +723,7 @@
 			throw new Error(t('zipMultipleMods'))
 		}
 		const sourceDir = roots[0]
-		const rootIsTemp = tools.path.resolve(sourceDir) === tools.path.resolve(tempDir)
+		const rootIsTemp = tools.path.resolve(sourceDir) === tools.path.resolve(extractDir)
 		const folderName = sanitizeModFolderName(rootIsTemp ? tools.path.basename(zipPath, tools.path.extname(zipPath)) : tools.path.basename(sourceDir))
 		const destDir = safeModDirectory(folderName)
 		return { tempDir, sourceDir, folderName, destDir }
@@ -711,11 +780,15 @@
 			document.body.appendChild(panel)
 		}
 
+		if (panel.__modloaderCleanup) panel.__modloaderCleanup()
 		panel.innerHTML = ''
 		const close = element('button', 'modloader-panel-close')
 		close.title = t('close')
 		close.setAttribute('aria-label', t('close'))
-		close.onclick = function () { panel.remove() }
+		close.onclick = function () {
+			if (panel.__modloaderCleanup) panel.__modloaderCleanup()
+			panel.remove()
+		}
 		panel.appendChild(close)
 		panel.appendChild(element('h2', '', `Cattail's ModLoader ${state.version}`))
 
@@ -877,13 +950,6 @@
 			}
 		}
 
-		const getZipPathFromFiles = function (files) {
-			for (const file of Array.from(files || [])) {
-				const name = file.path || file.name || ''
-				if (/\.zip$/i.test(name)) return file.path || ''
-			}
-			return ''
-		}
 
 		const importZipPath = async function (zipPath) {
 			if (!zipPath) {
@@ -1109,12 +1175,39 @@
 			importZipPath(zipPath)
 		}
 		importZone.onpaste = function (event) {
-			const zipPath = getZipPathFromFiles(event.clipboardData?.files)
+			const zipPath = getZipPathFromClipboardEvent(event)
 			if (!zipPath) {
 				importStatus.textContent = t('importNoZip')
 				return
 			}
+			event.preventDefault()
 			importZipPath(zipPath)
+		}
+		const importClipboardZip = function (event) {
+			const zipPath = getZipPathFromClipboardEvent(event)
+			if (!zipPath) {
+				importStatus.textContent = t('importNoZip')
+				return
+			}
+			event?.preventDefault?.()
+			event?.stopPropagation?.()
+			importZipPath(zipPath)
+		}
+		const documentPasteHandler = function (event) {
+			if (!importMode || !document.getElementById('modloader-panel')) return
+			importClipboardZip(event)
+		}
+		const documentKeyHandler = function (event) {
+			if (!importMode || !document.getElementById('modloader-panel')) return
+			if (!(event.ctrlKey || event.metaKey) || event.key.toLowerCase() !== 'v') return
+			importClipboardZip(event)
+		}
+		document.addEventListener('paste', documentPasteHandler, true)
+		document.addEventListener('keydown', documentKeyHandler, true)
+		panel.__modloaderCleanup = function () {
+			document.removeEventListener('paste', documentPasteHandler, true)
+			document.removeEventListener('keydown', documentKeyHandler, true)
+			panel.__modloaderCleanup = null
 		}
 
 		save.onclick = function () {
@@ -1149,7 +1242,10 @@
 	}
 	const togglePanel = function () {
 		const panel = document.getElementById('modloader-panel')
-		if (panel) panel.remove()
+		if (panel) {
+			if (panel.__modloaderCleanup) panel.__modloaderCleanup()
+			panel.remove()
+		}
 		else renderPanel()
 	}
 
