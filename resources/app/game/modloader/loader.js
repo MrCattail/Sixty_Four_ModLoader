@@ -22,7 +22,10 @@
 		music: {},
 		statusLogoIndex: -1,
 		statusLogoTimer: null,
-		modFileTools: undefined
+		modFileTools: undefined,
+		game: null,
+		languagePatched: false,
+		panelMessage: ''
 	}
 
 	const addIssue = function (level, code, message, details) {
@@ -165,6 +168,30 @@
 		row.appendChild(element('span', 'modloader-panel-value', value))
 		return row
 	}
+	const PANEL_TEXT = {
+		en: {
+			close: 'Close', installedMods: 'Installed mods', enabledEntries: 'Enabled entries', loadedMods: 'Loaded mods', issues: 'Issues', dataPatches: 'Data patches', wordPatches: 'Word patches', registeredLanguages: 'Registered languages', orphanEntities: 'Orphan entities', modManager: 'Mod Manager', toggleNote: 'Toggle mods or edit config below.', changesRequireReload: 'Changes require reload.', configSaveNote: 'Config saved to localStorage; some mods need reload.', saveReload: 'Save & Reload', saveConfig: 'Save Config', insert: 'insert', folder: 'folder', deleteMod: 'Delete mod', config: 'Config', recentLog: 'Recent Log', noLogEntries: 'No log entries.', noModsFound: 'No mods with mod.json were found.', fileAccessUnavailable: 'File access is unavailable.', fileAccessLoadedOnly: 'File access is unavailable, so only loaded mods can be shown.', reloadHot: 'hot capable, reload now', reloadRestart: 'restart required', reloadRequired: 'reload required', idPrefix: 'id: {value}', depsPrefix: 'deps: {value}', conflictsPrefix: 'conflicts: {value}', missingDependencies: 'Missing dependencies: {value}', conflictsEnabled: 'Conflicts enabled: {value}', savedReloading: 'Saved. Reloading...', saveFailed: 'Save failed: {value}', configSaved: 'Config saved.', noChanges: 'No changes to save.', openFolderFailed: 'Could not open folder: {value}', deleteTitle: 'Delete Mod?', deleteMessage: 'Delete {name} from the mods folder? This cannot be undone.', deleteConfirm: 'Delete', cancel: 'Cancel', replaceTitle: 'Replace Mod?', replaceMessage: 'mods already contains {name}. Replace it with the imported mod?', replaceConfirm: 'Replace', deletedMod: 'Deleted {name}. Reload to unload already running code.', deleteFailed: 'Delete failed: {value}', importHint: 'Drop a file here or paste', importDetail: 'Drag a mod zip here, or copy a zip file and press paste. ModLoader will unpack it into the mods folder automatically.', importWaiting: 'Waiting for a zip file...', importNoZip: 'Drop or paste a .zip file.', importNoPath: 'Could not read the file path from the dropped file.', importing: 'Importing {name}...', importedMod: 'Imported {name}. Enable it and Save & Reload when ready.', importFailed: 'Import failed: {value}', importModeOff: 'Back to mod list', invalidZip: 'Only .zip mod packages can be imported.', zipNoMod: 'The zip does not contain a mod.json.', zipMultipleMods: 'The zip contains multiple mod folders; import one mod at a time.', zipExtractFailed: 'Could not extract zip: {value}', folderOpened: 'Opened mods folder.'
+		},
+		sch: {
+			close: '\u5173\u95ed', installedMods: '\u5df2\u5b89\u88c5 mod', enabledEntries: '\u542f\u7528\u6761\u76ee', loadedMods: '\u5df2\u52a0\u8f7d mod', issues: '\u95ee\u9898', dataPatches: '\u6570\u636e\u8865\u4e01', wordPatches: '\u6587\u672c\u8865\u4e01', registeredLanguages: '\u5df2\u6ce8\u518c\u8bed\u8a00', orphanEntities: '\u5b64\u7acb\u5b9e\u4f53', modManager: 'Mod \u7ba1\u7406', toggleNote: '\u5728\u4e0b\u65b9\u5f00\u5173 mod \u6216\u7f16\u8f91\u914d\u7f6e\u3002', changesRequireReload: '\u6539\u52a8\u9700\u8981 reload\u3002', configSaveNote: '\u914d\u7f6e\u5df2\u4fdd\u5b58\u5230 localStorage\uff1b\u90e8\u5206 mod \u9700\u8981 reload \u751f\u6548\u3002', saveReload: '\u4fdd\u5b58\u5e76 Reload', saveConfig: '\u4fdd\u5b58\u914d\u7f6e', insert: '\u5bfc\u5165', folder: '\u6587\u4ef6\u5939', deleteMod: '\u5220\u9664 mod', config: '\u914d\u7f6e', recentLog: '\u6700\u8fd1\u65e5\u5fd7', noLogEntries: '\u6682\u65e0\u65e5\u5fd7\u3002', noModsFound: '\u6ca1\u6709\u627e\u5230\u5e26 mod.json \u7684 mod\u3002', fileAccessUnavailable: '\u6587\u4ef6\u8bbf\u95ee\u4e0d\u53ef\u7528\u3002', fileAccessLoadedOnly: '\u6587\u4ef6\u8bbf\u95ee\u4e0d\u53ef\u7528\uff0c\u6240\u4ee5\u53ea\u80fd\u663e\u793a\u5df2\u52a0\u8f7d\u7684 mod\u3002', reloadHot: '\u652f\u6301\u70ed\u5f00\u5173\uff0c\u5f53\u524d\u4ecd\u5efa\u8bae reload', reloadRestart: '\u9700\u8981\u91cd\u542f', reloadRequired: '\u9700\u8981 reload', idPrefix: 'id\uff1a{value}', depsPrefix: '\u4f9d\u8d56\uff1a{value}', conflictsPrefix: '\u51b2\u7a81\uff1a{value}', missingDependencies: '\u7f3a\u5c11\u4f9d\u8d56\uff1a{value}', conflictsEnabled: '\u5df2\u542f\u7528\u51b2\u7a81\uff1a{value}', savedReloading: '\u5df2\u4fdd\u5b58\uff0c\u6b63\u5728 reload...', saveFailed: '\u4fdd\u5b58\u5931\u8d25\uff1a{value}', configSaved: '\u914d\u7f6e\u5df2\u4fdd\u5b58\u3002', noChanges: '\u6ca1\u6709\u9700\u8981\u4fdd\u5b58\u7684\u6539\u52a8\u3002', openFolderFailed: '\u65e0\u6cd5\u6253\u5f00\u6587\u4ef6\u5939\uff1a{value}', deleteTitle: '\u5220\u9664 Mod\uff1f', deleteMessage: '\u4ece mods \u6587\u4ef6\u5939\u5220\u9664 {name}\uff1f\u8fd9\u4e2a\u64cd\u4f5c\u4e0d\u80fd\u64a4\u9500\u3002', deleteConfirm: '\u5220\u9664', cancel: '\u53d6\u6d88', replaceTitle: '\u66ff\u6362 Mod\uff1f', replaceMessage: 'mods \u91cc\u5df2\u7ecf\u6709 {name}\u3002\u662f\u5426\u7528\u5bfc\u5165\u7684 mod \u66ff\u6362\u5b83\uff1f', replaceConfirm: '\u66ff\u6362', deletedMod: '\u5df2\u5220\u9664 {name}\u3002\u5df2\u7ecf\u8fd0\u884c\u7684\u4ee3\u7801\u9700\u8981 reload \u624d\u4f1a\u5378\u8f7d\u3002', deleteFailed: '\u5220\u9664\u5931\u8d25\uff1a{value}', importHint: '\u628a\u6587\u4ef6\u62d6\u5230\u8fd9\u91cc\u6216\u590d\u5236', importDetail: '\u53ef\u4ee5\u628a mod zip \u5305\u76f4\u63a5\u62d6\u5165\uff0c\u6216\u8005\u590d\u5236 zip \u5305\u540e\u5728\u8fd9\u91cc\u6309\u7c98\u8d34\u5feb\u6377\u952e\uff0cModLoader \u4f1a\u81ea\u52a8\u89e3\u5305\u5230 mods \u6587\u4ef6\u5939\u3002', importWaiting: '\u7b49\u5f85 zip \u6587\u4ef6...', importNoZip: '\u8bf7\u62d6\u5165\u6216\u7c98\u8d34 .zip \u6587\u4ef6\u3002', importNoPath: '\u65e0\u6cd5\u8bfb\u53d6\u8be5\u6587\u4ef6\u8def\u5f84\u3002', importing: '\u6b63\u5728\u5bfc\u5165 {name}...', importedMod: '\u5df2\u5bfc\u5165 {name}\u3002\u9700\u8981\u65f6\u52fe\u9009\u5b83\u5e76\u4fdd\u5b58 reload\u3002', importFailed: '\u5bfc\u5165\u5931\u8d25\uff1a{value}', importModeOff: '\u8fd4\u56de mod \u5217\u8868', invalidZip: '\u53ea\u80fd\u5bfc\u5165 .zip mod \u5305\u3002', zipNoMod: '\u8fd9\u4e2a zip \u5185\u6ca1\u6709 mod.json\u3002', zipMultipleMods: '\u8fd9\u4e2a zip \u5305\u542b\u591a\u4e2a mod \u6587\u4ef6\u5939\uff1b\u8bf7\u4e00\u6b21\u5bfc\u5165\u4e00\u4e2a mod\u3002', zipExtractFailed: '\u65e0\u6cd5\u89e3\u538b zip\uff1a{value}', folderOpened: '\u5df2\u6253\u5f00 mods \u6587\u4ef6\u5939\u3002'
+		}
+	}
+	PANEL_TEXT.modsch = PANEL_TEXT.sch
+	PANEL_TEXT.tch = PANEL_TEXT.sch
+	const getPanelLanguage = function () {
+		const language = state.game?.language || ''
+		if (language === 'sch' || language === 'modsch') return 'sch'
+		if (language === 'tch') return 'tch'
+		return 'en'
+	}
+
+	const t = function (key, values) {
+		const language = getPanelLanguage()
+		const source = PANEL_TEXT[language]?.[key] || PANEL_TEXT.en[key] || key
+		return source.replace(/\{(\w+)\}/g, function (match, name) {
+			return values && values[name] !== undefined ? String(values[name]) : match
+		})
+	}
 
 	const ensurePanelStyle = function () {
 		if (document.getElementById('modloader-panel-style')) return
@@ -172,6 +199,7 @@
 		style.id = 'modloader-panel-style'
 		style.textContent = `
 			#modloader-panel { position: fixed; right: 16px; top: 16px; z-index: 2147483647; width: min(860px, calc(100vw - 32px)); max-height: calc(100vh - 32px); overflow: auto; padding: 14px; border-radius: 8px; background: rgba(8, 10, 12, .94); color: rgba(255,255,255,.92); box-shadow: 0 12px 36px rgba(0,0,0,.35); font: 13px/1.45 Montserrat, Arial, sans-serif; }
+			#modloader-panel.modloader-panel-modal-open > :not(.modloader-modal) { filter: blur(4px); opacity: .52; pointer-events: none; user-select: none; }
 			#modloader-panel h2 { margin: 0 0 8px; font-size: 16px; }
 			#modloader-panel h3 { margin: 14px 0 6px; font-size: 13px; color: rgba(255,255,255,.72); }
 			#modloader-panel button, #modloader-panel input, #modloader-panel textarea, #modloader-panel select { font: inherit; }
@@ -197,13 +225,30 @@
 			#modloader-panel .modloader-panel-config-note.active { display: inline; }
 			#modloader-panel .modloader-save-button { border: 0; border-radius: 6px; padding: 7px 10px; background: #f2f2ed; color: #111; cursor: pointer; }
 			#modloader-panel .modloader-save-button:disabled { cursor: default; opacity: .45; }
+			#modloader-panel .modloader-toolbar-actions { display: inline-flex; align-items: center; gap: 6px; flex: 0 0 auto; }
+			#modloader-panel .modloader-action-button { display: inline-flex; align-items: center; gap: 6px; border: 1px solid rgba(255,255,255,.12); border-radius: 6px; padding: 7px 9px; background: rgba(255,255,255,.08); color: rgba(255,255,255,.88); cursor: pointer; }
+			#modloader-panel .modloader-action-button:hover, #modloader-panel .modloader-action-button.active { background: rgba(255,255,255,.14); border-color: rgba(207,233,255,.3); }
+			#modloader-panel .modloader-action-button:disabled { cursor: default; opacity: .45; }
+			#modloader-panel .modloader-action-icon { position: relative; display: inline-block; width: 15px; height: 15px; flex: 0 0 auto; color: currentColor; }
+			#modloader-panel .modloader-action-icon-plus:before, #modloader-panel .modloader-action-icon-plus:after { content: ''; position: absolute; left: 50%; top: 50%; width: 13px; height: 2px; border-radius: 999px; background: currentColor; transform: translate(-50%, -50%); }
+			#modloader-panel .modloader-action-icon-plus:after { transform: translate(-50%, -50%) rotate(90deg); }
+			#modloader-panel .modloader-action-icon-folder { width: 16px; height: 12px; margin-top: 2px; border-radius: 3px; background: currentColor; }
+			#modloader-panel .modloader-action-icon-folder:before { content: ''; position: absolute; left: 1px; top: -4px; width: 8px; height: 5px; border-radius: 3px 3px 0 0; background: currentColor; }
 			#modloader-panel .modloader-panel-error { margin: 8px 0; padding: 8px; border-radius: 6px; background: rgba(255, 96, 96, .14); color: #ffb0b0; }
-			#modloader-panel .modloader-mod-manager { display: grid; gap: 6px; max-height: min(48vh, 460px); overflow-x: hidden; overflow-y: auto; padding-right: 5px; scrollbar-gutter: stable; scrollbar-width: thin; scrollbar-color: rgba(185,185,185,.48) transparent; }
+			#modloader-panel .modloader-import-zone { display: grid; place-items: center; min-height: 0; max-height: 0; opacity: 0; overflow: hidden; border: 1px solid transparent; border-radius: 7px; background: rgba(0,0,0,.16); box-shadow: inset 0 1px 18px rgba(0,0,0,.28); transform: translateY(-8px); transition: max-height .22s ease, min-height .22s ease, opacity .16s ease, transform .22s ease, border-color .16s ease; }
+			#modloader-panel .modloader-import-zone.active { min-height: 220px; max-height: 320px; opacity: 1; transform: translateY(0); border-color: rgba(255,255,255,.09); }
+			#modloader-panel .modloader-import-zone.dragging { border-color: rgba(207,233,255,.5); background: rgba(207,233,255,.08); }
+			#modloader-panel .modloader-import-copy { text-align: center; padding: 18px; color: rgba(255,255,255,.72); }
+			#modloader-panel .modloader-import-title { font-weight: 600; color: rgba(255,255,255,.9); }
+			#modloader-panel .modloader-import-detail { margin-top: 8px; max-width: 520px; color: rgba(255,255,255,.58); }
+			#modloader-panel .modloader-import-status { margin-top: 12px; color: #cfe9ff; }
+			#modloader-panel .modloader-mod-manager { display: grid; gap: 6px; max-height: min(48vh, 460px); overflow-x: hidden; overflow-y: auto; padding-right: 5px; scrollbar-gutter: stable; scrollbar-width: thin; scrollbar-color: rgba(185,185,185,.48) transparent; opacity: 1; transform: translateY(0); transition: opacity .16s ease, transform .18s ease, max-height .22s ease; }
+			#modloader-panel .modloader-mod-manager.modloader-mod-manager-importing { max-height: 0; opacity: 0; pointer-events: none; transform: translateY(8px); }
 			#modloader-panel .modloader-mod-manager::-webkit-scrollbar { width: 4px; }
 			#modloader-panel .modloader-mod-manager::-webkit-scrollbar-track { background: transparent; }
 			#modloader-panel .modloader-mod-manager::-webkit-scrollbar-thumb { border-radius: 999px; background: rgba(185,185,185,.48); }
 			#modloader-panel .modloader-mod-manager::-webkit-scrollbar-thumb:hover { background: rgba(210,210,210,.62); }
-			#modloader-panel .modloader-mod-row { position: relative; display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 10px; align-items: flex-start; padding: 9px; border: 1px solid rgba(255,255,255,.1); border-radius: 7px; background: rgba(255,255,255,.045); transition: border-color .14s ease, background .14s ease, box-shadow .14s ease; }
+			#modloader-panel .modloader-mod-row { position: relative; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 10px; align-items: flex-start; padding: 9px; border: 1px solid rgba(255,255,255,.1); border-radius: 7px; background: rgba(255,255,255,.045); transition: border-color .14s ease, background .14s ease, box-shadow .14s ease; }
 			#modloader-panel .modloader-mod-row-configurable { cursor: pointer; }
 			#modloader-panel .modloader-mod-row-configurable:hover { border-color: rgba(207,233,255,.28); }
 			#modloader-panel .modloader-mod-row-expanded { border-color: rgba(207,233,255,.5); box-shadow: 0 8px 22px rgba(0,0,0,.16); }
@@ -212,6 +257,10 @@
 			#modloader-panel .modloader-mod-row-problem { border-color: rgba(255, 196, 87, .48); }
 			#modloader-panel .modloader-mod-check { margin-top: 2px; }
 			#modloader-panel .modloader-mod-main { min-width: 0; }
+			#modloader-panel .modloader-mod-delete { position: relative; width: 25px; height: 25px; border: 0; border-radius: 5px; background: transparent; color: rgba(255,255,255,.56); cursor: pointer; }
+			#modloader-panel .modloader-mod-delete:hover { color: #ffb0b0; background: rgba(255,96,96,.1); }
+			#modloader-panel .modloader-mod-delete:before { content: ''; position: absolute; left: 8px; top: 9px; width: 9px; height: 10px; border: 2px solid currentColor; border-top: 0; border-radius: 1px 1px 3px 3px; box-sizing: border-box; }
+			#modloader-panel .modloader-mod-delete:after { content: ''; position: absolute; left: 7px; top: 6px; width: 11px; height: 2px; border-radius: 999px; background: currentColor; box-shadow: 3px -3px 0 -1px currentColor; }
 			#modloader-panel .modloader-mod-title { display: flex; flex-wrap: wrap; gap: 8px; align-items: baseline; }
 			#modloader-panel .modloader-mod-path { font-weight: 600; overflow-wrap: anywhere; }
 			#modloader-panel .modloader-mod-version { color: rgba(255,255,255,.58); }
@@ -234,6 +283,15 @@
 			#modloader-panel .modloader-config-field-invalid .modloader-config-input { border-color: rgba(255, 96, 96, .72); }
 			#modloader-panel .modloader-config-error { display: none; grid-column: 2; color: #ffb0b0; font-size: 11px; }
 			#modloader-panel .modloader-config-error.active { display: block; }
+			#modloader-panel .modloader-modal { position: absolute; inset: 0; z-index: 5; display: grid; place-items: center; padding: 16px; background: rgba(8,10,12,.2); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }
+			#modloader-panel .modloader-modal-box { width: min(420px, 100%); border: 1px solid rgba(255,255,255,.12); border-radius: 8px; padding: 14px; background: rgba(10,12,14,.92); box-shadow: 0 14px 36px rgba(0,0,0,.36); }
+			#modloader-panel .modloader-modal-title { margin: 0 0 8px; font-size: 14px; color: rgba(255,255,255,.94); }
+			#modloader-panel .modloader-modal-message { color: rgba(255,255,255,.72); overflow-wrap: anywhere; }
+			#modloader-panel .modloader-modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px; }
+			#modloader-panel .modloader-modal-button { border: 1px solid rgba(255,255,255,.14); border-radius: 6px; padding: 7px 10px; background: rgba(255,255,255,.08); color: rgba(255,255,255,.9); cursor: pointer; }
+			#modloader-panel .modloader-modal-button:hover { background: rgba(255,255,255,.14); }
+			#modloader-panel .modloader-modal-button-primary { background: #f2f2ed; color: #111; border-color: transparent; }
+			#modloader-panel .modloader-modal-button-danger { background: rgba(255,96,96,.2); color: #ffd4d4; border-color: rgba(255,96,96,.28); }
 			@media (max-width: 640px) {
 				#modloader-panel .modloader-panel-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 				#modloader-panel .modloader-config-field { grid-template-columns: 1fr; }
@@ -253,10 +311,19 @@
 			const fs = require('fs')
 			const path = require('path')
 			const url = require('url')
+			const os = require('os')
+			const childProcess = require('child_process')
+			let shell = null
+			try { shell = require('electron')?.shell || null } catch (error) {}
 			const gameRoot = path.dirname(url.fileURLToPath(window.location.href))
 			state.modFileTools = {
 				fs,
 				path,
+				url,
+				os,
+				childProcess,
+				shell,
+				gameRoot,
 				modsDir: path.join(gameRoot, 'mods'),
 				enabledPath: path.join(gameRoot, 'mods', 'enabled.json')
 			}
@@ -316,7 +383,7 @@
 				mods.push(item)
 				byPath[item.path] = item
 			}
-			errorMessage = 'File access is unavailable, so only loaded mods can be shown.'
+			errorMessage = t('fileAccessLoadedOnly')
 		}
 
 		for (const entry of state.enabledEntries) {
@@ -341,9 +408,9 @@
 
 	const getModReloadLabel = function (manifest) {
 		const policy = getModReloadPolicy(manifest)
-		if (policy === 'hot') return 'hot capable, reload now'
-		if (policy === 'restart') return 'restart required'
-		return 'reload required'
+		if (policy === 'hot') return t('reloadHot')
+		if (policy === 'restart') return t('reloadRestart')
+		return t('reloadRequired')
 	}
 
 	const getOrderedSelectedPaths = function (mods, selected) {
@@ -373,7 +440,7 @@
 
 	const writeEnabledConfig = function (paths) {
 		const tools = getModFileTools()
-		if (!tools) throw new Error('File access is unavailable.')
+		if (!tools) throw new Error(t('fileAccessUnavailable'))
 		const payload = JSON.stringify({ mods: paths }, null, 2) + '\n'
 		tools.fs.writeFileSync(tools.enabledPath, payload, 'utf8')
 	}
@@ -467,6 +534,165 @@
 		return count
 	}
 
+	const createPanelActionButton = function (icon, label, title) {
+		const button = element('button', 'modloader-action-button')
+		button.type = 'button'
+		button.title = title || label
+		button.setAttribute('aria-label', title || label)
+		button.appendChild(element('span', 'modloader-action-icon modloader-action-icon-' + icon))
+		button.appendChild(element('span', '', label))
+		return button
+	}
+
+	const showPanelConfirm = function (panel, options) {
+		return new Promise(function (resolve) {
+			const modal = element('div', 'modloader-modal')
+			const box = element('div', 'modloader-modal-box')
+			box.appendChild(element('h3', 'modloader-modal-title', options.title || ''))
+			box.appendChild(element('div', 'modloader-modal-message', options.message || ''))
+			const actions = element('div', 'modloader-modal-actions')
+			const cancel = element('button', 'modloader-modal-button', options.cancelText || t('cancel'))
+			const confirm = element('button', 'modloader-modal-button modloader-modal-button-primary' + (options.danger ? ' modloader-modal-button-danger' : ''), options.confirmText || 'OK')
+			const close = function (value) {
+				panel.classList.remove('modloader-panel-modal-open')
+				modal.remove()
+				resolve(value)
+			}
+			cancel.onclick = function () { close(false) }
+			confirm.onclick = function () { close(true) }
+			actions.append(cancel, confirm)
+			box.appendChild(actions)
+			modal.appendChild(box)
+			panel.classList.add('modloader-panel-modal-open')
+			panel.appendChild(modal)
+			confirm.focus()
+		})
+	}
+
+	const isPathInside = function (parent, child) {
+		const tools = getModFileTools()
+		if (!tools) return false
+		const parentPath = tools.path.resolve(parent)
+		const childPath = tools.path.resolve(child)
+		const relative = tools.path.relative(parentPath, childPath)
+		return relative === '' || (!!relative && !relative.startsWith('..') && !tools.path.isAbsolute(relative))
+	}
+
+	const safeModDirectory = function (modPath) {
+		const tools = getModFileTools()
+		if (!tools) throw new Error(t('fileAccessUnavailable'))
+		const directory = tools.path.resolve(tools.modsDir, modPath)
+		if (!isPathInside(tools.modsDir, directory)) throw new Error('Invalid mod path.')
+		return directory
+	}
+
+	const removeEnabledEntry = function (modPath) {
+		state.enabledEntries = state.enabledEntries.filter(function (entry) { return entry.path !== modPath })
+		writeEnabledConfig(state.enabledEntries.map(function (entry) { return entry.path }))
+	}
+
+	const deleteModFolder = function (mod) {
+		const tools = getModFileTools()
+		if (!tools) throw new Error(t('fileAccessUnavailable'))
+		const directory = safeModDirectory(mod.path)
+		if (tools.fs.existsSync(directory)) tools.fs.rmSync(directory, { recursive: true, force: true })
+		removeEnabledEntry(mod.path)
+	}
+
+	const openModsFolder = async function () {
+		const tools = getModFileTools()
+		if (!tools) throw new Error(t('fileAccessUnavailable'))
+		if (tools.shell?.openPath) {
+			const result = await tools.shell.openPath(tools.modsDir)
+			if (result) throw new Error(result)
+			return
+		}
+		tools.childProcess.spawn('explorer.exe', [tools.modsDir], { detached: true, stdio: 'ignore', windowsHide: true }).unref()
+	}
+
+	const sanitizeModFolderName = function (name) {
+		return String(name || 'imported-mod').replace(/[<>:"/\\|?*\x00-\x1f]/g, '_').replace(/[. ]+$/g, '').trim() || 'imported-mod'
+	}
+
+	const collectModRoots = function (directory, depth, out) {
+		const tools = getModFileTools()
+		if (tools.fs.existsSync(tools.path.join(directory, 'mod.json'))) {
+			out.push(directory)
+			return
+		}
+		if (depth >= 3) return
+		for (const entry of tools.fs.readdirSync(directory, { withFileTypes: true })) {
+			if (entry.isDirectory()) collectModRoots(tools.path.join(directory, entry.name), depth + 1, out)
+		}
+	}
+
+	const prepareZipImport = function (zipPath) {
+		const tools = getModFileTools()
+		if (!tools) throw new Error(t('fileAccessUnavailable'))
+		if (!zipPath || !/\.zip$/i.test(zipPath)) throw new Error(t('invalidZip'))
+		const importRoot = tools.path.join(tools.gameRoot, 'modloader', 'state', 'imports')
+		tools.fs.mkdirSync(importRoot, { recursive: true })
+		const tempDir = tools.fs.mkdtempSync(tools.path.join(importRoot, 'zip-'))
+		const result = tools.childProcess.spawnSync('powershell.exe', [
+			'-NoProfile', '-ExecutionPolicy', 'Bypass', '-Command',
+			'Expand-Archive -LiteralPath $args[0] -DestinationPath $args[1] -Force',
+			zipPath, tempDir
+		], { encoding: 'utf8', windowsHide: true })
+		if (result.error || result.status) {
+			const message = result.error?.message || result.stderr || result.stdout || String(result.status)
+			tools.fs.rmSync(tempDir, { recursive: true, force: true })
+			throw new Error(t('zipExtractFailed', { value: message.trim() }))
+		}
+		const roots = []
+		collectModRoots(tempDir, 0, roots)
+		if (!roots.length) {
+			tools.fs.rmSync(tempDir, { recursive: true, force: true })
+			throw new Error(t('zipNoMod'))
+		}
+		if (roots.length > 1) {
+			tools.fs.rmSync(tempDir, { recursive: true, force: true })
+			throw new Error(t('zipMultipleMods'))
+		}
+		const sourceDir = roots[0]
+		const rootIsTemp = tools.path.resolve(sourceDir) === tools.path.resolve(tempDir)
+		const folderName = sanitizeModFolderName(rootIsTemp ? tools.path.basename(zipPath, tools.path.extname(zipPath)) : tools.path.basename(sourceDir))
+		const destDir = safeModDirectory(folderName)
+		return { tempDir, sourceDir, folderName, destDir }
+	}
+
+	const completeZipImport = function (plan, replace) {
+		const tools = getModFileTools()
+		if (!tools) throw new Error(t('fileAccessUnavailable'))
+		try {
+			if (tools.fs.existsSync(plan.destDir)) {
+				if (!replace) return false
+				tools.fs.rmSync(plan.destDir, { recursive: true, force: true })
+			}
+			tools.fs.cpSync(plan.sourceDir, plan.destDir, { recursive: true })
+			return true
+		} finally {
+			tools.fs.rmSync(plan.tempDir, { recursive: true, force: true })
+		}
+	}
+
+	const refreshOpenPanel = function () {
+		if (document.getElementById('modloader-panel')) renderPanel()
+	}
+
+	const installLanguageBridge = function () {
+		if (state.languagePatched || typeof Game === 'undefined') return
+		state.languagePatched = true
+		api.patch(Game.prototype, 'changeLanguage', function (original) {
+			return function () {
+				const result = original.apply(this, arguments)
+				state.game = this
+				showStatus()
+				requestAnimationFrame(refreshOpenPanel)
+				return result
+			}
+		}, 'modloader')
+	}
+
 	const renderPanel = function () {
 		if (!document.body) return
 		ensurePanelStyle()
@@ -487,8 +713,8 @@
 
 		panel.innerHTML = ''
 		const close = element('button', 'modloader-panel-close')
-		close.title = 'Close'
-		close.setAttribute('aria-label', 'Close')
+		close.title = t('close')
+		close.setAttribute('aria-label', t('close'))
 		close.onclick = function () { panel.remove() }
 		panel.appendChild(close)
 		panel.appendChild(element('h2', '', `Cattail's ModLoader ${state.version}`))
@@ -502,37 +728,53 @@
 		}
 
 		const summary = element('div', 'modloader-panel-summary')
-		summary.appendChild(panelRow('Installed mods', String(mods.length)))
-		summary.appendChild(panelRow('Enabled entries', String(state.enabledEntries.length)))
-		summary.appendChild(panelRow('Loaded mods', String(state.mods.length)))
-		summary.appendChild(panelRow('Issues', String(state.issues.length)))
-		summary.appendChild(panelRow('Data patches', String(state.dataPatches.length)))
-		summary.appendChild(panelRow('Word patches', String(state.wordPatches.length)))
-		summary.appendChild(panelRow('Registered languages', state.languages.join(', ') || '-'))
-		summary.appendChild(panelRow('Orphan entities', String(state.orphanEntities.length)))
+		summary.appendChild(panelRow(t('installedMods'), String(mods.length)))
+		summary.appendChild(panelRow(t('enabledEntries'), String(state.enabledEntries.length)))
+		summary.appendChild(panelRow(t('loadedMods'), String(state.mods.length)))
+		summary.appendChild(panelRow(t('issues'), String(state.issues.length)))
+		summary.appendChild(panelRow(t('dataPatches'), String(state.dataPatches.length)))
+		summary.appendChild(panelRow(t('wordPatches'), String(state.wordPatches.length)))
+		summary.appendChild(panelRow(t('registeredLanguages'), state.languages.join(', ') || '-'))
+		summary.appendChild(panelRow(t('orphanEntities'), String(state.orphanEntities.length)))
 		panel.appendChild(summary)
 
-		panel.appendChild(element('h3', '', 'Mod Manager'))
+		panel.appendChild(element('h3', '', t('modManager')))
 		if (available.errorMessage) panel.appendChild(element('div', 'modloader-panel-error', available.errorMessage))
 
 		const toolbar = element('div', 'modloader-mod-toolbar')
-		const note = element('span', 'modloader-panel-note', 'Toggle mods or edit config below.')
-		const reloadNote = element('span', 'modloader-panel-reload-note', 'Changes require reload.')
-		const configNote = element('span', 'modloader-panel-config-note', 'Config saved to localStorage; some mods need reload.')
+		const note = element('span', 'modloader-panel-note', t('toggleNote'))
+		const reloadNote = element('span', 'modloader-panel-reload-note', t('changesRequireReload'))
+		const configNote = element('span', 'modloader-panel-config-note', t('configSaveNote'))
 		const message = element('span', 'modloader-panel-note', '')
-		const save = element('button', 'modloader-save-button', 'Save & Reload')
+		const save = element('button', 'modloader-save-button', t('saveReload'))
+		const insert = createPanelActionButton('plus', t('insert'), t('insert'))
+		const folder = createPanelActionButton('folder', t('folder'), t('folder'))
 		save.disabled = true
+		insert.disabled = !getModFileTools()
+		folder.disabled = !getModFileTools()
 		const left = element('span')
+		const actions = element('span', 'modloader-toolbar-actions')
 		left.append(note, document.createTextNode(' '), reloadNote, document.createTextNode(' '), configNote, document.createTextNode(' '), message)
-		toolbar.append(left, save)
+		actions.append(insert, folder, save)
+		toolbar.append(left, actions)
 		panel.appendChild(toolbar)
 
 		const list = element('div', 'modloader-mod-manager')
 		panel.appendChild(list)
+		const importZone = element('div', 'modloader-import-zone')
+		importZone.tabIndex = 0
+		const importCopy = element('div', 'modloader-import-copy')
+		importCopy.appendChild(element('div', 'modloader-import-title', t('importHint')))
+		importCopy.appendChild(element('div', 'modloader-import-detail', t('importDetail')))
+		const importStatus = element('div', 'modloader-import-status', t('importWaiting'))
+		importCopy.appendChild(importStatus)
+		importZone.appendChild(importCopy)
+		panel.appendChild(importZone)
 
 		let expandedRow = null
 		let configAnimating = false
 		let configAnimationTimer = null
+		let importMode = false
 
 		const isModRowToggleTarget = function (target) {
 			return target?.closest && !target.closest('input, textarea, select, button, .modloader-mod-config')
@@ -623,6 +865,63 @@
 			else expandConfigRow(rowModel)
 		}
 
+		const setImportMode = function (active) {
+			importMode = active
+			list.classList.toggle('modloader-mod-manager-importing', active)
+			importZone.classList.toggle('active', active)
+			insert.classList.toggle('active', active)
+			insert.title = active ? t('importModeOff') : t('insert')
+			if (active) {
+				importStatus.textContent = t('importWaiting')
+				importZone.focus()
+			}
+		}
+
+		const getZipPathFromFiles = function (files) {
+			for (const file of Array.from(files || [])) {
+				const name = file.path || file.name || ''
+				if (/\.zip$/i.test(name)) return file.path || ''
+			}
+			return ''
+		}
+
+		const importZipPath = async function (zipPath) {
+			if (!zipPath) {
+				importStatus.textContent = t('importNoPath')
+				return
+			}
+			let plan = null
+			try {
+				importStatus.textContent = t('importing', { name: zipPath.split(/[\\/]/).pop() || zipPath })
+				plan = prepareZipImport(zipPath)
+				let replace = false
+				const tools = getModFileTools()
+				if (tools.fs.existsSync(plan.destDir)) {
+					replace = await showPanelConfirm(panel, {
+						title: t('replaceTitle'),
+						message: t('replaceMessage', { name: plan.folderName }),
+						confirmText: t('replaceConfirm'),
+						cancelText: t('cancel'),
+						danger: true
+					})
+					if (!replace) {
+						tools.fs.rmSync(plan.tempDir, { recursive: true, force: true })
+						importStatus.textContent = t('importWaiting')
+						return
+					}
+				}
+				completeZipImport(plan, replace)
+				state.panelMessage = t('importedMod', { name: plan.folderName })
+				renderPanel()
+			} catch (error) {
+				try {
+					const tools = getModFileTools()
+					if (plan?.tempDir && tools?.fs.existsSync(plan.tempDir)) tools.fs.rmSync(plan.tempDir, { recursive: true, force: true })
+				} catch (cleanupError) {}
+				importStatus.textContent = t('importFailed', { value: error.message })
+			}
+		}
+
 		const refreshRows = function (keepMessage) {
 			const refs = new Set()
 			for (const mod of mods) {
@@ -651,8 +950,8 @@
 				if (checked) {
 					const missing = resolveModRefs(mod.manifest.dependencies).filter(function (ref) { return !refs.has(ref) })
 					const conflicts = resolveModRefs(mod.manifest.conflicts).filter(function (ref) { return refs.has(ref) })
-					if (missing.length) warnings.push('Missing dependencies: ' + missing.join(', '))
-					if (conflicts.length) warnings.push('Conflicts enabled: ' + conflicts.join(', '))
+					if (missing.length) warnings.push(t('missingDependencies', { value: missing.join(', ') }))
+					if (conflicts.length) warnings.push(t('conflictsEnabled', { value: conflicts.join(', ') }))
 				}
 				row.warning.textContent = warnings.join(' | ')
 				row.warning.classList.toggle('active', warnings.length > 0)
@@ -663,7 +962,7 @@
 			const enabledDirty = !sameStringList(orderedSelected, originalSelected)
 			reloadNote.classList.toggle('active', enabledDirty)
 			configNote.classList.toggle('active', configDirty)
-			save.textContent = enabledDirty ? 'Save & Reload' : 'Save Config'
+			save.textContent = enabledDirty ? t('saveReload') : t('saveConfig')
 			save.disabled = (!enabledDirty && !configDirty) || configInvalid || (enabledDirty && !getModFileTools())
 			if (!keepMessage) message.textContent = ''
 		}
@@ -690,11 +989,11 @@
 			const deps = resolveModRefs(mod.manifest.dependencies)
 			const conflicts = resolveModRefs(mod.manifest.conflicts)
 			const metaParts = [
-				'id: ' + (mod.id || mod.path),
+				t('idPrefix', { value: mod.id || mod.path }),
 				getModReloadLabel(mod.manifest)
 			]
-			if (deps.length) metaParts.push('deps: ' + deps.join(', '))
-			if (conflicts.length) metaParts.push('conflicts: ' + conflicts.join(', '))
+			if (deps.length) metaParts.push(t('depsPrefix', { value: deps.join(', ') }))
+			if (conflicts.length) metaParts.push(t('conflictsPrefix', { value: conflicts.join(', ') }))
 			main.appendChild(element('div', 'modloader-mod-meta', metaParts.join(' | ')))
 
 			const warning = element('div', 'modloader-mod-warning')
@@ -705,7 +1004,7 @@
 			if (modConfig.schema.length && !mod.loadError) {
 				row.classList.add('modloader-mod-row-configurable')
 				const configBox = element('div', 'modloader-mod-config')
-				configBox.appendChild(element('div', 'modloader-mod-config-title', 'Config'))
+				configBox.appendChild(element('div', 'modloader-mod-config-title', t('config')))
 				for (const item of modConfig.schema) {
 					const type = getConfigType(item)
 					const value = modConfig.values[item.key]
@@ -750,17 +1049,73 @@
 				main.appendChild(configBox)
 			}
 
+			const deleteButton = element('button', 'modloader-mod-delete')
+			deleteButton.type = 'button'
+			deleteButton.title = t('deleteMod')
+			deleteButton.setAttribute('aria-label', t('deleteMod'))
+			deleteButton.onclick = async function (event) {
+				event.preventDefault()
+				event.stopPropagation()
+				const confirmed = await showPanelConfirm(panel, {
+					title: t('deleteTitle'),
+					message: t('deleteMessage', { name: mod.path }),
+					confirmText: t('deleteConfirm'),
+					cancelText: t('cancel'),
+					danger: true
+				})
+				if (!confirmed) return
+				try {
+					deleteModFolder(mod)
+					state.panelMessage = t('deletedMod', { name: mod.path })
+					renderPanel()
+				} catch (error) {
+					message.textContent = t('deleteFailed', { value: error.message })
+				}
+			}
 			const rowModel = { mod, checkbox, container: row, warning, configModels: rowConfigModels }
 			row.onclick = function (event) {
 				if (!rowConfigModels.length || !isModRowToggleTarget(event.target)) return
 				toggleConfigRow(rowModel)
 			}
-			row.append(checkbox, main)
+			row.append(checkbox, main, deleteButton)
 			list.appendChild(row)
 			rowModels.push(rowModel)
 		}
 
-		if (!mods.length) list.appendChild(element('div', 'modloader-panel-note', 'No mods with mod.json were found.'))
+		if (!mods.length) list.appendChild(element('div', 'modloader-panel-note', t('noModsFound')))
+
+		insert.onclick = function () { setImportMode(!importMode) }
+		folder.onclick = async function () {
+			try {
+				await openModsFolder()
+				message.textContent = t('folderOpened')
+			} catch (error) {
+				message.textContent = t('openFolderFailed', { value: error.message })
+			}
+		}
+		importZone.ondragover = function (event) {
+			event.preventDefault()
+			importZone.classList.add('dragging')
+		}
+		importZone.ondragleave = function () { importZone.classList.remove('dragging') }
+		importZone.ondrop = function (event) {
+			event.preventDefault()
+			importZone.classList.remove('dragging')
+			const zipPath = getZipPathFromFiles(event.dataTransfer?.files)
+			if (!zipPath) {
+				importStatus.textContent = t('importNoZip')
+				return
+			}
+			importZipPath(zipPath)
+		}
+		importZone.onpaste = function (event) {
+			const zipPath = getZipPathFromFiles(event.clipboardData?.files)
+			if (!zipPath) {
+				importStatus.textContent = t('importNoZip')
+				return
+			}
+			importZipPath(zipPath)
+		}
 
 		save.onclick = function () {
 			const orderedSelected = getOrderedSelectedPaths(mods, selected)
@@ -769,24 +1124,28 @@
 				const configSaved = writeConfigChanges(configModels, selected)
 				if (enabledDirty) {
 					writeEnabledConfig(orderedSelected)
-					message.textContent = 'Saved. Reloading...'
+					message.textContent = t('savedReloading')
 					location.reload()
 				} else {
-					message.textContent = configSaved ? 'Config saved.' : 'No changes to save.'
+					message.textContent = configSaved ? t('configSaved') : t('noChanges')
 					refreshRows(true)
 				}
 			} catch (error) {
-				message.textContent = 'Save failed: ' + error.message
+				message.textContent = t('saveFailed', { value: error.message })
 			}
 		}
 
-		panel.appendChild(element('h3', '', 'Recent Log'))
+		panel.appendChild(element('h3', '', t('recentLog')))
 		const lines = state.log.slice(-12).map(function (entry) {
 			return `${entry.level}: ${entry.args.map(function (arg) { return arg instanceof Error ? arg.message : String(arg) }).join(' ')}`
 		})
-		panel.appendChild(element('pre', 'modloader-panel-log', lines.join('\n') || 'No log entries.'))
+		panel.appendChild(element('pre', 'modloader-panel-log', lines.join('\n') || t('noLogEntries')))
 
 		refreshRows()
+		if (state.panelMessage) {
+			message.textContent = state.panelMessage
+			state.panelMessage = ''
+		}
 	}
 	const togglePanel = function () {
 		const panel = document.getElementById('modloader-panel')
@@ -1085,8 +1444,13 @@
 		},
 
 		async stage(name, context, payload) {
+			if (context?.language) state.game = context
 			if (name === 'beforeVanillaScripts') await api.boot()
-			if (name === 'afterVanillaScripts') await api.loadEntries()
+			if (name === 'afterVanillaScripts') {
+				await api.loadEntries()
+				installLanguageBridge()
+			}
+			if (name === 'afterGameInit') requestAnimationFrame(refreshOpenPanel)
 
 			const hooks = state.hooks[name] || []
 			let current = payload

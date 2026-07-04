@@ -44,7 +44,9 @@ Prefer JSON patches for language, prices, unlocks, and preload lists. Use
 
 Press `Ctrl+M` in game to open the ModLoader panel. It shows loaded mods,
 registered languages, patch counts, hook stages, orphan entities, and recent
-loader logs.
+loader logs. The panel can open the `mods` folder, import mod zip packages by
+file drop or paste, and delete mod folders after an in-panel confirmation. Menu
+labels follow the current game language where ModLoader translations exist.
 
 The lower-left status line also shows the loader version, enabled mod count,
 and `Ctrl+M` reminder.
