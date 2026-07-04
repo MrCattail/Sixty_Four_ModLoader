@@ -175,7 +175,11 @@
 			#modloader-panel h2 { margin: 0 0 8px; font-size: 16px; }
 			#modloader-panel h3 { margin: 14px 0 6px; font-size: 13px; color: rgba(255,255,255,.72); }
 			#modloader-panel button, #modloader-panel input { font: inherit; }
-			#modloader-panel .modloader-panel-close { position: absolute; right: 10px; top: 8px; border: 0; background: transparent; color: rgba(255,255,255,.8); font: 18px/1 Arial, sans-serif; cursor: pointer; }
+			#modloader-panel .modloader-panel-close { position: absolute; right: 9px; top: 8px; width: 24px; height: 24px; border: 0; background: transparent; color: rgba(255,255,255,.8); cursor: pointer; }
+			#modloader-panel .modloader-panel-close:before, #modloader-panel .modloader-panel-close:after { content: ''; position: absolute; left: 50%; top: 50%; width: 15px; height: 2px; border-radius: 999px; background: currentColor; transform-origin: center; }
+			#modloader-panel .modloader-panel-close:before { transform: translate(-50%, -50%) rotate(45deg); }
+			#modloader-panel .modloader-panel-close:after { transform: translate(-50%, -50%) rotate(-45deg); }
+			#modloader-panel .modloader-panel-close:hover { color: #fff; }
 			#modloader-panel .modloader-panel-summary { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px 12px; margin: 8px 0 12px; }
 			#modloader-panel .modloader-panel-row { display: flex; gap: 12px; justify-content: space-between; border-top: 1px solid rgba(255,255,255,.1); padding: 5px 0; }
 			#modloader-panel .modloader-panel-label { color: rgba(255,255,255,.62); }
@@ -362,8 +366,9 @@
 		}
 
 		panel.innerHTML = ''
-		const close = element('button', 'modloader-panel-close', 'x')
+		const close = element('button', 'modloader-panel-close')
 		close.title = 'Close'
+		close.setAttribute('aria-label', 'Close')
 		close.onclick = function () { panel.remove() }
 		panel.appendChild(close)
 		panel.appendChild(element('h2', '', `Cattail's ModLoader ${state.version}`))
