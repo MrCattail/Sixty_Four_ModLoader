@@ -4,5 +4,15 @@
   "version": "0.1.0",
   "loaderVersion": ">=0.1.0",
   "entry": "scripts/main.js",
+  "config": {
+    "fillAmount": {
+      "type": "number",
+      "label": "Long fill amount",
+      "default": 100000000000,
+      "min": 1,
+      "step": 1,
+      "description": "Fill value assigned to activated silos."
+    }
+  },
   "description": "Makes activated silos keep an extremely large fill value."
 }
