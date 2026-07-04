@@ -16,6 +16,7 @@ ModLoader.register({
 		const opacityMin = 0.25
 		const opacityMax = 1
 		const opacityStep = 0.1
+		const coordinateDirectionTargetIds = ['chasm', 'voidsculpture', 'cookie', 'strange2', 'strange1', 'strange3']
 		const resourceSourceStateKey = '_cattailDynamicResourceSourceState'
 		const resourceSourceLastResourceKey = '_cattailDynamicResourceSourceLastResource'
 		const resourceSourceToggleKey = '_cattailDynamicResourceSourceToggle'
@@ -368,18 +369,24 @@ ModLoader.register({
 			if (window._cattailDynamicCoordinateToggleInstalled) return
 			window._cattailDynamicCoordinateToggleInstalled = true
 			addEventListener('keydown', function (event) {
-				if (!isCoordinateToggleEvent(event) || event.repeat) return
 				const game = lastGame
-				if (!game) return
+				if (!game || !isCoordinateToggleEvent(event, game) || event.repeat) return
 				setCoordinateToggle(game, !isCoordinateToggleActive(game))
 				event.preventDefault()
 				event.stopImmediatePropagation()
 			}, true)
 		}
 
-		function isCoordinateToggleEvent(event) {
+		function isCoordinateToggleEvent(event, game) {
 			const key = String(event?.key || '').toLowerCase()
-			return !!(event?.altKey && (key === 'c' || event?.code === 'KeyC' || event?.keyCode === 67))
+			const altC = !!(event?.altKey && (key === 'c' || event?.code === 'KeyC' || event?.keyCode === 67))
+			const altCtrl = !!(
+				event?.altKey &&
+				event?.ctrlKey &&
+				(event.keyCode === 17 || event.keyCode === 18 || key === 'control' || key === 'alt') &&
+				isCoordinateEmptyCellContext(game)
+			)
+			return altC || altCtrl
 		}
 		function isCoordinateToggleActive(game) {
 			return !!game?.[coordinateToggleKey]
@@ -664,6 +671,7 @@ ModLoader.register({
 				ctx.fillText(text, point.x, point.y)
 			}
 			ctx.restore()
+			renderCoordinateDirectionIndicators(game)
 		}
 
 		function getCoordinateOverlayPosition(game, width, height, gap, margin, hintRect = getCurrentHintCanvasRect(game)) {
@@ -704,6 +712,113 @@ ModLoader.register({
 			ctx.fill()
 		}
 
+		function renderCoordinateDirectionIndicators(game) {
+			if (!shouldShowCoordinateDirectionIndicators(game)) return
+			const targets = collectCoordinateDirectionTargets(game)
+			if (!targets.length) return
+
+			const ctx = game.ctx
+			const pixelRatio = game.pixelRatio || 1
+			const unit = game.screenUnit || game.unit || 1
+			const iconSize = Math.max(21 * pixelRatio, Math.min(34 * pixelRatio, unit * 0.26))
+			const arrowSize = Math.max(5 * pixelRatio, iconSize * 0.24)
+			const baseRadius = Math.max(52 * pixelRatio, iconSize * 2.55)
+			const spacing = iconSize * 1.15
+			const margin = Math.max(3 * pixelRatio, iconSize * 0.25)
+			const mouse = game.mouse?.xy || [game.w / 2, game.h / 2]
+			const originPoint = mouse
+			const placed = []
+
+			ctx.save()
+			ctx.globalAlpha = hintInfoOpaque ? 1 : hintOpacity
+			for (const target of targets) {
+				const targetPoint = game.uvToXYUntranslated(target.position)
+				let dx = targetPoint[0] - originPoint[0]
+				let dy = targetPoint[1] - originPoint[1]
+				if (Math.abs(dx) + Math.abs(dy) < 0.001) {
+					dx = 0
+					dy = -1
+				}
+				const angle = Math.atan2(dy, dx)
+				const directionX = Math.cos(angle)
+				const directionY = Math.sin(angle)
+				let radius = baseRadius
+				let x = mouse[0]
+				let y = mouse[1]
+				for (let attempt = 0; attempt < 5; attempt++) {
+					x = clampNumber(mouse[0] + directionX * radius, margin + iconSize / 2, Math.max(margin + iconSize / 2, game.w - margin - iconSize / 2))
+					y = clampNumber(mouse[1] + directionY * radius, margin + iconSize / 2, Math.max(margin + iconSize / 2, game.h - margin - iconSize / 2))
+					if (!placed.some((point) => Math.hypot(point[0] - x, point[1] - y) < spacing)) break
+					radius += spacing * 0.85
+				}
+				drawCoordinateDirectionIcon(game, target, x, y, iconSize)
+				drawCoordinateDirectionArrow(ctx, x + directionX * iconSize * 0.74, y + directionY * iconSize * 0.74, angle, arrowSize)
+				placed.push([x, y])
+			}
+			ctx.restore()
+		}
+
+		function shouldShowCoordinateDirectionIndicators(game) {
+			return !!(
+				isCoordinateEmptyCellContext(game) &&
+				(isCoordinateToggleActive(game) || (game.altActive && game.shiftPressed))
+			)
+		}
+
+		function collectCoordinateDirectionTargets(game) {
+			const targets = []
+			for (const id of coordinateDirectionTargetIds) {
+				const entity = findCoordinateDirectionEntity(game, id)
+				if (entity) targets.push({ id, entity, position: entity.position })
+			}
+			targets.push({ id: 'origin', position: [0, 0] })
+			return targets
+		}
+
+		function findCoordinateDirectionEntity(game, id) {
+			if (!Array.isArray(game?.stuff)) return null
+			return game.stuff.find((entity) => entity?.name === id && Array.isArray(entity.position)) || null
+		}
+
+		function drawCoordinateDirectionIcon(game, target, x, y, size) {
+			if (target.id === 'origin') {
+				drawCoordinateOriginIcon(game, x, y, size)
+				return
+			}
+			drawResourceSourceIcon(game, { kind: 'entity', name: target.id, entity: target.entity }, x, y, size)
+		}
+
+		function drawCoordinateOriginIcon(game, x, y, size) {
+			const ctx = game.ctx
+			ctx.save()
+			ctx.fillStyle = '#fff'
+			ctx.strokeStyle = 'rgba(17, 17, 22, 0.52)'
+			ctx.lineWidth = Math.max(1, size * 0.08)
+			fillCoordinateRoundRect(ctx, x - size / 2, y - size / 2, size, size, Math.max(2, size * 0.18))
+			ctx.strokeRect(x - size * 0.24, y - size * 0.24, size * 0.48, size * 0.48)
+			ctx.beginPath()
+			ctx.moveTo(x, y - size * 0.35)
+			ctx.lineTo(x, y + size * 0.35)
+			ctx.moveTo(x - size * 0.35, y)
+			ctx.lineTo(x + size * 0.35, y)
+			ctx.stroke()
+			ctx.restore()
+		}
+
+		function drawCoordinateDirectionArrow(ctx, x, y, angle, size) {
+			ctx.save()
+			ctx.translate(x, y)
+			ctx.rotate(angle)
+			ctx.fillStyle = 'rgba(17, 17, 22, 0.92)'
+			ctx.beginPath()
+			ctx.moveTo(size, 0)
+			ctx.lineTo(-size * 0.5, -size * 0.866)
+			ctx.lineTo(-size * 0.5, size * 0.866)
+			ctx.closePath()
+			ctx.fill()
+			ctx.restore()
+		}
+
 		function getCurrentHintCanvasRect(game) {
 			const element = game?.currentHint?.element
 			if (!element || !document.body.contains(element)) return null
@@ -732,6 +847,16 @@ ModLoader.register({
 				(game.mouse?.cursorVisible !== false) &&
 				Array.isArray(game.hoveredCell) &&
 				(game.altActive || isCoordinateToggleActive(game))
+			)
+		}
+
+		function isCoordinateEmptyCellContext(game) {
+			return !!(
+				game &&
+				!game.itemInHand &&
+				!game.hoveredEntity &&
+				Array.isArray(game.hoveredCell) &&
+				!game.entityAtCoordinates?.(game.hoveredCell)
 			)
 		}
 		function shouldUseTransientCubeHint(game) {
