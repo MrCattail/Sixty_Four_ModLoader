@@ -1847,6 +1847,22 @@ ModLoader.register({
 				}
 			})
 
+			api.patch(Game.prototype, 'watchCredits', function (original) {
+				return function (...args) {
+					clearResourceSourceGpuLines(this)
+					return original.apply(this, args)
+				}
+			})
+
+			api.patch(Game.prototype, 'addEntity', function (original) {
+				return function (name, ...args) {
+					if (name === 'pinhole') clearResourceSourceGpuLines(this)
+					const result = original.apply(this, arguments)
+					if (name === 'pinhole') clearResourceSourceGpuLines(this)
+					return result
+				}
+			})
+
 			api.patch(Game.prototype, 'createResourceTransfer', function (original) {
 				return function (resources, source, destination, onfinish, visibility, skip) {
 					const result = original.apply(this, arguments)
@@ -1906,6 +1922,10 @@ ModLoader.register({
 				return function (...args) {
 					profileResourceSource('resource.warmup.schedule', () => scheduleResourceSourceWarmup(this), () => getResourceSourceProfileDetail(this, getResourceSourceFocusResourceId(this)))
 					profileResourceSource('resource.events.trim.render', () => trimResourceSourceEvents(getResourceSourceState(this), performance.now()), () => getResourceSourceProfileDetail(this, getResourceSourceFocusResourceId(this)))
+					if (isResourceSourceEndingActive(this)) {
+						clearResourceSourceGpuLines(this)
+						return original.apply(this, args)
+					}
 					if (this.plane) {
 						clearResourceSourceGpuLines(this)
 						return original.apply(this, args)
@@ -2681,6 +2701,10 @@ ModLoader.register({
 			return performance.now() - start < 6
 		}
 		function renderResourceSourceLinks(game) {
+			if (isResourceSourceEndingActive(game)) {
+				clearResourceSourceGpuLines(game)
+				return
+			}
 			if (!isResourceSourceLinkActive(game)) {
 				clearResourceSourceGpuLines(game)
 				return
@@ -2869,6 +2893,10 @@ ModLoader.register({
 			renderer.gl.clearColor(0, 0, 0, 0)
 			renderer.gl.clear(renderer.gl.COLOR_BUFFER_BIT)
 			renderer.canvas.style.display = 'none'
+		}
+
+		function isResourceSourceEndingActive(game) {
+			return !!(game && (game.credits || game.pinhole || game.entitiesInGame?.pinhole > 0))
 		}
 
 		function bindResourceSourceGpuLineAttributes(gl, program, buffer) {
