@@ -625,24 +625,48 @@ ModLoader.register({
 			const fontSize = Math.max(9 * pixelRatio, unit * 0.105)
 			const gap = Math.max(8 * pixelRatio, fontSize * 0.85)
 			const margin = Math.max(4 * pixelRatio, fontSize * 0.35)
+			const hintRect = getCurrentHintCanvasRect(game)
+			const withHintCard = !!hintRect
 
 			ctx.save()
 			ctx.font = '400 ' + fontSize + 'px Montserrat, Arial, sans-serif'
 			ctx.textBaseline = 'top'
 			ctx.textAlign = 'left'
 			const textWidth = ctx.measureText(text).width
-			const height = fontSize * 1.18
-			const point = getCoordinateOverlayPosition(game, textWidth, height, gap, margin)
+			const textHeight = fontSize * 1.18
+			const paddingX = withHintCard ? Math.max(6 * pixelRatio, fontSize * 0.58) : 0
+			const paddingY = withHintCard ? Math.max(4 * pixelRatio, fontSize * 0.34) : 0
+			const width = textWidth + paddingX * 2
+			const height = textHeight + paddingY * 2
+			const point = getCoordinateOverlayPosition(game, width, height, gap, margin, hintRect)
 
-			ctx.shadowColor = 'rgba(255, 255, 255, 0.72)'
-			ctx.shadowBlur = Math.max(1, pixelRatio * 1.6)
-			ctx.fillStyle = 'rgba(45, 52, 64, 0.82)'
-			ctx.fillText(text, point.x, point.y)
+			if (withHintCard) {
+				const shellOpacity = Math.max(0, Math.min(1, (hintOpacity - opacityMin) / (opacityMax - opacityMin)))
+				const backgroundOpacity = hintInfoOpaque ? round(shellOpacity) : 1
+				const sharedOpacity = hintInfoOpaque ? 1 : hintOpacity
+				ctx.globalAlpha = sharedOpacity
+				ctx.shadowColor = 'rgba(0, 0, 0, ' + round((hintInfoOpaque ? shellOpacity : 1) * 0.12) + ')'
+				ctx.shadowBlur = Math.max(2 * pixelRatio, fontSize * 0.42)
+				ctx.shadowOffsetY = Math.max(1 * pixelRatio, fontSize * 0.12)
+				ctx.fillStyle = 'rgba(255, 255, 255, ' + backgroundOpacity + ')'
+				fillCoordinateRoundRect(ctx, point.x, point.y, width, height, Math.max(2 * pixelRatio, fontSize * 0.22))
+
+				ctx.shadowColor = 'rgba(0, 0, 0, 0)'
+				ctx.shadowBlur = 0
+				ctx.shadowOffsetY = 0
+				ctx.globalAlpha = sharedOpacity
+				ctx.fillStyle = '#2d3440'
+				ctx.fillText(text, point.x + paddingX, point.y + paddingY)
+			} else {
+				ctx.shadowColor = 'rgba(255, 255, 255, 0.72)'
+				ctx.shadowBlur = Math.max(1, pixelRatio * 1.6)
+				ctx.fillStyle = 'rgba(45, 52, 64, 0.82)'
+				ctx.fillText(text, point.x, point.y)
+			}
 			ctx.restore()
 		}
 
-		function getCoordinateOverlayPosition(game, width, height, gap, margin) {
-			const hintRect = getCurrentHintCanvasRect(game)
+		function getCoordinateOverlayPosition(game, width, height, gap, margin, hintRect = getCurrentHintCanvasRect(game)) {
 			if (hintRect) {
 				const x = clampNumber(hintRect.x + hintRect.width / 2 - width / 2, margin, Math.max(margin, game.w - width - margin))
 				let y = hintRect.y - height - gap
@@ -658,6 +682,26 @@ ModLoader.register({
 				x: clampNumber(mouse[0] + offsetX, margin, Math.max(margin, game.w - width - margin)),
 				y: clampNumber(mouse[1] - offsetY - height, margin, Math.max(margin, game.h - height - margin))
 			}
+		}
+
+		function fillCoordinateRoundRect(ctx, x, y, width, height, radius) {
+			const r = Math.max(0, Math.min(radius, width / 2, height / 2))
+			ctx.beginPath()
+			if (ctx.roundRect) {
+				ctx.roundRect(x, y, width, height, r)
+			} else {
+				ctx.moveTo(x + r, y)
+				ctx.lineTo(x + width - r, y)
+				ctx.quadraticCurveTo(x + width, y, x + width, y + r)
+				ctx.lineTo(x + width, y + height - r)
+				ctx.quadraticCurveTo(x + width, y + height, x + width - r, y + height)
+				ctx.lineTo(x + r, y + height)
+				ctx.quadraticCurveTo(x, y + height, x, y + height - r)
+				ctx.lineTo(x, y + r)
+				ctx.quadraticCurveTo(x, y, x + r, y)
+			}
+			ctx.closePath()
+			ctx.fill()
 		}
 
 		function getCurrentHintCanvasRect(game) {
