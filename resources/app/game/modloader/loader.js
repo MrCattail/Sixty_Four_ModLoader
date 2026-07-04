@@ -21,7 +21,8 @@
 		sounds: {},
 		music: {},
 		statusLogoIndex: -1,
-		statusLogoTimer: null
+		statusLogoTimer: null,
+		modFileTools: undefined
 	}
 
 	const addIssue = function (level, code, message, details) {
@@ -170,10 +171,12 @@
 		const style = document.createElement('style')
 		style.id = 'modloader-panel-style'
 		style.textContent = `
-			#modloader-panel { position: fixed; right: 16px; top: 16px; z-index: 2147483647; width: min(520px, calc(100vw - 32px)); max-height: calc(100vh - 32px); overflow: auto; padding: 14px; border-radius: 8px; background: rgba(8, 10, 12, .92); color: rgba(255,255,255,.92); box-shadow: 0 12px 36px rgba(0,0,0,.35); font: 13px/1.45 Montserrat, Arial, sans-serif; }
+			#modloader-panel { position: fixed; right: 16px; top: 16px; z-index: 2147483647; width: min(860px, calc(100vw - 32px)); max-height: calc(100vh - 32px); overflow: auto; padding: 14px; border-radius: 8px; background: rgba(8, 10, 12, .94); color: rgba(255,255,255,.92); box-shadow: 0 12px 36px rgba(0,0,0,.35); font: 13px/1.45 Montserrat, Arial, sans-serif; }
 			#modloader-panel h2 { margin: 0 0 8px; font-size: 16px; }
 			#modloader-panel h3 { margin: 14px 0 6px; font-size: 13px; color: rgba(255,255,255,.72); }
+			#modloader-panel button, #modloader-panel input { font: inherit; }
 			#modloader-panel .modloader-panel-close { position: absolute; right: 10px; top: 8px; border: 0; background: transparent; color: rgba(255,255,255,.8); font: 18px/1 Arial, sans-serif; cursor: pointer; }
+			#modloader-panel .modloader-panel-summary { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px 12px; margin: 8px 0 12px; }
 			#modloader-panel .modloader-panel-row { display: flex; gap: 12px; justify-content: space-between; border-top: 1px solid rgba(255,255,255,.1); padding: 5px 0; }
 			#modloader-panel .modloader-panel-label { color: rgba(255,255,255,.62); }
 			#modloader-panel .modloader-panel-value { text-align: right; overflow-wrap: anywhere; }
@@ -182,13 +185,174 @@
 			#modloader-panel .modloader-panel-issues { margin: 8px 0 0; padding: 8px 8px 8px 24px; border-radius: 6px; background: rgba(255, 196, 87, .12); color: rgba(255,255,255,.92); }
 			#modloader-panel .modloader-panel-issue-error { color: #ffb0b0; }
 			#modloader-panel .modloader-panel-issue-warn { color: #ffe1a3; }
+			#modloader-panel .modloader-mod-toolbar { position: sticky; top: -14px; z-index: 2; display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 8px -2px 10px; padding: 8px 2px; background: rgba(8, 10, 12, .96); }
+			#modloader-panel .modloader-panel-note { color: rgba(255,255,255,.7); }
+			#modloader-panel .modloader-panel-reload-note { display: none; color: #ffe1a3; }
+			#modloader-panel .modloader-panel-reload-note.active { display: inline; }
+			#modloader-panel .modloader-save-button { border: 0; border-radius: 6px; padding: 7px 10px; background: #f2f2ed; color: #111; cursor: pointer; }
+			#modloader-panel .modloader-save-button:disabled { cursor: default; opacity: .45; }
+			#modloader-panel .modloader-panel-error { margin: 8px 0; padding: 8px; border-radius: 6px; background: rgba(255, 96, 96, .14); color: #ffb0b0; }
+			#modloader-panel .modloader-mod-manager { display: grid; gap: 6px; }
+			#modloader-panel .modloader-mod-row { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 10px; align-items: flex-start; padding: 9px; border: 1px solid rgba(255,255,255,.1); border-radius: 7px; background: rgba(255,255,255,.045); }
+			#modloader-panel .modloader-mod-row-selected { border-color: rgba(174, 231, 160, .42); background: rgba(120, 190, 120, .08); }
+			#modloader-panel .modloader-mod-row-problem { border-color: rgba(255, 196, 87, .48); }
+			#modloader-panel .modloader-mod-check { margin-top: 2px; }
+			#modloader-panel .modloader-mod-main { min-width: 0; }
+			#modloader-panel .modloader-mod-title { display: flex; flex-wrap: wrap; gap: 8px; align-items: baseline; }
+			#modloader-panel .modloader-mod-path { font-weight: 600; overflow-wrap: anywhere; }
+			#modloader-panel .modloader-mod-version { color: rgba(255,255,255,.58); }
+			#modloader-panel .modloader-mod-name { color: rgba(255,255,255,.72); overflow-wrap: anywhere; }
+			#modloader-panel .modloader-mod-meta { margin-top: 3px; color: rgba(255,255,255,.62); overflow-wrap: anywhere; }
+			#modloader-panel .modloader-mod-warning { display: none; margin-top: 5px; color: #ffe1a3; overflow-wrap: anywhere; }
+			#modloader-panel .modloader-mod-warning.active { display: block; }
 		`
 		document.head.appendChild(style)
+	}
+
+	const getModFileTools = function () {
+		if (state.modFileTools !== undefined) return state.modFileTools
+		try {
+			if (typeof require !== 'function') {
+				state.modFileTools = null
+				return null
+			}
+			const fs = require('fs')
+			const path = require('path')
+			const url = require('url')
+			const gameRoot = path.dirname(url.fileURLToPath(window.location.href))
+			state.modFileTools = {
+				fs,
+				path,
+				modsDir: path.join(gameRoot, 'mods'),
+				enabledPath: path.join(gameRoot, 'mods', 'enabled.json')
+			}
+		} catch (error) {
+			warn('Mod file tools unavailable.', error)
+			state.modFileTools = null
+		}
+		return state.modFileTools
+	}
+
+	const getEnabledPathSet = function () {
+		const selected = new Set()
+		for (const entry of state.enabledEntries) selected.add(entry.path)
+		return selected
+	}
+
+	const readAvailableMods = function () {
+		const tools = getModFileTools()
+		const enabled = getEnabledPathSet()
+		const mods = []
+		const byPath = {}
+		let errorMessage = ''
+
+		if (tools) {
+			try {
+				const entries = tools.fs.readdirSync(tools.modsDir, { withFileTypes: true })
+					.filter(function (entry) { return entry.isDirectory() })
+					.map(function (entry) { return entry.name })
+					.sort(function (a, b) { return a.localeCompare(b) })
+
+				for (const name of entries) {
+					const manifestPath = tools.path.join(tools.modsDir, name, 'mod.json')
+					if (!tools.fs.existsSync(manifestPath)) continue
+					let manifest = {}
+					let loadError = ''
+					try {
+						manifest = JSON.parse(tools.fs.readFileSync(manifestPath, 'utf8'))
+					} catch (error) {
+						loadError = error.message
+					}
+					const mod = {
+						path: name,
+						id: manifest.id || name,
+						manifest,
+						enabled: enabled.has(name),
+						loadError
+					}
+					mods.push(mod)
+					byPath[name] = mod
+				}
+			} catch (error) {
+				errorMessage = error.message
+			}
+		} else {
+			for (const mod of state.mods) {
+				const item = Object.assign({}, mod, { enabled: true, loadError: '' })
+				mods.push(item)
+				byPath[item.path] = item
+			}
+			errorMessage = 'File access is unavailable, so only loaded mods can be shown.'
+		}
+
+		for (const entry of state.enabledEntries) {
+			if (byPath[entry.path]) continue
+			mods.push({
+				path: entry.path,
+				id: entry.id || entry.path,
+				manifest: { id: entry.id || entry.path },
+				enabled: true,
+				loadError: 'Enabled entry is missing mods/' + entry.path + '/mod.json.'
+			})
+		}
+
+		return { mods, errorMessage }
+	}
+
+	const getModReloadPolicy = function (manifest) {
+		if (manifest.reloadPolicy) return String(manifest.reloadPolicy)
+		if (manifest.hotReload === true) return 'hot'
+		return 'reload'
+	}
+
+	const getModReloadLabel = function (manifest) {
+		const policy = getModReloadPolicy(manifest)
+		if (policy === 'hot') return 'hot capable, reload now'
+		if (policy === 'restart') return 'restart required'
+		return 'reload required'
+	}
+
+	const getOrderedSelectedPaths = function (mods, selected) {
+		const out = []
+		const seen = new Set()
+		const available = new Set(mods.map(function (mod) { return mod.path }))
+		for (const entry of state.enabledEntries) {
+			if (!selected.has(entry.path) || seen.has(entry.path)) continue
+			out.push(entry.path)
+			seen.add(entry.path)
+		}
+		for (const mod of mods) {
+			if (!available.has(mod.path) || !selected.has(mod.path) || seen.has(mod.path)) continue
+			out.push(mod.path)
+			seen.add(mod.path)
+		}
+		return out
+	}
+
+	const sameStringList = function (a, b) {
+		if (a.length !== b.length) return false
+		for (let i = 0; i < a.length; i++) {
+			if (a[i] !== b[i]) return false
+		}
+		return true
+	}
+
+	const writeEnabledConfig = function (paths) {
+		const tools = getModFileTools()
+		if (!tools) throw new Error('File access is unavailable.')
+		const payload = JSON.stringify({ mods: paths }, null, 2) + '\n'
+		tools.fs.writeFileSync(tools.enabledPath, payload, 'utf8')
 	}
 
 	const renderPanel = function () {
 		if (!document.body) return
 		ensurePanelStyle()
+
+		const available = readAvailableMods()
+		const mods = available.mods
+		const originalSelected = getOrderedSelectedPaths(mods, getEnabledPathSet())
+		const selected = new Set(originalSelected)
+		const rowModels = []
 
 		let panel = document.getElementById('modloader-panel')
 		if (!panel) {
@@ -202,7 +366,8 @@
 		close.title = 'Close'
 		close.onclick = function () { panel.remove() }
 		panel.appendChild(close)
-		panel.appendChild(element('h2', '', `ModLoader ${state.version}`))
+		panel.appendChild(element('h2', '', `Cattail's ModLoader ${state.version}`))
+
 		if (state.issues.length) {
 			const issues = element('ul', 'modloader-panel-issues')
 			for (const issue of state.issues) {
@@ -210,59 +375,125 @@
 			}
 			panel.appendChild(issues)
 		}
-		panel.appendChild(panelRow('Enabled entries', String(state.enabledEntries.length)))
-		panel.appendChild(panelRow('Loaded mods', String(state.mods.length)))
-		panel.appendChild(panelRow('Issues', String(state.issues.length)))
-		panel.appendChild(panelRow('Data patches', String(state.dataPatches.length)))
-		panel.appendChild(panelRow('Word patches', String(state.wordPatches.length)))
-		panel.appendChild(panelRow('Registered languages', state.languages.join(', ') || '-'))
-		panel.appendChild(panelRow('Orphan entities', String(state.orphanEntities.length)))
-		panel.appendChild(panelRow('Hook stages', Object.keys(state.hooks).map(function (name) { return `${name}(${state.hooks[name].length})` }).join(', ') || '-'))
-		panel.appendChild(panelRow('Asset replacements', String(Object.keys(state.assetReplacements).length)))
-		panel.appendChild(panelRow('Registered sounds', Object.keys(state.sounds).join(', ') || '-'))
-		panel.appendChild(panelRow('Registered music', Object.keys(state.music).join(', ') || '-'))
 
-		panel.appendChild(element('h3', '', 'Mod Config'))
-		const configList = element('ul', 'modloader-panel-list')
-		let hasConfig = false
-		for (const modId in state.configs) {
-			const config = state.configs[modId]
-			if (!config.schema.length) continue
-			hasConfig = true
-			const values = config.schema.map(function (item) {
-				const label = item.label || item.key
-				return `${label} (${item.key}, ${item.type || 'value'})=${JSON.stringify(config.values[item.key])}`
-			}).join(', ')
-			configList.appendChild(element('li', '', `${modId}: ${values}`))
-		}
-		if (!hasConfig) configList.appendChild(element('li', '', 'No declared config.'))
-		panel.appendChild(configList)
+		const summary = element('div', 'modloader-panel-summary')
+		summary.appendChild(panelRow('Installed mods', String(mods.length)))
+		summary.appendChild(panelRow('Enabled entries', String(state.enabledEntries.length)))
+		summary.appendChild(panelRow('Loaded mods', String(state.mods.length)))
+		summary.appendChild(panelRow('Issues', String(state.issues.length)))
+		summary.appendChild(panelRow('Data patches', String(state.dataPatches.length)))
+		summary.appendChild(panelRow('Word patches', String(state.wordPatches.length)))
+		summary.appendChild(panelRow('Registered languages', state.languages.join(', ') || '-'))
+		summary.appendChild(panelRow('Orphan entities', String(state.orphanEntities.length)))
+		panel.appendChild(summary)
 
-		panel.appendChild(element('h3', '', 'Enabled Config'))
-		const enabledList = element('ul', 'modloader-panel-list')
-		for (const entry of state.enabledEntries) {
-			enabledList.appendChild(element('li', '', `${entry.path}${entry.id && entry.id !== entry.path ? ' | id hint: ' + entry.id : ''}`))
-		}
-		if (!state.enabledEntries.length) enabledList.appendChild(element('li', '', 'No enabled entries.'))
-		panel.appendChild(enabledList)
+		panel.appendChild(element('h3', '', 'Mod Manager'))
+		if (available.errorMessage) panel.appendChild(element('div', 'modloader-panel-error', available.errorMessage))
 
-		panel.appendChild(element('h3', '', 'Mods'))
-		const list = element('ul', 'modloader-panel-list')
-		for (const mod of state.mods) {
-			const deps = resolveModRefs(mod.manifest.dependencies).join(', ')
-			const conflicts = resolveModRefs(mod.manifest.conflicts).join(', ')
-			list.appendChild(element('li', '', `${mod.id} ${mod.manifest.version || ''}${mod.loaded ? ' | entry loaded' : mod.manifest.entry ? ' | entry pending' : ''}${deps ? ' | deps: ' + deps : ''}${conflicts ? ' | conflicts: ' + conflicts : ''}`))
-		}
-		if (!state.mods.length) list.appendChild(element('li', '', 'No loaded mods.'))
+		const toolbar = element('div', 'modloader-mod-toolbar')
+		const note = element('span', 'modloader-panel-note', 'Toggle mods below. Changes are applied after reload.')
+		const reloadNote = element('span', 'modloader-panel-reload-note', 'Changes require reload.')
+		const message = element('span', 'modloader-panel-note', '')
+		const save = element('button', 'modloader-save-button', 'Save & Reload')
+		save.disabled = true
+		const left = element('span')
+		left.append(note, document.createTextNode(' '), reloadNote, document.createTextNode(' '), message)
+		toolbar.append(left, save)
+		panel.appendChild(toolbar)
+
+		const list = element('div', 'modloader-mod-manager')
 		panel.appendChild(list)
+
+		const refreshRows = function () {
+			const refs = new Set()
+			for (const mod of mods) {
+				if (!selected.has(mod.path)) continue
+				refs.add(mod.path)
+				refs.add(mod.id)
+			}
+
+			for (const row of rowModels) {
+				const mod = row.mod
+				const checked = selected.has(mod.path)
+				row.checkbox.checked = checked
+				row.container.classList.toggle('modloader-mod-row-selected', checked)
+				const warnings = []
+				if (mod.loadError) warnings.push(mod.loadError)
+				if (checked) {
+					const missing = resolveModRefs(mod.manifest.dependencies).filter(function (ref) { return !refs.has(ref) })
+					const conflicts = resolveModRefs(mod.manifest.conflicts).filter(function (ref) { return refs.has(ref) })
+					if (missing.length) warnings.push('Missing dependencies: ' + missing.join(', '))
+					if (conflicts.length) warnings.push('Conflicts enabled: ' + conflicts.join(', '))
+				}
+				row.warning.textContent = warnings.join(' | ')
+				row.warning.classList.toggle('active', warnings.length > 0)
+				row.container.classList.toggle('modloader-mod-row-problem', warnings.length > 0)
+			}
+
+			const orderedSelected = getOrderedSelectedPaths(mods, selected)
+			const dirty = !sameStringList(orderedSelected, originalSelected)
+			reloadNote.classList.toggle('active', dirty)
+			save.disabled = !dirty || !getModFileTools()
+			message.textContent = ''
+		}
+
+		for (const mod of mods) {
+			const row = element('label', 'modloader-mod-row')
+			const checkbox = element('input', 'modloader-mod-check')
+			checkbox.type = 'checkbox'
+			checkbox.checked = selected.has(mod.path)
+			checkbox.disabled = !!mod.loadError && !checkbox.checked
+			checkbox.onchange = function () {
+				if (checkbox.checked) selected.add(mod.path)
+				else selected.delete(mod.path)
+				refreshRows()
+			}
+
+			const main = element('div', 'modloader-mod-main')
+			const title = element('div', 'modloader-mod-title')
+			title.appendChild(element('span', 'modloader-mod-path', mod.path))
+			if (mod.manifest.version) title.appendChild(element('span', 'modloader-mod-version', 'v' + mod.manifest.version))
+			if (mod.manifest.name && mod.manifest.name !== mod.path) title.appendChild(element('span', 'modloader-mod-name', mod.manifest.name))
+			main.appendChild(title)
+
+			const deps = resolveModRefs(mod.manifest.dependencies)
+			const conflicts = resolveModRefs(mod.manifest.conflicts)
+			const metaParts = [
+				'id: ' + (mod.id || mod.path),
+				getModReloadLabel(mod.manifest)
+			]
+			if (deps.length) metaParts.push('deps: ' + deps.join(', '))
+			if (conflicts.length) metaParts.push('conflicts: ' + conflicts.join(', '))
+			main.appendChild(element('div', 'modloader-mod-meta', metaParts.join(' | ')))
+
+			const warning = element('div', 'modloader-mod-warning')
+			main.appendChild(warning)
+			row.append(checkbox, main)
+			list.appendChild(row)
+			rowModels.push({ mod, checkbox, container: row, warning })
+		}
+
+		if (!mods.length) list.appendChild(element('div', 'modloader-panel-note', 'No mods with mod.json were found.'))
+
+		save.onclick = function () {
+			const orderedSelected = getOrderedSelectedPaths(mods, selected)
+			try {
+				writeEnabledConfig(orderedSelected)
+				message.textContent = 'Saved. Reloading...'
+				location.reload()
+			} catch (error) {
+				message.textContent = 'Save failed: ' + error.message
+			}
+		}
 
 		panel.appendChild(element('h3', '', 'Recent Log'))
 		const lines = state.log.slice(-12).map(function (entry) {
 			return `${entry.level}: ${entry.args.map(function (arg) { return arg instanceof Error ? arg.message : String(arg) }).join(' ')}`
 		})
 		panel.appendChild(element('pre', 'modloader-panel-log', lines.join('\n') || 'No log entries.'))
-	}
 
+		refreshRows()
+	}
 	const togglePanel = function () {
 		const panel = document.getElementById('modloader-panel')
 		if (panel) panel.remove()
