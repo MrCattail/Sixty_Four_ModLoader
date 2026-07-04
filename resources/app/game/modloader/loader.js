@@ -595,7 +595,10 @@
 			configAnimating = true
 			configAnimationTimer = setTimeout(function () {
 				configAnimationTimer = null
-				animateRowMove(rowModel.container, function () { restoreRowPosition(rowModel) }, function () { configAnimating = false })
+				animateRowMove(rowModel.container, function () {
+					restoreRowPosition(rowModel)
+					list.scrollTop = rowModel.configScrollTop || 0
+				}, function () { configAnimating = false })
 			}, 170)
 		}
 
@@ -603,6 +606,7 @@
 			if (!rowModel || !rowModel.configModels.length || configAnimating) return
 			if (expandedRow && expandedRow !== rowModel) collapseConfigRow(expandedRow, false)
 			expandedRow = rowModel
+			rowModel.configScrollTop = list.scrollTop
 			configAnimating = true
 			animateRowMove(rowModel.container, function () {
 				list.insertBefore(rowModel.container, list.firstChild)
