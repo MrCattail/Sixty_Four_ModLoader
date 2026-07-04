@@ -304,7 +304,7 @@ ModLoader.register({
 			const toggle = document.createElement('div')
 			toggle.className = 'cattail-shop-compact-toggle'
 			toggle.setAttribute('role', 'button')
-			toggle.tabIndex = 0
+			keepControlUnfocused(toggle)
 			document.body.append(toggle)
 			shop[toggleKey] = toggle
 			updateToggleLabel(shop)
@@ -438,6 +438,7 @@ ModLoader.register({
 			const header = document.createElement('button')
 			header.type = 'button'
 			header.className = 'cattail-shop-category-head'
+			keepControlUnfocused(header)
 			header.onclick = function (event) {
 				event.preventDefault()
 				event.stopPropagation()
@@ -481,6 +482,7 @@ ModLoader.register({
 			const row = document.createElement('button')
 			row.type = 'button'
 			row.className = 'cattail-shop-category-item'
+			keepControlUnfocused(row)
 			row.dataset.shopItem = item.name
 			const disabled = item.html.classList.contains('disabled')
 			const isNew = item.html.classList.contains('newItem')
@@ -594,6 +596,16 @@ ModLoader.register({
 			return field === 'title' ? value[0] : value[1]
 		}
 
+		function keepControlUnfocused(control) {
+			control.tabIndex = -1
+			control.addEventListener('mousedown', function (event) {
+				event.preventDefault()
+			})
+			control.addEventListener('focus', function () {
+				control.blur()
+			})
+		}
+
 		function cssEscape(value) {
 			if (window.CSS?.escape) return window.CSS.escape(value)
 			return String(value).replace(/"/g, '\\"')
@@ -622,6 +634,14 @@ ModLoader.register({
 }
 .cattail-shop-compact-toggle:active {
 	transform: scale(.94);
+}
+.cattail-shop-compact-toggle:focus,
+.cattail-shop-compact-toggle:focus-visible,
+.cattail-shop-category-head:focus,
+.cattail-shop-category-head:focus-visible,
+.cattail-shop-category-item:focus,
+.cattail-shop-category-item:focus-visible {
+	outline: none;
 }
 .cattail-shop-compact-toggle:before,
 .cattail-shop-compact-toggle:after {
