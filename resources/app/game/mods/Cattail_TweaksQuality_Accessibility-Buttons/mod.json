@@ -1,0 +1,8 @@
+{
+  "id": "Cattail_TweaksQuality_Accessibility-Buttons",
+  "name": "Accessibility Buttons",
+  "version": "0.1.0",
+  "loaderVersion": ">=0.1.0",
+  "entry": "scripts/main.js",
+  "description": "Adds the flash and chill toggles to the in-game view and stacks the menu toggles without changing vanilla scripts."
+}
