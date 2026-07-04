@@ -203,7 +203,11 @@
 			#modloader-panel .modloader-mod-manager::-webkit-scrollbar-track { background: transparent; }
 			#modloader-panel .modloader-mod-manager::-webkit-scrollbar-thumb { border-radius: 999px; background: rgba(185,185,185,.48); }
 			#modloader-panel .modloader-mod-manager::-webkit-scrollbar-thumb:hover { background: rgba(210,210,210,.62); }
-			#modloader-panel .modloader-mod-row { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 10px; align-items: flex-start; padding: 9px; border: 1px solid rgba(255,255,255,.1); border-radius: 7px; background: rgba(255,255,255,.045); }
+			#modloader-panel .modloader-mod-row { position: relative; display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 10px; align-items: flex-start; padding: 9px; border: 1px solid rgba(255,255,255,.1); border-radius: 7px; background: rgba(255,255,255,.045); transition: border-color .14s ease, background .14s ease, box-shadow .14s ease; }
+			#modloader-panel .modloader-mod-row-configurable { cursor: pointer; }
+			#modloader-panel .modloader-mod-row-configurable:hover { border-color: rgba(207,233,255,.28); }
+			#modloader-panel .modloader-mod-row-expanded { border-color: rgba(207,233,255,.5); box-shadow: 0 8px 22px rgba(0,0,0,.16); }
+			#modloader-panel .modloader-mod-row-moving { z-index: 3; will-change: transform; }
 			#modloader-panel .modloader-mod-row-selected { border-color: rgba(174, 231, 160, .42); background: rgba(120, 190, 120, .08); }
 			#modloader-panel .modloader-mod-row-problem { border-color: rgba(255, 196, 87, .48); }
 			#modloader-panel .modloader-mod-check { margin-top: 2px; }
@@ -215,7 +219,8 @@
 			#modloader-panel .modloader-mod-meta { margin-top: 3px; color: rgba(255,255,255,.62); overflow-wrap: anywhere; }
 			#modloader-panel .modloader-mod-warning { display: none; margin-top: 5px; color: #ffe1a3; overflow-wrap: anywhere; }
 			#modloader-panel .modloader-mod-warning.active { display: block; }
-			#modloader-panel .modloader-mod-config { margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(255,255,255,.09); }
+			#modloader-panel .modloader-mod-config { max-height: 0; margin-top: 0; padding-top: 0; border-top: 1px solid transparent; opacity: 0; overflow: hidden; pointer-events: none; transform: translateY(-4px); transition: max-height .2s ease, margin-top .2s ease, padding-top .2s ease, border-top-color .2s ease, opacity .16s ease, transform .2s ease; }
+			#modloader-panel .modloader-mod-row-expanded .modloader-mod-config { max-height: 640px; margin-top: 8px; padding-top: 8px; border-top-color: rgba(255,255,255,.09); opacity: 1; pointer-events: auto; transform: translateY(0); }
 			#modloader-panel .modloader-mod-config-title { margin-bottom: 5px; color: rgba(255,255,255,.72); font-weight: 600; }
 			#modloader-panel .modloader-config-field { display: grid; grid-template-columns: minmax(130px, .8fr) minmax(170px, 1fr); gap: 4px 10px; align-items: center; margin-top: 6px; }
 			#modloader-panel .modloader-config-field-disabled { opacity: .52; }
@@ -525,6 +530,95 @@
 		const list = element('div', 'modloader-mod-manager')
 		panel.appendChild(list)
 
+		let expandedRow = null
+		let configAnimating = false
+		let configAnimationTimer = null
+
+		const isModRowToggleTarget = function (target) {
+			return target?.closest && !target.closest('input, textarea, select, button, .modloader-mod-config')
+		}
+
+		const restoreRowPosition = function (rowModel) {
+			const index = rowModels.indexOf(rowModel)
+			let before = null
+			for (let i = index + 1; i < rowModels.length; i++) {
+				if (rowModels[i].container.parentNode === list) {
+					before = rowModels[i].container
+					break
+				}
+			}
+			list.insertBefore(rowModel.container, before)
+		}
+
+		const animateRowMove = function (row, mutate, done) {
+			const first = row.getBoundingClientRect()
+			mutate()
+			const last = row.getBoundingClientRect()
+			const dx = first.left - last.left
+			const dy = first.top - last.top
+			if (!dx && !dy) {
+				if (done) done()
+				return
+			}
+			row.classList.add('modloader-mod-row-moving')
+			row.style.transition = 'none'
+			row.style.transform = `translate(${dx}px, ${dy}px)`
+			row.getBoundingClientRect()
+			row.style.transition = 'transform .22s cubic-bezier(.2, .8, .2, 1)'
+			row.style.transform = ''
+			let finished = false
+			let fallbackTimer = null
+			const cleanup = function (event) {
+				if (event && event.target !== row) return
+				if (finished) return
+				finished = true
+				if (fallbackTimer) clearTimeout(fallbackTimer)
+				row.removeEventListener('transitionend', cleanup)
+				row.classList.remove('modloader-mod-row-moving')
+				row.style.transition = ''
+				row.style.transform = ''
+				if (done) done()
+			}
+			row.addEventListener('transitionend', cleanup)
+			fallbackTimer = setTimeout(cleanup, 280)
+		}
+
+		const collapseConfigRow = function (rowModel, moveBack) {
+			if (!rowModel || !rowModel.configModels.length || configAnimating) return
+			if (configAnimationTimer) clearTimeout(configAnimationTimer)
+			rowModel.container.classList.remove('modloader-mod-row-expanded')
+			expandedRow = expandedRow === rowModel ? null : expandedRow
+			if (!moveBack) {
+				restoreRowPosition(rowModel)
+				return
+			}
+			configAnimating = true
+			configAnimationTimer = setTimeout(function () {
+				configAnimationTimer = null
+				animateRowMove(rowModel.container, function () { restoreRowPosition(rowModel) }, function () { configAnimating = false })
+			}, 170)
+		}
+
+		const expandConfigRow = function (rowModel) {
+			if (!rowModel || !rowModel.configModels.length || configAnimating) return
+			if (expandedRow && expandedRow !== rowModel) collapseConfigRow(expandedRow, false)
+			expandedRow = rowModel
+			configAnimating = true
+			animateRowMove(rowModel.container, function () {
+				list.insertBefore(rowModel.container, list.firstChild)
+				list.scrollTop = 0
+			}, function () {
+				rowModel.container.classList.add('modloader-mod-row-expanded')
+				configAnimating = false
+			})
+		}
+
+		const toggleConfigRow = function (rowModel) {
+			if (configAnimating) return
+			if (expandedRow === rowModel) collapseConfigRow(rowModel, true)
+			else expandConfigRow(rowModel)
+		}
+
 		const refreshRows = function (keepMessage) {
 			const refs = new Set()
 			for (const mod of mods) {
@@ -605,6 +699,7 @@
 			const modConfig = readConfigForPanel(mod)
 			const rowConfigModels = []
 			if (modConfig.schema.length && !mod.loadError) {
+				row.classList.add('modloader-mod-row-configurable')
 				const configBox = element('div', 'modloader-mod-config')
 				configBox.appendChild(element('div', 'modloader-mod-config-title', 'Config'))
 				for (const item of modConfig.schema) {
@@ -651,9 +746,14 @@
 				main.appendChild(configBox)
 			}
 
+			const rowModel = { mod, checkbox, container: row, warning, configModels: rowConfigModels }
+			row.onclick = function (event) {
+				if (!rowConfigModels.length || !isModRowToggleTarget(event.target)) return
+				toggleConfigRow(rowModel)
+			}
 			row.append(checkbox, main)
 			list.appendChild(row)
-			rowModels.push({ mod, checkbox, container: row, warning, configModels: rowConfigModels })
+			rowModels.push(rowModel)
 		}
 
 		if (!mods.length) list.appendChild(element('div', 'modloader-panel-note', 'No mods with mod.json were found.'))
