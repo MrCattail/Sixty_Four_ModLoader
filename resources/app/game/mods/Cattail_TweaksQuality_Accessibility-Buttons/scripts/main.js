@@ -4,9 +4,12 @@ ModLoader.register({
 		const controllerKey = '__cattailAccessibilityButtonsController'
 		const styleId = 'cattail-accessibility-buttons-style'
 		const rootClass = 'cattail-accessibility-buttons'
+		const hotspotClass = 'cattail-accessibility-buttons-hotspot'
 		const hiddenClass = 'cattail-accessibility-buttons-hidden'
+		const autoHiddenClass = 'cattail-accessibility-buttons-auto-hidden'
 		const photofobiaClass = 'photofobia'
 		const activeClass = 'active'
+		const autoHideDelay = 5000
 
 		api.on('afterVanillaScripts', function () {
 			if (typeof Splash === 'undefined' || typeof Game === 'undefined') return
@@ -58,7 +61,7 @@ ModLoader.register({
 	box-shadow: 0 8px 22px rgba(0, 0, 0, .18);
 	transform: translateX(-50%);
 	opacity: .56;
-	transition: opacity .16s ease, transform .16s ease, background .16s ease;
+	transition: opacity .22s ease, transform .24s ease, background .16s ease;
 	-webkit-tap-highlight-color: transparent;
 	user-select: none;
 }
@@ -78,6 +81,12 @@ ModLoader.register({
 	opacity: 0;
 	pointer-events: none;
 	transform: translateX(-50%) translateY(8px);
+}
+
+.${rootClass}.${autoHiddenClass} {
+	opacity: 0;
+	pointer-events: none;
+	transform: translateX(-50%) translateY(calc(100% + max(18px, env(safe-area-inset-bottom))));
 }
 
 .${rootClass} button {
@@ -109,6 +118,21 @@ ModLoader.register({
 	outline: 2px solid rgba(120, 150, 255, .72);
 	outline-offset: 3px;
 	border-radius: 3px;
+}
+
+.${hotspotClass} {
+	position: fixed;
+	left: 50%;
+	bottom: 0;
+	z-index: 2147482999;
+	width: min(220px, 46vw);
+	height: max(18px, env(safe-area-inset-bottom));
+	transform: translateX(-50%);
+	background: transparent;
+}
+
+.${hotspotClass}.${hiddenClass} {
+	display: none;
 }
 
 .cattail-accessibility-flash {
@@ -149,6 +173,11 @@ ModLoader.register({
 	.${rootClass} button {
 		width: 44px;
 		height: 22px;
+	}
+
+	.${hotspotClass} {
+		width: min(200px, 54vw);
+		height: max(22px, env(safe-area-inset-bottom));
 	}
 }
 `
@@ -204,6 +233,10 @@ ModLoader.register({
 			root.setAttribute('role', 'group')
 			root.setAttribute('aria-label', 'Accessibility toggles')
 
+			const hotspot = document.createElement('div')
+			hotspot.className = hotspotClass
+			hotspot.setAttribute('aria-hidden', 'true')
+
 			const flash = createButton('cattail-accessibility-flash', 'Toggle reduced flashes', function () {
 				game.togglePhotofobia()
 			})
@@ -213,9 +246,19 @@ ModLoader.register({
 
 			root.append(flash)
 			root.append(chill)
+			document.body.appendChild(hotspot)
 			document.body.appendChild(root)
 
-			game[controllerKey] = { root, flash, chill }
+			game[controllerKey] = {
+				root,
+				hotspot,
+				flash,
+				chill,
+				pointerInside: false,
+				autoHidden: false,
+				autoHideTimer: null
+			}
+			bindAutoHide(game, game[controllerKey])
 			return game[controllerKey]
 		}
 
@@ -242,6 +285,49 @@ ModLoader.register({
 			return button
 		}
 
+		function bindAutoHide(game, controller) {
+			const enter = function () {
+				controller.pointerInside = true
+				showController(game)
+			}
+			const leave = function () {
+				controller.pointerInside = false
+				scheduleAutoHide(game)
+			}
+
+			controller.root.addEventListener('mouseenter', enter)
+			controller.root.addEventListener('mouseleave', leave)
+			controller.hotspot.addEventListener('mouseenter', enter)
+			controller.hotspot.addEventListener('mouseleave', leave)
+			controller.root.addEventListener('focusin', enter)
+			controller.root.addEventListener('focusout', leave)
+		}
+
+		function showController(game) {
+			const controller = ensureController(game)
+			if (!controller) return
+
+			controller.autoHidden = false
+			controller.root.classList.remove(autoHiddenClass)
+			if (controller.autoHideTimer) {
+				clearTimeout(controller.autoHideTimer)
+				controller.autoHideTimer = null
+			}
+		}
+
+		function scheduleAutoHide(game) {
+			const controller = ensureController(game)
+			if (!controller) return
+			if (controller.autoHideTimer) clearTimeout(controller.autoHideTimer)
+
+			controller.autoHideTimer = setTimeout(function () {
+				controller.autoHideTimer = null
+				if (controller.pointerInside || game.splash?.isShown) return
+				controller.autoHidden = true
+				controller.root.classList.add(autoHiddenClass)
+			}, autoHideDelay)
+		}
+
 		function updateController(game, splashOverride) {
 			const controller = ensureController(game)
 			if (!controller) return
@@ -252,10 +338,13 @@ ModLoader.register({
 			const splashShown = !!splash?.isShown
 
 			controller.root.classList.toggle(hiddenClass, splashShown)
+			controller.hotspot.classList.toggle(hiddenClass, splashShown)
 			controller.root.classList.toggle(photofobiaClass, photofobia)
 			controller.flash.setAttribute('aria-pressed', photofobia ? 'true' : 'false')
 			controller.chill.setAttribute('aria-pressed', chill ? 'true' : 'false')
 			controller.chill.classList.toggle(activeClass, chill)
+			if (splashShown) showController(game)
+			else if (!controller.pointerInside && !controller.autoHidden) scheduleAutoHide(game)
 		}
 	}
 })
