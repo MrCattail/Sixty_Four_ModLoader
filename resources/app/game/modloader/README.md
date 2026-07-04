@@ -117,7 +117,11 @@ api.config.schema()
 ```
 
 Values are stored in `localStorage` as `modloader:<modId>:config:<key>`.
-The `Ctrl+M` panel currently shows config values read-only.
+The `Ctrl+M` panel can edit declared config fields for enabled mods. Booleans
+use checkboxes, numbers use number inputs, strings use text fields, and
+array/object values use JSON text boxes. Config-only saves do not reload the
+game automatically; mods that read config during startup still need a manual
+reload to apply those values.
 
 ## Dependencies And Conflicts
 

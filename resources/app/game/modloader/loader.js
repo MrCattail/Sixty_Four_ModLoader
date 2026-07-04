@@ -174,7 +174,7 @@
 			#modloader-panel { position: fixed; right: 16px; top: 16px; z-index: 2147483647; width: min(860px, calc(100vw - 32px)); max-height: calc(100vh - 32px); overflow: auto; padding: 14px; border-radius: 8px; background: rgba(8, 10, 12, .94); color: rgba(255,255,255,.92); box-shadow: 0 12px 36px rgba(0,0,0,.35); font: 13px/1.45 Montserrat, Arial, sans-serif; }
 			#modloader-panel h2 { margin: 0 0 8px; font-size: 16px; }
 			#modloader-panel h3 { margin: 14px 0 6px; font-size: 13px; color: rgba(255,255,255,.72); }
-			#modloader-panel button, #modloader-panel input { font: inherit; }
+			#modloader-panel button, #modloader-panel input, #modloader-panel textarea, #modloader-panel select { font: inherit; }
 			#modloader-panel .modloader-panel-close { position: absolute; right: 9px; top: 8px; width: 24px; height: 24px; border: 0; background: transparent; color: rgba(255,255,255,.8); cursor: pointer; }
 			#modloader-panel .modloader-panel-close:before, #modloader-panel .modloader-panel-close:after { content: ''; position: absolute; left: 50%; top: 50%; width: 15px; height: 2px; border-radius: 999px; background: currentColor; transform-origin: center; }
 			#modloader-panel .modloader-panel-close:before { transform: translate(-50%, -50%) rotate(45deg); }
@@ -193,6 +193,8 @@
 			#modloader-panel .modloader-panel-note { color: rgba(255,255,255,.7); }
 			#modloader-panel .modloader-panel-reload-note { display: none; color: #ffe1a3; }
 			#modloader-panel .modloader-panel-reload-note.active { display: inline; }
+			#modloader-panel .modloader-panel-config-note { display: none; color: #cfe9ff; }
+			#modloader-panel .modloader-panel-config-note.active { display: inline; }
 			#modloader-panel .modloader-save-button { border: 0; border-radius: 6px; padding: 7px 10px; background: #f2f2ed; color: #111; cursor: pointer; }
 			#modloader-panel .modloader-save-button:disabled { cursor: default; opacity: .45; }
 			#modloader-panel .modloader-panel-error { margin: 8px 0; padding: 8px; border-radius: 6px; background: rgba(255, 96, 96, .14); color: #ffb0b0; }
@@ -209,6 +211,25 @@
 			#modloader-panel .modloader-mod-meta { margin-top: 3px; color: rgba(255,255,255,.62); overflow-wrap: anywhere; }
 			#modloader-panel .modloader-mod-warning { display: none; margin-top: 5px; color: #ffe1a3; overflow-wrap: anywhere; }
 			#modloader-panel .modloader-mod-warning.active { display: block; }
+			#modloader-panel .modloader-mod-config { margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(255,255,255,.09); }
+			#modloader-panel .modloader-mod-config-title { margin-bottom: 5px; color: rgba(255,255,255,.72); font-weight: 600; }
+			#modloader-panel .modloader-config-field { display: grid; grid-template-columns: minmax(130px, .8fr) minmax(170px, 1fr); gap: 4px 10px; align-items: center; margin-top: 6px; }
+			#modloader-panel .modloader-config-field-disabled { opacity: .52; }
+			#modloader-panel .modloader-config-text { min-width: 0; }
+			#modloader-panel .modloader-config-label { display: block; color: rgba(255,255,255,.86); overflow-wrap: anywhere; }
+			#modloader-panel .modloader-config-meta { display: block; font-size: 11px; color: rgba(255,255,255,.48); overflow-wrap: anywhere; }
+			#modloader-panel input.modloader-config-input:not([type="checkbox"]), #modloader-panel textarea.modloader-config-input, #modloader-panel select.modloader-config-input { box-sizing: border-box; width: 100%; min-width: 0; border: 1px solid rgba(255,255,255,.16); border-radius: 5px; padding: 5px 6px; background: rgba(0,0,0,.22); color: rgba(255,255,255,.92); outline: none; }
+			#modloader-panel input.modloader-config-input[type="checkbox"] { width: 16px; height: 16px; margin: 0; }
+			#modloader-panel textarea.modloader-config-input { min-height: 54px; resize: vertical; }
+			#modloader-panel .modloader-config-input:focus { border-color: rgba(207, 233, 255, .5); }
+			#modloader-panel .modloader-config-field-invalid .modloader-config-input { border-color: rgba(255, 96, 96, .72); }
+			#modloader-panel .modloader-config-error { display: none; grid-column: 2; color: #ffb0b0; font-size: 11px; }
+			#modloader-panel .modloader-config-error.active { display: block; }
+			@media (max-width: 640px) {
+				#modloader-panel .modloader-panel-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+				#modloader-panel .modloader-config-field { grid-template-columns: 1fr; }
+				#modloader-panel .modloader-config-error { grid-column: auto; }
+			}
 		`
 		document.head.appendChild(style)
 	}
@@ -348,6 +369,95 @@
 		tools.fs.writeFileSync(tools.enabledPath, payload, 'utf8')
 	}
 
+	const getConfigType = function (item) {
+		return String(item.type || inferConfigType(item.default) || 'string').toLowerCase()
+	}
+
+	const cloneConfigValue = function (value) {
+		return (isObject(value) || Array.isArray(value)) ? clone(value) : value
+	}
+
+	const sameConfigValue = function (a, b) {
+		return JSON.stringify(a) === JSON.stringify(b)
+	}
+
+	const readConfigForPanel = function (mod) {
+		const schema = normalizeConfigSchema(mod.manifest.config).map(function (item) {
+			item = clone(item)
+			item.type = getConfigType(item)
+			return item
+		})
+		const values = {}
+		for (const item of schema) {
+			values[item.key] = parseStoredConfig(localStorage.getItem(storageKey(mod.id, item.key)), item.default)
+		}
+		return { schema, values }
+	}
+
+	const formatConfigInputValue = function (value, type) {
+		if (value === undefined || value === null) {
+			if (type === 'array') return '[]'
+			if (type === 'object') return '{}'
+			return ''
+		}
+		if (type === 'array' || type === 'object') return JSON.stringify(value, null, 2)
+		return String(value)
+	}
+
+	const createConfigInput = function (item, value) {
+		const type = getConfigType(item)
+		const input = element(type === 'array' || type === 'object' ? 'textarea' : 'input', 'modloader-config-input')
+		if (type === 'boolean') {
+			input.type = 'checkbox'
+			input.checked = value === undefined ? !!item.default : !!value
+		} else if (type === 'number' || type === 'float' || type === 'integer' || type === 'int') {
+			input.type = 'number'
+			input.value = formatConfigInputValue(value, type)
+			input.step = item.step !== undefined ? String(item.step) : (type === 'integer' || type === 'int' ? '1' : 'any')
+			if (item.min !== undefined) input.min = String(item.min)
+			if (item.max !== undefined) input.max = String(item.max)
+		} else if (type === 'array' || type === 'object') {
+			input.spellcheck = false
+			input.value = formatConfigInputValue(value, type)
+		} else {
+			input.type = 'text'
+			input.value = formatConfigInputValue(value, type)
+		}
+		return input
+	}
+
+	const readConfigInputValue = function (item, input) {
+		const type = getConfigType(item)
+		if (type === 'boolean') return !!input.checked
+		if (type === 'number' || type === 'float' || type === 'integer' || type === 'int') {
+			if (String(input.value).trim() === '') throw new Error('Enter a number.')
+			const value = Number(input.value)
+			if (!Number.isFinite(value)) throw new Error('Enter a valid number.')
+			if ((type === 'integer' || type === 'int') && Math.floor(value) !== value) throw new Error('Enter a whole number.')
+			return value
+		}
+		if (type === 'array' || type === 'object') {
+			const value = JSON.parse(input.value || (type === 'array' ? '[]' : '{}'))
+			if (type === 'array' && !Array.isArray(value)) throw new Error('Enter a JSON array.')
+			if (type === 'object' && !isObject(value)) throw new Error('Enter a JSON object.')
+			return value
+		}
+		return input.value
+	}
+
+	const writeConfigChanges = function (models, selected) {
+		let count = 0
+		for (const model of models) {
+			if (!selected.has(model.mod.path)) continue
+			if (model.invalid) throw new Error('Fix invalid config values.')
+			if (sameConfigValue(model.value, model.initial)) continue
+			setConfigValue(model.mod.id, model.item.key, model.value)
+			model.initial = cloneConfigValue(model.value)
+			count++
+		}
+		return count
+	}
+
 	const renderPanel = function () {
 		if (!document.body) return
 		ensurePanelStyle()
@@ -357,6 +467,7 @@
 		const originalSelected = getOrderedSelectedPaths(mods, getEnabledPathSet())
 		const selected = new Set(originalSelected)
 		const rowModels = []
+		const configModels = []
 
 		let panel = document.getElementById('modloader-panel')
 		if (!panel) {
@@ -396,20 +507,21 @@
 		if (available.errorMessage) panel.appendChild(element('div', 'modloader-panel-error', available.errorMessage))
 
 		const toolbar = element('div', 'modloader-mod-toolbar')
-		const note = element('span', 'modloader-panel-note', 'Toggle mods below. Changes are applied after reload.')
+		const note = element('span', 'modloader-panel-note', 'Toggle mods or edit config below.')
 		const reloadNote = element('span', 'modloader-panel-reload-note', 'Changes require reload.')
+		const configNote = element('span', 'modloader-panel-config-note', 'Config saved to localStorage; some mods need reload.')
 		const message = element('span', 'modloader-panel-note', '')
 		const save = element('button', 'modloader-save-button', 'Save & Reload')
 		save.disabled = true
 		const left = element('span')
-		left.append(note, document.createTextNode(' '), reloadNote, document.createTextNode(' '), message)
+		left.append(note, document.createTextNode(' '), reloadNote, document.createTextNode(' '), configNote, document.createTextNode(' '), message)
 		toolbar.append(left, save)
 		panel.appendChild(toolbar)
 
 		const list = element('div', 'modloader-mod-manager')
 		panel.appendChild(list)
 
-		const refreshRows = function () {
+		const refreshRows = function (keepMessage) {
 			const refs = new Set()
 			for (const mod of mods) {
 				if (!selected.has(mod.path)) continue
@@ -417,11 +529,21 @@
 				refs.add(mod.id)
 			}
 
+			let configDirty = false
+			let configInvalid = false
 			for (const row of rowModels) {
 				const mod = row.mod
 				const checked = selected.has(mod.path)
 				row.checkbox.checked = checked
 				row.container.classList.toggle('modloader-mod-row-selected', checked)
+				for (const model of row.configModels) {
+					const disabled = !checked || !!mod.loadError
+					model.input.disabled = disabled
+					model.container.classList.toggle('modloader-config-field-disabled', disabled)
+					if (disabled) continue
+					if (model.invalid) configInvalid = true
+					if (!sameConfigValue(model.value, model.initial)) configDirty = true
+				}
 				const warnings = []
 				if (mod.loadError) warnings.push(mod.loadError)
 				if (checked) {
@@ -436,14 +558,16 @@
 			}
 
 			const orderedSelected = getOrderedSelectedPaths(mods, selected)
-			const dirty = !sameStringList(orderedSelected, originalSelected)
-			reloadNote.classList.toggle('active', dirty)
-			save.disabled = !dirty || !getModFileTools()
-			message.textContent = ''
+			const enabledDirty = !sameStringList(orderedSelected, originalSelected)
+			reloadNote.classList.toggle('active', enabledDirty)
+			configNote.classList.toggle('active', configDirty)
+			save.textContent = enabledDirty ? 'Save & Reload' : 'Save Config'
+			save.disabled = (!enabledDirty && !configDirty) || configInvalid || (enabledDirty && !getModFileTools())
+			if (!keepMessage) message.textContent = ''
 		}
 
 		for (const mod of mods) {
-			const row = element('label', 'modloader-mod-row')
+			const row = element('div', 'modloader-mod-row')
 			const checkbox = element('input', 'modloader-mod-check')
 			checkbox.type = 'checkbox'
 			checkbox.checked = selected.has(mod.path)
@@ -473,19 +597,76 @@
 
 			const warning = element('div', 'modloader-mod-warning')
 			main.appendChild(warning)
+
+			const modConfig = readConfigForPanel(mod)
+			const rowConfigModels = []
+			if (modConfig.schema.length && !mod.loadError) {
+				const configBox = element('div', 'modloader-mod-config')
+				configBox.appendChild(element('div', 'modloader-mod-config-title', 'Config'))
+				for (const item of modConfig.schema) {
+					const type = getConfigType(item)
+					const value = modConfig.values[item.key]
+					const field = element('label', 'modloader-config-field')
+					const text = element('span', 'modloader-config-text')
+					text.appendChild(element('span', 'modloader-config-label', item.label || item.key))
+					text.appendChild(element('span', 'modloader-config-meta', item.key + ' | ' + type))
+					const input = createConfigInput(item, value)
+					const error = element('span', 'modloader-config-error')
+					const model = {
+						mod,
+						item,
+						input,
+						container: field,
+						error,
+						initial: cloneConfigValue(value),
+						value: cloneConfigValue(value),
+						invalid: false
+					}
+					const updateConfig = function () {
+						try {
+							model.value = readConfigInputValue(item, input)
+							model.invalid = false
+							error.textContent = ''
+							error.classList.remove('active')
+							field.classList.remove('modloader-config-field-invalid')
+						} catch (errorValue) {
+							model.invalid = true
+							error.textContent = errorValue.message
+							error.classList.add('active')
+							field.classList.add('modloader-config-field-invalid')
+						}
+						refreshRows()
+					}
+					input.oninput = updateConfig
+					input.onchange = updateConfig
+					field.append(text, input, error)
+					configBox.appendChild(field)
+					rowConfigModels.push(model)
+					configModels.push(model)
+				}
+				main.appendChild(configBox)
+			}
+
 			row.append(checkbox, main)
 			list.appendChild(row)
-			rowModels.push({ mod, checkbox, container: row, warning })
+			rowModels.push({ mod, checkbox, container: row, warning, configModels: rowConfigModels })
 		}
 
 		if (!mods.length) list.appendChild(element('div', 'modloader-panel-note', 'No mods with mod.json were found.'))
 
 		save.onclick = function () {
 			const orderedSelected = getOrderedSelectedPaths(mods, selected)
+			const enabledDirty = !sameStringList(orderedSelected, originalSelected)
 			try {
-				writeEnabledConfig(orderedSelected)
-				message.textContent = 'Saved. Reloading...'
-				location.reload()
+				const configSaved = writeConfigChanges(configModels, selected)
+				if (enabledDirty) {
+					writeEnabledConfig(orderedSelected)
+					message.textContent = 'Saved. Reloading...'
+					location.reload()
+				} else {
+					message.textContent = configSaved ? 'Config saved.' : 'No changes to save.'
+					refreshRows(true)
+				}
 			} catch (error) {
 				message.textContent = 'Save failed: ' + error.message
 			}
