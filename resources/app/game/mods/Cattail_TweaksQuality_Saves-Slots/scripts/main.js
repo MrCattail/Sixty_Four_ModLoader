@@ -142,6 +142,7 @@ ModLoader.register({
 			const game = splash.master
 			const manualSlots = readManualSlots(game)
 			const autoSlot = getAutoSlot(game)
+			const previousScrollTop = page.querySelector('.cattail-save-slots-list')?.scrollTop || 0
 			page.innerHTML = ''
 
 			const brand = document.createElement('div')
@@ -173,6 +174,10 @@ ModLoader.register({
 
 			for (let i = 0; i < manualSlotCount; i++) list.append(renderManualSlot(splash, page, manualSlots, i))
 			page.append(list)
+			if (previousScrollTop > 0) {
+				list.scrollTop = previousScrollTop
+				list.classList.add('cattail-save-slots-scrollbar-visible')
+			}
 
 			const back = document.createElement('button')
 			back.type = 'button'
