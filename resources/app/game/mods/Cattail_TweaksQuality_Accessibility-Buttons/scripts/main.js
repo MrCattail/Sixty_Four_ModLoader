@@ -5,11 +5,18 @@ ModLoader.register({
 		const styleId = 'cattail-accessibility-buttons-style'
 		const rootClass = 'cattail-accessibility-buttons'
 		const hotspotClass = 'cattail-accessibility-buttons-hotspot'
+		const paletteClass = 'cattail-accessibility-buttons-palette'
+		const paletteMarkerClass = 'cattail-accessibility-buttons-palette-marker'
+		const floorButtonClass = 'cattail-accessibility-floor'
 		const hiddenClass = 'cattail-accessibility-buttons-hidden'
 		const autoHiddenClass = 'cattail-accessibility-buttons-auto-hidden'
 		const photofobiaClass = 'photofobia'
 		const activeClass = 'active'
 		const autoHideDelay = 5000
+		const floorColorKey = '__cattailAccessibilityFloorColor'
+		const floorPalettePositionKey = '__cattailAccessibilityFloorPalettePosition'
+		const defaultFloorColor = '#ffffff'
+		const grayStripWidth = .2
 
 		api.on('afterVanillaScripts', function () {
 			if (typeof Splash === 'undefined' || typeof Game === 'undefined') return
@@ -21,10 +28,12 @@ ModLoader.register({
 			patchSplashVisibility(api, 'close')
 			patchGameToggle(api, 'togglePhotofobia')
 			patchGameToggle(api, 'toggleChill')
+			patchFloorRender(api)
 		})
 
 		api.on('afterGameInit', function (payload, game) {
 			installStyle()
+			loadFloorColor(game)
 			ensureController(game)
 			updateController(game)
 		})
@@ -135,6 +144,104 @@ ModLoader.register({
 	display: none;
 }
 
+.${floorButtonClass} {
+	position: relative;
+	display: inline-grid !important;
+	place-items: center;
+	width: 48px !important;
+	height: 24px !important;
+	border: 0 !important;
+	border-radius: 0;
+	color: #111;
+	background-image: none;
+}
+
+.${rootClass}.${photofobiaClass} .${floorButtonClass} {
+	color: #fff;
+}
+
+.${floorButtonClass} span {
+	display: block;
+	width: 15px;
+	height: 9px;
+	border-radius: 1px;
+	background: currentColor;
+	transform: rotate(-24deg) skewX(-22deg);
+	pointer-events: none;
+}
+
+.${paletteClass} {
+	position: fixed;
+	left: 50%;
+	bottom: calc(max(12px, env(safe-area-inset-bottom)) + 52px);
+	z-index: 2147483001;
+	width: 168px;
+	height: 168px;
+	box-sizing: border-box;
+	border: 1px solid rgba(0, 0, 0, .16);
+	border-radius: 10px;
+	overflow: hidden;
+	background: linear-gradient(to bottom, #fff 0%, #808080 50%, #000 100%);
+	box-shadow: 0 12px 32px rgba(0, 0, 0, .24);
+	cursor: crosshair;
+	opacity: .96;
+	transform: translateX(-50%);
+	transition: opacity .16s ease, transform .18s ease;
+	touch-action: none;
+	user-select: none;
+	-webkit-user-select: none;
+}
+
+.${paletteClass}::before {
+	content: '';
+	position: absolute;
+	left: 20%;
+	top: 0;
+	right: 0;
+	bottom: 0;
+	background:
+		linear-gradient(to bottom, #fff 0%, rgba(255, 255, 255, 0) 42%, rgba(0, 0, 0, 0) 58%, #000 100%),
+		linear-gradient(90deg, #f43, #ff0, #0e6, #0df, #36f, #c3f, #f43);
+	pointer-events: none;
+}
+
+.${paletteClass}::after {
+	content: '';
+	position: absolute;
+	left: 20%;
+	top: 0;
+	bottom: 0;
+	width: 1px;
+	background: rgba(0, 0, 0, .18);
+	pointer-events: none;
+}
+
+.${paletteClass}.${hiddenClass} {
+	opacity: 0;
+	pointer-events: none;
+	transform: translateX(-50%) translateY(8px) scale(.98);
+}
+
+.${paletteClass}.${photofobiaClass} {
+	border-color: rgba(255, 255, 255, .18);
+	box-shadow: 0 12px 32px rgba(0, 0, 0, .38);
+}
+
+.${paletteMarkerClass} {
+	position: absolute;
+	left: 0;
+	top: 0;
+	width: 13px;
+	height: 13px;
+	box-sizing: border-box;
+	border: 2px solid #fff;
+	border-radius: 50%;
+	box-shadow: 0 0 0 1px rgba(0, 0, 0, .55), 0 2px 6px rgba(0, 0, 0, .3);
+	transform: translate(-50%, -50%);
+	pointer-events: none;
+	z-index: 1;
+}
+
 .cattail-accessibility-flash {
 	background-image: url('img/flashlight.svg');
 	background-size: 100%;
@@ -178,6 +285,17 @@ ModLoader.register({
 	.${hotspotClass} {
 		width: min(200px, 54vw);
 		height: max(22px, env(safe-area-inset-bottom));
+	}
+
+	.${floorButtonClass} {
+		width: 44px !important;
+		height: 22px !important;
+	}
+
+	.${paletteClass} {
+		bottom: calc(max(9px, env(safe-area-inset-bottom)) + 48px);
+		width: 156px;
+		height: 156px;
 	}
 }
 `
@@ -237,24 +355,42 @@ ModLoader.register({
 			hotspot.className = hotspotClass
 			hotspot.setAttribute('aria-hidden', 'true')
 
+			const palette = document.createElement('div')
+			palette.className = paletteClass + ' ' + hiddenClass
+			palette.setAttribute('aria-label', 'Reality floor color palette')
+			palette.setAttribute('role', 'application')
+
+			const marker = document.createElement('div')
+			marker.className = paletteMarkerClass
+			palette.append(marker)
+
 			const flash = createButton('cattail-accessibility-flash', 'Toggle reduced flashes', function () {
 				game.togglePhotofobia()
 			})
 			const chill = createButton('cattail-accessibility-chill', 'Toggle chill mode', function () {
 				game.toggleChill()
 			})
+			const floor = createFloorButton(game)
 
 			root.append(flash)
 			root.append(chill)
+			root.append(floor.button)
 			document.body.appendChild(hotspot)
 			document.body.appendChild(root)
+			document.body.appendChild(palette)
 
 			game[controllerKey] = {
 				root,
 				hotspot,
+				palette,
+				marker,
 				flash,
 				chill,
+				floor: floor.button,
+				floorIcon: floor.icon,
 				pointerInside: false,
+				paletteOpen: false,
+				paletteDragging: false,
 				autoHidden: false,
 				autoHideTimer: null
 			}
@@ -285,6 +421,34 @@ ModLoader.register({
 			return button
 		}
 
+		function createFloorButton(game) {
+			const button = document.createElement('button')
+			button.type = 'button'
+			button.className = floorButtonClass
+			button.title = 'Adjust reality floor color'
+			button.setAttribute('aria-label', 'Adjust reality floor color')
+			button.setAttribute('aria-expanded', 'false')
+
+			const icon = document.createElement('span')
+			icon.setAttribute('aria-hidden', 'true')
+			button.append(icon)
+
+			const stop = function (event) {
+				event.stopPropagation()
+			}
+
+			button.addEventListener('pointerdown', stop, true)
+			button.addEventListener('mousedown', stop, true)
+			button.addEventListener('touchstart', stop, true)
+			button.addEventListener('click', function (event) {
+				event.preventDefault()
+				event.stopPropagation()
+				togglePalette(game)
+			}, true)
+
+			return { button, icon }
+		}
+
 		function bindAutoHide(game, controller) {
 			const enter = function () {
 				controller.pointerInside = true
@@ -299,8 +463,11 @@ ModLoader.register({
 			controller.root.addEventListener('mouseleave', leave)
 			controller.hotspot.addEventListener('mouseenter', enter)
 			controller.hotspot.addEventListener('mouseleave', leave)
+			controller.palette.addEventListener('mouseenter', enter)
+			controller.palette.addEventListener('mouseleave', leave)
 			controller.root.addEventListener('focusin', enter)
 			controller.root.addEventListener('focusout', leave)
+			bindPalette(game, controller)
 		}
 
 		function showController(game) {
@@ -322,10 +489,157 @@ ModLoader.register({
 
 			controller.autoHideTimer = setTimeout(function () {
 				controller.autoHideTimer = null
-				if (controller.pointerInside || game.splash?.isShown) return
+				if (controller.pointerInside || controller.paletteOpen || game.splash?.isShown) return
 				controller.autoHidden = true
 				controller.root.classList.add(autoHiddenClass)
 			}, autoHideDelay)
+		}
+
+		function patchFloorRender(api) {
+			api.patch(Game.prototype, 'renderloop', function (original) {
+				return function (...args) {
+					const ctx = this.ctx
+					if (!ctx || typeof ctx.fillRect !== 'function') return original.apply(this, args)
+
+					const originalFillRect = ctx.fillRect
+					const game = this
+					let replacedBackground = false
+
+					ctx.fillRect = function (x, y, w, h) {
+						if (!replacedBackground && !game.plane && x === 0 && y === 0 && w === game.w && h === game.h) {
+							replacedBackground = true
+							const previousFillStyle = this.fillStyle
+							this.fillStyle = game[floorColorKey] || defaultFloorColor
+							try {
+								return originalFillRect.apply(this, arguments)
+							} finally {
+								this.fillStyle = previousFillStyle
+							}
+						}
+						return originalFillRect.apply(this, arguments)
+					}
+
+					try {
+						return original.apply(this, args)
+					} finally {
+						if (ctx.fillRect !== originalFillRect) ctx.fillRect = originalFillRect
+					}
+				}
+			})
+		}
+
+		function bindPalette(game, controller) {
+			controller.palette.addEventListener('pointerdown', function (event) {
+				event.preventDefault()
+				event.stopPropagation()
+				controller.paletteDragging = true
+				controller.pointerInside = true
+				showController(game)
+				try { controller.palette.setPointerCapture(event.pointerId) } catch (error) {}
+				applyPalettePointer(game, event)
+			}, true)
+
+			controller.palette.addEventListener('pointermove', function (event) {
+				if (!controller.paletteDragging) return
+				event.preventDefault()
+				event.stopPropagation()
+				applyPalettePointer(game, event)
+			}, true)
+
+			const stopDrag = function (event) {
+				if (!controller.paletteDragging) return
+				event.preventDefault()
+				event.stopPropagation()
+				controller.paletteDragging = false
+				try { controller.palette.releasePointerCapture(event.pointerId) } catch (error) {}
+			}
+
+			controller.palette.addEventListener('pointerup', stopDrag, true)
+			controller.palette.addEventListener('pointercancel', stopDrag, true)
+			controller.palette.addEventListener('click', function (event) {
+				event.preventDefault()
+				event.stopPropagation()
+			}, true)
+		}
+
+		function togglePalette(game) {
+			const controller = ensureController(game)
+			if (!controller) return
+			controller.paletteOpen = !controller.paletteOpen
+			controller.floor.setAttribute('aria-expanded', controller.paletteOpen ? 'true' : 'false')
+			if (controller.paletteOpen) showController(game)
+			else scheduleAutoHide(game)
+			updateController(game)
+		}
+
+		function applyPalettePointer(game, event) {
+			const controller = ensureController(game)
+			if (!controller) return
+			const rect = controller.palette.getBoundingClientRect()
+			if (!rect.width || !rect.height) return
+			const x = clamp((event.clientX - rect.left) / rect.width, 0, 1)
+			const y = clamp((event.clientY - rect.top) / rect.height, 0, 1)
+			setFloorColorFromPalette(game, controller, x, y)
+		}
+
+		function setFloorColorFromPalette(game, controller, x, y) {
+			const position = { x: clamp(x, 0, 1), y: clamp(y, 0, 1) }
+			const color = paletteColor(position.x, position.y)
+			game[floorColorKey] = color
+			game[floorPalettePositionKey] = position
+			try {
+				localStorage.setItem(storageKey(game, 'floorColor'), color)
+				localStorage.setItem(storageKey(game, 'floorPalette'), JSON.stringify(position))
+			} catch (error) {}
+			updatePaletteMarker(controller, game)
+		}
+
+		function loadFloorColor(game) {
+			if (!game) return
+			let color = null
+			let position = null
+			try {
+				color = localStorage.getItem(storageKey(game, 'floorColor'))
+				position = parsePalettePosition(localStorage.getItem(storageKey(game, 'floorPalette')))
+			} catch (error) {}
+			game[floorPalettePositionKey] = position || { x: 0, y: 0 }
+			game[floorColorKey] = position ? paletteColor(position.x, position.y) : (color || defaultFloorColor)
+		}
+
+		function updatePaletteMarker(controller, game) {
+			const position = game[floorPalettePositionKey] || { x: 0, y: 0 }
+			const color = game[floorColorKey] || defaultFloorColor
+			controller.marker.style.left = (position.x * 100) + '%'
+			controller.marker.style.top = (position.y * 100) + '%'
+			controller.floorIcon.style.backgroundColor = color
+		}
+
+		function parsePalettePosition(value) {
+			if (!value) return null
+			try {
+				const parsed = JSON.parse(value)
+				if (typeof parsed?.x !== 'number' || typeof parsed?.y !== 'number') return null
+				return { x: clamp(parsed.x, 0, 1), y: clamp(parsed.y, 0, 1) }
+			} catch (error) {
+				return null
+			}
+		}
+
+		function paletteColor(x, y) {
+			const normalizedX = clamp(x, 0, 1)
+			const lightness = Math.round(100 - clamp(y, 0, 1) * 100)
+			if (normalizedX <= grayStripWidth) return 'hsl(0, 0%, ' + lightness + '%)'
+			const hueX = (normalizedX - grayStripWidth) / (1 - grayStripWidth)
+			const hue = Math.round(clamp(hueX, 0, 1) * 360)
+			return 'hsl(' + hue + ', 100%, ' + lightness + '%)'
+		}
+
+		function storageKey(game, key) {
+			return 'cattailAccessibilityButtons:' + (game?.steamId || 'default') + ':' + key
+		}
+
+		function clamp(value, min, max) {
+			return Math.max(min, Math.min(max, value))
 		}
 
 		function updateController(game, splashOverride) {
@@ -339,12 +653,22 @@ ModLoader.register({
 
 			controller.root.classList.toggle(hiddenClass, splashShown)
 			controller.hotspot.classList.toggle(hiddenClass, splashShown)
+			controller.palette.classList.toggle(hiddenClass, splashShown || !controller.paletteOpen)
 			controller.root.classList.toggle(photofobiaClass, photofobia)
+			controller.palette.classList.toggle(photofobiaClass, photofobia)
 			controller.flash.setAttribute('aria-pressed', photofobia ? 'true' : 'false')
 			controller.chill.setAttribute('aria-pressed', chill ? 'true' : 'false')
 			controller.chill.classList.toggle(activeClass, chill)
-			if (splashShown) showController(game)
-			else if (!controller.pointerInside && !controller.autoHidden) scheduleAutoHide(game)
+			updatePaletteMarker(controller, game)
+			if (splashShown) {
+				controller.paletteOpen = false
+				controller.floor.setAttribute('aria-expanded', 'false')
+				showController(game)
+			} else if (controller.paletteOpen) {
+				showController(game)
+			} else if (!controller.pointerInside && !controller.autoHidden) {
+				scheduleAutoHide(game)
+			}
 		}
 	}
 })
