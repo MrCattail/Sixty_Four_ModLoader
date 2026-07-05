@@ -1,0 +1,11 @@
+{
+  "id": "Cattail_TweaksQuality_Dynamic-Background-Sprite-Cleanup",
+  "name": "Dynamic Background Sprite Cleanup",
+  "version": "0.1.0",
+  "loaderVersion": ">=0.1.0",
+  "entry": "scripts/main.js",
+  "dependencies": [
+    "Cattail_TweaksQuality_Accessibility-Buttons"
+  ],
+  "description": "Cleans reality-plane machine sprites so their baked white matte becomes transparent and their baked floor shadows render as neutral alpha shadows."
+}

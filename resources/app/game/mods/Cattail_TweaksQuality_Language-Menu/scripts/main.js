@@ -309,16 +309,26 @@ ModLoader.register({
 		function installInertialScroll(list) {
 			let velocity = 0
 			let frame = 0
-			const friction = .82
-			const influence = .22
+			const friction = .88
+			const directInfluence = .30
+			const tailInfluence = .13
+			const maxVelocity = 34
 
 			const clamp = function (value) {
 				const max = Math.max(0, list.scrollHeight - list.clientHeight)
 				return Math.min(max, Math.max(0, value))
 			}
+			const clampVelocity = function (value) {
+				return Math.min(maxVelocity, Math.max(-maxVelocity, value))
+			}
+			const stop = function () {
+				velocity = 0
+				if (frame) cancelAnimationFrame(frame)
+				frame = 0
+			}
 			const animate = function () {
 				frame = 0
-				if (Math.abs(velocity) < .25) {
+				if (Math.abs(velocity) < .35) {
 					velocity = 0
 					return
 				}
@@ -336,9 +346,16 @@ ModLoader.register({
 				const delta = normalizeWheelDelta(event, list)
 				if (!delta) return
 				event.preventDefault()
-				velocity += delta * influence
+				const before = list.scrollTop
+				list.scrollTop = clamp(before + delta * directInfluence)
+				if (list.scrollTop === before) {
+					velocity = 0
+					return
+				}
+				velocity = clampVelocity(velocity + delta * tailInfluence)
 				if (!frame) frame = requestAnimationFrame(animate)
 			}, { passive: false })
+			list.addEventListener('pointerdown', stop, true)
 		}
 
 		function normalizeWheelDelta(event, list) {
