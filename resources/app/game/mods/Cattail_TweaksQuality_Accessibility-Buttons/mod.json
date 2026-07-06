@@ -1,8 +1,8 @@
 {
   "id": "Cattail_TweaksQuality_Accessibility-Buttons",
   "name": "Accessibility Buttons",
-  "version": "0.2.3",
+  "version": "0.2.4",
   "loaderVersion": ">=0.1.0",
   "entry": "scripts/main.js",
-  "description": "Adds in-game accessibility toggles, an auto-hiding bottom control bar, and a reality-floor color palette without changing vanilla scripts."
+  "description": "Adds in-game accessibility toggles, an auto-hiding bottom control bar, and a click-toggle/long-press reality-floor color palette without changing vanilla scripts."
 }

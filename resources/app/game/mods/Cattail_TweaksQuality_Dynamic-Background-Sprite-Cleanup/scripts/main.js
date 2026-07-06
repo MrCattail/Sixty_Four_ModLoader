@@ -2,6 +2,7 @@ ModLoader.register({
 	id: 'Cattail_TweaksQuality_Dynamic-Background-Sprite-Cleanup',
 	init(api) {
 		const sourceKey = '__cattailSpriteCleanupSource'
+		const defaultTuning = Object.freeze({ enabled: true, matte: 1, shadow: 1, edge: 1, frames: {} })
 		const targetImages = new Set([
 			'img/annihilator.png',
 			'img/auxpump.png',
@@ -63,6 +64,7 @@ ModLoader.register({
 			'img/waypoint2.png'
 		])
 		const cache = new Map()
+		let lastConfigSignature = ''
 
 		api.on('afterVanillaScripts', function () {
 			if (typeof Sprite === 'undefined') return
@@ -177,6 +179,10 @@ ModLoader.register({
 			if (!targetImages.has(src)) return null
 			if (!sprite.img || !isImageReady(sprite.img)) return null
 
+			refreshConfigCache()
+			const tuning = getSpriteTuning(src)
+			if (tuning.enabled === false) return null
+
 			let entry = cache.get(src)
 			if (!entry) {
 				entry = { canvas: null, failed: false }
@@ -185,7 +191,7 @@ ModLoader.register({
 			if (entry.failed) return null
 			if (!entry.canvas) {
 				try {
-					entry.canvas = buildCleanSprite(sprite.img)
+					entry.canvas = buildCleanSprite(sprite, tuning)
 				} catch (error) {
 					entry.failed = true
 					console.warn('[Sprite Cleanup] Failed to process ' + src, error)
@@ -195,7 +201,8 @@ ModLoader.register({
 			return entry.canvas
 		}
 
-		function buildCleanSprite(image) {
+		function buildCleanSprite(sprite, tuning) {
+			const image = sprite.img
 			const width = image.naturalWidth || image.width
 			const height = image.naturalHeight || image.height
 			const source = document.createElement('canvas')
@@ -206,28 +213,8 @@ ModLoader.register({
 
 			const imageData = sourceCtx.getImageData(0, 0, width, height)
 			const data = imageData.data
-			const background = estimateBackground(data, width, height)
-			const connected = floodConnectedBackdrop(data, width, height, background)
-			const machineAdjacent = markMachineAdjacent(data, width, height, connected, background)
-
-			for (let i = 0; i < connected.length; i++) {
-				const p = i * 4
-				const alpha = data[p + 3]
-				if (alpha < 5) continue
-				if (connected[i]) {
-					if (isShadowPixel(data, p, background)) {
-						const opacity = shadowOpacity(data, p, background)
-						data[p] = 0
-						data[p + 1] = 0
-						data[p + 2] = 0
-						data[p + 3] = Math.round(255 * opacity)
-					} else {
-						data[p + 3] = 0
-					}
-				} else if (machineAdjacent[i]) {
-					decontaminateEdgePixel(data, p, background)
-				}
-			}
+			const masks = getSpriteMasks(sprite, width, height)
+			for (const mask of masks) processFrame(data, width, height, mask, getFrameTuning(tuning, mask.index))
 
 			const out = document.createElement('canvas')
 			out.width = width
@@ -236,83 +223,183 @@ ModLoader.register({
 			return out
 		}
 
-		function floodConnectedBackdrop(data, width, height, background) {
-			const length = width * height
-			const connected = new Uint8Array(length)
+		function getSpriteMasks(sprite, width, height) {
+			const masks = []
+			const seen = new Set()
+			const add = function (frame, index) {
+				if (!Array.isArray(frame) || frame.length < 4) return
+				const x = Math.max(0, Math.floor(frame[0]))
+				const y = Math.max(0, Math.floor(frame[1]))
+				const w = Math.min(width - x, Math.max(0, Math.floor(frame[2])))
+				const h = Math.min(height - y, Math.max(0, Math.floor(frame[3])))
+				if (!w || !h) return
+				const key = x + ',' + y + ',' + w + ',' + h
+				if (seen.has(key)) return
+				seen.add(key)
+				masks.push({ x, y, w, h, index })
+			}
+
+			if (Array.isArray(sprite.frames)) sprite.frames.forEach(function (frame, index) { add(frame, index) })
+			if (Array.isArray(sprite.backframes)) sprite.backframes.forEach(function (frame, index) { add(frame, index) })
+			if (!masks.length) add([0, 0, width, height], 0)
+			return masks
+		}
+
+		function processFrame(data, width, height, frame, tuning) {
+			if (tuning.enabled === false) return
+			const background = estimateBackground(data, width, height, frame)
+			const length = frame.w * frame.h
+			const matte = tuning.matte > 0 ? floodConnectedMatte(data, width, height, frame, background, tuning) : new Uint8Array(length)
+			const shadow = tuning.shadow > 0 ? floodConnectedShadow(data, width, height, frame, background, matte, tuning) : new Uint8Array(length)
+			const edge = tuning.edge > 0 ? markEdgeDecontamination(data, width, height, frame, background, matte, shadow, tuning) : new Uint8Array(length)
+
+			for (let i = 0; i < length; i++) {
+				const p = framePixelOffset(i, width, frame)
+				if (data[p + 3] < 5) continue
+				if (matte[i]) {
+					data[p + 3] = 0
+				} else if (shadow[i]) {
+					const opacity = shadowOpacity(data, p, background, tuning)
+					data[p] = 0
+					data[p + 1] = 0
+					data[p + 2] = 0
+					data[p + 3] = Math.round(255 * opacity)
+				} else if (edge[i]) {
+					decontaminateEdgePixel(data, p, background, tuning)
+				}
+			}
+		}
+
+		function floodConnectedMatte(data, width, height, frame, background, tuning) {
+			const length = frame.w * frame.h
+			const matte = new Uint8Array(length)
 			const stack = []
 
-			for (let x = 0; x < width; x++) {
-				pushIfBackdrop(x, 0)
-				pushIfBackdrop(x, height - 1)
+			for (let x = 0; x < frame.w; x++) {
+				pushIfMatte(x, 0)
+				pushIfMatte(x, frame.h - 1)
 			}
-			for (let y = 1; y < height - 1; y++) {
-				pushIfBackdrop(0, y)
-				pushIfBackdrop(width - 1, y)
+			for (let y = 1; y < frame.h - 1; y++) {
+				pushIfMatte(0, y)
+				pushIfMatte(frame.w - 1, y)
 			}
+			for (const seed of getMatteSeeds(tuning)) pushMatteSeed(seed)
 
 			while (stack.length) {
 				const i = stack.pop()
-				const x = i % width
-				const y = (i - x) / width
-				pushIfBackdrop(x + 1, y)
-				pushIfBackdrop(x - 1, y)
-				pushIfBackdrop(x, y + 1)
-				pushIfBackdrop(x, y - 1)
+				const x = i % frame.w
+				const y = (i - x) / frame.w
+				pushIfMatte(x + 1, y)
+				pushIfMatte(x - 1, y)
+				pushIfMatte(x, y + 1)
+				pushIfMatte(x, y - 1)
 			}
 
-			return connected
+			return matte
 
-			function pushIfBackdrop(x, y) {
-				if (x < 0 || y < 0 || x >= width || y >= height) return
-				const i = y * width + x
-				if (connected[i]) return
-				const p = i * 4
-				if (data[p + 3] < 5 || isBackdropPixel(data, p, background)) {
-					connected[i] = 1
+			function pushMatteSeed(seed) {
+				if (!Array.isArray(seed) || seed.length < 2) return
+				const sx = Number(seed[0])
+				const sy = Number(seed[1])
+				if (!Number.isFinite(sx) || !Number.isFinite(sy)) return
+				const x = Math.round(Math.abs(sx) <= 1 ? sx * (frame.w - 1) : sx)
+				const y = Math.round(Math.abs(sy) <= 1 ? sy * (frame.h - 1) : sy)
+				pushIfMatte(x, y, true)
+			}
+
+			function pushIfMatte(x, y, force) {
+				if (x < 0 || y < 0 || x >= frame.w || y >= frame.h) return
+				const i = y * frame.w + x
+				if (matte[i]) return
+				const p = framePixelOffset(i, width, frame)
+				if (data[p + 3] < 5 || force || isMattePixel(data, p, background, tuning)) {
+					matte[i] = 1
 					stack.push(i)
 				}
 			}
 		}
 
-		function markMachineAdjacent(data, width, height, connected, background) {
-			const adjacent = new Uint8Array(width * height)
-			for (let y = 0; y < height; y++) {
-				for (let x = 0; x < width; x++) {
-					const i = y * width + x
-					if (connected[i]) continue
-					const p = i * 4
-					if (data[p + 3] < 5) continue
-					if (colorDistance(data, p, background) > 120) continue
+		function floodConnectedShadow(data, width, height, frame, background, matte, tuning) {
+			const shadow = new Uint8Array(frame.w * frame.h)
+			const distance = new Uint16Array(frame.w * frame.h)
+			const stack = []
+			const maxDistance = Math.max(12, Math.min(72, Math.round(frame.h * .16 * tuning.shadow)))
+
+			for (let y = 0; y < frame.h; y++) {
+				for (let x = 0; x < frame.w; x++) {
+					const i = y * frame.w + x
+					if (!matte[i]) continue
+					pushIfShadow(x + 1, y, 1)
+					pushIfShadow(x - 1, y, 1)
+					pushIfShadow(x, y + 1, 1)
+					pushIfShadow(x, y - 1, 1)
+				}
+			}
+
+			while (stack.length) {
+				const i = stack.pop()
+				const x = i % frame.w
+				const y = (i - x) / frame.w
+				const nextDistance = distance[i] + 1
+				if (nextDistance > maxDistance) continue
+				pushIfShadow(x + 1, y, nextDistance)
+				pushIfShadow(x - 1, y, nextDistance)
+				pushIfShadow(x, y + 1, nextDistance)
+				pushIfShadow(x, y - 1, nextDistance)
+			}
+
+			return shadow
+
+			function pushIfShadow(x, y, d) {
+				if (x < 0 || y < 0 || x >= frame.w || y >= frame.h) return
+				const i = y * frame.w + x
+				if (matte[i] || shadow[i]) return
+				const p = framePixelOffset(i, width, frame)
+				if (!isShadowPixel(data, p, background, y / frame.h, tuning)) return
+				shadow[i] = 1
+				distance[i] = d
+				stack.push(i)
+			}
+		}
+
+		function markEdgeDecontamination(data, width, height, frame, background, matte, shadow, tuning) {
+			const edge = new Uint8Array(frame.w * frame.h)
+			for (let y = 0; y < frame.h; y++) {
+				for (let x = 0; x < frame.w; x++) {
+					const i = y * frame.w + x
+					if (matte[i] || shadow[i]) continue
+					const p = framePixelOffset(i, width, frame)
+					if (data[p + 3] < 5 || !shouldDecontaminatePixel(data, p, background, tuning)) continue
 					for (let yy = -1; yy <= 1; yy++) {
 						for (let xx = -1; xx <= 1; xx++) {
 							if (!xx && !yy) continue
 							const nx = x + xx
 							const ny = y + yy
-							if (nx < 0 || ny < 0 || nx >= width || ny >= height) continue
-							if (connected[ny * width + nx]) adjacent[i] = 1
+							if (nx < 0 || ny < 0 || nx >= frame.w || ny >= frame.h) continue
+							if (matte[ny * frame.w + nx]) edge[i] = 1
 						}
 					}
 				}
 			}
-			return adjacent
+			return edge
 		}
 
-		function estimateBackground(data, width, height) {
+		function estimateBackground(data, width, height, frame) {
 			const samples = []
-			const strideX = Math.max(1, Math.floor(width / 28))
-			const strideY = Math.max(1, Math.floor(height / 28))
-			for (let x = 0; x < width; x += strideX) {
+			const strideX = Math.max(1, Math.floor(frame.w / 28))
+			const strideY = Math.max(1, Math.floor(frame.h / 28))
+			for (let x = 0; x < frame.w; x += strideX) {
 				sample(x, 0)
-				sample(x, height - 1)
+				sample(x, frame.h - 1)
 			}
-			for (let y = 0; y < height; y += strideY) {
+			for (let y = 0; y < frame.h; y += strideY) {
 				sample(0, y)
-				sample(width - 1, y)
+				sample(frame.w - 1, y)
 			}
 			if (!samples.length) return { r: 255, g: 255, b: 255, luma: 255 }
 
 			samples.sort(function (a, b) { return luma(b) - luma(a) })
-			const top = samples.slice(0, Math.max(4, Math.ceil(samples.length * .45)))
+			const top = samples.slice(0, Math.max(4, Math.ceil(samples.length * .6)))
 			const color = top.reduce(function (out, item) {
 				out.r += item.r
 				out.g += item.g
@@ -326,41 +413,150 @@ ModLoader.register({
 			return color
 
 			function sample(x, y) {
-				const p = (y * width + x) * 4
+				const p = ((frame.y + y) * width + frame.x + x) * 4
 				if (data[p + 3] < 5) return
 				samples.push({ r: data[p], g: data[p + 1], b: data[p + 2] })
 			}
 		}
 
-		function isBackdropPixel(data, p, background) {
-			if (nearBackground(data, p, background)) return true
-			return isShadowPixel(data, p, background)
-		}
-
-		function nearBackground(data, p, background) {
+		function isMattePixel(data, p, background, tuning) {
+			const matte = tuning.matte
 			const lum = rgbLuma(data[p], data[p + 1], data[p + 2])
-			return lum > background.luma - 55 && colorDistance(data, p, background) < 72
+			const lumaTolerance = getNumber(tuning.matteLuma, 24 * matte)
+			const distanceMax = getNumber(tuning.matteDistance, 34 * matte)
+			const satLimit = getNumber(tuning.matteSaturation, clamp(.1 * (1 + (matte - 1) * .25), .04, .18))
+			return lum > background.luma - lumaTolerance && colorDistance(data, p, background) < distanceMax && saturation(data[p], data[p + 1], data[p + 2]) < satLimit
 		}
 
-		function isShadowPixel(data, p, background) {
+		function isShadowPixel(data, p, background, yRatio, tuning) {
+			const shadow = tuning.shadow
 			const lum = rgbLuma(data[p], data[p + 1], data[p + 2])
 			const diff = background.luma - lum
-			return diff > 8 && diff < 150 && saturation(data[p], data[p + 1], data[p + 2]) < .18 && colorDistance(data, p, background) < 190
+			const yMin = clamp(.38 - (shadow - 1) * .1, .18, .58)
+			const lumMin = 126 - (shadow - 1) * 24
+			const diffMin = Math.max(3, 7 / Math.max(.25, shadow))
+			const diffMax = 118 * shadow
+			const satMax = clamp(.13 * (1 + (shadow - 1) * .45), .05, .3)
+			const distanceMax = 152 * shadow
+			return yRatio > yMin && lum > lumMin && diff > diffMin && diff < diffMax && saturation(data[p], data[p + 1], data[p + 2]) < satMax && colorDistance(data, p, background) < distanceMax
 		}
 
-		function shadowOpacity(data, p, background) {
+		function shadowOpacity(data, p, background, tuning) {
 			const lum = rgbLuma(data[p], data[p + 1], data[p + 2])
 			const diff = Math.max(0, background.luma - lum)
-			return clamp(Math.pow(diff / 120, .86) * .72, .04, .62)
+			return clamp(Math.pow(diff / 128, .9) * .56 * Math.sqrt(tuning.shadow), .025, .62)
 		}
 
-		function decontaminateEdgePixel(data, p, background) {
+		function shouldDecontaminatePixel(data, p, background, tuning) {
+			const edge = tuning.edge
+			const lum = rgbLuma(data[p], data[p + 1], data[p + 2])
+			const diff = background.luma - lum
+			const sat = saturation(data[p], data[p + 1], data[p + 2])
 			const distance = colorDistance(data, p, background)
-			const alpha = clamp(distance / 105, .24, 1)
+			const floor = Math.max(.25, edge)
+			return diff > 18 / floor && diff < 126 * edge && distance > 30 / floor && distance < 148 * edge && sat > .08 / floor
+		}
+
+		function decontaminateEdgePixel(data, p, background, tuning) {
+			const edge = Math.max(.25, tuning.edge)
+			const distance = colorDistance(data, p, background)
+			const minAlpha = clamp(.62 / Math.sqrt(edge), .32, .94)
+			const alpha = clamp(distance / (130 * edge), minAlpha, 1)
 			data[p] = clampByte((data[p] - background.r * (1 - alpha)) / alpha)
 			data[p + 1] = clampByte((data[p + 1] - background.g * (1 - alpha)) / alpha)
 			data[p + 2] = clampByte((data[p + 2] - background.b * (1 - alpha)) / alpha)
 			data[p + 3] = Math.round(data[p + 3] * alpha)
+		}
+
+		function framePixelOffset(i, width, frame) {
+			const x = i % frame.w
+			const y = (i - x) / frame.w
+			return ((frame.y + y) * width + frame.x + x) * 4
+		}
+
+		function refreshConfigCache() {
+			const signature = JSON.stringify({
+				globalThresholds: api.config.get('globalThresholds', {}),
+				spriteThresholds: api.config.get('spriteThresholds', {})
+			})
+			if (signature === lastConfigSignature) return
+			lastConfigSignature = signature
+			cache.clear()
+		}
+
+		function getSpriteTuning(src) {
+			const global = normalizeTuning(api.config.get('globalThresholds', {}))
+			const spriteThresholds = readObject(api.config.get('spriteThresholds', {}))
+			const shortName = src.replace(/^img\//, '')
+			const specific = normalizeTuning(spriteThresholds[src] !== undefined ? spriteThresholds[src] : spriteThresholds[shortName])
+			return Object.assign({}, defaultTuning, global, specific, { frames: mergeFrameTuning(global.frames, specific.frames) })
+		}
+
+		function getFrameTuning(spriteTuning, index) {
+			const frames = readObject(spriteTuning.frames)
+			const oneBased = index + 1
+			const value = frames[String(oneBased)] ?? frames['frame' + oneBased] ?? frames['index' + index]
+			if (value === undefined) return spriteTuning
+			return Object.assign({}, spriteTuning, normalizeTuning(value), { frames })
+		}
+
+		function normalizeTuning(value) {
+			const tuning = {}
+			if (value === false) {
+				tuning.enabled = false
+				return tuning
+			}
+			if (typeof value === 'number') {
+				tuning.matte = normalizeFactor(value, 1)
+				return tuning
+			}
+			if (!isPlainObject(value)) return tuning
+
+			if (value.enabled === false) tuning.enabled = false
+			if (value.enabled === true) tuning.enabled = true
+			applyTuningValue(tuning, 'matte', value.matte ?? value.white ?? value.whiteMatte ?? value.removeWhite)
+			applyTuningValue(tuning, 'shadow', value.shadow ?? value.shadowMatte)
+			applyTuningValue(tuning, 'edge', value.edge ?? value.dewhite ?? value.dewhiteEdge)
+			applyTuningValue(tuning, 'matteDistance', value.matteDistance ?? value.whiteDistance)
+			applyTuningValue(tuning, 'matteLuma', value.matteLuma ?? value.whiteLuma)
+			applyTuningValue(tuning, 'matteSaturation', value.matteSaturation ?? value.whiteSaturation)
+			if (Array.isArray(value.matteSeeds)) tuning.matteSeeds = value.matteSeeds
+			else if (Array.isArray(value.seeds)) tuning.matteSeeds = value.seeds
+			if (isPlainObject(value.frames)) tuning.frames = value.frames
+			else if (isPlainObject(value.frameThresholds)) tuning.frames = value.frameThresholds
+			return tuning
+		}
+
+		function mergeFrameTuning(globalFrames, specificFrames) {
+			return Object.assign({}, readObject(globalFrames), readObject(specificFrames))
+		}
+
+		function getMatteSeeds(tuning) {
+			return Array.isArray(tuning.matteSeeds) ? tuning.matteSeeds : []
+		}
+
+		function applyTuningValue(tuning, key, value) {
+			if (value === undefined) return
+			const max = key === 'matteDistance' || key === 'matteLuma' ? 1024 : key === 'matteSaturation' ? 1 : 3
+			tuning[key] = normalizeFactor(value, tuning[key] ?? 1, max)
+		}
+
+		function normalizeFactor(value, fallback, max = 3) {
+			const number = Number(value)
+			return Number.isFinite(number) ? clamp(number, 0, max) : fallback
+		}
+
+		function getNumber(value, fallback) {
+			const number = Number(value)
+			return Number.isFinite(number) ? number : fallback
+		}
+
+		function readObject(value) {
+			return isPlainObject(value) ? value : {}
+		}
+
+		function isPlainObject(value) {
+			return !!value && typeof value === 'object' && !Array.isArray(value)
 		}
 
 		function normalizeImageSrc(img) {

@@ -1,11 +1,342 @@
 {
   "id": "Cattail_TweaksQuality_Dynamic-Background-Sprite-Cleanup",
   "name": "Dynamic Background Sprite Cleanup",
-  "version": "0.1.0",
+  "version": "0.1.2",
   "loaderVersion": ">=0.1.0",
   "entry": "scripts/main.js",
   "dependencies": [
     "Cattail_TweaksQuality_Accessibility-Buttons"
   ],
-  "description": "Cleans reality-plane machine sprites so their baked white matte becomes transparent and their baked floor shadows render as neutral alpha shadows."
+  "description": "Cleans reality-plane machine sprites so their baked white matte becomes transparent and their baked floor shadows render as neutral alpha shadows.",
+  "config": {
+    "globalThresholds": {
+      "type": "object",
+      "default": {
+        "matte": 1,
+        "shadow": 1,
+        "edge": 1
+      },
+      "description": "Global cleanup multipliers. matte/shadow/edge are 0-3. Lower preserves more sprite detail; higher removes more matte, shadow, or edge fringe."
+    },
+    "spriteThresholds": {
+      "type": "object",
+      "default": {
+        "img/annihilator.png": {
+          "matte": 1,
+          "shadow": 1,
+          "edge": 1,
+          "frames": {
+            "5": {
+              "matte": 1,
+              "shadow": 1,
+              "edge": 1
+            }
+          }
+        },
+        "img/auxpump.png": {
+          "matte": 1,
+          "shadow": 1,
+          "edge": 1
+        },
+        "img/auxpump1.png": {
+          "matte": 1,
+          "shadow": 1,
+          "edge": 1
+        },
+        "img/c1-3.png": {
+          "matte": 1,
+          "shadow": 1,
+          "edge": 1
+        },
+        "img/c31-2.png": {
+          "matte": 1,
+          "shadow": 1,
+          "edge": 1
+        },
+        "img/c4-1.png": {
+          "matte": 1,
+          "shadow": 1,
+          "edge": 1
+        },
+        "img/c7-6.png": {
+          "matte": 1,
+          "shadow": 1,
+          "edge": 1
+        },
+        "img/channel.png": {
+          "matte": 1,
+          "shadow": 1,
+          "edge": 1
+        },
+        "img/channel2.png": {
+          "matte": 1,
+          "shadow": 1,
+          "edge": 1
+        },
+        "img/chasm.png": {
+          "matte": 1,
+          "shadow": 1,
+          "edge": 1
+        },
+        "img/clicker1.png": {
+          "matte": 1,
+          "shadow": 1,
+          "edge": 1
+        },
+        "img/clicker2.png": {
+          "matte": 1,
+          "shadow": 1,
+          "edge": 1
+        },
+        "img/clicker3.png": {
+          "matte": 1,
+          "shadow": 1,
+          "edge": 1
+        },
+        "img/conductor.png": {
+          "matte": 1,
+          "shadow": 1,
+          "edge": 1
+        },
+        "img/consumer.png": {
+          "matte": 1,
+          "shadow": 1,
+          "edge": 1
+        },
+        "img/cookie.png": {
+          "matte": 1,
+          "shadow": 1,
+          "edge": 1
+        },
+        "img/des.png": {
+          "matte": 1,
+          "shadow": 1,
+          "edge": 1
+        },
+        "img/des2.png": {
+          "matte": 1,
+          "shadow": 1,
+          "edge": 1
+        },
+        "img/des2a.png": {
+          "matte": 1,
+          "shadow": 1,
+          "edge": 1
+        },
+        "img/double2.png": {
+          "matte": 1,
+          "shadow": 1,
+          "edge": 1
+        },
+        "img/double_spr.png": {
+          "matte": 1,
+          "shadow": 1,
+          "edge": 1
+        },
+        "img/entropy.png": {
+          "matte": 1,
+          "shadow": 1,
+          "edge": 1
+        },
+        "img/entropy2.png": {
+          "matte": 1,
+          "shadow": 1,
+          "edge": 1
+        },
+        "img/entropy2a.png": {
+          "matte": 1,
+          "shadow": 1,
+          "edge": 1
+        },
+        "img/entropy3.png": {
+          "matte": 1,
+          "shadow": 1,
+          "edge": 1
+        },
+        "img/eye.png": {
+          "matte": 1,
+          "shadow": 1,
+          "edge": 1
+        },
+        "img/flower.png": {
+          "matte": 1,
+          "shadow": 1,
+          "edge": 1
+        },
+        "img/fruit.png": {
+          "matte": 1,
+          "shadow": 1,
+          "edge": 1
+        },
+        "img/generaldecay.png": {
+          "matte": 1,
+          "shadow": 1,
+          "edge": 1
+        },
+        "img/gradient.png": {
+          "matte": 1,
+          "shadow": 1,
+          "edge": 1
+        },
+        "img/hollow.png": {
+          "matte": 1,
+          "shadow": 1,
+          "edge": 1
+        },
+        "img/injector.png": {
+          "matte": 1,
+          "shadow": 1,
+          "edge": 1
+        },
+        "img/mega1.png": {
+          "matte": 1,
+          "shadow": 1,
+          "edge": 1
+        },
+        "img/mega1a.png": {
+          "matte": 1,
+          "shadow": 1,
+          "edge": 1
+        },
+        "img/mega1b.png": {
+          "matte": 1,
+          "shadow": 1,
+          "edge": 1
+        },
+        "img/pinhole.png": {
+          "matte": 1,
+          "shadow": 1,
+          "edge": 1
+        },
+        "img/preheater.png": {
+          "matte": 1,
+          "shadow": 1,
+          "edge": 1
+        },
+        "img/puncture.png": {
+          "matte": 1,
+          "shadow": 1,
+          "edge": 1
+        },
+        "img/reactor.png": {
+          "matte": 1,
+          "shadow": 1,
+          "edge": 1
+        },
+        "img/recycler.png": {
+          "matte": 1,
+          "shadow": 1,
+          "edge": 1
+        },
+        "img/recycler2.png": {
+          "matte": 1,
+          "shadow": 1,
+          "edge": 1
+        },
+        "img/reflector.png": {
+          "matte": 1,
+          "shadow": 1,
+          "edge": 1
+        },
+        "img/silo.png": {
+          "matte": 1,
+          "shadow": 1,
+          "edge": 1
+        },
+        "img/silo2.png": {
+          "matte": 1,
+          "shadow": 1,
+          "edge": 1
+        },
+        "img/stabilizer.png": {
+          "matte": 1,
+          "shadow": 1,
+          "edge": 1
+        },
+        "img/stabilizer2.png": {
+          "matte": 1,
+          "shadow": 1,
+          "edge": 1
+        },
+        "img/stabilizer3.png": {
+          "matte": 1,
+          "shadow": 1,
+          "edge": 1
+        },
+        "img/strange.png": {
+          "matte": 1,
+          "shadow": 1,
+          "edge": 1
+        },
+        "img/strange1.png": {
+          "matte": 1,
+          "shadow": 1,
+          "edge": 1
+        },
+        "img/strange2.png": {
+          "matte": 1,
+          "shadow": 1,
+          "edge": 1
+        },
+        "img/strange3.png": {
+          "matte": 1,
+          "shadow": 1,
+          "edge": 1
+        },
+        "img/valve.png": {
+          "matte": 1,
+          "shadow": 1,
+          "edge": 1
+        },
+        "img/vault.png": {
+          "matte": 1,
+          "shadow": 1,
+          "edge": 1
+        },
+        "img/vessel.png": {
+          "matte": 1,
+          "shadow": 1,
+          "edge": 1
+        },
+        "img/vessel2.png": {
+          "matte": 1,
+          "shadow": 1,
+          "edge": 1
+        },
+        "img/voidsculpture.png": {
+          "matte": 1,
+          "shadow": 1,
+          "edge": 1
+        },
+        "img/waypoint.png": {
+          "matte": 1,
+          "shadow": 1,
+          "edge": 1,
+          "frames": {
+            "1": {
+              "matte": 1,
+              "shadow": 1,
+              "edge": 1
+            },
+            "2": {
+              "matte": 1,
+              "shadow": 1,
+              "edge": 1
+            },
+            "3": {
+              "matte": 1,
+              "shadow": 1,
+              "edge": 1
+            }
+          }
+        },
+        "img/waypoint2.png": {
+          "matte": 1,
+          "shadow": 1,
+          "edge": 1
+        }
+      },
+      "description": "Per-image cleanup keyed by img/*.png. Supports matte/shadow/edge, enabled:false, matteDistance, matteLuma, matteSaturation, matteSeeds:[[x,y]], and one-based frames:{\"5\":{...}} overrides."
+    }
+  }
 }

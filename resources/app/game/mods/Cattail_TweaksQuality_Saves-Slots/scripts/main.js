@@ -5,6 +5,7 @@ ModLoader.register({
 		const autoConfirmationIndex = 'auto'
 		let activeSplash = null
 		let pendingConfirmation = null
+		let pendingImport = null
 
 		api.on('afterVanillaScripts', function () {
 			if (typeof Splash === 'undefined' || typeof Game === 'undefined') return
@@ -103,6 +104,7 @@ ModLoader.register({
 
 		function hideSlotsPage(splash) {
 			pendingConfirmation = null
+			pendingImport = null
 			if (!splash?.element) return
 			splash.element.classList.remove('cattail-save-slots-active')
 			splash.element.querySelector('.cattail-save-slots-page')?.remove()
@@ -162,6 +164,7 @@ ModLoader.register({
 			subtitle.className = 'cattail-save-slots-subtitle'
 			subtitle.textContent = text(game, 'title')
 			page.append(subtitle)
+			page.append(renderTransferBar(splash, page))
 
 			const list = document.createElement('div')
 			list.className = 'cattail-save-slots-list'
@@ -426,6 +429,172 @@ ModLoader.register({
 			setTimeout(function () { input.focus(); input.select() }, 0)
 		}
 
+		function renderTransferBar(splash, page) {
+			const game = splash.master
+			const bar = document.createElement('div')
+			bar.className = 'cattail-save-slots-transfer'
+			if (pendingImport) {
+				const status = document.createElement('span')
+				status.className = 'cattail-save-slots-transfer-status'
+				status.textContent = text(game, pendingImport.auto ? 'importConfirmWithAuto' : 'importConfirm', { count: pendingImport.filledCount })
+				const ok = actionButton('', false, function () {
+					const shouldReload = applyImportedSlots(game, pendingImport)
+					pendingImport = null
+					if (shouldReload) {
+						game.preventSaving = true
+						setTimeout(function () { location.reload() }, 100)
+						return
+					}
+					renderSlotsPage(splash, page)
+				})
+				ok.classList.add('cattail-save-slots-confirm-icon', 'cattail-save-slots-confirm-ok')
+				ok.setAttribute('aria-label', 'Confirm')
+				const cancel = actionButton('', false, function () {
+					pendingImport = null
+					renderSlotsPage(splash, page)
+				})
+				cancel.classList.add('cattail-save-slots-confirm-icon', 'cattail-save-slots-confirm-cancel')
+				cancel.setAttribute('aria-label', 'Cancel')
+				bar.append(status, ok, actionSeparator(), cancel)
+				return bar
+			}
+			bar.append(actionButton(text(game, 'exportSlots'), false, function () { exportSlotsFile(game) }))
+			bar.append(actionSeparator())
+			bar.append(actionButton(text(game, 'importSlots'), false, function () { chooseImportFile(splash, page) }))
+			return bar
+		}
+
+		function exportSlotsFile(game) {
+			const payload = buildExportPayload(game)
+			const content = encodeExportPayload(payload)
+			const blob = new Blob([content], { type: 'text/plain;charset=utf-8' })
+			const url = URL.createObjectURL(blob)
+			const link = document.createElement('a')
+			link.href = url
+			link.download = exportFileName()
+			document.body.append(link)
+			link.click()
+			link.remove()
+			setTimeout(function () { URL.revokeObjectURL(url) }, 1000)
+		}
+
+		function chooseImportFile(splash, page) {
+			const input = document.createElement('input')
+			input.type = 'file'
+			input.accept = '.cattail-save-slots,.txt,.json,text/plain,application/json'
+			input.style.display = 'none'
+			input.onchange = function () {
+				const file = input.files?.[0]
+				input.remove()
+				if (!file) return
+				const reader = new FileReader()
+				reader.onload = function () {
+					const imported = parseImportedSlots(splash.master, String(reader.result || ''))
+					if (!imported) {
+						alert(text(splash.master, 'importInvalid'))
+						return
+					}
+					pendingConfirmation = null
+					pendingImport = imported
+					renderSlotsPage(splash, page)
+				}
+				reader.onerror = function () { alert(text(splash.master, 'importInvalid')) }
+				reader.readAsText(file)
+			}
+			document.body.append(input)
+			input.click()
+		}
+
+		function buildExportPayload(game) {
+			const autoSlot = getAutoSlot(game)
+			const manualSlots = readManualSlots(game)
+			return {
+				type: 'Cattail_TweaksQuality_Saves-Slots',
+				version: 1,
+				exportedAt: new Date().toISOString(),
+				steamId: String(game?.steamId || ''),
+				slotCount: manualSlotCount,
+				auto: sanitizeSlot(game, autoSlot.data ? { data: autoSlot.data, timestamp: autoSlot.timestamp, createdAt: autoSlot.timestamp, updatedAt: autoSlot.timestamp } : null),
+				manual: emptySlots().map(function (_, index) { return sanitizeSlot(game, manualSlots[index]) })
+			}
+		}
+
+		function parseImportedSlots(game, raw) {
+			try {
+				const payload = decodeExportPayload(raw)
+				if (!payload || typeof payload !== 'object') return null
+				const sourceSlots = Array.isArray(payload) ? payload : (Array.isArray(payload.manual) ? payload.manual : (Array.isArray(payload.slots) ? payload.slots : null))
+				if (!sourceSlots) return null
+				const manual = emptySlots().map(function (_, index) { return sanitizeSlot(game, sourceSlots[index]) })
+				const auto = Array.isArray(payload) ? null : sanitizeSlot(game, payload.auto || payload.autosave)
+				return { auto, manual, filledCount: manual.filter(Boolean).length }
+			} catch (error) {
+				console.warn('[Save Slots] Could not import save slots.', error)
+				return null
+			}
+		}
+
+		function applyImportedSlots(game, imported) {
+			writeManualSlots(game, imported.manual)
+			if (imported.auto?.data) {
+				localStorage.setItem(autoKey(game), imported.auto.data)
+				game.spaceport?.send('save', imported.auto.data)
+				return true
+			}
+			return false
+		}
+
+		function sanitizeSlot(game, slot) {
+			if (!slot) return null
+			const data = typeof slot === 'string' ? slot : slot.data
+			if (typeof data !== 'string' || !data) return null
+			const decoded = decodeSlot(game, data)
+			if (!decoded) return null
+			return {
+				name: typeof slot.name === 'string' ? slot.name.slice(0, 64) : '',
+				data,
+				timestamp: safeTimestamp(slot.timestamp || decoded.timestamp),
+				createdAt: safeTimestamp(slot.createdAt || slot.timestamp || decoded.timestamp),
+				updatedAt: safeTimestamp(slot.updatedAt || slot.timestamp || decoded.timestamp)
+			}
+		}
+
+		function safeTimestamp(value) {
+			const number = Number(value)
+			return Number.isFinite(number) && number > 0 ? number : null
+		}
+
+		function encodeExportPayload(payload) {
+			return 'CattailSaveSlots:v1\n' + encodeBase64(JSON.stringify(payload))
+		}
+
+		function decodeExportPayload(raw) {
+			const content = String(raw || '').trim()
+			if (!content) return null
+			if (content.startsWith('CattailSaveSlots:v1')) return JSON.parse(decodeBase64(content.slice('CattailSaveSlots:v1'.length).trim()))
+			return JSON.parse(content)
+		}
+
+		function encodeBase64(value) {
+			const bytes = new TextEncoder().encode(value)
+			let binary = ''
+			for (let i = 0; i < bytes.length; i += 0x8000) binary += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000))
+			return btoa(binary)
+		}
+
+		function decodeBase64(value) {
+			const binary = atob(String(value || '').replace(/\s+/g, ''))
+			const bytes = new Uint8Array(binary.length)
+			for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i)
+			return new TextDecoder().decode(bytes)
+		}
+
+		function exportFileName() {
+			const date = new Date()
+			const pad = function (value) { return String(value).padStart(2, '0') }
+			return `Cattail_SaveSlots_${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}_${pad(date.getHours())}-${pad(date.getMinutes())}.cattail-save-slots`
+		}
+
 		function confirmAction(game, action) {
 			const wrap = document.createElement('span')
 			wrap.className = 'cattail-save-slots-confirm-action'
@@ -626,10 +795,10 @@ ModLoader.register({
 		}
 
 		const EXTRA_LABELS = {
-			en: {back: 'Back', noTime: 'No save time', noResources: 'No resources', emptyResourceHint: 'Empty'},
-			sch: {back: '返回', noTime: '没有存档时间', noResources: '没有资源', emptyResourceHint: '空'},
-			modsch: {back: '返回', noTime: '没有存档时间', noResources: '没有资源', emptyResourceHint: '空'},
-			tch: {back: '返回', noTime: '沒有存檔時間', noResources: '沒有資源', emptyResourceHint: '空'}
+			en: {back: 'Back', noTime: 'No save time', noResources: 'No resources', emptyResourceHint: 'Empty', exportSlots: 'Export all', importSlots: 'Import file', importConfirm: 'Import {count} manual slots?', importConfirmWithAuto: 'Import autosave and {count} manual slots?', importInvalid: 'This save-slot file could not be imported.'},
+			sch: {back: '返回', noTime: '没有存档时间', noResources: '没有资源', emptyResourceHint: '空', exportSlots: '导出全部', importSlots: '导入文件', importConfirm: '导入 {count} 个手动存档格？', importConfirmWithAuto: '导入自动存档和 {count} 个手动存档格？', importInvalid: '无法导入这个存档格文件。'},
+			modsch: {back: '返回', noTime: '没有存档时间', noResources: '没有资源', emptyResourceHint: '空', exportSlots: '导出全部', importSlots: '导入文件', importConfirm: '导入 {count} 个手动存档格？', importConfirmWithAuto: '导入自动存档和 {count} 个手动存档格？', importInvalid: '无法导入这个存档格文件。'},
+			tch: {back: '返回', noTime: '沒有存檔時間', noResources: '沒有資源', emptyResourceHint: '空', exportSlots: '匯出全部', importSlots: '匯入檔案', importConfirm: '匯入 {count} 個手動存檔格？', importConfirmWithAuto: '匯入自動存檔和 {count} 個手動存檔格？', importInvalid: '無法匯入這個存檔格檔案。'}
 		}
 
 		function text(game, key, values) {
@@ -673,8 +842,12 @@ ModLoader.register({
 				.cattail-save-slots-brand { display:flex; align-items:center; justify-content:center; gap:32px; margin:0 auto 14px; }
 				.cattail-save-slots-logo-mark { flex:0 0 auto; width:92px; height:92px; margin:0; background:url('img/logo/sheet.png'); background-size:400% 200%; }
 				.cattail-save-slots-logo { text-align:center; font:54px Montserrat,Arial,sans-serif; letter-spacing:16px; white-space:nowrap; }
-				.cattail-save-slots-subtitle { margin:0 auto 24px; text-align:center; font:23px Montserrat,Arial,sans-serif; letter-spacing:9px; color:#fffc; }
-				.cattail-save-slots-list { box-sizing:border-box; width:min(1760px,100%); height:min(820px,calc(100vh - 280px)); margin:0 auto; padding:2px 28px 16px 0; overflow-x:hidden; overflow-y:auto; scrollbar-width:thin; scrollbar-color:transparent transparent; transition:scrollbar-color .28s ease; outline:none; }
+				.cattail-save-slots-subtitle { margin:0 auto 12px; text-align:center; font:23px Montserrat,Arial,sans-serif; letter-spacing:9px; color:#fffc; }
+				.cattail-save-slots-transfer { display:flex; align-items:center; justify-content:center; gap:14px; width:min(1760px,100%); min-height:28px; margin:0 auto 14px; color:rgba(255,255,255,.82); font:17px/1.2 Montserrat,Arial,sans-serif; letter-spacing:3px; white-space:nowrap; }
+				.cattail-save-slots-transfer button { appearance:none; border:0; background:transparent; color:inherit; font:inherit; letter-spacing:inherit; padding:0; cursor:pointer; transition:color .18s ease,opacity .18s ease; }
+				.cattail-save-slots-transfer button:hover { color:#b56b87; }
+				.cattail-save-slots-transfer-status { color:rgba(255,255,255,.66); }
+				.cattail-save-slots-list { box-sizing:border-box; width:min(1760px,100%); height:min(790px,calc(100vh - 318px)); margin:0 auto; padding:2px 28px 16px 0; overflow-x:hidden; overflow-y:auto; scrollbar-width:thin; scrollbar-color:transparent transparent; transition:scrollbar-color .28s ease; outline:none; }
 				.cattail-save-slots-list:hover, .cattail-save-slots-list:active, .cattail-save-slots-list.cattail-save-slots-scrollbar-visible { scrollbar-color:#fffc #fff2; }
 				.cattail-save-slots-list::-webkit-scrollbar { width:10px; }
 				.cattail-save-slots-list::-webkit-scrollbar-track { background:transparent; transition:background .28s ease; }
@@ -715,7 +888,8 @@ ModLoader.register({
 				.splash.mobile .cattail-save-slots-logo-mark { width:16vw; height:16vw; max-width:74px; max-height:74px; }
 				.splash.mobile .cattail-save-slots-logo { font-size:min(8vw,34px); letter-spacing:min(2.2vw,9px); }
 				.splash.mobile .cattail-save-slots-subtitle { font-size:min(5vw,18px); }
-				.splash.mobile .cattail-save-slots-list { height:min(620px,calc(100vh - 270px)); padding-right:14px; }
+				.splash.mobile .cattail-save-slots-transfer { font-size:min(4vw,15px); letter-spacing:1px; }
+				.splash.mobile .cattail-save-slots-list { height:min(620px,calc(100vh - 300px)); padding-right:14px; }
 				.splash.mobile .cattail-save-slots-row { grid-template-columns:1fr; gap:10px; min-height:0; padding:14px 6px; }
 				.splash.mobile .cattail-save-slots-resources { justify-content:flex-start; }
 				.splash.mobile .cattail-save-slots-actions { justify-content:flex-end; font-size:min(4vw,15px); letter-spacing:1px; }

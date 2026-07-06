@@ -1,8 +1,0 @@
-{
-  "id": "Cattail_TweaksX_Cookie-Boost",
-  "name": "Cookie Boost",
-  "version": "0.1.0",
-  "loaderVersion": ">=0.1.0",
-  "entry": "scripts/main.js",
-  "description": "Grants a one-time 1T boost to every resource, unlocks the Inverse Chasm plus Pinhole, and satisfies Red-blue Rock plus Neophobia when the cookie is clicked."
-}

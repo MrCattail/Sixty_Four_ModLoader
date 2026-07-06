@@ -13,7 +13,9 @@ ModLoader.register({
 		const photofobiaClass = 'photofobia'
 		const activeClass = 'active'
 		const autoHideDelay = 5000
+		const floorLongPressDelay = 520
 		const floorColorKey = '__cattailAccessibilityFloorColor'
+		const floorOverrideKey = '__cattailAccessibilityFloorOverride'
 		const floorPalettePositionKey = '__cattailAccessibilityFloorPalettePosition'
 		const defaultFloorColor = '#ffffff'
 		const grayStripWidth = .2
@@ -388,6 +390,9 @@ ModLoader.register({
 				chill,
 				floor: floor.button,
 				floorIcon: floor.icon,
+				floorLongPressTimer: null,
+				floorLongPressTriggered: false,
+				floorPointerId: null,
 				pointerInside: false,
 				paletteOpen: false,
 				paletteDragging: false,
@@ -425,9 +430,10 @@ ModLoader.register({
 			const button = document.createElement('button')
 			button.type = 'button'
 			button.className = floorButtonClass
-			button.title = 'Adjust reality floor color'
-			button.setAttribute('aria-label', 'Adjust reality floor color')
+			button.title = 'Toggle reality floor color override; hold to adjust color'
+			button.setAttribute('aria-label', 'Toggle reality floor color override; hold to adjust color')
 			button.setAttribute('aria-expanded', 'false')
+			button.setAttribute('aria-pressed', 'true')
 
 			const icon = document.createElement('span')
 			icon.setAttribute('aria-hidden', 'true')
@@ -436,14 +442,59 @@ ModLoader.register({
 			const stop = function (event) {
 				event.stopPropagation()
 			}
+			const clearLongPress = function (event) {
+				const controller = ensureController(game)
+				if (!controller) return
+				if (controller.floorLongPressTimer) {
+					clearTimeout(controller.floorLongPressTimer)
+					controller.floorLongPressTimer = null
+				}
+				if (controller.floorPointerId !== null && (!event || event.pointerId === controller.floorPointerId)) {
+					try { button.releasePointerCapture(controller.floorPointerId) } catch (error) {}
+					controller.floorPointerId = null
+				}
+			}
 
-			button.addEventListener('pointerdown', stop, true)
+			button.addEventListener('pointerdown', function (event) {
+				event.preventDefault()
+				event.stopPropagation()
+				const controller = ensureController(game)
+				if (!controller) return
+				clearLongPress(event)
+				controller.floorLongPressTriggered = false
+				controller.floorPointerId = event.pointerId
+				try { button.setPointerCapture(event.pointerId) } catch (error) {}
+				controller.floorLongPressTimer = setTimeout(function () {
+					controller.floorLongPressTimer = null
+					controller.floorLongPressTriggered = true
+					openPaletteWithOverride(game)
+				}, floorLongPressDelay)
+			}, true)
+			button.addEventListener('pointerup', clearLongPress, true)
+			button.addEventListener('pointercancel', clearLongPress, true)
+			button.addEventListener('pointerleave', function (event) {
+				if (event.pointerType === 'mouse') clearLongPress(event)
+			}, true)
 			button.addEventListener('mousedown', stop, true)
 			button.addEventListener('touchstart', stop, true)
+			button.addEventListener('contextmenu', function (event) {
+				event.preventDefault()
+				event.stopPropagation()
+			}, true)
 			button.addEventListener('click', function (event) {
 				event.preventDefault()
 				event.stopPropagation()
-				togglePalette(game)
+				const controller = ensureController(game)
+				const consumed = !!controller?.floorLongPressTriggered
+				if (controller) controller.floorLongPressTriggered = false
+				if (consumed) return
+				if (controller?.paletteOpen) {
+					closePalette(game)
+					scheduleAutoHide(game)
+					updateController(game)
+					return
+				}
+				toggleFloorOverride(game)
 			}, true)
 
 			return { button, icon }
@@ -506,7 +557,7 @@ ModLoader.register({
 					let replacedBackground = false
 
 					ctx.fillRect = function (x, y, w, h) {
-						if (!replacedBackground && !game.plane && x === 0 && y === 0 && w === game.w && h === game.h) {
+						if (!replacedBackground && isFloorOverrideEnabled(game) && !game.plane && x === 0 && y === 0 && w === game.w && h === game.h) {
 							replacedBackground = true
 							const previousFillStyle = this.fillStyle
 							this.fillStyle = game[floorColorKey] || defaultFloorColor
@@ -562,13 +613,50 @@ ModLoader.register({
 			}, true)
 		}
 
+		function toggleFloorOverride(game) {
+			setFloorOverride(game, !isFloorOverrideEnabled(game))
+			updateController(game)
+		}
+
+		function setFloorOverride(game, enabled) {
+			if (!game) return
+			game[floorOverrideKey] = !!enabled
+			try {
+				localStorage.setItem(storageKey(game, 'floorOverride'), game[floorOverrideKey] ? 'true' : 'false')
+			} catch (error) {}
+			if (!game[floorOverrideKey]) closePalette(game)
+		}
+
+		function isFloorOverrideEnabled(game) {
+			return game?.[floorOverrideKey] !== false
+		}
+
+		function openPaletteWithOverride(game) {
+			setFloorOverride(game, true)
+			const controller = ensureController(game)
+			if (!controller) return
+			controller.paletteOpen = true
+			controller.floor.setAttribute('aria-expanded', 'true')
+			showController(game)
+			updateController(game)
+		}
+
+		function closePalette(game) {
+			const controller = ensureController(game)
+			if (!controller) return
+			controller.paletteOpen = false
+			controller.floor.setAttribute('aria-expanded', 'false')
+		}
+
 		function togglePalette(game) {
 			const controller = ensureController(game)
 			if (!controller) return
-			controller.paletteOpen = !controller.paletteOpen
-			controller.floor.setAttribute('aria-expanded', controller.paletteOpen ? 'true' : 'false')
-			if (controller.paletteOpen) showController(game)
-			else scheduleAutoHide(game)
+			if (controller.paletteOpen) {
+				closePalette(game)
+				scheduleAutoHide(game)
+			} else {
+				openPaletteWithOverride(game)
+			}
 			updateController(game)
 		}
 
@@ -583,6 +671,7 @@ ModLoader.register({
 		}
 
 		function setFloorColorFromPalette(game, controller, x, y) {
+			setFloorOverride(game, true)
 			const position = { x: clamp(x, 0, 1), y: clamp(y, 0, 1) }
 			const color = paletteColor(position.x, position.y)
 			game[floorColorKey] = color
@@ -598,20 +687,29 @@ ModLoader.register({
 			if (!game) return
 			let color = null
 			let position = null
+			let override = null
 			try {
 				color = localStorage.getItem(storageKey(game, 'floorColor'))
 				position = parsePalettePosition(localStorage.getItem(storageKey(game, 'floorPalette')))
+				override = localStorage.getItem(storageKey(game, 'floorOverride'))
 			} catch (error) {}
 			game[floorPalettePositionKey] = position || { x: 0, y: 0 }
 			game[floorColorKey] = position ? paletteColor(position.x, position.y) : (color || defaultFloorColor)
+			game[floorOverrideKey] = override === null ? true : override !== 'false'
 		}
 
 		function updatePaletteMarker(controller, game) {
 			const position = game[floorPalettePositionKey] || { x: 0, y: 0 }
 			const color = game[floorColorKey] || defaultFloorColor
+			const override = isFloorOverrideEnabled(game)
 			controller.marker.style.left = (position.x * 100) + '%'
 			controller.marker.style.top = (position.y * 100) + '%'
-			controller.floorIcon.style.backgroundColor = color
+			controller.floor.classList.toggle(activeClass, override)
+			controller.floor.setAttribute('aria-pressed', override ? 'true' : 'false')
+			controller.floor.title = override ? 'Use original reality floor color; hold to adjust custom color' : 'Use custom reality floor color; hold to adjust custom color'
+			controller.floor.setAttribute('aria-label', controller.floor.title)
+			controller.floorIcon.style.backgroundColor = override ? color : 'transparent'
+			controller.floorIcon.style.boxShadow = override ? 'none' : 'inset 0 0 0 1px currentColor'
 		}
 
 		function parsePalettePosition(value) {
