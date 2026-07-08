@@ -1,0 +1,72 @@
+{
+  "id": "Cattail_TweaksQuality_Accessibility-Pack",
+  "name": "Accessibility Pack",
+  "version": "0.1.0",
+  "loaderVersion": ">=0.1.0",
+  "entries": [
+    "scripts/explainer-language-fix.js",
+    "scripts/ending-skip.js",
+    "scripts/accessibility-buttons.js",
+    "scripts/view-distance.js"
+  ],
+  "conflicts": [
+    "Cattail_TweaksQuality_View-Distance",
+    "Cattail_TweaksQuality_Ending-Skip",
+    "Cattail_TweaksQuality_Accessibility-Buttons",
+    "Cattail_Tweaks_Explainer-Language-Fix"
+  ],
+  "config": {
+    "enableExplainerLanguageFix": {
+      "type": "boolean",
+      "label": "Explainer language fix",
+      "default": true,
+      "description": "Refresh pulsing explainer hints immediately after language changes."
+    },
+    "enableEndingSkip": {
+      "type": "boolean",
+      "label": "Ending skip",
+      "default": true,
+      "description": "Show a skip button during the pinhole ending and credits sequence."
+    },
+    "enableAccessibilityButtons": {
+      "type": "boolean",
+      "label": "Accessibility buttons",
+      "default": true,
+      "description": "Show the bottom accessibility control bar and reality-floor color palette."
+    },
+    "enableViewDistance": {
+      "type": "boolean",
+      "label": "View distance limits",
+      "default": true,
+      "description": "Use expanded camera zoom limits."
+    },
+    "farthestZoom": {
+      "type": "number",
+      "label": "Farthest zoom",
+      "default": 0.12,
+      "min": 0.03,
+      "max": 1,
+      "step": 0.01,
+      "description": "Lower values show more of the world. Vanilla far limit is 0.3."
+    },
+    "closestZoom": {
+      "type": "number",
+      "label": "Closest zoom",
+      "default": 4,
+      "min": 1,
+      "max": 24,
+      "step": 0.1,
+      "description": "Higher values zoom closer to the world. Vanilla near limit is 2."
+    },
+    "fallbackZoom": {
+      "type": "number",
+      "label": "Fallback zoom",
+      "default": 1,
+      "min": 0.03,
+      "max": 24,
+      "step": 0.01,
+      "description": "Used when the saved zoom value is missing or invalid."
+    }
+  },
+  "description": "Combines view distance limits, ending skip, accessibility buttons, and dynamic explainer language refresh into one multi-entry quality mod."
+}

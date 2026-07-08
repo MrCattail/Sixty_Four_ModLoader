@@ -1,6 +1,8 @@
 ModLoader.register({
-	id: 'Cattail_TweaksQuality_Ending-Skip',
+	id: 'Cattail_TweaksQuality_Accessibility-Pack',
 	init(api) {
+		if (api.config.get('enableEndingSkip', true) === false) return
+
 		const controllerKey = '__cattailEndingSkipController'
 		const styleId = 'cattail-ending-skip-style'
 		const buttonClass = 'cattail-ending-skip-button'

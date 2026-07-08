@@ -1,8 +1,0 @@
-{
-  "id": "Cattail_TweaksQuality_Language-Menu",
-  "name": "Language Menu",
-  "version": "0.1.0",
-  "loaderVersion": ">=0.1.0",
-  "entry": "scripts/main.js",
-  "description": "Replaces the splash language toggle with a scrollable language selection page."
-}

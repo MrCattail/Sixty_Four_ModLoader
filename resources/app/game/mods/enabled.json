@@ -1,15 +1,11 @@
 {
   "mods": [
     "Cattail_TweaksX_Reality-Auto-Collect",
-    "Cattail_Tweaks_Explainer-Language-Fix",
-    "Cattail_TweaksQuality_Shop-Categories",
+    "Cattail_TweaksQuality_Interface-Pack",
     "Cattail_TweaksQuality_Dynamic-Details",
-    "Cattail_TweaksQuality_Ending-Skip",
     "Cattail_Tweaks_Chat-Timestamps",
     "Cattail_Tweaks_简体中文优化",
-    "Cattail_TweaksQuality_Saves-Slots",
     "Cattail_TweaksX_Super-Silo",
-    "Cattail_TweaksQuality_Language-Menu",
-    "Cattail_TweaksQuality_View-Distance"
+    "Cattail_TweaksQuality_Accessibility-Pack"
   ]
 }

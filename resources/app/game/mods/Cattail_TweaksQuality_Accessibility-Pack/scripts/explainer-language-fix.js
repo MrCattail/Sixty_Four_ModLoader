@@ -1,6 +1,8 @@
 ModLoader.register({
-	id: 'Cattail_Tweaks_Explainer-Language-Fix',
+	id: 'Cattail_TweaksQuality_Accessibility-Pack',
 	init(api) {
+		if (api.config.get('enableExplainerLanguageFix', true) === false) return
+
 		api.on('afterVanillaScripts', function () {
 			if (typeof Game === 'undefined' || typeof Explainer === 'undefined') return
 
@@ -19,5 +21,3 @@ ModLoader.register({
 		})
 	}
 })
-
-

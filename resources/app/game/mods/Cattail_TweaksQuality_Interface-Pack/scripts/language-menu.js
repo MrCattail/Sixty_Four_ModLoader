@@ -1,6 +1,8 @@
 ModLoader.register({
-	id: 'Cattail_TweaksQuality_Language-Menu',
+	id: 'Cattail_TweaksQuality_Interface-Pack',
 	init(api) {
+		if (api.config.get('enableLanguageMenu', true) === false) return
+
 		let activeSplash = null
 
 		const fallbackLanguageLabels = {

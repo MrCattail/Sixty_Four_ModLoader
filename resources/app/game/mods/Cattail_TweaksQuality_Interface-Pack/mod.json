@@ -1,0 +1,37 @@
+{
+  "id": "Cattail_TweaksQuality_Interface-Pack",
+  "name": "Interface Pack",
+  "version": "0.1.0",
+  "loaderVersion": ">=0.1.0",
+  "entries": [
+    "scripts/shop-categories.js",
+    "scripts/save-slots.js",
+    "scripts/language-menu.js"
+  ],
+  "conflicts": [
+    "Cattail_TweaksQuality_Language-Menu",
+    "Cattail_TweaksQuality_Saves-Slots",
+    "Cattail_TweaksQuality_Shop-Categories"
+  ],
+  "config": {
+    "enableShopCategories": {
+      "type": "boolean",
+      "label": "Shop categories",
+      "default": true,
+      "description": "Show the optional categorized compact building shop view."
+    },
+    "enableSaveSlots": {
+      "type": "boolean",
+      "label": "Save slots",
+      "default": true,
+      "description": "Show the in-game save-slot page with import and export actions."
+    },
+    "enableLanguageMenu": {
+      "type": "boolean",
+      "label": "Language menu",
+      "default": true,
+      "description": "Use the scrollable language selection page on the splash menu."
+    }
+  },
+  "description": "Combines shop categories, save slots, and the language menu into one multi-entry interface quality mod."
+}

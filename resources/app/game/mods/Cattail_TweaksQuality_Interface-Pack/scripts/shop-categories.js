@@ -1,6 +1,8 @@
 ModLoader.register({
-	id: 'Cattail_TweaksQuality_Shop-Categories',
+	id: 'Cattail_TweaksQuality_Interface-Pack',
 	init(api) {
+		if (api.config.get('enableShopCategories', true) === false) return
+
 		const storageKey = 'cattailShopCategoriesCompressed'
 		const expandedKey = '_cattailShopCategoryExpanded'
 		const panelKey = '_cattailShopCategoryPanel'

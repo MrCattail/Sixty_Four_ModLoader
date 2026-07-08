@@ -1,4 +1,5 @@
-const MOD_ID = 'Cattail_TweaksQuality_View-Distance'
+const MOD_ID = 'Cattail_TweaksQuality_Accessibility-Pack'
+const LEGACY_VIEW_DISTANCE_MOD_ID = 'Cattail_TweaksQuality_View-Distance'
 const DEFAULT_FARTHEST_ZOOM = 0.12
 const DEFAULT_CLOSEST_ZOOM = 4
 const DEFAULT_FALLBACK_ZOOM = 1
@@ -8,6 +9,9 @@ const ABSOLUTE_MAX_ZOOM = 24
 ModLoader.register({
 	id: MOD_ID,
 	init(api) {
+		if (api.config.get('enableViewDistance', true) === false) return
+		migrateLegacyZoomConfig(api)
+
 		api.on('afterVanillaScripts', function () {
 			if (typeof Game === 'undefined') return
 
@@ -72,9 +76,42 @@ function getFallbackZoom(api, range) {
 }
 
 function readZoomConfig(api, key, fallback) {
-	const value = Number(api.config.get(key, fallback))
+	const value = Number(readConfigWithLegacy(api, key, fallback))
 	if (!Number.isFinite(value) || value <= 0) return fallback
 	return value
+}
+
+function readConfigWithLegacy(api, key, fallback) {
+	try {
+		const ownRaw = localStorage.getItem(configStorageKey(api.id, key))
+		if (ownRaw !== null) return parseStoredConfigValue(ownRaw)
+		const legacyRaw = localStorage.getItem(configStorageKey(LEGACY_VIEW_DISTANCE_MOD_ID, key))
+		if (legacyRaw !== null) return parseStoredConfigValue(legacyRaw)
+	} catch (error) {}
+	return api.config.get(key, fallback)
+}
+
+function migrateLegacyZoomConfig(api) {
+	for (const key of ['farthestZoom', 'closestZoom', 'fallbackZoom']) {
+		try {
+			const ownKey = configStorageKey(api.id, key)
+			if (localStorage.getItem(ownKey) !== null) continue
+			const legacyRaw = localStorage.getItem(configStorageKey(LEGACY_VIEW_DISTANCE_MOD_ID, key))
+			if (legacyRaw !== null) localStorage.setItem(ownKey, legacyRaw)
+		} catch (error) {}
+	}
+}
+
+function configStorageKey(modId, key) {
+	return 'modloader:' + modId + ':config:' + key
+}
+
+function parseStoredConfigValue(raw) {
+	try {
+		return JSON.parse(raw)
+	} catch (error) {
+		return raw
+	}
 }
 
 function readSavedZoom(game) {

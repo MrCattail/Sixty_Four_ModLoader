@@ -1,6 +1,8 @@
 ModLoader.register({
-	id: 'Cattail_TweaksQuality_Saves-Slots',
+	id: 'Cattail_TweaksQuality_Interface-Pack',
 	init(api) {
+		if (api.config.get('enableSaveSlots', true) === false) return
+
 		const manualSlotCount = 10
 		const autoConfirmationIndex = 'auto'
 		let activeSplash = null
@@ -900,17 +902,3 @@ ModLoader.register({
 		}
 	}
 })
-
-
-
-
-
-
-
-
-
-
-
-
-
-

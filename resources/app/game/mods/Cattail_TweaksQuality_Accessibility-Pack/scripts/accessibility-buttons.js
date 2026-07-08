@@ -1,6 +1,8 @@
 ModLoader.register({
-	id: 'Cattail_TweaksQuality_Accessibility-Buttons',
+	id: 'Cattail_TweaksQuality_Accessibility-Pack',
 	init(api) {
+		if (api.config.get('enableAccessibilityButtons', true) === false) return
+
 		const controllerKey = '__cattailAccessibilityButtonsController'
 		const styleId = 'cattail-accessibility-buttons-style'
 		const rootClass = 'cattail-accessibility-buttons'
