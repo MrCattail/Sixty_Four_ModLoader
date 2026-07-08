@@ -32,6 +32,25 @@ mods/my-mod/
 Prefer JSON patches for language, prices, unlocks, and preload lists. Use
 `scripts/main.js` only when the mod needs new classes or behavior hooks.
 
+Behavior entries can be split across multiple files. `entry` may be a string or
+an array, and `entries` / `scripts` are also accepted:
+
+```json
+{
+  "entries": [
+    "features/mainfunction1.json",
+    "features/mainfunction2.json",
+    "scripts/main.js"
+  ]
+}
+```
+
+JSON entry files load during boot, before data and word patches are applied. Use
+`{ "type": "data", "patch": { ... } }`, `{ "type": "words", "patch": { ... } }`,
+or a mini manifest with `patches.data`, `patches.words`, `data` file refs, or
+`locale` file refs. JavaScript entries load later, in the listed order, after
+vanilla scripts exist.
+
 ## Main Hooks
 
 - `beforeVanillaScripts`

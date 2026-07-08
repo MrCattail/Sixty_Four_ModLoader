@@ -1535,22 +1535,71 @@
 		return []
 	}
 
+	const resolveFileList = function (value) {
+		return resolveList(value).filter(function (file) { return typeof file === 'string' && file })
+	}
+
+	const getModEntryFiles = function (manifest) {
+		const out = []
+		for (const value of [ manifest.entry, manifest.entries, manifest.scripts ]) {
+			for (const file of resolveFileList(value)) out.push(file)
+		}
+		return out
+	}
+
+	const isJsonEntryFile = function (file) {
+		return /\.json$/i.test(file)
+	}
+
+	const pushInlinePatch = function (mod, type, patch) {
+		if (!isObject(patch)) return false
+		const item = { modId: mod.id, patch: clone(patch) }
+		if (type === 'data') state.dataPatches.push(item)
+		else state.wordPatches.push(item)
+		return true
+	}
+
+	const applyInlineJsonPatches = function (mod, manifest) {
+		if (manifest.words) pushInlinePatch(mod, 'words', manifest.words)
+		if (manifest.patches?.words) pushInlinePatch(mod, 'words', manifest.patches.words)
+		if (manifest.patches?.data) pushInlinePatch(mod, 'data', manifest.patches.data)
+	}
+
 	const loadDeclaredJsonPatches = async function (mod) {
-		const localeFiles = resolveList(mod.manifest.locale || mod.manifest.locales || mod.manifest.assets?.locale)
+		const localeFiles = resolveFileList(mod.manifest.locale || mod.manifest.locales || mod.manifest.assets?.locale)
 		for (const file of localeFiles) {
 			const patch = await readJson(`${mod.basePath}${file}`)
 			state.wordPatches.push({ modId: mod.id, patch })
 		}
 
-		const dataFiles = resolveList(mod.manifest.data || mod.manifest.dataPatches || mod.manifest.assets?.data)
+		const dataFiles = resolveFileList(mod.manifest.data || mod.manifest.dataPatches || mod.manifest.assets?.data)
 		for (const file of dataFiles) {
 			const patch = await readJson(`${mod.basePath}${file}`)
 			state.dataPatches.push({ modId: mod.id, patch })
 		}
 
-		if (mod.manifest.words) state.wordPatches.push({ modId: mod.id, patch: clone(mod.manifest.words) })
-		if (mod.manifest.patches?.words) state.wordPatches.push({ modId: mod.id, patch: clone(mod.manifest.patches.words) })
-		if (mod.manifest.patches?.data) state.dataPatches.push({ modId: mod.id, patch: clone(mod.manifest.patches.data) })
+		applyInlineJsonPatches(mod, mod.manifest)
+	}
+
+	const loadJsonEntry = async function (mod, file) {
+		const manifest = await readJson(`${mod.basePath}${file}`)
+		if (Array.isArray(manifest.languages)) {
+			for (const language of manifest.languages) api.registerLanguage(language)
+		}
+		const type = String(manifest.type || manifest.kind || '').toLowerCase()
+		if ((type === 'data' || type === 'words' || type === 'locale') && pushInlinePatch(mod, type === 'data' ? 'data' : 'words', manifest.patch || manifest.patches?.[type] || manifest.words || manifest.data)) return
+		await loadDeclaredJsonPatches({ ...mod, manifest })
+	}
+
+	const loadDeclaredJsonEntries = async function (mod) {
+		for (const file of getModEntryFiles(mod.manifest).filter(isJsonEntryFile)) {
+			try {
+				await loadJsonEntry(mod, file)
+			} catch (error) {
+				addIssue('error', 'json-entry-load-failed', `failed to load ${mod.path}/${file}`, error.message)
+				warn(`Failed to load JSON entry for ${mod.id}: ${file}`, error)
+			}
+		}
 	}
 
 	const runHookSync = function (name, payload, context) {
@@ -1591,6 +1640,7 @@
 						for (const language of manifest.languages) api.registerLanguage(language)
 					}
 					await loadDeclaredJsonPatches(mod)
+					await loadDeclaredJsonEntries(mod)
 				} catch (error) {
 					addIssue('error', 'manifest-load-failed', `failed to load ${entry.path}/mod.json`, error.message)
 					warn(`Failed to load mod at ${entry.path}`, error)
@@ -1606,13 +1656,16 @@
 		async loadEntries() {
 			await api.boot()
 			for (const mod of state.mods) {
-				if (mod.loaded || !mod.manifest.entry) continue
+				const scriptEntries = getModEntryFiles(mod.manifest).filter(function (file) { return !isJsonEntryFile(file) })
+				if (mod.loaded || !scriptEntries.length) continue
+				let failed = false
 				try {
-					await loadScript(`${mod.basePath}${mod.manifest.entry}`)
-					mod.loaded = true
+					for (const file of scriptEntries) await loadScript(`${mod.basePath}${file}`)
 				} catch (error) {
+					failed = true
 					warn(`Failed to load entry for ${mod.id}`, error)
 				}
+				mod.loaded = !failed
 			}
 			showStatus()
 		},
