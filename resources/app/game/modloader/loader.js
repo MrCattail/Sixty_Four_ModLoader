@@ -22,6 +22,7 @@
 		music: {},
 		statusLogoIndex: -1,
 		statusLogoTimer: null,
+		statusDragging: false,
 		modFileTools: undefined,
 		game: null,
 		languagePatched: false,
@@ -47,7 +48,8 @@
 		const style = document.createElement('style')
 		style.id = 'modloader-status-style'
 		style.textContent = `
-			#modloader-status { position: fixed; left: 10px; bottom: 10px; z-index: 2147483647; display: inline-flex; align-items: center; gap: 7px; max-width: calc(100vw - 20px); box-sizing: border-box; padding: 6px 8px; border-radius: 7px; background: rgba(0, 0, 0, .62); color: rgba(255, 255, 255, .92); box-shadow: 0 6px 20px rgba(0,0,0,.18); font: 12px/1.35 Montserrat, Arial, sans-serif; pointer-events: auto; user-select: none; white-space: nowrap; }
+			#modloader-status { position: fixed; left: 10px; bottom: 10px; z-index: 2147483647; display: inline-flex; align-items: center; gap: 7px; max-width: calc(100vw - 20px); box-sizing: border-box; padding: 6px 8px; border-radius: 7px; background: rgba(0, 0, 0, .62); color: rgba(255, 255, 255, .92); box-shadow: 0 6px 20px rgba(0,0,0,.18); font: 12px/1.35 Montserrat, Arial, sans-serif; pointer-events: auto; user-select: none; white-space: nowrap; cursor: grab; touch-action: none; transition: left .16s ease, right .16s ease, top .16s ease, bottom .16s ease; }
+			#modloader-status.modloader-status-dragging { cursor: grabbing; transition: none; }
 			#modloader-status .modloader-status-logo { width: 18px; height: 18px; flex: 0 0 auto; border-radius: 4px; background: url('img/logo/sheet.png'); background-size: 400% 200%; box-shadow: inset 0 0 0 1px rgba(255,255,255,.12); opacity: 1; transition: opacity .32s ease, filter .32s ease; }
 			#modloader-status .modloader-status-logo-changing { opacity: .2; filter: saturate(.7); }
 			#modloader-status .modloader-status-title { font-weight: 600; }
@@ -63,6 +65,80 @@
 			#modloader-status:hover .modloader-status-dots { opacity: 0; transform: translate(8px, -50%); }
 		`
 		document.head.appendChild(style)
+	}
+
+	const STATUS_CORNER_KEY = 'modloader.statusCorner'
+	const STATUS_MARGIN = 10
+	const VALID_STATUS_CORNERS = new Set([ 'top-left', 'top-right', 'bottom-left', 'bottom-right' ])
+
+	const readStatusCorner = function () {
+		try {
+			const value = localStorage.getItem(STATUS_CORNER_KEY)
+			if (VALID_STATUS_CORNERS.has(value)) return value
+		} catch (error) {}
+		return 'bottom-left'
+	}
+
+	const writeStatusCorner = function (corner) {
+		try { localStorage.setItem(STATUS_CORNER_KEY, corner) } catch (error) {}
+	}
+
+	const applyStatusCorner = function (el, corner) {
+		const vertical = corner.startsWith('top') ? 'top' : 'bottom'
+		const horizontal = corner.endsWith('left') ? 'left' : 'right'
+		el.style.left = horizontal === 'left' ? `${STATUS_MARGIN}px` : 'auto'
+		el.style.right = horizontal === 'right' ? `${STATUS_MARGIN}px` : 'auto'
+		el.style.top = vertical === 'top' ? `${STATUS_MARGIN}px` : 'auto'
+		el.style.bottom = vertical === 'bottom' ? `${STATUS_MARGIN}px` : 'auto'
+	}
+
+	const nearestStatusCorner = function (el) {
+		const rect = el.getBoundingClientRect()
+		const horizontal = rect.left + rect.width / 2 < window.innerWidth / 2 ? 'left' : 'right'
+		const vertical = rect.top + rect.height / 2 < window.innerHeight / 2 ? 'top' : 'bottom'
+		return `${vertical}-${horizontal}`
+	}
+
+	const installStatusDrag = function (el) {
+		if (el.__modloaderStatusDrag) return
+		el.__modloaderStatusDrag = true
+		let drag = null
+		const clamp = function (value, min, max) { return Math.min(Math.max(value, min), max) }
+		const finish = function () {
+			if (!drag) return
+			drag = null
+			state.statusDragging = false
+			el.classList.remove('modloader-status-dragging')
+			const corner = nearestStatusCorner(el)
+			writeStatusCorner(corner)
+			applyStatusCorner(el, corner)
+		}
+		el.addEventListener('pointerdown', function (event) {
+			if (event.button !== undefined && event.button !== 0) return
+			const rect = el.getBoundingClientRect()
+			drag = { offsetX: event.clientX - rect.left, offsetY: event.clientY - rect.top }
+			state.statusDragging = true
+			el.classList.add('modloader-status-dragging')
+			el.setPointerCapture?.(event.pointerId)
+			event.preventDefault()
+			event.stopPropagation()
+		})
+		el.addEventListener('pointermove', function (event) {
+			if (!drag) return
+			const maxLeft = Math.max(STATUS_MARGIN, window.innerWidth - el.offsetWidth - STATUS_MARGIN)
+			const maxTop = Math.max(STATUS_MARGIN, window.innerHeight - el.offsetHeight - STATUS_MARGIN)
+			el.style.left = `${clamp(event.clientX - drag.offsetX, STATUS_MARGIN, maxLeft)}px`
+			el.style.top = `${clamp(event.clientY - drag.offsetY, STATUS_MARGIN, maxTop)}px`
+			el.style.right = 'auto'
+			el.style.bottom = 'auto'
+			event.preventDefault()
+			event.stopPropagation()
+		})
+		el.addEventListener('pointerup', finish)
+		el.addEventListener('pointercancel', finish)
+		window.addEventListener('resize', function () {
+			if (!state.statusDragging) applyStatusCorner(el, readStatusCorner())
+		})
 	}
 
 	const appendStatusText = function (parent, className, text) {
@@ -124,6 +200,8 @@
 
 		const names = state.mods.map(function (mod) { return mod.path || mod.id }).join(', ') || 'No mods'
 		el.title = `Cattail's ModLoader ${state.version} | mod: ${state.mods.length} | Ctrl+M | ${names}`
+		installStatusDrag(el)
+		if (!state.statusDragging) applyStatusCorner(el, readStatusCorner())
 		el.innerHTML = ''
 
 		const logo = document.createElement('span')
