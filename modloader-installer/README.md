@@ -17,8 +17,30 @@ For most players:
 3. Double-click `Install ModLoader.cmd`.
 4. Start the game and press `Ctrl+M`.
 
-Use `modloader-installer\Uninstall ModLoader.cmd` to restore the latest install backup, or
+Use `modloader-installer\update.cmd` to update from a new `SixtyFour-ModLoader.zip`,
+`modloader-installer\Uninstall ModLoader.cmd` to restore the latest install backup, or
 `modloader-installer\Verify ModLoader.cmd` to check the loader hooks.
+
+## Update
+
+For installed players:
+
+1. Put the new `SixtyFour-ModLoader.zip` in `modloader-installer`.
+2. Double-click `update.cmd`.
+3. Choose whether the package `mods` folder should replace the current `mods`
+   folder.
+
+Choose **Yes** only when you want the package mods to fully replace the current
+mods folder. Choose **No** to update ModLoader while leaving the current mods
+folder untouched.
+
+Command-line options:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\modloader-installer\update.ps1 -GameRoot "D:\Steam\steamapps\common\Sixty Four\win-unpacked"
+```
+
+Use `-ReplaceMods` or `-PreserveMods` to skip the prompt.
 
 ## Install
 

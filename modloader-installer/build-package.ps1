@@ -119,6 +119,14 @@ $packageReadme = @'
 The folder should contain `sixtyfour.exe`, `resources`, and
 `modloader-installer` at the same level.
 
+## Easy Update
+
+To update an existing install without manually extracting over the game folder:
+
+1. Put the new `SixtyFour-ModLoader.zip` in `modloader-installer`.
+2. Double-click `modloader-installer\update.cmd`.
+3. Choose whether the package mods should replace the current mods folder.
+
 ## Command-Line Install
 
 You can also install with:

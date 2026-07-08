@@ -1,7 +1,9 @@
 param(
 	[string]$GameRoot,
 	[string]$SourceRoot,
-	[switch]$Force
+	[switch]$Force,
+	[switch]$SkipMods,
+	[switch]$ReplaceMods
 )
 
 $ErrorActionPreference = 'Stop'
@@ -107,6 +109,9 @@ function Copy-DirectoryContents {
 
 $targetRoot = Resolve-GameRoot -Path $GameRoot
 $sourceRoot = Find-SourceRoot -ExplicitSourceRoot $SourceRoot
+if ($SkipMods -and $ReplaceMods) {
+	throw 'Use either -SkipMods or -ReplaceMods, not both.'
+}
 
 $targetGame = Join-Path $targetRoot 'resources\app\game'
 $sourceGame = Join-Path $sourceRoot 'resources\app\game'
@@ -152,12 +157,22 @@ foreach ($relativePath in $trackedFiles) {
 	$manifestFiles += $entry
 }
 
+$fullModsBackup = $null
+if ($ReplaceMods -and -not $SkipMods) {
+	$targetModsForBackup = Join-Path $targetGame 'mods'
+	if (Test-Path -LiteralPath $targetModsForBackup) {
+		$fullModsBackup = 'resources\app\game\mods'
+		Copy-DirectoryContents -Source $targetModsForBackup -Target (Join-Path $backupPath $fullModsBackup)
+	}
+}
+
 $manifest = [ordered]@{
 	createdAtUtc = (Get-Date).ToUniversalTime().ToString('o')
 	backupId = $stamp
 	gameRoot = $targetRoot
 	sourceRoot = $sourceRoot
 	files = $manifestFiles
+	fullModsBackup = $fullModsBackup
 }
 
 $manifest | ConvertTo-Json -Depth 20 | Set-Content -LiteralPath (Join-Path $backupPath 'install-backup.json') -Encoding UTF8
@@ -182,18 +197,37 @@ Copy-DirectoryContents -Source (Join-Path $sourceGame 'modloader') -Target (Join
 
 $sourceMods = Join-Path $sourceGame 'mods'
 $targetMods = Join-Path $targetGame 'mods'
-New-DirectoryIfMissing -Path $targetMods
-Get-ChildItem -LiteralPath $sourceMods -Directory | ForEach-Object {
-	$destination = Join-Path $targetMods $_.Name
-	Copy-DirectoryContents -Source $_.FullName -Target $destination
-}
-
-$sourceEnabled = Join-Path $sourceMods 'enabled.json'
-$targetEnabled = Join-Path $targetMods 'enabled.json'
-if (-not (Test-Path -LiteralPath $targetEnabled)) {
-	Copy-Item -LiteralPath $sourceEnabled -Destination $targetEnabled -Force
+if ($SkipMods) {
+	Write-Host 'Keeping existing mods folder unchanged.'
 } else {
-	Write-Host 'Keeping existing mods\enabled.json.'
+	if (-not (Test-Path -LiteralPath $sourceMods)) {
+		throw "Installer source mods folder missing: $sourceMods"
+	}
+	if ($ReplaceMods -and (Test-Path -LiteralPath $targetMods)) {
+		$resolvedTargetMods = (Resolve-Path -LiteralPath $targetMods).Path.TrimEnd('\')
+		$resolvedTargetGame = (Resolve-Path -LiteralPath $targetGame).Path.TrimEnd('\')
+		$targetGamePrefix = $resolvedTargetGame + '\'
+		if (-not $resolvedTargetMods.StartsWith($targetGamePrefix, [System.StringComparison]::OrdinalIgnoreCase)) {
+			throw "Refusing to replace mods folder outside game root: $resolvedTargetMods"
+		}
+		Remove-Item -LiteralPath $targetMods -Recurse -Force
+		Write-Host 'Replaced existing mods folder.'
+	}
+	New-DirectoryIfMissing -Path $targetMods
+	Get-ChildItem -LiteralPath $sourceMods -Directory | ForEach-Object {
+		$destination = Join-Path $targetMods $_.Name
+		Copy-DirectoryContents -Source $_.FullName -Target $destination
+	}
+
+	$sourceEnabled = Join-Path $sourceMods 'enabled.json'
+	$targetEnabled = Join-Path $targetMods 'enabled.json'
+	if (-not (Test-Path -LiteralPath $targetEnabled)) {
+		Copy-Item -LiteralPath $sourceEnabled -Destination $targetEnabled -Force
+	} elseif ($ReplaceMods) {
+		Copy-Item -LiteralPath $sourceEnabled -Destination $targetEnabled -Force
+	} else {
+		Write-Host 'Keeping existing mods\enabled.json.'
+	}
 }
 
 $verify = Join-Path $targetGame 'modloader\tools\verify.ps1'
