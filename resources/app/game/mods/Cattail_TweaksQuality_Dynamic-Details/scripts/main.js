@@ -768,11 +768,36 @@ ModLoader.register({
 		function collectCoordinateDirectionTargets(game) {
 			const targets = []
 			for (const id of coordinateDirectionTargetIds) {
+				if (!shouldIncludeCoordinateDirectionTarget(game, id)) continue
 				const entity = findCoordinateDirectionEntity(game, id)
 				if (entity) targets.push({ id, entity, position: entity.position })
 			}
 			targets.push({ id: 'origin', position: [0, 0] })
 			return targets
+		}
+
+		function shouldIncludeCoordinateDirectionTarget(game, id) {
+			return id !== 'cookie' || isCookieDirectionUnlocked(game)
+		}
+
+		function isCookieDirectionUnlocked(game) {
+			return !!(
+				hasCookieDirectionPassword() ||
+				game?.cookie ||
+				isAchievementUnlocked(game, 'COOKIECLICKER')
+			)
+		}
+
+		function hasCookieDirectionPassword() {
+			return String(api.config.get('cookieDirectionPassword', '') || '').trim().toLowerCase() === 'cookie'
+		}
+
+		function isAchievementUnlocked(game, steamid) {
+			const achievements = game?.codex?.achievements
+			const fired = game?.achiever?.fired
+			if (!Array.isArray(achievements) || !Array.isArray(fired)) return false
+			const index = achievements.findIndex((achievement) => achievement?.steamid === steamid)
+			return index >= 0 && !!fired[index]
 		}
 
 		function findCoordinateDirectionEntity(game, id) {

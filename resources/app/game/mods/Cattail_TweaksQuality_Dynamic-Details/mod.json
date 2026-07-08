@@ -7,5 +7,13 @@
   "locale": [
     "locale/dynamic-details.json"
   ],
+  "config": {
+    "cookieDirectionPassword": {
+      "type": "string",
+      "label": "Cookie direction password",
+      "default": "",
+      "description": "Enter cookie to show the cookie direction indicator before Cookie Clicker is achieved."
+    }
+  },
   "description": "Adds Alt+Shift dynamic building detail panels and shop build-availability countdowns without modifying vanilla scripts."
 }
