@@ -114,6 +114,8 @@ ModLoader.register({
 			state.active = true
 			state.hoveredResource = null
 			state.lastHoveredResource = null
+			state.resourceInfoLocked = false
+			state.lockedResource = null
 			state.lastSignature = ''
 			game.removeHint?.()
 
@@ -137,6 +139,8 @@ ModLoader.register({
 			state.active = false
 			state.hoveredResource = null
 			state.lastHoveredResource = null
+			state.resourceInfoLocked = false
+			state.lockedResource = null
 			state.lastSignature = ''
 			if (game) game.hoveredResource = false
 			clearWatcherModifiers(game)
@@ -169,6 +173,10 @@ ModLoader.register({
 			const ids = getVisibleResourceIds(game)
 			if (Number.isInteger(state.hoveredResource) && ids.indexOf(state.hoveredResource) === -1) state.hoveredResource = null
 			if (Number.isInteger(state.lastHoveredResource) && ids.indexOf(state.lastHoveredResource) === -1) state.lastHoveredResource = null
+			if (Number.isInteger(state.lockedResource) && ids.indexOf(state.lockedResource) === -1) {
+				state.resourceInfoLocked = false
+				state.lockedResource = null
+			}
 			const activeResource = getPopupResourceId(game, ids)
 			const activeInfo = Number.isInteger(activeResource) ? buildResourceInfo(game, activeResource) : null
 			const hasInfo = !!activeInfo
@@ -186,7 +194,8 @@ ModLoader.register({
 			const scale = normalizePopupScale(state.popupScale)
 			const payload = {
 				rows,
-				hoveredResource: activeResource,
+				activeResource,
+				hoveredResource: state.hoveredResource,
 				hasInfo,
 				infoWidth,
 				iconWidth,
@@ -215,14 +224,33 @@ ModLoader.register({
 		}
 
 		function getLockedResourceId(game) {
-			if (state.resourceInfoLocked && Number.isInteger(state.lockedResource)) return state.lockedResource
-			if (!isDynamicDetailsEnabled() || !game?.[dynamicSourceToggleKey]) return null
-			const locked = Number(game[dynamicSourceLastResourceKey])
-			return Number.isInteger(locked) ? locked : null
+			if (!state.resourceInfoLocked) return null
+			if (Number.isInteger(state.lastHoveredResource)) return state.lastHoveredResource
+			return Number.isInteger(state.lockedResource) ? state.lockedResource : null
 		}
 
 		function isDynamicDetailsEnabled() {
 			return !!api.state?.modById?.[dynamicDetailsModId]
+		}
+
+		function rememberWatcherResource(game, resourceId) {
+			if (!Number.isInteger(resourceId)) return null
+			state.lastHoveredResource = resourceId
+			if (state.resourceInfoLocked) state.lockedResource = resourceId
+			if (game) {
+				game._cattailResourceWatcherLastResource = resourceId
+				if (state.resourceInfoLocked && isDynamicDetailsEnabled()) {
+					game[dynamicSourceLastResourceKey] = resourceId
+					localStorage.setItem(dynamicSourceLastResourceStorageKey, String(resourceId))
+				}
+			}
+			return resourceId
+		}
+
+		function getWatcherSelectedResourceId(game) {
+			if (Number.isInteger(state.hoveredResource)) return rememberWatcherResource(game, state.hoveredResource)
+			if (Number.isInteger(state.lastHoveredResource)) return state.lastHoveredResource
+			return Number.isInteger(game?._cattailResourceWatcherLastResource) ? game._cattailResourceWatcherLastResource : null
 		}
 
 		function getVisibleResourceIds(game) {
@@ -464,9 +492,13 @@ ModLoader.register({
 							hover(event) {
 								if (!state.active) return
 								const raw = event.payload
-								const next = raw === null || raw === undefined || raw === '' ? null : Number(raw)
-								state.hoveredResource = Number.isInteger(next) ? next : null
-								if (Number.isInteger(state.hoveredResource)) state.lastHoveredResource = state.hoveredResource
+				const currentRaw = raw && typeof raw === 'object' ? raw.current : raw
+				const lastRaw = raw && typeof raw === 'object' ? raw.last : undefined
+				const next = currentRaw === null || currentRaw === undefined || currentRaw === '' ? null : Number(currentRaw)
+				const last = lastRaw === null || lastRaw === undefined || lastRaw === '' ? null : Number(lastRaw)
+				state.hoveredResource = Number.isInteger(next) ? next : null
+				if (Number.isInteger(state.hoveredResource)) rememberWatcherResource(state.game, state.hoveredResource)
+				else if (Number.isInteger(last)) rememberWatcherResource(state.game, last)
 								if (state.game) state.game.hoveredResource = state.hoveredResource === null ? false : state.hoveredResource
 								updatePopup(state.game, true)
 							},
@@ -491,6 +523,8 @@ ModLoader.register({
 								state.active = false
 								state.hoveredResource = null
 								state.lastHoveredResource = null
+								state.resourceInfoLocked = false
+								state.lockedResource = null
 								state.popupTools = null
 								stopPopupTimer()
 							}
@@ -526,7 +560,8 @@ ModLoader.register({
 				if (!game) return
 				const keyCode = Number(payload.keyCode) || 0
 				const pressed = payload.eventType === 'keydown'
-				const selectedResource = Number.isInteger(state.lastHoveredResource) ? state.lastHoveredResource : Number.isInteger(state.hoveredResource) ? state.hoveredResource : null
+				const previousResource = Number.isInteger(state.lockedResource) ? state.lockedResource : null
+				const selectedResource = getWatcherSelectedResourceId(game)
 				if (keyCode === 18) {
 					game.altActive = pressed
 					document.body.classList.toggle('altHolded', pressed)
@@ -540,10 +575,7 @@ ModLoader.register({
 					Number.isInteger(selectedResource)
 				)
 				if (detailToggle) {
-					const dynamicActive = isDynamicDetailsEnabled() && !!game[dynamicSourceToggleKey]
-					const currentLockedResource = getLockedResourceId(game)
-					const switchingResource = (state.resourceInfoLocked || dynamicActive) && selectedResource !== currentLockedResource
-					const active = switchingResource || !(state.resourceInfoLocked || dynamicActive)
+					const active = !state.resourceInfoLocked || (Number.isInteger(selectedResource) && selectedResource !== previousResource)
 					state.resourceInfoLocked = active
 					state.lockedResource = active ? selectedResource : null
 					if (isDynamicDetailsEnabled()) {
@@ -608,7 +640,7 @@ html[data-side="left"] .infoPanel{left:0;right:auto;align-items:flex-start;text-
 .amount{display:block;min-width:0;overflow:hidden;text-overflow:ellipsis;text-align:left;color:#111;font:600 24px/1.05 Montserrat,Arial,sans-serif;text-rendering:geometricPrecision;text-shadow:0 1px 2px rgba(255,255,255,.92),0 -1px 2px rgba(255,255,255,.82),1px 0 2px rgba(255,255,255,.82),-1px 0 2px rgba(255,255,255,.82);}
 </style></head><body><div id="root"><div id="surface"><button id="move" type="button" tabindex="-1" aria-label="move"><svg viewBox="0 0 18 18" aria-hidden="true"><path d="M9 2v14"></path><path d="M6 5l3-3 3 3"></path><path d="M6 13l3 3 3-3"></path><path d="M2 9h14"></path><path d="M5 6L2 9l3 3"></path><path d="M13 6l3 3-3 3"></path></svg></button><button id="resize" type="button" tabindex="-1" aria-label="resize"><svg viewBox="0 0 18 18" aria-hidden="true"><path d="M7 3H3v4"></path><path d="M3 3l5 5"></path><path d="M11 15h4v-4"></path><path d="M15 15l-5-5"></path></svg></button><button id="back" type="button" tabindex="-1">back</button><div id="list"></div></div></div><script>
 const {ipcRenderer}=require('electron');const root=document.getElementById('root');const surface=document.getElementById('surface');const list=document.getElementById('list');const back=document.getElementById('back');const resize=document.getElementById('resize');const move=document.getElementById('move');let latestState=null;let resizeDrag=null;let moveDrag=null;
-function send(message){try{ipcRenderer.send('modloader:window:message',{type:message&&message.type||'message',payload:message&&('id'in message?message.id:message.payload)})}catch(error){}}
+function send(message){try{ipcRenderer.send('modloader:window:message',{type:message&&message.type||'message',payload:message&&message.payload})}catch(error){}}
 function normalizeScale(value){const number=Number(value);return Math.max(.5,Math.min(3,Number.isFinite(number)&&number>0?number:1))}
 function normalizeSide(value){return value==='left'?'left':'right'}
 function applySide(value){const side=normalizeSide(value);document.documentElement.dataset.side=side;if(latestState)latestState.side=side;return side}
@@ -626,8 +658,13 @@ function startMove(event){event.preventDefault();event.stopPropagation();const p
 function moveWindow(event){if(!moveDrag)return;event.preventDefault();moveDrag.lastBounds=getMoveBounds(event);sendMoveBounds(moveDrag.lastBounds,false)}
 function endMove(event){if(!moveDrag)return;event.preventDefault();const bounds=getMoveBounds(event);sendMoveBounds(bounds,true);moveDrag=null;move.classList.remove('moving');try{move.releasePointerCapture(event.pointerId)}catch(error){}}
 let hoveredIconId=null;
-function setHoveredIcon(value){const next=Number.isInteger(value)?value:null;if(next===hoveredIconId)return;hoveredIconId=next;send({type:'hover',id:next})}
-function updateHoveredIcon(event){const icon=event.target&&event.target.closest?event.target.closest('.icon'):null;const row=icon&&icon.closest('.row');setHoveredIcon(row?Number(row.dataset.id):null)}
+let lastHoveredIconId=null;
+let lastPointer={inside:false,x:0,y:0,screenX:null,screenY:null};
+function getIconIdFromPoint(x,y){const icons=list.querySelectorAll('.row .icon');for(const icon of icons){const rect=icon.getBoundingClientRect();if(x>=rect.left&&x<=rect.right&&y>=rect.top&&y<=rect.bottom){const row=icon.closest('.row');const id=row?Number(row.dataset.id):null;return Number.isInteger(id)?id:null}}return null}
+function getLastPointerClient(){const sx=Number(lastPointer.screenX);const sy=Number(lastPointer.screenY);const wx=Number(window.screenX);const wy=Number(window.screenY);if(Number.isFinite(sx)&&Number.isFinite(sy)&&Number.isFinite(wx)&&Number.isFinite(wy))return {x:sx-wx,y:sy-wy};return {x:lastPointer.x,y:lastPointer.y}}
+function setHoveredIcon(value,force){const next=Number.isInteger(value)?value:null;if(Number.isInteger(next))lastHoveredIconId=next;if(next===hoveredIconId&&!force)return;hoveredIconId=next;send({type:'hover',payload:{current:next,last:lastHoveredIconId}})}
+function updateHoveredIcon(event){lastPointer={inside:true,x:event.clientX,y:event.clientY,screenX:event.screenX,screenY:event.screenY};const point=getLastPointerClient();setHoveredIcon(getIconIdFromPoint(point.x,point.y))}
+function syncHoveredIconFromPoint(){if(!lastPointer.inside||!Number.isInteger(hoveredIconId))return;const point=getLastPointerClient();if(getIconIdFromPoint(point.x,point.y)!==hoveredIconId)setHoveredIcon(null,true)}
 function rowHtml(row,hovered){const active=hovered===row.id&&row.info;const offset=-(Number(row.id)||0)*36;const pop=Math.max(0,Number(row.pop)||0);const scale=Number((1+pop*.35).toFixed(3));return '<div class="row '+(active?'hovered':'')+'" data-id="'+row.id+'" title="'+escapeHtml(row.name)+'"><span class="info">'+(active?safeInfoHtml(row.info):'')+'</span><span class="icon" style="background-position:'+offset+'px 0;transform:scale('+scale+')"></span><span class="amount">'+escapeHtml(row.amount)+'</span></div>'}
 function infoHtml(info){let html='<span class="infoPanel"><span class="rateStack"><span class="ratePill name" style="--line-color:'+normalizeColor(info.color)+'">'+escapeHtml(info.name)+'</span>';if(info.gainText)html+='<span class="ratePill rate" style="--line-color:#6ea56e">'+escapeHtml(info.gainText)+'</span>';if(info.consumeText)html+='<span class="ratePill rate" style="--line-color:#C38C75">'+escapeHtml(info.consumeText)+'</span>';html+='</span>';if(info.graph)html+='<canvas class="graphCanvas"></canvas>';if(info.sourceSummary)html+=sourcePanelHtml(info.sourceSummary);return html+'</span>'}
 function safeInfoHtml(info){try{return infoHtml(info)}catch(error){console.error('[Resource Watcher popup] info render failed',error);return ''}}
@@ -645,8 +682,8 @@ function escapeHtml(value){return String(value==null?'':value).replace(/[&<>"']/
 function escapeAttr(value){return escapeHtml(value)}
 function px(name,value){document.documentElement.style.setProperty(name,(value||0)+'px')}
 function placeInfoPanel(){const panel=list.querySelector('.row.hovered .infoPanel');if(!panel)return;const row=panel.closest('.row');panel.style.transform='none';const scale=getScale();const surfaceRect=surface.getBoundingClientRect();const rowRect=row.getBoundingClientRect();const panelRect=panel.getBoundingClientRect();let top=rowRect.top+rowRect.height/2-panelRect.height/2;top=Math.max(surfaceRect.top+30*scale,Math.min(top,surfaceRect.bottom-panelRect.height-4*scale));panel.style.top=((top-rowRect.top)/scale)+'px';drawGraphs()}
-window.cattailResourceWatcherSetState=function(state){latestState=state||{};try{applyScale(latestState.scale||1);px('--base-width',latestState.baseWidth||latestState.width||206);px('--base-height',latestState.baseHeight||latestState.height||118);px('--popup-top-reserve',latestState.popupTopReserve||86);px('--list-width',latestState.listWidth||206);px('--info-width',latestState.infoWidth||0);px('--icon-width',latestState.iconWidth||42);px('--amount-width',latestState.amountWidth||154);px('--column-gap',latestState.columnGap||10);px('--row-height',latestState.rowHeight||44);px('--row-gap',latestState.rowGap||4);list.innerHTML=(latestState.rows||[]).map(function(row){return rowHtml(row,latestState.hoveredResource)}).join('')||'<div class="row"><span class="info"></span><span class="icon"></span><span class="amount">0</span></div>';requestAnimationFrame(function(){applyWindowShape();placeInfoPanel()})}catch(error){console.error('[Resource Watcher popup] state render failed',error);try{list.innerHTML=(latestState.rows||[]).map(function(row){const offset=-(Number(row.id)||0)*36;return '<div class="row" data-id="'+row.id+'"><span class="info"></span><span class="icon" style="background-position:'+offset+'px 0"></span><span class="amount">'+escapeHtml(row.amount)+'</span></div>'}).join('')}catch(fallbackError){}}};ipcRenderer.on('modloader:window:update',function(event,state){window.cattailResourceWatcherSetState(state)});ipcRenderer.on('modloader:window:geometry',function(event,geometry){if(geometry&&geometry.side){applySide(geometry.side);applyWindowShape()}});
-document.addEventListener('pointermove',updateHoveredIcon,true);root.addEventListener('pointerleave',function(){setHoveredIcon(null)},true);back.addEventListener('click',function(event){event.preventDefault();event.stopPropagation();send({type:'back'})},true);resize.addEventListener('pointerdown',startResize,true);resize.addEventListener('pointermove',moveResize,true);resize.addEventListener('pointerup',endResize,true);resize.addEventListener('pointercancel',endResize,true);move.addEventListener('pointerdown',startMove,true);move.addEventListener('pointermove',moveWindow,true);move.addEventListener('pointerup',endMove,true);move.addEventListener('pointercancel',endMove,true);document.addEventListener('keydown',function(event){if(event.key==='Escape')send({type:'back'})},true);
+window.cattailResourceWatcherSetState=function(state){latestState=state||{};try{applyScale(latestState.scale||1);px('--base-width',latestState.baseWidth||latestState.width||206);px('--base-height',latestState.baseHeight||latestState.height||118);px('--popup-top-reserve',latestState.popupTopReserve||86);px('--list-width',latestState.listWidth||206);px('--info-width',latestState.infoWidth||0);px('--icon-width',latestState.iconWidth||42);px('--amount-width',latestState.amountWidth||154);px('--column-gap',latestState.columnGap||10);px('--row-height',latestState.rowHeight||44);px('--row-gap',latestState.rowGap||4);const activeResource=Number.isInteger(latestState.activeResource)?latestState.activeResource:latestState.hoveredResource;list.innerHTML=(latestState.rows||[]).map(function(row){return rowHtml(row,activeResource)}).join('')||'<div class="row"><span class="info"></span><span class="icon"></span><span class="amount">0</span></div>';requestAnimationFrame(function(){syncHoveredIconFromPoint();applyWindowShape();placeInfoPanel()})}catch(error){console.error('[Resource Watcher popup] state render failed',error);try{list.innerHTML=(latestState.rows||[]).map(function(row){const offset=-(Number(row.id)||0)*36;return '<div class="row" data-id="'+row.id+'"><span class="info"></span><span class="icon" style="background-position:'+offset+'px 0"></span><span class="amount">'+escapeHtml(row.amount)+'</span></div>'}).join('')}catch(fallbackError){}}};ipcRenderer.on('modloader:window:update',function(event,state){window.cattailResourceWatcherSetState(state)});ipcRenderer.on('modloader:window:geometry',function(event,geometry){if(geometry&&geometry.side){applySide(geometry.side);applyWindowShape()}});
+document.addEventListener('pointermove',updateHoveredIcon,true);document.addEventListener('pointerover',updateHoveredIcon,true);root.addEventListener('pointerleave',function(){lastPointer.inside=false;setHoveredIcon(null,true)},true);back.addEventListener('click',function(event){event.preventDefault();event.stopPropagation();send({type:'back'})},true);resize.addEventListener('pointerdown',startResize,true);resize.addEventListener('pointermove',moveResize,true);resize.addEventListener('pointerup',endResize,true);resize.addEventListener('pointercancel',endResize,true);move.addEventListener('pointerdown',startMove,true);move.addEventListener('pointermove',moveWindow,true);move.addEventListener('pointerup',endMove,true);move.addEventListener('pointercancel',endMove,true);document.addEventListener('keydown',function(event){if(event.key==='Escape')send({type:'back'})},true);
 </script></body></html>`
 		}
 		function safeCall(fn, fallback) {
