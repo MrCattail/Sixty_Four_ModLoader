@@ -26,7 +26,9 @@
 		modFileTools: undefined,
 		game: null,
 		languagePatched: false,
-		panelMessage: ''
+		panelMessage: '',
+		uiButtons: {},
+		uiDocks: {}
 	}
 
 	const addIssue = function (level, code, message, details) {
@@ -232,6 +234,121 @@
 		}
 		mods.appendChild(dots)
 		el.appendChild(mods)
+	}
+
+	const UI_DOCK_NAMES = new Set([ 'game-bottom-right', 'game-top-right', 'splash-bottom-right', 'splash-top-right' ])
+
+	const normalizeUiDockName = function (value) {
+		const name = String(value || 'game-bottom-right').toLowerCase()
+		if (name === 'bottom-right') return 'game-bottom-right'
+		if (name === 'top-right') return 'game-top-right'
+		if (name === 'shop-bottom-right') return 'game-bottom-right'
+		return UI_DOCK_NAMES.has(name) ? name : 'game-bottom-right'
+	}
+
+	const ensureUiDockStyle = function () {
+		if (document.getElementById('modloader-ui-dock-style')) return
+		const style = document.createElement('style')
+		style.id = 'modloader-ui-dock-style'
+		style.textContent = `
+			.modloader-ui-dock { position: absolute; z-index: 2; display: inline-flex; align-items: center; gap: calc(var(--unit) * .35); pointer-events: none; }
+			.modloader-ui-dock-empty { display: none; }
+			.modloader-ui-dock > .modloader-ui-dock-button { position: relative !important; left: auto !important; right: auto !important; top: auto !important; bottom: auto !important; flex: 0 0 auto; margin: 0 !important; pointer-events: auto; }
+			.modloader-ui-dock-game-bottom-right { right: calc(var(--unit) * 3.35); bottom: calc(var(--unit) * .5); flex-direction: row-reverse; }
+			.modloader-ui-dock-game-top-right { right: calc(var(--unit) * .5); top: calc(var(--unit) * 3.35); flex-direction: column; }
+			.modloader-ui-dock-splash-bottom-right { right: 72px; bottom: 15px; flex-direction: row-reverse; }
+			.modloader-ui-dock-splash-top-right { right: 72px; top: 15px; flex-direction: row-reverse; }
+			.mobile .modloader-ui-hide-mobile { display: none !important; }
+		`
+		document.head.appendChild(style)
+	}
+
+	const ensureUiDock = function (dockName) {
+		if (!document.body) return null
+		ensureUiDockStyle()
+		let dock = state.uiDocks[dockName]
+		if (dock?.isConnected) return dock
+		dock = document.getElementById(`modloader-ui-dock-${dockName}`)
+		if (!dock) {
+			dock = document.createElement('div')
+			dock.id = `modloader-ui-dock-${dockName}`
+			dock.className = `modloader-ui-dock modloader-ui-dock-${dockName}`
+			dock.setAttribute('aria-hidden', 'false')
+			document.body.appendChild(dock)
+		}
+		state.uiDocks[dockName] = dock
+		return dock
+	}
+
+	const uiButtonKey = function (modId, id) {
+		return `${modId || 'anonymous'}:${id || 'button'}`
+	}
+
+	const syncUiDock = function (dockName) {
+		const dock = ensureUiDock(dockName)
+		if (!dock) return
+		const entries = Object.keys(state.uiButtons).map(function (key) { return state.uiButtons[key] }).filter(function (entry) {
+			return entry.dock === dockName && entry.element
+		}).sort(function (a, b) {
+			return (a.order - b.order) || String(a.id).localeCompare(String(b.id))
+		})
+		for (const entry of entries) {
+			entry.element.classList.add('modloader-ui-dock-button')
+			entry.element.classList.toggle('modloader-ui-hide-mobile', !!entry.hideOnMobile)
+			if (entry.element.parentNode !== dock) dock.appendChild(entry.element)
+		}
+		dock.classList.toggle('modloader-ui-dock-empty', entries.length === 0)
+	}
+
+	const syncUiDocks = function () {
+		const names = new Set(Object.keys(state.uiDocks))
+		for (const key in state.uiButtons) names.add(state.uiButtons[key].dock)
+		for (const name of names) syncUiDock(name)
+	}
+
+	const unregisterUiButton = function (modId, id, element) {
+		const key = uiButtonKey(modId, id)
+		const entry = state.uiButtons[key]
+		if (!entry || (element && entry.element !== element)) return
+		delete state.uiButtons[key]
+		entry.element?.classList.remove('modloader-ui-dock-button', 'modloader-ui-hide-mobile')
+		if (entry.element?.parentNode?.classList?.contains('modloader-ui-dock')) entry.element.remove()
+		syncUiDock(entry.dock)
+	}
+
+	const registerUiButton = function (modId, options) {
+		if (!options || !options.element) {
+			warn(`Ignoring UI button registration from ${modId || 'anonymous'} without an element.`)
+			return function () {}
+		}
+		const id = options.id || options.element.id || 'button'
+		const key = uiButtonKey(modId, id)
+		const dock = normalizeUiDockName(options.dock || options.anchor || options.position)
+		if (state.uiButtons[key]?.element && state.uiButtons[key].element !== options.element) {
+			state.uiButtons[key].element.classList.remove('modloader-ui-dock-button', 'modloader-ui-hide-mobile')
+		}
+		state.uiButtons[key] = {
+			id,
+			key,
+			modId: modId || 'anonymous',
+			element: options.element,
+			dock,
+			order: Number.isFinite(Number(options.order)) ? Number(options.order) : 100,
+			hideOnMobile: options.hideOnMobile !== false
+		}
+		syncUiDock(dock)
+		return function () { unregisterUiButton(modId, id, options.element) }
+	}
+
+	const createUiApi = function (modId) {
+		return {
+			registerCornerButton(options) { return registerUiButton(modId, options) },
+			registerButton(options) { return registerUiButton(modId, options) },
+			unregisterCornerButton(id) { return unregisterUiButton(modId, id) },
+			unregisterButton(id) { return unregisterUiButton(modId, id) },
+			refreshCornerButtons: syncUiDocks,
+			refreshButtons: syncUiDocks
+		}
 	}
 	const element = function (tag, className, text) {
 		const el = document.createElement(tag)
@@ -495,6 +612,29 @@
 		if (policy === 'hot') return t('reloadHot')
 		if (policy === 'restart') return t('reloadRestart')
 		return t('reloadRequired')
+	}
+
+	const getConfigReloadPolicy = function (manifest, item) {
+		if (item?.reloadPolicy) return String(item.reloadPolicy)
+		if (item?.reloadOnChange === true || item?.requiresReload === true) return 'reload'
+		if (manifest?.configReloadPolicy) return String(manifest.configReloadPolicy)
+		if (manifest?.reloadOnConfigChange === true) return 'reload'
+		return 'hot'
+	}
+
+	const configChangeRequiresReload = function (model) {
+		if (!model || sameConfigValue(model.value, model.initial)) return false
+		const policy = getConfigReloadPolicy(model.mod?.manifest || {}, model.item || {})
+		return policy !== 'hot'
+	}
+
+	const hasReloadingConfigChanges = function (models, selected) {
+		for (const model of models) {
+			if (!selected.has(model.mod.path)) continue
+			if (model.invalid) continue
+			if (configChangeRequiresReload(model)) return true
+		}
+		return false
 	}
 
 	const getOrderedSelectedPaths = function (mods, selected) {
@@ -1075,6 +1215,7 @@
 			}
 
 			let configDirty = false
+			let configReloadDirty = false
 			let configInvalid = false
 			for (const row of rowModels) {
 				const mod = row.mod
@@ -1087,7 +1228,10 @@
 					model.container.classList.toggle('modloader-config-field-disabled', disabled)
 					if (disabled) continue
 					if (model.invalid) configInvalid = true
-					if (!sameConfigValue(model.value, model.initial)) configDirty = true
+					if (!sameConfigValue(model.value, model.initial)) {
+						configDirty = true
+						if (configChangeRequiresReload(model)) configReloadDirty = true
+					}
 				}
 				const warnings = []
 				if (mod.loadError) warnings.push(mod.loadError)
@@ -1104,9 +1248,10 @@
 
 			const orderedSelected = getOrderedSelectedPaths(mods, selected)
 			const enabledDirty = !sameStringList(orderedSelected, originalSelected)
-			reloadNote.classList.toggle('active', enabledDirty)
-			configNote.classList.toggle('active', configDirty)
-			save.textContent = enabledDirty ? t('saveReload') : t('saveConfig')
+			const reloadDirty = enabledDirty || configReloadDirty
+			reloadNote.classList.toggle('active', reloadDirty)
+			configNote.classList.toggle('active', configDirty && !configReloadDirty)
+			save.textContent = reloadDirty ? t('saveReload') : t('saveConfig')
 			save.disabled = (!enabledDirty && !configDirty) || configInvalid || (enabledDirty && !getModFileTools())
 			if (!keepMessage) message.textContent = ''
 		}
@@ -1291,10 +1436,11 @@
 		save.onclick = function () {
 			const orderedSelected = getOrderedSelectedPaths(mods, selected)
 			const enabledDirty = !sameStringList(orderedSelected, originalSelected)
+			const configReloadDirty = hasReloadingConfigChanges(configModels, selected)
 			try {
 				const configSaved = writeConfigChanges(configModels, selected)
-				if (enabledDirty) {
-					writeEnabledConfig(orderedSelected)
+				if (enabledDirty) writeEnabledConfig(orderedSelected)
+				if (enabledDirty || configReloadDirty) {
 					message.textContent = t('savedReloading')
 					location.reload()
 				} else {
@@ -1616,9 +1762,162 @@
 		return current
 	}
 
+	const modloaderWindowApiState = {
+		ipcRenderer: undefined,
+		listenerInstalled: false,
+		listeners: {}
+	}
+
+	const getWindowIpcRenderer = function () {
+		if (modloaderWindowApiState.ipcRenderer !== undefined) return modloaderWindowApiState.ipcRenderer
+		try {
+			if (typeof require !== 'function') {
+				modloaderWindowApiState.ipcRenderer = null
+				return null
+			}
+			modloaderWindowApiState.ipcRenderer = require('electron')?.ipcRenderer || null
+		} catch (error) {
+			modloaderWindowApiState.ipcRenderer = null
+		}
+		return modloaderWindowApiState.ipcRenderer
+	}
+
+	const isWindowApiAvailable = function () {
+		const ipcRenderer = getWindowIpcRenderer()
+		if (!ipcRenderer) return false
+		try {
+			return ipcRenderer.sendSync('modloader:window:ping') === 'ok'
+		} catch (error) {
+			return false
+		}
+	}
+
+	const normalizeWindowId = function (modId, id) {
+		const prefix = String(modId || 'anonymous') + ':'
+		let local = String(id || 'window')
+		if (local.indexOf(prefix) === 0) local = local.slice(prefix.length)
+		local = local.replace(/[^a-zA-Z0-9_.:-]/g, '-').replace(/^-+|-+$/g, '') || 'window'
+		return prefix + local
+	}
+
+	const ensureWindowApiListener = function () {
+		const ipcRenderer = getWindowIpcRenderer()
+		if (!ipcRenderer || modloaderWindowApiState.listenerInstalled) return ipcRenderer
+		modloaderWindowApiState.listenerInstalled = true
+		ipcRenderer.on('modloader:window:message', function (event, message) {
+			dispatchWindowEvent(message?.id, message?.type || 'message', message?.payload)
+		})
+		ipcRenderer.on('modloader:window:closed', function (event, message) {
+			dispatchWindowEvent(message?.id, 'closed', null)
+			if (message?.id) delete modloaderWindowApiState.listeners[message.id]
+		})
+		return ipcRenderer
+	}
+
+	const addWindowListener = function (id, type, fn) {
+		if (!id || typeof fn !== 'function') return function () {}
+		const eventType = type || 'message'
+		const byId = modloaderWindowApiState.listeners[id] = modloaderWindowApiState.listeners[id] || {}
+		const list = byId[eventType] = byId[eventType] || []
+		list.push(fn)
+		return function () {
+			const index = list.indexOf(fn)
+			if (index !== -1) list.splice(index, 1)
+		}
+	}
+
+	const dispatchWindowEvent = function (id, type, payload) {
+		if (!id) return
+		const byId = modloaderWindowApiState.listeners[id]
+		if (!byId) return
+		const event = { id, type, payload }
+		const lists = []
+		if (byId[type]) lists.push(byId[type].slice())
+		if (byId['*']) lists.push(byId['*'].slice())
+		for (const list of lists) {
+			for (const fn of list) {
+				try { fn(event) } catch (error) { warn(`Window event ${type} failed for ${id}.`, error) }
+			}
+		}
+	}
+
+	const normalizeWindowOptions = function (options) {
+		return {
+			anchor: options?.anchor,
+			margin: options?.margin,
+			hideParent: !!options?.hideParent,
+			transparent: options?.transparent,
+			frame: options?.frame,
+			resizable: options?.resizable,
+			movable: options?.movable,
+			globalModifierKeys: !!options?.globalModifierKeys,
+			alwaysOnTop: options?.alwaysOnTop,
+			skipTaskbar: options?.skipTaskbar,
+			showInactive: options?.showInactive,
+			visibleOnAllWorkspaces: options?.visibleOnAllWorkspaces,
+			backgroundColor: options?.backgroundColor,
+			minWidth: options?.minWidth,
+			minHeight: options?.minHeight
+		}
+	}
+
+	const createWindowHandle = function (modId, id) {
+		return {
+			id,
+			localId: id.slice((String(modId || 'anonymous') + ':').length),
+			on(type, fn) { return addWindowListener(id, type, fn) },
+			update(payload, size) {
+				const ipcRenderer = getWindowIpcRenderer()
+				if (!ipcRenderer) return false
+				const envelope = { id }
+				if (payload !== undefined) envelope.payload = payload
+				if (size !== undefined) envelope.size = size
+				ipcRenderer.send('modloader:window:update', envelope)
+				return true
+			},
+			close() {
+				const ipcRenderer = getWindowIpcRenderer()
+				if (!ipcRenderer) return false
+				ipcRenderer.send('modloader:window:close', { id })
+				return true
+			}
+		}
+	}
+
+	const createWindowApi = function (modId) {
+		return {
+			isAvailable: isWindowApiAvailable,
+			id(id) { return normalizeWindowId(modId, id) },
+			open(options) {
+				options = options || {}
+				const ipcRenderer = ensureWindowApiListener()
+				if (!ipcRenderer || !isWindowApiAvailable()) {
+					warn(`Window API is unavailable for ${modId}.`)
+					return null
+				}
+				const id = normalizeWindowId(modId, options.id)
+				const handle = createWindowHandle(modId, id)
+				if (typeof options.onMessage === 'function') handle.on('message', options.onMessage)
+				if (typeof options.onClosed === 'function') handle.on('closed', options.onClosed)
+				if (options.on && typeof options.on === 'object') {
+					for (const type in options.on) handle.on(type, options.on[type])
+				}
+				ipcRenderer.send('modloader:window:open', {
+					id,
+					html: String(options.html || '<!doctype html><body></body>'),
+					size: options.size || null,
+					payload: options.payload,
+					options: normalizeWindowOptions(options)
+				})
+				return handle
+			}
+		}
+	}
 	const api = {
 		version: state.version,
 		state,
+		windows: createWindowApi('ModLoader'),
+		ui: createUiApi('ModLoader'),
 
 		async boot() {
 			if (state.booted) return state
@@ -1677,7 +1976,10 @@
 				await api.loadEntries()
 				installLanguageBridge()
 			}
-			if (name === 'afterGameInit') requestAnimationFrame(refreshOpenPanel)
+			if (name === 'afterGameInit') {
+				requestAnimationFrame(refreshOpenPanel)
+				requestAnimationFrame(syncUiDocks)
+			}
 
 			const hooks = state.hooks[name] || []
 			let current = payload
@@ -1715,6 +2017,8 @@
 				registerEntity(id, klass, dataEntry) { api.registerEntity(id, klass, dataEntry, modId) },
 				registerLanguage(id) { api.registerLanguage(id) },
 				patch(target, methodName, wrapper) { return api.patch(target, methodName, wrapper, modId) },
+				windows: createWindowApi(modId),
+				ui: createUiApi(modId),
 				asset(path) { return api.asset(modId, path) },
 				replaceAsset(from, to) { return api.replaceAsset(from, api.asset(modId, to), modId) },
 				registerSound(name, src, options) { return api.registerSound(name, api.asset(modId, src), options, modId) },

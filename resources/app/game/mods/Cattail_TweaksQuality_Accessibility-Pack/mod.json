@@ -68,5 +68,6 @@
       "description": "Used when the saved zoom value is missing or invalid."
     }
   },
-  "description": "Combines view distance limits, ending skip, accessibility buttons, and dynamic explainer language refresh into one multi-entry quality mod."
+  "description": "Combines view distance limits, ending skip, accessibility buttons, and dynamic explainer language refresh into one multi-entry quality mod.",
+  "reloadOnConfigChange": true
 }

@@ -307,7 +307,8 @@ ModLoader.register({
 			toggle.className = 'cattail-shop-compact-toggle'
 			toggle.setAttribute('role', 'button')
 			keepControlUnfocused(toggle)
-			document.body.append(toggle)
+			api.ui?.registerCornerButton({ id: 'shop-categories', element: toggle, anchor: 'game-bottom-right', order: 10, hideOnMobile: true })
+			if (!toggle.isConnected) document.body.append(toggle)
 			shop[toggleKey] = toggle
 			updateToggleLabel(shop)
 			syncToggleVisibility(shop)

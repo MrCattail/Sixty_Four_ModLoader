@@ -33,5 +33,6 @@
       "description": "Use the scrollable language selection page on the splash menu."
     }
   },
-  "description": "Combines shop categories, save slots, and the language menu into one multi-entry interface quality mod."
+  "description": "Combines shop categories, save slots, and the language menu into one multi-entry interface quality mod.",
+  "reloadOnConfigChange": true
 }

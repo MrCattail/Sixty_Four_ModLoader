@@ -36,6 +36,7 @@ ModLoader.register({
 		const resourceSourceLineResourceStorageKey = 'cattailDynamicResourceSourceLineResource'
 		const resourceSourceGpuLineModeStorageKey = 'cattailDynamicResourceSourceGpuLineMode'
 		const resourceSourceWindowMs = 30000
+		const pumpSurgeDisplayMs = 2000
 		const resourceSourceMinAmount = 0.0001
 		const resourceSourceSummaryCacheMs = 350
 		const resourceSourceEventBucketMs = 250
@@ -956,7 +957,7 @@ ModLoader.register({
 		}
 
 		function pumpCoversCell(pump, position) {
-			const offsets = (pump.name === 'pump2' && pump.soe) ? pump.soe : (pump.soi || [])
+			const offsets = getPumpRangeOffsets(pump)
 			for (const offset of offsets) {
 				if (pump.position[0] + offset[0] === position[0] && pump.position[1] + offset[1] === position[1]) return true
 			}
@@ -1031,9 +1032,13 @@ ModLoader.register({
 			const game = entity.master
 			const flow = getPumpFlow(entity)
 			const distribution = getPumpDistribution(entity)
-			const resources = distribution.map((value) => value * flow.actualResourcesPerSecond)
+			const theoreticalResources = distribution.map((value) => value * flow.theoreticalResourcesPerSecond)
+			const miningResources = distribution.map((value) => value * flow.miningResourcesPerSecond)
+			const incomeResources = getRecentEntityResourceSourceRate(entity, 'gain')
 			const rows = [
-				resourceRow(text(game, 'production'), resources, '/s'),
+				resourceRow(text(game, 'theoreticalProduction'), theoreticalResources, '/s'),
+				resourceRow(text(game, 'miningProduction'), miningResources, '/s'),
+				resourceRow(text(game, 'incomeProduction'), incomeResources, '/s'),
 				textRow(text(game, 'depthSpeed'), formatNumber(game, flow.depthMetersPerSecond) + ' m/s'),
 				textRow(text(game, 'coolerBonus'), '+' + formatPercent(flow.coolerBonus) + ' (' + formatNumber(game, flow.coolerUnitsPerSecond) + '/s)'),
 				textRow(text(game, 'auxBonus'), '+' + formatPercent(flow.auxBonus) + ' (' + formatNumber(game, flow.auxUnitsPerSecond) + '/s)'),
@@ -1047,6 +1052,7 @@ ModLoader.register({
 				round(entity.spoolup),
 				round(entity.surgeBoost),
 				flow.signature,
+				resourceSignature(incomeResources),
 				nearbySignature(entity)
 			].join('|'))
 		}
@@ -1371,22 +1377,56 @@ ModLoader.register({
 			const basePumpSpeed = entity.basePumpSpeed || 0
 			const pumpSpeed = entity.pumpSpeed || basePumpSpeed
 			const coolerBonus = pumpSpeed && basePumpSpeed ? (pumpSpeed / basePumpSpeed) - 1 : (entity.doublechannel || 0)
-			const auxBonus = getActiveAuxBonus(entity)
-			const surgeBonus = entity.surgeBoost || 0
-			const rawUnitsPerMs = (entity.active ? pumpSpeed : 0) + (auxBonus + surgeBonus) * pumpSpeed
-			const actualUnitsPerMs = (entity.spoolup || 0) >= 1 ? rawUnitsPerMs : 0
-			const actualResourcesPerSecond = actualUnitsPerMs * 1000
-			const depthMetersPerSecond = entity.digSpeed ? entity.digSpeed * actualUnitsPerMs * 1000 * 10 / (1 + (entity.depth || 0) ** 0.7) : 0
+			const auxBonus = entity.active ? 0 : getActiveAuxBonus(entity)
+			const realSurgeBonus = entity.surgeBoost || 0
+			const displaySurgeBonus = getPumpDisplaySurgeBonus(entity)
+			const stableUnitsPerMs = (entity.active ? pumpSpeed : 0) + auxBonus * pumpSpeed
+			const displayUnitsPerMs = stableUnitsPerMs + displaySurgeBonus * pumpSpeed
+			const spooledUnitsPerMs = (entity.spoolup || 0) >= 1 ? displayUnitsPerMs : 0
+			const workState = getPumpWorkState(entity)
+			const miningUnitsPerMs = workState.canWork ? spooledUnitsPerMs : 0
+			const theoreticalResourcesPerSecond = stableUnitsPerMs * 1000
+			const spooledResourcesPerSecond = spooledUnitsPerMs * 1000
+			const miningResourcesPerSecond = miningUnitsPerMs * 1000
+			const depthMetersPerSecond = entity.digSpeed ? entity.digSpeed * miningUnitsPerMs * 1000 * 10 / (1 + (entity.depth || 0) ** 0.7) : 0
 			return {
 				coolerBonus,
 				auxBonus,
-				surgeBonus,
-				actualResourcesPerSecond,
+				surgeBonus: displaySurgeBonus,
+				realSurgeBonus,
+				theoreticalResourcesPerSecond,
+				spooledResourcesPerSecond,
+				miningResourcesPerSecond,
+				actualResourcesPerSecond: miningResourcesPerSecond,
 				depthMetersPerSecond,
 				coolerUnitsPerSecond: basePumpSpeed * coolerBonus * 1000,
 				auxUnitsPerSecond: pumpSpeed * auxBonus * 1000,
-				signature: [round(rawUnitsPerMs), round(actualUnitsPerMs), round(coolerBonus), round(auxBonus), round(surgeBonus)].join(':')
+				workState,
+				signature: [
+					round(stableUnitsPerMs),
+					round(displayUnitsPerMs),
+					round(spooledUnitsPerMs),
+					round(miningUnitsPerMs),
+					round(coolerBonus),
+					round(auxBonus),
+					round(realSurgeBonus),
+					round(displaySurgeBonus),
+					workState.signature
+				].join(':')
 			}
+		}
+
+		function getPumpDisplaySurgeBonus(entity) {
+			const timer = Number(entity?.surgeTimer) || 0
+			const maxTime = Number(entity?.surgeMaxTime) || 0
+			if (timer <= 0 || maxTime <= 0) return 0
+
+			// UI-only shortening: vanilla surge still lasts its full duration in game logic.
+			const displayDuration = Math.max(1, Math.min(maxTime, pumpSurgeDisplayMs))
+			const elapsed = Math.max(0, maxTime - timer)
+			if (elapsed >= displayDuration) return 0
+			const remaining = (displayDuration - elapsed) / displayDuration
+			return remaining * remaining * 8
 		}
 
 		function getActiveAuxBonus(entity) {
@@ -1398,6 +1438,50 @@ ModLoader.register({
 				else if (aux.name === 'auxpump') bonus = Math.max(bonus, 0.25)
 			}
 			return bonus
+		}
+
+		function getPumpWorkState(entity) {
+			const state = {
+				canWork: false,
+				hasGrowingCube: false,
+				hasEmptySpot: false,
+				growingCubes: 0,
+				emptySpots: 0,
+				signature: '0:0'
+			}
+			const game = entity?.master
+			if (!game || !Array.isArray(entity?.position)) return state
+
+			for (const offset of getPumpRangeOffsets(entity)) {
+				if (!Array.isArray(offset)) continue
+				const position = [entity.position[0] + offset[0], entity.position[1] + offset[1]]
+				const cell = game.entityAtCoordinates?.(position)
+				if (cell?.name === 'cube' && cell.state === 0 && cell.pump === entity) {
+					state.hasGrowingCube = true
+					state.growingCubes++
+				} else if (!cell && !isPumpSpotHeldByCursor(game, position)) {
+					state.hasEmptySpot = true
+					state.emptySpots++
+				}
+			}
+
+			state.canWork = !!(state.hasGrowingCube || state.hasEmptySpot)
+			state.signature = state.growingCubes + ':' + state.emptySpots
+			return state
+		}
+
+		function getPumpRangeOffsets(entity) {
+			if (entity?.name === 'pump2' && Array.isArray(entity.soe)) return entity.soe
+			return Array.isArray(entity?.soi) ? entity.soi : []
+		}
+
+		function isPumpSpotHeldByCursor(game, position) {
+			return !!(
+				game?.itemInHand &&
+				Array.isArray(game.hoveredCell) &&
+				game.hoveredCell[0] === position[0] &&
+				game.hoveredCell[1] === position[1]
+			)
 		}
 
 		function getPumpDistribution(entity) {
@@ -3362,6 +3446,32 @@ ModLoader.register({
 			return clampNumber(y, 2, Math.max(2, game.h - height - 2))
 		}
 
+		function getResourceSourceSeconds(state, now = performance.now()) {
+			return Math.max(1, Math.min(resourceSourceWindowMs, now - (state?.startedAt || now)) / 1000)
+		}
+
+		function getRecentEntityResourceSourceRate(entity, type = 'gain') {
+			const game = entity?.master
+			const resources = new Array(resourceCountSize(game)).fill(0)
+			if (!game || !entity?.name) return resources
+
+			const state = getResourceSourceState(game)
+			const now = performance.now()
+			trimResourceSourceEvents(state, now)
+			const seconds = getResourceSourceSeconds(state, now)
+			const source = normalizeResourceSource(game, { kind: 'entity', entity })
+			if (!source?.instanceKey) return resources
+
+			for (const event of state.events) {
+				if (!event || event.type !== type || event.source?.instanceKey !== source.instanceKey) continue
+				const resourceId = Number(event.resourceId)
+				if (!Number.isInteger(resourceId) || resourceId < 0 || resourceId >= resources.length) continue
+				resources[resourceId] += Number(event.amount) || 0
+			}
+
+			return resources.map((amount) => amount / seconds)
+		}
+
 		function getResourceSourceSummary(game, resourceId) {
 			const now = performance.now()
 			const state = getResourceSourceState(game)
@@ -3370,16 +3480,16 @@ ModLoader.register({
 			const cached = state.summaryCache?.[cacheKey]
 			if (cached && now - cached.time < resourceSourceSummaryCacheMs) return cached.summary
 
-			const seconds = Math.max(1, Math.min(resourceSourceWindowMs, now - state.startedAt) / 1000)
+			const seconds = getResourceSourceSeconds(state, now)
 			const summary = {
 				gain: profileResourceSource(
 					'resource.summary.aggregate.gain',
-					() => aggregateResourceSourceEvents(state.events, resourceId, 'gain', seconds),
+					() => aggregateResourceSourceEvents(game, state.events, resourceId, 'gain', seconds),
 					() => getResourceSourceProfileDetail(game, resourceId, { seconds: Math.round(seconds * 100) / 100 })
 				),
 				consume: profileResourceSource(
 					'resource.summary.aggregate.consume',
-					() => aggregateResourceSourceEvents(state.events, resourceId, 'consume', seconds),
+					() => aggregateResourceSourceEvents(game, state.events, resourceId, 'consume', seconds),
 					() => getResourceSourceProfileDetail(game, resourceId, { seconds: Math.round(seconds * 100) / 100 })
 				)
 			}
@@ -3387,7 +3497,7 @@ ModLoader.register({
 			return summary
 		}
 
-		function aggregateResourceSourceEvents(events, resourceId, type, seconds) {
+		function aggregateResourceSourceEvents(game, events, resourceId, type, seconds) {
 			const groups = new Map()
 			for (const event of events) {
 				if (!event || event.resourceId !== resourceId || event.type !== type) continue
@@ -3404,10 +3514,41 @@ ModLoader.register({
 
 			return Array.from(groups.values()).map((group) => {
 				group.sources = Array.from(group.sources.values())
-				group.count = group.source.kind === 'resource' ? 1 : Math.max(1, group.sources.length)
+				group.count = getResourceSourceGroupWorkingCount(game, group)
 				group.rate = group.amount / seconds
 				return group
 			}).filter((group) => group.rate >= resourceSourceMinAmount).sort((a, b) => b.rate - a.rate)
+		}
+
+		function getResourceSourceGroupWorkingCount(game, group) {
+			const source = group?.source
+			if (source?.kind === 'resource') return 1
+			if (source?.kind === 'entity' && source.name) return countWorkingEntitiesByName(game, source.name)
+			return Math.max(1, group?.sources?.length || 0)
+		}
+
+		function countWorkingEntitiesByName(game, name) {
+			let count = 0
+			for (const entity of game?.stuff || []) {
+				if (entity?.name === name && isResourceSourceEntityWorking(entity)) count++
+			}
+			return count
+		}
+
+		function isResourceSourceEntityWorking(entity) {
+			if (!entity?.name) return false
+			if (entity.name === 'pump' || entity.name === 'pump2') return getPumpFlow(entity).miningResourcesPerSecond >= resourceSourceMinAmount
+			if (entity.name === 'gradient') {
+				const flow = getGradientFlow(entity)
+				return flow.periodicPowerPerSecond >= resourceSourceMinAmount || flow.triggerPower >= resourceSourceMinAmount
+			}
+			if (entity.name === 'consumer') return entity.state === 2 || (entity.resourceCount || 0) > 0
+			if (entity.name === 'annihilator') return entity.state === 2 && (entity.fill || 0) > 0
+			if (isConverter(entity)) return entity.state === 2 && entity.alone !== false
+			if (entity.state === 2) return true
+			if ('active' in entity) return !!entity.active
+			if (!('state' in entity)) return true
+			return false
 		}
 
 		function formatResourceSourceRate(game, row) {

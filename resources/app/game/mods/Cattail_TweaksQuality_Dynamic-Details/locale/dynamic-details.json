@@ -57,7 +57,10 @@
       "surgeResource": "Surge resource",
       "surgeEffect": "Surge effect",
       "energyRemaining": "Energy left",
-      "transporting": "Transport"
+      "transporting": "Transport",
+      "theoreticalProduction": "Theoretical fill",
+      "miningProduction": "Actual mining",
+      "incomeProduction": "Received"
     },
     "cattailBuildCountdown": {
       "buildableIn": "Buildable"
@@ -121,7 +124,10 @@
       "surgeResource": "浪涌资源",
       "surgeEffect": "浪涌效果",
       "energyRemaining": "能量剩余",
-      "transporting": "运输"
+      "transporting": "运输",
+      "theoreticalProduction": "理论填充",
+      "miningProduction": "实际挖掘",
+      "incomeProduction": "实际到账"
     },
     "cattailBuildCountdown": {
       "buildableIn": "可建造"
@@ -185,7 +191,10 @@
       "surgeResource": "浪涌资源",
       "surgeEffect": "浪涌效果",
       "energyRemaining": "能量剩余",
-      "transporting": "运输"
+      "transporting": "运输",
+      "theoreticalProduction": "理论填充",
+      "miningProduction": "实际挖掘",
+      "incomeProduction": "实际到账"
     },
     "cattailBuildCountdown": {
       "buildableIn": "可建造"
@@ -249,7 +258,10 @@
       "surgeResource": "浪湧資源",
       "surgeEffect": "浪湧效果",
       "energyRemaining": "能量剩餘",
-      "transporting": "運輸"
+      "transporting": "運輸",
+      "theoreticalProduction": "理論填充",
+      "miningProduction": "實際挖掘",
+      "incomeProduction": "實際到帳"
     },
     "cattailBuildCountdown": {
       "buildableIn": "可建造"
