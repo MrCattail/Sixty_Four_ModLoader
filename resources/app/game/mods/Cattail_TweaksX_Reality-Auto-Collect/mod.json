@@ -1,7 +1,12 @@
 {
   "id": "Cattail_TweaksX_Reality-Auto-Collect",
+  "uniqueId": "Cattail_TweaksX_Reality-Auto-Collect",
   "name": "Auto Reality Collect",
   "version": "0.1.0",
+  "previousVersion": {
+    "name": "Auto Reality Collect",
+    "version": "0.1.0"
+  },
   "loaderVersion": ">=0.1.0",
   "entry": "scripts/main.js",
   "description": "Automatically collects ready reality/soul power while in the dark plane."

@@ -1,7 +1,12 @@
 {
   "id": "Cattail_TweaksX_Super-Silo",
+  "uniqueId": "Cattail_TweaksX_Super-Silo",
   "name": "Long Silo Fill",
   "version": "0.1.0",
+  "previousVersion": {
+    "name": "Long Silo Fill",
+    "version": "0.1.0"
+  },
   "loaderVersion": ">=0.1.0",
   "entry": "scripts/main.js",
   "config": {

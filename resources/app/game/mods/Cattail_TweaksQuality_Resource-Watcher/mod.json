@@ -1,7 +1,12 @@
 {
   "id": "Cattail_TweaksQuality_Resource-Watcher",
+  "uniqueId": "Cattail_TweaksQuality_Resource-Watcher",
   "name": "Resource Watcher",
   "version": "0.1.0",
+  "previousVersion": {
+    "name": "Resource Watcher",
+    "version": "0.1.0"
+  },
   "loaderVersion": ">=0.1.0",
   "entry": "scripts/main.js",
   "description": "Adds a bottom-right resource watcher button that shrinks the game into an always-on-top resource monitor without changing vanilla scripts. Integrates with Dynamic Details resource-source data when that mod is enabled."

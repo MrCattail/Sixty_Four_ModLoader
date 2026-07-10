@@ -1,7 +1,12 @@
 {
   "id": "Cattail_TweaksQuality_Dynamic-Background-Sprite-Cleanup",
+  "uniqueId": "Cattail_TweaksQuality_Dynamic-Background-Sprite-Cleanup",
   "name": "Dynamic Background Sprite Cleanup",
   "version": "0.1.2",
+  "previousVersion": {
+    "name": "Dynamic Background Sprite Cleanup",
+    "version": "0.1.2"
+  },
   "loaderVersion": ">=0.1.0",
   "entry": "scripts/main.js",
   "dependencies": [
