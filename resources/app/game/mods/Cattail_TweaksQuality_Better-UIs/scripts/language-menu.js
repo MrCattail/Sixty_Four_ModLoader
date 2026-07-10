@@ -1,5 +1,5 @@
 ModLoader.register({
-	id: 'Cattail_TweaksQuality_Interface-Pack',
+	id: 'Cattail_TweaksQuality_Better-UIs',
 	init(api) {
 		if (api.config.get('enableLanguageMenu', true) === false) return
 

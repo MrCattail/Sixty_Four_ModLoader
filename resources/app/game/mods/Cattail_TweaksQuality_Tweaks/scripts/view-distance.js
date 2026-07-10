@@ -1,4 +1,4 @@
-const MOD_ID = 'Cattail_TweaksQuality_Accessibility-Pack'
+const MOD_ID = 'Cattail_TweaksQuality_Tweaks'
 const LEGACY_VIEW_DISTANCE_MOD_ID = 'Cattail_TweaksQuality_View-Distance'
 const DEFAULT_FARTHEST_ZOOM = 0.12
 const DEFAULT_CLOSEST_ZOOM = 4

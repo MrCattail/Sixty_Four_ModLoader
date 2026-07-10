@@ -1,5 +1,5 @@
 ModLoader.register({
-	id: 'Cattail_TweaksQuality_Accessibility-Pack',
+	id: 'Cattail_TweaksQuality_Tweaks',
 	init(api) {
 		if (api.config.get('enableExplainerLanguageFix', true) === false) return
 

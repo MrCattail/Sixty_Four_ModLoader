@@ -1,7 +1,7 @@
 {
-  "id": "Cattail_TweaksQuality_Accessibility-Pack",
-  "uniqueId": "Cattail_TweaksQuality_Accessibility-Pack",
-  "name": "Accessibility Pack",
+  "id": "Cattail_TweaksQuality_Tweaks",
+  "uniqueId": "Cattail_TweaksQuality_Tweaks",
+  "name": "Tweaks",
   "version": "0.1.0",
   "previousVersion": {
     "name": "Accessibility Pack",

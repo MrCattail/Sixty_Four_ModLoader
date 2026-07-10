@@ -1,5 +1,5 @@
 ModLoader.register({
-	id: 'Cattail_TweaksQuality_Dynamic-Background-Sprite-Cleanup',
+	id: 'Cattail_TweaksQuality_Custom-Background-Color',
 	init(api) {
 		const sourceKey = '__cattailSpriteCleanupSource'
 		const floorOverrideSharedStateKey = '__cattailAccessibilityFloorOverrideEnabled'
