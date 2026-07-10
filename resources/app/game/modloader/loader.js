@@ -31,6 +31,7 @@
 		panelHidden: false,
 		panelHiddenSide: 'right',
 		panelTabPosition: null,
+		panelTabPositions: { left: null, right: null, top: null, bottom: null },
 		panelSettings: { theme: 'dark', hideMode: 'auto' },
 		panelSettingsOpen: false,
 		panelStateLoaded: false,
@@ -415,19 +416,19 @@
 			#modloader-panel .modloader-panel-close:after { transform: translate(-50%, -50%) rotate(-45deg); }
 			#modloader-panel .modloader-panel-edge { font: 700 15px/1 Montserrat, Arial, sans-serif; letter-spacing: -1px; }
 			#modloader-panel .modloader-panel-edge-icon { display: block; transform: translateY(-1px); }
-			#modloader-panel .modloader-panel-settings:before { content: '\\2699'; display: block; font-size: 16px; line-height: 1; transform: translateY(-1px); }
+			#modloader-panel .modloader-panel-settings:before { content: '\\2699'; display: block; font-size: 16px; line-height: 1; transform: translateY(1px); }
 			#modloader-panel .modloader-panel-settings.active, #modloader-panel .modloader-panel-edge:hover:not(:disabled), #modloader-panel .modloader-panel-settings:hover, #modloader-panel .modloader-panel-close:hover { color: #fff; background: rgba(255,255,255,.08); }
 			#modloader-panel .modloader-panel-edge:disabled { cursor: default; opacity: .34; }
 			#modloader-panel.modloader-panel-dragging { transition: none; }
-			#modloader-panel.modloader-panel-autohidden { overflow: visible; background: transparent; box-shadow: none; pointer-events: none; }
-			#modloader-panel.modloader-panel-autohidden > :not(.modloader-panel-tab) { opacity: 0; pointer-events: none; }
-			#modloader-panel .modloader-panel-tab { position: absolute; display: none; place-items: center; width: 42px; height: 42px; border: 1px solid rgba(255,255,255,.14); border-radius: 8px; padding: 0; background: rgba(8,10,12,.9); color: inherit; box-shadow: 0 8px 22px rgba(0,0,0,.32); cursor: grab; pointer-events: auto; touch-action: none; }
+			#modloader-panel.modloader-panel-autohidden { width: 42px; height: 42px; max-height: 42px; overflow: visible; padding: 0; background: transparent; box-shadow: none; pointer-events: none; }
+			#modloader-panel.modloader-panel-autohidden > :not(.modloader-panel-tab) { display: none; }
+			#modloader-panel .modloader-panel-tab { position: absolute; inset: 0; display: none; place-items: center; width: 42px; height: 42px; border: 1px solid rgba(255,255,255,.14); border-radius: 8px; padding: 0; background: rgba(8,10,12,.9); color: inherit; box-shadow: 0 8px 22px rgba(0,0,0,.32); cursor: grab; pointer-events: auto; touch-action: none; }
 			#modloader-panel .modloader-panel-tab:active { cursor: grabbing; }
 			#modloader-panel.modloader-panel-autohidden .modloader-panel-tab { display: grid; }
-			#modloader-panel.modloader-panel-hidden-left .modloader-panel-tab { right: 0; top: 0; border-radius: 0 8px 8px 0; }
-			#modloader-panel.modloader-panel-hidden-right .modloader-panel-tab { left: 0; top: 0; border-radius: 8px 0 0 8px; }
-			#modloader-panel.modloader-panel-hidden-top .modloader-panel-tab { left: 0; bottom: 0; border-radius: 0 0 8px 8px; }
-			#modloader-panel.modloader-panel-hidden-bottom .modloader-panel-tab { left: 0; top: 0; border-radius: 8px 8px 0 0; }
+			#modloader-panel.modloader-panel-hidden-left .modloader-panel-tab { border-radius: 0 8px 8px 0; }
+			#modloader-panel.modloader-panel-hidden-right .modloader-panel-tab { border-radius: 8px 0 0 8px; }
+			#modloader-panel.modloader-panel-hidden-top .modloader-panel-tab { border-radius: 0 0 8px 8px; }
+			#modloader-panel.modloader-panel-hidden-bottom .modloader-panel-tab { border-radius: 8px 8px 0 0; }
 			#modloader-panel .modloader-panel-tab-logo { width: 24px; height: 24px; border-radius: 5px; background: url('img/logo/sheet.png'); background-size: 400% 200%; box-shadow: inset 0 0 0 1px rgba(255,255,255,.14), 0 2px 8px rgba(0,0,0,.22); }
 			#modloader-panel .modloader-panel-settings-page { display: none; gap: 9px; margin: 0 0 12px; padding: 10px 0 11px; border-top: 1px solid rgba(255,255,255,.09); border-bottom: 1px solid rgba(255,255,255,.09); }
 			#modloader-panel .modloader-panel-settings-page.active { display: grid; }
@@ -1355,6 +1356,7 @@
 
 	const PANEL_EDGE_MARGIN = 16
 	const PANEL_TAB_SIZE = 42
+	const PANEL_EDGES = [ 'left', 'right', 'top', 'bottom' ]
 	const PANEL_STATE_STORAGE_KEY = 'modloader:panelState'
 
 	const clampNumber = function (value, min, max) {
@@ -1373,6 +1375,28 @@
 		return value === 'left' || value === 'right' || value === 'top' || value === 'bottom'
 	}
 
+	const normalizePanelTabPosition = function (value) {
+		if (!isObject(value) || !isValidPanelEdge(value.edge)) return null
+		return {
+			edge: value.edge,
+			offset: clampPanelTabOffset(value.edge, Number(value.offset) || 0)
+		}
+	}
+
+	const createPanelTabPositionMap = function () {
+		return { left: null, right: null, top: null, bottom: null }
+	}
+
+	const readPanelTabPositionMap = function (source) {
+		const result = createPanelTabPositionMap()
+		if (!isObject(source)) return result
+		for (const edge of PANEL_EDGES) {
+			const tab = normalizePanelTabPosition(source[edge])
+			if (tab) result[edge] = { edge, offset: clampPanelTabOffset(edge, tab.offset) }
+		}
+		return result
+	}
+
 	const loadPanelState = function () {
 		if (state.panelStateLoaded) return
 		state.panelStateLoaded = true
@@ -1382,9 +1406,12 @@
 				x: Number(stored.position.x) || PANEL_EDGE_MARGIN,
 				y: Number(stored.position.y) || PANEL_EDGE_MARGIN
 			}
-			if (isObject(stored.tabPosition) && isValidPanelEdge(stored.tabPosition.edge)) state.panelTabPosition = {
-				edge: stored.tabPosition.edge,
-				offset: Number(stored.tabPosition.offset) || 0
+			const hasStoredTabPositions = isObject(stored.tabPositions)
+			state.panelTabPositions = readPanelTabPositionMap(stored.tabPositions)
+			const activeTab = normalizePanelTabPosition(stored.tabPosition)
+			if (activeTab) {
+				state.panelTabPosition = activeTab
+				if (!hasStoredTabPositions) state.panelTabPositions[activeTab.edge] = activeTab
 			}
 			if (isObject(stored.settings)) {
 				if (isValidPanelTheme(stored.settings.theme)) state.panelSettings.theme = stored.settings.theme
@@ -1399,6 +1426,7 @@
 			localStorage.setItem(PANEL_STATE_STORAGE_KEY, JSON.stringify({
 				position: state.panelPosition,
 				tabPosition: state.panelTabPosition,
+				tabPositions: state.panelTabPositions,
 				settings: state.panelSettings
 			}))
 		} catch (error) {}
@@ -1461,19 +1489,39 @@
 		return Object.keys(distances).sort(function (a, b) { return distances[a] - distances[b] })[0] || 'right'
 	}
 
-	const getPanelTabPositionFromPanel = function (panel) {
-		if (state.panelTabPosition && isValidPanelEdge(state.panelTabPosition.edge)) {
-			return {
-				edge: state.panelTabPosition.edge,
-				offset: clampPanelTabOffset(state.panelTabPosition.edge, state.panelTabPosition.offset)
-			}
-		}
+	const getStoredPanelTabPosition = function (edge) {
+		if (!isValidPanelEdge(edge)) return null
+		return normalizePanelTabPosition(state.panelTabPositions?.[edge])
+	}
+
+	const rememberPanelTabPosition = function (tab) {
+		const normalized = normalizePanelTabPosition(tab)
+		if (!normalized) return null
+		state.panelHiddenSide = normalized.edge
+		state.panelTabPosition = normalized
+		state.panelTabPositions[normalized.edge] = normalized
+		return normalized
+	}
+
+	const resetPanelTabPositionMemory = function (edge) {
+		if (isValidPanelEdge(edge)) state.panelTabPositions[edge] = null
+	}
+
+	const getPanelTabPositionFromPanel = function (panel, useStoredMemory) {
 		const rect = panel.getBoundingClientRect()
 		const edge = getNearestPanelEdge(panel)
+		const stored = useStoredMemory ? getStoredPanelTabPosition(edge) : null
+		if (stored) return stored
 		const offset = (edge === 'left' || edge === 'right')
 			? rect.top + rect.height / 2 - PANEL_TAB_SIZE / 2
 			: rect.left + rect.width / 2 - PANEL_TAB_SIZE / 2
 		return { edge, offset: clampPanelTabOffset(edge, offset) }
+	}
+
+	const getActivePanelTabPosition = function (panel) {
+		const active = normalizePanelTabPosition(state.panelTabPosition)
+		if (active) return active
+		return getPanelTabPositionFromPanel(panel, true)
 	}
 
 	const getPanelTabPositionFromPointer = function (clientX, clientY) {
@@ -1486,6 +1534,24 @@
 		const edge = Object.keys(distances).sort(function (a, b) { return distances[a] - distances[b] })[0] || 'right'
 		const offset = (edge === 'left' || edge === 'right') ? clientY - PANEL_TAB_SIZE / 2 : clientX - PANEL_TAB_SIZE / 2
 		return { edge, offset: clampPanelTabOffset(edge, offset) }
+	}
+
+	const getPanelTabCoordinates = function (tab) {
+		if (tab.edge === 'left') return { x: 0, y: tab.offset }
+		if (tab.edge === 'right') return { x: window.innerWidth - PANEL_TAB_SIZE, y: tab.offset }
+		if (tab.edge === 'top') return { x: tab.offset, y: 0 }
+		return { x: tab.offset, y: window.innerHeight - PANEL_TAB_SIZE }
+	}
+
+	const setPanelHiddenTabPosition = function (panel, tab) {
+		const normalized = normalizePanelTabPosition(tab) || getActivePanelTabPosition(panel)
+		state.panelHiddenSide = normalized.edge
+		state.panelTabPosition = normalized
+		const position = getPanelTabCoordinates(normalized)
+		panel.style.right = 'auto'
+		panel.style.left = Math.round(position.x) + 'px'
+		panel.style.top = Math.round(position.y) + 'px'
+		setPanelHiddenClasses(panel, normalized.edge)
 	}
 
 	const setPanelHiddenClasses = function (panel, edge) {
@@ -1508,34 +1574,12 @@
 			setPanelHiddenClasses(panel, state.panelHiddenSide || 'right')
 			return
 		}
-		const tab = getPanelTabPositionFromPanel(panel)
-		const size = getPanelSize(panel)
-		state.panelHiddenSide = tab.edge
-		state.panelTabPosition = tab
-		let left = 0
-		let top = 0
-		if (tab.edge === 'left') {
-			left = -(size.width - PANEL_TAB_SIZE)
-			top = tab.offset
-		} else if (tab.edge === 'right') {
-			left = window.innerWidth - PANEL_TAB_SIZE
-			top = tab.offset
-		} else if (tab.edge === 'top') {
-			left = tab.offset
-			top = -(size.height - PANEL_TAB_SIZE)
-		} else {
-			left = tab.offset
-			top = window.innerHeight - PANEL_TAB_SIZE
-		}
-		panel.style.right = 'auto'
-		panel.style.left = Math.round(left) + 'px'
-		panel.style.top = Math.round(top) + 'px'
-		setPanelHiddenClasses(panel, tab.edge)
+		setPanelHiddenTabPosition(panel, getActivePanelTabPosition(panel))
 	}
 
 	const showPanelFromEdge = function (panel) {
 		clearPanelAutoHideTimer()
-		const tab = getPanelTabPositionFromPanel(panel)
+		const tab = getActivePanelTabPosition(panel)
 		state.panelHidden = false
 		setPanelHiddenClasses(panel, tab.edge)
 		const size = getPanelSize(panel)
@@ -1560,11 +1604,7 @@
 	const hidePanelToEdge = function (panel, useStoredTab) {
 		if (!isPanelAutoHideEnabled()) return
 		const rect = panel.getBoundingClientRect()
-		const tab = useStoredTab && state.panelTabPosition ? getPanelTabPositionFromPanel(panel) : getPanelTabPositionFromPanel({
-			getBoundingClientRect: function () { return rect },
-			offsetWidth: panel.offsetWidth,
-			offsetHeight: panel.offsetHeight
-		})
+		const tab = getPanelTabPositionFromPanel(panel, useStoredTab)
 		panel.scrollTop = 0
 		panel.style.right = 'auto'
 		panel.style.left = Math.round(rect.left) + 'px'
@@ -1576,7 +1616,7 @@
 		state.panelPosition = { x: clampPanelX(panel, rect.left), y: clampPanelY(panel, rect.top) }
 		savePanelState()
 		setPanelHiddenClasses(panel, tab.edge)
-		requestAnimationFrame(function () { applyPanelHiddenPosition(panel) })
+		requestAnimationFrame(function () { setPanelHiddenTabPosition(panel, tab) })
 	}
 
 	const schedulePanelAutoHide = function (panel) {
@@ -1643,7 +1683,9 @@
 		let moveHandler = null
 		let upHandler = null
 		let moved = false
+		let startEdge = null
 		const clearDrag = function () {
+			panel.classList.remove('modloader-panel-dragging')
 			if (moveHandler) document.removeEventListener('pointermove', moveHandler, true)
 			if (upHandler) document.removeEventListener('pointerup', upHandler, true)
 			moveHandler = null
@@ -1655,17 +1697,23 @@
 			clearPanelAutoHideTimer()
 			const startX = event.clientX
 			const startY = event.clientY
+			const active = getActivePanelTabPosition(panel)
+			startEdge = active.edge
 			moved = false
+			panel.classList.add('modloader-panel-dragging')
 			event.preventDefault()
+			event.stopPropagation()
 			moveHandler = function (moveEvent) {
 				moveEvent.preventDefault()
 				if (Math.abs(moveEvent.clientX - startX) + Math.abs(moveEvent.clientY - startY) > 3) moved = true
-				state.panelTabPosition = getPanelTabPositionFromPointer(moveEvent.clientX, moveEvent.clientY)
-				state.panelHiddenSide = state.panelTabPosition.edge
-				applyPanelHiddenPosition(panel)
+				const next = getPanelTabPositionFromPointer(moveEvent.clientX, moveEvent.clientY)
+				setPanelHiddenTabPosition(panel, next)
 			}
 			upHandler = function () {
 				if (moved) {
+					const finalTab = getActivePanelTabPosition(panel)
+					if (startEdge && finalTab.edge !== startEdge) resetPanelTabPositionMemory(startEdge)
+					rememberPanelTabPosition(finalTab)
 					savePanelState()
 					tab.__modloaderSuppressClick = true
 					setTimeout(function () { tab.__modloaderSuppressClick = false }, 0)
