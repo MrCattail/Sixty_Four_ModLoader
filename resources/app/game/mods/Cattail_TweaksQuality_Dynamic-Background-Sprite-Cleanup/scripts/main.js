@@ -2,6 +2,8 @@ ModLoader.register({
 	id: 'Cattail_TweaksQuality_Dynamic-Background-Sprite-Cleanup',
 	init(api) {
 		const sourceKey = '__cattailSpriteCleanupSource'
+		const floorOverrideSharedStateKey = '__cattailAccessibilityFloorOverrideEnabled'
+		const floorOverrideWindowStateKey = 'cattailAccessibilityFloorOverrideEnabled'
 		const defaultTuning = Object.freeze({ enabled: true, matte: 1, shadow: 1, edge: 1, frames: {} })
 		const targetImages = new Set([
 			'img/annihilator.png',
@@ -175,6 +177,7 @@ ModLoader.register({
 
 		function getRenderableImage(sprite) {
 			if (!sprite?.master || sprite.master.plane) return null
+			if (isRealityFloorCleanupDisabled(sprite.master)) return null
 			const src = sprite[sourceKey] || normalizeImageSrc(sprite.img)
 			if (!targetImages.has(src)) return null
 			if (!sprite.img || !isImageReady(sprite.img)) return null
@@ -199,6 +202,14 @@ ModLoader.register({
 				}
 			}
 			return entry.canvas
+		}
+
+		function isRealityFloorCleanupDisabled(game) {
+			if (game?.[floorOverrideSharedStateKey] === false) return true
+			try {
+				if (typeof window !== 'undefined' && window[floorOverrideWindowStateKey] === false) return true
+			} catch (error) {}
+			return false
 		}
 
 		function buildCleanSprite(sprite, tuning) {

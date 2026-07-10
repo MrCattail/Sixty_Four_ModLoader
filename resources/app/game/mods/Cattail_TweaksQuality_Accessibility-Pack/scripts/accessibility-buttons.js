@@ -18,6 +18,8 @@ ModLoader.register({
 		const floorLongPressDelay = 520
 		const floorColorKey = '__cattailAccessibilityFloorColor'
 		const floorOverrideKey = '__cattailAccessibilityFloorOverride'
+		const floorOverrideSharedStateKey = '__cattailAccessibilityFloorOverrideEnabled'
+		const floorOverrideWindowStateKey = 'cattailAccessibilityFloorOverrideEnabled'
 		const floorPalettePositionKey = '__cattailAccessibilityFloorPalettePosition'
 		const defaultFloorColor = '#ffffff'
 		const grayStripWidth = .2
@@ -627,10 +629,19 @@ ModLoader.register({
 				localStorage.setItem(storageKey(game, 'floorOverride'), game[floorOverrideKey] ? 'true' : 'false')
 			} catch (error) {}
 			if (!game[floorOverrideKey]) closePalette(game)
+			publishFloorOverrideState(game)
 		}
 
 		function isFloorOverrideEnabled(game) {
 			return game?.[floorOverrideKey] !== false
+		}
+
+		function publishFloorOverrideState(game) {
+			const enabled = isFloorOverrideEnabled(game)
+			game[floorOverrideSharedStateKey] = enabled
+			try {
+				if (typeof window !== 'undefined') window[floorOverrideWindowStateKey] = enabled
+			} catch (error) {}
 		}
 
 		function openPaletteWithOverride(game) {
@@ -698,6 +709,7 @@ ModLoader.register({
 			game[floorPalettePositionKey] = position || { x: 0, y: 0 }
 			game[floorColorKey] = position ? paletteColor(position.x, position.y) : (color || defaultFloorColor)
 			game[floorOverrideKey] = override === null ? true : override !== 'false'
+			publishFloorOverrideState(game)
 		}
 
 		function updatePaletteMarker(controller, game) {
