@@ -12,6 +12,7 @@
     "scripts/explainer-language-fix.js",
     "scripts/ending-skip.js",
     "scripts/accessibility-buttons.js",
+    "scripts/resource-glow-colors.js",
     "scripts/view-distance.js"
   ],
   "conflicts": [
@@ -38,6 +39,20 @@
       "label": "Accessibility buttons",
       "default": true,
       "description": "Show the bottom accessibility control bar and reality-floor color palette."
+    },
+    "enableResourceGlowColors": {
+      "type": "boolean",
+      "label": "Resource glow colors",
+      "default": true,
+      "description": "Color resource icon glows by resource, with optional per-resource overrides.",
+      "reloadPolicy": "hot"
+    },
+    "resourceGlowColors": {
+      "type": "resourceColors",
+      "label": "Resource glow palette",
+      "default": {},
+      "description": "Per-resource glow color overrides. Empty rows use each resource's native color.",
+      "reloadPolicy": "hot"
     },
     "enableViewDistance": {
       "type": "boolean",
@@ -73,6 +88,6 @@
       "description": "Used when the saved zoom value is missing or invalid."
     }
   },
-  "description": "Combines view distance limits, ending skip, accessibility buttons, and dynamic explainer language refresh into one multi-entry quality mod.",
+  "description": "Combines view distance limits, ending skip, accessibility buttons, resource glow colors, and dynamic explainer language refresh into one multi-entry quality mod.",
   "reloadOnConfigChange": true
 }

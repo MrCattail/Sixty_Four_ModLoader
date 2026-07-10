@@ -490,6 +490,14 @@
 			#modloader-panel .modloader-config-field-invalid .modloader-config-input { border-color: rgba(255, 96, 96, .72); }
 			#modloader-panel .modloader-config-error { display: none; grid-column: 2; color: #ffb0b0; font-size: 11px; }
 			#modloader-panel .modloader-config-error.active { display: block; }
+			#modloader-panel .modloader-resource-colors { display: grid; gap: 6px; min-width: 0; }
+			#modloader-panel .modloader-resource-color-row { display: grid; grid-template-columns: 38px 34px minmax(0, 1fr) auto; gap: 8px; align-items: center; min-width: 0; }
+			#modloader-panel .modloader-resource-color-icon { display: block; width: 36px; height: 40px; background-image: url('img/resources.png'); background-size: 360px 40px; background-repeat: no-repeat; filter: drop-shadow(0 1px 2px rgba(255,255,255,.78)); }
+			#modloader-panel .modloader-resource-color-picker { width: 30px; height: 28px; box-sizing: border-box; border: 1px solid rgba(255,255,255,.18); border-radius: 5px; padding: 0; background: transparent; color: inherit; cursor: pointer; }
+			#modloader-panel .modloader-resource-color-text { box-sizing: border-box; width: 100%; min-width: 0; border: 1px solid rgba(255,255,255,.16); border-radius: 5px; padding: 5px 6px; background: rgba(0,0,0,.22); color: rgba(255,255,255,.92); outline: none; }
+			#modloader-panel .modloader-resource-color-text:focus { border-color: rgba(207, 233, 255, .5); }
+			#modloader-panel .modloader-resource-color-reset { border: 1px solid rgba(255,255,255,.14); border-radius: 5px; padding: 5px 7px; background: rgba(255,255,255,.08); color: rgba(255,255,255,.78); cursor: pointer; }
+			#modloader-panel .modloader-resource-color-reset:hover { background: rgba(255,255,255,.14); color: rgba(255,255,255,.94); }
 			#modloader-panel .modloader-modal { position: absolute; inset: 0; z-index: 5; display: grid; place-items: center; padding: 16px; background: rgba(8,10,12,.2); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }
 			#modloader-panel .modloader-modal-box { width: min(420px, 100%); border: 1px solid rgba(255,255,255,.12); border-radius: 8px; padding: 14px; background: rgba(10,12,14,.92); box-shadow: 0 14px 36px rgba(0,0,0,.36); }
 			#modloader-panel .modloader-modal-title { margin: 0 0 8px; font-size: 14px; color: rgba(255,255,255,.94); }
@@ -814,6 +822,9 @@
 	const getConfigType = function (item) {
 		return String(item.type || inferConfigType(item.default) || 'string').toLowerCase()
 	}
+	const isResourceColorsConfigType = function (type) {
+		return type === 'resourcecolors' || type === 'resource-colors' || type === 'resource_glow_colors'
+	}
 
 	const cloneConfigValue = function (value) {
 		return (isObject(value) || Array.isArray(value)) ? clone(value) : value
@@ -821,6 +832,19 @@
 
 	const sameConfigValue = function (a, b) {
 		return JSON.stringify(a) === JSON.stringify(b)
+	}
+	const dispatchConfigPreview = function (model) {
+		if (!model || model.invalid) return
+		try {
+			window.dispatchEvent(new CustomEvent('modloader:config-preview', {
+				detail: {
+					modId: model.mod?.id || '',
+					path: model.mod?.path || '',
+					key: model.item?.key || '',
+					value: cloneConfigValue(model.value)
+				}
+			}))
+		} catch (error) {}
 	}
 
 	const readConfigForPanel = function (mod) {
@@ -846,8 +870,106 @@
 		return String(value)
 	}
 
+	const createResourceColorsInput = function (item, value) {
+		const root = element('div', 'modloader-resource-colors modloader-config-input')
+		const resources = getResourceColorConfigRows(item, value)
+		for (const resource of resources) {
+			const row = element('div', 'modloader-resource-color-row')
+			row.dataset.resourceId = String(resource.id)
+			row.dataset.defaultColor = resource.defaultColor
+
+			const icon = element('span', 'modloader-resource-color-icon')
+			icon.style.backgroundPosition = '-' + (resource.id * 36) + 'px 0'
+			icon.title = resource.name
+
+			const picker = element('input', 'modloader-resource-color-picker')
+			picker.type = 'color'
+			picker.value = resource.color
+			picker.title = resource.name
+
+			const textInput = element('input', 'modloader-resource-color-text')
+			textInput.type = 'text'
+			textInput.spellcheck = false
+			textInput.value = resource.color
+			textInput.setAttribute('aria-label', resource.name + ' glow color')
+
+			const reset = element('button', 'modloader-resource-color-reset', 'Reset')
+			reset.type = 'button'
+			reset.title = 'Reset to resource color'
+
+			picker.addEventListener('input', function () {
+				textInput.value = picker.value.toUpperCase()
+				root.dispatchEvent(new Event('input', { bubbles: true }))
+			})
+			textInput.addEventListener('input', function () {
+				const color = normalizePanelHexColor(textInput.value)
+				if (color) picker.value = color
+			})
+			reset.addEventListener('click', function (event) {
+				event.preventDefault()
+				picker.value = row.dataset.defaultColor || '#FFFFFF'
+				textInput.value = picker.value
+				root.dispatchEvent(new Event('input', { bubbles: true }))
+			})
+
+			row.append(icon, picker, textInput, reset)
+			root.appendChild(row)
+		}
+
+		root.readConfigValue = function () {
+			const out = {}
+			const rows = root.querySelectorAll('.modloader-resource-color-row')
+			for (const row of rows) {
+				const textInput = row.querySelector('.modloader-resource-color-text')
+				const color = normalizePanelHexColor(textInput?.value)
+				if (!color) throw new Error('Enter colors as #RRGGBB.')
+				if (color !== row.dataset.defaultColor) out[row.dataset.resourceId] = color
+			}
+			return out
+		}
+
+		Object.defineProperty(root, 'disabled', {
+			get() { return root.dataset.disabled === 'true' },
+			set(value) {
+				root.dataset.disabled = value ? 'true' : 'false'
+				root.querySelectorAll('input, button').forEach(function (input) { input.disabled = !!value })
+			}
+		})
+		return root
+	}
+
+	const getResourceColorConfigRows = function (item, value) {
+		const overrides = isObject(value) ? value : {}
+		const gameResources = state.game?.codex?.resources || []
+		const manifestResources = Array.isArray(item.resources) ? item.resources : []
+		const count = Math.max(Number(item.count) || 0, gameResources.length, manifestResources.length, 10)
+		const rows = []
+		for (let i = 0; i < count; i++) {
+			const resource = gameResources[i] || {}
+			const manifestResource = manifestResources[i] || {}
+			const defaultColor = normalizePanelHexColor(resource?.triplet?.[2]) || normalizePanelHexColor(resource?.triplet?.[1]) || normalizePanelHexColor(resource?.triplet?.[0]) || normalizePanelHexColor(manifestResource.color) || '#FFFFFF'
+			const override = overrides[i] ?? overrides[String(i)] ?? overrides['r' + i]
+			rows.push({
+				id: i,
+				name: String(resource.name || manifestResource.name || ('Resource ' + (i + 1))),
+				defaultColor,
+				color: normalizePanelHexColor(override) || defaultColor
+			})
+		}
+		return rows
+	}
+
+	const normalizePanelHexColor = function (value) {
+		if (value === undefined || value === null) return ''
+		const text = String(value).trim()
+		const shortMatch = text.match(/^#?([0-9a-f]{3})$/i)
+		if (shortMatch) return '#' + shortMatch[1].split('').map(function (part) { return part + part }).join('').toUpperCase()
+		const fullMatch = text.match(/^#?([0-9a-f]{6})$/i)
+		return fullMatch ? '#' + fullMatch[1].toUpperCase() : ''
+	}
 	const createConfigInput = function (item, value) {
 		const type = getConfigType(item)
+		if (isResourceColorsConfigType(type)) return createResourceColorsInput(item, value)
 		const input = element(type === 'array' || type === 'object' ? 'textarea' : 'input', 'modloader-config-input')
 		if (type === 'boolean') {
 			input.type = 'checkbox'
@@ -872,6 +994,7 @@
 
 	const readConfigInputValue = function (item, input) {
 		const type = getConfigType(item)
+		if (isResourceColorsConfigType(type)) return input.readConfigValue()
 		if (type === 'boolean') return !!input.checked
 		if (type === 'number' || type === 'float' || type === 'integer' || type === 'int') {
 			if (String(input.value).trim() === '') throw new Error('Enter a number.')
@@ -1599,6 +1722,7 @@
 							error.textContent = ''
 							error.classList.remove('active')
 							field.classList.remove('modloader-config-field-invalid')
+							dispatchConfigPreview(model)
 						} catch (errorValue) {
 							model.invalid = true
 							error.textContent = errorValue.message
