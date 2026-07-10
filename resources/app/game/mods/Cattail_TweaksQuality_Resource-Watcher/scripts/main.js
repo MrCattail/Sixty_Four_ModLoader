@@ -26,6 +26,7 @@ ModLoader.register({
 		const minPopupScale = 0.5
 		const maxPopupScale = 3
 		const updateMs = 33
+		const hoverClearDelayMs = 150
 
 		const state = {
 			active: false,
@@ -38,6 +39,7 @@ ModLoader.register({
 			resourceInfoLocked: false,
 			lockedResource: null,
 			updateTimer: null,
+			hoverClearTimer: null,
 			lastSignature: '',
 			assetCache: new Map(),
 			missingBridgeAlerted: false
@@ -116,6 +118,7 @@ ModLoader.register({
 			state.lastHoveredResource = null
 			state.resourceInfoLocked = false
 			state.lockedResource = null
+			clearHoverClearTimer()
 			state.lastSignature = ''
 			game.removeHint?.()
 
@@ -141,6 +144,7 @@ ModLoader.register({
 			state.lastHoveredResource = null
 			state.resourceInfoLocked = false
 			state.lockedResource = null
+			clearHoverClearTimer()
 			state.lastSignature = ''
 			if (game) game.hoveredResource = false
 			clearWatcherModifiers(game)
@@ -166,6 +170,35 @@ ModLoader.register({
 		function stopPopupTimer() {
 			if (state.updateTimer) clearInterval(state.updateTimer)
 			state.updateTimer = null
+		}
+
+		function clearHoverClearTimer() {
+			if (state.hoverClearTimer) clearTimeout(state.hoverClearTimer)
+			state.hoverClearTimer = null
+		}
+
+		function scheduleHoverClear(game) {
+			if (state.resourceInfoLocked) {
+				clearHoverClearTimer()
+				state.hoveredResource = null
+				if (game) game.hoveredResource = false
+				updatePopup(game, true)
+				return
+			}
+			if (!Number.isInteger(state.hoveredResource)) {
+				if (game) game.hoveredResource = false
+				updatePopup(game, true)
+				return
+			}
+			if (state.hoverClearTimer) return
+			const resourceId = state.hoveredResource
+			state.hoverClearTimer = setTimeout(function () {
+				state.hoverClearTimer = null
+				if (!state.active || state.resourceInfoLocked || state.hoveredResource !== resourceId) return
+				state.hoveredResource = null
+				if (state.game) state.game.hoveredResource = false
+				updatePopup(state.game, true)
+			}, hoverClearDelayMs)
 		}
 
 		function updatePopup(game, force = false) {
@@ -496,11 +529,17 @@ ModLoader.register({
 				const lastRaw = raw && typeof raw === 'object' ? raw.last : undefined
 				const next = currentRaw === null || currentRaw === undefined || currentRaw === '' ? null : Number(currentRaw)
 				const last = lastRaw === null || lastRaw === undefined || lastRaw === '' ? null : Number(lastRaw)
-				state.hoveredResource = Number.isInteger(next) ? next : null
-				if (Number.isInteger(state.hoveredResource)) rememberWatcherResource(state.game, state.hoveredResource)
-				else if (Number.isInteger(last)) rememberWatcherResource(state.game, last)
-								if (state.game) state.game.hoveredResource = state.hoveredResource === null ? false : state.hoveredResource
-								updatePopup(state.game, true)
+				const nextResource = Number.isInteger(next) ? next : null
+				if (Number.isInteger(nextResource)) {
+					clearHoverClearTimer()
+					state.hoveredResource = nextResource
+					rememberWatcherResource(state.game, state.hoveredResource)
+					if (state.game) state.game.hoveredResource = state.hoveredResource
+					updatePopup(state.game, true)
+				} else {
+					if (Number.isInteger(last)) rememberWatcherResource(state.game, last)
+					scheduleHoverClear(state.game)
+				}
 							},
 							back() {
 								if (state.active) exitWatcher()
@@ -524,6 +563,7 @@ ModLoader.register({
 								state.hoveredResource = null
 								state.lastHoveredResource = null
 								state.resourceInfoLocked = false
+								clearHoverClearTimer()
 								state.lockedResource = null
 								state.popupTools = null
 								stopPopupTimer()
