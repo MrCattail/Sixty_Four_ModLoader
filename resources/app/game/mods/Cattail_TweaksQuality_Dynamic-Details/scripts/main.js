@@ -330,7 +330,10 @@ ModLoader.register({
 				const game = lastGame
 				if (!game) return
 				if (isResourceSourceContext(game)) {
-					setResourceSourceToggle(game, !isResourceSourceToggleActive(game))
+					const wasActive = isResourceSourceToggleActive(game)
+					const previousResource = Number.isInteger(game[resourceSourceLastResourceKey]) ? game[resourceSourceLastResourceKey] : null
+					const selectedResource = getResourceSourceSelectedResourceId(game)
+					setResourceSourceToggle(game, !wasActive || (Number.isInteger(selectedResource) && selectedResource !== previousResource))
 				} else if (isBuildingDetailContext(game)) {
 					setDetailToggle(game, !isDetailToggleActive(game))
 				} else {
@@ -407,9 +410,9 @@ ModLoader.register({
 			if (!game) return
 			initializeResourceSourcePreferences(game)
 			game[resourceSourceToggleKey] = !!active
-			if (active && Number.isInteger(game.hoveredResource)) {
-				game[resourceSourceLastResourceKey] = game.hoveredResource
-				saveStoredInteger(resourceSourceLastResourceStorageKey, game.hoveredResource)
+			if (active) {
+				const selectedResource = getResourceSourceSelectedResourceId(game)
+				if (Number.isInteger(selectedResource)) rememberResourceSourceResource(game, selectedResource)
 			}
 			saveStoredBoolean(resourceSourceToggleStorageKey, !!active)
 		}
@@ -2209,6 +2212,7 @@ ModLoader.register({
 						return original.apply(this, args)
 					}
 					const previousHoveredResource = this.hoveredResource
+					if (Number.isInteger(previousHoveredResource)) rememberResourceSourceResource(this, previousHoveredResource)
 					const virtualHoveredResource = getResourceSourceVirtualHoveredResourceId(this)
 					const useVirtualHover = Number.isInteger(virtualHoveredResource) && !Number.isInteger(previousHoveredResource)
 					if (useVirtualHover) this.hoveredResource = virtualHoveredResource

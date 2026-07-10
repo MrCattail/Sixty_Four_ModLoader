@@ -4,6 +4,12 @@ ModLoader.register({
 		const styleId = 'cattail-resource-watcher-style'
 		const toggleId = 'cattail-resource-watcher-toggle'
 		const watcherKey = '__cattailResourceWatcherController'
+		const dynamicDetailsModId = 'Cattail_TweaksQuality_Dynamic-Details'
+		const dynamicSourceStateKey = '_cattailDynamicResourceSourceState'
+		const dynamicSourceToggleKey = '_cattailDynamicResourceSourceToggle'
+		const dynamicSourceLastResourceKey = '_cattailDynamicResourceSourceLastResource'
+		const dynamicSourceToggleStorageKey = 'cattailDynamicResourceSourceToggle'
+		const dynamicSourceLastResourceStorageKey = 'cattailDynamicResourceSourceLastResource'
 		const rowHeight = 44
 		const rowGap = 4
 		const popupTopReserve = 86
@@ -28,6 +34,9 @@ ModLoader.register({
 			popupTools: null,
 			popupScale: 1,
 			hoveredResource: null,
+			lastHoveredResource: null,
+			resourceInfoLocked: false,
+			lockedResource: null,
 			updateTimer: null,
 			lastSignature: '',
 			assetCache: new Map(),
@@ -104,6 +113,7 @@ ModLoader.register({
 			state.game = game
 			state.active = true
 			state.hoveredResource = null
+			state.lastHoveredResource = null
 			state.lastSignature = ''
 			game.removeHint?.()
 
@@ -126,6 +136,7 @@ ModLoader.register({
 			const game = state.game
 			state.active = false
 			state.hoveredResource = null
+			state.lastHoveredResource = null
 			state.lastSignature = ''
 			if (game) game.hoveredResource = false
 			clearWatcherModifiers(game)
@@ -157,6 +168,7 @@ ModLoader.register({
 			if (!state.active || !state.popupTools || !game) return
 			const ids = getVisibleResourceIds(game)
 			if (Number.isInteger(state.hoveredResource) && ids.indexOf(state.hoveredResource) === -1) state.hoveredResource = null
+			if (Number.isInteger(state.lastHoveredResource) && ids.indexOf(state.lastHoveredResource) === -1) state.lastHoveredResource = null
 			const activeResource = getPopupResourceId(game, ids)
 			const activeInfo = Number.isInteger(activeResource) ? buildResourceInfo(game, activeResource) : null
 			const hasInfo = !!activeInfo
@@ -198,9 +210,19 @@ ModLoader.register({
 		}
 		function getPopupResourceId(game, ids) {
 			if (Number.isInteger(state.hoveredResource)) return state.hoveredResource
-			if (!game?.['_cattailDynamicResourceSourceToggle']) return null
-			const locked = Number(game['_cattailDynamicResourceSourceLastResource'])
+			const locked = getLockedResourceId(game)
 			return Number.isInteger(locked) && ids.indexOf(locked) !== -1 ? locked : null
+		}
+
+		function getLockedResourceId(game) {
+			if (state.resourceInfoLocked && Number.isInteger(state.lockedResource)) return state.lockedResource
+			if (!isDynamicDetailsEnabled() || !game?.[dynamicSourceToggleKey]) return null
+			const locked = Number(game[dynamicSourceLastResourceKey])
+			return Number.isInteger(locked) ? locked : null
+		}
+
+		function isDynamicDetailsEnabled() {
+			return !!api.state?.modById?.[dynamicDetailsModId]
 		}
 
 		function getVisibleResourceIds(game) {
@@ -283,16 +305,16 @@ ModLoader.register({
 
 		function buildSourceSummary(game, resourceId) {
 			if (!isDynamicResourceInfoActive(game)) return null
-			const state = game?.['_cattailDynamicResourceSourceState']
-			if (!state || !Array.isArray(state.events)) return null
-			const gain = aggregateResourceSourceGroups(game, state, resourceId, 'gain').slice(0, 6).map(function (group) { return makeSourceInfoRow(game, group, 'gain') })
-			const consume = aggregateResourceSourceGroups(game, state, resourceId, 'consume').slice(0, 6).map(function (group) { return makeSourceInfoRow(game, group, 'consume') })
+			const dynamicState = game?.[dynamicSourceStateKey]
+			if (!dynamicState || !Array.isArray(dynamicState.events)) return null
+			const gain = aggregateResourceSourceGroups(game, dynamicState, resourceId, 'gain').slice(0, 6).map(function (group) { return makeSourceInfoRow(game, group, 'gain') })
+			const consume = aggregateResourceSourceGroups(game, dynamicState, resourceId, 'consume').slice(0, 6).map(function (group) { return makeSourceInfoRow(game, group, 'consume') })
 			if (!gain.length && !consume.length) return null
 			return { gain, consume }
 		}
 
 		function isDynamicResourceInfoActive(game) {
-			return !!(game && (game.altActive || game['_cattailDynamicResourceSourceToggle']))
+			return !!(isDynamicDetailsEnabled() && game && (game.altActive || state.resourceInfoLocked || game[dynamicSourceToggleKey]))
 		}
 
 		function aggregateResourceSourceGroups(game, state, resourceId, type) {
@@ -444,6 +466,7 @@ ModLoader.register({
 								const raw = event.payload
 								const next = raw === null || raw === undefined || raw === '' ? null : Number(raw)
 								state.hoveredResource = Number.isInteger(next) ? next : null
+								if (Number.isInteger(state.hoveredResource)) state.lastHoveredResource = state.hoveredResource
 								if (state.game) state.game.hoveredResource = state.hoveredResource === null ? false : state.hoveredResource
 								updatePopup(state.game, true)
 							},
@@ -467,6 +490,7 @@ ModLoader.register({
 								clearWatcherModifiers(state.game)
 								state.active = false
 								state.hoveredResource = null
+								state.lastHoveredResource = null
 								state.popupTools = null
 								stopPopupTimer()
 							}
@@ -502,7 +526,7 @@ ModLoader.register({
 				if (!game) return
 				const keyCode = Number(payload.keyCode) || 0
 				const pressed = payload.eventType === 'keydown'
-				const selectedResource = Number.isInteger(state.hoveredResource) ? state.hoveredResource : null
+				const selectedResource = Number.isInteger(state.lastHoveredResource) ? state.lastHoveredResource : Number.isInteger(state.hoveredResource) ? state.hoveredResource : null
 				if (keyCode === 18) {
 					game.altActive = pressed
 					document.body.classList.toggle('altHolded', pressed)
@@ -516,14 +540,20 @@ ModLoader.register({
 					Number.isInteger(selectedResource)
 				)
 				if (detailToggle) {
-					const detailToggleKey = '_cattailDynamicResourceSourceToggle'
-					const active = !game[detailToggleKey]
-					game[detailToggleKey] = active
-					if (active) {
-						game._cattailDynamicResourceSourceLastResource = selectedResource
-						localStorage.setItem('cattailDynamicResourceSourceLastResource', String(selectedResource))
+					const dynamicActive = isDynamicDetailsEnabled() && !!game[dynamicSourceToggleKey]
+					const currentLockedResource = getLockedResourceId(game)
+					const switchingResource = (state.resourceInfoLocked || dynamicActive) && selectedResource !== currentLockedResource
+					const active = switchingResource || !(state.resourceInfoLocked || dynamicActive)
+					state.resourceInfoLocked = active
+					state.lockedResource = active ? selectedResource : null
+					if (isDynamicDetailsEnabled()) {
+						game[dynamicSourceToggleKey] = active
+						if (active) {
+							game[dynamicSourceLastResourceKey] = selectedResource
+							localStorage.setItem(dynamicSourceLastResourceStorageKey, String(selectedResource))
+						}
+						localStorage.setItem(dynamicSourceToggleStorageKey, active ? '1' : '0')
 					}
-					localStorage.setItem('cattailDynamicResourceSourceToggle', active ? '1' : '0')
 					console.info('[Resource Watcher] resource lock', active ? 'enabled' : 'disabled', selectedResource)
 				}
 				updatePopup(game, true)

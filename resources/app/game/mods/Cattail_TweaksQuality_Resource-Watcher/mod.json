@@ -4,8 +4,5 @@
   "version": "0.1.0",
   "loaderVersion": ">=0.1.0",
   "entry": "scripts/main.js",
-  "dependencies": [
-    "Cattail_TweaksQuality_Dynamic-Details"
-  ],
-  "description": "Adds a bottom-right resource watcher button that shrinks the game into an always-on-top resource monitor without changing vanilla scripts."
+  "description": "Adds a bottom-right resource watcher button that shrinks the game into an always-on-top resource monitor without changing vanilla scripts. Integrates with Dynamic Details resource-source data when that mod is enabled."
 }
