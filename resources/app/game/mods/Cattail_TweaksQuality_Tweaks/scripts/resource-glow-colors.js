@@ -5,6 +5,7 @@ ModLoader.register({
 		let previewColors = null
 
 		installConfigPreviewListener()
+		installResourceGlowSharingPanel()
 
 		api.on('afterVanillaScripts', function () {
 			if (typeof Game === 'undefined') return
@@ -20,6 +21,241 @@ ModLoader.register({
 					if (detail.key === 'resourceGlowColors') previewColors = readObject(detail.value)
 				})
 			} catch (error) {}
+		}
+		function installResourceGlowSharingPanel() {
+			ensureResourceGlowSharingStyle()
+			const enhance = function () {
+				const panel = document.getElementById('modloader-panel')
+				if (!panel) return
+				panel.querySelectorAll('.modloader-resource-colors').forEach(function (root) {
+					if (root.dataset.cattailGlowSharing === 'true') return
+					if (!isResourceGlowConfigRoot(root)) return
+					root.dataset.cattailGlowSharing = 'true'
+					insertResourceGlowSharingTools(root)
+				})
+			}
+			const start = function () {
+				if (!document.body) {
+					setTimeout(start, 100)
+					return
+				}
+				enhance()
+				const observer = new MutationObserver(enhance)
+				observer.observe(document.body, { childList: true, subtree: true })
+			}
+			start()
+		}
+
+		function isResourceGlowConfigRoot(root) {
+			const field = root.closest('.modloader-config-field')
+			const row = root.closest('.modloader-mod-row')
+			const meta = field?.querySelector('.modloader-config-meta')?.textContent || ''
+			const rowText = row?.textContent || ''
+			return meta.includes('resourceGlowColors') && rowText.includes('Cattail_TweaksQuality_Tweaks')
+		}
+
+		function insertResourceGlowSharingTools(root) {
+			const tools = document.createElement('div')
+			tools.className = 'cattail-resource-glow-share-tools'
+			const exportButton = document.createElement('button')
+			exportButton.type = 'button'
+			exportButton.className = 'cattail-resource-glow-share-button'
+			exportButton.textContent = 'Export'
+			exportButton.title = 'Copy all resource glow colors to the clipboard'
+			const importButton = document.createElement('button')
+			importButton.type = 'button'
+			importButton.className = 'cattail-resource-glow-share-button'
+			importButton.textContent = 'Import'
+			importButton.title = 'Import resource glow colors from the clipboard'
+			const status = document.createElement('span')
+			status.className = 'cattail-resource-glow-share-status'
+			const disabled = root.dataset.disabled === 'true'
+			exportButton.disabled = disabled
+			importButton.disabled = disabled
+			tools.append(exportButton, importButton, status)
+			root.insertBefore(tools, root.firstChild)
+
+			exportButton.addEventListener('click', async function (event) {
+				event.preventDefault()
+				event.stopPropagation()
+				try {
+					await writeClipboardText(createResourceGlowShareText(root))
+					setSharingStatus(status, 'Copied all colors.', 'ok')
+				} catch (error) {
+					setSharingStatus(status, error.message || 'Export failed.', 'error')
+				}
+			})
+			importButton.addEventListener('click', async function (event) {
+				event.preventDefault()
+				event.stopPropagation()
+				try {
+					const colors = parseResourceGlowShareText(await readClipboardText())
+					const count = applyResourceGlowColors(root, colors)
+					setSharingStatus(status, 'Imported ' + count + ' colors.', 'ok')
+				} catch (error) {
+					setSharingStatus(status, error.message || 'Import failed.', 'error')
+				}
+			})
+		}
+
+		function ensureResourceGlowSharingStyle() {
+			if (document.getElementById('cattail-resource-glow-sharing-style')) return
+			const style = document.createElement('style')
+			style.id = 'cattail-resource-glow-sharing-style'
+			style.textContent = `
+				#modloader-panel .cattail-resource-glow-share-tools { display: flex; align-items: center; gap: 7px; min-width: 0; margin-bottom: 2px; }
+				#modloader-panel .cattail-resource-glow-share-button { border: 1px solid rgba(255,255,255,.14); border-radius: 5px; padding: 5px 7px; background: rgba(255,255,255,.08); color: rgba(255,255,255,.78); cursor: pointer; }
+				#modloader-panel .cattail-resource-glow-share-button:hover { background: rgba(255,255,255,.14); color: rgba(255,255,255,.94); }
+				#modloader-panel .cattail-resource-glow-share-button:disabled { cursor: default; opacity: .45; }
+				#modloader-panel .cattail-resource-glow-share-status { min-width: 0; color: rgba(255,255,255,.5); font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+				#modloader-panel .cattail-resource-glow-share-status[data-tone="ok"] { color: #cfe9ff; }
+				#modloader-panel .cattail-resource-glow-share-status[data-tone="error"] { color: #ffb0b0; }
+				#modloader-panel.modloader-panel-theme-light .cattail-resource-glow-share-button { background: rgba(0,0,0,.055); border-color: rgba(0,0,0,.12); color: rgba(18,20,22,.78); }
+			`
+			document.head.appendChild(style)
+		}
+
+		function setSharingStatus(status, message, tone) {
+			if (!status) return
+			status.textContent = message || ''
+			status.dataset.tone = tone || ''
+			if (status.__cattailTimer) clearTimeout(status.__cattailTimer)
+			status.__cattailTimer = null
+			if (!message) return
+			status.__cattailTimer = setTimeout(function () {
+				status.textContent = ''
+				status.dataset.tone = ''
+				status.__cattailTimer = null
+			}, 2400)
+		}
+
+		function createResourceGlowShareText(root) {
+			return JSON.stringify({
+				type: 'CattailResourceGlowColors',
+				version: 1,
+				colors: readResourceGlowColors(root, true)
+			}, null, 2)
+		}
+
+		function readResourceGlowColors(root, includeDefaults) {
+			const out = {}
+			root.querySelectorAll('.modloader-resource-color-row').forEach(function (row) {
+				const textInput = row.querySelector('.modloader-resource-color-text')
+				const color = normalizeHexColor(textInput?.value)
+				if (!color) throw new Error('Enter colors as #RRGGBB.')
+				if (includeDefaults || color !== row.dataset.defaultColor) out[row.dataset.resourceId] = color
+			})
+			return out
+		}
+
+		function parseResourceGlowShareText(text) {
+			const source = String(text || '').trim()
+			if (!source) throw new Error('Clipboard is empty.')
+			if (/^[\[{]/.test(source)) {
+				try {
+					return normalizeResourceGlowImportData(JSON.parse(source))
+				} catch (error) {
+					throw new Error('Clipboard does not contain valid color data.')
+				}
+			}
+			return parseResourceGlowColorLines(source)
+		}
+
+		function normalizeResourceGlowImportData(data) {
+			const source = data && (data.colors !== undefined ? data.colors : (data.resourceGlowColors !== undefined ? data.resourceGlowColors : data))
+			const out = {}
+			const add = function (key, value) {
+				const id = normalizeResourceGlowImportKey(key)
+				const raw = value && typeof value === 'object' && !Array.isArray(value) && value.color !== undefined ? value.color : value
+				const color = normalizeHexColor(raw)
+				if (!id && color) return
+				if (id && !color) throw new Error('Imported color data contains invalid colors.')
+				if (id && color) out[id] = color
+			}
+			if (Array.isArray(source)) {
+				source.forEach(function (value, index) {
+					const key = value && typeof value === 'object' && !Array.isArray(value) && value.id !== undefined ? value.id : index
+					add(key, value)
+				})
+			} else if (source && typeof source === 'object') {
+				Object.keys(source).forEach(function (key) { add(key, source[key]) })
+			} else {
+				throw new Error('Clipboard does not contain color data.')
+			}
+			if (!Object.keys(out).length) throw new Error('Clipboard does not contain color data.')
+			return out
+		}
+
+		function parseResourceGlowColorLines(text) {
+			const out = {}
+			let nextId = 0
+			String(text || '').split(/[\r\n,;]+/).map(function (part) { return part.trim() }).filter(Boolean).forEach(function (part) {
+				const match = part.match(/^(?:r?(\d+)\s*[:=]\s*)?(#?[0-9a-f]{3}(?:[0-9a-f]{3})?)$/i)
+				if (!match) throw new Error('Clipboard does not contain valid color data.')
+				const color = normalizeHexColor(match[2])
+				if (!color) throw new Error('Clipboard does not contain valid color data.')
+				const id = match[1] !== undefined ? String(Number(match[1])) : String(nextId++)
+				out[id] = color
+			})
+			if (!Object.keys(out).length) throw new Error('Clipboard is empty.')
+			return out
+		}
+
+		function normalizeResourceGlowImportKey(key) {
+			const match = String(key).trim().match(/^r?(\d+)$/i)
+			return match ? String(Number(match[1])) : ''
+		}
+
+		function applyResourceGlowColors(root, colors) {
+			let applied = 0
+			root.querySelectorAll('.modloader-resource-color-row').forEach(function (row) {
+				const color = colors[row.dataset.resourceId]
+				if (color === undefined) return
+				const normalized = normalizeHexColor(color)
+				if (!normalized) throw new Error('Imported color data contains invalid colors.')
+				const picker = row.querySelector('.modloader-resource-color-picker')
+				const textInput = row.querySelector('.modloader-resource-color-text')
+				if (picker) picker.value = normalized
+				if (textInput) textInput.value = normalized
+				applied++
+			})
+			if (!applied) throw new Error('No matching resource colors were found.')
+			root.dispatchEvent(new Event('input', { bubbles: true }))
+			return applied
+		}
+
+		async function readClipboardText() {
+			try {
+				if (window.navigator?.clipboard?.readText) {
+					const text = await window.navigator.clipboard.readText()
+					if (text !== undefined && text !== null) return String(text)
+				}
+			} catch (error) {}
+			const clipboard = getElectronClipboard()
+			if (clipboard?.readText) return String(clipboard.readText() || '')
+			throw new Error('Clipboard is not available.')
+		}
+
+		async function writeClipboardText(text) {
+			try {
+				if (window.navigator?.clipboard?.writeText) {
+					await window.navigator.clipboard.writeText(text)
+					return
+				}
+			} catch (error) {}
+			const clipboard = getElectronClipboard()
+			if (clipboard?.writeText) {
+				clipboard.writeText(text)
+				return
+			}
+			throw new Error('Clipboard is not available.')
+		}
+
+		function getElectronClipboard() {
+			try {
+				if (typeof require === 'function') return require('electron')?.clipboard || null
+			} catch (error) {}
+			return null
 		}
 		function patchResourceGlow(api) {
 			api.patch(Game.prototype, 'renderResources', function (original) {

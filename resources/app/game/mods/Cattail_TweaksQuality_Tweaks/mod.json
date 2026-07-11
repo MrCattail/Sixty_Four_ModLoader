@@ -13,6 +13,7 @@
     "scripts/ending-skip.js",
     "scripts/accessibility-buttons.js",
     "scripts/resource-glow-colors.js",
+    "scripts/play-time-counter.js",
     "scripts/view-distance.js"
   ],
   "conflicts": [
@@ -54,6 +55,20 @@
       "description": "Per-resource glow color overrides. Empty rows use each resource's native color.",
       "reloadPolicy": "hot"
     },
+    "enablePlayTimeCounter": {
+      "type": "boolean",
+      "label": "Play time counter",
+      "default": true,
+      "description": "Show the active run play-time counter on the game canvas.",
+      "reloadPolicy": "hot"
+    },
+    "playTimeCounterPosition": {
+      "type": "string",
+      "label": "Play time counter position",
+      "default": "bottom-right",
+      "description": "Use bottom-right to place it left of the shop button, or top-center to place it at the top center.",
+      "reloadPolicy": "hot"
+    },
     "enableViewDistance": {
       "type": "boolean",
       "label": "View distance limits",
@@ -88,6 +103,6 @@
       "description": "Used when the saved zoom value is missing or invalid."
     }
   },
-  "description": "Combines view distance limits, ending skip, accessibility buttons, resource glow colors, and dynamic explainer language refresh into one multi-entry quality mod.",
+  "description": "Combines view distance limits, ending skip, accessibility buttons, resource glow colors, play-time counter, and dynamic explainer language refresh into one multi-entry quality mod.",
   "reloadOnConfigChange": true
 }
