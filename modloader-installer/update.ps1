@@ -81,13 +81,14 @@ function Find-PackageRoot {
 	$candidates = @((Get-Item -LiteralPath $ExtractRoot)) + @(Get-ChildItem -LiteralPath $ExtractRoot -Directory -Recurse)
 	foreach ($candidate in $candidates) {
 		$installer = Join-Path $candidate.FullName 'modloader-installer\install.ps1'
+		$patcher = Join-Path $candidate.FullName 'modloader-installer\patch-source.ps1'
 		$loader = Join-Path $candidate.FullName 'resources\app\game\modloader\loader.js'
-		if ((Test-Path -LiteralPath $installer) -and (Test-Path -LiteralPath $loader)) {
+		if ((Test-Path -LiteralPath $installer) -and (Test-Path -LiteralPath $patcher) -and (Test-Path -LiteralPath $loader)) {
 			return $candidate.FullName
 		}
 	}
 
-	throw 'The zip does not look like a Sixty Four ModLoader package. Missing modloader-installer\install.ps1 or resources\app\game\modloader\loader.js.'
+	throw 'The zip does not look like a Sixty Four ModLoader package. Missing modloader-installer\install.ps1, modloader-installer\patch-source.ps1, or resources\app\game\modloader\loader.js.'
 }
 
 function Get-ReplaceModsPromptText {

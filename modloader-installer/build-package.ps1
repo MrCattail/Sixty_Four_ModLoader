@@ -1,4 +1,4 @@
-﻿param(
+param(
 	[string]$OutputPath = '.\dist\SixtyFour-ModLoader.zip',
 	[switch]$Clean,
 	[switch]$CleanEnabled
@@ -14,22 +14,6 @@ function New-DirectoryIfMissing {
 	}
 }
 
-function Copy-FileWithParents {
-	param(
-		[string]$SourceRoot,
-		[string]$TargetRoot,
-		[string]$RelativePath
-	)
-
-	$source = Join-Path $SourceRoot $RelativePath
-	$target = Join-Path $TargetRoot $RelativePath
-	if (-not (Test-Path -LiteralPath $source)) {
-		throw "Package source file missing: $source"
-	}
-
-	New-DirectoryIfMissing -Path (Split-Path -Parent $target)
-	Copy-Item -LiteralPath $source -Destination $target -Force
-}
 
 function Copy-DirectoryFiltered {
 	param(
@@ -73,17 +57,6 @@ if (Test-Path -LiteralPath $stagingRoot) {
 }
 New-DirectoryIfMissing -Path $stagingRoot
 
-$coreFiles = @(
-	'resources\app\main.js',
-	'resources\app\game\index.html',
-	'resources\app\game\scripts\game.js',
-	'resources\app\game\scripts\ui.js',
-	'resources\app\game\scripts\sprites.js'
-)
-
-foreach ($relativePath in $coreFiles) {
-	Copy-FileWithParents -SourceRoot $packageRoot -TargetRoot $stagingRoot -RelativePath $relativePath
-}
 
 Copy-DirectoryFiltered `
 	-Source (Join-Path $packageRoot 'modloader-installer') `
@@ -117,7 +90,8 @@ $packageReadme = @'
 5. Press `Ctrl+M` to open the ModLoader panel.
 
 The folder should contain `sixtyfour.exe`, `resources`, and
-`modloader-installer` at the same level.
+`modloader-installer` at the same level. This package does not include copied
+Sixty Four source files; the installer patches the local game files in place.
 
 ## Easy Update
 
@@ -145,6 +119,19 @@ if (Test-Path -LiteralPath $resolvedOutput) {
 	Remove-Item -LiteralPath $resolvedOutput -Force
 }
 
-Compress-Archive -Path (Join-Path $stagingRoot '*') -DestinationPath $resolvedOutput -Force
+$forbiddenCoreFiles = @(
+	'resources\app\main.js',
+	'resources\app\game\index.html',
+	'resources\app\game\scripts\game.js',
+	'resources\app\game\scripts\ui.js',
+	'resources\app\game\scripts\sprites.js'
+)
+foreach ($relativePath in $forbiddenCoreFiles) {
+	$forbidden = Join-Path $stagingRoot $relativePath
+	if (Test-Path -LiteralPath $forbidden) {
+		throw "Refusing to package copied game source file: $relativePath"
+	}
+}
 
+Compress-Archive -Path (Join-Path $stagingRoot '*') -DestinationPath $resolvedOutput -Force
 Write-Host "Package created: $resolvedOutput"

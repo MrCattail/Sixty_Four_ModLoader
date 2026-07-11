@@ -43,8 +43,8 @@ function Find-SourceRoot {
 		}
 
 		$loader = Join-Path $resolved 'resources\app\game\modloader\loader.js'
-		$game = Join-Path $resolved 'resources\app\game\scripts\game.js'
-		if ((Test-Path -LiteralPath $loader) -and (Test-Path -LiteralPath $game)) {
+		$patcher = Join-Path $resolved 'modloader-installer\patch-source.ps1'
+		if ((Test-Path -LiteralPath $loader) -and (Test-Path -LiteralPath $patcher)) {
 			return $resolved.Path
 		}
 	}
@@ -60,26 +60,6 @@ function New-DirectoryIfMissing {
 	}
 }
 
-function Copy-FileWithParents {
-	param(
-		[string]$SourceRoot,
-		[string]$TargetRoot,
-		[string]$RelativePath
-	)
-
-	$source = Join-Path $SourceRoot $RelativePath
-	$target = Join-Path $TargetRoot $RelativePath
-	if (-not (Test-Path -LiteralPath $source)) {
-		throw "Installer source file missing: $source"
-	}
-
-	if ((Resolve-Path -LiteralPath $source).Path -eq (Resolve-Path -LiteralPath $target -ErrorAction SilentlyContinue).Path) {
-		return
-	}
-
-	New-DirectoryIfMissing -Path (Split-Path -Parent $target)
-	Copy-Item -LiteralPath $source -Destination $target -Force
-}
 
 function Copy-DirectoryContents {
 	param(
@@ -179,21 +159,15 @@ $manifest | ConvertTo-Json -Depth 20 | Set-Content -LiteralPath (Join-Path $back
 New-DirectoryIfMissing -Path $backupRoot
 $stamp | Set-Content -LiteralPath (Join-Path $backupRoot 'latest-install.txt') -Encoding ASCII
 
-$coreFiles = @(
-	'resources\app\main.js',
-	'resources\app\game\index.html',
-	'resources\app\game\scripts\game.js',
-	'resources\app\game\scripts\ui.js',
-	'resources\app\game\scripts\sprites.js'
-)
-
-foreach ($relativePath in $coreFiles) {
-	Copy-FileWithParents -SourceRoot $sourceRoot -TargetRoot $targetRoot -RelativePath $relativePath
-}
-
 Copy-DirectoryContents -Source (Join-Path $sourceGame 'modloader') -Target (Join-Path $targetGame 'modloader') -ExcludeRelative @(
 	'state\install-backups\latest-install.txt'
 )
+
+$patcher = Join-Path $sourceRoot 'modloader-installer\patch-source.ps1'
+& powershell -NoProfile -ExecutionPolicy Bypass -File $patcher -GameRoot $targetRoot
+if ($LASTEXITCODE) {
+	throw "patch-source.ps1 failed with exit code $LASTEXITCODE"
+}
 
 $sourceMods = Join-Path $sourceGame 'mods'
 $targetMods = Join-Path $targetGame 'mods'

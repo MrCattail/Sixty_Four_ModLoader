@@ -1,0 +1,435 @@
+param(
+	[string]$GameRoot
+)
+
+$ErrorActionPreference = 'Stop'
+
+function Resolve-GameRoot {
+	param([string]$Path)
+
+	if ($Path) {
+		$resolved = Resolve-Path -LiteralPath $Path
+	} else {
+		$resolved = Resolve-Path -LiteralPath (Get-Location)
+	}
+
+	$gamePath = Join-Path $resolved 'resources\app\game'
+	if (-not (Test-Path -LiteralPath $gamePath)) {
+		throw "GameRoot must point to the Sixty Four win-unpacked folder. Missing: $gamePath"
+	}
+
+	return $resolved.Path
+}
+
+function Convert-ToLf {
+	param([string]$Text)
+	return $Text -replace "`r`n", "`n" -replace "`r", "`n"
+}
+
+function Read-TextFile {
+	param([string]$Path)
+	return Convert-ToLf ([System.IO.File]::ReadAllText($Path))
+}
+
+function Write-TextFile {
+	param(
+		[string]$Path,
+		[string]$Text
+	)
+	[System.IO.File]::WriteAllText($Path, $Text, [System.Text.UTF8Encoding]::new($false))
+}
+
+function Apply-Required {
+	param(
+		[string]$Text,
+		[string]$Old,
+		[string]$New,
+		[string]$Description
+	)
+
+	if (-not $Text.Contains($Old)) {
+		throw "Could not patch $Description. The game file may have changed or was edited by another tool."
+	}
+	return $Text.Replace($Old, $New)
+}
+
+function Apply-Optional {
+	param(
+		[string]$Text,
+		[string]$Old,
+		[string]$New
+	)
+
+	if ($Text.Contains($Old)) {
+		return $Text.Replace($Old, $New)
+	}
+	return $Text
+}
+
+function Update-TextFile {
+	param(
+		[string]$RelativePath,
+		[scriptblock]$Patch
+	)
+
+	$path = Join-Path $script:TargetRoot $RelativePath
+	if (-not (Test-Path -LiteralPath $path)) {
+		throw "Missing file to patch: $RelativePath"
+	}
+
+	$before = Read-TextFile -Path $path
+	$after = & $Patch $before
+	if ($after -ne $before) {
+		Write-TextFile -Path $path -Text $after
+		Write-Host "Patched $RelativePath"
+	} else {
+		Write-Host "Already patched $RelativePath"
+	}
+}
+function Assert-Contains {
+	param(
+		[string]$RelativePath,
+		[string]$Pattern,
+		[string]$Description
+	)
+
+	$path = Join-Path $script:TargetRoot $RelativePath
+	if (-not (Test-Path -LiteralPath $path)) {
+		throw "Patch verification failed: missing $RelativePath for $Description"
+	}
+	$text = Read-TextFile -Path $path
+	if (-not $text.Contains($Pattern)) {
+		throw "Patch verification failed: missing $Description in $RelativePath"
+	}
+}
+
+function Patch-IndexHtml {
+	param([string]$Text)
+
+	if ($Text.Contains('modloader/loader.js')) {
+		return $Text
+	}
+
+	$pattern = '(<script\s+type="text/javascript"\s+src="scripts/game\.js[^"]*"></script>)'
+	if (-not [regex]::IsMatch($Text, $pattern)) {
+		throw 'Could not patch index.html. Missing scripts/game.js script tag.'
+	}
+
+	$replacement = '$1' + "`n        <script type=`"text/javascript`" src=`"modloader/loader.js?v=1`"></script>"
+	return [regex]::Replace($Text, $pattern, $replacement, 1)
+}
+
+function Patch-GameJs {
+	param([string]$Text)
+
+	$oldInitDesktop = @'
+	async init(canvas, preload){
+
+		await this.loadScripts()
+		await this.loadStyle(`cascade.css`)
+'@
+	$newInitDesktop = @'
+	async init(canvas, preload){
+
+		await window.ModLoader?.stage(`beforeVanillaScripts`, this)
+		await this.loadScripts()
+		await window.ModLoader?.stage(`afterVanillaScripts`, this)
+		await this.loadStyle(`cascade.css`)
+'@
+	$Text = Apply-Optional $Text $oldInitDesktop $newInitDesktop
+
+	$oldInitMobile = @'
+	async initMobile(canvas, preload){
+
+		await this.loadScripts()
+		await this.loadStyle(`cascade_mobile.css`)
+'@
+	$newInitMobile = @'
+	async initMobile(canvas, preload){
+
+		await window.ModLoader?.stage(`beforeVanillaScripts`, this)
+		await this.loadScripts()
+		await window.ModLoader?.stage(`afterVanillaScripts`, this)
+		await this.loadStyle(`cascade_mobile.css`)
+'@
+	$Text = Apply-Optional $Text $oldInitMobile $newInitMobile
+
+	if (-not $Text.Contains('ModLoader?.applyData')) {
+		$oldData = @'
+		this.codex = abstract_getCodex()
+		this.images = this.preloadImages()
+		const words = abstract_getWords()
+		this.words = words[this.language]
+'@
+		$newData = @'
+		this.languages = window.ModLoader?.applyLanguages(this.languages) || this.languages
+		const moddedLanguageId = this.getLanguageId()
+		if (moddedLanguageId !== null) this.languageId = moddedLanguageId
+		if (!this.languages[this.languageId]) this.languageId = 0
+		this.language = this.languages[this.languageId]
+
+		this.codex = window.ModLoader?.applyData(abstract_getCodex(), this) || abstract_getCodex()
+		this.images = this.preloadImages()
+		const words = window.ModLoader?.applyWords(abstract_getWords(), this) || abstract_getWords()
+		if (!words[this.language]) {
+			this.languageId = 0
+			this.language = this.languages[this.languageId] || `en`
+			localStorage.setItem(`abstractv03_language${this.steamId}`, this.languageId)
+		}
+		this.words = words[this.language]
+'@
+		$Text = Apply-Required $Text $oldData $newData 'game data and language hooks'
+	}
+
+	if (-not $Text.Contains('afterGameInit')) {
+		$oldAfterMouse = @'
+		this.updateMouseData(this.w2/2, this.h2/2)
+		this.processMousemove2()
+'@
+		$newAfterMouse = @'
+		this.updateMouseData(this.w2/2, this.h2/2)
+		this.processMousemove2()
+		await window.ModLoader?.stage(`afterGameInit`, this)
+'@
+		$Text = Apply-Required $Text $oldAfterMouse $newAfterMouse 'afterGameInit hook'
+	}
+
+	if (-not $Text.Contains('ModLoader?.applyPreloadList')) {
+		$Text = Apply-Required $Text "		const list = this.codex.preload" "		const list = window.ModLoader?.applyPreloadList(this.codex.preload) || this.codex.preload" 'preload list hook'
+	}
+
+	$oldChangeLanguage = @'
+		this.language = this.languages[this.languageId]
+		this.words = abstract_getWords()[this.language]
+'@
+	$newChangeLanguage = @'
+		this.language = this.languages[this.languageId]
+		const words = window.ModLoader?.applyWords(abstract_getWords(), this) || abstract_getWords()
+		this.words = words[this.language] || words.en || abstract_getWords()[this.language]
+'@
+	$Text = Apply-Optional $Text $oldChangeLanguage $newChangeLanguage
+
+	if (-not $Text.Contains('ModLoader?.applyLoadedSave')) {
+		$oldLoadedSave = @'
+		try {
+			//To make sure
+'@
+		$newLoadedSave = @'
+		try {
+			manual = window.ModLoader?.applyLoadedSave(manual, this) || manual
+			//To make sure
+'@
+		$Text = Apply-Required $Text $oldLoadedSave $newLoadedSave 'loaded save hook'
+	}
+
+	if (-not $Text.Contains('rememberOrphanEntity')) {
+		$oldOrphan = @'
+			const s = manual.stuff[i]
+			const entity = s.name === `cube` ? new Cube(s.name, s.position.x, s.position.y, s.par) : new Entity(s.name, s.position.x, s.position.y, s.par)
+'@
+		$newOrphan = @'
+			const s = manual.stuff[i]
+			if (!window.ModLoader?.canLoadEntity(s.name, this) && !this.codex.entities[s.name]) {
+				window.ModLoader?.rememberOrphanEntity(s)
+				continue
+			}
+			const entity = s.name === `cube` ? new Cube(s.name, s.position.x, s.position.y, s.par) : new Entity(s.name, s.position.x, s.position.y, s.par)
+'@
+		$Text = Apply-Required $Text $oldOrphan $newOrphan 'orphan entity save guard'
+	}
+
+	if (-not $Text.Contains('ModLoader?.applySave')) {
+		$Text = Apply-Required $Text "		const string = JSON.stringify({" "		const saveState = {" 'save hook start'
+		$oldSaveEnd = @'
+			backups: backupless ? undefined : this.backups
+		})
+
+		return this.encodeSave(string)
+'@
+		$newSaveEnd = @'
+			backups: backupless ? undefined : this.backups
+		}
+		const string = JSON.stringify(window.ModLoader?.applySave(saveState, this) || saveState)
+
+		return this.encodeSave(string)
+'@
+		$Text = Apply-Required $Text $oldSaveEnd $newSaveEnd 'save hook finish'
+	}
+
+	if (-not $Text.Contains('ModLoader?.applyEntitySave')) {
+		$oldEntitySave = '		return {name: e.name, position: e.position, par: par}'
+		$newEntitySave = @'
+		const entityState = {name: e.name, position: e.position, par: par}
+		return window.ModLoader?.applyEntitySave(entityState, e, this) || entityState
+'@
+		$Text = Apply-Required $Text $oldEntitySave $newEntitySave 'entity save hook'
+	}
+
+	if (-not $Text.Contains('ModLoader?.applySoundList')) {
+		$oldSound = @'
+		]
+
+		for (let i = 0; i < samples.length; i++){
+'@
+		$newSound = @'
+		]
+		samples = window.ModLoader?.applySoundList(samples) || samples
+
+		for (let i = 0; i < samples.length; i++){
+'@
+		$Text = Apply-Required $Text $oldSound $newSound 'sound list hook'
+	}
+
+	if (-not $Text.Contains('ModLoader?.resolveMusic')) {
+		$Text = Apply-Required $Text '		fetch(`sfx/${name}.mp3`).then(r => {' '		fetch(window.ModLoader?.resolveMusic(name) || `sfx/${name}.mp3`).then(r => {' 'music asset hook'
+	}
+
+	return $Text
+}
+
+function Patch-SpritesJs {
+	param([string]$Text)
+
+	if (-not $Text.Contains('args.src = window.ModLoader?.resolveAsset')) {
+		$oldSprite = @'
+		this.bctx = this.master.bctx
+
+		if (this.master.images[args.src]){
+'@
+		$newSprite = @'
+		this.bctx = this.master.bctx
+
+		args.src = window.ModLoader?.resolveAsset(args.src) || args.src
+		if (this.master.images[args.src]){
+'@
+		$Text = Apply-Required $Text $oldSprite $newSprite 'sprite asset hook'
+	}
+
+	if (-not $Text.Contains('this.src = window.ModLoader?.resolveAsset')) {
+		$Text = Apply-Required $Text '		this.src = args.src' '		this.src = window.ModLoader?.resolveAsset(args.src) || args.src' 'GL sprite asset hook'
+	}
+
+	return $Text
+}
+
+function Patch-UiJs {
+	param([string]$Text)
+
+	if ($Text.Contains('ModLoader?.resolveAsset(this.master.codex.entities[params.id]?.shopImage')) {
+		return $Text
+	}
+
+	$oldShopImage = '			image.src = `img/shop/${params.isDark ? params.id + `_dark` : params.id}.jpg`'
+	$newShopImage = '			image.src = window.ModLoader?.resolveAsset(this.master.codex.entities[params.id]?.shopImage || `img/shop/${params.isDark ? params.id + `_dark` : params.id}.jpg`) || this.master.codex.entities[params.id]?.shopImage || `img/shop/${params.isDark ? params.id + `_dark` : params.id}.jpg`'
+	return Apply-Required $Text $oldShopImage $newShopImage 'shop icon asset hook'
+}
+
+function Patch-MainJs {
+	param([string]$Text)
+
+	$removedLegacyMainProcess = $false
+	$legacyStart = $Text.IndexOf('function getModloaderWindowWorkArea(bounds){')
+	if ($legacyStart -ge 0) {
+		$legacyEnd = $Text.IndexOf('//1111111111111111', $legacyStart)
+		if ($legacyEnd -lt 0) {
+			throw 'Could not remove legacy ModLoader main-process block. Missing sentinel marker.'
+		}
+		$Text = $Text.Remove($legacyStart, $legacyEnd - $legacyStart)
+		$removedLegacyMainProcess = $true
+	}
+
+	if ($removedLegacyMainProcess -or $Text.Contains("const { spawn } = require('child_process')") -or $Text.Contains('const modloaderWindows = new Map()')) {
+		$Text = $Text.Replace("const { app, BrowserWindow, Tray, ipcMain, Menu, shell, globalShortcut, screen } = require('electron')", "const { app, BrowserWindow, Tray, ipcMain, Menu, shell, globalShortcut } = require('electron')")
+		$Text = [regex]::Replace($Text, "(?s)const \{ spawn \} = require\('child_process'\)\nconst runtimeLogPath = path\.join\(__dirname, 'game', 'modloader', 'state', 'runtime\.log'\)\nfunction runtimeLog\(\.\.\.args\)\{.*?\n\}\n", '', 1)
+		$Text = $Text.Replace("const modloaderWindows = new Map()`nlet modloaderParentWindowState = null`nconst modloaderWindowMargin = 12`n", '')
+		$Text = $Text.Replace("runtimeLog('gameError'", "ModLoaderMainProcess.runtimeLog('gameError'")
+		$Text = $Text.Replace("runtimeLog('console'", "ModLoaderMainProcess.runtimeLog('console'")
+		$Text = $Text.Replace("runtimeLog('render-process-gone'", "ModLoaderMainProcess.runtimeLog('render-process-gone'")
+		$Text = $Text.Replace("runtimeLog('did-fail-load'", "ModLoaderMainProcess.runtimeLog('did-fail-load'")
+	}
+
+	if (-not $Text.Contains('ModLoaderMainProcess')) {
+		$Text = Apply-Required $Text "const path = require('path')" "const path = require('path')`nconst ModLoaderMainProcess = require('./game/modloader/main-process.js')" 'main-process bridge require'
+	}
+
+	if (-not $Text.Contains("runtimeLog('gameError'") -and -not $Text.Contains("ModLoaderMainProcess.runtimeLog('gameError'")) {
+		$oldGameError = @'
+ipcMain.on(`gameError`, (e,d)=>{
+  TrackJS?.track(d)
+})
+'@
+		$newGameError = @'
+ipcMain.on(`gameError`, (e,d)=>{
+  TrackJS?.track(d)
+  ModLoaderMainProcess.runtimeLog('gameError', d && (d.stack || d.message || d.toString ? d.toString() : d))
+})
+'@
+		$Text = Apply-Required $Text $oldGameError $newGameError 'game error runtime log hook'
+	}
+
+	if (-not $Text.Contains('ModLoaderMainProcess.attachWindow(win)')) {
+		$oldAttach = '  if (!options.fullscreen) win.setFullScreen(false)'
+		$newAttach = "  if (!options.fullscreen) win.setFullScreen(false)`n  ModLoaderMainProcess.attachWindow(win)"
+		$Text = Apply-Required $Text $oldAttach $newAttach 'main window attachment'
+	}
+
+	if (-not $Text.Contains('toggleDevTools')) {
+		$devToolsBlock = @'
+  const isMac = process.platform === 'darwin'
+  const temp = [
+    {
+      label: 'View',
+      submenu: [
+        {role: 'reload'},
+        {role: 'forceReload'},
+        {role: 'toggleDevTools'}
+      ]
+    }
+  ]
+  const menu = Menu.buildFromTemplate(temp)
+  Menu.setApplicationMenu(menu)
+
+  globalShortcut.register('CommandOrControl+Shift+I', _=>{
+    win.webContents.toggleDevTools()
+  })
+  globalShortcut.register('F12', _=>{
+    win.webContents.toggleDevTools()
+  })
+
+  win.webContents.on('console-message', (event, level, message, line, sourceId)=>{
+    ModLoaderMainProcess.runtimeLog('console', level, message, `${sourceId}:${line}`)
+  })
+  win.webContents.on('render-process-gone', (event, details)=>{
+    ModLoaderMainProcess.runtimeLog('render-process-gone', details)
+  })
+  win.webContents.on('did-fail-load', (event, errorCode, errorDescription, validatedURL)=>{
+    ModLoaderMainProcess.runtimeLog('did-fail-load', errorCode, errorDescription, validatedURL)
+  })
+
+'@
+		$Text = Apply-Required $Text '  //LOAD' ($devToolsBlock + '  //LOAD') 'DevTools menu and runtime diagnostics'
+	}
+
+	return $Text
+}
+
+$script:TargetRoot = Resolve-GameRoot -Path $GameRoot
+
+Update-TextFile -RelativePath 'resources\app\game\index.html' -Patch { param($Text) Patch-IndexHtml $Text }
+Update-TextFile -RelativePath 'resources\app\game\scripts\game.js' -Patch { param($Text) Patch-GameJs $Text }
+Update-TextFile -RelativePath 'resources\app\game\scripts\sprites.js' -Patch { param($Text) Patch-SpritesJs $Text }
+Update-TextFile -RelativePath 'resources\app\game\scripts\ui.js' -Patch { param($Text) Patch-UiJs $Text }
+Update-TextFile -RelativePath 'resources\app\main.js' -Patch { param($Text) Patch-MainJs $Text }
+
+Assert-Contains -RelativePath 'resources\app\game\index.html' -Pattern 'modloader/loader.js' -Description 'index loader script'
+Assert-Contains -RelativePath 'resources\app\game\scripts\game.js' -Pattern 'ModLoader?.stage(`beforeVanillaScripts`' -Description 'beforeVanillaScripts hook'
+Assert-Contains -RelativePath 'resources\app\game\scripts\game.js' -Pattern 'ModLoader?.applyData' -Description 'data hook'
+Assert-Contains -RelativePath 'resources\app\game\scripts\game.js' -Pattern 'ModLoader?.applyWords' -Description 'words hook'
+Assert-Contains -RelativePath 'resources\app\game\scripts\game.js' -Pattern 'ModLoader?.applySave' -Description 'save hook'
+Assert-Contains -RelativePath 'resources\app\game\scripts\game.js' -Pattern 'ModLoader?.applySoundList' -Description 'sound list hook'
+Assert-Contains -RelativePath 'resources\app\game\scripts\sprites.js' -Pattern 'ModLoader?.resolveAsset' -Description 'sprite asset hook'
+Assert-Contains -RelativePath 'resources\app\game\scripts\ui.js' -Pattern 'ModLoader?.resolveAsset' -Description 'shop icon asset hook'
+Assert-Contains -RelativePath 'resources\app\main.js' -Pattern 'ModLoaderMainProcess.attachWindow(win)' -Description 'main process bridge'
+Assert-Contains -RelativePath 'resources\app\game\modloader\main-process.js' -Pattern 'module.exports' -Description 'main process module'
+
+Write-Host 'ModLoader source hooks are installed.'

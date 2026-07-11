@@ -1,4 +1,4 @@
-﻿# Sixty Four ModLoader Installer
+# Sixty Four ModLoader Installer
 
 Run these scripts from PowerShell. `GameRoot` is the game's `win-unpacked`
 folder, for example:
@@ -50,10 +50,14 @@ From the package root:
 powershell -NoProfile -ExecutionPolicy Bypass -File .\modloader-installer\install.ps1 -GameRoot "D:\Steam\steamapps\common\Sixty Four\win-unpacked"
 ```
 
+The package does not include copied Sixty Four source files. Instead,
+`patch-source.ps1` inserts the small hooks ModLoader needs into the player's
+local install.
+
 The installer:
 
 - backs up core files to `resources/app/game/modloader/state/install-backups/`
-- copies loader-integrated core files
+- patches the local game files with the ModLoader hooks
 - copies `modloader/`
 - copies mod folders and templates
 - keeps an existing `mods/enabled.json`

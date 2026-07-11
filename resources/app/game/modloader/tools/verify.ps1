@@ -9,7 +9,9 @@ $checks = @(
 	[ordered]@{ file = 'scripts\game.js'; pattern = 'ModLoader?.applySoundList'; description = 'audio sample hook' },
 	[ordered]@{ file = 'scripts\sprites.js'; pattern = 'ModLoader?.resolveAsset'; description = 'sprite asset hook' },
 	[ordered]@{ file = 'scripts\ui.js'; pattern = 'ModLoader?.resolveAsset'; description = 'shop icon asset hook' },
+	[ordered]@{ file = '..\main.js'; pattern = 'ModLoaderMainProcess.attachWindow(win)'; description = 'main process bridge support' },
 	[ordered]@{ file = '..\main.js'; pattern = 'toggleDevTools'; description = 'DevTools shortcut/menu support' },
+	[ordered]@{ file = 'modloader\main-process.js'; pattern = 'module.exports'; description = 'main process window module' },
 	[ordered]@{ file = 'modloader\loader.js'; pattern = 'window.ModLoader = api'; description = 'loader exports API' }
 )
 
