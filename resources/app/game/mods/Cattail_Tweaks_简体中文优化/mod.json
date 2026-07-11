@@ -14,5 +14,69 @@
   "locale": [
     "locale/modsch.json"
   ],
-  "description": "Adds the 中文优化版 language extracted from the previous modified words.js."
+  "description": "Adds the 中文优化版 language extracted from the previous modified words.js.",
+  "translations": {
+    "sch": {
+      "name": "简体中文优化",
+      "description": "添加从之前修改过的 words.js 中提取出的中文优化版语言。"
+    },
+    "modsch": {
+      "name": "简体中文优化",
+      "description": "添加从之前修改过的 words.js 中提取出的中文优化版语言。"
+    },
+    "en": {
+      "name": "Simplified Chinese Optimization"
+    },
+    "ru": {
+      "name": "Оптимизация упрощенного китайского"
+    },
+    "de": {
+      "name": "Optimiertes vereinfachtes Chinesisch"
+    },
+    "ptbr": {
+      "name": "Otimização de chinês simplificado"
+    },
+    "it": {
+      "name": "Ottimizzazione cinese semplificato"
+    },
+    "es": {
+      "name": "Optimización de chino simplificado"
+    },
+    "fr": {
+      "name": "Optimisation chinois simplifié"
+    },
+    "nl": {
+      "name": "Vereenvoudigd Chinees verbeteren"
+    },
+    "cz": {
+      "name": "Optimalizace zjednodušené čínštiny"
+    },
+    "pl": {
+      "name": "Optymalizacja chińskiego uproszczonego"
+    },
+    "jp": {
+      "name": "簡体字中国語最適化"
+    },
+    "kr": {
+      "name": "간체 중국어 최적화"
+    },
+    "tch": {
+      "name": "簡體中文優化"
+    },
+    "thai": {
+      "name": "ปรับปรุงภาษาจีนตัวย่อ"
+    },
+    "hu": {
+      "name": "Egyszerűsített kínai optimalizálás"
+    },
+    "lv": {
+      "name": "Vienkāršotās ķīniešu valodas uzlabojums"
+    },
+    "ro": {
+      "name": "Optimizare chineză simplificată"
+    },
+    "no": {
+      "name": "Optimalisering av forenklet kinesisk"
+    }
+  }
 }

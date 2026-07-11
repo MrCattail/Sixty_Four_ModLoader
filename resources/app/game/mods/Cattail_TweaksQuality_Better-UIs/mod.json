@@ -39,5 +39,295 @@
     }
   },
   "description": "Combines shop categories, save slots, and the language menu into one multi-entry interface quality mod.",
-  "reloadOnConfigChange": true
+  "reloadOnConfigChange": true,
+  "translations": {
+    "sch": {
+      "name": "更好的界面",
+      "description": "将商店分类、存档栏和语言菜单整合为一个界面优化 mod。",
+      "config": {
+        "enableShopCategories": {
+          "label": "商店分类",
+          "description": "显示可选的分类压缩建筑商店视图。"
+        },
+        "enableSaveSlots": {
+          "label": "存档栏",
+          "description": "显示游戏内存档页，并提供导入和导出功能。"
+        },
+        "enableLanguageMenu": {
+          "label": "语言菜单",
+          "description": "在主菜单使用可滚动的语言选择页面。"
+        }
+      }
+    },
+    "modsch": {
+      "name": "更好的界面",
+      "description": "将商店分类、存档栏和语言菜单整合为一个界面优化 mod。",
+      "config": {
+        "enableShopCategories": {
+          "label": "商店分类",
+          "description": "显示可选的分类压缩建筑商店视图。"
+        },
+        "enableSaveSlots": {
+          "label": "存档栏",
+          "description": "显示游戏内存档页，并提供导入和导出功能。"
+        },
+        "enableLanguageMenu": {
+          "label": "语言菜单",
+          "description": "在主菜单使用可滚动的语言选择页面。"
+        }
+      }
+    },
+    "en": {
+      "name": "Better UIs",
+      "config": {
+        "enableShopCategories": {
+          "label": "Shop categories"
+        },
+        "enableSaveSlots": {
+          "label": "Save slots"
+        },
+        "enableLanguageMenu": {
+          "label": "Language menu"
+        }
+      }
+    },
+    "ru": {
+      "name": "Улучшенный интерфейс",
+      "config": {
+        "enableShopCategories": {
+          "label": "Категории магазина"
+        },
+        "enableSaveSlots": {
+          "label": "Ячейки сохранения"
+        },
+        "enableLanguageMenu": {
+          "label": "Меню языка"
+        }
+      }
+    },
+    "de": {
+      "name": "Bessere Oberflächen",
+      "config": {
+        "enableShopCategories": {
+          "label": "Shop-Kategorien"
+        },
+        "enableSaveSlots": {
+          "label": "Speicherplätze"
+        },
+        "enableLanguageMenu": {
+          "label": "Sprachmenü"
+        }
+      }
+    },
+    "ptbr": {
+      "name": "Interfaces melhores",
+      "config": {
+        "enableShopCategories": {
+          "label": "Categorias da loja"
+        },
+        "enableSaveSlots": {
+          "label": "Espaços de save"
+        },
+        "enableLanguageMenu": {
+          "label": "Menu de idioma"
+        }
+      }
+    },
+    "it": {
+      "name": "Interfacce migliori",
+      "config": {
+        "enableShopCategories": {
+          "label": "Categorie negozio"
+        },
+        "enableSaveSlots": {
+          "label": "Slot salvataggio"
+        },
+        "enableLanguageMenu": {
+          "label": "Menu lingua"
+        }
+      }
+    },
+    "es": {
+      "name": "Interfaces mejoradas",
+      "config": {
+        "enableShopCategories": {
+          "label": "Categorías de tienda"
+        },
+        "enableSaveSlots": {
+          "label": "Ranuras de guardado"
+        },
+        "enableLanguageMenu": {
+          "label": "Menú de idioma"
+        }
+      }
+    },
+    "fr": {
+      "name": "Interfaces améliorées",
+      "config": {
+        "enableShopCategories": {
+          "label": "Catégories de boutique"
+        },
+        "enableSaveSlots": {
+          "label": "Emplacements de sauvegarde"
+        },
+        "enableLanguageMenu": {
+          "label": "Menu de langue"
+        }
+      }
+    },
+    "nl": {
+      "name": "Betere interfaces",
+      "config": {
+        "enableShopCategories": {
+          "label": "Winkelcategorieën"
+        },
+        "enableSaveSlots": {
+          "label": "Opslagsleuven"
+        },
+        "enableLanguageMenu": {
+          "label": "Taalmenu"
+        }
+      }
+    },
+    "cz": {
+      "name": "Lepší rozhraní",
+      "config": {
+        "enableShopCategories": {
+          "label": "Kategorie obchodu"
+        },
+        "enableSaveSlots": {
+          "label": "Pozice uložení"
+        },
+        "enableLanguageMenu": {
+          "label": "Nabídka jazyka"
+        }
+      }
+    },
+    "pl": {
+      "name": "Lepsze interfejsy",
+      "config": {
+        "enableShopCategories": {
+          "label": "Kategorie sklepu"
+        },
+        "enableSaveSlots": {
+          "label": "Sloty zapisu"
+        },
+        "enableLanguageMenu": {
+          "label": "Menu języka"
+        }
+      }
+    },
+    "jp": {
+      "name": "UI改善",
+      "config": {
+        "enableShopCategories": {
+          "label": "ショップ分類"
+        },
+        "enableSaveSlots": {
+          "label": "セーブスロット"
+        },
+        "enableLanguageMenu": {
+          "label": "言語メニュー"
+        }
+      }
+    },
+    "kr": {
+      "name": "개선된 UI",
+      "config": {
+        "enableShopCategories": {
+          "label": "상점 카테고리"
+        },
+        "enableSaveSlots": {
+          "label": "저장 슬롯"
+        },
+        "enableLanguageMenu": {
+          "label": "언어 메뉴"
+        }
+      }
+    },
+    "tch": {
+      "name": "更好的介面",
+      "config": {
+        "enableShopCategories": {
+          "label": "商店分類"
+        },
+        "enableSaveSlots": {
+          "label": "存檔欄"
+        },
+        "enableLanguageMenu": {
+          "label": "語言選單"
+        }
+      }
+    },
+    "thai": {
+      "name": "UI ที่ดีขึ้น",
+      "config": {
+        "enableShopCategories": {
+          "label": "หมวดหมู่ร้านค้า"
+        },
+        "enableSaveSlots": {
+          "label": "ช่องเซฟ"
+        },
+        "enableLanguageMenu": {
+          "label": "เมนูภาษา"
+        }
+      }
+    },
+    "hu": {
+      "name": "Jobb felületek",
+      "config": {
+        "enableShopCategories": {
+          "label": "Bolt kategóriái"
+        },
+        "enableSaveSlots": {
+          "label": "Mentési helyek"
+        },
+        "enableLanguageMenu": {
+          "label": "Nyelv menü"
+        }
+      }
+    },
+    "lv": {
+      "name": "Labākas saskarnes",
+      "config": {
+        "enableShopCategories": {
+          "label": "Veikala kategorijas"
+        },
+        "enableSaveSlots": {
+          "label": "Saglabāšanas vietas"
+        },
+        "enableLanguageMenu": {
+          "label": "Valodas izvēlne"
+        }
+      }
+    },
+    "ro": {
+      "name": "Interfețe mai bune",
+      "config": {
+        "enableShopCategories": {
+          "label": "Categorii magazin"
+        },
+        "enableSaveSlots": {
+          "label": "Sloturi salvare"
+        },
+        "enableLanguageMenu": {
+          "label": "Meniu limbă"
+        }
+      }
+    },
+    "no": {
+      "name": "Bedre grensesnitt",
+      "config": {
+        "enableShopCategories": {
+          "label": "Butikkategorier"
+        },
+        "enableSaveSlots": {
+          "label": "Lagringsplasser"
+        },
+        "enableLanguageMenu": {
+          "label": "Språkmeny"
+        }
+      }
+    }
+  }
 }

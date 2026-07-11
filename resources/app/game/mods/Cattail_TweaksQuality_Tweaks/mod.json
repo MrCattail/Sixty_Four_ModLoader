@@ -12,6 +12,7 @@
     "scripts/explainer-language-fix.js",
     "scripts/ending-skip.js",
     "scripts/accessibility-buttons.js",
+    "scripts/stabilizer-surge-flash-reduction.js",
     "scripts/resource-glow-colors.js",
     "scripts/play-time-counter.js",
     "scripts/view-distance.js"
@@ -40,6 +41,13 @@
       "label": "Accessibility buttons",
       "default": true,
       "description": "Show the bottom accessibility control bar and reality-floor color palette."
+    },
+    "enableStabilizerSurgeFlashReduction": {
+      "type": "boolean",
+      "label": "Stabilizer surge flash reduction",
+      "default": true,
+      "description": "After the void altar exists, hide full-screen flashes caused by stabilizer-triggered surge effects.",
+      "reloadPolicy": "hot"
     },
     "enableResourceGlowColors": {
       "type": "boolean",
@@ -103,6 +111,854 @@
       "description": "Used when the saved zoom value is missing or invalid."
     }
   },
-  "description": "Combines view distance limits, ending skip, accessibility buttons, resource glow colors, play-time counter, and dynamic explainer language refresh into one multi-entry quality mod.",
-  "reloadOnConfigChange": true
+  "description": "Combines view distance limits, ending skip, accessibility buttons, stabilizer surge flash reduction, resource glow colors, play-time counter, and dynamic explainer language refresh into one multi-entry quality mod.",
+  "reloadOnConfigChange": true,
+  "translations": {
+    "sch": {
+      "name": "便利调整",
+      "description": "将视野距离限制、结局跳过、辅助按钮、稳定器浪涌闪烁削弱、资源光圈颜色、游戏时间计数器和动态提示语言刷新整合为一个综合调整 mod。",
+      "config": {
+        "enableExplainerLanguageFix": {
+          "label": "提示语言修复",
+          "description": "切换语言后立刻刷新会跳动的提示文本。"
+        },
+        "enableEndingSkip": {
+          "label": "结局跳过",
+          "description": "在针孔结局和制作人员名单阶段显示跳过按钮。"
+        },
+        "enableAccessibilityButtons": {
+          "label": "辅助按钮",
+          "description": "显示底部辅助控制栏和现实地板颜色调色板。"
+        },
+        "enableStabilizerSurgeFlashReduction": {
+          "label": "稳定器浪涌闪烁削弱",
+          "description": "虚空祭坛存在后，隐藏由稳定器触发浪涌效果造成的全屏闪烁。"
+        },
+        "enableResourceGlowColors": {
+          "label": "资源光圈颜色",
+          "description": "根据资源类型给资源图标光圈上色，并支持单独覆盖每种资源颜色。"
+        },
+        "enablePlayTimeCounter": {
+          "label": "游戏时间计数器",
+          "description": "在游戏画布上显示当前存档的游玩时间计数器。"
+        },
+        "playTimeCounterPosition": {
+          "label": "游戏时间计数器位置",
+          "description": "bottom-right 会放在商店按钮左侧，top-center 会放在顶部居中。"
+        },
+        "resourceGlowColors": {
+          "label": "资源光圈调色板",
+          "description": "逐资源设置光圈颜色。留空的资源会使用该资源的原生颜色。"
+        },
+        "enableViewDistance": {
+          "label": "视野距离限制",
+          "description": "使用扩展后的镜头缩放范围。"
+        },
+        "farthestZoom": {
+          "label": "最远缩放",
+          "description": "数值越低，可看到的世界范围越大。原版最远限制为 0.3。"
+        },
+        "closestZoom": {
+          "label": "最近缩放",
+          "description": "数值越高，镜头可以拉得越近。原版最近限制为 2。"
+        },
+        "fallbackZoom": {
+          "label": "默认缩放",
+          "description": "当保存的缩放值缺失或无效时使用。"
+        }
+      }
+    },
+    "modsch": {
+      "name": "便利调整",
+      "description": "将视野距离限制、结局跳过、辅助按钮、稳定器浪涌闪烁削弱、资源光圈颜色、游戏时间计数器和动态提示语言刷新整合为一个综合调整 mod。",
+      "config": {
+        "enableExplainerLanguageFix": {
+          "label": "提示语言修复",
+          "description": "切换语言后立刻刷新会跳动的提示文本。"
+        },
+        "enableEndingSkip": {
+          "label": "结局跳过",
+          "description": "在针孔结局和制作人员名单阶段显示跳过按钮。"
+        },
+        "enableAccessibilityButtons": {
+          "label": "辅助按钮",
+          "description": "显示底部辅助控制栏和现实地板颜色调色板。"
+        },
+        "enableStabilizerSurgeFlashReduction": {
+          "label": "稳定器浪涌闪烁削弱",
+          "description": "虚空祭坛存在后，隐藏由稳定器触发浪涌效果造成的全屏闪烁。"
+        },
+        "enableResourceGlowColors": {
+          "label": "资源光圈颜色",
+          "description": "根据资源类型给资源图标光圈上色，并支持单独覆盖每种资源颜色。"
+        },
+        "enablePlayTimeCounter": {
+          "label": "游戏时间计数器",
+          "description": "在游戏画布上显示当前存档的游玩时间计数器。"
+        },
+        "playTimeCounterPosition": {
+          "label": "游戏时间计数器位置",
+          "description": "bottom-right 会放在商店按钮左侧，top-center 会放在顶部居中。"
+        },
+        "resourceGlowColors": {
+          "label": "资源光圈调色板",
+          "description": "逐资源设置光圈颜色。留空的资源会使用该资源的原生颜色。"
+        },
+        "enableViewDistance": {
+          "label": "视野距离限制",
+          "description": "使用扩展后的镜头缩放范围。"
+        },
+        "farthestZoom": {
+          "label": "最远缩放",
+          "description": "数值越低，可看到的世界范围越大。原版最远限制为 0.3。"
+        },
+        "closestZoom": {
+          "label": "最近缩放",
+          "description": "数值越高，镜头可以拉得越近。原版最近限制为 2。"
+        },
+        "fallbackZoom": {
+          "label": "默认缩放",
+          "description": "当保存的缩放值缺失或无效时使用。"
+        }
+      }
+    },
+    "en": {
+      "name": "Tweaks",
+      "config": {
+        "enableExplainerLanguageFix": {
+          "label": "Explainer language fix"
+        },
+        "enableEndingSkip": {
+          "label": "Ending skip"
+        },
+        "enableAccessibilityButtons": {
+          "label": "Accessibility buttons"
+        },
+        "enableStabilizerSurgeFlashReduction": {
+          "label": "Stabilizer surge flash reduction"
+        },
+        "enableResourceGlowColors": {
+          "label": "Resource glow colors"
+        },
+        "enablePlayTimeCounter": {
+          "label": "Play time counter"
+        },
+        "playTimeCounterPosition": {
+          "label": "Play time counter position"
+        },
+        "resourceGlowColors": {
+          "label": "Resource glow palette"
+        },
+        "enableViewDistance": {
+          "label": "View distance limits"
+        },
+        "farthestZoom": {
+          "label": "Farthest zoom"
+        },
+        "closestZoom": {
+          "label": "Closest zoom"
+        },
+        "fallbackZoom": {
+          "label": "Fallback zoom"
+        }
+      }
+    },
+    "ru": {
+      "name": "Настройки удобства",
+      "config": {
+        "enableExplainerLanguageFix": {
+          "label": "Исправление языка подсказок"
+        },
+        "enableEndingSkip": {
+          "label": "Пропуск концовки"
+        },
+        "enableAccessibilityButtons": {
+          "label": "Кнопки доступности"
+        },
+        "enableStabilizerSurgeFlashReduction": {
+          "label": "Снижение вспышек стабилизатора"
+        },
+        "enableResourceGlowColors": {
+          "label": "Цвета свечения ресурсов"
+        },
+        "enablePlayTimeCounter": {
+          "label": "Счетчик времени игры"
+        },
+        "playTimeCounterPosition": {
+          "label": "Позиция счетчика времени"
+        },
+        "resourceGlowColors": {
+          "label": "Палитра свечения ресурсов"
+        },
+        "enableViewDistance": {
+          "label": "Пределы дальности обзора"
+        },
+        "farthestZoom": {
+          "label": "Самое дальнее отдаление"
+        },
+        "closestZoom": {
+          "label": "Самое близкое приближение"
+        },
+        "fallbackZoom": {
+          "label": "Запасной масштаб"
+        }
+      }
+    },
+    "de": {
+      "name": "Komfortanpassungen",
+      "config": {
+        "enableExplainerLanguageFix": {
+          "label": "Hinweis-Sprachfix"
+        },
+        "enableEndingSkip": {
+          "label": "Ende überspringen"
+        },
+        "enableAccessibilityButtons": {
+          "label": "Bedienhilfen-Schaltflächen"
+        },
+        "enableStabilizerSurgeFlashReduction": {
+          "label": "Stabilisator-Blitzreduktion"
+        },
+        "enableResourceGlowColors": {
+          "label": "Ressourcen-Leuchtfarben"
+        },
+        "enablePlayTimeCounter": {
+          "label": "Spielzeitzähler"
+        },
+        "playTimeCounterPosition": {
+          "label": "Position des Spielzeitzählers"
+        },
+        "resourceGlowColors": {
+          "label": "Ressourcen-Leuchtpalette"
+        },
+        "enableViewDistance": {
+          "label": "Sichtweitenlimits"
+        },
+        "farthestZoom": {
+          "label": "Weitester Zoom"
+        },
+        "closestZoom": {
+          "label": "Nächster Zoom"
+        },
+        "fallbackZoom": {
+          "label": "Fallback-Zoom"
+        }
+      }
+    },
+    "ptbr": {
+      "name": "Ajustes de qualidade",
+      "config": {
+        "enableExplainerLanguageFix": {
+          "label": "Correção do idioma das dicas"
+        },
+        "enableEndingSkip": {
+          "label": "Pular final"
+        },
+        "enableAccessibilityButtons": {
+          "label": "Botões de acessibilidade"
+        },
+        "enableStabilizerSurgeFlashReduction": {
+          "label": "Redução de flashes do estabilizador"
+        },
+        "enableResourceGlowColors": {
+          "label": "Cores do brilho dos recursos"
+        },
+        "enablePlayTimeCounter": {
+          "label": "Contador de tempo de jogo"
+        },
+        "playTimeCounterPosition": {
+          "label": "Posição do contador de tempo"
+        },
+        "resourceGlowColors": {
+          "label": "Paleta de brilho dos recursos"
+        },
+        "enableViewDistance": {
+          "label": "Limites de distância de visão"
+        },
+        "farthestZoom": {
+          "label": "Zoom mais distante"
+        },
+        "closestZoom": {
+          "label": "Zoom mais próximo"
+        },
+        "fallbackZoom": {
+          "label": "Zoom reserva"
+        }
+      }
+    },
+    "it": {
+      "name": "Migliorie",
+      "config": {
+        "enableExplainerLanguageFix": {
+          "label": "Correzione lingua suggerimenti"
+        },
+        "enableEndingSkip": {
+          "label": "Salta finale"
+        },
+        "enableAccessibilityButtons": {
+          "label": "Pulsanti accessibilità"
+        },
+        "enableStabilizerSurgeFlashReduction": {
+          "label": "Riduzione lampeggi stabilizzatore"
+        },
+        "enableResourceGlowColors": {
+          "label": "Colori bagliore risorse"
+        },
+        "enablePlayTimeCounter": {
+          "label": "Contatore tempo di gioco"
+        },
+        "playTimeCounterPosition": {
+          "label": "Posizione contatore tempo"
+        },
+        "resourceGlowColors": {
+          "label": "Tavolozza bagliore risorse"
+        },
+        "enableViewDistance": {
+          "label": "Limiti distanza visuale"
+        },
+        "farthestZoom": {
+          "label": "Zoom più lontano"
+        },
+        "closestZoom": {
+          "label": "Zoom più vicino"
+        },
+        "fallbackZoom": {
+          "label": "Zoom di riserva"
+        }
+      }
+    },
+    "es": {
+      "name": "Ajustes de calidad",
+      "config": {
+        "enableExplainerLanguageFix": {
+          "label": "Corrección de idioma de pistas"
+        },
+        "enableEndingSkip": {
+          "label": "Saltar final"
+        },
+        "enableAccessibilityButtons": {
+          "label": "Botones de accesibilidad"
+        },
+        "enableStabilizerSurgeFlashReduction": {
+          "label": "Reducción de destellos del estabilizador"
+        },
+        "enableResourceGlowColors": {
+          "label": "Colores de brillo de recursos"
+        },
+        "enablePlayTimeCounter": {
+          "label": "Contador de tiempo de juego"
+        },
+        "playTimeCounterPosition": {
+          "label": "Posición del contador de tiempo"
+        },
+        "resourceGlowColors": {
+          "label": "Paleta de brillo de recursos"
+        },
+        "enableViewDistance": {
+          "label": "Límites de distancia de vista"
+        },
+        "farthestZoom": {
+          "label": "Zoom más lejano"
+        },
+        "closestZoom": {
+          "label": "Zoom más cercano"
+        },
+        "fallbackZoom": {
+          "label": "Zoom de reserva"
+        }
+      }
+    },
+    "fr": {
+      "name": "Ajustements pratiques",
+      "config": {
+        "enableExplainerLanguageFix": {
+          "label": "Correction langue des astuces"
+        },
+        "enableEndingSkip": {
+          "label": "Sauter la fin"
+        },
+        "enableAccessibilityButtons": {
+          "label": "Boutons d’accessibilité"
+        },
+        "enableStabilizerSurgeFlashReduction": {
+          "label": "Réduction des flashs du stabilisateur"
+        },
+        "enableResourceGlowColors": {
+          "label": "Couleurs de halo des ressources"
+        },
+        "enablePlayTimeCounter": {
+          "label": "Compteur de temps de jeu"
+        },
+        "playTimeCounterPosition": {
+          "label": "Position du compteur de temps"
+        },
+        "resourceGlowColors": {
+          "label": "Palette de halo des ressources"
+        },
+        "enableViewDistance": {
+          "label": "Limites de distance de vue"
+        },
+        "farthestZoom": {
+          "label": "Zoom le plus éloigné"
+        },
+        "closestZoom": {
+          "label": "Zoom le plus proche"
+        },
+        "fallbackZoom": {
+          "label": "Zoom de secours"
+        }
+      }
+    },
+    "nl": {
+      "name": "Kwaliteitsaanpassingen",
+      "config": {
+        "enableExplainerLanguageFix": {
+          "label": "Taalfix voor hints"
+        },
+        "enableEndingSkip": {
+          "label": "Einde overslaan"
+        },
+        "enableAccessibilityButtons": {
+          "label": "Toegankelijkheidsknoppen"
+        },
+        "enableStabilizerSurgeFlashReduction": {
+          "label": "Flitsreductie stabilisator"
+        },
+        "enableResourceGlowColors": {
+          "label": "Gloedkleuren van grondstoffen"
+        },
+        "enablePlayTimeCounter": {
+          "label": "Speeltijdteller"
+        },
+        "playTimeCounterPosition": {
+          "label": "Positie speeltijdteller"
+        },
+        "resourceGlowColors": {
+          "label": "Gloedpalet van grondstoffen"
+        },
+        "enableViewDistance": {
+          "label": "Kijkafstandslimieten"
+        },
+        "farthestZoom": {
+          "label": "Verste zoom"
+        },
+        "closestZoom": {
+          "label": "Dichtste zoom"
+        },
+        "fallbackZoom": {
+          "label": "Reservezoom"
+        }
+      }
+    },
+    "cz": {
+      "name": "Vylepšení",
+      "config": {
+        "enableExplainerLanguageFix": {
+          "label": "Oprava jazyka nápověd"
+        },
+        "enableEndingSkip": {
+          "label": "Přeskočení konce"
+        },
+        "enableAccessibilityButtons": {
+          "label": "Tlačítka přístupnosti"
+        },
+        "enableStabilizerSurgeFlashReduction": {
+          "label": "Omezení záblesků stabilizátoru"
+        },
+        "enableResourceGlowColors": {
+          "label": "Barvy záře surovin"
+        },
+        "enablePlayTimeCounter": {
+          "label": "Počítadlo herního času"
+        },
+        "playTimeCounterPosition": {
+          "label": "Poloha počítadla času"
+        },
+        "resourceGlowColors": {
+          "label": "Paleta záře surovin"
+        },
+        "enableViewDistance": {
+          "label": "Limity vzdálenosti zobrazení"
+        },
+        "farthestZoom": {
+          "label": "Nejvzdálenější zoom"
+        },
+        "closestZoom": {
+          "label": "Nejbližší zoom"
+        },
+        "fallbackZoom": {
+          "label": "Záložní zoom"
+        }
+      }
+    },
+    "pl": {
+      "name": "Usprawnienia",
+      "config": {
+        "enableExplainerLanguageFix": {
+          "label": "Naprawa języka podpowiedzi"
+        },
+        "enableEndingSkip": {
+          "label": "Pomijanie zakończenia"
+        },
+        "enableAccessibilityButtons": {
+          "label": "Przyciski dostępności"
+        },
+        "enableStabilizerSurgeFlashReduction": {
+          "label": "Redukcja błysków stabilizatora"
+        },
+        "enableResourceGlowColors": {
+          "label": "Kolory poświaty zasobów"
+        },
+        "enablePlayTimeCounter": {
+          "label": "Licznik czasu gry"
+        },
+        "playTimeCounterPosition": {
+          "label": "Pozycja licznika czasu"
+        },
+        "resourceGlowColors": {
+          "label": "Paleta poświaty zasobów"
+        },
+        "enableViewDistance": {
+          "label": "Limity zasięgu widoku"
+        },
+        "farthestZoom": {
+          "label": "Najdalszy zoom"
+        },
+        "closestZoom": {
+          "label": "Najbliższy zoom"
+        },
+        "fallbackZoom": {
+          "label": "Zapasowy zoom"
+        }
+      }
+    },
+    "jp": {
+      "name": "便利調整",
+      "config": {
+        "enableExplainerLanguageFix": {
+          "label": "ヒント言語修正"
+        },
+        "enableEndingSkip": {
+          "label": "エンディングスキップ"
+        },
+        "enableAccessibilityButtons": {
+          "label": "アクセシビリティボタン"
+        },
+        "enableStabilizerSurgeFlashReduction": {
+          "label": "安定器サージ点滅軽減"
+        },
+        "enableResourceGlowColors": {
+          "label": "資源の光輪色"
+        },
+        "enablePlayTimeCounter": {
+          "label": "プレイ時間カウンター"
+        },
+        "playTimeCounterPosition": {
+          "label": "プレイ時間カウンター位置"
+        },
+        "resourceGlowColors": {
+          "label": "資源の光輪パレット"
+        },
+        "enableViewDistance": {
+          "label": "表示距離制限"
+        },
+        "farthestZoom": {
+          "label": "最遠ズーム"
+        },
+        "closestZoom": {
+          "label": "最近ズーム"
+        },
+        "fallbackZoom": {
+          "label": "予備ズーム"
+        }
+      }
+    },
+    "kr": {
+      "name": "편의성 조정",
+      "config": {
+        "enableExplainerLanguageFix": {
+          "label": "힌트 언어 수정"
+        },
+        "enableEndingSkip": {
+          "label": "엔딩 건너뛰기"
+        },
+        "enableAccessibilityButtons": {
+          "label": "접근성 버튼"
+        },
+        "enableStabilizerSurgeFlashReduction": {
+          "label": "안정기 서지 점멸 감소"
+        },
+        "enableResourceGlowColors": {
+          "label": "자원 발광 색상"
+        },
+        "enablePlayTimeCounter": {
+          "label": "플레이 시간 카운터"
+        },
+        "playTimeCounterPosition": {
+          "label": "플레이 시간 카운터 위치"
+        },
+        "resourceGlowColors": {
+          "label": "자원 발광 팔레트"
+        },
+        "enableViewDistance": {
+          "label": "시야 거리 제한"
+        },
+        "farthestZoom": {
+          "label": "가장 먼 줌"
+        },
+        "closestZoom": {
+          "label": "가장 가까운 줌"
+        },
+        "fallbackZoom": {
+          "label": "대체 줌"
+        }
+      }
+    },
+    "tch": {
+      "name": "便利調整",
+      "config": {
+        "enableExplainerLanguageFix": {
+          "label": "提示語言修復"
+        },
+        "enableEndingSkip": {
+          "label": "結局跳過"
+        },
+        "enableAccessibilityButtons": {
+          "label": "輔助按鈕"
+        },
+        "enableStabilizerSurgeFlashReduction": {
+          "label": "穩定器浪湧閃爍削弱"
+        },
+        "enableResourceGlowColors": {
+          "label": "資源光圈顏色"
+        },
+        "enablePlayTimeCounter": {
+          "label": "遊戲時間計數器"
+        },
+        "playTimeCounterPosition": {
+          "label": "遊戲時間計數器位置"
+        },
+        "resourceGlowColors": {
+          "label": "資源光圈調色板"
+        },
+        "enableViewDistance": {
+          "label": "視野距離限制"
+        },
+        "farthestZoom": {
+          "label": "最遠縮放"
+        },
+        "closestZoom": {
+          "label": "最近縮放"
+        },
+        "fallbackZoom": {
+          "label": "預設縮放"
+        }
+      }
+    },
+    "thai": {
+      "name": "การปรับแต่งความสะดวก",
+      "config": {
+        "enableExplainerLanguageFix": {
+          "label": "แก้ภาษาคำแนะนำ"
+        },
+        "enableEndingSkip": {
+          "label": "ข้ามตอนจบ"
+        },
+        "enableAccessibilityButtons": {
+          "label": "ปุ่มช่วยใช้งาน"
+        },
+        "enableStabilizerSurgeFlashReduction": {
+          "label": "ลดแฟลชจากตัวเสถียร"
+        },
+        "enableResourceGlowColors": {
+          "label": "สีเรืองแสงทรัพยากร"
+        },
+        "enablePlayTimeCounter": {
+          "label": "ตัวนับเวลาเล่น"
+        },
+        "playTimeCounterPosition": {
+          "label": "ตำแหน่งตัวนับเวลาเล่น"
+        },
+        "resourceGlowColors": {
+          "label": "พาเลตแสงทรัพยากร"
+        },
+        "enableViewDistance": {
+          "label": "ขีดจำกัดระยะมองเห็น"
+        },
+        "farthestZoom": {
+          "label": "ซูมไกลสุด"
+        },
+        "closestZoom": {
+          "label": "ซูมใกล้สุด"
+        },
+        "fallbackZoom": {
+          "label": "ซูมสำรอง"
+        }
+      }
+    },
+    "hu": {
+      "name": "Kényelmi finomítások",
+      "config": {
+        "enableExplainerLanguageFix": {
+          "label": "Tippnyelv javítása"
+        },
+        "enableEndingSkip": {
+          "label": "Befejezés átugrása"
+        },
+        "enableAccessibilityButtons": {
+          "label": "Akadálymentes gombok"
+        },
+        "enableStabilizerSurgeFlashReduction": {
+          "label": "Stabilizátor villanáscsökkentés"
+        },
+        "enableResourceGlowColors": {
+          "label": "Erőforrás-fény színei"
+        },
+        "enablePlayTimeCounter": {
+          "label": "Játékidő-számláló"
+        },
+        "playTimeCounterPosition": {
+          "label": "Játékidő-számláló helye"
+        },
+        "resourceGlowColors": {
+          "label": "Erőforrás-fény paletta"
+        },
+        "enableViewDistance": {
+          "label": "Látótávolság-korlátok"
+        },
+        "farthestZoom": {
+          "label": "Legtávolabbi nagyítás"
+        },
+        "closestZoom": {
+          "label": "Legközelebbi nagyítás"
+        },
+        "fallbackZoom": {
+          "label": "Tartalék nagyítás"
+        }
+      }
+    },
+    "lv": {
+      "name": "Ērtības uzlabojumi",
+      "config": {
+        "enableExplainerLanguageFix": {
+          "label": "Padomu valodas labojums"
+        },
+        "enableEndingSkip": {
+          "label": "Beigu izlaišana"
+        },
+        "enableAccessibilityButtons": {
+          "label": "Pieejamības pogas"
+        },
+        "enableStabilizerSurgeFlashReduction": {
+          "label": "Stabilizatora zibšņu mazināšana"
+        },
+        "enableResourceGlowColors": {
+          "label": "Resursu spīduma krāsas"
+        },
+        "enablePlayTimeCounter": {
+          "label": "Spēles laika skaitītājs"
+        },
+        "playTimeCounterPosition": {
+          "label": "Spēles laika skaitītāja vieta"
+        },
+        "resourceGlowColors": {
+          "label": "Resursu spīduma palete"
+        },
+        "enableViewDistance": {
+          "label": "Skata attāluma limiti"
+        },
+        "farthestZoom": {
+          "label": "Tālākais tālummaiņas līmenis"
+        },
+        "closestZoom": {
+          "label": "Tuvākais tālummaiņas līmenis"
+        },
+        "fallbackZoom": {
+          "label": "Rezerves tālummaiņa"
+        }
+      }
+    },
+    "ro": {
+      "name": "Ajustări utile",
+      "config": {
+        "enableExplainerLanguageFix": {
+          "label": "Corecție limbă indicii"
+        },
+        "enableEndingSkip": {
+          "label": "Sari peste final"
+        },
+        "enableAccessibilityButtons": {
+          "label": "Butoane accesibilitate"
+        },
+        "enableStabilizerSurgeFlashReduction": {
+          "label": "Reducere flash stabilizator"
+        },
+        "enableResourceGlowColors": {
+          "label": "Culori halou resurse"
+        },
+        "enablePlayTimeCounter": {
+          "label": "Contor timp de joc"
+        },
+        "playTimeCounterPosition": {
+          "label": "Poziție contor timp"
+        },
+        "resourceGlowColors": {
+          "label": "Paletă halou resurse"
+        },
+        "enableViewDistance": {
+          "label": "Limite distanță vizuală"
+        },
+        "farthestZoom": {
+          "label": "Zoom cel mai îndepărtat"
+        },
+        "closestZoom": {
+          "label": "Zoom cel mai apropiat"
+        },
+        "fallbackZoom": {
+          "label": "Zoom de rezervă"
+        }
+      }
+    },
+    "no": {
+      "name": "Praktiske justeringer",
+      "config": {
+        "enableExplainerLanguageFix": {
+          "label": "Språkfiks for hint"
+        },
+        "enableEndingSkip": {
+          "label": "Hopp over slutt"
+        },
+        "enableAccessibilityButtons": {
+          "label": "Tilgjengelighetsknapper"
+        },
+        "enableStabilizerSurgeFlashReduction": {
+          "label": "Reduser stabilisatorblink"
+        },
+        "enableResourceGlowColors": {
+          "label": "Glødefarger for ressurser"
+        },
+        "enablePlayTimeCounter": {
+          "label": "Spilletidteller"
+        },
+        "playTimeCounterPosition": {
+          "label": "Plassering av spilletidteller"
+        },
+        "resourceGlowColors": {
+          "label": "Glødepalett for ressurser"
+        },
+        "enableViewDistance": {
+          "label": "Grenser for visningsavstand"
+        },
+        "farthestZoom": {
+          "label": "Fjerneste zoom"
+        },
+        "closestZoom": {
+          "label": "Nærmeste zoom"
+        },
+        "fallbackZoom": {
+          "label": "Reservezoom"
+        }
+      }
+    }
+  }
 }

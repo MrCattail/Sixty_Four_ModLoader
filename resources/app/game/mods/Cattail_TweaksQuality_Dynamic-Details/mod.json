@@ -20,5 +20,171 @@
       "description": "Enter cookie to show the cookie direction indicator before Cookie Clicker is achieved."
     }
   },
-  "description": "Adds Alt+Shift dynamic building detail panels and shop build-availability countdowns without modifying vanilla scripts."
+  "description": "Adds Alt+Shift dynamic building detail panels and shop build-availability countdowns without modifying vanilla scripts.",
+  "translations": {
+    "sch": {
+      "name": "动态详情",
+      "description": "添加 Alt+Shift 动态建筑详情面板和商店建造可用倒计时，不修改原版脚本。",
+      "config": {
+        "cookieDirectionPassword": {
+          "label": "饼干方向密码",
+          "description": "输入 cookie 可在达成 Cookie Clicker 前显示饼干方向指示。"
+        }
+      }
+    },
+    "modsch": {
+      "name": "动态详情",
+      "description": "添加 Alt+Shift 动态建筑详情面板和商店建造可用倒计时，不修改原版脚本。",
+      "config": {
+        "cookieDirectionPassword": {
+          "label": "饼干方向密码",
+          "description": "输入 cookie 可在达成 Cookie Clicker 前显示饼干方向指示。"
+        }
+      }
+    },
+    "en": {
+      "name": "Dynamic Details",
+      "config": {
+        "cookieDirectionPassword": {
+          "label": "Cookie direction password"
+        }
+      }
+    },
+    "ru": {
+      "name": "Динамические сведения",
+      "config": {
+        "cookieDirectionPassword": {
+          "label": "Пароль направления печенья"
+        }
+      }
+    },
+    "de": {
+      "name": "Dynamische Details",
+      "config": {
+        "cookieDirectionPassword": {
+          "label": "Cookie-Richtungspasswort"
+        }
+      }
+    },
+    "ptbr": {
+      "name": "Detalhes dinâmicos",
+      "config": {
+        "cookieDirectionPassword": {
+          "label": "Senha da direção do cookie"
+        }
+      }
+    },
+    "it": {
+      "name": "Dettagli dinamici",
+      "config": {
+        "cookieDirectionPassword": {
+          "label": "Password direzione cookie"
+        }
+      }
+    },
+    "es": {
+      "name": "Detalles dinámicos",
+      "config": {
+        "cookieDirectionPassword": {
+          "label": "Contraseña de dirección de cookie"
+        }
+      }
+    },
+    "fr": {
+      "name": "Détails dynamiques",
+      "config": {
+        "cookieDirectionPassword": {
+          "label": "Mot de passe de direction du cookie"
+        }
+      }
+    },
+    "nl": {
+      "name": "Dynamische details",
+      "config": {
+        "cookieDirectionPassword": {
+          "label": "Cookie-richtingswachtwoord"
+        }
+      }
+    },
+    "cz": {
+      "name": "Dynamické detaily",
+      "config": {
+        "cookieDirectionPassword": {
+          "label": "Heslo směru sušenky"
+        }
+      }
+    },
+    "pl": {
+      "name": "Dynamiczne szczegóły",
+      "config": {
+        "cookieDirectionPassword": {
+          "label": "Hasło kierunku ciasteczka"
+        }
+      }
+    },
+    "jp": {
+      "name": "動的詳細",
+      "config": {
+        "cookieDirectionPassword": {
+          "label": "クッキー方向パスワード"
+        }
+      }
+    },
+    "kr": {
+      "name": "동적 세부 정보",
+      "config": {
+        "cookieDirectionPassword": {
+          "label": "쿠키 방향 암호"
+        }
+      }
+    },
+    "tch": {
+      "name": "動態詳情",
+      "config": {
+        "cookieDirectionPassword": {
+          "label": "餅乾方向密碼"
+        }
+      }
+    },
+    "thai": {
+      "name": "รายละเอียดแบบไดนามิก",
+      "config": {
+        "cookieDirectionPassword": {
+          "label": "รหัสทิศทางคุกกี้"
+        }
+      }
+    },
+    "hu": {
+      "name": "Dinamikus részletek",
+      "config": {
+        "cookieDirectionPassword": {
+          "label": "Sütiirány jelszó"
+        }
+      }
+    },
+    "lv": {
+      "name": "Dinamiska informācija",
+      "config": {
+        "cookieDirectionPassword": {
+          "label": "Cepuma virziena parole"
+        }
+      }
+    },
+    "ro": {
+      "name": "Detalii dinamice",
+      "config": {
+        "cookieDirectionPassword": {
+          "label": "Parolă direcție cookie"
+        }
+      }
+    },
+    "no": {
+      "name": "Dynamiske detaljer",
+      "config": {
+        "cookieDirectionPassword": {
+          "label": "Passord for kjeksretning"
+        }
+      }
+    }
+  }
 }

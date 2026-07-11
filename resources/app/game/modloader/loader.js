@@ -211,7 +211,7 @@
 			document.body.appendChild(el)
 		}
 
-		const names = state.mods.map(function (mod) { return mod.path || mod.id }).join(', ') || 'No mods'
+		const names = state.mods.map(function (mod) { return getLocalizedModName(mod) || mod.path || mod.id }).join(', ') || 'No mods'
 		el.title = `Cattail's ModLoader ${state.version} | mod: ${state.mods.length} | Ctrl+M | ${names}`
 		installStatusDrag(el)
 		if (!state.statusDragging) applyStatusCorner(el, readStatusCorner())
@@ -398,6 +398,164 @@
 			return values && values[name] !== undefined ? String(values[name]) : match
 		})
 	}
+
+	const isLocaleObject = function (value) {
+		return value && typeof value === 'object' && !Array.isArray(value)
+	}
+
+	const addUniqueLocaleCandidate = function (out, value) {
+		const text = String(value || '').trim().toLowerCase()
+		if (text && out.indexOf(text) === -1) out.push(text)
+	}
+
+	const getLocaleCandidates = function () {
+		const raw = String(state.game?.language || '').trim().toLowerCase()
+		const panel = getPanelLanguage()
+		const out = []
+		addUniqueLocaleCandidate(out, raw)
+		addUniqueLocaleCandidate(out, panel)
+		if (raw === 'modsch' || panel === 'sch') {
+			addUniqueLocaleCandidate(out, 'modsch')
+			addUniqueLocaleCandidate(out, 'sch')
+			addUniqueLocaleCandidate(out, 'zh-cn')
+			addUniqueLocaleCandidate(out, 'zh')
+		}
+		if (panel === 'tch') {
+			addUniqueLocaleCandidate(out, 'tch')
+			addUniqueLocaleCandidate(out, 'zh-tw')
+			addUniqueLocaleCandidate(out, 'sch')
+		}
+		addUniqueLocaleCandidate(out, 'en')
+		return out
+	}
+
+	const pickLocalizedText = function (value, candidates) {
+		if (typeof value === 'string') return value
+		if (!isLocaleObject(value)) return ''
+		for (const language of candidates) {
+			if (typeof value[language] === 'string') return value[language]
+		}
+		return typeof value.en === 'string' ? value.en : ''
+	}
+
+	const getManifestTranslationRoot = function (manifest) {
+		for (const key of [ 'translations', 'i18n', 'uiTranslations', 'uiText' ]) {
+			if (isLocaleObject(manifest?.[key])) return manifest[key]
+		}
+		return null
+	}
+
+	const getLocalizedManifestText = function (manifest, key, fallback) {
+		const candidates = getLocaleCandidates()
+		const translations = getManifestTranslationRoot(manifest)
+		if (translations) {
+			for (const language of candidates) {
+				const group = translations[language]
+				const value = pickLocalizedText(group?.[key], [ language, 'en' ])
+				if (value) return value
+			}
+		}
+		return pickLocalizedText(manifest?.[key], candidates) || fallback || ''
+	}
+
+	const getLocalizedConfigText = function (manifest, item, key, fallback) {
+		const candidates = getLocaleCandidates()
+		const translations = getManifestTranslationRoot(manifest)
+		if (translations && item?.key) {
+			for (const language of candidates) {
+				const group = translations[language]
+				const configGroup = group?.config || group?.configs
+				const value = pickLocalizedText(configGroup?.[item.key]?.[key], [ language, 'en' ])
+				if (value) return value
+			}
+		}
+		const direct = pickLocalizedText(item?.translations?.[key], candidates) || pickLocalizedText(item?.[key], candidates)
+		return direct || fallback || ''
+	}
+
+	const getLocalizedModName = function (mod) {
+		return getLocalizedManifestText(mod?.manifest, 'name', mod?.path || mod?.id || '')
+	}
+
+	const getLocalizedModDescription = function (mod) {
+		return getLocalizedManifestText(mod?.manifest, 'description', '')
+	}
+
+	const getInlineLocalizedText = function (value, values) {
+		let text = pickLocalizedText(value, getLocaleCandidates())
+		if (!values) return text
+		for (const key in values) text = text.replace(new RegExp('\\{' + key + '\\}', 'g'), values[key])
+		return text
+	}
+
+	const CONFIG_INLINE_TEXT = {
+	"glowColorLabel": {
+		"en": "{name} glow color",
+		"ru": "Свечение ресурса {name}",
+		"de": "{name}-Leuchtfarbe",
+		"ptbr": "Brilho de {name}",
+		"it": "Colore bagliore {name}",
+		"es": "Color de brillo de {name}",
+		"fr": "Couleur de halo de {name}",
+		"nl": "Gloedkleur van {name}",
+		"cz": "Barva záře {name}",
+		"pl": "Kolor poświaty {name}",
+		"jp": "{name}の光輪色",
+		"kr": "{name} 발광 색상",
+		"sch": "{name} 光圈颜色",
+		"tch": "{name} 光圈顏色",
+		"thai": "สีเรืองแสง {name}",
+		"hu": "{name} fényének színe",
+		"lv": "{name} spīduma krāsa",
+		"ro": "Culoare halou {name}",
+		"no": "Glødefarge for {name}",
+		"modsch": "{name} 光圈颜色"
+	},
+	"reset": {
+		"en": "Reset",
+		"ru": "Сброс",
+		"de": "Zurücksetzen",
+		"ptbr": "Redefinir",
+		"it": "Ripristina",
+		"es": "Restablecer",
+		"fr": "Réinitialiser",
+		"nl": "Resetten",
+		"cz": "Resetovat",
+		"pl": "Resetuj",
+		"jp": "リセット",
+		"kr": "초기화",
+		"sch": "重置",
+		"tch": "重置",
+		"thai": "รีเซ็ต",
+		"hu": "Visszaállítás",
+		"lv": "Atiestatīt",
+		"ro": "Resetare",
+		"no": "Tilbakestill",
+		"modsch": "重置"
+	},
+	"resetTitle": {
+		"en": "Reset to resource color",
+		"ru": "Сбросить к цвету ресурса",
+		"de": "Auf Ressourcenfarbe zurücksetzen",
+		"ptbr": "Redefinir para a cor do recurso",
+		"it": "Ripristina al colore risorsa",
+		"es": "Restablecer al color del recurso",
+		"fr": "Réinitialiser à la couleur de ressource",
+		"nl": "Terugzetten naar grondstofkleur",
+		"cz": "Resetovat na barvu suroviny",
+		"pl": "Resetuj do koloru zasobu",
+		"jp": "資源色にリセット",
+		"kr": "자원 색상으로 초기화",
+		"sch": "重置为资源默认颜色",
+		"tch": "重置為資源預設顏色",
+		"thai": "รีเซ็ตเป็นสีทรัพยากร",
+		"hu": "Visszaállítás az erőforrás színére",
+		"lv": "Atiestatīt uz resursa krāsu",
+		"ro": "Resetează la culoarea resursei",
+		"no": "Tilbakestill til ressursfarge",
+		"modsch": "重置为资源默认颜色"
+	}
+}
 
 	const ensurePanelStyle = function () {
 		if (document.getElementById('modloader-panel-style')) return
@@ -966,11 +1124,11 @@
 			textInput.type = 'text'
 			textInput.spellcheck = false
 			textInput.value = resource.color
-			textInput.setAttribute('aria-label', resource.name + ' glow color')
+			textInput.setAttribute('aria-label', getInlineLocalizedText(CONFIG_INLINE_TEXT.glowColorLabel, { name: resource.name }))
 
-			const reset = element('button', 'modloader-resource-color-reset', 'Reset')
+			const reset = element('button', 'modloader-resource-color-reset', getInlineLocalizedText(CONFIG_INLINE_TEXT.reset))
 			reset.type = 'button'
-			reset.title = 'Reset to resource color'
+			reset.title = getInlineLocalizedText(CONFIG_INLINE_TEXT.resetTitle)
 
 			picker.addEventListener('input', function () {
 				textInput.value = picker.value.toUpperCase()
@@ -2534,7 +2692,9 @@
 			const checkbox = element('input', 'modloader-mod-check modloader-switch-input')
 			checkbox.type = 'checkbox'
 			checkbox.setAttribute('role', 'switch')
-			checkbox.setAttribute('aria-label', 'Enable ' + (mod.manifest.name || mod.id || mod.path))
+			const localizedModName = getLocalizedModName(mod) || mod.path
+			const localizedModDescription = getLocalizedModDescription(mod)
+			checkbox.setAttribute('aria-label', 'Enable ' + localizedModName)
 			checkbox.checked = selected.has(mod.path)
 			checkbox.disabled = !!mod.loadError && !checkbox.checked
 			checkbox.onchange = function () {
@@ -2545,9 +2705,10 @@
 
 			const main = element('div', 'modloader-mod-main')
 			const title = element('div', 'modloader-mod-title')
-			title.appendChild(element('span', 'modloader-mod-path', mod.manifest.name || mod.path))
+			title.appendChild(element('span', 'modloader-mod-path', localizedModName))
+			if (localizedModDescription) title.title = localizedModDescription
 			if (mod.manifest.version) title.appendChild(element('span', 'modloader-mod-version', 'v' + mod.manifest.version))
-			if (mod.manifest.name && mod.manifest.name !== mod.path) title.appendChild(element('span', 'modloader-mod-name', mod.path))
+			if (localizedModName !== mod.path) title.appendChild(element('span', 'modloader-mod-name', mod.path))
 			main.appendChild(title)
 
 			const deps = resolveModRefs(mod.manifest.dependencies)
@@ -2580,7 +2741,12 @@
 					const value = modConfig.values[item.key]
 					const field = element('label', 'modloader-config-field')
 					const text = element('span', 'modloader-config-text')
-					text.appendChild(element('span', 'modloader-config-label', item.label || item.key))
+					const localizedConfigLabel = getLocalizedConfigText(mod.manifest, item, 'label', item.key)
+					const localizedConfigDescription = getLocalizedConfigText(mod.manifest, item, 'description', '')
+					const label = element('span', 'modloader-config-label', localizedConfigLabel || item.key)
+					if (localizedConfigDescription) label.title = localizedConfigDescription
+					text.appendChild(label)
+					if (localizedConfigDescription) text.title = localizedConfigDescription
 					text.appendChild(element('span', 'modloader-config-meta', item.key + ' | ' + type))
 					const input = createConfigInput(item, value)
 					const error = element('span', 'modloader-config-error')
