@@ -457,7 +457,7 @@
 			#modloader-panel.modloader-panel-theme-light .modloader-mod-row, #modloader-panel.modloader-panel-theme-light .modloader-panel-log, #modloader-panel.modloader-panel-theme-light .modloader-import-zone { border-color: rgba(0,0,0,.1); background: rgba(0,0,0,.035); }
 			#modloader-panel.modloader-panel-theme-light .modloader-mod-name, #modloader-panel.modloader-panel-theme-light .modloader-mod-version, #modloader-panel.modloader-panel-theme-light .modloader-mod-meta, #modloader-panel.modloader-panel-theme-light .modloader-config-meta { color: rgba(18,20,22,.58); }
 			#modloader-panel.modloader-panel-theme-light input.modloader-config-input:not([type="checkbox"]), #modloader-panel.modloader-panel-theme-light textarea.modloader-config-input, #modloader-panel.modloader-panel-theme-light select.modloader-config-input, #modloader-panel.modloader-panel-theme-light .modloader-panel-settings-number, #modloader-panel.modloader-panel-theme-light .modloader-resource-color-text { background: rgba(0,0,0,.045); border-color: rgba(0,0,0,.14); color: rgba(18,20,22,.92); }
-			#modloader-panel.modloader-panel-theme-light .modloader-action-button, #modloader-panel.modloader-panel-theme-light .modloader-modal-button, #modloader-panel.modloader-panel-theme-light .modloader-resource-color-reset { background: rgba(0,0,0,.055); border-color: rgba(0,0,0,.12); color: rgba(18,20,22,.78); }
+			#modloader-panel.modloader-panel-theme-light .modloader-action-button, #modloader-panel.modloader-panel-theme-light .modloader-modal-button, #modloader-panel.modloader-panel-theme-light .modloader-resource-color-button, #modloader-panel.modloader-panel-theme-light .modloader-resource-color-reset { background: rgba(0,0,0,.055); border-color: rgba(0,0,0,.12); color: rgba(18,20,22,.78); }
 			#modloader-panel.modloader-panel-theme-light .modloader-panel-tab { background: rgba(248,248,246,.95); border-color: rgba(0,0,0,.12); }
 			#modloader-panel .modloader-panel-summary { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px 12px; margin: 8px 0 12px; }
 			#modloader-panel .modloader-panel-row { display: flex; gap: 12px; justify-content: space-between; border-top: 1px solid rgba(255,255,255,.1); padding: 5px 0; }
@@ -558,13 +558,17 @@
 			#modloader-panel .modloader-config-error { display: none; grid-column: 2; color: #ffb0b0; font-size: 11px; }
 			#modloader-panel .modloader-config-error.active { display: block; }
 			#modloader-panel .modloader-resource-colors { display: grid; gap: 6px; min-width: 0; }
+			#modloader-panel .modloader-resource-color-tools { display: flex; align-items: center; gap: 7px; min-width: 0; margin-bottom: 2px; }
+			#modloader-panel .modloader-resource-color-status { min-width: 0; color: rgba(255,255,255,.5); font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+			#modloader-panel .modloader-resource-color-status[data-tone="ok"] { color: #cfe9ff; }
+			#modloader-panel .modloader-resource-color-status[data-tone="error"] { color: #ffb0b0; }
 			#modloader-panel .modloader-resource-color-row { display: grid; grid-template-columns: 38px 34px minmax(0, 1fr) auto; gap: 8px; align-items: center; min-width: 0; }
 			#modloader-panel .modloader-resource-color-icon { display: block; width: 36px; height: 40px; background-image: url('img/resources.png'); background-size: 360px 40px; background-repeat: no-repeat; filter: drop-shadow(0 1px 2px rgba(255,255,255,.78)); }
 			#modloader-panel .modloader-resource-color-picker { width: 30px; height: 28px; box-sizing: border-box; border: 1px solid rgba(255,255,255,.18); border-radius: 5px; padding: 0; background: transparent; color: inherit; cursor: pointer; }
 			#modloader-panel .modloader-resource-color-text { box-sizing: border-box; width: 100%; min-width: 0; border: 1px solid rgba(255,255,255,.16); border-radius: 5px; padding: 5px 6px; background: rgba(0,0,0,.22); color: rgba(255,255,255,.92); outline: none; }
 			#modloader-panel .modloader-resource-color-text:focus { border-color: rgba(207, 233, 255, .5); }
-			#modloader-panel .modloader-resource-color-reset { border: 1px solid rgba(255,255,255,.14); border-radius: 5px; padding: 5px 7px; background: rgba(255,255,255,.08); color: rgba(255,255,255,.78); cursor: pointer; }
-			#modloader-panel .modloader-resource-color-reset:hover { background: rgba(255,255,255,.14); color: rgba(255,255,255,.94); }
+			#modloader-panel .modloader-resource-color-button, #modloader-panel .modloader-resource-color-reset { border: 1px solid rgba(255,255,255,.14); border-radius: 5px; padding: 5px 7px; background: rgba(255,255,255,.08); color: rgba(255,255,255,.78); cursor: pointer; }
+			#modloader-panel .modloader-resource-color-button:hover, #modloader-panel .modloader-resource-color-reset:hover { background: rgba(255,255,255,.14); color: rgba(255,255,255,.94); }
 			#modloader-panel .modloader-modal { position: absolute; inset: 0; z-index: 5; display: grid; place-items: center; padding: 16px; background: rgba(8,10,12,.2); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }
 			#modloader-panel .modloader-modal-box { width: min(420px, 100%); border: 1px solid rgba(255,255,255,.12); border-radius: 8px; padding: 14px; background: rgba(10,12,14,.92); box-shadow: 0 14px 36px rgba(0,0,0,.36); }
 			#modloader-panel .modloader-modal-title { margin: 0 0 8px; font-size: 14px; color: rgba(255,255,255,.94); }
@@ -939,9 +943,175 @@
 		return String(value)
 	}
 
+	const setResourceColorToolStatus = function (status, message, tone) {
+		if (!status) return
+		status.textContent = message || ''
+		status.dataset.tone = tone || ''
+		if (status.__modloaderTimer) clearTimeout(status.__modloaderTimer)
+		status.__modloaderTimer = null
+		if (!message) return
+		status.__modloaderTimer = setTimeout(function () {
+			status.textContent = ''
+			status.dataset.tone = ''
+			status.__modloaderTimer = null
+		}, 2400)
+	}
+
+	const readResourceColorsFromRows = function (root, options) {
+		const includeDefaults = !!options?.includeDefaults
+		const out = {}
+		const rows = root.querySelectorAll('.modloader-resource-color-row')
+		for (const row of rows) {
+			const textInput = row.querySelector('.modloader-resource-color-text')
+			const color = normalizePanelHexColor(textInput?.value)
+			if (!color) throw new Error('Enter colors as #RRGGBB.')
+			if (includeDefaults || color !== row.dataset.defaultColor) out[row.dataset.resourceId] = color
+		}
+		return out
+	}
+
+	const createResourceColorShareText = function (root) {
+		return JSON.stringify({
+			type: 'CattailResourceGlowColors',
+			version: 1,
+			colors: readResourceColorsFromRows(root, { includeDefaults: true })
+		}, null, 2)
+	}
+
+	const normalizeResourceColorImportKey = function (key) {
+		const match = String(key).trim().match(/^r?(\d+)$/i)
+		return match ? String(Number(match[1])) : ''
+	}
+
+	const normalizeResourceColorImportData = function (data) {
+		const source = data && (data.colors !== undefined ? data.colors : (data.resourceGlowColors !== undefined ? data.resourceGlowColors : data))
+		const out = {}
+		const add = function (key, value) {
+			const id = normalizeResourceColorImportKey(key)
+			const raw = isObject(value) && value.color !== undefined ? value.color : value
+			const color = normalizePanelHexColor(raw)
+			if (!id && color) return
+			if (id && !color) throw new Error('Imported color data contains invalid colors.')
+			if (id && color) out[id] = color
+		}
+		if (Array.isArray(source)) {
+			source.forEach(function (value, index) {
+				const key = isObject(value) && value.id !== undefined ? value.id : index
+				add(key, value)
+			})
+		} else if (isObject(source)) {
+			for (const key of Object.keys(source)) add(key, source[key])
+		} else {
+			throw new Error('Clipboard does not contain color data.')
+		}
+		if (!Object.keys(out).length) throw new Error('Clipboard does not contain color data.')
+		return out
+	}
+
+	const parseResourceColorLines = function (text) {
+		const out = {}
+		let nextId = 0
+		const parts = String(text || '').split(/[\r\n,;]+/).map(function (part) { return part.trim() }).filter(Boolean)
+		for (const part of parts) {
+			const match = part.match(/^(?:r?(\d+)\s*[:=]\s*)?(#?[0-9a-f]{3}(?:[0-9a-f]{3})?)$/i)
+			if (!match) throw new Error('Clipboard does not contain valid color data.')
+			const color = normalizePanelHexColor(match[2])
+			if (!color) throw new Error('Clipboard does not contain valid color data.')
+			const id = match[1] !== undefined ? String(Number(match[1])) : String(nextId++)
+			out[id] = color
+		}
+		if (!Object.keys(out).length) throw new Error('Clipboard is empty.')
+		return out
+	}
+
+	const parseResourceColorShareText = function (text) {
+		const source = String(text || '').trim()
+		if (!source) throw new Error('Clipboard is empty.')
+		if (/^[\[{]/.test(source)) return normalizeResourceColorImportData(JSON.parse(source))
+		return parseResourceColorLines(source)
+	}
+
+	const readPanelClipboardText = async function () {
+		try {
+			if (window.navigator?.clipboard?.readText) {
+				const text = await window.navigator.clipboard.readText()
+				if (text !== undefined && text !== null) return String(text)
+			}
+		} catch (error) {}
+		const tools = getModFileTools()
+		if (tools?.clipboard?.readText) return String(tools.clipboard.readText() || '')
+		throw new Error('Clipboard is not available.')
+	}
+
+	const writePanelClipboardText = async function (text) {
+		try {
+			if (window.navigator?.clipboard?.writeText) {
+				await window.navigator.clipboard.writeText(text)
+				return
+			}
+		} catch (error) {}
+		const tools = getModFileTools()
+		if (tools?.clipboard?.writeText) {
+			tools.clipboard.writeText(text)
+			return
+		}
+		throw new Error('Clipboard is not available.')
+	}
+
+	const applyResourceColorImport = function (root, colors) {
+		let applied = 0
+		const rows = root.querySelectorAll('.modloader-resource-color-row')
+		for (const row of rows) {
+			const color = colors[row.dataset.resourceId]
+			if (color === undefined) continue
+			const normalized = normalizePanelHexColor(color)
+			if (!normalized) throw new Error('Imported color data contains invalid colors.')
+			const picker = row.querySelector('.modloader-resource-color-picker')
+			const textInput = row.querySelector('.modloader-resource-color-text')
+			if (picker) picker.value = normalized
+			if (textInput) textInput.value = normalized
+			applied++
+		}
+		if (!applied) throw new Error('No matching resource colors were found.')
+		root.dispatchEvent(new Event('input', { bubbles: true }))
+		return applied
+	}
 	const createResourceColorsInput = function (item, value) {
 		const root = element('div', 'modloader-resource-colors modloader-config-input')
 		const resources = getResourceColorConfigRows(item, value)
+		const tools = element('div', 'modloader-resource-color-tools')
+		const exportButton = element('button', 'modloader-resource-color-button', 'Export')
+		exportButton.type = 'button'
+		exportButton.title = 'Copy all resource glow colors to the clipboard'
+		const importButton = element('button', 'modloader-resource-color-button', 'Import')
+		importButton.type = 'button'
+		importButton.title = 'Import resource glow colors from the clipboard'
+		const toolStatus = element('span', 'modloader-resource-color-status')
+		tools.append(exportButton, importButton, toolStatus)
+		root.appendChild(tools)
+
+		exportButton.addEventListener('click', async function (event) {
+			event.preventDefault()
+			event.stopPropagation()
+			try {
+				await writePanelClipboardText(createResourceColorShareText(root))
+				setResourceColorToolStatus(toolStatus, 'Copied all colors.', 'ok')
+			} catch (error) {
+				setResourceColorToolStatus(toolStatus, error.message || 'Export failed.', 'error')
+			}
+		})
+		importButton.addEventListener('click', async function (event) {
+			event.preventDefault()
+			event.stopPropagation()
+			try {
+				const colors = parseResourceColorShareText(await readPanelClipboardText())
+				const count = applyResourceColorImport(root, colors)
+				setResourceColorToolStatus(toolStatus, 'Imported ' + count + ' colors.', 'ok')
+			} catch (error) {
+				setResourceColorToolStatus(toolStatus, error.message || 'Import failed.', 'error')
+			}
+		})
+
 		for (const resource of resources) {
 			const row = element('div', 'modloader-resource-color-row')
 			row.dataset.resourceId = String(resource.id)
@@ -986,15 +1156,7 @@
 		}
 
 		root.readConfigValue = function () {
-			const out = {}
-			const rows = root.querySelectorAll('.modloader-resource-color-row')
-			for (const row of rows) {
-				const textInput = row.querySelector('.modloader-resource-color-text')
-				const color = normalizePanelHexColor(textInput?.value)
-				if (!color) throw new Error('Enter colors as #RRGGBB.')
-				if (color !== row.dataset.defaultColor) out[row.dataset.resourceId] = color
-			}
-			return out
+			return readResourceColorsFromRows(root, { includeDefaults: false })
 		}
 
 		Object.defineProperty(root, 'disabled', {
