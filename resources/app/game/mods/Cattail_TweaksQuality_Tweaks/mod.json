@@ -48,13 +48,6 @@
       "description": "Color resource icon glows by resource, with optional per-resource overrides.",
       "reloadPolicy": "hot"
     },
-    "resourceGlowColors": {
-      "type": "resourceColors",
-      "label": "Resource glow palette",
-      "default": {},
-      "description": "Per-resource glow color overrides. Empty rows use each resource's native color.",
-      "reloadPolicy": "hot"
-    },
     "enablePlayTimeCounter": {
       "type": "boolean",
       "label": "Play time counter",
@@ -67,6 +60,13 @@
       "label": "Play time counter position",
       "default": "bottom-right",
       "description": "Use bottom-right to place it left of the shop button, or top-center to place it at the top center.",
+      "reloadPolicy": "hot"
+    },
+    "resourceGlowColors": {
+      "type": "resourceColors",
+      "label": "Resource glow palette",
+      "default": {},
+      "description": "Per-resource glow color overrides. Empty rows use each resource's native color.",
       "reloadPolicy": "hot"
     },
     "enableViewDistance": {
