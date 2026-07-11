@@ -139,7 +139,10 @@ ModLoader.register({
 		function renderLanguagePage(splash, page, options = {}) {
 			const game = splash.master
 			const words = readWords(game)
-			const languages = Array.isArray(game?.languages) ? game.languages : []
+			const rawLanguages = Array.isArray(game?.languages) ? game.languages : []
+			const languages = rawLanguages
+				.map(function (id, index) { return { id, index } })
+				.filter(function (entry) { return languageIsAvailable(words, entry.id) })
 			page.innerHTML = ''
 
 			const brand = document.createElement('div')
@@ -166,10 +169,8 @@ ModLoader.register({
 			installTransientScrollbar(list)
 			installInertialScroll(list)
 
-			for (let index = 0; index < languages.length; index++) {
-				const id = languages[index]
-				if (!id) continue
-				list.append(renderLanguageOption(splash, words, id, index))
+			for (const entry of languages) {
+				list.append(renderLanguageOption(splash, words, entry.id, entry.index))
 			}
 
 			page.append(list)
@@ -265,6 +266,12 @@ ModLoader.register({
 		function languageOptionLabel(words, id) {
 			const split = splitLanguageLine(words?.[id]?.splash?.language)
 			return split.value || fallbackLanguageLabels[id] || languageCodeLabel(id)
+		}
+
+		function languageIsAvailable(words, id) {
+			if (!id) return false
+			if (!words || !Object.keys(words).length) return true
+			return !!words?.[id]?.splash?.language
 		}
 
 		function splitLanguageLine(value) {

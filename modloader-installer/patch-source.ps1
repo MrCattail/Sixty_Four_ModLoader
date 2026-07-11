@@ -187,9 +187,29 @@ function Patch-GameJs {
 	$newChangeLanguage = @'
 		this.language = this.languages[this.languageId]
 		const words = window.ModLoader?.applyWords(abstract_getWords(), this) || abstract_getWords()
+		if (!words[this.language]) {
+			this.languageId = 0
+			this.language = this.languages[this.languageId] || `en`
+		}
+		this.words = words[this.language]
+		this.words_en = words.en
+'@
+	$oldModLoaderChangeLanguage = @'
+		this.language = this.languages[this.languageId]
+		const words = window.ModLoader?.applyWords(abstract_getWords(), this) || abstract_getWords()
 		this.words = words[this.language] || words.en || abstract_getWords()[this.language]
 '@
 	$Text = Apply-Optional $Text $oldChangeLanguage $newChangeLanguage
+	$Text = Apply-Optional $Text $oldModLoaderChangeLanguage $newChangeLanguage
+
+	$robustChangeLanguagePattern = '(?s)changeLanguage\(id\)\{.*?ModLoader\?\.applyWords.*?if \(!words\[this\.language\]\).*?this\.words_en = words\.en'
+	if (-not [regex]::IsMatch($Text, $robustChangeLanguagePattern)) {
+		$vanillaChangeLanguageWordsPattern = '(?m)^(\s*)this\.language = this\.languages\[this\.languageId\]\s*\n\s*this\.words = abstract_getWords\(\)\[this\.language\]\s*\n'
+		if (-not [regex]::IsMatch($Text, $vanillaChangeLanguageWordsPattern)) {
+			throw 'Could not patch language-change words hook. The game file may have changed or was edited by another tool.'
+		}
+		$Text = [regex]::Replace($Text, $vanillaChangeLanguageWordsPattern, { param($match) $indent = $match.Groups[1].Value; [regex]::Replace($newChangeLanguage, '(?m)^\t\t', $indent) + "`n" }, 1)
+	}
 
 	if (-not $Text.Contains('ModLoader?.applyLoadedSave')) {
 		$loadedSavePattern = '(?m)^(\t\ttry \{\n)(\t\t\t//To make sure\n)'
