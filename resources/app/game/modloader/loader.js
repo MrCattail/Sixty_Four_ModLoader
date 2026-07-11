@@ -32,6 +32,7 @@
 		panelHiddenSide: 'right',
 		panelTabPosition: null,
 		panelTabPositions: { left: null, right: null, top: null, bottom: null },
+		panelPreferredHideEdge: null,
 		panelSettings: { theme: 'dark', hideMode: 'auto' },
 		panelSettingsOpen: false,
 		panelStateLoaded: false,
@@ -1507,15 +1508,19 @@
 		if (isValidPanelEdge(edge)) state.panelTabPositions[edge] = null
 	}
 
-	const getPanelTabPositionFromPanel = function (panel, useStoredMemory) {
-		const rect = panel.getBoundingClientRect()
-		const edge = getNearestPanelEdge(panel)
+	const getPanelTabPositionForEdge = function (panel, edge, useStoredMemory) {
+		if (!isValidPanelEdge(edge)) return null
 		const stored = useStoredMemory ? getStoredPanelTabPosition(edge) : null
 		if (stored) return stored
+		const rect = panel.getBoundingClientRect()
 		const offset = (edge === 'left' || edge === 'right')
 			? rect.top + rect.height / 2 - PANEL_TAB_SIZE / 2
 			: rect.left + rect.width / 2 - PANEL_TAB_SIZE / 2
 		return { edge, offset: clampPanelTabOffset(edge, offset) }
+	}
+
+	const getPanelTabPositionFromPanel = function (panel, useStoredMemory) {
+		return getPanelTabPositionForEdge(panel, getNearestPanelEdge(panel), useStoredMemory)
 	}
 
 	const getActivePanelTabPosition = function (panel) {
@@ -1568,6 +1573,16 @@
 		if (!isPanelAutoHideEnabled()) clearPanelAutoHideTimer()
 	}
 
+	const closePanelSettingsPage = function (panel) {
+		if (!state.panelSettingsOpen) return
+		state.panelSettingsOpen = false
+		panel.classList.remove('modloader-panel-settings-open')
+		const settingsButton = panel.querySelector('.modloader-panel-settings')
+		const settingsPage = panel.querySelector('.modloader-panel-settings-page')
+		if (settingsButton) settingsButton.classList.remove('active')
+		if (settingsPage) settingsPage.classList.remove('active')
+	}
+
 	const applyPanelHiddenPosition = function (panel) {
 		if (!isPanelAutoHideEnabled()) {
 			state.panelHidden = false
@@ -1580,6 +1595,7 @@
 	const showPanelFromEdge = function (panel) {
 		clearPanelAutoHideTimer()
 		const tab = getActivePanelTabPosition(panel)
+		state.panelPreferredHideEdge = tab.edge
 		state.panelHidden = false
 		setPanelHiddenClasses(panel, tab.edge)
 		const size = getPanelSize(panel)
@@ -1603,8 +1619,12 @@
 
 	const hidePanelToEdge = function (panel, useStoredTab) {
 		if (!isPanelAutoHideEnabled()) return
+		closePanelSettingsPage(panel)
 		const rect = panel.getBoundingClientRect()
-		const tab = getPanelTabPositionFromPanel(panel, useStoredTab)
+		const activeTab = normalizePanelTabPosition(state.panelTabPosition)
+		const preferredEdge = useStoredTab && isValidPanelEdge(state.panelPreferredHideEdge) ? state.panelPreferredHideEdge : null
+		const preferredTab = preferredEdge && activeTab?.edge === preferredEdge ? activeTab : getPanelTabPositionForEdge(panel, preferredEdge, true)
+		const tab = preferredTab || getPanelTabPositionFromPanel(panel, useStoredTab)
 		panel.scrollTop = 0
 		panel.style.right = 'auto'
 		panel.style.left = Math.round(rect.left) + 'px'
@@ -1613,6 +1633,7 @@
 		state.panelHidden = true
 		state.panelHiddenSide = tab.edge
 		state.panelTabPosition = tab
+		state.panelPreferredHideEdge = tab.edge
 		state.panelPosition = { x: clampPanelX(panel, rect.left), y: clampPanelY(panel, rect.top) }
 		savePanelState()
 		setPanelHiddenClasses(panel, tab.edge)
@@ -1663,6 +1684,7 @@
 			const startLeft = rect.left
 			const startTop = rect.top
 			panel.classList.add('modloader-panel-dragging')
+			state.panelPreferredHideEdge = null
 			event.preventDefault()
 			moveHandler = function (moveEvent) {
 				moveEvent.preventDefault()
@@ -1695,6 +1717,7 @@
 			if (event.button !== undefined && event.button !== 0) return
 			if (!state.panelHidden) return
 			clearPanelAutoHideTimer()
+			state.panelPreferredHideEdge = null
 			const startX = event.clientX
 			const startY = event.clientY
 			const active = getActivePanelTabPosition(panel)
