@@ -1,0 +1,313 @@
+{
+  "id": "Cattail_TweaksX_Scan-Reality-Surges",
+  "uniqueId": "Cattail_TweaksX_Scan-Reality-Surges",
+  "name": "Scan Reality Surges",
+  "version": "0.1.0",
+  "loaderVersion": ">=0.1.0",
+  "entry": "scripts/main.js",
+  "description": "Spawns random reality-plane surges around the impact point when a supercritical kernel lands.",
+  "config": {
+    "surgeCount": {
+      "type": "number",
+      "label": "Surge count",
+      "default": 8,
+      "min": 1,
+      "max": 64,
+      "step": 1,
+      "description": "Number of random surges to create when a supercritical kernel lands.",
+      "reloadPolicy": "hot"
+    },
+    "surgeRadius": {
+      "type": "number",
+      "label": "Spawn radius",
+      "default": 8,
+      "min": 1,
+      "max": 64,
+      "step": 1,
+      "description": "Circular radius, in cells, used to search for empty reality-plane spawn spots.",
+      "reloadPolicy": "hot"
+    }
+  },
+  "translations": {
+    "sch": {
+      "name": "超临界浪涌",
+      "description": "超临界内核砸中地面后，在对应现实坐标周围生成随机浪涌。",
+      "config": {
+        "surgeCount": {
+          "label": "浪涌数量",
+          "description": "每次超临界内核落地时尝试生成的随机浪涌数量。"
+        },
+        "surgeRadius": {
+          "label": "生成半径",
+          "description": "以落点为中心搜索现实世界空格的圆形半径（格）。"
+        }
+      }
+    },
+    "modsch": {
+      "name": "超临界浪涌",
+      "description": "超临界内核砸中地面后，在对应现实坐标周围生成随机浪涌。",
+      "config": {
+        "surgeCount": {
+          "label": "浪涌数量",
+          "description": "每次超临界内核落地时尝试生成的随机浪涌数量。"
+        },
+        "surgeRadius": {
+          "label": "生成半径",
+          "description": "以落点为中心搜索现实世界空格的圆形半径（格）。"
+        }
+      }
+    },
+    "en": {
+      "name": "Scan Reality Surges",
+      "description": "Spawns random reality-plane surges around the impact point when a supercritical kernel lands.",
+      "config": {
+        "surgeCount": {
+          "label": "Surge count",
+          "description": "Number of random surges to create when a supercritical kernel lands."
+        },
+        "surgeRadius": {
+          "label": "Spawn radius",
+          "description": "Circular radius, in cells, used to search for empty reality-plane spawn spots."
+        }
+      }
+    },
+    "ru": {
+      "name": "Core Surges",
+      "description": "Creates random reality-plane surges around the supercritical kernel impact point.",
+      "config": {
+        "surgeCount": {
+          "label": "Surge count",
+          "description": "Number of random surges to create when a supercritical kernel lands."
+        },
+        "surgeRadius": {
+          "label": "Spawn radius",
+          "description": "Circular radius, in cells, used to search for empty reality-plane spawn spots."
+        }
+      }
+    },
+    "de": {
+      "name": "Scan-Realitaetswellen",
+      "description": "Erzeugt zufaellige Realitaetswellen um den Einschlagspunkt eines superkritischen Kerns.",
+      "config": {
+        "surgeCount": {
+          "label": "Wellenanzahl",
+          "description": "Anzahl zufaelliger Wellen beim Einschlag eines superkritischen Kerns."
+        },
+        "surgeRadius": {
+          "label": "Spawnradius",
+          "description": "Kreisradius in Zellen zur Suche nach freien Spawnfeldern."
+        }
+      }
+    },
+    "ptbr": {
+      "name": "Surtos de Realidade",
+      "description": "Cria surtos aleatorios no plano da realidade ao redor do impacto de um nucleo supercritico.",
+      "config": {
+        "surgeCount": {
+          "label": "Quantidade de surtos",
+          "description": "Numero de surtos aleatorios criados quando um nucleo supercritico cai."
+        },
+        "surgeRadius": {
+          "label": "Raio de surgimento",
+          "description": "Raio circular, em celulas, usado para procurar espacos vazios."
+        }
+      }
+    },
+    "it": {
+      "name": "Impulsi di realta",
+      "description": "Genera impulsi casuali nel piano reale attorno all impatto di un nucleo supercritico.",
+      "config": {
+        "surgeCount": {
+          "label": "Numero impulsi",
+          "description": "Numero di impulsi casuali creati quando atterra un nucleo supercritico."
+        },
+        "surgeRadius": {
+          "label": "Raggio generazione",
+          "description": "Raggio circolare, in celle, usato per cercare spazi liberi."
+        }
+      }
+    },
+    "es": {
+      "name": "Oleadas de realidad",
+      "description": "Genera oleadas aleatorias en el plano real alrededor del impacto de un nucleo supercritico.",
+      "config": {
+        "surgeCount": {
+          "label": "Cantidad de oleadas",
+          "description": "Numero de oleadas aleatorias creadas cuando cae un nucleo supercritico."
+        },
+        "surgeRadius": {
+          "label": "Radio de aparicion",
+          "description": "Radio circular, en celdas, usado para buscar espacios vacios."
+        }
+      }
+    },
+    "fr": {
+      "name": "Surges de realite",
+      "description": "Fait apparaitre des surges aleatoires dans le plan reel autour de l impact d un noyau supercritique.",
+      "config": {
+        "surgeCount": {
+          "label": "Nombre de surges",
+          "description": "Nombre de surges aleatoires creees quand un noyau supercritique atterrit."
+        },
+        "surgeRadius": {
+          "label": "Rayon apparition",
+          "description": "Rayon circulaire, en cellules, utilise pour trouver des emplacements libres."
+        }
+      }
+    },
+    "nl": {
+      "name": "Realiteitsgolven",
+      "description": "Maakt willekeurige golven in het realiteitsvlak rond de inslag van een superkritische kern.",
+      "config": {
+        "surgeCount": {
+          "label": "Aantal golven",
+          "description": "Aantal willekeurige golven dat ontstaat wanneer een superkritische kern landt."
+        },
+        "surgeRadius": {
+          "label": "Verschijnradius",
+          "description": "Cirkelradius in cellen om vrije plekken te zoeken."
+        }
+      }
+    },
+    "cz": {
+      "name": "Vlny reality",
+      "description": "Vytvori nahodne vlny v rovine reality kolem dopadu superkritickeho jadra.",
+      "config": {
+        "surgeCount": {
+          "label": "Pocet vln",
+          "description": "Pocet nahodnych vln pri dopadu superkritickeho jadra."
+        },
+        "surgeRadius": {
+          "label": "Polomer vzniku",
+          "description": "Kruhovy polomer v bunkach pro hledani volnych mist."
+        }
+      }
+    },
+    "pl": {
+      "name": "Skoki rzeczywistosci",
+      "description": "Tworzy losowe skoki w plaszczyznie rzeczywistosci wokol miejsca uderzenia superkrytycznego jadra.",
+      "config": {
+        "surgeCount": {
+          "label": "Liczba skokow",
+          "description": "Liczba losowych skokow po upadku superkrytycznego jadra."
+        },
+        "surgeRadius": {
+          "label": "Promien pojawiania",
+          "description": "Okragly promien w komorkach do szukania wolnych miejsc."
+        }
+      }
+    },
+    "hu": {
+      "name": "Valosaghullamok",
+      "description": "Veletlenszeru valosaghullamokat hoz letre a szuperkritikus mag becsapodasi pontja korul.",
+      "config": {
+        "surgeCount": {
+          "label": "Hullamok szama",
+          "description": "A becsapodaskor letrehozott veletlen hullamok szama."
+        },
+        "surgeRadius": {
+          "label": "Megjelenesi sugar",
+          "description": "Kor alaku sugar cellakban, ahol ures helyeket keres."
+        }
+      }
+    },
+    "lv": {
+      "name": "Realitates vilni",
+      "description": "Izveido nejausus realitates plaknes vilnus ap superkritiska kodola trieciena punktu.",
+      "config": {
+        "surgeCount": {
+          "label": "Vilnu skaits",
+          "description": "Nejauso vilnu skaits, kas rodas kodolam piezemejoties."
+        },
+        "surgeRadius": {
+          "label": "Rasanas radiuss",
+          "description": "Aplveida radiuss sunas, kura meklet brivas vietas."
+        }
+      }
+    },
+    "ro": {
+      "name": "Valuri de realitate",
+      "description": "Genereaza valuri aleatorii in planul realitatii in jurul impactului unui nucleu supercritic.",
+      "config": {
+        "surgeCount": {
+          "label": "Numar de valuri",
+          "description": "Numarul de valuri aleatorii create cand aterizeaza un nucleu supercritic."
+        },
+        "surgeRadius": {
+          "label": "Raza de aparitie",
+          "description": "Raza circulara, in celule, folosita pentru a cauta locuri libere."
+        }
+      }
+    },
+    "no": {
+      "name": "Virkelighetsbolger",
+      "description": "Lager tilfeldige bolger i virkelighetsplanet rundt nedslaget til en superkritisk kjerne.",
+      "config": {
+        "surgeCount": {
+          "label": "Antall bolger",
+          "description": "Antall tilfeldige bolger som lages naar en superkritisk kjerne lander."
+        },
+        "surgeRadius": {
+          "label": "Oppstaelsesradius",
+          "description": "Sirkelradius i celler for aa finne ledige plasser."
+        }
+      }
+    },
+    "jp": {
+      "name": "リアリティサージ",
+      "description": "超臨界カーネルの着地点の周囲に、現実面のランダムなサージを生成します。",
+      "config": {
+        "surgeCount": {
+          "label": "サージ数",
+          "description": "超臨界カーネルが着地した時に生成するランダムサージの数。"
+        },
+        "surgeRadius": {
+          "label": "生成半径",
+          "description": "現実面の空きマスを探す円形半径（マス数）。"
+        }
+      }
+    },
+    "kr": {
+      "name": "현실 쇄도",
+      "description": "초임계 핵이 착지한 지점 주변의 현실 평면에 무작위 쇄도를 생성합니다.",
+      "config": {
+        "surgeCount": {
+          "label": "쇄도 수",
+          "description": "초임계 핵이 착지할 때 생성할 무작위 쇄도 수입니다."
+        },
+        "surgeRadius": {
+          "label": "생성 반경",
+          "description": "현실 평면의 빈 칸을 찾는 원형 반경입니다."
+        }
+      }
+    },
+    "tch": {
+      "name": "超臨界浪湧",
+      "description": "超臨界核心落地後，在對應現實座標周圍生成隨機浪湧。",
+      "config": {
+        "surgeCount": {
+          "label": "浪湧數量",
+          "description": "每次超臨界核心落地時嘗試生成的隨機浪湧數量。"
+        },
+        "surgeRadius": {
+          "label": "生成半徑",
+          "description": "以落點為中心搜尋現實世界空格的圓形半徑（格）。"
+        }
+      }
+    },
+    "thai": {
+      "name": "คลื่นพลังความจริง",
+      "description": "สร้างคลื่นพลังแบบสุ่มบนระนาบความจริงรอบจุดตกของแกนเหนือวิกฤต",
+      "config": {
+        "surgeCount": {
+          "label": "Surge count",
+          "description": "Number of random surges to create when a supercritical kernel lands."
+        },
+        "surgeRadius": {
+          "label": "Spawn radius",
+          "description": "Circular radius, in cells, used to search for empty reality-plane spawn spots."
+        }
+      }
+    }
+  }
+}
