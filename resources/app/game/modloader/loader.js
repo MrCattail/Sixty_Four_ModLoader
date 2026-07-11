@@ -534,8 +534,14 @@
 			#modloader-panel .modloader-mod-warning { display: none; margin-top: 5px; color: #ffe1a3; overflow-wrap: anywhere; }
 			#modloader-panel .modloader-mod-warning.active { display: block; }
 			#modloader-panel .modloader-mod-config { max-height: 0; margin-top: 0; padding-top: 0; border-top: 1px solid transparent; opacity: 0; overflow: hidden; pointer-events: none; transform: translateY(-4px); transition: max-height .2s ease, margin-top .2s ease, padding-top .2s ease, border-top-color .2s ease, opacity .16s ease, transform .2s ease; }
-			#modloader-panel .modloader-mod-row-expanded .modloader-mod-config { max-height: 640px; margin-top: 8px; padding-top: 8px; border-top-color: rgba(255,255,255,.09); opacity: 1; pointer-events: auto; transform: translateY(0); }
+			#modloader-panel .modloader-mod-row-expanded .modloader-mod-config { max-height: min(42vh, 380px); margin-top: 8px; padding-top: 8px; border-top-color: rgba(255,255,255,.09); opacity: 1; pointer-events: auto; transform: translateY(0); }
 			#modloader-panel .modloader-mod-config-title { margin-bottom: 5px; color: rgba(255,255,255,.72); font-weight: 600; }
+			#modloader-panel .modloader-mod-config-scroll { max-height: min(34vh, 310px); overflow-x: hidden; overflow-y: auto; padding-right: 5px; scrollbar-gutter: stable; scrollbar-width: thin; scrollbar-color: rgba(185,185,185,.48) transparent; }
+			#modloader-panel .modloader-mod-config-scroll::-webkit-scrollbar { width: 4px; }
+			#modloader-panel .modloader-mod-config-scroll::-webkit-scrollbar-track { background: transparent; }
+			#modloader-panel .modloader-mod-config-scroll::-webkit-scrollbar-thumb { border-radius: 999px; background: rgba(185,185,185,.48); }
+			#modloader-panel .modloader-mod-config-scroll::-webkit-scrollbar-thumb:hover { background: rgba(210,210,210,.62); }
+			#modloader-panel .modloader-mod-config-scroll .modloader-config-field:first-child { margin-top: 0; }
 			#modloader-panel .modloader-config-field { display: grid; grid-template-columns: minmax(130px, .8fr) minmax(170px, 1fr); gap: 4px 10px; align-items: center; margin-top: 6px; }
 			#modloader-panel .modloader-config-field-disabled { opacity: .52; }
 			#modloader-panel .modloader-config-text { min-width: 0; }
@@ -2565,6 +2571,10 @@
 				row.classList.add('modloader-mod-row-configurable')
 				const configBox = element('div', 'modloader-mod-config')
 				configBox.appendChild(element('div', 'modloader-mod-config-title', t('config')))
+				const configScroll = element('div', 'modloader-mod-config-scroll')
+				configScroll.addEventListener('wheel', function (event) {
+					event.stopPropagation()
+				}, { passive: true })
 				for (const item of modConfig.schema) {
 					const type = getConfigType(item)
 					const value = modConfig.values[item.key]
@@ -2603,10 +2613,11 @@
 					input.oninput = updateConfig
 					input.onchange = updateConfig
 					field.append(text, input, error)
-					configBox.appendChild(field)
+					configScroll.appendChild(field)
 					rowConfigModels.push(model)
 					configModels.push(model)
 				}
+				configBox.appendChild(configScroll)
 				main.appendChild(configBox)
 			}
 
