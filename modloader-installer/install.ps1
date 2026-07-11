@@ -87,6 +87,28 @@ function Copy-DirectoryContents {
 	}
 }
 
+function Restore-InstallBackup {
+	param(
+		[object[]]$ManifestFiles,
+		[string]$TargetRoot,
+		[string]$BackupPath
+	)
+
+	foreach ($entry in $ManifestFiles) {
+		$relativePath = $entry.relativePath
+		$target = Join-Path $TargetRoot $relativePath
+		if ($entry.exists) {
+			$backup = Join-Path $BackupPath $relativePath
+			if (Test-Path -LiteralPath $backup) {
+				New-DirectoryIfMissing -Path (Split-Path -Parent $target)
+				Copy-Item -LiteralPath $backup -Destination $target -Force
+			}
+		} elseif (Test-Path -LiteralPath $target) {
+			Remove-Item -LiteralPath $target -Force
+		}
+	}
+}
+
 $targetRoot = Resolve-GameRoot -Path $GameRoot
 $sourceRoot = Find-SourceRoot -ExplicitSourceRoot $SourceRoot
 if ($SkipMods -and $ReplaceMods) {
@@ -159,6 +181,7 @@ $manifest | ConvertTo-Json -Depth 20 | Set-Content -LiteralPath (Join-Path $back
 New-DirectoryIfMissing -Path $backupRoot
 $stamp | Set-Content -LiteralPath (Join-Path $backupRoot 'latest-install.txt') -Encoding ASCII
 
+try {
 Copy-DirectoryContents -Source (Join-Path $sourceGame 'modloader') -Target (Join-Path $targetGame 'modloader') -ExcludeRelative @(
 	'state\install-backups\latest-install.txt'
 )
@@ -207,6 +230,13 @@ if ($SkipMods) {
 $verify = Join-Path $targetGame 'modloader\tools\verify.ps1'
 if (Test-Path -LiteralPath $verify) {
 	& powershell -NoProfile -ExecutionPolicy Bypass -File $verify
+}
+} catch {
+	Write-Host ""
+	Write-Host "ModLoader install failed: $($_.Exception.Message)" -ForegroundColor Red
+	Write-Host "Restoring backed-up core files from: $backupPath"
+	Restore-InstallBackup -ManifestFiles $manifestFiles -TargetRoot $targetRoot -BackupPath $backupPath
+	throw
 }
 
 Write-Host ""

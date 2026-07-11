@@ -122,76 +122,58 @@ function Patch-IndexHtml {
 function Patch-GameJs {
 	param([string]$Text)
 
-	$oldInitDesktop = @'
-	async init(canvas, preload){
-
-		await this.loadScripts()
-		await this.loadStyle(`cascade.css`)
-'@
-	$newInitDesktop = @'
-	async init(canvas, preload){
-
-		await window.ModLoader?.stage(`beforeVanillaScripts`, this)
-		await this.loadScripts()
-		await window.ModLoader?.stage(`afterVanillaScripts`, this)
-		await this.loadStyle(`cascade.css`)
-'@
-	$Text = Apply-Optional $Text $oldInitDesktop $newInitDesktop
-
-	$oldInitMobile = @'
-	async initMobile(canvas, preload){
-
-		await this.loadScripts()
-		await this.loadStyle(`cascade_mobile.css`)
-'@
-	$newInitMobile = @'
-	async initMobile(canvas, preload){
-
-		await window.ModLoader?.stage(`beforeVanillaScripts`, this)
-		await this.loadScripts()
-		await window.ModLoader?.stage(`afterVanillaScripts`, this)
-		await this.loadStyle(`cascade_mobile.css`)
-'@
-	$Text = Apply-Optional $Text $oldInitMobile $newInitMobile
+	if (-not $Text.Contains('ModLoader?.stage(`beforeVanillaScripts`')) {
+		$loadScriptsPattern = '(?m)^(\t\t)await this\.loadScripts\(\)\n(\t\tawait this\.loadStyle\(`cascade(?:_mobile)?\.css`\)\n)'
+		if (-not [regex]::IsMatch($Text, $loadScriptsPattern)) {
+			throw 'Could not patch vanilla script stage hooks. The game file may have changed or was edited by another tool.'
+		}
+        $Text = [regex]::Replace($Text, $loadScriptsPattern, {
+            param($match)
+            $indent = $match.Groups[1].Value
+            $indent + "await window.ModLoader?.stage(``beforeVanillaScripts``, this)`n" +
+                $indent + "await this.loadScripts()`n" +
+                $indent + "await window.ModLoader?.stage(``afterVanillaScripts``, this)`n" +
+                $match.Groups[2].Value
+        })
+	}
 
 	if (-not $Text.Contains('ModLoader?.applyData')) {
-		$oldData = @'
-		this.codex = abstract_getCodex()
-		this.images = this.preloadImages()
-		const words = abstract_getWords()
-		this.words = words[this.language]
-'@
+		$oldDataPattern = '(?m)^\t\tthis\.codex = abstract_getCodex\(\)\n\t\tthis\.images = this\.preloadImages\(\)\n\t\tconst words = abstract_getWords\(\)\n\t\tthis\.words = words\[this\.language\]\n(?:\t\tthis\.words_en = words\.en\n)?'
 		$newData = @'
-		this.languages = window.ModLoader?.applyLanguages(this.languages) || this.languages
-		const moddedLanguageId = this.getLanguageId()
-		if (moddedLanguageId !== null) this.languageId = moddedLanguageId
-		if (!this.languages[this.languageId]) this.languageId = 0
-		this.language = this.languages[this.languageId]
+        this.languages = window.ModLoader?.applyLanguages(this.languages) || this.languages
+        const moddedLanguageId = this.getLanguageId()
+        if (moddedLanguageId !== null) this.languageId = moddedLanguageId
+        if (!this.languages[this.languageId]) this.languageId = 0
+        this.language = this.languages[this.languageId]
 
-		this.codex = window.ModLoader?.applyData(abstract_getCodex(), this) || abstract_getCodex()
-		this.images = this.preloadImages()
-		const words = window.ModLoader?.applyWords(abstract_getWords(), this) || abstract_getWords()
-		if (!words[this.language]) {
-			this.languageId = 0
-			this.language = this.languages[this.languageId] || `en`
-			localStorage.setItem(`abstractv03_language${this.steamId}`, this.languageId)
-		}
-		this.words = words[this.language]
+        this.codex = window.ModLoader?.applyData(abstract_getCodex(), this) || abstract_getCodex()
+        this.images = this.preloadImages()
+        const words = window.ModLoader?.applyWords(abstract_getWords(), this) || abstract_getWords()
+        if (!words[this.language]) {
+            this.languageId = 0
+            this.language = this.languages[this.languageId] || `en`
+            localStorage.setItem(`abstractv03_language${this.steamId}`, this.languageId)
+        }
+        this.words = words[this.language]
+        this.words_en = words.en
 '@
-		$Text = Apply-Required $Text $oldData $newData 'game data and language hooks'
+		if (-not [regex]::IsMatch($Text, $oldDataPattern)) {
+			throw 'Could not patch game data and language hooks. The game file may have changed or was edited by another tool.'
+		}
+		$Text = [regex]::Replace($Text, $oldDataPattern, { param($match) $newData + "`n" })
 	}
 
 	if (-not $Text.Contains('afterGameInit')) {
-		$oldAfterMouse = @'
-		this.updateMouseData(this.w2/2, this.h2/2)
-		this.processMousemove2()
-'@
+		$afterMousePattern = '(?m)^\t\tthis\.updateMouseData\(this\.w2/2, this\.h2/2\)\n\t\tthis\.processMousemove2\(\)\n'
 		$newAfterMouse = @'
-		this.updateMouseData(this.w2/2, this.h2/2)
-		this.processMousemove2()
-		await window.ModLoader?.stage(`afterGameInit`, this)
+        this.updateMouseData(this.w2/2, this.h2/2)
+        this.processMousemove2()
+        await window.ModLoader?.stage(`afterGameInit`, this)
 '@
-		$Text = Apply-Required $Text $oldAfterMouse $newAfterMouse 'afterGameInit hook'
+		if (-not [regex]::IsMatch($Text, $afterMousePattern)) {
+			throw 'Could not patch afterGameInit hook. The game file may have changed or was edited by another tool.'
+		}
+        $Text = [regex]::Replace($Text, $afterMousePattern, { param($match) $newAfterMouse + "`n" })
 	}
 
 	if (-not $Text.Contains('ModLoader?.applyPreloadList')) {
@@ -210,50 +192,37 @@ function Patch-GameJs {
 	$Text = Apply-Optional $Text $oldChangeLanguage $newChangeLanguage
 
 	if (-not $Text.Contains('ModLoader?.applyLoadedSave')) {
-		$oldLoadedSave = @'
-		try {
-			//To make sure
-'@
-		$newLoadedSave = @'
-		try {
-			manual = window.ModLoader?.applyLoadedSave(manual, this) || manual
-			//To make sure
-'@
-		$Text = Apply-Required $Text $oldLoadedSave $newLoadedSave 'loaded save hook'
+		$loadedSavePattern = '(?m)^(\t\ttry \{\n)(\t\t\t//To make sure\n)'
+		if (-not [regex]::IsMatch($Text, $loadedSavePattern)) {
+			throw 'Could not patch loaded save hook. The game file may have changed or was edited by another tool.'
+		}
+        $Text = [regex]::Replace($Text, $loadedSavePattern, { param($match) $match.Groups[1].Value + "`t`t`tmanual = window.ModLoader?.applyLoadedSave(manual, this) || manual`n" + $match.Groups[2].Value }, 1)
 	}
 
 	if (-not $Text.Contains('rememberOrphanEntity')) {
-		$oldOrphan = @'
-			const s = manual.stuff[i]
-			const entity = s.name === `cube` ? new Cube(s.name, s.position.x, s.position.y, s.par) : new Entity(s.name, s.position.x, s.position.y, s.par)
-'@
-		$newOrphan = @'
-			const s = manual.stuff[i]
-			if (!window.ModLoader?.canLoadEntity(s.name, this) && !this.codex.entities[s.name]) {
-				window.ModLoader?.rememberOrphanEntity(s)
-				continue
-			}
-			const entity = s.name === `cube` ? new Cube(s.name, s.position.x, s.position.y, s.par) : new Entity(s.name, s.position.x, s.position.y, s.par)
-'@
-		$Text = Apply-Required $Text $oldOrphan $newOrphan 'orphan entity save guard'
+		$orphanPattern = '(?m)^(\t+const s = manual\.stuff\[i\]\n)(\t+)const entity = '
+		if (-not [regex]::IsMatch($Text, $orphanPattern)) {
+			throw 'Could not patch orphan entity save guard. The game file may have changed or was edited by another tool.'
+		}
+        $Text = [regex]::Replace($Text, $orphanPattern, {
+            param($match)
+            $indent = $match.Groups[2].Value
+            $match.Groups[1].Value +
+                $indent + "if (!window.ModLoader?.canLoadEntity(s.name, this) && !this.codex.entities[s.name]) {`n" +
+                $indent + "`twindow.ModLoader?.rememberOrphanEntity(s)`n" +
+                $indent + "`tcontinue`n" +
+                $indent + "}`n" +
+                $indent + "const entity = "
+        }, 1)
 	}
 
 	if (-not $Text.Contains('ModLoader?.applySave')) {
-		$Text = Apply-Required $Text "		const string = JSON.stringify({" "		const saveState = {" 'save hook start'
-		$oldSaveEnd = @'
-			backups: backupless ? undefined : this.backups
-		})
-
-		return this.encodeSave(string)
-'@
-		$newSaveEnd = @'
-			backups: backupless ? undefined : this.backups
+        $Text = Apply-Required $Text "`t`tconst string = JSON.stringify({" "`t`tconst saveState = {" "save hook start"
+		$saveEndPattern = '(?m)^\t\t\}\)\n\n\t\treturn this\.encodeSave\(string\)'
+		if (-not [regex]::IsMatch($Text, $saveEndPattern)) {
+			throw 'Could not patch save hook finish. The game file may have changed or was edited by another tool.'
 		}
-		const string = JSON.stringify(window.ModLoader?.applySave(saveState, this) || saveState)
-
-		return this.encodeSave(string)
-'@
-		$Text = Apply-Required $Text $oldSaveEnd $newSaveEnd 'save hook finish'
+        $Text = [regex]::Replace($Text, $saveEndPattern, "`t`t}`n`t`tconst string = JSON.stringify(window.ModLoader?.applySave(saveState, this) || saveState)`n`n`t`treturn this.encodeSave(string)", 1)
 	}
 
 	if (-not $Text.Contains('ModLoader?.applyEntitySave')) {
@@ -266,18 +235,12 @@ function Patch-GameJs {
 	}
 
 	if (-not $Text.Contains('ModLoader?.applySoundList')) {
-		$oldSound = @'
-		]
-
-		for (let i = 0; i < samples.length; i++){
-'@
-		$newSound = @'
-		]
-		samples = window.ModLoader?.applySoundList(samples) || samples
-
-		for (let i = 0; i < samples.length; i++){
-'@
-		$Text = Apply-Required $Text $oldSound $newSound 'sound list hook'
+        $Text = Apply-Optional $Text "`t`tconst samples = [" "`t`tlet samples = ["
+		$soundPattern = '(?m)^(\t+\]\n\n)(\t+for \(let i = 0; i < samples\.length; i\+\+\)\{)'
+		if (-not [regex]::IsMatch($Text, $soundPattern)) {
+			throw 'Could not patch sound list hook. The game file may have changed or was edited by another tool.'
+		}
+        $Text = [regex]::Replace($Text, $soundPattern, { param($match) $indent = $match.Groups[2].Value -replace "for.*$", ""; $match.Groups[1].Value + $indent + "samples = window.ModLoader?.applySoundList(samples) || samples`n`n" + $match.Groups[2].Value }, 1)
 	}
 
 	if (-not $Text.Contains('ModLoader?.resolveMusic')) {
@@ -291,18 +254,11 @@ function Patch-SpritesJs {
 	param([string]$Text)
 
 	if (-not $Text.Contains('args.src = window.ModLoader?.resolveAsset')) {
-		$oldSprite = @'
-		this.bctx = this.master.bctx
-
-		if (this.master.images[args.src]){
-'@
-		$newSprite = @'
-		this.bctx = this.master.bctx
-
-		args.src = window.ModLoader?.resolveAsset(args.src) || args.src
-		if (this.master.images[args.src]){
-'@
-		$Text = Apply-Required $Text $oldSprite $newSprite 'sprite asset hook'
+		$spritePattern = '(?m)^(\t+this\.bctx = this\.master\.bctx\n\n)(\t+)if \(this\.master\.images\[args\.src\]\)\{'
+		if (-not [regex]::IsMatch($Text, $spritePattern)) {
+			throw 'Could not patch sprite asset hook. The game file may have changed or was edited by another tool.'
+		}
+        $Text = [regex]::Replace($Text, $spritePattern, { param($match) $match.Groups[1].Value + $match.Groups[2].Value + "args.src = window.ModLoader?.resolveAsset(args.src) || args.src`n" + $match.Groups[2].Value + "if (this.master.images[args.src]){" }, 1)
 	}
 
 	if (-not $Text.Contains('this.src = window.ModLoader?.resolveAsset')) {
@@ -319,9 +275,16 @@ function Patch-UiJs {
 		return $Text
 	}
 
-	$oldShopImage = '			image.src = `img/shop/${params.isDark ? params.id + `_dark` : params.id}.jpg`'
-	$newShopImage = '			image.src = window.ModLoader?.resolveAsset(this.master.codex.entities[params.id]?.shopImage || `img/shop/${params.isDark ? params.id + `_dark` : params.id}.jpg`) || this.master.codex.entities[params.id]?.shopImage || `img/shop/${params.isDark ? params.id + `_dark` : params.id}.jpg`'
-	return Apply-Required $Text $oldShopImage $newShopImage 'shop icon asset hook'
+	$shopImagePattern = '(?m)^(\t+)image\.src = `img/shop/\$\{params\.isDark \? params\.id \+ ._dark. : params\.id\}\.jpg`'
+	if (-not [regex]::IsMatch($Text, $shopImagePattern)) {
+		throw 'Could not patch shop icon asset hook. The game file may have changed or was edited by another tool.'
+	}
+	$shopPath = '`img/shop/${params.isDark ? params.id + String.fromCharCode(95, 100, 97, 114, 107) : params.id}.jpg`'
+    return [regex]::Replace($Text, $shopImagePattern, {
+        param($match)
+        $indent = $match.Groups[1].Value
+        $indent + "image.src = window.ModLoader?.resolveAsset(this.master.codex.entities[params.id]?.shopImage || " + $shopPath + ") || this.master.codex.entities[params.id]?.shopImage || " + $shopPath
+    }, 1)
 }
 
 function Patch-MainJs {
