@@ -586,7 +586,7 @@
 	min-height: calc(var(--unit) * .18);
 	color: #b6aeae;
 	font: inherit;
-	font-size: calc(var(--unit) * .64);
+	font-size: calc(var(--unit) * .54);
 	font-weight: 400;
 	line-height: 1.1;
 	text-align: var(--cattail-scan-slider-label-align, center);
