@@ -1,0 +1,687 @@
+{
+  "id": "Cattail_TweaksX_Reality-Pack",
+  "uniqueId": "Cattail_TweaksX_Reality-Pack",
+  "name": "Reality Pack",
+  "version": "0.1.0",
+  "previousVersions": [
+    {
+      "name": "Auto Reality Collect",
+      "version": "0.1.0"
+    },
+    {
+      "name": "Scan Reality Surges",
+      "version": "0.1.0"
+    },
+    {
+      "name": "Long Silo Fill",
+      "version": "0.1.0"
+    }
+  ],
+  "loaderVersion": ">=0.1.0",
+  "entries": [
+    "scripts/config-migration.js",
+    "scripts/reality-auto-collect.js",
+    "scripts/scan-reality-surges.js",
+    "scripts/super-silo.js"
+  ],
+  "conflicts": [
+    "Cattail_TweaksX_Reality-Auto-Collect",
+    "Cattail_TweaksX_Scan-Reality-Surges",
+    "Cattail_TweaksX_Super-Silo"
+  ],
+  "config": {
+    "enableRealityAutoCollect": {
+      "type": "boolean",
+      "label": "Reality auto collect",
+      "default": true,
+      "description": "Automatically collect ready Reality / soul power in the void world.",
+      "reloadPolicy": "hot"
+    },
+    "enableScanRealitySurges": {
+      "type": "boolean",
+      "label": "Scan reality surges",
+      "default": true,
+      "description": "Create random reality-plane surges when a supercritical kernel lands.",
+      "reloadPolicy": "hot"
+    },
+    "surgeCount": {
+      "type": "number",
+      "label": "Surge count",
+      "default": 8,
+      "min": 1,
+      "max": 64,
+      "step": 1,
+      "description": "Number of random surges to create when a supercritical kernel lands.",
+      "reloadPolicy": "hot"
+    },
+    "surgeRadius": {
+      "type": "number",
+      "label": "Spawn radius",
+      "default": 8,
+      "min": 1,
+      "max": 64,
+      "step": 1,
+      "description": "Circular radius, in cells, used to search for empty reality-plane spawn spots.",
+      "reloadPolicy": "hot"
+    },
+    "enableSuperSilo": {
+      "type": "boolean",
+      "label": "Super Silo",
+      "default": true,
+      "description": "Keep activated silos filled with the configured long fill amount.",
+      "reloadPolicy": "hot"
+    },
+    "fillAmount": {
+      "type": "number",
+      "label": "Long fill amount",
+      "default": 100000000000,
+      "min": 1,
+      "step": 1,
+      "description": "Fill value assigned to activated silos.",
+      "reloadPolicy": "hot"
+    }
+  },
+  "description": "Combines Auto Reality Collect, Scan Reality Surges, and Super Silo into one TweaksX mod.",
+  "translations": {
+    "en": {
+      "name": "Reality Pack",
+      "description": "Combines Auto Reality Collect, Scan Reality Surges, and Super Silo into one TweaksX mod.",
+      "config": {
+        "surgeCount": {
+          "label": "Surge count",
+          "description": "Number of random surges to create when a supercritical kernel lands."
+        },
+        "surgeRadius": {
+          "label": "Spawn radius",
+          "description": "Circular radius, in cells, used to search for empty reality-plane spawn spots."
+        },
+        "fillAmount": {
+          "label": "Long fill amount",
+          "description": "Fill value assigned to activated silos."
+        },
+        "enableRealityAutoCollect": {
+          "label": "Reality auto collect",
+          "description": "Automatically collect ready Reality / soul power in the void world."
+        },
+        "enableScanRealitySurges": {
+          "label": "Scan reality surges",
+          "description": "Create random reality-plane surges when a supercritical kernel lands."
+        },
+        "enableSuperSilo": {
+          "label": "Super Silo",
+          "description": "Keep activated silos filled with the configured long fill amount."
+        }
+      }
+    },
+    "ru": {
+      "name": "Пакет Reality",
+      "description": "Объединяет автосбор Reality, волны от сканирования и супер-силос в один мод TweaksX.",
+      "config": {
+        "surgeCount": {
+          "label": "Количество волн",
+          "description": "Number of random surges to create when a supercritical kernel lands."
+        },
+        "surgeRadius": {
+          "label": "Радиус появления",
+          "description": "Circular radius, in cells, used to search for empty reality-plane spawn spots."
+        },
+        "fillAmount": {
+          "label": "Длинное заполнение",
+          "description": "Fill value assigned to activated silos."
+        },
+        "enableRealityAutoCollect": {
+          "label": "Автосбор Reality",
+          "description": "Автоматически собирает готовую Reality / soul power в пустотном мире."
+        },
+        "enableScanRealitySurges": {
+          "label": "Волны Reality от сканирования",
+          "description": "Создает случайные волны на плоскости Reality при падении сверхкритического ядра."
+        },
+        "enableSuperSilo": {
+          "label": "Супер-силос",
+          "description": "Поддерживает активированные силосы заполненными заданным длинным значением."
+        }
+      }
+    },
+    "de": {
+      "name": "Reality-Paket",
+      "description": "Kombiniert Reality-Autosammlung, Scan-Realitätswellen und Super-Silo in einem TweaksX-Mod.",
+      "config": {
+        "surgeCount": {
+          "label": "Wellenanzahl",
+          "description": "Anzahl zufaelliger Wellen beim Einschlag eines superkritischen Kerns."
+        },
+        "surgeRadius": {
+          "label": "Spawnradius",
+          "description": "Kreisradius in Zellen zur Suche nach freien Spawnfeldern."
+        },
+        "fillAmount": {
+          "label": "Lange Füllmenge",
+          "description": "Fill value assigned to activated silos."
+        },
+        "enableRealityAutoCollect": {
+          "label": "Reality automatisch sammeln",
+          "description": "Sammelt bereite Reality / Soul Power in der Leerenwelt automatisch ein."
+        },
+        "enableScanRealitySurges": {
+          "label": "Scan-Realitätswellen",
+          "description": "Erzeugt zufällige Realitätswellen, wenn ein superkritischer Kern landet."
+        },
+        "enableSuperSilo": {
+          "label": "Super-Silo",
+          "description": "Hält aktivierte Silos mit der eingestellten langen Füllmenge gefüllt."
+        }
+      }
+    },
+    "ptbr": {
+      "name": "Pacote Reality",
+      "description": "Combina coleta automática de Reality, surtos de varredura e Super Silo em um mod TweaksX.",
+      "config": {
+        "surgeCount": {
+          "label": "Quantidade de surtos",
+          "description": "Numero de surtos aleatorios criados quando um nucleo supercritico cai."
+        },
+        "surgeRadius": {
+          "label": "Raio de surgimento",
+          "description": "Raio circular, em celulas, usado para procurar espacos vazios."
+        },
+        "fillAmount": {
+          "label": "Valor de enchimento longo",
+          "description": "Fill value assigned to activated silos."
+        },
+        "enableRealityAutoCollect": {
+          "label": "Coleta automática de Reality",
+          "description": "Coleta automaticamente Reality / soul power pronta no mundo vazio."
+        },
+        "enableScanRealitySurges": {
+          "label": "Surtos de Reality por varredura",
+          "description": "Cria surtos aleatórios no plano Reality quando um núcleo supercrítico cai."
+        },
+        "enableSuperSilo": {
+          "label": "Super Silo",
+          "description": "Mantém silos ativados preenchidos com o valor longo configurado."
+        }
+      }
+    },
+    "it": {
+      "name": "Pacchetto Reality",
+      "description": "Unisce raccolta automatica Reality, impulsi da scansione e Super Silo in un mod TweaksX.",
+      "config": {
+        "surgeCount": {
+          "label": "Numero impulsi",
+          "description": "Numero di impulsi casuali creati quando atterra un nucleo supercritico."
+        },
+        "surgeRadius": {
+          "label": "Raggio generazione",
+          "description": "Raggio circolare, in celle, usato per cercare spazi liberi."
+        },
+        "fillAmount": {
+          "label": "Riempimento lungo",
+          "description": "Fill value assigned to activated silos."
+        },
+        "enableRealityAutoCollect": {
+          "label": "Raccolta automatica Reality",
+          "description": "Raccoglie automaticamente Reality / soul power pronta nel mondo del vuoto."
+        },
+        "enableScanRealitySurges": {
+          "label": "Impulsi Reality da scansione",
+          "description": "Genera impulsi casuali sul piano Reality quando atterra un nucleo supercritico."
+        },
+        "enableSuperSilo": {
+          "label": "Super Silo",
+          "description": "Mantiene i silo attivati pieni con il valore lungo configurato."
+        }
+      }
+    },
+    "es": {
+      "name": "Paquete Reality",
+      "description": "Combina recolección automática de Reality, oleadas por escaneo y Súper silo en un mod TweaksX.",
+      "config": {
+        "surgeCount": {
+          "label": "Cantidad de oleadas",
+          "description": "Numero de oleadas aleatorias creadas cuando cae un nucleo supercritico."
+        },
+        "surgeRadius": {
+          "label": "Radio de aparición",
+          "description": "Radio circular, en celdas, usado para buscar espacios vacios."
+        },
+        "fillAmount": {
+          "label": "Valor de llenado largo",
+          "description": "Fill value assigned to activated silos."
+        },
+        "enableRealityAutoCollect": {
+          "label": "Recolección automática de Reality",
+          "description": "Recolecta automáticamente Reality / soul power lista en el mundo del vacío."
+        },
+        "enableScanRealitySurges": {
+          "label": "Oleadas Reality por escaneo",
+          "description": "Genera oleadas aleatorias en el plano Reality cuando cae un núcleo supercrítico."
+        },
+        "enableSuperSilo": {
+          "label": "Súper silo",
+          "description": "Mantiene los silos activados llenos con el valor largo configurado."
+        }
+      }
+    },
+    "fr": {
+      "name": "Pack Reality",
+      "description": "Regroupe la collecte auto de Reality, les surges de scan et le Super silo dans un mod TweaksX.",
+      "config": {
+        "surgeCount": {
+          "label": "Nombre de surges",
+          "description": "Nombre de surges aleatoires creees quand un noyau supercritique atterrit."
+        },
+        "surgeRadius": {
+          "label": "Rayon apparition",
+          "description": "Rayon circulaire, en cellules, utilise pour trouver des emplacements libres."
+        },
+        "fillAmount": {
+          "label": "Remplissage long",
+          "description": "Fill value assigned to activated silos."
+        },
+        "enableRealityAutoCollect": {
+          "label": "Collecte auto de Reality",
+          "description": "Collecte automatiquement Reality / soul power prête dans le monde du vide."
+        },
+        "enableScanRealitySurges": {
+          "label": "Surges Reality de scan",
+          "description": "Crée des surges aléatoires dans le plan Reality quand un noyau supercritique atterrit."
+        },
+        "enableSuperSilo": {
+          "label": "Super silo",
+          "description": "Garde les silos activés remplis avec la valeur longue configurée."
+        }
+      }
+    },
+    "nl": {
+      "name": "Reality-pakket",
+      "description": "Combineert Reality automatisch verzamelen, scan-golven en Super-silo in een TweaksX-mod.",
+      "config": {
+        "surgeCount": {
+          "label": "Aantal golven",
+          "description": "Aantal willekeurige golven dat ontstaat wanneer een superkritische kern landt."
+        },
+        "surgeRadius": {
+          "label": "Verschijnradius",
+          "description": "Cirkelradius in cellen om vrije plekken te zoeken."
+        },
+        "fillAmount": {
+          "label": "Lange vulwaarde",
+          "description": "Fill value assigned to activated silos."
+        },
+        "enableRealityAutoCollect": {
+          "label": "Reality automatisch verzamelen",
+          "description": "Verzamelt automatisch klaarstaande Reality / soul power in de leegtewereld."
+        },
+        "enableScanRealitySurges": {
+          "label": "Reality-golven door scan",
+          "description": "Maakt willekeurige golven in het Reality-vlak wanneer een superkritische kern landt."
+        },
+        "enableSuperSilo": {
+          "label": "Super-silo",
+          "description": "Houdt geactiveerde silo’s gevuld met de ingestelde lange vulwaarde."
+        }
+      }
+    },
+    "cz": {
+      "name": "Balíček Reality",
+      "description": "Spojuje automatický sběr Reality, vlny ze skenu a Super silo do jednoho modu TweaksX.",
+      "config": {
+        "surgeCount": {
+          "label": "Počet vln",
+          "description": "Pocet nahodnych vln pri dopadu superkritickeho jadra."
+        },
+        "surgeRadius": {
+          "label": "Poloměr vzniku",
+          "description": "Kruhovy polomer v bunkach pro hledani volnych mist."
+        },
+        "fillAmount": {
+          "label": "Dlouhé naplnění",
+          "description": "Fill value assigned to activated silos."
+        },
+        "enableRealityAutoCollect": {
+          "label": "Automatický sběr Reality",
+          "description": "Automaticky sbírá připravenou Reality / soul power ve světě prázdnoty."
+        },
+        "enableScanRealitySurges": {
+          "label": "Vlny Reality ze skenu",
+          "description": "Vytvoří náhodné vlny v rovině Reality při dopadu superkritického jádra."
+        },
+        "enableSuperSilo": {
+          "label": "Super silo",
+          "description": "Udržuje aktivovaná sila naplněná nastavenou dlouhou hodnotou."
+        }
+      }
+    },
+    "pl": {
+      "name": "Pakiet Reality",
+      "description": "Łączy automatyczne zbieranie Reality, skoki po skanie i Super silos w jeden mod TweaksX.",
+      "config": {
+        "surgeCount": {
+          "label": "Liczba skoków",
+          "description": "Liczba losowych skokow po upadku superkrytycznego jadra."
+        },
+        "surgeRadius": {
+          "label": "Promień pojawiania",
+          "description": "Okragly promien w komorkach do szukania wolnych miejsc."
+        },
+        "fillAmount": {
+          "label": "Długie napełnienie",
+          "description": "Fill value assigned to activated silos."
+        },
+        "enableRealityAutoCollect": {
+          "label": "Automatyczne zbieranie Reality",
+          "description": "Automatycznie zbiera gotowe Reality / soul power w świecie pustki."
+        },
+        "enableScanRealitySurges": {
+          "label": "Skoki Reality po skanie",
+          "description": "Tworzy losowe skoki na płaszczyźnie Reality po upadku superkrytycznego jądra."
+        },
+        "enableSuperSilo": {
+          "label": "Super silos",
+          "description": "Utrzymuje aktywowane silosy napełnione skonfigurowaną długą wartością."
+        }
+      }
+    },
+    "jp": {
+      "name": "Realityパック",
+      "description": "Reality自動回収、スキャン発生サージ、スーパーサイロを1つのTweaksX modに統合します。",
+      "config": {
+        "surgeCount": {
+          "label": "サージ数",
+          "description": "超臨界カーネルが着地した時に生成するランダムサージの数。"
+        },
+        "surgeRadius": {
+          "label": "生成半径",
+          "description": "現実面の空きマスを探す円形半径（マス数）。"
+        },
+        "fillAmount": {
+          "label": "長時間補充量",
+          "description": "Fill value assigned to activated silos."
+        },
+        "enableRealityAutoCollect": {
+          "label": "Reality自動回収",
+          "description": "虚空世界で準備済みのReality / soul powerを自動回収します。"
+        },
+        "enableScanRealitySurges": {
+          "label": "スキャンRealityサージ",
+          "description": "超臨界カーネルが着地した時にReality面へランダムなサージを生成します。"
+        },
+        "enableSuperSilo": {
+          "label": "スーパーサイロ",
+          "description": "有効化されたサイロを設定した長時間補充量で維持します。"
+        }
+      }
+    },
+    "kr": {
+      "name": "Reality 팩",
+      "description": "Reality 자동 수집, 스캔 현실 쇄도, 슈퍼 사일로를 하나의 TweaksX 모드로 합칩니다.",
+      "config": {
+        "surgeCount": {
+          "label": "쇄도 수",
+          "description": "초임계 핵이 착지할 때 생성할 무작위 쇄도 수입니다."
+        },
+        "surgeRadius": {
+          "label": "생성 반경",
+          "description": "현실 평면의 빈 칸을 찾는 원형 반경입니다."
+        },
+        "fillAmount": {
+          "label": "긴 충전값",
+          "description": "Fill value assigned to activated silos."
+        },
+        "enableRealityAutoCollect": {
+          "label": "Reality 자동 수집",
+          "description": "공허 세계에서 준비된 Reality / soul power를 자동으로 수집합니다."
+        },
+        "enableScanRealitySurges": {
+          "label": "스캔 Reality 쇄도",
+          "description": "초임계 커널이 착지할 때 Reality 평면에 무작위 쇄도를 생성합니다."
+        },
+        "enableSuperSilo": {
+          "label": "슈퍼 사일로",
+          "description": "활성화된 사일로를 설정된 긴 충전값으로 유지합니다."
+        }
+      }
+    },
+    "sch": {
+      "name": "机制修改",
+      "description": "修改游戏的机制，可能会影响游戏平衡",
+      "config": {
+        "surgeCount": {
+          "label": "浪涌数量",
+          "description": "每次超临界内核落地时尝试生成的随机浪涌数量。"
+        },
+        "surgeRadius": {
+          "label": "生成半径",
+          "description": "以落点为中心搜索现实世界空格的圆形半径（格）。"
+        },
+        "fillAmount": {
+          "label": "超长填充值",
+          "description": "赋予已激活 Silo 的填充值。"
+        },
+        "enableRealityAutoCollect": {
+          "label": "自动 Reality 收集",
+          "description": "在虚空世界自动收集已经准备好的 Reality / soul power。"
+        },
+        "enableScanRealitySurges": {
+          "label": "超临界浪涌",
+          "description": "超临界内核落地时，在 Reality 平面生成随机浪涌。"
+        },
+        "enableSuperSilo": {
+          "label": "超级 Silo",
+          "description": "让已激活的 Silo 保持配置的超长填充值。"
+        }
+      }
+    },
+    "tch": {
+      "name": "Reality 整合包",
+      "description": "將自動 Reality 收集、超臨界浪湧和超級 Silo 整合為一個 TweaksX mod。",
+      "config": {
+        "surgeCount": {
+          "label": "浪湧數量",
+          "description": "每次超臨界核心落地時嘗試生成的隨機浪湧數量。"
+        },
+        "surgeRadius": {
+          "label": "生成半徑",
+          "description": "以落點為中心搜尋現實世界空格的圓形半徑（格）。"
+        },
+        "fillAmount": {
+          "label": "超長填充值",
+          "description": "Fill value assigned to activated silos."
+        },
+        "enableRealityAutoCollect": {
+          "label": "自動 Reality 收集",
+          "description": "在虛空世界自動收集已經準備好的 Reality / soul power。"
+        },
+        "enableScanRealitySurges": {
+          "label": "超臨界浪湧",
+          "description": "超臨界內核落地時，在 Reality 平面生成隨機浪湧。"
+        },
+        "enableSuperSilo": {
+          "label": "超級 Silo",
+          "description": "讓已啟動的 Silo 保持設定的超長填充值。"
+        }
+      }
+    },
+    "thai": {
+      "name": "แพ็ก Reality",
+      "description": "รวมการเก็บ Reality อัตโนมัติ คลื่นพลังจากการสแกน และไซโลพิเศษไว้ในม็อด TweaksX เดียว",
+      "config": {
+        "surgeCount": {
+          "label": "จำนวนคลื่นพลัง",
+          "description": "Number of random surges to create when a supercritical kernel lands."
+        },
+        "surgeRadius": {
+          "label": "รัศมีเกิด",
+          "description": "Circular radius, in cells, used to search for empty reality-plane spawn spots."
+        },
+        "fillAmount": {
+          "label": "ค่าการเติมยาว",
+          "description": "Fill value assigned to activated silos."
+        },
+        "enableRealityAutoCollect": {
+          "label": "เก็บ Reality อัตโนมัติ",
+          "description": "เก็บ Reality / soul power ที่พร้อมแล้วในโลกวอยด์โดยอัตโนมัติ"
+        },
+        "enableScanRealitySurges": {
+          "label": "คลื่นพลัง Reality จากสแกน",
+          "description": "สร้างคลื่นพลังแบบสุ่มบนระนาบ Reality เมื่อแกนเหนือวิกฤตตกถึงพื้น"
+        },
+        "enableSuperSilo": {
+          "label": "ไซโลพิเศษ",
+          "description": "คงค่าเติมของไซโลที่เปิดใช้แล้วไว้ตามค่าการเติมยาวที่ตั้งไว้"
+        }
+      }
+    },
+    "hu": {
+      "name": "Reality csomag",
+      "description": "Egy TweaksX modba egyesíti a Reality automatikus gyűjtést, a scan hullámokat és a szuper silót.",
+      "config": {
+        "surgeCount": {
+          "label": "Hullámok száma",
+          "description": "A becsapodaskor letrehozott veletlen hullamok szama."
+        },
+        "surgeRadius": {
+          "label": "Megjelenési sugár",
+          "description": "Kor alaku sugar cellakban, ahol ures helyeket keres."
+        },
+        "fillAmount": {
+          "label": "Hosszú feltöltési érték",
+          "description": "Fill value assigned to activated silos."
+        },
+        "enableRealityAutoCollect": {
+          "label": "Reality automatikus gyűjtése",
+          "description": "Automatikusan összegyűjti a kész Reality / soul power értéket az üresség világában."
+        },
+        "enableScanRealitySurges": {
+          "label": "Scan Reality hullámok",
+          "description": "Véletlen Reality-sík hullámokat hoz létre, amikor egy szuperkritikus mag földet ér."
+        },
+        "enableSuperSilo": {
+          "label": "Szuper siló",
+          "description": "Az aktivált silókat a beállított hosszú feltöltési értéken tartja."
+        }
+      }
+    },
+    "lv": {
+      "name": "Reality paka",
+      "description": "Apvieno automātisku Reality savākšanu, skenēšanas viļņus un Super Silo vienā TweaksX modā.",
+      "config": {
+        "surgeCount": {
+          "label": "Viļņu skaits",
+          "description": "Nejauso vilnu skaits, kas rodas kodolam piezemejoties."
+        },
+        "surgeRadius": {
+          "label": "Rašanās radiuss",
+          "description": "Aplveida radiuss sunas, kura meklet brivas vietas."
+        },
+        "fillAmount": {
+          "label": "Ilgās uzpildes vērtība",
+          "description": "Fill value assigned to activated silos."
+        },
+        "enableRealityAutoCollect": {
+          "label": "Automātiska Reality savākšana",
+          "description": "Automātiski savāc gatavo Reality / soul power tukšuma pasaulē."
+        },
+        "enableScanRealitySurges": {
+          "label": "Skenēšanas Reality viļņi",
+          "description": "Izveido nejaušus Reality plaknes viļņus, kad superkritiskais kodols piezemējas."
+        },
+        "enableSuperSilo": {
+          "label": "Super Silo",
+          "description": "Uztur aktivizētās tvertnes piepildītas ar iestatīto ilgo uzpildes vērtību."
+        }
+      }
+    },
+    "ro": {
+      "name": "Pachet Reality",
+      "description": "Combină colectarea automată Reality, valurile de scanare și Super siloz într-un singur mod TweaksX.",
+      "config": {
+        "surgeCount": {
+          "label": "Număr de valuri",
+          "description": "Numarul de valuri aleatorii create cand aterizeaza un nucleu supercritic."
+        },
+        "surgeRadius": {
+          "label": "Raza de apariție",
+          "description": "Raza circulara, in celule, folosita pentru a cauta locuri libere."
+        },
+        "fillAmount": {
+          "label": "Valoare umplere lungă",
+          "description": "Fill value assigned to activated silos."
+        },
+        "enableRealityAutoCollect": {
+          "label": "Colectare automată Reality",
+          "description": "Colectează automat Reality / soul power pregătită în lumea vidului."
+        },
+        "enableScanRealitySurges": {
+          "label": "Valuri Reality la scanare",
+          "description": "Creează valuri aleatorii în planul Reality când aterizează un nucleu supercritic."
+        },
+        "enableSuperSilo": {
+          "label": "Super siloz",
+          "description": "Menține silozurile activate umplute cu valoarea lungă configurată."
+        }
+      }
+    },
+    "no": {
+      "name": "Reality-pakke",
+      "description": "Kombinerer automatisk Reality-innsamling, skanningsbølger og Super-silo i én TweaksX-mod.",
+      "config": {
+        "surgeCount": {
+          "label": "Antall bølger",
+          "description": "Antall tilfeldige bolger som lages naar en superkritisk kjerne lander."
+        },
+        "surgeRadius": {
+          "label": "Oppståelsesradius",
+          "description": "Sirkelradius i celler for aa finne ledige plasser."
+        },
+        "fillAmount": {
+          "label": "Lang fyllverdi",
+          "description": "Fill value assigned to activated silos."
+        },
+        "enableRealityAutoCollect": {
+          "label": "Automatisk Reality-innsamling",
+          "description": "Samler automatisk klar Reality / soul power i tomromsverdenen."
+        },
+        "enableScanRealitySurges": {
+          "label": "Reality-bølger fra skanning",
+          "description": "Lager tilfeldige bølger i Reality-planet når en superkritisk kjerne lander."
+        },
+        "enableSuperSilo": {
+          "label": "Super-silo",
+          "description": "Holder aktiverte siloer fylt med den konfigurerte lange fyllverdien."
+        }
+      }
+    },
+    "modsch": {
+      "name": "机制修改",
+      "description": "修改游戏的机制，可能会影响游戏平衡。",
+      "config": {
+        "surgeCount": {
+          "label": "浪涌数量",
+          "description": "每次超临界内核落地时尝试生成的随机浪涌数量。"
+        },
+        "surgeRadius": {
+          "label": "生成半径",
+          "description": "以落点为中心搜索现实世界空格的圆形半径（格）。"
+        },
+        "fillAmount": {
+          "label": "超长填充值",
+          "description": "赋予已激活 Silo 的填充值。"
+        },
+        "enableRealityAutoCollect": {
+          "label": "自动 Reality 收集",
+          "description": "在虚空世界自动收集已经准备好的 Reality / soul power。"
+        },
+        "enableScanRealitySurges": {
+          "label": "超临界浪涌",
+          "description": "超临界内核落地时，在 Reality 平面生成随机浪涌。"
+        },
+        "enableSuperSilo": {
+          "label": "超级 Silo",
+          "description": "让已激活的 Silo 保持配置的超长填充值。"
+        }
+      }
+    }
+  }
+}

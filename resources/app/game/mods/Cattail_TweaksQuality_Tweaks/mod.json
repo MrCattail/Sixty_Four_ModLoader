@@ -115,51 +115,51 @@
   "reloadOnConfigChange": true,
   "translations": {
     "sch": {
-      "name": "便利调整",
-      "description": "将视野距离限制、结局跳过、辅助按钮、稳定器浪涌闪烁削弱、资源光圈颜色、游戏时间计数器和动态提示语言刷新整合为一个综合调整 mod。",
+      "name": "优化和修复",
+      "description": "优化和修复游戏中的部分内容。",
       "config": {
         "enableExplainerLanguageFix": {
           "label": "提示语言修复",
-          "description": "切换语言后立刻刷新会跳动的提示文本。"
+          "description": "修复了切换语言后提示不跟随语言切换的问题。"
         },
         "enableEndingSkip": {
           "label": "结局跳过",
-          "description": "在针孔结局和制作人员名单阶段显示跳过按钮。"
+          "description": "新增在结局和致谢名单的跳过功能。"
         },
         "enableAccessibilityButtons": {
           "label": "辅助按钮",
-          "description": "显示底部辅助控制栏和现实地板颜色调色板。"
+          "description": "鼠标移动到底部中间时会弹出设置按钮。"
         },
         "enableStabilizerSurgeFlashReduction": {
-          "label": "稳定器浪涌闪烁削弱",
-          "description": "虚空祭坛存在后，隐藏由稳定器触发浪涌效果造成的全屏闪烁。"
+          "label": "禁用稳定器触发浪涌时的闪烁",
+          "description": "在建造虚空祭坛之后，也禁用稳定器激活浪涌效果时产生的全频闪烁。"
         },
         "enableResourceGlowColors": {
-          "label": "资源光圈颜色",
-          "description": "根据资源类型给资源图标光圈上色，并支持单独覆盖每种资源颜色。"
+          "label": "资源发光颜色",
+          "description": "新增默认根据资源的颜色改变对应资源发光颜色，并支持自定义。"
         },
         "enablePlayTimeCounter": {
-          "label": "游戏时间计数器",
-          "description": "在游戏画布上显示当前存档的游玩时间计数器。"
+          "label": "游戏时长显示",
+          "description": "在游戏里显示当前存档的游玩时长。"
         },
         "playTimeCounterPosition": {
-          "label": "游戏时间计数器位置",
+          "label": "游戏时长位置",
           "description": "bottom-right 会放在商店按钮左侧，top-center 会放在顶部居中。"
         },
         "resourceGlowColors": {
-          "label": "资源光圈调色板",
-          "description": "逐资源设置光圈颜色。留空的资源会使用该资源的原生颜色。"
+          "label": "资源发光颜色调色板",
+          "description": "可自定义设置每周资源的发光颜色。"
         },
         "enableViewDistance": {
-          "label": "视野距离限制",
-          "description": "使用扩展后的镜头缩放范围。"
+          "label": "禁用视野距离限制",
+          "description": "可修改原版游戏的视角的远近限制。"
         },
         "farthestZoom": {
-          "label": "最远缩放",
+          "label": "最远视角距离",
           "description": "数值越低，可看到的世界范围越大。原版最远限制为 0.3。"
         },
         "closestZoom": {
-          "label": "最近缩放",
+          "label": "最近视角距离",
           "description": "数值越高，镜头可以拉得越近。原版最近限制为 2。"
         },
         "fallbackZoom": {
@@ -169,51 +169,51 @@
       }
     },
     "modsch": {
-      "name": "便利调整",
-      "description": "将视野距离限制、结局跳过、辅助按钮、稳定器浪涌闪烁削弱、资源光圈颜色、游戏时间计数器和动态提示语言刷新整合为一个综合调整 mod。",
+      "name": "优化和修复",
+      "description": "优化和修复游戏中的部分内容。",
       "config": {
         "enableExplainerLanguageFix": {
           "label": "提示语言修复",
-          "description": "切换语言后立刻刷新会跳动的提示文本。"
+          "description": "修复了切换语言后提示不跟随语言切换的问题。"
         },
         "enableEndingSkip": {
           "label": "结局跳过",
-          "description": "在针孔结局和制作人员名单阶段显示跳过按钮。"
+          "description": "新增在结局和致谢名单的跳过功能。"
         },
         "enableAccessibilityButtons": {
           "label": "辅助按钮",
-          "description": "显示底部辅助控制栏和现实地板颜色调色板。"
+          "description": "鼠标移动到底部中间时会弹出设置按钮。"
         },
         "enableStabilizerSurgeFlashReduction": {
-          "label": "稳定器浪涌闪烁削弱",
-          "description": "虚空祭坛存在后，隐藏由稳定器触发浪涌效果造成的全屏闪烁。"
+          "label": "禁用稳定器触发浪涌时的闪烁",
+          "description": "在建造虚空祭坛之后，也禁用稳定器激活浪涌效果时产生的全频闪烁。"
         },
         "enableResourceGlowColors": {
-          "label": "资源光圈颜色",
-          "description": "根据资源类型给资源图标光圈上色，并支持单独覆盖每种资源颜色。"
+          "label": "资源发光颜色",
+          "description": "新增默认根据资源的颜色改变对应资源发光颜色，并支持自定义。"
         },
         "enablePlayTimeCounter": {
-          "label": "游戏时间计数器",
-          "description": "在游戏画布上显示当前存档的游玩时间计数器。"
+          "label": "游戏时长显示",
+          "description": "在游戏里显示当前存档的游玩时长。"
         },
         "playTimeCounterPosition": {
-          "label": "游戏时间计数器位置",
+          "label": "游戏时长位置",
           "description": "bottom-right 会放在商店按钮左侧，top-center 会放在顶部居中。"
         },
         "resourceGlowColors": {
-          "label": "资源光圈调色板",
-          "description": "逐资源设置光圈颜色。留空的资源会使用该资源的原生颜色。"
+          "label": "资源发光颜色调色板",
+          "description": "可自定义设置每周资源的发光颜色。"
         },
         "enableViewDistance": {
-          "label": "视野距离限制",
-          "description": "使用扩展后的镜头缩放范围。"
+          "label": "禁用视野距离限制",
+          "description": "可修改原版游戏的视角的远近限制。"
         },
         "farthestZoom": {
-          "label": "最远缩放",
+          "label": "最远视角距离",
           "description": "数值越低，可看到的世界范围越大。原版最远限制为 0.3。"
         },
         "closestZoom": {
-          "label": "最近缩放",
+          "label": "最近视角距离",
           "description": "数值越高，镜头可以拉得越近。原版最近限制为 2。"
         },
         "fallbackZoom": {

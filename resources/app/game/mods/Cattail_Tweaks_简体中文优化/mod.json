@@ -18,11 +18,11 @@
   "translations": {
     "sch": {
       "name": "简体中文优化",
-      "description": "添加从之前修改过的 words.js 中提取出的中文优化版语言。"
+      "description": "简体中文优化版。"
     },
     "modsch": {
       "name": "简体中文优化",
-      "description": "添加从之前修改过的 words.js 中提取出的中文优化版语言。"
+      "description": "简体中文优化版。"
     },
     "en": {
       "name": "Simplified Chinese Optimization"

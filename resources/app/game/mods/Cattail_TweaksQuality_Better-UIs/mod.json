@@ -42,38 +42,38 @@
   "reloadOnConfigChange": true,
   "translations": {
     "sch": {
-      "name": "更好的界面",
+      "name": "更好的UI界面",
       "description": "将商店分类、存档栏和语言菜单整合为一个界面优化 mod。",
       "config": {
         "enableShopCategories": {
           "label": "商店分类",
-          "description": "显示可选的分类压缩建筑商店视图。"
+          "description": "可将建筑建造卡的视图切换至可按照分类进行收缩/展开。"
         },
         "enableSaveSlots": {
           "label": "存档栏",
-          "description": "显示游戏内存档页，并提供导入和导出功能。"
+          "description": "新增游戏内存档页，并提供导入和导出功能。"
         },
         "enableLanguageMenu": {
           "label": "语言菜单",
-          "description": "在主菜单使用可滚动的语言选择页面。"
+          "description": "语言切换功能新增滚动列表。"
         }
       }
     },
     "modsch": {
-      "name": "更好的界面",
+      "name": "更好的UI界面",
       "description": "将商店分类、存档栏和语言菜单整合为一个界面优化 mod。",
       "config": {
         "enableShopCategories": {
-          "label": "商店分类",
-          "description": "显示可选的分类压缩建筑商店视图。"
+          "label": "建筑分类",
+          "description": "可将建筑建造卡的视图切换至可按照分类进行收缩/展开。"
         },
         "enableSaveSlots": {
           "label": "存档栏",
-          "description": "显示游戏内存档页，并提供导入和导出功能。"
+          "description": "新增游戏内存档页，并提供导入和导出功能。"
         },
         "enableLanguageMenu": {
           "label": "语言菜单",
-          "description": "在主菜单使用可滚动的语言选择页面。"
+          "description": "语言切换功能新增滚动列表。"
         }
       }
     },
