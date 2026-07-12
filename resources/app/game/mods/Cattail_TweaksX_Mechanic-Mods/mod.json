@@ -22,6 +22,7 @@
     "scripts/config-migration.js",
     "scripts/reality-auto-collect.js",
     "scripts/scan-reality-surges.js",
+    "scripts/scan-reality-slider.js",
     "scripts/super-silo.js"
   ],
   "conflicts": [
@@ -42,6 +43,13 @@
       "label": "Scan reality surges",
       "default": true,
       "description": "Create random reality-plane surges when a supercritical kernel lands.",
+      "reloadPolicy": "hot"
+    },
+    "enableScanRealitySlider": {
+      "type": "boolean",
+      "label": "Supercritical kernel slider",
+      "default": true,
+      "description": "Show the supercritical kernel range and Reality infusion slider on its shop card.",
       "reloadPolicy": "hot"
     },
     "surgeCount": {
@@ -110,6 +118,10 @@
         "enableSuperSilo": {
           "label": "Super Silo",
           "description": "Keep activated silos filled with the configured long fill amount."
+        },
+        "enableScanRealitySlider": {
+          "label": "Supercritical kernel slider",
+          "description": "Show the supercritical kernel range and Reality infusion slider on its shop card."
         }
       }
     },
@@ -140,6 +152,10 @@
         "enableSuperSilo": {
           "label": "Супер-силос",
           "description": "Поддерживает активированные силосы заполненными заданным длинным значением."
+        },
+        "enableScanRealitySlider": {
+          "label": "Ползунок сверхкритического ядра",
+          "description": "Показывает диаметр области и ползунок вливания Reality на карточке покупки сверхкритического ядра."
         }
       }
     },
@@ -170,6 +186,10 @@
         "enableSuperSilo": {
           "label": "Super-Silo",
           "description": "Hält aktivierte Silos mit der eingestellten langen Füllmenge gefüllt."
+        },
+        "enableScanRealitySlider": {
+          "label": "Regler für superkritischen Kern",
+          "description": "Zeigt den Reichweitendurchmesser und den Reality-Infusionsregler auf der Kaufkarte des superkritischen Kerns."
         }
       }
     },
@@ -200,6 +220,10 @@
         "enableSuperSilo": {
           "label": "Super Silo",
           "description": "Mantém silos ativados preenchidos com o valor longo configurado."
+        },
+        "enableScanRealitySlider": {
+          "label": "Controle do núcleo supercrítico",
+          "description": "Mostra o diâmetro do alcance e o controle de infusão de Reality no cartão de compra do núcleo supercrítico."
         }
       }
     },
@@ -230,6 +254,10 @@
         "enableSuperSilo": {
           "label": "Super Silo",
           "description": "Mantiene i silo attivati pieni con il valore lungo configurato."
+        },
+        "enableScanRealitySlider": {
+          "label": "Cursore nucleo supercritico",
+          "description": "Mostra il diametro del raggio e il cursore di infusione Reality sulla scheda di acquisto del nucleo supercritico."
         }
       }
     },
@@ -260,6 +288,10 @@
         "enableSuperSilo": {
           "label": "Súper silo",
           "description": "Mantiene los silos activados llenos con el valor largo configurado."
+        },
+        "enableScanRealitySlider": {
+          "label": "Control del núcleo supercrítico",
+          "description": "Muestra el diámetro de alcance y el control de inyección de Reality en la tarjeta de compra del núcleo supercrítico."
         }
       }
     },
@@ -290,6 +322,10 @@
         "enableSuperSilo": {
           "label": "Super silo",
           "description": "Garde les silos activés remplis avec la valeur longue configurée."
+        },
+        "enableScanRealitySlider": {
+          "label": "Curseur du noyau supercritique",
+          "description": "Affiche le diamètre de portée et le curseur d’injection de Reality sur la carte d’achat du noyau supercritique."
         }
       }
     },
@@ -320,6 +356,10 @@
         "enableSuperSilo": {
           "label": "Super-silo",
           "description": "Houdt geactiveerde silo’s gevuld met de ingestelde lange vulwaarde."
+        },
+        "enableScanRealitySlider": {
+          "label": "Schuif voor superkritische kern",
+          "description": "Toont de bereikdiameter en Reality-injectieschuif op de aankoopkaart van de superkritische kern."
         }
       }
     },
@@ -350,6 +390,10 @@
         "enableSuperSilo": {
           "label": "Super silo",
           "description": "Udržuje aktivovaná sila naplněná nastavenou dlouhou hodnotou."
+        },
+        "enableScanRealitySlider": {
+          "label": "Posuvník superkritického jádra",
+          "description": "Zobrazí průměr dosahu a posuvník vložení Reality na nákupní kartě superkritického jádra."
         }
       }
     },
@@ -380,6 +424,10 @@
         "enableSuperSilo": {
           "label": "Super silos",
           "description": "Utrzymuje aktywowane silosy napełnione skonfigurowaną długą wartością."
+        },
+        "enableScanRealitySlider": {
+          "label": "Suwak superkrytycznego jądra",
+          "description": "Pokazuje średnicę zasięgu i suwak wlewu Reality na karcie zakupu superkrytycznego jądra."
         }
       }
     },
@@ -410,6 +458,10 @@
         "enableSuperSilo": {
           "label": "スーパーサイロ",
           "description": "有効化されたサイロを設定した長時間補充量で維持します。"
+        },
+        "enableScanRealitySlider": {
+          "label": "超臨界コアスライダー",
+          "description": "超臨界コアの購入カードに範囲直径とReality注入スライダーを表示します。"
         }
       }
     },
@@ -440,6 +492,10 @@
         "enableSuperSilo": {
           "label": "슈퍼 사일로",
           "description": "활성화된 사일로를 설정된 긴 충전값으로 유지합니다."
+        },
+        "enableScanRealitySlider": {
+          "label": "초임계 핵 슬라이더",
+          "description": "초임계 핵 구매 카드에 범위 지름과 Reality 주입 슬라이더를 표시합니다."
         }
       }
     },
@@ -470,6 +526,10 @@
         "enableSuperSilo": {
           "label": "超级 Silo",
           "description": "让已激活的 Silo 保持配置的超长填充值。"
+        },
+        "enableScanRealitySlider": {
+          "label": "超临界内核滑块",
+          "description": "在超临界内核购买卡片上显示范围直径和 Reality 注入滑块。"
         }
       }
     },
@@ -500,6 +560,10 @@
         "enableSuperSilo": {
           "label": "超級 Silo",
           "description": "讓已啟動的 Silo 保持設定的超長填充值。"
+        },
+        "enableScanRealitySlider": {
+          "label": "超臨界核心滑桿",
+          "description": "在超臨界核心購買卡片上顯示範圍直徑和 Reality 注入滑桿。"
         }
       }
     },
@@ -530,6 +594,10 @@
         "enableSuperSilo": {
           "label": "ไซโลพิเศษ",
           "description": "คงค่าเติมของไซโลที่เปิดใช้แล้วไว้ตามค่าการเติมยาวที่ตั้งไว้"
+        },
+        "enableScanRealitySlider": {
+          "label": "แถบเลื่อนแกนเหนือวิกฤต",
+          "description": "แสดงเส้นผ่านศูนย์กลางระยะและแถบเลื่อนเติม Reality บนการ์ดซื้อแกนเหนือวิกฤต"
         }
       }
     },
@@ -560,6 +628,10 @@
         "enableSuperSilo": {
           "label": "Szuper siló",
           "description": "Az aktivált silókat a beállított hosszú feltöltési értéken tartja."
+        },
+        "enableScanRealitySlider": {
+          "label": "Szuperkritikus mag csúszka",
+          "description": "Megjeleníti a hatótáv átmérőjét és a Reality-betöltés csúszkáját a szuperkritikus mag vásárlási kártyáján."
         }
       }
     },
@@ -590,6 +662,10 @@
         "enableSuperSilo": {
           "label": "Super Silo",
           "description": "Uztur aktivizētās tvertnes piepildītas ar iestatīto ilgo uzpildes vērtību."
+        },
+        "enableScanRealitySlider": {
+          "label": "Superkritiskā kodola slīdnis",
+          "description": "Rāda diapazona diametru un Reality ieplūdes slīdni superkritiskā kodola iegādes kartītē."
         }
       }
     },
@@ -620,6 +696,10 @@
         "enableSuperSilo": {
           "label": "Super siloz",
           "description": "Menține silozurile activate umplute cu valoarea lungă configurată."
+        },
+        "enableScanRealitySlider": {
+          "label": "Glisor nucleu supercritic",
+          "description": "Afișează diametrul razei și glisorul de infuzie Reality pe cardul de cumpărare al nucleului supercritic."
         }
       }
     },
@@ -650,6 +730,10 @@
         "enableSuperSilo": {
           "label": "Super-silo",
           "description": "Holder aktiverte siloer fylt med den konfigurerte lange fyllverdien."
+        },
+        "enableScanRealitySlider": {
+          "label": "Skyver for superkritisk kjerne",
+          "description": "Viser rekkeviddediameteren og Reality-infusjonsskyveren på kjøpskortet for den superkritiske kjernen."
         }
       }
     },
@@ -680,6 +764,10 @@
         "enableSuperSilo": {
           "label": "超级 Silo",
           "description": "让已激活的 Silo 保持配置的超长填充值。"
+        },
+        "enableScanRealitySlider": {
+          "label": "超临界内核滑块",
+          "description": "在超临界内核购买卡片上显示范围直径和 Reality 注入滑块。"
         }
       }
     }
