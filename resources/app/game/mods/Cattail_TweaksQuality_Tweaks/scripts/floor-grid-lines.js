@@ -2,13 +2,15 @@
 	const MOD_ID = 'Cattail_TweaksQuality_Tweaks'
 	const installedKey = '__cattailFloorGridLinesInstalled'
 	const enableConfigKey = 'enableFloorGridLines'
-	const colorConfigKey = 'floorGridLineColor'
+	const realityColorConfigKey = 'floorGridLineRealityColor'
+	const voidColorConfigKey = 'floorGridLineVoidColor'
 	const defaultRealityColor = '#1D232B'
 	const defaultVoidColor = '#FFFFFF'
 	const maxGridLines = 1200
 
 	let previewEnabled = null
-	let previewColor = null
+	let previewRealityColor = null
+	let previewVoidColor = null
 
 	ModLoader.register({
 		id: MOD_ID,
@@ -26,7 +28,8 @@
 				const detail = event?.detail || {}
 				if (detail.modId !== MOD_ID) return
 				if (detail.key === enableConfigKey) previewEnabled = detail.value === true
-				if (detail.key === colorConfigKey) previewColor = detail.value
+				if (detail.key === realityColorConfigKey) previewRealityColor = detail.value
+				if (detail.key === voidColorConfigKey) previewVoidColor = detail.value
 			})
 		} catch (error) {}
 	}
@@ -110,10 +113,10 @@
 	}
 
 	function getFloorGridLineColor(game, api) {
-		if (previewColor !== null) {
-			return normalizeHexColor(previewColor) || getAutomaticFloorGridLineColor(game)
-		}
-		const configured = normalizeHexColor(api.config.get(colorConfigKey, ''))
+		const preview = game.plane ? previewVoidColor : previewRealityColor
+		if (preview !== null) return normalizeHexColor(preview) || getAutomaticFloorGridLineColor(game)
+		const key = game.plane ? voidColorConfigKey : realityColorConfigKey
+		const configured = normalizeHexColor(api.config.get(key, ''))
 		if (configured) return configured
 		return getAutomaticFloorGridLineColor(game)
 	}

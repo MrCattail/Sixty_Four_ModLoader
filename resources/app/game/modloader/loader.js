@@ -1795,11 +1795,13 @@
 		textInput.addEventListener('input', function () {
 			if (allowAuto && String(textInput.value || '').trim() === '') {
 				setAuto()
+				root.dispatchEvent(new Event('input', { bubbles: true }))
 				return
 			}
 			markManual()
 			const color = normalizePanelHexColor(textInput.value)
 			if (color) picker.value = color
+			root.dispatchEvent(new Event('input', { bubbles: true }))
 		})
 		reset.addEventListener('click', function (event) {
 			event.preventDefault()
@@ -1857,6 +1859,7 @@
 	const readConfigInputValue = function (item, input) {
 		const type = getConfigType(item)
 		if (isResourceColorsConfigItem(item, type)) return input.readConfigValue()
+		if (isColorConfigType(type)) return input.readConfigValue()
 		if (isSliderConfigItem(item, type)) return input.readConfigValue()
 		if (type === 'boolean') return !!input.checked
 		if (isNumberConfigType(type)) return readNumberConfigValue(item, input.value, type)

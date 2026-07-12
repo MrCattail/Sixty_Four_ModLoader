@@ -145,9 +145,9 @@
       "description": "Draw thin outlines around the in-game floor cells.",
       "reloadPolicy": "hot"
     },
-    "floorGridLineColor": {
+    "floorGridLineRealityColor": {
       "type": "color",
-      "label": "Floor grid outline color",
+      "label": "Reality floor grid outline color",
       "default": "",
       "defaultColor": "#1D232B",
       "allowAuto": true,
@@ -173,7 +173,38 @@
         "ro": "Auto",
         "no": "Auto"
       },
-      "description": "Leave empty to use dark gray in reality and white in the void. A custom color overrides both worlds.",
+      "description": "Leave empty to use the default dark gray outline in reality.",
+      "reloadPolicy": "hot"
+    },
+    "floorGridLineVoidColor": {
+      "type": "color",
+      "label": "Void floor grid outline color",
+      "default": "",
+      "defaultColor": "#FFFFFF",
+      "allowAuto": true,
+      "autoLabel": {
+        "en": "Auto",
+        "sch": "自动",
+        "modsch": "自动",
+        "tch": "自動",
+        "ru": "Avto",
+        "de": "Auto",
+        "ptbr": "Auto",
+        "it": "Auto",
+        "es": "Auto",
+        "fr": "Auto",
+        "nl": "Auto",
+        "cz": "Auto",
+        "pl": "Auto",
+        "jp": "Auto",
+        "kr": "Auto",
+        "thai": "Auto",
+        "hu": "Auto",
+        "lv": "Auto",
+        "ro": "Auto",
+        "no": "Auto"
+      },
+      "description": "Leave empty to use the default white outline in the void.",
       "reloadPolicy": "hot"
     },
     "enablePlayTimeCounter": {
@@ -389,9 +420,13 @@
           "label": "显示地板方格边框",
           "description": "在游戏内地板方格周围绘制细线边框。"
         },
-        "floorGridLineColor": {
-          "label": "地板方格边框颜色",
-          "description": "留空时现实世界使用深灰色，虚空世界使用白色；自定义颜色会同时影响两个世界。"
+        "floorGridLineRealityColor": {
+          "label": "现实世界地板方格边框颜色",
+          "description": "留空时现实世界使用默认深灰色边框。"
+        },
+        "floorGridLineVoidColor": {
+          "label": "虚空世界地板方格边框颜色",
+          "description": "留空时虚空世界使用默认白色边框。"
         }
       }
     },
@@ -463,9 +498,13 @@
           "label": "显示地板方格边框",
           "description": "在游戏内地板方格周围绘制细线边框。"
         },
-        "floorGridLineColor": {
-          "label": "地板方格边框颜色",
-          "description": "留空时现实世界使用深灰色，虚空世界使用白色；自定义颜色会同时影响两个世界。"
+        "floorGridLineRealityColor": {
+          "label": "现实世界地板方格边框颜色",
+          "description": "留空时现实世界使用默认深灰色边框。"
+        },
+        "floorGridLineVoidColor": {
+          "label": "虚空世界地板方格边框颜色",
+          "description": "留空时虚空世界使用默认白色边框。"
         }
       }
     },
@@ -525,9 +564,13 @@
           "label": "Floor grid outlines",
           "description": "Draw thin outlines around the in-game floor cells."
         },
-        "floorGridLineColor": {
-          "label": "Floor grid outline color",
-          "description": "Leave empty to use dark gray in reality and white in the void. A custom color overrides both worlds."
+        "floorGridLineRealityColor": {
+          "label": "Reality floor grid outline color",
+          "description": "Leave empty to use the default dark gray outline in reality."
+        },
+        "floorGridLineVoidColor": {
+          "label": "Void floor grid outline color",
+          "description": "Leave empty to use the default white outline in the void."
         }
       }
     },
@@ -587,9 +630,13 @@
           "label": "Kontury kletok pola",
           "description": "Risuet tonkie kontury vokrug kletok pola v igre."
         },
-        "floorGridLineColor": {
-          "label": "Tsvet konturov kletok pola",
-          "description": "Pustoe znachenie: temno-seryy v realnosti i belyy v pustote. Svoi tsvet zamenyaet oba mira."
+        "floorGridLineRealityColor": {
+          "label": "Tsvet setki pola realnosti",
+          "description": "Pustoe znachenie ispolzuet temno-seryy kontur v realnosti."
+        },
+        "floorGridLineVoidColor": {
+          "label": "Tsvet setki pola pustoty",
+          "description": "Pustoe znachenie ispolzuet belyy kontur v pustote."
         }
       }
     },
@@ -649,9 +696,13 @@
           "label": "Bodenraster-Umrisse",
           "description": "Zeichnet duenne Umrisse um die Bodenfelder im Spiel."
         },
-        "floorGridLineColor": {
-          "label": "Farbe der Bodenraster-Umrisse",
-          "description": "Leer lassen fuer Dunkelgrau in der Realitaet und Weiss in der Leere. Eine eigene Farbe ersetzt beide Welten."
+        "floorGridLineRealityColor": {
+          "label": "Bodenrasterfarbe Realitaet",
+          "description": "Leer lassen fuer die dunkelgraue Standardlinie in der Realitaet."
+        },
+        "floorGridLineVoidColor": {
+          "label": "Bodenrasterfarbe Leere",
+          "description": "Leer lassen fuer die weisse Standardlinie in der Leere."
         }
       }
     },
@@ -711,9 +762,13 @@
           "label": "Contornos da grade do piso",
           "description": "Desenha contornos finos nas celulas do piso do jogo."
         },
-        "floorGridLineColor": {
-          "label": "Cor dos contornos do piso",
-          "description": "Vazio usa cinza escuro na realidade e branco no vazio. Uma cor personalizada substitui ambos os mundos."
+        "floorGridLineRealityColor": {
+          "label": "Cor da grade do piso na realidade",
+          "description": "Vazio usa o contorno cinza escuro padrao na realidade."
+        },
+        "floorGridLineVoidColor": {
+          "label": "Cor da grade do piso no vazio",
+          "description": "Vazio usa o contorno branco padrao no vazio."
         }
       }
     },
@@ -773,9 +828,13 @@
           "label": "Contorni griglia pavimento",
           "description": "Disegna contorni sottili attorno alle celle del pavimento."
         },
-        "floorGridLineColor": {
-          "label": "Colore contorni pavimento",
-          "description": "Vuoto usa grigio scuro nella realta e bianco nel vuoto. Un colore personalizzato sostituisce entrambi."
+        "floorGridLineRealityColor": {
+          "label": "Colore griglia pavimento realta",
+          "description": "Vuoto usa il contorno grigio scuro predefinito nella realta."
+        },
+        "floorGridLineVoidColor": {
+          "label": "Colore griglia pavimento vuoto",
+          "description": "Vuoto usa il contorno bianco predefinito nel vuoto."
         }
       }
     },
@@ -835,9 +894,13 @@
           "label": "Bordes de cuadricula del suelo",
           "description": "Dibuja bordes finos alrededor de las celdas del suelo."
         },
-        "floorGridLineColor": {
-          "label": "Color de bordes del suelo",
-          "description": "Vacio usa gris oscuro en realidad y blanco en el vacio. Un color personalizado reemplaza ambos mundos."
+        "floorGridLineRealityColor": {
+          "label": "Color de cuadricula en realidad",
+          "description": "Vacio usa el borde gris oscuro predeterminado en realidad."
+        },
+        "floorGridLineVoidColor": {
+          "label": "Color de cuadricula en vacio",
+          "description": "Vacio usa el borde blanco predeterminado en el vacio."
         }
       }
     },
@@ -897,9 +960,13 @@
           "label": "Contours de grille du sol",
           "description": "Dessine de fins contours autour des cases du sol."
         },
-        "floorGridLineColor": {
-          "label": "Couleur des contours du sol",
-          "description": "Vide utilise gris fonce en realite et blanc dans le vide. Une couleur personnalisee remplace les deux mondes."
+        "floorGridLineRealityColor": {
+          "label": "Couleur de grille en realite",
+          "description": "Vide utilise le contour gris fonce par defaut en realite."
+        },
+        "floorGridLineVoidColor": {
+          "label": "Couleur de grille du vide",
+          "description": "Vide utilise le contour blanc par defaut dans le vide."
         }
       }
     },
@@ -959,9 +1026,13 @@
           "label": "Vloerraster-omtrekken",
           "description": "Tekent dunne omtrekken rond vloercellen."
         },
-        "floorGridLineColor": {
-          "label": "Kleur vloerraster-omtrek",
-          "description": "Leeg gebruikt donkergrijs in realiteit en wit in de leegte. Een eigen kleur vervangt beide werelden."
+        "floorGridLineRealityColor": {
+          "label": "Vloerrasterkleur realiteit",
+          "description": "Leeg gebruikt de standaard donkergrijze omtrek in realiteit."
+        },
+        "floorGridLineVoidColor": {
+          "label": "Vloerrasterkleur leegte",
+          "description": "Leeg gebruikt de standaard witte omtrek in de leegte."
         }
       }
     },
@@ -1021,9 +1092,13 @@
           "label": "Obrysy mrizky podlahy",
           "description": "Kresli tenke obrysy okolo policek podlahy."
         },
-        "floorGridLineColor": {
-          "label": "Barva obrysu podlahy",
-          "description": "Prazdne: tmave seda v realite a bila v prazdnote. Vlastni barva prepise oba svety."
+        "floorGridLineRealityColor": {
+          "label": "Barva mrizky podlahy reality",
+          "description": "Prazdne pouzije vychozi tmave sedy obrys v realite."
+        },
+        "floorGridLineVoidColor": {
+          "label": "Barva mrizky podlahy prazdnoty",
+          "description": "Prazdne pouzije vychozi bily obrys v prazdnote."
         }
       }
     },
@@ -1083,9 +1158,13 @@
           "label": "Obrysy siatki podlogi",
           "description": "Rysuje cienkie obrysy wokol pol podlogi."
         },
-        "floorGridLineColor": {
-          "label": "Kolor obrysow podlogi",
-          "description": "Puste uzywa ciemnoszarego w rzeczywistosci i bialego w pustce. Wlasny kolor nadpisuje oba swiaty."
+        "floorGridLineRealityColor": {
+          "label": "Kolor siatki podlogi rzeczywistosci",
+          "description": "Puste uzywa domyslnego ciemnoszarego obrysu w rzeczywistosci."
+        },
+        "floorGridLineVoidColor": {
+          "label": "Kolor siatki podlogi pustki",
+          "description": "Puste uzywa domyslnego bialego obrysu w pustce."
         }
       }
     },
@@ -1145,9 +1224,13 @@
           "label": "Floor grid outlines",
           "description": "Draw thin outlines around floor cells."
         },
-        "floorGridLineColor": {
-          "label": "Floor grid outline color",
-          "description": "Empty uses dark gray in reality and white in the void; custom color affects both."
+        "floorGridLineRealityColor": {
+          "label": "Reality floor grid outline color",
+          "description": "Empty uses the default dark gray outline in reality."
+        },
+        "floorGridLineVoidColor": {
+          "label": "Void floor grid outline color",
+          "description": "Empty uses the default white outline in the void."
         }
       }
     },
@@ -1207,9 +1290,13 @@
           "label": "Floor grid outlines",
           "description": "Draw thin outlines around floor cells."
         },
-        "floorGridLineColor": {
-          "label": "Floor grid outline color",
-          "description": "Empty uses dark gray in reality and white in the void; custom color affects both."
+        "floorGridLineRealityColor": {
+          "label": "Reality floor grid outline color",
+          "description": "Empty uses the default dark gray outline in reality."
+        },
+        "floorGridLineVoidColor": {
+          "label": "Void floor grid outline color",
+          "description": "Empty uses the default white outline in the void."
         }
       }
     },
@@ -1269,9 +1356,13 @@
           "label": "顯示地板方格邊框",
           "description": "在遊戲內地板方格周圍繪製細線邊框。"
         },
-        "floorGridLineColor": {
-          "label": "地板方格邊框顏色",
-          "description": "留空時現實世界使用深灰色，虛空世界使用白色；自訂顏色會同時影響兩個世界。"
+        "floorGridLineRealityColor": {
+          "label": "現實世界地板方格邊框顏色",
+          "description": "留空時現實世界使用預設深灰色邊框。"
+        },
+        "floorGridLineVoidColor": {
+          "label": "虛空世界地板方格邊框顏色",
+          "description": "留空時虛空世界使用預設白色邊框。"
         }
       }
     },
@@ -1331,9 +1422,13 @@
           "label": "Floor grid outlines",
           "description": "Draw thin outlines around floor cells."
         },
-        "floorGridLineColor": {
-          "label": "Floor grid outline color",
-          "description": "Empty uses dark gray in reality and white in the void; custom color affects both."
+        "floorGridLineRealityColor": {
+          "label": "Reality floor grid outline color",
+          "description": "Empty uses the default dark gray outline in reality."
+        },
+        "floorGridLineVoidColor": {
+          "label": "Void floor grid outline color",
+          "description": "Empty uses the default white outline in the void."
         }
       }
     },
@@ -1393,9 +1488,13 @@
           "label": "Padloracs korvonalai",
           "description": "Vekony korvonalakat rajzol a padlocellak kore."
         },
-        "floorGridLineColor": {
-          "label": "Padloracs korvonal szine",
-          "description": "Uresen sotetszurke a valosagban es feher az urben. Egyedi szin mindket vilagot felulirja."
+        "floorGridLineRealityColor": {
+          "label": "Valosag padloracs szine",
+          "description": "Uresen az alapertelmezett sotetszurke korvonalat hasznalja a valosagban."
+        },
+        "floorGridLineVoidColor": {
+          "label": "Ur padloracs szine",
+          "description": "Uresen az alapertelmezett feher korvonalat hasznalja az urben."
         }
       }
     },
@@ -1455,9 +1554,13 @@
           "label": "Gridas konturas",
           "description": "Zime smalkas konturas ap gridas lauciniem."
         },
-        "floorGridLineColor": {
-          "label": "Gridas konturu krasa",
-          "description": "Tukss: tumsi pelks realitate un balts tuksumaa. Pielagota krasa aizstaj abus."
+        "floorGridLineRealityColor": {
+          "label": "Realitates gridas konturu krasa",
+          "description": "Tukss izmanto noklusejuma tumsi peleku konturu realitate."
+        },
+        "floorGridLineVoidColor": {
+          "label": "Tuksuma gridas konturu krasa",
+          "description": "Tukss izmanto noklusejuma baltu konturu tuksumaa."
         }
       }
     },
@@ -1517,9 +1620,13 @@
           "label": "Contururi grila podea",
           "description": "Deseneaza contururi subtiri in jurul celulelor podelei."
         },
-        "floorGridLineColor": {
-          "label": "Culoare contur podea",
-          "description": "Gol foloseste gri inchis in realitate si alb in vid. O culoare personalizata le inlocuieste pe ambele."
+        "floorGridLineRealityColor": {
+          "label": "Culoare grila podea realitate",
+          "description": "Gol foloseste conturul implicit gri inchis in realitate."
+        },
+        "floorGridLineVoidColor": {
+          "label": "Culoare grila podea vid",
+          "description": "Gol foloseste conturul implicit alb in vid."
         }
       }
     },
@@ -1579,9 +1686,13 @@
           "label": "Omriss for gulvrutenett",
           "description": "Tegner tynne omriss rundt gulvceller."
         },
-        "floorGridLineColor": {
-          "label": "Farge for gulvomriss",
-          "description": "Tomt bruker mork gratt i virkeligheten og hvitt i tomrommet. Egen farge overstyrer begge."
+        "floorGridLineRealityColor": {
+          "label": "Gulvrutenettfarge i virkelighet",
+          "description": "Tomt bruker standard morkegratt omriss i virkeligheten."
+        },
+        "floorGridLineVoidColor": {
+          "label": "Gulvrutenettfarge i tomrom",
+          "description": "Tomt bruker standard hvitt omriss i tomrommet."
         }
       }
     }
