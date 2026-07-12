@@ -24,6 +24,9 @@ ModLoader.register({
 		const resourceSourceLineResourceKey = '_cattailDynamicResourceSourceLineResource'
 		const resourceSourceGpuLineModeKey = '_cattailDynamicResourceSourceGpuLineMode'
 		const resourceSourceGpuRendererKey = '_cattailDynamicResourceSourceGpuRenderer'
+		const resourceSourceLineRendererConfigKey = 'resourceSourceLineRenderer'
+		const resourceSourceLineRendererCanvas = 0
+		const resourceSourceLineRendererWebgl = 1
 		const resourceSourceWarmupKey = '_cattailDynamicResourceSourceWarmup'
 		const resourceSourceSuppressTransferKey = '_cattailDynamicResourceSourceSuppressTransfer'
 		const resourceSourceActiveCubeKey = '_cattailDynamicResourceSourceActiveCube'
@@ -60,6 +63,7 @@ ModLoader.register({
 		const resourceSourceProfilerActiveStack = []
 		const resourceSourceImageDecodeQueue = []
 		let resourceSourceImageDecodeActive = false
+		let resourceSourceLineRendererConfigMigrated = false
 		let resourceSourceFrameProbeStarted = false
 		let resourceSourceLongTaskObserverStarted = false
 		let resourceSourceLongTaskObserver = null
@@ -418,11 +422,14 @@ ModLoader.register({
 		}
 
 		function initializeResourceSourcePreferences(game) {
-			if (!game || game[resourceSourcePrefsLoadedKey]) return
-			game[resourceSourcePrefsLoadedKey] = true
-			game[resourceSourceToggleKey] = loadStoredBoolean(resourceSourceToggleStorageKey, false)
-			game[resourceSourceLineLockKey] = loadStoredBoolean(resourceSourceLineLockStorageKey, false)
-			game[resourceSourceGpuLineModeKey] = loadStoredBoolean(resourceSourceGpuLineModeStorageKey, true)
+			if (!game) return
+			migrateResourceSourceLineRendererConfig()
+			if (!game[resourceSourcePrefsLoadedKey]) {
+				game[resourceSourcePrefsLoadedKey] = true
+				game[resourceSourceToggleKey] = loadStoredBoolean(resourceSourceToggleStorageKey, false)
+				game[resourceSourceLineLockKey] = loadStoredBoolean(resourceSourceLineLockStorageKey, false)
+			}
+			game[resourceSourceGpuLineModeKey] = getConfiguredResourceSourceGpuLineMode()
 			const lastResource = loadStoredInteger(resourceSourceLastResourceStorageKey)
 			const lineResource = loadStoredInteger(resourceSourceLineResourceStorageKey)
 			if (Number.isInteger(lastResource)) game[resourceSourceLastResourceKey] = lastResource
@@ -431,6 +438,39 @@ ModLoader.register({
 			if (game[resourceSourceLineLockKey] && !Number.isInteger(game[resourceSourceLineResourceKey]) && Number.isInteger(lastResource)) game[resourceSourceLineResourceKey] = lastResource
 		}
 
+		function migrateResourceSourceLineRendererConfig() {
+			if (resourceSourceLineRendererConfigMigrated) return
+			resourceSourceLineRendererConfigMigrated = true
+			try {
+				const configKey = getModConfigStorageKey(resourceSourceLineRendererConfigKey)
+				if (localStorage.getItem(configKey) !== null) return
+				const legacy = localStorage.getItem(resourceSourceGpuLineModeStorageKey)
+				if (legacy === null) return
+				api.config.set(resourceSourceLineRendererConfigKey, legacy === '0' ? resourceSourceLineRendererCanvas : resourceSourceLineRendererWebgl)
+			} catch (error) {}
+		}
+
+		function getConfiguredResourceSourceGpuLineMode() {
+			return normalizeResourceSourceLineRendererValue(api.config.get(resourceSourceLineRendererConfigKey, resourceSourceLineRendererWebgl)) === resourceSourceLineRendererWebgl
+		}
+
+		function setConfiguredResourceSourceGpuLineMode(active) {
+			const mode = active ? resourceSourceLineRendererWebgl : resourceSourceLineRendererCanvas
+			api.config.set(resourceSourceLineRendererConfigKey, mode)
+			return mode
+		}
+
+		function normalizeResourceSourceLineRendererValue(value) {
+			const text = String(value ?? '').trim().toLowerCase()
+			if (text === '0' || text === 'canvas' || text === 'canvas2d' || text === 'canvas 2d') return resourceSourceLineRendererCanvas
+			if (text === '1' || text === 'webgl' || text === 'gpu') return resourceSourceLineRendererWebgl
+			const number = Number(value)
+			return Number.isFinite(number) && number <= 0 ? resourceSourceLineRendererCanvas : resourceSourceLineRendererWebgl
+		}
+
+		function getModConfigStorageKey(key) {
+			return 'modloader:' + api.id + ':config:' + key
+		}
 		function installOpacityControls() {
 			if (window._cattailDynamicDetailsOpacityInstalled) return
 			window._cattailDynamicDetailsOpacityInstalled = true
@@ -2523,6 +2563,7 @@ ModLoader.register({
 		function setResourceSourceGpuLineMode(game, active) {
 			if (!game) return
 			initializeResourceSourcePreferences(game)
+			setConfiguredResourceSourceGpuLineMode(active)
 			game[resourceSourceGpuLineModeKey] = !!active
 			saveStoredBoolean(resourceSourceGpuLineModeStorageKey, !!active)
 			if (!active) clearResourceSourceGpuLines(game)

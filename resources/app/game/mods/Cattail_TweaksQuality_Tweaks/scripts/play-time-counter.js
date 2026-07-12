@@ -4,6 +4,7 @@
 	const installedKey = '__cattailPlayTimeCounterInstalled'
 	const defaultPosition = 'bottom-right'
 	const topPosition = 'top-center'
+	const leftPosition = 'bottom-left'
 
 	ModLoader.register({
 		id: MOD_ID,
@@ -66,14 +67,17 @@
 	}
 
 	function getPlayTimeCounterPoint(game, api, textWidth, textHeight, margin) {
-		return getPlayTimeCounterPositionMode(api) === topPosition
-			? getTopPlayTimeCounterPoint(game, textWidth, textHeight, margin)
-			: getBottomRightPlayTimeCounterPoint(game, textWidth, textHeight, margin)
+		const mode = getPlayTimeCounterPositionMode(api)
+		if (mode === topPosition) return getTopPlayTimeCounterPoint(game, textWidth, textHeight, margin)
+		if (mode === leftPosition) return getBottomLeftPlayTimeCounterPoint(game, textWidth, textHeight, margin)
+		return getBottomRightPlayTimeCounterPoint(game, textWidth, textHeight, margin)
 	}
 
 	function getPlayTimeCounterPositionMode(api) {
-		const value = String(readConfigWithLegacy(api, 'playTimeCounterPosition', defaultPosition) || '').trim().toLowerCase()
-		if (value === 'top' || value === 'top-center' || value === 'top center' || value === 'center-top') return topPosition
+		const raw = readConfigWithLegacy(api, 'playTimeCounterPosition', 0)
+		const normalized = normalizePlayTimeCounterPositionValue(raw)
+		if (normalized === 1) return topPosition
+		if (normalized === 2) return leftPosition
 		return defaultPosition
 	}
 
@@ -82,6 +86,14 @@
 		return {
 			x: clampNumber(game.w / 2 - textWidth / 2, margin, Math.max(margin, game.w - textWidth - margin)),
 			y: clampNumber(Math.max(margin, unit * 0.42), margin, Math.max(margin, game.h - textHeight - margin))
+		}
+	}
+
+	function getBottomLeftPlayTimeCounterPoint(game, textWidth, textHeight, margin) {
+		const point = getBottomRightPlayTimeCounterPoint(game, textWidth, textHeight, margin)
+		return {
+			x: clampNumber(game.w - point.x - textWidth, margin, Math.max(margin, game.w - textWidth - margin)),
+			y: point.y
 		}
 	}
 
@@ -138,12 +150,27 @@
 	function migrateLegacyPlayTimeCounterConfig(api) {
 		try {
 			const ownKey = configStorageKey(api.id, 'playTimeCounterPosition')
-			if (localStorage.getItem(ownKey) !== null) return
+			const ownRaw = localStorage.getItem(ownKey)
+			if (ownRaw !== null) {
+				localStorage.setItem(ownKey, JSON.stringify(normalizePlayTimeCounterPositionValue(parseStoredConfigValue(ownRaw))))
+				return
+			}
 			const legacyRaw = localStorage.getItem(configStorageKey(LEGACY_MOD_ID, 'playTimeCounterPosition'))
-			if (legacyRaw !== null) localStorage.setItem(ownKey, legacyRaw)
+			if (legacyRaw !== null) {
+				localStorage.setItem(ownKey, JSON.stringify(normalizePlayTimeCounterPositionValue(parseStoredConfigValue(legacyRaw))))
+			}
 		} catch (error) {}
 	}
 
+	function normalizePlayTimeCounterPositionValue(value) {
+		if (value === 1 || value === true) return 1
+		if (value === 2) return 2
+		if (value === 0 || value === false) return 0
+		const text = String(value ?? '').trim().toLowerCase()
+		if (text === '1' || text === 'top' || text === 'top-center' || text === 'top center' || text === 'center-top') return 1
+		if (text === '2' || text === 'left' || text === 'bottom-left' || text === 'bottom left' || text === 'left-bottom' || text === 'left bottom') return 2
+		return 0
+	}
 	function readConfigWithLegacy(api, key, fallback) {
 		try {
 			const ownRaw = localStorage.getItem(configStorageKey(api.id, key))

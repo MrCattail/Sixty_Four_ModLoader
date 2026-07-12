@@ -18,6 +18,29 @@
       "label": "Cookie direction password",
       "default": "",
       "description": "Enter cookie to show the cookie direction indicator before Cookie Clicker is achieved."
+    },
+    "resourceSourceLineRenderer": {
+      "type": "slider",
+      "label": {
+        "en": "Resource source line renderer",
+        "sch": "资源来源连线渲染",
+        "modsch": "资源来源连线渲染"
+      },
+      "default": 1,
+      "min": 0,
+      "max": 1,
+      "step": 1,
+      "integer": true,
+      "valueLabels": [
+        "Canvas 2D",
+        "WebGL"
+      ],
+      "description": {
+        "en": "Choose how resource source lines are rendered. Press O in game to switch this value.",
+        "sch": "选择资源来源连线的渲染方式。游戏中按 O 也会切换这个值。",
+        "modsch": "选择资源来源连线的渲染方式。游戏中按 O 也会切换这个值。"
+      },
+      "reloadPolicy": "hot"
     }
   },
   "description": "Adds Alt+Shift dynamic building detail panels and shop build-availability countdowns without modifying vanilla scripts.",

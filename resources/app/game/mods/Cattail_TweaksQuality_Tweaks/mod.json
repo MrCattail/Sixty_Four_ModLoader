@@ -14,6 +14,7 @@
     "scripts/accessibility-buttons.js",
     "scripts/stabilizer-surge-flash-reduction.js",
     "scripts/resource-glow-colors.js",
+    "scripts/chasm-line-renderer.js",
     "scripts/play-time-counter.js",
     "scripts/view-distance.js"
   ],
@@ -56,6 +57,79 @@
       "description": "Color resource icon glows by resource, with optional per-resource overrides.",
       "reloadPolicy": "hot"
     },
+    "enableChasmLineRenderer": {
+      "type": "boolean",
+      "label": "Chasm line renderer",
+      "default": true,
+      "description": "Allow this mod to replace the chasm-to-resource lines with the selected renderer.",
+      "reloadPolicy": "hot"
+    },
+    "chasmLineRendererMode": {
+      "type": "slider",
+      "valueType": "integer",
+      "integer": true,
+      "label": "Chasm line rendering mode",
+      "default": 1,
+      "min": 0,
+      "max": 1,
+      "step": 1,
+      "valueLabels": {
+        "0": {
+          "en": "Canvas 2D",
+          "sch": "Canvas 2D",
+          "modsch": "Canvas 2D",
+          "ru": "Canvas 2D",
+          "de": "Canvas 2D",
+          "ptbr": "Canvas 2D",
+          "it": "Canvas 2D",
+          "es": "Canvas 2D",
+          "fr": "Canvas 2D",
+          "nl": "Canvas 2D",
+          "cz": "Canvas 2D",
+          "pl": "Canvas 2D",
+          "jp": "Canvas 2D",
+          "kr": "Canvas 2D",
+          "tch": "Canvas 2D",
+          "thai": "Canvas 2D",
+          "hu": "Canvas 2D",
+          "lv": "Canvas 2D",
+          "ro": "Canvas 2D",
+          "no": "Canvas 2D"
+        },
+        "1": {
+          "en": "WebGL",
+          "sch": "WebGL",
+          "modsch": "WebGL",
+          "ru": "WebGL",
+          "de": "WebGL",
+          "ptbr": "WebGL",
+          "it": "WebGL",
+          "es": "WebGL",
+          "fr": "WebGL",
+          "nl": "WebGL",
+          "cz": "WebGL",
+          "pl": "WebGL",
+          "jp": "WebGL",
+          "kr": "WebGL",
+          "tch": "WebGL",
+          "thai": "WebGL",
+          "hu": "WebGL",
+          "lv": "WebGL",
+          "ro": "WebGL",
+          "no": "WebGL"
+        }
+      },
+      "valueAliases": {
+        "canvas": 0,
+        "canvas2d": 0,
+        "canvas 2d": 0,
+        "vanilla": 0,
+        "webgl": 1,
+        "gpu": 1
+      },
+      "description": "Canvas 2D uses the original game drawing. WebGL renders the same chasm-to-resource curves through a GPU-backed canvas.",
+      "reloadPolicy": "hot"
+    },
     "enablePlayTimeCounter": {
       "type": "boolean",
       "label": "Play time counter",
@@ -64,11 +138,98 @@
       "reloadPolicy": "hot"
     },
     "playTimeCounterPosition": {
-      "type": "string",
+      "type": "slider",
       "label": "Play time counter position",
-      "default": "bottom-right",
-      "description": "Use bottom-right to place it left of the shop button, or top-center to place it at the top center.",
-      "reloadPolicy": "hot"
+      "default": 0,
+      "description": "Slide between bottom-right, top-center, and bottom-left.",
+      "reloadPolicy": "hot",
+      "valueType": "integer",
+      "min": 0,
+      "max": 2,
+      "step": 1,
+      "valueLabels": {
+        "0": {
+          "en": "bottom-right",
+          "sch": "右下角",
+          "modsch": "右下角",
+          "ru": "Внизу справа",
+          "de": "Unten rechts",
+          "ptbr": "Inferior direito",
+          "it": "In basso a destra",
+          "es": "Abajo derecha",
+          "fr": "En bas a droite",
+          "nl": "Rechtsonder",
+          "cz": "Vpravo dole",
+          "pl": "Prawy dol",
+          "jp": "右下",
+          "kr": "오른쪽 아래",
+          "tch": "右下角",
+          "thai": "มุมขวาล่าง",
+          "hu": "Jobb also",
+          "lv": "Apaksa pa labi",
+          "ro": "Jos dreapta",
+          "no": "Nederst til hoyre"
+        },
+        "1": {
+          "en": "top-center",
+          "sch": "顶部居中",
+          "modsch": "顶部居中",
+          "ru": "Вверху по центру",
+          "de": "Oben mittig",
+          "ptbr": "Superior central",
+          "it": "In alto al centro",
+          "es": "Arriba centro",
+          "fr": "En haut au centre",
+          "nl": "Boven midden",
+          "cz": "Nahore uprostred",
+          "pl": "Gora srodek",
+          "jp": "上部中央",
+          "kr": "상단 중앙",
+          "tch": "頂部置中",
+          "thai": "กึ่งกลางด้านบน",
+          "hu": "Felul kozepen",
+          "lv": "Augsa centra",
+          "ro": "Sus centru",
+          "no": "Overst i midten"
+        },
+        "2": {
+          "en": "bottom-left",
+          "sch": "左下角",
+          "modsch": "左下角",
+          "ru": "Внизу слева",
+          "de": "Unten links",
+          "ptbr": "Inferior esquerdo",
+          "it": "In basso a sinistra",
+          "es": "Abajo izquierda",
+          "fr": "En bas a gauche",
+          "nl": "Linksonder",
+          "cz": "Vlevo dole",
+          "pl": "Lewy dol",
+          "jp": "左下",
+          "kr": "왼쪽 아래",
+          "tch": "左下角",
+          "thai": "มุมซ้ายล่าง",
+          "hu": "Bal also",
+          "lv": "Apaksa pa kreisi",
+          "ro": "Jos stanga",
+          "no": "Nederst til venstre"
+        }
+      },
+      "valueAliases": {
+        "bottom-right": 0,
+        "bottom right": 0,
+        "bottom": 0,
+        "right": 0,
+        "top-center": 1,
+        "top center": 1,
+        "center-top": 1,
+        "top": 1,
+        "bottom-left": 2,
+        "bottom left": 2,
+        "left-bottom": 2,
+        "left bottom": 2,
+        "left": 2
+      }
     },
     "resourceGlowColors": {
       "type": "resourceColors",
@@ -144,7 +305,7 @@
         },
         "playTimeCounterPosition": {
           "label": "游戏时长位置",
-          "description": "bottom-right 会放在商店按钮左侧，top-center 会放在顶部居中。"
+          "description": "滑动选择右下角、顶部居中或左下角。"
         },
         "resourceGlowColors": {
           "label": "资源发光颜色调色板",
@@ -165,6 +326,14 @@
         "fallbackZoom": {
           "label": "默认缩放",
           "description": "当保存的缩放值缺失或无效时使用。"
+        },
+        "enableChasmLineRenderer": {
+          "label": "逆裂缝连线渲染",
+          "description": "允许本 mod 用选择的渲染器替换逆裂缝和资源之间的连线。"
+        },
+        "chasmLineRendererMode": {
+          "label": "逆裂缝连线渲染模式",
+          "description": "Canvas 2D 使用原版绘制。WebGL 使用 GPU 画布渲染同样的逆裂缝到资源曲线。"
         }
       }
     },
@@ -198,7 +367,7 @@
         },
         "playTimeCounterPosition": {
           "label": "游戏时长位置",
-          "description": "bottom-right 会放在商店按钮左侧，top-center 会放在顶部居中。"
+          "description": "滑动选择右下角、顶部居中或左下角。"
         },
         "resourceGlowColors": {
           "label": "资源发光颜色调色板",
@@ -219,6 +388,14 @@
         "fallbackZoom": {
           "label": "默认缩放",
           "description": "当保存的缩放值缺失或无效时使用。"
+        },
+        "enableChasmLineRenderer": {
+          "label": "逆裂缝连线渲染",
+          "description": "允许本 mod 用选择的渲染器替换逆裂缝和资源之间的连线。"
+        },
+        "chasmLineRendererMode": {
+          "label": "逆裂缝连线渲染模式",
+          "description": "Canvas 2D 使用原版绘制。WebGL 使用 GPU 画布渲染同样的逆裂缝到资源曲线。"
         }
       }
     },
@@ -244,7 +421,8 @@
           "label": "Play time counter"
         },
         "playTimeCounterPosition": {
-          "label": "Play time counter position"
+          "label": "Play time counter position",
+          "description": "Slide between bottom-right, top-center, and bottom-left."
         },
         "resourceGlowColors": {
           "label": "Resource glow palette"
@@ -260,6 +438,14 @@
         },
         "fallbackZoom": {
           "label": "Fallback zoom"
+        },
+        "enableChasmLineRenderer": {
+          "label": "Chasm line renderer",
+          "description": "Allow this mod to replace the chasm-to-resource lines with the selected renderer."
+        },
+        "chasmLineRendererMode": {
+          "label": "Chasm line rendering mode",
+          "description": "Canvas 2D uses the original game drawing. WebGL renders the same chasm-to-resource curves through a GPU-backed canvas."
         }
       }
     },
@@ -285,7 +471,8 @@
           "label": "Счетчик времени игры"
         },
         "playTimeCounterPosition": {
-          "label": "Позиция счетчика времени"
+          "label": "Позиция счетчика времени",
+          "description": "Slide between bottom-right, top-center, and bottom-left."
         },
         "resourceGlowColors": {
           "label": "Палитра свечения ресурсов"
@@ -301,6 +488,14 @@
         },
         "fallbackZoom": {
           "label": "Запасной масштаб"
+        },
+        "enableChasmLineRenderer": {
+          "label": "Render lines chasm",
+          "description": "Allow the mod to replace chasm-to-resource lines with the selected renderer."
+        },
+        "chasmLineRendererMode": {
+          "label": "Chasm line render mode",
+          "description": "Canvas 2D uses original drawing. WebGL uses a GPU-backed canvas."
         }
       }
     },
@@ -326,7 +521,8 @@
           "label": "Spielzeitzähler"
         },
         "playTimeCounterPosition": {
-          "label": "Position des Spielzeitzählers"
+          "label": "Position des Spielzeitzählers",
+          "description": "Slide between bottom-right, top-center, and bottom-left."
         },
         "resourceGlowColors": {
           "label": "Ressourcen-Leuchtpalette"
@@ -342,6 +538,14 @@
         },
         "fallbackZoom": {
           "label": "Fallback-Zoom"
+        },
+        "enableChasmLineRenderer": {
+          "label": "Risslinien-Renderer",
+          "description": "Erlaubt dem Mod, die Linien zwischen Riss und Ressourcen mit dem gewaehlten Renderer zu ersetzen."
+        },
+        "chasmLineRendererMode": {
+          "label": "Risslinien-Renderingmodus",
+          "description": "Canvas 2D nutzt die originale Zeichnung. WebGL nutzt eine GPU-Canvas."
         }
       }
     },
@@ -367,7 +571,8 @@
           "label": "Contador de tempo de jogo"
         },
         "playTimeCounterPosition": {
-          "label": "Posição do contador de tempo"
+          "label": "Posição do contador de tempo",
+          "description": "Slide between bottom-right, top-center, and bottom-left."
         },
         "resourceGlowColors": {
           "label": "Paleta de brilho dos recursos"
@@ -383,6 +588,14 @@
         },
         "fallbackZoom": {
           "label": "Zoom reserva"
+        },
+        "enableChasmLineRenderer": {
+          "label": "Renderizador das linhas da fenda",
+          "description": "Permite trocar as linhas entre a fenda e os recursos pelo renderizador escolhido."
+        },
+        "chasmLineRendererMode": {
+          "label": "Modo das linhas da fenda",
+          "description": "Canvas 2D usa o desenho original. WebGL usa uma tela acelerada por GPU."
         }
       }
     },
@@ -408,7 +621,8 @@
           "label": "Contatore tempo di gioco"
         },
         "playTimeCounterPosition": {
-          "label": "Posizione contatore tempo"
+          "label": "Posizione contatore tempo",
+          "description": "Slide between bottom-right, top-center, and bottom-left."
         },
         "resourceGlowColors": {
           "label": "Tavolozza bagliore risorse"
@@ -424,6 +638,14 @@
         },
         "fallbackZoom": {
           "label": "Zoom di riserva"
+        },
+        "enableChasmLineRenderer": {
+          "label": "Renderer linee fenditura",
+          "description": "Permette al mod di sostituire le linee tra fenditura e risorse con il renderer scelto."
+        },
+        "chasmLineRendererMode": {
+          "label": "Modo rendering linee fenditura",
+          "description": "Canvas 2D usa il disegno originale. WebGL usa una canvas GPU."
         }
       }
     },
@@ -449,7 +671,8 @@
           "label": "Contador de tiempo de juego"
         },
         "playTimeCounterPosition": {
-          "label": "Posición del contador de tiempo"
+          "label": "Posición del contador de tiempo",
+          "description": "Slide between bottom-right, top-center, and bottom-left."
         },
         "resourceGlowColors": {
           "label": "Paleta de brillo de recursos"
@@ -465,6 +688,14 @@
         },
         "fallbackZoom": {
           "label": "Zoom de reserva"
+        },
+        "enableChasmLineRenderer": {
+          "label": "Renderizador de lineas de grieta",
+          "description": "Permite reemplazar las lineas entre la grieta y los recursos con el renderizador elegido."
+        },
+        "chasmLineRendererMode": {
+          "label": "Modo de lineas de grieta",
+          "description": "Canvas 2D usa el dibujo original. WebGL usa un lienzo con GPU."
         }
       }
     },
@@ -490,7 +721,8 @@
           "label": "Compteur de temps de jeu"
         },
         "playTimeCounterPosition": {
-          "label": "Position du compteur de temps"
+          "label": "Position du compteur de temps",
+          "description": "Slide between bottom-right, top-center, and bottom-left."
         },
         "resourceGlowColors": {
           "label": "Palette de halo des ressources"
@@ -506,6 +738,14 @@
         },
         "fallbackZoom": {
           "label": "Zoom de secours"
+        },
+        "enableChasmLineRenderer": {
+          "label": "Rendu des lignes de faille",
+          "description": "Permet de remplacer les lignes entre la faille et les ressources par le rendu choisi."
+        },
+        "chasmLineRendererMode": {
+          "label": "Mode de rendu des lignes de faille",
+          "description": "Canvas 2D utilise le dessin original. WebGL utilise un canvas GPU."
         }
       }
     },
@@ -531,7 +771,8 @@
           "label": "Speeltijdteller"
         },
         "playTimeCounterPosition": {
-          "label": "Positie speeltijdteller"
+          "label": "Positie speeltijdteller",
+          "description": "Slide between bottom-right, top-center, and bottom-left."
         },
         "resourceGlowColors": {
           "label": "Gloedpalet van grondstoffen"
@@ -547,6 +788,14 @@
         },
         "fallbackZoom": {
           "label": "Reservezoom"
+        },
+        "enableChasmLineRenderer": {
+          "label": "Klooflijnen-renderer",
+          "description": "Laat de mod de lijnen tussen kloof en grondstoffen vervangen door de gekozen renderer."
+        },
+        "chasmLineRendererMode": {
+          "label": "Renderstand klooflijnen",
+          "description": "Canvas 2D gebruikt de originele tekening. WebGL gebruikt een GPU-canvas."
         }
       }
     },
@@ -572,7 +821,8 @@
           "label": "Počítadlo herního času"
         },
         "playTimeCounterPosition": {
-          "label": "Poloha počítadla času"
+          "label": "Poloha počítadla času",
+          "description": "Slide between bottom-right, top-center, and bottom-left."
         },
         "resourceGlowColors": {
           "label": "Paleta záře surovin"
@@ -588,6 +838,14 @@
         },
         "fallbackZoom": {
           "label": "Záložní zoom"
+        },
+        "enableChasmLineRenderer": {
+          "label": "Vykreslovani car prurvy",
+          "description": "Umoznuje modu nahradit cary mezi prurvou a surovinami zvolenym rendererem."
+        },
+        "chasmLineRendererMode": {
+          "label": "Rezim vykreslovani car prurvy",
+          "description": "Canvas 2D pouziva puvodni kresleni. WebGL pouziva GPU canvas."
         }
       }
     },
@@ -613,7 +871,8 @@
           "label": "Licznik czasu gry"
         },
         "playTimeCounterPosition": {
-          "label": "Pozycja licznika czasu"
+          "label": "Pozycja licznika czasu",
+          "description": "Slide between bottom-right, top-center, and bottom-left."
         },
         "resourceGlowColors": {
           "label": "Paleta poświaty zasobów"
@@ -629,6 +888,14 @@
         },
         "fallbackZoom": {
           "label": "Zapasowy zoom"
+        },
+        "enableChasmLineRenderer": {
+          "label": "Renderer linii szczeliny",
+          "description": "Pozwala modowi zastapic linie miedzy szczelina i zasobami wybranym rendererem."
+        },
+        "chasmLineRendererMode": {
+          "label": "Tryb renderowania linii szczeliny",
+          "description": "Canvas 2D uzywa oryginalnego rysowania. WebGL uzywa canvas GPU."
         }
       }
     },
@@ -654,7 +921,8 @@
           "label": "プレイ時間カウンター"
         },
         "playTimeCounterPosition": {
-          "label": "プレイ時間カウンター位置"
+          "label": "プレイ時間カウンター位置",
+          "description": "Slide between bottom-right, top-center, and bottom-left."
         },
         "resourceGlowColors": {
           "label": "資源の光輪パレット"
@@ -670,6 +938,14 @@
         },
         "fallbackZoom": {
           "label": "予備ズーム"
+        },
+        "enableChasmLineRenderer": {
+          "label": "Chasm line renderer",
+          "description": "Chasm to resource lines can use the selected renderer."
+        },
+        "chasmLineRendererMode": {
+          "label": "Chasm line render mode",
+          "description": "Canvas 2D uses original drawing. WebGL uses a GPU-backed canvas."
         }
       }
     },
@@ -695,7 +971,8 @@
           "label": "플레이 시간 카운터"
         },
         "playTimeCounterPosition": {
-          "label": "플레이 시간 카운터 위치"
+          "label": "플레이 시간 카운터 위치",
+          "description": "Slide between bottom-right, top-center, and bottom-left."
         },
         "resourceGlowColors": {
           "label": "자원 발광 팔레트"
@@ -711,6 +988,14 @@
         },
         "fallbackZoom": {
           "label": "대체 줌"
+        },
+        "enableChasmLineRenderer": {
+          "label": "Chasm line renderer",
+          "description": "Chasm to resource lines can use the selected renderer."
+        },
+        "chasmLineRendererMode": {
+          "label": "Chasm line render mode",
+          "description": "Canvas 2D uses original drawing. WebGL uses a GPU-backed canvas."
         }
       }
     },
@@ -736,7 +1021,8 @@
           "label": "遊戲時間計數器"
         },
         "playTimeCounterPosition": {
-          "label": "遊戲時間計數器位置"
+          "label": "遊戲時間計數器位置",
+          "description": "滑動選擇右下角、頂部置中或左下角。"
         },
         "resourceGlowColors": {
           "label": "資源光圈調色板"
@@ -752,6 +1038,14 @@
         },
         "fallbackZoom": {
           "label": "預設縮放"
+        },
+        "enableChasmLineRenderer": {
+          "label": "逆裂縫連線渲染",
+          "description": "允許本 mod 用選擇的渲染器替換逆裂縫和資源之間的連線。"
+        },
+        "chasmLineRendererMode": {
+          "label": "逆裂縫連線渲染模式",
+          "description": "Canvas 2D 使用原版繪製。WebGL 使用 GPU 畫布渲染同樣的逆裂縫到資源曲線。"
         }
       }
     },
@@ -777,7 +1071,8 @@
           "label": "ตัวนับเวลาเล่น"
         },
         "playTimeCounterPosition": {
-          "label": "ตำแหน่งตัวนับเวลาเล่น"
+          "label": "ตำแหน่งตัวนับเวลาเล่น",
+          "description": "Slide between bottom-right, top-center, and bottom-left."
         },
         "resourceGlowColors": {
           "label": "พาเลตแสงทรัพยากร"
@@ -793,6 +1088,14 @@
         },
         "fallbackZoom": {
           "label": "ซูมสำรอง"
+        },
+        "enableChasmLineRenderer": {
+          "label": "Chasm line renderer",
+          "description": "Chasm to resource lines can use the selected renderer."
+        },
+        "chasmLineRendererMode": {
+          "label": "Chasm line render mode",
+          "description": "Canvas 2D uses original drawing. WebGL uses a GPU-backed canvas."
         }
       }
     },
@@ -818,7 +1121,8 @@
           "label": "Játékidő-számláló"
         },
         "playTimeCounterPosition": {
-          "label": "Játékidő-számláló helye"
+          "label": "Játékidő-számláló helye",
+          "description": "Slide between bottom-right, top-center, and bottom-left."
         },
         "resourceGlowColors": {
           "label": "Erőforrás-fény paletta"
@@ -834,6 +1138,14 @@
         },
         "fallbackZoom": {
           "label": "Tartalék nagyítás"
+        },
+        "enableChasmLineRenderer": {
+          "label": "Hasadekvonal-renderelo",
+          "description": "A mod a hasadek es eroforrasok vonalait a valasztott renderelovel rajzolhatja."
+        },
+        "chasmLineRendererMode": {
+          "label": "Hasadekvonal renderelesi mod",
+          "description": "Canvas 2D az eredeti rajzolast hasznalja. WebGL GPU canvast hasznal."
         }
       }
     },
@@ -859,7 +1171,8 @@
           "label": "Spēles laika skaitītājs"
         },
         "playTimeCounterPosition": {
-          "label": "Spēles laika skaitītāja vieta"
+          "label": "Spēles laika skaitītāja vieta",
+          "description": "Slide between bottom-right, top-center, and bottom-left."
         },
         "resourceGlowColors": {
           "label": "Resursu spīduma palete"
@@ -875,6 +1188,14 @@
         },
         "fallbackZoom": {
           "label": "Rezerves tālummaiņa"
+        },
+        "enableChasmLineRenderer": {
+          "label": "Plaisas liniju renderetajs",
+          "description": "Mods var aizstat plaisas un resursu linijas ar izveleto renderetaju."
+        },
+        "chasmLineRendererMode": {
+          "label": "Plaisas liniju renderesanas rezims",
+          "description": "Canvas 2D izmanto originalo zimesanu. WebGL izmanto GPU canvas."
         }
       }
     },
@@ -900,7 +1221,8 @@
           "label": "Contor timp de joc"
         },
         "playTimeCounterPosition": {
-          "label": "Poziție contor timp"
+          "label": "Poziție contor timp",
+          "description": "Slide between bottom-right, top-center, and bottom-left."
         },
         "resourceGlowColors": {
           "label": "Paletă halou resurse"
@@ -916,6 +1238,14 @@
         },
         "fallbackZoom": {
           "label": "Zoom de rezervă"
+        },
+        "enableChasmLineRenderer": {
+          "label": "Randare linii fisura",
+          "description": "Permite modului sa inlocuiasca liniile dintre fisura si resurse cu randarea aleasa."
+        },
+        "chasmLineRendererMode": {
+          "label": "Mod randare linii fisura",
+          "description": "Canvas 2D foloseste desenarea originala. WebGL foloseste un canvas GPU."
         }
       }
     },
@@ -941,7 +1271,8 @@
           "label": "Spilletidteller"
         },
         "playTimeCounterPosition": {
-          "label": "Plassering av spilletidteller"
+          "label": "Plassering av spilletidteller",
+          "description": "Slide between bottom-right, top-center, and bottom-left."
         },
         "resourceGlowColors": {
           "label": "Glødepalett for ressurser"
@@ -957,6 +1288,14 @@
         },
         "fallbackZoom": {
           "label": "Reservezoom"
+        },
+        "enableChasmLineRenderer": {
+          "label": "Kløftlinje-renderer",
+          "description": "Lar modden erstatte linjene mellom kloften og ressursene med valgt renderer."
+        },
+        "chasmLineRendererMode": {
+          "label": "Renderingsmodus for kloftlinjer",
+          "description": "Canvas 2D bruker original tegning. WebGL bruker et GPU-canvas."
         }
       }
     }
