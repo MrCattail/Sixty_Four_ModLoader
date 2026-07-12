@@ -123,7 +123,8 @@ A mod can declare config defaults in `mod.json`:
   "id": "my-mod",
   "config": {
     "enabled": { "type": "boolean", "default": true },
-    "multiplier": { "type": "number", "default": 2 }
+    "multiplier": { "type": "number", "default": 2 },
+    "opacity": { "type": "slider", "default": 0.8, "min": 0, "max": 1, "step": 0.05 }
   }
 }
 ```
@@ -139,10 +140,13 @@ api.config.schema()
 
 Values are stored in `localStorage` as `modloader:<modId>:config:<key>`.
 The `Ctrl+M` panel can edit declared config fields for enabled mods. Booleans
-use checkboxes, numbers use number inputs, strings use text fields, and
-array/object values use JSON text boxes. Config-only saves do not reload the
-game automatically; mods that read config during startup still need a manual
-reload to apply those values.
+use switches, numbers use number inputs, strings use text fields, and
+array/object values use JSON text boxes. Numeric slider controls can be declared
+with `type: "slider"` or by adding `ui`, `control`, or `input` set to
+`"slider"` on a numeric field; sliders use `min`, `max`, and `step`, and save
+ordinary number values. Config-only saves do not reload the game automatically;
+mods that read config during startup still need a manual reload to apply those
+values.
 
 ## Dependencies And Conflicts
 

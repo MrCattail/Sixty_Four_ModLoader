@@ -615,6 +615,10 @@
 			#modloader-panel.modloader-panel-theme-light .modloader-mod-row, #modloader-panel.modloader-panel-theme-light .modloader-panel-log, #modloader-panel.modloader-panel-theme-light .modloader-import-zone { border-color: rgba(0,0,0,.1); background: rgba(0,0,0,.035); }
 			#modloader-panel.modloader-panel-theme-light .modloader-mod-name, #modloader-panel.modloader-panel-theme-light .modloader-mod-version, #modloader-panel.modloader-panel-theme-light .modloader-mod-meta, #modloader-panel.modloader-panel-theme-light .modloader-config-meta { color: rgba(18,20,22,.58); }
 			#modloader-panel.modloader-panel-theme-light input.modloader-config-input:not([type="checkbox"]), #modloader-panel.modloader-panel-theme-light textarea.modloader-config-input, #modloader-panel.modloader-panel-theme-light select.modloader-config-input, #modloader-panel.modloader-panel-theme-light .modloader-panel-settings-number, #modloader-panel.modloader-panel-theme-light .modloader-resource-color-text { background: rgba(0,0,0,.045); border-color: rgba(0,0,0,.14); color: rgba(18,20,22,.92); }
+			#modloader-panel.modloader-panel-theme-light .modloader-config-slider-number { background: rgba(0,0,0,.045); border-color: rgba(0,0,0,.14); color: rgba(18,20,22,.92); }
+			#modloader-panel.modloader-panel-theme-light .modloader-config-slider-range::-webkit-slider-runnable-track { background: linear-gradient(90deg, rgba(18,20,22,.52) 0 var(--modloader-slider-fill, 0%), rgba(0,0,0,.12) var(--modloader-slider-fill, 0%) 100%); box-shadow: inset 0 1px 2px rgba(0,0,0,.18); }
+			#modloader-panel.modloader-panel-theme-light .modloader-config-slider-range::-moz-range-track { background: rgba(0,0,0,.12); box-shadow: inset 0 1px 2px rgba(0,0,0,.18); }
+			#modloader-panel.modloader-panel-theme-light .modloader-config-slider-range::-moz-range-progress { background: rgba(18,20,22,.52); }
 			#modloader-panel.modloader-panel-theme-light .modloader-action-button, #modloader-panel.modloader-panel-theme-light .modloader-modal-button, #modloader-panel.modloader-panel-theme-light .modloader-resource-color-reset { background: rgba(0,0,0,.055); border-color: rgba(0,0,0,.12); color: rgba(18,20,22,.78); }
 			#modloader-panel.modloader-panel-theme-light .modloader-panel-tab { background: rgba(248,248,246,.95); border-color: rgba(0,0,0,.12); }
 			#modloader-panel .modloader-panel-summary { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px 12px; margin: 8px 0 12px; }
@@ -706,6 +710,19 @@
 			#modloader-panel .modloader-config-label { display: block; color: rgba(255,255,255,.86); overflow-wrap: anywhere; }
 			#modloader-panel .modloader-config-meta { display: block; font-size: 11px; color: rgba(255,255,255,.48); overflow-wrap: anywhere; }
 			#modloader-panel input.modloader-config-input:not([type="checkbox"]), #modloader-panel textarea.modloader-config-input, #modloader-panel select.modloader-config-input { box-sizing: border-box; width: 100%; min-width: 0; border: 1px solid rgba(255,255,255,.16); border-radius: 5px; padding: 5px 6px; background: rgba(0,0,0,.22); color: rgba(255,255,255,.92); outline: none; }
+			#modloader-panel .modloader-config-slider { display: grid; grid-template-columns: minmax(0, 1fr) 66px; gap: 8px; align-items: center; width: 100%; min-width: 0; }
+			#modloader-panel .modloader-config-slider-range { appearance: none; -webkit-appearance: none; width: 100%; min-width: 0; height: 32px; margin: 0; background: transparent; cursor: pointer; outline: none; }
+			#modloader-panel .modloader-config-slider-range::-webkit-slider-runnable-track { height: 6px; border-radius: 999px; background: linear-gradient(90deg, rgba(207,233,255,.82) 0 var(--modloader-slider-fill, 0%), rgba(255,255,255,.14) var(--modloader-slider-fill, 0%) 100%); box-shadow: inset 0 1px 3px rgba(0,0,0,.42); }
+			#modloader-panel .modloader-config-slider-range::-webkit-slider-thumb { -webkit-appearance: none; width: 28px; height: 31px; margin-top: -12px; border: 0; background: url('img/resources.png') -196px 0 / 280px 31px no-repeat; filter: drop-shadow(0 2px 3px rgba(0,0,0,.55)) drop-shadow(0 0 5px rgba(207,233,255,.22)); }
+			#modloader-panel .modloader-config-slider-range::-moz-range-track { height: 6px; border-radius: 999px; background: rgba(255,255,255,.14); box-shadow: inset 0 1px 3px rgba(0,0,0,.42); }
+			#modloader-panel .modloader-config-slider-range::-moz-range-progress { height: 6px; border-radius: 999px; background: rgba(207,233,255,.82); }
+			#modloader-panel .modloader-config-slider-range::-moz-range-thumb { width: 28px; height: 31px; border: 0; background: url('img/resources.png') -196px 0 / 280px 31px no-repeat; filter: drop-shadow(0 2px 3px rgba(0,0,0,.55)) drop-shadow(0 0 5px rgba(207,233,255,.22)); }
+			#modloader-panel .modloader-config-slider-range:focus-visible::-webkit-slider-thumb { filter: drop-shadow(0 2px 3px rgba(0,0,0,.58)) drop-shadow(0 0 8px rgba(207,233,255,.52)); }
+			#modloader-panel .modloader-config-slider-range:focus-visible::-moz-range-thumb { filter: drop-shadow(0 2px 3px rgba(0,0,0,.58)) drop-shadow(0 0 8px rgba(207,233,255,.52)); }
+			#modloader-panel .modloader-config-slider-number { box-sizing: border-box; width: 66px; min-width: 0; border: 1px solid rgba(255,255,255,.16); border-radius: 5px; padding: 5px 6px; background: rgba(0,0,0,.22); color: rgba(255,255,255,.92); text-align: right; outline: none; }
+			#modloader-panel .modloader-config-slider-number:focus { border-color: rgba(207, 233, 255, .5); }
+			#modloader-panel .modloader-config-slider[data-disabled="true"] { opacity: .52; }
+			#modloader-panel .modloader-config-slider-range:disabled, #modloader-panel .modloader-config-slider-number:disabled { cursor: default; }
 			#modloader-panel .modloader-switch-input { appearance: none; -webkit-appearance: none; position: relative; width: 46px; height: 24px; margin: 0; border: 0; border-radius: 999px; background: rgba(18,21,24,.66); box-shadow: inset 0 2px 6px rgba(0,0,0,.48), inset 0 -1px 0 rgba(255,255,255,.06), inset 0 0 0 1px rgba(255,255,255,.08), 0 1px 2px rgba(255,255,255,.04); cursor: pointer; outline: none; transition: background .18s ease, box-shadow .18s ease, opacity .18s ease; vertical-align: middle; }
 			#modloader-panel .modloader-switch-input:before { content: ''; position: absolute; left: 2px; top: 2px; width: 20px; height: 20px; border-radius: 50%; background: linear-gradient(145deg, rgba(255,255,255,.98), rgba(220,230,237,.96)); box-shadow: 0 3px 7px rgba(0,0,0,.34), 0 1px 1px rgba(0,0,0,.24), inset 0 1px 1px rgba(255,255,255,.92), inset 0 -1px 2px rgba(0,0,0,.12); transition: transform .18s cubic-bezier(.2,.8,.2,1), box-shadow .18s ease; }
 			#modloader-panel .modloader-switch-input:after { content: 'OFF'; position: absolute; right: 6px; top: 50%; transform: translateY(-50%); color: rgba(255,255,255,.46); font: 700 9px/1 Montserrat, Arial, sans-serif; letter-spacing: .25px; text-shadow: 0 1px 2px rgba(0,0,0,.42); transition: left .18s ease, right .18s ease, color .18s ease, text-shadow .18s ease; }
@@ -1059,6 +1076,57 @@
 		return type === 'resourcecolors' || type === 'resource-colors' || type === 'resource_glow_colors'
 	}
 
+	const isNumberConfigType = function (type) {
+		return type === 'number' || type === 'float' || type === 'integer' || type === 'int'
+	}
+
+	const isSliderConfigType = function (type) {
+		return type === 'slider' || type === 'range'
+	}
+
+	const getConfigControl = function (item) {
+		return String(item.control || item.input || item.ui || item.widget || item.display || '').toLowerCase()
+	}
+
+	const isSliderConfigItem = function (item, type) {
+		const control = getConfigControl(item)
+		return isSliderConfigType(type) || item.slider === true || control === 'slider' || control === 'range'
+	}
+
+	const getNumberConfigType = function (item, type) {
+		const valueType = String(item.valueType || item.numberType || item.numericType || '').toLowerCase()
+		if (isNumberConfigType(valueType)) return valueType
+		if (isNumberConfigType(type)) return type
+		return item.integer === true ? 'integer' : 'number'
+	}
+
+	const getConfigNumberStep = function (item, type) {
+		if (item.step !== undefined) return String(item.step)
+		return getNumberConfigType(item, type) === 'integer' || getNumberConfigType(item, type) === 'int' ? '1' : 'any'
+	}
+
+	const getFiniteConfigNumber = function (value) {
+		if (value === undefined || value === null || value === '') return null
+		const number = Number(value)
+		return Number.isFinite(number) ? number : null
+	}
+
+	const readNumberConfigValue = function (item, rawValue, type, options) {
+		const text = String(rawValue).trim()
+		if (text === '') throw new Error('Enter a number.')
+		const value = Number(text)
+		if (!Number.isFinite(value)) throw new Error('Enter a valid number.')
+		const numberType = getNumberConfigType(item, type)
+		if ((numberType === 'integer' || numberType === 'int') && Math.floor(value) !== value) throw new Error('Enter a whole number.')
+		if (options?.enforceRange) {
+			const min = getFiniteConfigNumber(options.min)
+			const max = getFiniteConfigNumber(options.max)
+			if (min !== null && value < min) throw new Error('Enter a number greater than or equal to ' + min + '.')
+			if (max !== null && value > max) throw new Error('Enter a number less than or equal to ' + max + '.')
+		}
+		return value
+	}
+
 	const cloneConfigValue = function (value) {
 		return (isObject(value) || Array.isArray(value)) ? clone(value) : value
 	}
@@ -1192,6 +1260,75 @@
 		return rows
 	}
 
+	const getSliderBounds = function (item, value, type) {
+		const stored = getFiniteConfigNumber(value)
+		const fallback = getFiniteConfigNumber(item.default)
+		let min = getFiniteConfigNumber(item.min)
+		let max = getFiniteConfigNumber(item.max)
+		const base = stored !== null ? stored : (fallback !== null ? fallback : 0)
+		if (min === null) min = Math.min(0, base)
+		if (max === null) max = Math.max(100, min + 1, base)
+		if (max <= min) max = min + 1
+		const current = clampNumber(base, min, max)
+		return { min, max, value: current, step: getConfigNumberStep(item, type) }
+	}
+
+	const setSliderFill = function (range, min, max) {
+		const value = Number(range.value)
+		const percent = max > min ? clampNumber((value - min) / (max - min), 0, 1) * 100 : 0
+		range.style.setProperty('--modloader-slider-fill', percent.toFixed(2) + '%')
+	}
+
+	const createSliderConfigInput = function (item, value, type) {
+		const root = element('div', 'modloader-config-slider modloader-config-input')
+		const bounds = getSliderBounds(item, value, type)
+		const range = element('input', 'modloader-config-slider-range')
+		range.type = 'range'
+		range.min = String(bounds.min)
+		range.max = String(bounds.max)
+		range.step = bounds.step
+		range.value = String(bounds.value)
+
+		const number = element('input', 'modloader-config-slider-number')
+		number.type = 'number'
+		number.min = String(bounds.min)
+		number.max = String(bounds.max)
+		number.step = bounds.step
+		number.value = String(bounds.value)
+		number.spellcheck = false
+
+		const syncFromRange = function () {
+			number.value = range.value
+			setSliderFill(range, bounds.min, bounds.max)
+		}
+		const syncFromNumber = function () {
+			const current = getFiniteConfigNumber(number.value)
+			if (current !== null) range.value = String(clampNumber(current, bounds.min, bounds.max))
+			setSliderFill(range, bounds.min, bounds.max)
+		}
+
+		range.addEventListener('input', syncFromRange)
+		range.addEventListener('change', syncFromRange)
+		number.addEventListener('input', syncFromNumber)
+		number.addEventListener('change', syncFromNumber)
+		setSliderFill(range, bounds.min, bounds.max)
+
+		root.readConfigValue = function () {
+			return readNumberConfigValue(item, number.value, type, { enforceRange: true, min: bounds.min, max: bounds.max })
+		}
+
+		Object.defineProperty(root, 'disabled', {
+			get() { return root.dataset.disabled === 'true' },
+			set(value) {
+				root.dataset.disabled = value ? 'true' : 'false'
+				range.disabled = !!value
+				number.disabled = !!value
+			}
+		})
+
+		root.append(range, number)
+		return root
+	}
 	const normalizePanelHexColor = function (value) {
 		if (value === undefined || value === null) return ''
 		const text = String(value).trim()
@@ -1203,16 +1340,17 @@
 	const createConfigInput = function (item, value) {
 		const type = getConfigType(item)
 		if (isResourceColorsConfigType(type)) return createResourceColorsInput(item, value)
+		if (isSliderConfigItem(item, type)) return createSliderConfigInput(item, value, type)
 		const input = element(type === 'array' || type === 'object' ? 'textarea' : 'input', 'modloader-config-input')
 		if (type === 'boolean') {
 			input.type = 'checkbox'
 			input.classList.add('modloader-switch-input')
 			input.setAttribute('role', 'switch')
 			input.checked = value === undefined ? !!item.default : !!value
-		} else if (type === 'number' || type === 'float' || type === 'integer' || type === 'int') {
+		} else if (isNumberConfigType(type)) {
 			input.type = 'number'
 			input.value = formatConfigInputValue(value, type)
-			input.step = item.step !== undefined ? String(item.step) : (type === 'integer' || type === 'int' ? '1' : 'any')
+			input.step = getConfigNumberStep(item, type)
 			if (item.min !== undefined) input.min = String(item.min)
 			if (item.max !== undefined) input.max = String(item.max)
 		} else if (type === 'array' || type === 'object') {
@@ -1228,14 +1366,9 @@
 	const readConfigInputValue = function (item, input) {
 		const type = getConfigType(item)
 		if (isResourceColorsConfigType(type)) return input.readConfigValue()
+		if (isSliderConfigItem(item, type)) return input.readConfigValue()
 		if (type === 'boolean') return !!input.checked
-		if (type === 'number' || type === 'float' || type === 'integer' || type === 'int') {
-			if (String(input.value).trim() === '') throw new Error('Enter a number.')
-			const value = Number(input.value)
-			if (!Number.isFinite(value)) throw new Error('Enter a valid number.')
-			if ((type === 'integer' || type === 'int') && Math.floor(value) !== value) throw new Error('Enter a whole number.')
-			return value
-		}
+		if (isNumberConfigType(type)) return readNumberConfigValue(item, input.value, type)
 		if (type === 'array' || type === 'object') {
 			const value = JSON.parse(input.value || (type === 'array' ? '[]' : '{}'))
 			if (type === 'array' && !Array.isArray(value)) throw new Error('Enter a JSON array.')
@@ -2747,7 +2880,8 @@
 					if (localizedConfigDescription) label.title = localizedConfigDescription
 					text.appendChild(label)
 					if (localizedConfigDescription) text.title = localizedConfigDescription
-					text.appendChild(element('span', 'modloader-config-meta', item.key + ' | ' + type))
+					const controlLabel = isSliderConfigItem(item, type) && !isSliderConfigType(type) ? ' | slider' : ''
+					text.appendChild(element('span', 'modloader-config-meta', item.key + ' | ' + type + controlLabel))
 					const input = createConfigInput(item, value)
 					const error = element('span', 'modloader-config-error')
 					const model = {
