@@ -711,7 +711,7 @@
 			#modloader-panel .modloader-config-label { display: block; color: rgba(255,255,255,.86); overflow-wrap: anywhere; }
 			#modloader-panel .modloader-config-meta { display: block; font-size: 11px; color: rgba(255,255,255,.48); overflow-wrap: anywhere; }
 			#modloader-panel input.modloader-config-input:not([type="checkbox"]), #modloader-panel textarea.modloader-config-input, #modloader-panel select.modloader-config-input { box-sizing: border-box; width: 100%; min-width: 0; border: 1px solid rgba(255,255,255,.16); border-radius: 5px; padding: 5px 6px; background: rgba(0,0,0,.22); color: rgba(255,255,255,.92); outline: none; }
-			#modloader-panel .modloader-config-slider { display: grid; grid-template-columns: minmax(0, 1fr) 66px; gap: 4px 8px; align-items: center; width: 100%; min-width: 0; }
+			#modloader-panel .modloader-config-slider { display: grid; grid-template-columns: minmax(0, 1fr) 66px; gap: 4px 8px; align-items: center; width: 100%; min-width: 0; --modloader-slider-thumb-half: 14px; }
 			#modloader-panel .modloader-config-slider-labeled { grid-template-columns: minmax(0, 1fr); }
 			#modloader-panel .modloader-config-slider-range { appearance: none; -webkit-appearance: none; width: 100%; min-width: 0; height: 32px; margin: 0; background: transparent; cursor: grab; outline: none; }
 			#modloader-panel .modloader-config-slider-range:active { cursor: grabbing; }
@@ -724,7 +724,11 @@
 			#modloader-panel .modloader-config-slider-range:focus-visible::-moz-range-thumb { filter: drop-shadow(0 2px 3px rgba(0,0,0,.58)) drop-shadow(0 0 8px rgba(207,233,255,.52)); }
 			#modloader-panel .modloader-config-slider-number { box-sizing: border-box; width: 66px; min-width: 0; border: 1px solid rgba(255,255,255,.16); border-radius: 5px; padding: 5px 6px; background: rgba(0,0,0,.22); color: rgba(255,255,255,.92); text-align: right; outline: none; }
 			#modloader-panel .modloader-config-slider-number:focus { border-color: rgba(207, 233, 255, .5); }
-			#modloader-panel .modloader-config-slider[data-disabled="true"] { opacity: .52; }
+			#modloader-panel .modloader-config-slider-labeled .modloader-config-slider-number { display: none; }
+			#modloader-panel .modloader-config-slider-labels { position: relative; height: 13px; min-width: 0; margin: -9px var(--modloader-slider-thumb-half) 0; color: rgba(255,255,255,.48); font-size: 10px; }
+			#modloader-panel .modloader-config-slider-labels span { position: absolute; top: 0; max-width: 74px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: center; transform: translateX(-50%); }
+			#modloader-panel .modloader-config-slider-value { min-width: 0; text-align: center; color: rgba(255,255,255,.72); font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+			#modloader-panel .modloader-config-slider[data-disabled=true] { opacity: .52; }
 			#modloader-panel .modloader-config-slider-range:disabled, #modloader-panel .modloader-config-slider-number:disabled { cursor: default; }
 			#modloader-panel .modloader-switch-input { appearance: none; -webkit-appearance: none; position: relative; width: 46px; height: 24px; margin: 0; border: 0; border-radius: 999px; background: rgba(18,21,24,.66); box-shadow: inset 0 2px 6px rgba(0,0,0,.48), inset 0 -1px 0 rgba(255,255,255,.06), inset 0 0 0 1px rgba(255,255,255,.08), 0 1px 2px rgba(255,255,255,.04); cursor: pointer; outline: none; transition: background .18s ease, box-shadow .18s ease, opacity .18s ease; vertical-align: middle; }
 			#modloader-panel .modloader-switch-input:before { content: ''; position: absolute; left: 2px; top: 2px; width: 20px; height: 20px; border-radius: 50%; background: linear-gradient(145deg, rgba(255,255,255,.98), rgba(220,230,237,.96)); box-shadow: 0 3px 7px rgba(0,0,0,.34), 0 1px 1px rgba(0,0,0,.24), inset 0 1px 1px rgba(255,255,255,.92), inset 0 -1px 2px rgba(0,0,0,.12); transition: transform .18s cubic-bezier(.2,.8,.2,1), box-shadow .18s ease; }
@@ -1366,6 +1370,12 @@
 		return clampNumber(Number(snapped.toFixed(getSliderPrecision(bounds))), bounds.min, bounds.max)
 	}
 
+	const getSliderPercent = function (value, bounds) {
+		const number = getFiniteConfigNumber(value)
+		if (number === null || bounds.max <= bounds.min) return 0
+		return clampNumber((number - bounds.min) / (bounds.max - bounds.min), 0, 1) * 100
+	}
+
 	const createSliderConfigInput = function (item, value, type) {
 		const bounds = getSliderBounds(item, value, type)
 		const hasValueLabels = !!getSliderLabelSource(item)
@@ -1485,7 +1495,9 @@
 
 		if (hasValueLabels) {
 			for (const labelValue of getSliderLabelValues(item, bounds)) {
-				labels.appendChild(element('span', '', getSliderValueLabel(item, labelValue) || formatSliderNumber(labelValue, bounds)))
+				const label = element('span', '', getSliderValueLabel(item, labelValue) || formatSliderNumber(labelValue, bounds))
+				label.style.left = getSliderPercent(labelValue, bounds).toFixed(4) + '%'
+				labels.appendChild(label)
 			}
 			root.append(range, number, labels, valueLabel)
 		} else {
