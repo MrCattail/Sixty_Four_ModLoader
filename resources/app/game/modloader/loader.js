@@ -626,6 +626,11 @@
 			#modloader-panel.modloader-panel-theme-light .modloader-panel-settings-number-wrap { color: rgba(18,20,22,.56); }
 			#modloader-panel.modloader-panel-theme-light .modloader-mod-toolbar { background: rgba(248,248,246,.96); }
 			#modloader-panel.modloader-panel-theme-light .modloader-mod-row, #modloader-panel.modloader-panel-theme-light .modloader-panel-log, #modloader-panel.modloader-panel-theme-light .modloader-import-zone { border-color: rgba(0,0,0,.1); background: rgba(0,0,0,.035); }
+			#modloader-panel.modloader-panel-theme-light .modloader-import-zone.dragging { border-color: rgba(18,20,22,.28); background: rgba(18,20,22,.06); }
+			#modloader-panel.modloader-panel-theme-light .modloader-import-copy { color: rgba(18,20,22,.62); }
+			#modloader-panel.modloader-panel-theme-light .modloader-import-title { color: rgba(18,20,22,.88); }
+			#modloader-panel.modloader-panel-theme-light .modloader-import-detail { color: rgba(18,20,22,.56); }
+			#modloader-panel.modloader-panel-theme-light .modloader-import-status { color: rgba(18,20,22,.62); }
 			#modloader-panel.modloader-panel-theme-light .modloader-mod-name, #modloader-panel.modloader-panel-theme-light .modloader-mod-version, #modloader-panel.modloader-panel-theme-light .modloader-mod-meta, #modloader-panel.modloader-panel-theme-light .modloader-config-meta { color: rgba(18,20,22,.58); }
 			#modloader-panel.modloader-panel-theme-light input.modloader-config-input:not([type="checkbox"]), #modloader-panel.modloader-panel-theme-light textarea.modloader-config-input, #modloader-panel.modloader-panel-theme-light select.modloader-config-input, #modloader-panel.modloader-panel-theme-light .modloader-panel-settings-number, #modloader-panel.modloader-panel-theme-light .modloader-resource-color-text, #modloader-panel.modloader-panel-theme-light .modloader-color-text { background: rgba(0,0,0,.045); border-color: rgba(0,0,0,.14); color: rgba(18,20,22,.92); }
 			#modloader-panel.modloader-panel-theme-light .modloader-config-slider-number { background: rgba(0,0,0,.045); border-color: rgba(0,0,0,.14); color: rgba(18,20,22,.92); }
