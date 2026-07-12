@@ -505,31 +505,31 @@
       "config": {
         "surgeCount": {
           "label": "浪涌数量",
-          "description": "每次超临界内核落地时尝试生成的随机浪涌数量。"
+          "description": "可修改内核振动现实结构后浪涌生成范围内的浪涌数量。"
         },
         "surgeRadius": {
-          "label": "生成半径",
-          "description": "以落点为中心搜索现实世界空格的圆形半径（格）。"
+          "label": "浪涌生成半径",
+          "description": "可修改内核振动现实结构后浪涌的生成范围。"
         },
         "fillAmount": {
-          "label": "超长填充值",
-          "description": "赋予已激活 Silo 的填充值。"
+          "label": "筒仓填充值",
+          "description": "可修改超级筒仓的填充值"
         },
         "enableRealityAutoCollect": {
-          "label": "自动 Reality 收集",
-          "description": "在虚空世界自动收集已经准备好的 Reality / soul power。"
+          "label": "现实自动收集",
+          "description": "自动收集在虚空维度中完全发亮的符号。"
         },
         "enableScanRealitySurges": {
-          "label": "超临界浪涌",
-          "description": "超临界内核落地时，在 Reality 平面生成随机浪涌。"
+          "label": "强力超临界内核",
+          "description": "超临界内核得到加强。在震荡现实结构时，会在现实对应位置震出一些浪涌。"
         },
         "enableSuperSilo": {
-          "label": "超级 Silo",
-          "description": "让已激活的 Silo 保持配置的超长填充值。"
+          "label": "超级筒仓",
+          "description": "让已激活的筒仓保持配置的超长填充值。"
         },
         "enableScanRealitySlider": {
-          "label": "超临界内核滑块",
-          "description": "在超临界内核购买卡片上显示范围直径和 Reality 注入滑块。"
+          "label": "可控超临界内核",
+          "description": "可以注入现实来提升超临界内核的威力。"
         }
       }
     },
@@ -743,31 +743,31 @@
       "config": {
         "surgeCount": {
           "label": "浪涌数量",
-          "description": "每次超临界内核落地时尝试生成的随机浪涌数量。"
+          "description": "可修改内核振动现实结构后浪涌生成范围内的浪涌数量。"
         },
         "surgeRadius": {
-          "label": "生成半径",
-          "description": "以落点为中心搜索现实世界空格的圆形半径（格）。"
+          "label": "浪涌生成半径",
+          "description": "可修改内核振动现实结构后浪涌的生成范围。"
         },
         "fillAmount": {
-          "label": "超长填充值",
-          "description": "赋予已激活 Silo 的填充值。"
+          "label": "筒仓填充值",
+          "description": "可修改超级筒仓的填充值"
         },
         "enableRealityAutoCollect": {
-          "label": "自动 Reality 收集",
-          "description": "在虚空世界自动收集已经准备好的 Reality / soul power。"
+          "label": "现实自动收集",
+          "description": "自动收集在虚空维度中完全发亮的符号。"
         },
         "enableScanRealitySurges": {
-          "label": "超临界浪涌",
-          "description": "超临界内核落地时，在 Reality 平面生成随机浪涌。"
+          "label": "强力超临界内核",
+          "description": "超临界内核得到加强。在震荡现实结构时，会在现实对应位置震出一些浪涌。"
         },
         "enableSuperSilo": {
-          "label": "超级 Silo",
-          "description": "让已激活的 Silo 保持配置的超长填充值。"
+          "label": "超级筒仓",
+          "description": "让已激活的筒仓保持配置的超长填充值。"
         },
         "enableScanRealitySlider": {
-          "label": "超临界内核滑块",
-          "description": "在超临界内核购买卡片上显示范围直径和 Reality 注入滑块。"
+          "label": "可控超临界内核",
+          "description": "可以注入现实来提升超临界内核的威力。"
         }
       }
     }

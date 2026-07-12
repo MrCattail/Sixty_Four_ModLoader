@@ -13,6 +13,7 @@
     "scripts/ending-skip.js",
     "scripts/accessibility-buttons.js",
     "scripts/stabilizer-surge-flash-reduction.js",
+    "scripts/void-return-fade-skip.js",
     "scripts/resource-glow-colors.js",
     "scripts/chasm-line-renderer.js",
     "scripts/floor-grid-lines.js",
@@ -49,6 +50,13 @@
       "label": "Stabilizer surge flash reduction",
       "default": true,
       "description": "After the void altar exists, hide full-screen flashes caused by stabilizer-triggered surge effects.",
+      "reloadPolicy": "hot"
+    },
+    "enableVoidReturnFadeSkip": {
+      "type": "boolean",
+      "label": "Skip void return fade",
+      "default": true,
+      "description": "When returning from the void to reality, remove the long white recovery fade and show the clear view immediately.",
       "reloadPolicy": "hot"
     },
     "enableResourceGlowColors": {
@@ -349,7 +357,7 @@
       "description": "Used when the saved zoom value is missing or invalid."
     }
   },
-  "description": "Combines view distance limits, ending skip, accessibility buttons, stabilizer surge flash reduction, resource glow colors, chasm line rendering, floor grid outlines, play-time counter, and dynamic explainer language refresh into one multi-entry quality mod.",
+  "description": "Combines view distance limits, ending skip, accessibility buttons, stabilizer surge flash reduction, void return fade skip, resource glow colors, chasm line rendering, floor grid outlines, play-time counter, and dynamic explainer language refresh into one multi-entry quality mod.",
   "reloadOnConfigChange": true,
   "translations": {
     "sch": {
@@ -405,28 +413,32 @@
           "description": "当保存的缩放值缺失或无效时使用。"
         },
         "enableChasmLineRenderer": {
-          "label": "逆裂缝连线渲染",
-          "description": "允许本 mod 用选择的渲染器替换逆裂缝和资源之间的连线。"
+          "label": "逆裂缝绘线渲染模式切换",
+          "description": "新增并可切换WebGL逆裂缝绘线的渲染方式，以提升性能。"
         },
         "chasmLineRendererMode": {
-          "label": "逆裂缝连线渲染模式",
-          "description": "Canvas 2D 使用原版绘制。WebGL 使用 GPU 画布渲染同样的逆裂缝到资源曲线。"
+          "label": "渲染模式",
+          "description": "原版渲染方式为Canvas 2D。可切换至WebGL渲染模式，用GPU进行渲染以提升性能。"
         },
         "enableChasmLineDistanceOverride": {
-          "label": "逆裂缝连线无视距离",
-          "description": "开启后，视角离逆裂缝较远时仍继续渲染逆裂缝与资源之间的连线。"
+          "label": "无视距离渲染逆裂缝绘线",
+          "description": "无论距离多远，逆裂缝的绘线都会保持渲染。"
         },
         "enableFloorGridLines": {
           "label": "显示地板方格边框",
-          "description": "在游戏内地板方格周围绘制细线边框。"
+          "description": "新增地板方格边框，方便数格子。"
         },
         "floorGridLineRealityColor": {
-          "label": "现实世界地板方格边框颜色",
+          "label": "现实维度地板方格边框颜色",
           "description": "留空时现实世界使用默认深灰色边框。"
         },
         "floorGridLineVoidColor": {
-          "label": "虚空世界地板方格边框颜色",
+          "label": "虚空维度地板方格边框颜色",
           "description": "留空时虚空世界使用默认白色边框。"
+        },
+        "enableVoidReturnFadeSkip": {
+          "label": "禁用回到现实白屏淡出效果",
+          "description": "从虚空维度返回现实维度时，移除长时间的白色淡出效果，直接显示清晰画面。"
         }
       }
     },
@@ -483,28 +495,32 @@
           "description": "当保存的缩放值缺失或无效时使用。"
         },
         "enableChasmLineRenderer": {
-          "label": "逆裂缝连线渲染",
-          "description": "允许本 mod 用选择的渲染器替换逆裂缝和资源之间的连线。"
+          "label": "逆裂缝绘线渲染模式切换",
+          "description": "新增并可切换WebGL逆裂缝绘线的渲染方式，以提升性能。"
         },
         "chasmLineRendererMode": {
-          "label": "逆裂缝连线渲染模式",
-          "description": "Canvas 2D 使用原版绘制。WebGL 使用 GPU 画布渲染同样的逆裂缝到资源曲线。"
+          "label": "渲染模式",
+          "description": "原版渲染方式为Canvas 2D。可切换至WebGL渲染模式，用GPU进行渲染以提升性能。"
         },
         "enableChasmLineDistanceOverride": {
-          "label": "逆裂缝连线无视距离",
-          "description": "开启后，视角离逆裂缝较远时仍继续渲染逆裂缝与资源之间的连线。"
+          "label": "无视距离渲染逆裂缝绘线",
+          "description": "无论距离多远，逆裂缝的绘线都会保持渲染。"
         },
         "enableFloorGridLines": {
           "label": "显示地板方格边框",
-          "description": "在游戏内地板方格周围绘制细线边框。"
+          "description": "新增地板方格边框，方便数格子。"
         },
         "floorGridLineRealityColor": {
-          "label": "现实世界地板方格边框颜色",
+          "label": "现实维度地板方格边框颜色",
           "description": "留空时现实世界使用默认深灰色边框。"
         },
         "floorGridLineVoidColor": {
-          "label": "虚空世界地板方格边框颜色",
+          "label": "虚空维度地板方格边框颜色",
           "description": "留空时虚空世界使用默认白色边框。"
+        },
+        "enableVoidReturnFadeSkip": {
+          "label": "禁用回到现实白屏淡出效果",
+          "description": "从虚空维度返回现实维度时，移除长时间的白色淡出效果，直接显示清晰画面。"
         }
       }
     },
@@ -571,6 +587,10 @@
         "floorGridLineVoidColor": {
           "label": "Void floor grid outline color",
           "description": "Leave empty to use the default white outline in the void."
+        },
+        "enableVoidReturnFadeSkip": {
+          "label": "Skip void return fade",
+          "description": "When returning from the void to reality, remove the long white recovery fade and show the clear view immediately."
         }
       }
     },
@@ -637,6 +657,10 @@
         "floorGridLineVoidColor": {
           "label": "Tsvet setki pola pustoty",
           "description": "Pustoe znachenie ispolzuet belyy kontur v pustote."
+        },
+        "enableVoidReturnFadeSkip": {
+          "label": "Propusk belogo zatuhaniya iz pustoty",
+          "description": "Pri vozvrate iz pustoty v realnost ubiraet dolgoe beloe vosstanovlenie i srazu pokazyvaet chetkiy vid."
         }
       }
     },
@@ -703,6 +727,10 @@
         "floorGridLineVoidColor": {
           "label": "Bodenrasterfarbe Leere",
           "description": "Leer lassen fuer die weisse Standardlinie in der Leere."
+        },
+        "enableVoidReturnFadeSkip": {
+          "label": "Rueckkehr-Fade aus der Leere ueberspringen",
+          "description": "Beim Zurueckkehren aus der Leere zur Realitaet wird die lange weisse Aufhellung entfernt."
         }
       }
     },
@@ -769,6 +797,10 @@
         "floorGridLineVoidColor": {
           "label": "Cor da grade do piso no vazio",
           "description": "Vazio usa o contorno branco padrao no vazio."
+        },
+        "enableVoidReturnFadeSkip": {
+          "label": "Pular fade ao voltar do vazio",
+          "description": "Ao voltar do vazio para a realidade, remove o longo fade branco e mostra a tela nitida imediatamente."
         }
       }
     },
@@ -835,6 +867,10 @@
         "floorGridLineVoidColor": {
           "label": "Colore griglia pavimento vuoto",
           "description": "Vuoto usa il contorno bianco predefinito nel vuoto."
+        },
+        "enableVoidReturnFadeSkip": {
+          "label": "Salta dissolvenza ritorno dal vuoto",
+          "description": "Quando torni dal vuoto alla realta, rimuove la lunga dissolvenza bianca e mostra subito la vista chiara."
         }
       }
     },
@@ -901,6 +937,10 @@
         "floorGridLineVoidColor": {
           "label": "Color de cuadricula en vacio",
           "description": "Vacio usa el borde blanco predeterminado en el vacio."
+        },
+        "enableVoidReturnFadeSkip": {
+          "label": "Omitir fundido al volver del vacio",
+          "description": "Al volver del vacio a la realidad, elimina el largo fundido blanco y muestra la vista clara de inmediato."
         }
       }
     },
@@ -967,6 +1007,10 @@
         "floorGridLineVoidColor": {
           "label": "Couleur de grille du vide",
           "description": "Vide utilise le contour blanc par defaut dans le vide."
+        },
+        "enableVoidReturnFadeSkip": {
+          "label": "Ignorer le fondu de retour du vide",
+          "description": "Au retour du vide vers la realite, supprime le long fondu blanc et affiche tout de suite une vue nette."
         }
       }
     },
@@ -1033,6 +1077,10 @@
         "floorGridLineVoidColor": {
           "label": "Vloerrasterkleur leegte",
           "description": "Leeg gebruikt de standaard witte omtrek in de leegte."
+        },
+        "enableVoidReturnFadeSkip": {
+          "label": "Witte fade na leegte overslaan",
+          "description": "Bij terugkeer uit de leegte naar realiteit wordt de lange witte fade verwijderd."
         }
       }
     },
@@ -1099,6 +1147,10 @@
         "floorGridLineVoidColor": {
           "label": "Barva mrizky podlahy prazdnoty",
           "description": "Prazdne pouzije vychozi bily obrys v prazdnote."
+        },
+        "enableVoidReturnFadeSkip": {
+          "label": "Preskocit bile blednuti z prazdnoty",
+          "description": "Pri navratu z prazdnoty do reality odstrani dlouhe bile dozneni a hned ukaze cisty obraz."
         }
       }
     },
@@ -1165,6 +1217,10 @@
         "floorGridLineVoidColor": {
           "label": "Kolor siatki podlogi pustki",
           "description": "Puste uzywa domyslnego bialego obrysu w pustce."
+        },
+        "enableVoidReturnFadeSkip": {
+          "label": "Pomin biale zanikanie po pustce",
+          "description": "Po powrocie z pustki do rzeczywistosci usuwa dlugie biale zanikanie i od razu pokazuje czysty obraz."
         }
       }
     },
@@ -1231,6 +1287,10 @@
         "floorGridLineVoidColor": {
           "label": "Void floor grid outline color",
           "description": "Empty uses the default white outline in the void."
+        },
+        "enableVoidReturnFadeSkip": {
+          "label": "Skip void return fade",
+          "description": "Remove the long white recovery fade when returning from the void to reality."
         }
       }
     },
@@ -1297,6 +1357,10 @@
         "floorGridLineVoidColor": {
           "label": "Void floor grid outline color",
           "description": "Empty uses the default white outline in the void."
+        },
+        "enableVoidReturnFadeSkip": {
+          "label": "Skip void return fade",
+          "description": "Remove the long white recovery fade when returning from the void to reality."
         }
       }
     },
@@ -1363,6 +1427,10 @@
         "floorGridLineVoidColor": {
           "label": "虛空世界地板方格邊框顏色",
           "description": "留空時虛空世界使用預設白色邊框。"
+        },
+        "enableVoidReturnFadeSkip": {
+          "label": "跳過虛空返回白色恢復效果",
+          "description": "從虛空世界返回現實世界時，移除長時間白色恢復淡出，直接顯示清晰畫面。"
         }
       }
     },
@@ -1429,6 +1497,10 @@
         "floorGridLineVoidColor": {
           "label": "Void floor grid outline color",
           "description": "Empty uses the default white outline in the void."
+        },
+        "enableVoidReturnFadeSkip": {
+          "label": "Skip void return fade",
+          "description": "Remove the long white recovery fade when returning from the void to reality."
         }
       }
     },
@@ -1495,6 +1567,10 @@
         "floorGridLineVoidColor": {
           "label": "Ur padloracs szine",
           "description": "Uresen az alapertelmezett feher korvonalat hasznalja az urben."
+        },
+        "enableVoidReturnFadeSkip": {
+          "label": "Urbeli visszateres feher fade kihagyasa",
+          "description": "Az urbol a valosagba visszaterve eltavolitja a hosszu feher atmenetet."
         }
       }
     },
@@ -1561,6 +1637,10 @@
         "floorGridLineVoidColor": {
           "label": "Tuksuma gridas konturu krasa",
           "description": "Tukss izmanto noklusejuma baltu konturu tuksumaa."
+        },
+        "enableVoidReturnFadeSkip": {
+          "label": "Izlaist balto atgriesanos no tuksuma",
+          "description": "Atgriezoties no tuksuma realitate, nonem ilgo balto parpludumu un uzreiz rada skaidru skatu."
         }
       }
     },
@@ -1627,6 +1707,10 @@
         "floorGridLineVoidColor": {
           "label": "Culoare grila podea vid",
           "description": "Gol foloseste conturul implicit alb in vid."
+        },
+        "enableVoidReturnFadeSkip": {
+          "label": "Sari peste fade-ul din vid",
+          "description": "La revenirea din vid in realitate, elimina estomparea alba lunga si arata imediat imaginea clara."
         }
       }
     },
@@ -1693,6 +1777,10 @@
         "floorGridLineVoidColor": {
           "label": "Gulvrutenettfarge i tomrom",
           "description": "Tomt bruker standard hvitt omriss i tomrommet."
+        },
+        "enableVoidReturnFadeSkip": {
+          "label": "Hopp over hvit fade fra tomrom",
+          "description": "Nar du gar fra tomrommet tilbake til virkeligheten, fjernes den lange hvite faden."
         }
       }
     }

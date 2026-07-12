@@ -568,7 +568,7 @@
 	position: relative;
 	width: 90%;
 	margin: calc(var(--unit) * .3) auto calc(var(--unit) * .26);
-	padding: calc(var(--unit) * .92) 0 calc(var(--unit) * .24);
+	padding: calc(var(--unit) * 1.2) 0 calc(var(--unit) * .24);
 	color: #111;
 	font: inherit;
 	user-select: none;
@@ -577,7 +577,7 @@
 .cattail-scan-reality-slider-category {
 	margin-top: calc(var(--unit) * .18);
 	margin-bottom: calc(var(--unit) * .3);
-	padding-top: calc(var(--unit) * .88);
+	padding-top: calc(var(--unit) * 1.16);
 }
 .cattail-scan-slider-value {
 	position: absolute;
@@ -601,7 +601,7 @@
 	top: calc(var(--unit) * .08);
 }
 .cattail-scan-slider-reality {
-	top: calc(var(--unit) * 1.48);
+	top: calc(var(--unit) * 1.86);
 }
 .cattail-scan-slider-input {
 	appearance: none;
@@ -610,7 +610,7 @@
 	width: 100%;
 	height: calc(var(--unit) * .22);
 	min-height: 4px;
-	margin: 0 auto calc(var(--unit) * 1.04);
+	margin: 0 auto calc(var(--unit) * 1.56);
 	border: 0;
 	border-radius: 999px;
 	background:
@@ -649,7 +649,7 @@
 	display: block;
 	min-width: calc(var(--unit) * 1.24);
 	min-height: calc(var(--unit) * .42);
-	margin: calc(var(--unit) * .12) auto 0;
+	margin: calc(var(--unit) * .24) auto 0;
 	padding: 0 calc(var(--unit) * .3);
 	border: 0;
 	border-radius: 999px;
@@ -683,6 +683,14 @@
 		0 calc(var(--unit) * .06) calc(var(--unit) * .14) rgba(0,0,0,.18),
 		inset 0 calc(var(--unit) * .035) calc(var(--unit) * .055) rgba(0,0,0,.18),
 		inset 0 calc(var(--unit) * -.035) calc(var(--unit) * .05) rgba(255,255,255,.75);
+}
+.shop .shopItem.disabled .cattail-scan-reality-slider,
+.shop .shopItem.disabled .cattail-scan-slider-input,
+.shop .shopItem.disabled .cattail-scan-slider-reset {
+	pointer-events: auto;
+}
+.shop .shopItem.disabled .cattail-scan-slider-value {
+	pointer-events: none;
 }
 .shop.darkShop .cattail-scan-reality-slider {
 	color: #fff;
