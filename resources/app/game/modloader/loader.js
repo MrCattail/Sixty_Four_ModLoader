@@ -554,7 +554,20 @@
 		"ro": "Resetează la culoarea resursei",
 		"no": "Tilbakestill til ressursfarge",
 		"modsch": "重置为资源默认颜色"
-	}
+	},
+	"exportColors": { "en": "Export colors", "sch": "导出颜色", "modsch": "导出颜色", "tch": "匯出顏色" },
+	"exportColorsTitle": { "en": "Copy these colors to the clipboard", "sch": "复制这些颜色到剪贴板", "modsch": "复制这些颜色到剪贴板", "tch": "複製這些顏色到剪貼簿" },
+	"importColors": { "en": "Import colors", "sch": "导入颜色", "modsch": "导入颜色", "tch": "匯入顏色" },
+	"importColorsTitle": { "en": "Import colors from the clipboard", "sch": "从剪贴板导入颜色", "modsch": "从剪贴板导入颜色", "tch": "從剪貼簿匯入顏色" },
+	"colorsCopied": { "en": "Copied colors.", "sch": "已复制颜色。", "modsch": "已复制颜色。", "tch": "已複製顏色。" },
+	"colorsImported": { "en": "Imported {count} colors.", "sch": "已导入 {count} 个颜色。", "modsch": "已导入 {count} 个颜色。", "tch": "已匯入 {count} 個顏色。" },
+	"colorExportFailed": { "en": "Export failed.", "sch": "导出失败。", "modsch": "导出失败。", "tch": "匯出失敗。" },
+	"colorImportFailed": { "en": "Import failed.", "sch": "导入失败。", "modsch": "导入失败。", "tch": "匯入失敗。" },
+	"colorClipboardEmpty": { "en": "Clipboard is empty.", "sch": "剪贴板是空的。", "modsch": "剪贴板是空的。", "tch": "剪貼簿是空的。" },
+	"colorClipboardInvalid": { "en": "Clipboard does not contain valid color data.", "sch": "剪贴板里没有有效的颜色数据。", "modsch": "剪贴板里没有有效的颜色数据。", "tch": "剪貼簿裡沒有有效的顏色資料。" },
+	"colorClipboardUnavailable": { "en": "Clipboard is not available.", "sch": "剪贴板不可用。", "modsch": "剪贴板不可用。", "tch": "剪貼簿不可用。" },
+	"colorNoMatches": { "en": "No matching color rows were found.", "sch": "没有找到匹配的颜色行。", "modsch": "没有找到匹配的颜色行。", "tch": "沒有找到匹配的顏色列。" },
+	"colorInvalidHex": { "en": "Enter colors as #RRGGBB.", "sch": "请输入 #RRGGBB 格式的颜色。", "modsch": "请输入 #RRGGBB 格式的颜色。", "tch": "請輸入 #RRGGBB 格式的顏色。" }
 }
 
 	const ensurePanelStyle = function () {
@@ -620,7 +633,8 @@
 			#modloader-panel.modloader-panel-theme-light .modloader-config-slider-range::-webkit-slider-runnable-track { background: linear-gradient(90deg, rgba(18,20,22,.52) 0 var(--modloader-slider-fill, 0%), rgba(0,0,0,.12) var(--modloader-slider-fill, 0%) 100%); box-shadow: inset 0 1px 2px rgba(0,0,0,.18); }
 			#modloader-panel.modloader-panel-theme-light .modloader-config-slider-range::-moz-range-track { background: rgba(0,0,0,.12); box-shadow: inset 0 1px 2px rgba(0,0,0,.18); }
 			#modloader-panel.modloader-panel-theme-light .modloader-config-slider-range::-moz-range-progress { background: rgba(18,20,22,.52); }
-			#modloader-panel.modloader-panel-theme-light .modloader-action-button, #modloader-panel.modloader-panel-theme-light .modloader-modal-button, #modloader-panel.modloader-panel-theme-light .modloader-resource-color-reset { background: rgba(0,0,0,.055); border-color: rgba(0,0,0,.12); color: rgba(18,20,22,.78); }
+			#modloader-panel.modloader-panel-theme-light .modloader-action-button, #modloader-panel.modloader-panel-theme-light .modloader-modal-button, #modloader-panel.modloader-panel-theme-light .modloader-resource-color-reset, #modloader-panel.modloader-panel-theme-light .modloader-resource-color-share-button { background: rgba(0,0,0,.055); border-color: rgba(0,0,0,.12); color: rgba(18,20,22,.78); }
+			#modloader-panel.modloader-panel-theme-light .modloader-resource-color-share-status { color: rgba(18,20,22,.54); }
 			#modloader-panel.modloader-panel-theme-light .modloader-panel-tab { background: rgba(248,248,246,.95); border-color: rgba(0,0,0,.12); }
 			#modloader-panel .modloader-panel-summary { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px 12px; margin: 8px 0 12px; }
 			#modloader-panel .modloader-panel-row { display: flex; gap: 12px; justify-content: space-between; border-top: 1px solid rgba(255,255,255,.1); padding: 5px 0; }
@@ -746,8 +760,17 @@
 			#modloader-panel .modloader-config-error { display: none; grid-column: 2; color: #ffb0b0; font-size: 11px; }
 			#modloader-panel .modloader-config-error.active { display: block; }
 			#modloader-panel .modloader-resource-colors { display: grid; gap: 6px; min-width: 0; }
+			#modloader-panel .modloader-resource-color-tools { display: flex; align-items: center; gap: 7px; min-width: 0; margin-bottom: 2px; }
+			#modloader-panel .modloader-resource-color-share-button { border: 1px solid rgba(255,255,255,.14); border-radius: 5px; padding: 5px 7px; background: rgba(255,255,255,.08); color: rgba(255,255,255,.78); cursor: pointer; }
+			#modloader-panel .modloader-resource-color-share-button:hover { background: rgba(255,255,255,.14); color: rgba(255,255,255,.94); }
+			#modloader-panel .modloader-resource-color-share-button:disabled { cursor: default; opacity: .45; }
+			#modloader-panel .modloader-resource-color-share-status { min-width: 0; color: rgba(255,255,255,.5); font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+			#modloader-panel .modloader-resource-color-share-status[data-tone="ok"] { color: #cfe9ff; }
+			#modloader-panel .modloader-resource-color-share-status[data-tone="error"] { color: #ffb0b0; }
 			#modloader-panel .modloader-resource-color-row { display: grid; grid-template-columns: 38px 34px minmax(0, 1fr) auto; gap: 8px; align-items: center; min-width: 0; }
+			#modloader-panel .modloader-resource-colors-no-icons .modloader-resource-color-row { grid-template-columns: 34px minmax(0, 1fr) auto; }
 			#modloader-panel .modloader-resource-color-icon { display: block; width: 36px; height: 40px; background-image: url('img/resources.png'); background-size: 360px 40px; background-repeat: no-repeat; filter: drop-shadow(0 1px 2px rgba(255,255,255,.78)); }
+			#modloader-panel .modloader-resource-colors-no-icons .modloader-resource-color-icon { display: none; }
 			#modloader-panel .modloader-resource-color-picker { width: 30px; height: 28px; box-sizing: border-box; border: 1px solid rgba(255,255,255,.18); border-radius: 5px; padding: 0; background: transparent; color: inherit; cursor: pointer; }
 			#modloader-panel .modloader-resource-color-text { box-sizing: border-box; width: 100%; min-width: 0; border: 1px solid rgba(255,255,255,.16); border-radius: 5px; padding: 5px 6px; background: rgba(0,0,0,.22); color: rgba(255,255,255,.92); outline: none; }
 			#modloader-panel .modloader-resource-color-text:focus { border-color: rgba(207, 233, 255, .5); }
@@ -1080,7 +1103,7 @@
 		return String(item.type || inferConfigType(item.default) || 'string').toLowerCase()
 	}
 	const isResourceColorsConfigType = function (type) {
-		return type === 'resourcecolors' || type === 'resource-colors' || type === 'resource_glow_colors'
+		return type === 'resourcecolors' || type === 'resource-colors' || type === 'resource_glow_colors' || type === 'resourcecolorpalette' || type === 'resource-color-palette' || type === 'colorpalette' || type === 'color-palette'
 	}
 
 	const isNumberConfigType = function (type) {
@@ -1093,6 +1116,11 @@
 
 	const getConfigControl = function (item) {
 		return String(item.control || item.input || item.ui || item.widget || item.display || '').toLowerCase()
+	}
+
+	const isResourceColorsConfigItem = function (item, type) {
+		const control = getConfigControl(item)
+		return isResourceColorsConfigType(type) || item.resourceColors === true || control === 'resourcecolors' || control === 'resource-colors' || control === 'resource_glow_colors' || control === 'colorpalette' || control === 'color-palette'
 	}
 
 	const isSliderConfigItem = function (item, type) {
@@ -1178,8 +1206,201 @@
 		return String(value)
 	}
 
+	const shouldShowResourceColorSharing = function (item) {
+		const value = item.importExport ?? item.exportImport ?? item.share ?? item.sharing ?? item.colorSharing
+		return value !== false
+	}
+
+	const shouldShowResourceColorIcons = function (item) {
+		const value = item.showIcons ?? item.showIcon ?? item.icons ?? item.resourceIcons
+		return value !== false
+	}
+
+	const getResourceColorShareType = function (item) {
+		return String(item.shareType || item.exportType || item.clipboardType || (item.key === 'resourceGlowColors' ? 'CattailResourceGlowColors' : 'ModLoaderColorPalette'))
+	}
+
+	const readPanelClipboardText = async function () {
+		try {
+			if (window.navigator?.clipboard?.readText) {
+				const text = await window.navigator.clipboard.readText()
+				if (text !== undefined && text !== null) return String(text)
+			}
+		} catch (error) {}
+		const clipboard = getModFileTools()?.clipboard
+		if (clipboard?.readText) return String(clipboard.readText() || '')
+		throw new Error(getInlineLocalizedText(CONFIG_INLINE_TEXT.colorClipboardUnavailable))
+	}
+
+	const writePanelClipboardText = async function (value) {
+		try {
+			if (window.navigator?.clipboard?.writeText) {
+				await window.navigator.clipboard.writeText(value)
+				return
+			}
+		} catch (error) {}
+		const clipboard = getModFileTools()?.clipboard
+		if (clipboard?.writeText) {
+			clipboard.writeText(value)
+			return
+		}
+		throw new Error(getInlineLocalizedText(CONFIG_INLINE_TEXT.colorClipboardUnavailable))
+	}
+
+	const setResourceColorShareStatus = function (status, message, tone) {
+		if (!status) return
+		status.textContent = message || ''
+		status.dataset.tone = tone || ''
+		if (status.__modloaderTimer) clearTimeout(status.__modloaderTimer)
+		status.__modloaderTimer = null
+		if (!message) return
+		status.__modloaderTimer = setTimeout(function () {
+			status.textContent = ''
+			status.dataset.tone = ''
+			status.__modloaderTimer = null
+		}, 2400)
+	}
+
+	const readResourceColorsFromInput = function (root, options) {
+		const includeDefaults = !!options?.includeDefaults
+		const out = {}
+		const rows = root.querySelectorAll('.modloader-resource-color-row')
+		for (const row of rows) {
+			const textInput = row.querySelector('.modloader-resource-color-text')
+			const color = normalizePanelHexColor(textInput?.value)
+			if (!color) throw new Error(getInlineLocalizedText(CONFIG_INLINE_TEXT.colorInvalidHex))
+			if (includeDefaults || color !== row.dataset.defaultColor) out[row.dataset.resourceId] = color
+		}
+		return out
+	}
+
+	const createResourceColorShareText = function (item, root) {
+		return JSON.stringify({
+			type: getResourceColorShareType(item),
+			version: 1,
+			key: item.key || '',
+			colors: readResourceColorsFromInput(root, { includeDefaults: item.exportDefaults !== false })
+		}, null, 2)
+	}
+	const normalizeResourceColorImportKey = function (key) {
+		const text = String(key ?? '').trim()
+		if (!text) return ''
+		const resourceMatch = text.match(/^r(\d+)$/i)
+		return resourceMatch ? String(Number(resourceMatch[1])) : text
+	}
+
+	const addResourceColorImportValue = function (out, key, value) {
+		const id = normalizeResourceColorImportKey(key)
+		const raw = value && typeof value === 'object' && !Array.isArray(value) ? (value.color ?? value.value ?? value.hex) : value
+		const color = normalizePanelHexColor(raw)
+		if (!id && color) return
+		if (id && !color) throw new Error(getInlineLocalizedText(CONFIG_INLINE_TEXT.colorClipboardInvalid))
+		if (id && color) out[id] = color
+	}
+
+	const normalizeResourceColorImportData = function (data) {
+		const source = data && (data.colors ?? data.resourceGlowColors ?? data.resourceColors ?? data.palette ?? data)
+		const out = {}
+		if (Array.isArray(source)) {
+			source.forEach(function (value, index) {
+				const key = value && typeof value === 'object' && !Array.isArray(value) ? (value.id ?? value.key ?? value.resource ?? index) : index
+				addResourceColorImportValue(out, key, value)
+			})
+		} else if (source && typeof source === 'object') {
+			Object.keys(source).forEach(function (key) { addResourceColorImportValue(out, key, source[key]) })
+		} else {
+			throw new Error(getInlineLocalizedText(CONFIG_INLINE_TEXT.colorClipboardInvalid))
+		}
+		if (!Object.keys(out).length) throw new Error(getInlineLocalizedText(CONFIG_INLINE_TEXT.colorClipboardInvalid))
+		return out
+	}
+
+	const parseResourceColorLines = function (value) {
+		const out = {}
+		let nextId = 0
+		String(value || '').split(/[\r\n,;]+/).map(function (part) { return part.trim() }).filter(Boolean).forEach(function (part) {
+			const match = part.match(/^(?:(.+?)\s*[:=]\s*)?(#?[0-9a-f]{3}(?:[0-9a-f]{3})?)$/i)
+			if (!match) throw new Error(getInlineLocalizedText(CONFIG_INLINE_TEXT.colorClipboardInvalid))
+			const color = normalizePanelHexColor(match[2])
+			if (!color) throw new Error(getInlineLocalizedText(CONFIG_INLINE_TEXT.colorClipboardInvalid))
+			const id = match[1] !== undefined ? normalizeResourceColorImportKey(match[1]) : String(nextId++)
+			if (!id) throw new Error(getInlineLocalizedText(CONFIG_INLINE_TEXT.colorClipboardInvalid))
+			out[id] = color
+		})
+		if (!Object.keys(out).length) throw new Error(getInlineLocalizedText(CONFIG_INLINE_TEXT.colorClipboardEmpty))
+		return out
+	}
+
+	const parseResourceColorShareText = function (value) {
+		const source = String(value || '').trim()
+		if (!source) throw new Error(getInlineLocalizedText(CONFIG_INLINE_TEXT.colorClipboardEmpty))
+		if (/^[\[{]/.test(source)) {
+			try {
+				return normalizeResourceColorImportData(JSON.parse(source))
+			} catch (error) {
+				throw new Error(error.message || getInlineLocalizedText(CONFIG_INLINE_TEXT.colorClipboardInvalid))
+			}
+		}
+		return parseResourceColorLines(source)
+	}
+
+	const applyResourceColorsToInput = function (root, colors) {
+		let applied = 0
+		root.querySelectorAll('.modloader-resource-color-row').forEach(function (row) {
+			const id = row.dataset.resourceId
+			const color = colors[id] ?? colors[String(id)] ?? colors['r' + id]
+			if (color === undefined) return
+			const normalized = normalizePanelHexColor(color)
+			if (!normalized) throw new Error(getInlineLocalizedText(CONFIG_INLINE_TEXT.colorClipboardInvalid))
+			const picker = row.querySelector('.modloader-resource-color-picker')
+			const textInput = row.querySelector('.modloader-resource-color-text')
+			if (picker) picker.value = normalized
+			if (textInput) textInput.value = normalized
+			applied++
+		})
+		if (!applied) throw new Error(getInlineLocalizedText(CONFIG_INLINE_TEXT.colorNoMatches))
+		root.dispatchEvent(new Event('input', { bubbles: true }))
+		return applied
+	}
+	const createResourceColorShareTools = function (item, root) {
+		const tools = element('div', 'modloader-resource-color-tools')
+		const exportButton = element('button', 'modloader-resource-color-share-button', getInlineLocalizedText(CONFIG_INLINE_TEXT.exportColors))
+		exportButton.type = 'button'
+		exportButton.title = getInlineLocalizedText(CONFIG_INLINE_TEXT.exportColorsTitle)
+		const importButton = element('button', 'modloader-resource-color-share-button', getInlineLocalizedText(CONFIG_INLINE_TEXT.importColors))
+		importButton.type = 'button'
+		importButton.title = getInlineLocalizedText(CONFIG_INLINE_TEXT.importColorsTitle)
+		const status = element('span', 'modloader-resource-color-share-status')
+		exportButton.addEventListener('click', async function (event) {
+			event.preventDefault()
+			event.stopPropagation()
+			try {
+				await writePanelClipboardText(createResourceColorShareText(item, root))
+				setResourceColorShareStatus(status, getInlineLocalizedText(CONFIG_INLINE_TEXT.colorsCopied), 'ok')
+			} catch (error) {
+				setResourceColorShareStatus(status, error.message || getInlineLocalizedText(CONFIG_INLINE_TEXT.colorExportFailed), 'error')
+			}
+		})
+		importButton.addEventListener('click', async function (event) {
+			event.preventDefault()
+			event.stopPropagation()
+			try {
+				const count = applyResourceColorsToInput(root, parseResourceColorShareText(await readPanelClipboardText()))
+				setResourceColorShareStatus(status, getInlineLocalizedText(CONFIG_INLINE_TEXT.colorsImported, { count }), 'ok')
+			} catch (error) {
+				setResourceColorShareStatus(status, error.message || getInlineLocalizedText(CONFIG_INLINE_TEXT.colorImportFailed), 'error')
+			}
+		})
+		tools.append(exportButton, importButton, status)
+		return tools
+	}
 	const createResourceColorsInput = function (item, value) {
 		const root = element('div', 'modloader-resource-colors modloader-config-input')
+		root.dataset.modloaderResourceColors = 'true'
+		root.dataset.cattailGlowSharing = 'true'
+		const showIcons = shouldShowResourceColorIcons(item)
+		if (!showIcons) root.classList.add('modloader-resource-colors-no-icons')
+		if (shouldShowResourceColorSharing(item)) root.appendChild(createResourceColorShareTools(item, root))
 		const resources = getResourceColorConfigRows(item, value)
 		for (const resource of resources) {
 			const row = element('div', 'modloader-resource-color-row')
@@ -1187,7 +1408,7 @@
 			row.dataset.defaultColor = resource.defaultColor
 
 			const icon = element('span', 'modloader-resource-color-icon')
-			icon.style.backgroundPosition = '-' + (resource.id * 36) + 'px 0'
+			icon.style.backgroundPosition = '-' + (resource.iconIndex * 36) + 'px 0'
 			icon.title = resource.name
 
 			const picker = element('input', 'modloader-resource-color-picker')
@@ -1220,20 +1441,16 @@
 				root.dispatchEvent(new Event('input', { bubbles: true }))
 			})
 
-			row.append(icon, picker, textInput, reset)
+			if (showIcons) {
+				if (resource.showIcon === false) icon.style.visibility = 'hidden'
+				row.appendChild(icon)
+			}
+			row.append(picker, textInput, reset)
 			root.appendChild(row)
 		}
 
 		root.readConfigValue = function () {
-			const out = {}
-			const rows = root.querySelectorAll('.modloader-resource-color-row')
-			for (const row of rows) {
-				const textInput = row.querySelector('.modloader-resource-color-text')
-				const color = normalizePanelHexColor(textInput?.value)
-				if (!color) throw new Error('Enter colors as #RRGGBB.')
-				if (color !== row.dataset.defaultColor) out[row.dataset.resourceId] = color
-			}
-			return out
+			return readResourceColorsFromInput(root, { includeDefaults: false })
 		}
 
 		Object.defineProperty(root, 'disabled', {
@@ -1245,28 +1462,34 @@
 		})
 		return root
 	}
-
 	const getResourceColorConfigRows = function (item, value) {
 		const overrides = isObject(value) ? value : {}
 		const gameResources = state.game?.codex?.resources || []
-		const manifestResources = Array.isArray(item.resources) ? item.resources : []
+		const manifestResources = Array.isArray(item.resources) ? item.resources : (Array.isArray(item.rows) ? item.rows : (Array.isArray(item.colors) ? item.colors : []))
 		const count = Math.max(Number(item.count) || 0, gameResources.length, manifestResources.length, 10)
 		const rows = []
 		for (let i = 0; i < count; i++) {
-			const resource = gameResources[i] || {}
 			const manifestResource = manifestResources[i] || {}
-			const defaultColor = normalizePanelHexColor(resource?.triplet?.[2]) || normalizePanelHexColor(resource?.triplet?.[1]) || normalizePanelHexColor(resource?.triplet?.[0]) || normalizePanelHexColor(manifestResource.color) || '#FFFFFF'
-			const override = overrides[i] ?? overrides[String(i)] ?? overrides['r' + i]
+			const explicitId = manifestResource.id ?? manifestResource.key
+			const id = explicitId !== undefined ? String(explicitId) : String(i)
+			let resourceIndex = getFiniteConfigNumber(manifestResource.resourceIndex ?? manifestResource.resourceId ?? manifestResource.resource ?? explicitId)
+			if (resourceIndex === null) resourceIndex = i
+			const resource = gameResources[resourceIndex] || gameResources[i] || {}
+			let iconIndex = getFiniteConfigNumber(manifestResource.iconIndex ?? manifestResource.icon ?? resourceIndex)
+			if (iconIndex === null) iconIndex = i
+			const defaultColor = normalizePanelHexColor(manifestResource.defaultColor) || normalizePanelHexColor(resource?.triplet?.[2]) || normalizePanelHexColor(resource?.triplet?.[1]) || normalizePanelHexColor(resource?.triplet?.[0]) || normalizePanelHexColor(manifestResource.color) || '#FFFFFF'
+			const override = overrides[id] ?? overrides[String(id)] ?? overrides[i] ?? overrides[String(i)] ?? overrides['r' + id] ?? overrides['r' + i]
 			rows.push({
-				id: i,
-				name: String(resource.name || manifestResource.name || ('Resource ' + (i + 1))),
+				id,
+				name: pickLocalizedText(manifestResource.name || manifestResource.label, getLocaleCandidates()) || String(resource.name || manifestResource.name || manifestResource.label || ('Resource ' + (i + 1))),
 				defaultColor,
-				color: normalizePanelHexColor(override) || defaultColor
+				color: normalizePanelHexColor(override) || defaultColor,
+				iconIndex: Math.max(0, iconIndex),
+				showIcon: manifestResource.icon !== false && manifestResource.showIcon !== false
 			})
 		}
 		return rows
 	}
-
 	const getSliderAliasNumber = function (item, value) {
 		const aliases = item?.valueAliases || item?.sliderAliases
 		if (!aliases || typeof aliases !== 'object') return null
@@ -1515,7 +1738,7 @@
 	}
 	const createConfigInput = function (item, value) {
 		const type = getConfigType(item)
-		if (isResourceColorsConfigType(type)) return createResourceColorsInput(item, value)
+		if (isResourceColorsConfigItem(item, type)) return createResourceColorsInput(item, value)
 		if (isSliderConfigItem(item, type)) return createSliderConfigInput(item, value, type)
 		const input = element(type === 'array' || type === 'object' ? 'textarea' : 'input', 'modloader-config-input')
 		if (type === 'boolean') {
@@ -1541,7 +1764,7 @@
 
 	const readConfigInputValue = function (item, input) {
 		const type = getConfigType(item)
-		if (isResourceColorsConfigType(type)) return input.readConfigValue()
+		if (isResourceColorsConfigItem(item, type)) return input.readConfigValue()
 		if (isSliderConfigItem(item, type)) return input.readConfigValue()
 		if (type === 'boolean') return !!input.checked
 		if (isNumberConfigType(type)) return readNumberConfigValue(item, input.value, type)

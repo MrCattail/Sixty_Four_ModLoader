@@ -148,6 +148,27 @@ ordinary number values. Config-only saves do not reload the game automatically;
 mods that read config during startup still need a manual reload to apply those
 values.
 
+Color map config can use the built-in `resourceColors` control. It renders an
+optional Export colors / Import colors toolbar, then rows in this order:
+optional resource icon, color picker, hex color input, reset button. Other mods
+can disable the toolbar or icons with `importExport: false` or `showIcons: false`.
+
+```json
+{
+  "config": {
+    "resourceGlowColors": {
+      "type": "resourceColors",
+      "default": {},
+      "reloadPolicy": "hot"
+    }
+  }
+}
+```
+
+Custom palettes can provide `resources`, `rows`, or `colors` entries with `id`,
+`name`, `defaultColor`, and optional `iconIndex`; saved values are an object of
+`id` to `#RRGGBB` overrides.
+
 ## Dependencies And Conflicts
 
 A mod can declare simple dependency and conflict lists in `mod.json`:
