@@ -616,6 +616,7 @@
 			#modloader-panel.modloader-panel-theme-light .modloader-mod-name, #modloader-panel.modloader-panel-theme-light .modloader-mod-version, #modloader-panel.modloader-panel-theme-light .modloader-mod-meta, #modloader-panel.modloader-panel-theme-light .modloader-config-meta { color: rgba(18,20,22,.58); }
 			#modloader-panel.modloader-panel-theme-light input.modloader-config-input:not([type="checkbox"]), #modloader-panel.modloader-panel-theme-light textarea.modloader-config-input, #modloader-panel.modloader-panel-theme-light select.modloader-config-input, #modloader-panel.modloader-panel-theme-light .modloader-panel-settings-number, #modloader-panel.modloader-panel-theme-light .modloader-resource-color-text { background: rgba(0,0,0,.045); border-color: rgba(0,0,0,.14); color: rgba(18,20,22,.92); }
 			#modloader-panel.modloader-panel-theme-light .modloader-config-slider-number { background: rgba(0,0,0,.045); border-color: rgba(0,0,0,.14); color: rgba(18,20,22,.92); }
+			#modloader-panel.modloader-panel-theme-light .modloader-config-slider-labels, #modloader-panel.modloader-panel-theme-light .modloader-config-slider-value { color: rgba(18,20,22,.58); }
 			#modloader-panel.modloader-panel-theme-light .modloader-config-slider-range::-webkit-slider-runnable-track { background: linear-gradient(90deg, rgba(18,20,22,.52) 0 var(--modloader-slider-fill, 0%), rgba(0,0,0,.12) var(--modloader-slider-fill, 0%) 100%); box-shadow: inset 0 1px 2px rgba(0,0,0,.18); }
 			#modloader-panel.modloader-panel-theme-light .modloader-config-slider-range::-moz-range-track { background: rgba(0,0,0,.12); box-shadow: inset 0 1px 2px rgba(0,0,0,.18); }
 			#modloader-panel.modloader-panel-theme-light .modloader-config-slider-range::-moz-range-progress { background: rgba(18,20,22,.52); }
@@ -710,13 +711,15 @@
 			#modloader-panel .modloader-config-label { display: block; color: rgba(255,255,255,.86); overflow-wrap: anywhere; }
 			#modloader-panel .modloader-config-meta { display: block; font-size: 11px; color: rgba(255,255,255,.48); overflow-wrap: anywhere; }
 			#modloader-panel input.modloader-config-input:not([type="checkbox"]), #modloader-panel textarea.modloader-config-input, #modloader-panel select.modloader-config-input { box-sizing: border-box; width: 100%; min-width: 0; border: 1px solid rgba(255,255,255,.16); border-radius: 5px; padding: 5px 6px; background: rgba(0,0,0,.22); color: rgba(255,255,255,.92); outline: none; }
-			#modloader-panel .modloader-config-slider { display: grid; grid-template-columns: minmax(0, 1fr) 66px; gap: 8px; align-items: center; width: 100%; min-width: 0; }
-			#modloader-panel .modloader-config-slider-range { appearance: none; -webkit-appearance: none; width: 100%; min-width: 0; height: 32px; margin: 0; background: transparent; cursor: pointer; outline: none; }
-			#modloader-panel .modloader-config-slider-range::-webkit-slider-runnable-track { height: 6px; border-radius: 999px; background: linear-gradient(90deg, rgba(207,233,255,.82) 0 var(--modloader-slider-fill, 0%), rgba(255,255,255,.14) var(--modloader-slider-fill, 0%) 100%); box-shadow: inset 0 1px 3px rgba(0,0,0,.42); }
-			#modloader-panel .modloader-config-slider-range::-webkit-slider-thumb { -webkit-appearance: none; width: 28px; height: 31px; margin-top: -12px; border: 0; background: url('img/resources.png') -196px 0 / 280px 31px no-repeat; filter: drop-shadow(0 2px 3px rgba(0,0,0,.55)) drop-shadow(0 0 5px rgba(207,233,255,.22)); }
-			#modloader-panel .modloader-config-slider-range::-moz-range-track { height: 6px; border-radius: 999px; background: rgba(255,255,255,.14); box-shadow: inset 0 1px 3px rgba(0,0,0,.42); }
+			#modloader-panel .modloader-config-slider { display: grid; grid-template-columns: minmax(0, 1fr) 66px; gap: 4px 8px; align-items: center; width: 100%; min-width: 0; }
+			#modloader-panel .modloader-config-slider-labeled { grid-template-columns: minmax(0, 1fr); }
+			#modloader-panel .modloader-config-slider-range { appearance: none; -webkit-appearance: none; width: 100%; min-width: 0; height: 32px; margin: 0; background: transparent; cursor: grab; outline: none; }
+			#modloader-panel .modloader-config-slider-range:active { cursor: grabbing; }
+			#modloader-panel .modloader-config-slider-range::-webkit-slider-runnable-track { height: 6px; border-radius: 999px; background: linear-gradient(90deg, rgba(207,233,255,.82) 0 var(--modloader-slider-fill, 0%), rgba(255,255,255,.14) var(--modloader-slider-fill, 0%) 100%); box-shadow: inset 0 1px 3px rgba(0,0,0,.42); transition: background .14s ease, box-shadow .14s ease; }
+			#modloader-panel .modloader-config-slider-range::-webkit-slider-thumb { -webkit-appearance: none; width: 28px; height: 31px; margin-top: -12px; border: 0; background: url('img/resources.png') -196px 0 / 280px 31px no-repeat; filter: drop-shadow(0 2px 3px rgba(0,0,0,.55)) drop-shadow(0 0 5px rgba(207,233,255,.22)); transition: filter .14s ease; }
+			#modloader-panel .modloader-config-slider-range::-moz-range-track { height: 6px; border-radius: 999px; background: rgba(255,255,255,.14); box-shadow: inset 0 1px 3px rgba(0,0,0,.42); transition: background .14s ease, box-shadow .14s ease; }
 			#modloader-panel .modloader-config-slider-range::-moz-range-progress { height: 6px; border-radius: 999px; background: rgba(207,233,255,.82); }
-			#modloader-panel .modloader-config-slider-range::-moz-range-thumb { width: 28px; height: 31px; border: 0; background: url('img/resources.png') -196px 0 / 280px 31px no-repeat; filter: drop-shadow(0 2px 3px rgba(0,0,0,.55)) drop-shadow(0 0 5px rgba(207,233,255,.22)); }
+			#modloader-panel .modloader-config-slider-range::-moz-range-thumb { width: 28px; height: 31px; border: 0; background: url('img/resources.png') -196px 0 / 280px 31px no-repeat; filter: drop-shadow(0 2px 3px rgba(0,0,0,.55)) drop-shadow(0 0 5px rgba(207,233,255,.22)); transition: filter .14s ease; }
 			#modloader-panel .modloader-config-slider-range:focus-visible::-webkit-slider-thumb { filter: drop-shadow(0 2px 3px rgba(0,0,0,.58)) drop-shadow(0 0 8px rgba(207,233,255,.52)); }
 			#modloader-panel .modloader-config-slider-range:focus-visible::-moz-range-thumb { filter: drop-shadow(0 2px 3px rgba(0,0,0,.58)) drop-shadow(0 0 8px rgba(207,233,255,.52)); }
 			#modloader-panel .modloader-config-slider-number { box-sizing: border-box; width: 66px; min-width: 0; border: 1px solid rgba(255,255,255,.16); border-radius: 5px; padding: 5px 6px; background: rgba(0,0,0,.22); color: rgba(255,255,255,.92); text-align: right; outline: none; }
@@ -1260,9 +1263,19 @@
 		return rows
 	}
 
+	const getSliderAliasNumber = function (item, value) {
+		const aliases = item?.valueAliases || item?.sliderAliases
+		if (!aliases || typeof aliases !== 'object') return null
+		const direct = aliases[String(value)]
+		const normalized = aliases[String(value ?? '').trim().toLowerCase()]
+		return getFiniteConfigNumber(direct ?? normalized)
+	}
+
 	const getSliderBounds = function (item, value, type) {
-		const stored = getFiniteConfigNumber(value)
-		const fallback = getFiniteConfigNumber(item.default)
+		let stored = getFiniteConfigNumber(value)
+		if (stored === null) stored = getSliderAliasNumber(item, value)
+		let fallback = getFiniteConfigNumber(item.default)
+		if (fallback === null) fallback = getSliderAliasNumber(item, item.default)
 		let min = getFiniteConfigNumber(item.min)
 		let max = getFiniteConfigNumber(item.max)
 		const base = stored !== null ? stored : (fallback !== null ? fallback : 0)
@@ -1279,14 +1292,89 @@
 		range.style.setProperty('--modloader-slider-fill', percent.toFixed(2) + '%')
 	}
 
+	const getSliderLabelSource = function (item) {
+		const source = item?.valueLabels || item?.sliderLabels
+		if (!source || typeof source !== 'object') return null
+		return Array.isArray(source) || isLocaleObject(source) ? source : null
+	}
+
+	const getSliderValueLabel = function (item, value) {
+		const source = getSliderLabelSource(item)
+		if (!source) return ''
+		if (Array.isArray(source)) {
+			const index = Math.max(0, Math.min(source.length - 1, Math.round(Number(value))))
+			return pickLocalizedText(source[index], getLocaleCandidates()) || String(source[index] ?? '')
+		}
+		const exact = source[String(value)]
+		const numeric = source[String(Number(value))]
+		return pickLocalizedText(exact ?? numeric, getLocaleCandidates())
+	}
+
+	const getSliderLabelValues = function (item, bounds) {
+		const source = getSliderLabelSource(item)
+		if (!source) return []
+		if (Array.isArray(source)) {
+			return source.map(function (entry, index) { return index }).filter(function (index) { return index >= bounds.min && index <= bounds.max })
+		}
+		const values = Object.keys(source)
+			.map(function (key) { return Number(key) })
+			.filter(function (value) { return Number.isFinite(value) && value >= bounds.min && value <= bounds.max })
+			.sort(function (a, b) { return a - b })
+		if (values.length > 0 && values.length <= 8) return values
+		return [ bounds.min, bounds.max ]
+	}
+
+	const getSliderStepNumber = function (bounds) {
+		const step = getFiniteConfigNumber(bounds?.step)
+		return step !== null && step > 0 ? step : null
+	}
+
+	const getSliderPrecision = function (bounds) {
+		const step = getSliderStepNumber(bounds)
+		const values = [ bounds?.min, bounds?.max, step ].filter(function (value) { return value !== null && value !== undefined })
+		let precision = 0
+		for (const value of values) {
+			const text = String(value)
+			const exponent = text.match(/e-(\d+)$/i)
+			if (exponent) {
+				precision = Math.max(precision, Number(exponent[1]) || 0)
+				continue
+			}
+			const decimal = text.split('.')[1]
+			if (decimal) precision = Math.max(precision, decimal.length)
+		}
+		return Math.min(8, precision)
+	}
+
+	const formatSliderNumber = function (value, bounds) {
+		const number = getFiniteConfigNumber(value)
+		if (number === null) return ''
+		const basePrecision = getSliderPrecision(bounds)
+		const precision = getSliderStepNumber(bounds) === null ? Math.min(8, Math.max(4, basePrecision)) : basePrecision
+		if (precision <= 0) return String(Math.round(number))
+		return Number(number.toFixed(precision)).toString()
+	}
+
+	const snapSliderValue = function (value, bounds) {
+		const current = getFiniteConfigNumber(value)
+		const fallback = getFiniteConfigNumber(bounds?.value)
+		let snapped = clampNumber(current !== null ? current : (fallback !== null ? fallback : 0), bounds.min, bounds.max)
+		const step = getSliderStepNumber(bounds)
+		if (step === null) return snapped
+		const stepCount = Math.round((snapped - bounds.min) / step)
+		snapped = bounds.min + stepCount * step
+		return clampNumber(Number(snapped.toFixed(getSliderPrecision(bounds))), bounds.min, bounds.max)
+	}
+
 	const createSliderConfigInput = function (item, value, type) {
-		const root = element('div', 'modloader-config-slider modloader-config-input')
 		const bounds = getSliderBounds(item, value, type)
+		const hasValueLabels = !!getSliderLabelSource(item)
+		const root = element('div', 'modloader-config-slider modloader-config-input' + (hasValueLabels ? ' modloader-config-slider-labeled' : ''))
 		const range = element('input', 'modloader-config-slider-range')
 		range.type = 'range'
 		range.min = String(bounds.min)
 		range.max = String(bounds.max)
-		range.step = bounds.step
+		range.step = 'any'
 		range.value = String(bounds.value)
 
 		const number = element('input', 'modloader-config-slider-number')
@@ -1294,27 +1382,95 @@
 		number.min = String(bounds.min)
 		number.max = String(bounds.max)
 		number.step = bounds.step
-		number.value = String(bounds.value)
+		number.value = formatSliderNumber(bounds.value, bounds)
 		number.spellcheck = false
 
-		const syncFromRange = function () {
-			number.value = range.value
-			setSliderFill(range, bounds.min, bounds.max)
-		}
-		const syncFromNumber = function () {
-			const current = getFiniteConfigNumber(number.value)
-			if (current !== null) range.value = String(clampNumber(current, bounds.min, bounds.max))
-			setSliderFill(range, bounds.min, bounds.max)
+		const labels = element('div', 'modloader-config-slider-labels')
+		const valueLabel = element('span', 'modloader-config-slider-value')
+		let snapAnimationFrame = 0
+
+		const cancelSnapAnimation = function () {
+			if (!snapAnimationFrame || typeof window === 'undefined' || typeof window.cancelAnimationFrame !== 'function') return
+			window.cancelAnimationFrame(snapAnimationFrame)
+			snapAnimationFrame = 0
 		}
 
-		range.addEventListener('input', syncFromRange)
-		range.addEventListener('change', syncFromRange)
-		number.addEventListener('input', syncFromNumber)
-		number.addEventListener('change', syncFromNumber)
-		setSliderFill(range, bounds.min, bounds.max)
+		const syncValueLabel = function (displayValue) {
+			if (!hasValueLabels) return
+			valueLabel.textContent = getSliderValueLabel(item, displayValue) || formatSliderNumber(displayValue, bounds)
+		}
+
+		const updateVisualValue = function (displayValue) {
+			range.value = String(displayValue)
+			setSliderFill(range, bounds.min, bounds.max)
+			syncValueLabel(displayValue)
+		}
+
+		const setSliderValue = function (nextValue, options) {
+			cancelSnapAnimation()
+			const config = options || {}
+			const parsed = getFiniteConfigNumber(nextValue)
+			const fallback = getFiniteConfigNumber(range.value)
+			const rawValue = parsed !== null ? parsed : (fallback !== null ? fallback : bounds.value)
+			const displayValue = config.snap ? snapSliderValue(rawValue, bounds) : clampNumber(rawValue, bounds.min, bounds.max)
+			updateVisualValue(displayValue)
+			if (config.updateNumber !== false) number.value = formatSliderNumber(displayValue, bounds)
+			return displayValue
+		}
+
+		const animateSliderTo = function (targetValue) {
+			cancelSnapAnimation()
+			const startValue = getFiniteConfigNumber(range.value) ?? targetValue
+			const delta = targetValue - startValue
+			if (Math.abs(delta) < 0.00001 || typeof window === 'undefined' || typeof window.requestAnimationFrame !== 'function') {
+				updateVisualValue(targetValue)
+				return
+			}
+			const getTime = function () { return (typeof performance !== 'undefined' && typeof performance.now === 'function') ? performance.now() : Date.now() }
+			const startTime = getTime()
+			const duration = 140
+			const tick = function () {
+				const elapsed = getTime() - startTime
+				const progress = clampNumber(elapsed / duration, 0, 1)
+				const eased = 1 - Math.pow(1 - progress, 3)
+				updateVisualValue(startValue + delta * eased)
+				if (progress < 1) {
+					snapAnimationFrame = window.requestAnimationFrame(tick)
+				} else {
+					snapAnimationFrame = 0
+					updateVisualValue(targetValue)
+				}
+			}
+			snapAnimationFrame = window.requestAnimationFrame(tick)
+		}
+
+		const commitSliderValue = function (nextValue) {
+			const snapped = snapSliderValue(nextValue, bounds)
+			number.value = formatSliderNumber(snapped, bounds)
+			syncValueLabel(snapped)
+			animateSliderTo(snapped)
+			return snapped
+		}
+
+		range.addEventListener('input', function () {
+			setSliderValue(range.value, { snap: false })
+		})
+		range.addEventListener('change', function () {
+			commitSliderValue(range.value)
+		})
+		number.addEventListener('input', function () {
+			setSliderValue(number.value, { snap: false, updateNumber: false })
+		})
+		number.addEventListener('change', function () {
+			commitSliderValue(number.value)
+		})
+		setSliderValue(bounds.value, { snap: true })
 
 		root.readConfigValue = function () {
-			return readNumberConfigValue(item, number.value, type, { enforceRange: true, min: bounds.min, max: bounds.max })
+			const current = getFiniteConfigNumber(number.value)
+			if (current === null) return readNumberConfigValue(item, number.value, type, { enforceRange: true, min: bounds.min, max: bounds.max })
+			const snapped = snapSliderValue(current, bounds)
+			return readNumberConfigValue(item, formatSliderNumber(snapped, bounds), type, { enforceRange: true, min: bounds.min, max: bounds.max })
 		}
 
 		Object.defineProperty(root, 'disabled', {
@@ -1323,10 +1479,18 @@
 				root.dataset.disabled = value ? 'true' : 'false'
 				range.disabled = !!value
 				number.disabled = !!value
+				if (value) cancelSnapAnimation()
 			}
 		})
 
-		root.append(range, number)
+		if (hasValueLabels) {
+			for (const labelValue of getSliderLabelValues(item, bounds)) {
+				labels.appendChild(element('span', '', getSliderValueLabel(item, labelValue) || formatSliderNumber(labelValue, bounds)))
+			}
+			root.append(range, number, labels, valueLabel)
+		} else {
+			root.append(range, number)
+		}
 		return root
 	}
 	const normalizePanelHexColor = function (value) {
