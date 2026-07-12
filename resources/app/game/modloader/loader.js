@@ -627,13 +627,13 @@
 			#modloader-panel.modloader-panel-theme-light .modloader-mod-toolbar { background: rgba(248,248,246,.96); }
 			#modloader-panel.modloader-panel-theme-light .modloader-mod-row, #modloader-panel.modloader-panel-theme-light .modloader-panel-log, #modloader-panel.modloader-panel-theme-light .modloader-import-zone { border-color: rgba(0,0,0,.1); background: rgba(0,0,0,.035); }
 			#modloader-panel.modloader-panel-theme-light .modloader-mod-name, #modloader-panel.modloader-panel-theme-light .modloader-mod-version, #modloader-panel.modloader-panel-theme-light .modloader-mod-meta, #modloader-panel.modloader-panel-theme-light .modloader-config-meta { color: rgba(18,20,22,.58); }
-			#modloader-panel.modloader-panel-theme-light input.modloader-config-input:not([type="checkbox"]), #modloader-panel.modloader-panel-theme-light textarea.modloader-config-input, #modloader-panel.modloader-panel-theme-light select.modloader-config-input, #modloader-panel.modloader-panel-theme-light .modloader-panel-settings-number, #modloader-panel.modloader-panel-theme-light .modloader-resource-color-text { background: rgba(0,0,0,.045); border-color: rgba(0,0,0,.14); color: rgba(18,20,22,.92); }
+			#modloader-panel.modloader-panel-theme-light input.modloader-config-input:not([type="checkbox"]), #modloader-panel.modloader-panel-theme-light textarea.modloader-config-input, #modloader-panel.modloader-panel-theme-light select.modloader-config-input, #modloader-panel.modloader-panel-theme-light .modloader-panel-settings-number, #modloader-panel.modloader-panel-theme-light .modloader-resource-color-text, #modloader-panel.modloader-panel-theme-light .modloader-color-text { background: rgba(0,0,0,.045); border-color: rgba(0,0,0,.14); color: rgba(18,20,22,.92); }
 			#modloader-panel.modloader-panel-theme-light .modloader-config-slider-number { background: rgba(0,0,0,.045); border-color: rgba(0,0,0,.14); color: rgba(18,20,22,.92); }
 			#modloader-panel.modloader-panel-theme-light .modloader-config-slider-labels, #modloader-panel.modloader-panel-theme-light .modloader-config-slider-value { color: rgba(18,20,22,.58); }
 			#modloader-panel.modloader-panel-theme-light .modloader-config-slider-range::-webkit-slider-runnable-track { background: linear-gradient(90deg, rgba(18,20,22,.52) 0 var(--modloader-slider-fill, 0%), rgba(0,0,0,.12) var(--modloader-slider-fill, 0%) 100%); box-shadow: inset 0 1px 2px rgba(0,0,0,.18); }
 			#modloader-panel.modloader-panel-theme-light .modloader-config-slider-range::-moz-range-track { background: rgba(0,0,0,.12); box-shadow: inset 0 1px 2px rgba(0,0,0,.18); }
 			#modloader-panel.modloader-panel-theme-light .modloader-config-slider-range::-moz-range-progress { background: rgba(18,20,22,.52); }
-			#modloader-panel.modloader-panel-theme-light .modloader-action-button, #modloader-panel.modloader-panel-theme-light .modloader-modal-button, #modloader-panel.modloader-panel-theme-light .modloader-resource-color-reset, #modloader-panel.modloader-panel-theme-light .modloader-resource-color-share-button { background: rgba(0,0,0,.055); border-color: rgba(0,0,0,.12); color: rgba(18,20,22,.78); }
+			#modloader-panel.modloader-panel-theme-light .modloader-action-button, #modloader-panel.modloader-panel-theme-light .modloader-modal-button, #modloader-panel.modloader-panel-theme-light .modloader-resource-color-reset, #modloader-panel.modloader-panel-theme-light .modloader-resource-color-share-button, #modloader-panel.modloader-panel-theme-light .modloader-color-reset { background: rgba(0,0,0,.055); border-color: rgba(0,0,0,.12); color: rgba(18,20,22,.78); }
 			#modloader-panel.modloader-panel-theme-light .modloader-resource-color-share-status { color: rgba(18,20,22,.54); }
 			#modloader-panel.modloader-panel-theme-light .modloader-panel-tab { background: rgba(248,248,246,.95); border-color: rgba(0,0,0,.12); }
 			#modloader-panel .modloader-panel-summary { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px 12px; margin: 8px 0 12px; }
@@ -759,6 +759,12 @@
 			#modloader-panel .modloader-config-field-invalid .modloader-config-input { border-color: rgba(255, 96, 96, .72); }
 			#modloader-panel .modloader-config-error { display: none; grid-column: 2; color: #ffb0b0; font-size: 11px; }
 			#modloader-panel .modloader-config-error.active { display: block; }
+			#modloader-panel .modloader-color-input { display: grid; grid-template-columns: 34px minmax(0, 1fr) auto; gap: 8px; align-items: center; min-width: 0; }
+			#modloader-panel .modloader-color-picker { width: 30px; height: 28px; box-sizing: border-box; border: 1px solid rgba(255,255,255,.18); border-radius: 5px; padding: 0; background: transparent; color: inherit; cursor: pointer; }
+			#modloader-panel .modloader-color-text { box-sizing: border-box; width: 100%; min-width: 0; border: 1px solid rgba(255,255,255,.16); border-radius: 5px; padding: 5px 6px; background: rgba(0,0,0,.22); color: rgba(255,255,255,.92); outline: none; }
+			#modloader-panel .modloader-color-text:focus { border-color: rgba(207, 233, 255, .5); }
+			#modloader-panel .modloader-color-reset { border: 1px solid rgba(255,255,255,.14); border-radius: 5px; padding: 5px 7px; background: rgba(255,255,255,.08); color: rgba(255,255,255,.78); cursor: pointer; }
+			#modloader-panel .modloader-color-reset:hover { background: rgba(255,255,255,.14); color: rgba(255,255,255,.94); }
 			#modloader-panel .modloader-resource-colors { display: grid; gap: 6px; min-width: 0; }
 			#modloader-panel .modloader-resource-color-tools { display: flex; align-items: center; gap: 7px; min-width: 0; margin-bottom: 2px; }
 			#modloader-panel .modloader-resource-color-share-button { border: 1px solid rgba(255,255,255,.14); border-radius: 5px; padding: 5px 7px; background: rgba(255,255,255,.08); color: rgba(255,255,255,.78); cursor: pointer; }
@@ -1104,6 +1110,10 @@
 	}
 	const isResourceColorsConfigType = function (type) {
 		return type === 'resourcecolors' || type === 'resource-colors' || type === 'resource_glow_colors' || type === 'resourcecolorpalette' || type === 'resource-color-palette' || type === 'colorpalette' || type === 'color-palette'
+	}
+
+	const isColorConfigType = function (type) {
+		return type === 'color' || type === 'colour' || type === 'hexcolor' || type === 'hex-color'
 	}
 
 	const isNumberConfigType = function (type) {
@@ -1736,9 +1746,91 @@
 		const fullMatch = text.match(/^#?([0-9a-f]{6})$/i)
 		return fullMatch ? '#' + fullMatch[1].toUpperCase() : ''
 	}
+
+	const getColorConfigDisplayDefault = function (item) {
+		return normalizePanelHexColor(item?.defaultColor) || normalizePanelHexColor(item?.colorDefault) || normalizePanelHexColor(item?.default) || '#FFFFFF'
+	}
+
+	const createColorConfigInput = function (item, value) {
+		const root = element('div', 'modloader-color-input modloader-config-input')
+		const displayDefault = getColorConfigDisplayDefault(item)
+		const allowAuto = item?.allowAuto === true
+		let auto = allowAuto && !normalizePanelHexColor(value)
+		const picker = element('input', 'modloader-color-picker')
+		picker.type = 'color'
+		picker.value = normalizePanelHexColor(value) || displayDefault
+
+		const textInput = element('input', 'modloader-color-text')
+		textInput.type = 'text'
+		textInput.spellcheck = false
+		textInput.value = auto ? '' : (normalizePanelHexColor(value) || displayDefault)
+
+		const reset = element('button', 'modloader-color-reset', getInlineLocalizedText(CONFIG_INLINE_TEXT.reset))
+		reset.type = 'button'
+		reset.title = getInlineLocalizedText(CONFIG_INLINE_TEXT.resetTitle)
+
+		const getAutoPlaceholder = function () {
+			return pickLocalizedText(item?.autoLabel, getLocaleCandidates()) || displayDefault
+		}
+		const syncAutoPlaceholder = function () {
+			textInput.placeholder = auto ? getAutoPlaceholder() : ''
+		}
+		const setAuto = function () {
+			auto = allowAuto
+			picker.value = displayDefault
+			textInput.value = auto ? '' : displayDefault
+			syncAutoPlaceholder()
+		}
+		const markManual = function () {
+			auto = false
+			syncAutoPlaceholder()
+		}
+
+		syncAutoPlaceholder()
+		picker.addEventListener('input', function () {
+			markManual()
+			textInput.value = picker.value.toUpperCase()
+			root.dispatchEvent(new Event('input', { bubbles: true }))
+		})
+		textInput.addEventListener('input', function () {
+			if (allowAuto && String(textInput.value || '').trim() === '') {
+				setAuto()
+				return
+			}
+			markManual()
+			const color = normalizePanelHexColor(textInput.value)
+			if (color) picker.value = color
+		})
+		reset.addEventListener('click', function (event) {
+			event.preventDefault()
+			setAuto()
+			root.dispatchEvent(new Event('input', { bubbles: true }))
+		})
+
+		root.readConfigValue = function () {
+			if (auto) return ''
+			const color = normalizePanelHexColor(textInput.value)
+			if (!color) throw new Error('Enter colors as #RRGGBB.')
+			return color
+		}
+
+		Object.defineProperty(root, 'disabled', {
+			get() { return root.dataset.disabled === 'true' },
+			set(value) {
+				root.dataset.disabled = value ? 'true' : 'false'
+				picker.disabled = !!value
+				textInput.disabled = !!value
+				reset.disabled = !!value
+			}
+		})
+
+		root.append(picker, textInput, reset)
+		return root
+	}
 	const createConfigInput = function (item, value) {
 		const type = getConfigType(item)
 		if (isResourceColorsConfigItem(item, type)) return createResourceColorsInput(item, value)
+		if (isColorConfigType(type)) return createColorConfigInput(item, value)
 		if (isSliderConfigItem(item, type)) return createSliderConfigInput(item, value, type)
 		const input = element(type === 'array' || type === 'object' ? 'textarea' : 'input', 'modloader-config-input')
 		if (type === 'boolean') {

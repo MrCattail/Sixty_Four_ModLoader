@@ -5,6 +5,7 @@
 	const rendererFailedKey = '__cattailChasmLineRendererFailed'
 	const enableConfigKey = 'enableChasmLineRenderer'
 	const modeConfigKey = 'chasmLineRendererMode'
+	const ignoreDistanceConfigKey = 'enableChasmLineDistanceOverride'
 	const modeCanvas = 0
 	const modeWebgl = 1
 	const curveSegments = 64
@@ -23,21 +24,28 @@
 		window[installedKey] = true
 		api.patch(Game.prototype, 'renderChasm', function (original) {
 			return function (...args) {
-				if (!shouldUseWebglChasmLines(this, api)) return original.apply(this, args)
-				const segments = collectChasmLineSegments(this)
+				const ignoreDistance = shouldIgnoreChasmLineDistance(this, api)
+				const rendererEnabled = isChasmLineRendererEnabled(api)
+				const mode = normalizeChasmLineMode(api.config.get(modeConfigKey, modeWebgl))
+				if (!rendererEnabled && !ignoreDistance) return original.apply(this, args)
+				const segments = collectChasmLineSegments(this, { ignoreDistance })
 				if (!segments) return original.apply(this, args)
-				if (renderChasmLineSegmentsWebgl(this, segments)) return
+				if (rendererEnabled && mode === modeWebgl && renderChasmLineSegmentsWebgl(this, segments)) return
+				if (ignoreDistance) {
+					drawChasmLineSegmentsCanvas(this, segments)
+					return
+				}
 				return original.apply(this, args)
 			}
 		})
 	}
 
-	function shouldUseWebglChasmLines(game, api) {
-		return !!(
-			game &&
-			api.config.get(enableConfigKey, true) !== false &&
-			normalizeChasmLineMode(api.config.get(modeConfigKey, modeWebgl)) === modeWebgl
-		)
+	function isChasmLineRendererEnabled(api) {
+		return api.config.get(enableConfigKey, true) !== false
+	}
+
+	function shouldIgnoreChasmLineDistance(game, api) {
+		return !!game && api.config.get(ignoreDistanceConfigKey, false) === true
 	}
 
 	function normalizeChasmLineMode(value) {
@@ -48,9 +56,10 @@
 		return Number.isFinite(number) && number <= 0 ? modeCanvas : modeWebgl
 	}
 
-	function collectChasmLineSegments(game) {
+	function collectChasmLineSegments(game, options = {}) {
 		if (!game?.chasm || !game.ctx || typeof game.uvToXYUntranslated !== 'function') return null
-		if (typeof game.isVisible === 'function' && !game.isVisible(game.chasm)) return []
+		const ignoreDistance = options.ignoreDistance === true
+		if (!ignoreDistance && typeof game.isVisible === 'function' && !game.isVisible(game.chasm)) return []
 		if (!Array.isArray(game.resources) || !Array.isArray(game.resourceHomes)) return null
 
 		const unit = game.unit || 1
@@ -80,6 +89,23 @@
 		}
 
 		return segments
+	}
+
+	function drawChasmLineSegmentsCanvas(game, segments) {
+		const ctx = game?.ctx
+		if (!ctx) return false
+		ctx.save()
+		for (let i = 0; i < segments.length; i++) {
+			const segment = segments[i]
+			ctx.strokeStyle = segment.color
+			ctx.lineWidth = Math.max(0.5, Number(segment.width) || 1)
+			ctx.beginPath()
+			ctx.moveTo(segment.p0[0], segment.p0[1])
+			ctx.bezierCurveTo(segment.p1[0], segment.p1[1], segment.p2[0], segment.p2[1], segment.p3[0], segment.p3[1])
+			ctx.stroke()
+		}
+		ctx.restore()
+		return true
 	}
 
 	function getChasmLineDeltas(unit) {
