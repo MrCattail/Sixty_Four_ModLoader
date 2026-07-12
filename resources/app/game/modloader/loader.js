@@ -652,8 +652,9 @@
 			#modloader-panel .modloader-panel-note { color: rgba(255,255,255,.7); }
 			#modloader-panel .modloader-panel-reload-note { display: none; color: #ffe1a3; }
 			#modloader-panel .modloader-panel-reload-note.active { display: inline; }
-			#modloader-panel .modloader-panel-config-note { display: none; color: #cfe9ff; }
-			#modloader-panel .modloader-panel-config-note.active { display: inline; }
+			#modloader-panel .modloader-panel-config-note { position: absolute; right: 2px; top: calc(100% + 2px); display: block; box-sizing: border-box; max-width: min(520px, calc(100% - 16px)); overflow: hidden; border-radius: 999px; padding: 3px 8px; background: rgba(8,10,12,.88); color: rgba(207,233,255,.88); box-shadow: 0 5px 14px rgba(0,0,0,.22); opacity: 0; pointer-events: none; text-overflow: ellipsis; white-space: nowrap; transform: translateY(-3px); transition: opacity .14s ease, transform .14s ease; }
+			#modloader-panel .modloader-panel-config-note.active { opacity: 1; transform: translateY(0); }
+			#modloader-panel.modloader-panel-theme-light .modloader-panel-config-note { border: 1px solid rgba(0,0,0,.08); background: rgba(248,248,246,.96); color: rgba(18,20,22,.58); box-shadow: 0 5px 14px rgba(0,0,0,.12); }
 			#modloader-panel .modloader-save-button { border: 0; border-radius: 6px; padding: 7px 10px; background: #f2f2ed; color: #111; cursor: pointer; }
 			#modloader-panel .modloader-save-button:disabled { cursor: default; opacity: .45; }
 			#modloader-panel .modloader-toolbar-actions { display: inline-flex; align-items: center; gap: 6px; flex: 0 0 auto; }
