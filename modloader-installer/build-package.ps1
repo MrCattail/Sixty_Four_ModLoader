@@ -14,6 +14,16 @@ function New-DirectoryIfMissing {
 	}
 }
 
+function Get-LoaderVersionFromText {
+	param([string]$Text)
+
+	if ($Text -match 'version\s*:\s*[''"]([^''"]+)[''"]') {
+		return $Matches[1].Trim()
+	}
+
+	return '0.0.0'
+}
+
 
 function Copy-DirectoryFiltered {
 	param(
@@ -78,6 +88,15 @@ if ($CleanEnabled) {
 	"{`r`n  `"mods`": []`r`n}" | Set-Content -LiteralPath $cleanEnabledPath -Encoding ASCII -NoNewline
 }
 
+$loaderVersion = Get-LoaderVersionFromText -Text (Get-Content -LiteralPath (Join-Path $stagingRoot 'resources\app\game\modloader\loader.js') -Raw -Encoding UTF8)
+$packageManifest = [ordered]@{
+	id = 'sixtyfour-modloader'
+	name = "Cattail's ModLoader"
+	version = $loaderVersion
+	packageFormat = 1
+}
+$packageManifest | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath (Join-Path $stagingRoot 'modloader-installer\modloader-package.json') -Encoding ASCII
+
 $packageReadme = @'
 # Sixty Four ModLoader
 
@@ -97,9 +116,11 @@ Sixty Four source files; the installer patches the local game files in place.
 
 To update an existing install without manually extracting over the game folder:
 
-1. Put the new `SixtyFour-ModLoader.zip` in `modloader-installer`.
+1. Put any newer ModLoader zip in `modloader-installer`; the file name does not matter.
 2. Double-click `modloader-installer\update.cmd`.
-3. Choose whether the package mods should replace the current mods folder.
+3. The updater scans all zip files there and uses the newest ModLoader package.
+4. Choose whether the package mods should replace the current mods folder.
+5. After a successful update, choose whether to delete the zip package that was used.
 
 ## Command-Line Install
 

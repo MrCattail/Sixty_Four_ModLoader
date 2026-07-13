@@ -17,7 +17,7 @@ For most players:
 3. Double-click `Install ModLoader.cmd`.
 4. Start the game and press `Ctrl+M`.
 
-Use `modloader-installer\update.cmd` to update from a new `SixtyFour-ModLoader.zip`,
+Use `modloader-installer\update.cmd` to update from any newer ModLoader zip,
 `modloader-installer\Uninstall ModLoader.cmd` to restore the latest install backup, or
 `modloader-installer\Verify ModLoader.cmd` to check the loader hooks.
 
@@ -25,14 +25,18 @@ Use `modloader-installer\update.cmd` to update from a new `SixtyFour-ModLoader.z
 
 For installed players:
 
-1. Put the new `SixtyFour-ModLoader.zip` in `modloader-installer`.
+1. Put any newer ModLoader zip in `modloader-installer`. The file name does not matter.
 2. Double-click `update.cmd`.
-3. Choose whether the package `mods` folder should replace the current `mods`
+3. The updater scans all zip files there, ignores non-ModLoader or older packages,
+   and uses the newest ModLoader package it can find.
+4. Choose whether the package `mods` folder should replace the current `mods`
    folder.
+5. After a successful update, choose whether to delete the zip package that was
+   just used.
 
-Choose **Yes** only when you want the package mods to fully replace the current
-mods folder. Choose **No** to update ModLoader while leaving the current mods
-folder untouched.
+Choose **Yes** on the mods prompt only when you want the package mods to fully
+replace the current mods folder. Choose **No** to update ModLoader while leaving
+the current mods folder untouched.
 
 Command-line options:
 
@@ -40,7 +44,7 @@ Command-line options:
 powershell -NoProfile -ExecutionPolicy Bypass -File .\modloader-installer\update.ps1 -GameRoot "D:\Steam\steamapps\common\Sixty Four\win-unpacked"
 ```
 
-Use `-ReplaceMods` or `-PreserveMods` to skip the prompt.
+Use `-ReplaceMods` or `-PreserveMods` to skip the mods prompt. Use `-DeletePackage` or `-KeepPackage` to skip the post-update package cleanup prompt.
 
 ## Install
 

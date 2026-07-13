@@ -2,7 +2,9 @@ param(
 	[string]$GameRoot,
 	[string]$ZipPath,
 	[switch]$ReplaceMods,
-	[switch]$PreserveMods
+	[switch]$PreserveMods,
+	[switch]$DeletePackage,
+	[switch]$KeepPackage
 )
 
 $ErrorActionPreference = 'Stop'
@@ -48,31 +50,212 @@ function Copy-DirectoryContents {
 	}
 }
 
+function Normalize-ZipPath {
+	param([string]$Path)
+
+	return ($Path -replace '\\', '/').TrimStart('/')
+}
+
+function Read-ZipEntryText {
+	param($Entry)
+
+	$stream = $Entry.Open()
+	try {
+		$reader = [System.IO.StreamReader]::new($stream, [System.Text.Encoding]::UTF8, $true)
+		try {
+			return $reader.ReadToEnd()
+		} finally {
+			$reader.Dispose()
+		}
+	} finally {
+		if ($stream) {
+			$stream.Dispose()
+		}
+	}
+}
+
+function Get-LoaderVersionFromText {
+	param([string]$Text)
+
+	if ($Text -match 'version\s*:\s*[''"]([^''"]+)[''"]') {
+		return $Matches[1].Trim()
+	}
+
+	return ''
+}
+
+function Get-InstalledModLoaderVersion {
+	param([string]$Root)
+
+	$loaderPath = Join-Path $Root 'resources\app\game\modloader\loader.js'
+	if (-not (Test-Path -LiteralPath $loaderPath)) {
+		return '0.0.0'
+	}
+
+	return Get-LoaderVersionFromText -Text (Get-Content -LiteralPath $loaderPath -Raw -Encoding UTF8)
+}
+
+function Get-VersionParts {
+	param([string]$Version)
+
+	$match = [regex]::Match([string]$Version, '\d+(?:\.\d+){0,3}')
+	if (-not $match.Success) {
+		return $null
+	}
+
+	$parts = @($match.Value -split '\.' | ForEach-Object { [int]$_ })
+	while ($parts.Count -lt 4) {
+		$parts += 0
+	}
+
+	return ,$parts[0..3]
+}
+
+function Compare-VersionText {
+	param(
+		[string]$Left,
+		[string]$Right
+	)
+
+	$leftParts = Get-VersionParts -Version $Left
+	$rightParts = Get-VersionParts -Version $Right
+	if (-not $leftParts -and -not $rightParts) {
+		return [string]::Compare($Left, $Right, [System.StringComparison]::OrdinalIgnoreCase)
+	}
+	if (-not $leftParts) { return -1 }
+	if (-not $rightParts) { return 1 }
+
+	for ($i = 0; $i -lt 4; $i++) {
+		if ($leftParts[$i] -gt $rightParts[$i]) { return 1 }
+		if ($leftParts[$i] -lt $rightParts[$i]) { return -1 }
+	}
+
+	return 0
+}
+
+function Get-VersionSortKey {
+	param([string]$Version)
+
+	$parts = Get-VersionParts -Version $Version
+	if (-not $parts) {
+		return '00000000.00000000.00000000.00000000'
+	}
+
+	return ('{0:D8}.{1:D8}.{2:D8}.{3:D8}' -f $parts[0], $parts[1], $parts[2], $parts[3])
+}
+
+function Get-PackageInfoFromZip {
+	param([string]$Path)
+
+	$file = Get-Item -LiteralPath $Path
+	Add-Type -AssemblyName System.IO.Compression.FileSystem
+	$zip = [System.IO.Compression.ZipFile]::OpenRead($file.FullName)
+	try {
+		$entriesByPath = @{}
+		foreach ($entry in $zip.Entries) {
+			if (-not $entry.FullName) { continue }
+			$normalized = Normalize-ZipPath -Path $entry.FullName
+			if (-not $normalized) { continue }
+			$entriesByPath[$normalized.ToLowerInvariant()] = $entry
+		}
+
+		$loaderSuffix = 'resources/app/game/modloader/loader.js'
+		$roots = @()
+		foreach ($entryPath in $entriesByPath.Keys) {
+			if ($entryPath.EndsWith($loaderSuffix)) {
+				$roots += $entryPath.Substring(0, $entryPath.Length - $loaderSuffix.Length)
+			}
+		}
+
+		$packages = @()
+		foreach ($root in @($roots | Sort-Object -Unique)) {
+			$installKey = ($root + 'modloader-installer/install.ps1').ToLowerInvariant()
+			$patchKey = ($root + 'modloader-installer/patch-source.ps1').ToLowerInvariant()
+			$loaderKey = ($root + $loaderSuffix).ToLowerInvariant()
+			if (-not $entriesByPath.ContainsKey($installKey) -or -not $entriesByPath.ContainsKey($patchKey) -or -not $entriesByPath.ContainsKey($loaderKey)) {
+				continue
+			}
+
+			$version = ''
+			$manifestKey = ($root + 'modloader-installer/modloader-package.json').ToLowerInvariant()
+			if ($entriesByPath.ContainsKey($manifestKey)) {
+				try {
+					$manifest = Read-ZipEntryText -Entry $entriesByPath[$manifestKey] | ConvertFrom-Json
+					if ($manifest.id -and $manifest.id -ne 'sixtyfour-modloader') {
+						continue
+					}
+					$version = [string]$manifest.version
+				} catch {
+					$version = ''
+				}
+			}
+			if (-not $version) {
+				$version = Get-LoaderVersionFromText -Text (Read-ZipEntryText -Entry $entriesByPath[$loaderKey])
+			}
+			if (-not $version) {
+				continue
+			}
+
+			$packages += [pscustomobject]@{
+				Path = $file.FullName
+				Version = $version
+				VersionKey = Get-VersionSortKey -Version $version
+				LastWriteTimeUtc = $file.LastWriteTimeUtc
+				PackageRoot = $root.TrimEnd('/')
+			}
+		}
+
+		if (-not $packages) {
+			return $null
+		}
+
+		return $packages | Sort-Object @{ Expression = 'VersionKey'; Descending = $true }, @{ Expression = 'LastWriteTimeUtc'; Descending = $true } | Select-Object -First 1
+	} finally {
+		$zip.Dispose()
+	}
+}
+
 function Find-PackageZip {
-	param([string]$ExplicitZipPath)
+	param(
+		[string]$ExplicitZipPath,
+		[string]$CurrentVersion
+	)
 
 	if ($ExplicitZipPath) {
 		$resolved = Resolve-Path -LiteralPath $ExplicitZipPath
-		return $resolved.Path
+		$info = Get-PackageInfoFromZip -Path $resolved.Path
+		if (-not $info) {
+			throw 'The selected zip is not a Sixty Four ModLoader package.'
+		}
+		if ((Compare-VersionText -Left $info.Version -Right $CurrentVersion) -le 0) {
+			throw "The selected package version ($($info.Version)) is not newer than the installed ModLoader version ($CurrentVersion)."
+		}
+		return $info
 	}
 
-	$exactNames = @('sixtyfour-modloader.zip', 'SixtyFour-ModLoader.zip')
-	foreach ($name in $exactNames) {
-		$candidate = Join-Path $PSScriptRoot $name
-		if (Test-Path -LiteralPath $candidate) {
-			return (Resolve-Path -LiteralPath $candidate).Path
+	$zipFiles = @(Get-ChildItem -LiteralPath $PSScriptRoot -File -Filter '*.zip')
+	if (-not $zipFiles) {
+		throw 'Could not find any zip package next to update.cmd. Put the new ModLoader zip in modloader-installer and run update.cmd again.'
+	}
+
+	$packages = @()
+	foreach ($zipFile in $zipFiles) {
+		try {
+			$info = Get-PackageInfoFromZip -Path $zipFile.FullName
+			if ($info) {
+				$packages += $info
+			}
+		} catch {
+			Write-Host "Skipping unreadable zip: $($zipFile.Name)" -ForegroundColor DarkGray
 		}
 	}
 
-	$matches = Get-ChildItem -LiteralPath $PSScriptRoot -File -Filter '*.zip' | Where-Object {
-		$_.Name -match '^sixty[-_]?four[-_]?modloader.*\.zip$'
-	} | Sort-Object LastWriteTimeUtc -Descending
-
-	if (-not $matches) {
-		throw 'Could not find sixtyfour-modloader.zip next to update.cmd. Put the new ModLoader zip in modloader-installer and run update.cmd again.'
+	$newerPackages = @($packages | Where-Object { (Compare-VersionText -Left $_.Version -Right $CurrentVersion) -gt 0 })
+	if (-not $newerPackages) {
+		throw "Could not find a newer Sixty Four ModLoader package in modloader-installer. Installed version: $CurrentVersion"
 	}
 
-	return $matches[0].FullName
+	return $newerPackages | Sort-Object @{ Expression = 'VersionKey'; Descending = $true }, @{ Expression = 'LastWriteTimeUtc'; Descending = $true } | Select-Object -First 1
 }
 
 function Find-PackageRoot {
@@ -125,12 +308,53 @@ function Ask-ReplaceMods {
 	}
 }
 
+function Get-DeletePackagePromptText {
+	param([string]$PackagePath)
+
+	return (-join @(
+		[char]0x662f, [char]0x5426,
+		[char]0x5220, [char]0x9664,
+		[char]0x521a, [char]0x624d,
+		[char]0x4f7f, [char]0x7528,
+		[char]0x7684,
+		[char]0x5b89, [char]0x88c5,
+		[char]0x5305, [char]0xff1f
+	)) + "`n$PackagePath"
+}
+
+function Ask-DeletePackage {
+	param([string]$PackagePath)
+
+	if ($DeletePackage) { return $true }
+	if ($KeepPackage) { return $false }
+
+	$message = Get-DeletePackagePromptText -PackagePath $PackagePath
+	try {
+		Add-Type -AssemblyName System.Windows.Forms
+		$result = [System.Windows.Forms.MessageBox]::Show(
+			$message,
+			'Sixty Four ModLoader Update',
+			[System.Windows.Forms.MessageBoxButtons]::YesNo,
+			[System.Windows.Forms.MessageBoxIcon]::Question
+		)
+		return $result -eq [System.Windows.Forms.DialogResult]::Yes
+	} catch {
+		$answer = Read-Host "$message [Y/N]"
+		return $answer -match '^(y|yes)$'
+	}
+}
+
 if ($ReplaceMods -and $PreserveMods) {
 	throw 'Use either -ReplaceMods or -PreserveMods, not both.'
 }
+if ($DeletePackage -and $KeepPackage) {
+	throw 'Use either -DeletePackage or -KeepPackage, not both.'
+}
 
 $targetRoot = Resolve-GameRoot -Path $GameRoot
-$zip = Find-PackageZip -ExplicitZipPath $ZipPath
+$currentVersion = Get-InstalledModLoaderVersion -Root $targetRoot
+$package = Find-PackageZip -ExplicitZipPath $ZipPath -CurrentVersion $currentVersion
+$zip = $package.Path
 $stamp = Get-Date -Format 'yyyyMMdd-HHmmss'
 $tempRoot = Join-Path ([System.IO.Path]::GetTempPath()) "SixtyFour-ModLoader-Update-$stamp"
 
@@ -141,6 +365,8 @@ try {
 	New-DirectoryIfMissing -Path $tempRoot
 
 	Write-Host "Using package: $zip"
+	Write-Host "Installed ModLoader version: $currentVersion"
+	Write-Host "Package ModLoader version: $($package.Version)"
 	Write-Host "Extracting package..."
 	Expand-Archive -LiteralPath $zip -DestinationPath $tempRoot -Force
 	$packageRoot = Find-PackageRoot -ExtractRoot $tempRoot
@@ -175,6 +401,10 @@ try {
 
 	Write-Host ''
 	Write-Host 'ModLoader update completed.'
+	if (Ask-DeletePackage -PackagePath $zip) {
+		Remove-Item -LiteralPath $zip -Force
+		Write-Host "Deleted package: $zip"
+	}
 } finally {
 	if (Test-Path -LiteralPath $tempRoot) {
 		Remove-Item -LiteralPath $tempRoot -Recurse -Force
