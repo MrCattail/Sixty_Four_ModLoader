@@ -764,6 +764,8 @@
 			#modloader-panel .modloader-mod-config-scroll::-webkit-scrollbar-thumb:hover { background: rgba(210,210,210,.62); }
 			#modloader-panel .modloader-mod-config-scroll .modloader-config-field:first-child { margin-top: 0; }
 			#modloader-panel .modloader-config-field { display: grid; grid-template-columns: minmax(130px, .8fr) minmax(170px, 1fr); gap: 4px 10px; align-items: center; margin-top: 6px; }
+			#modloader-panel .modloader-config-section-start { margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(185,185,185,.18); }
+			#modloader-panel.modloader-panel-theme-light .modloader-config-section-start { border-top-color: rgba(18,20,22,.12); }
 			#modloader-panel .modloader-config-field-disabled { opacity: .52; }
 			#modloader-panel .modloader-config-text { min-width: 0; }
 			#modloader-panel .modloader-config-label { display: block; color: rgba(255,255,255,.86); overflow-wrap: anywhere; }
@@ -1555,6 +1557,13 @@
 		return { schema, values }
 	}
 
+	const getConfigSectionId = function (item) {
+		const raw = item?.section ?? item?.group ?? item?.feature ?? item?.configGroup ?? item?.category
+		if (raw === undefined || raw === null || raw === false) return ''
+		if (typeof raw === 'string' || typeof raw === 'number' || typeof raw === 'boolean') return String(raw)
+		if (isObject(raw)) return String(raw.id || raw.key || raw.name || raw.en || raw.sch || raw.modsch || '')
+		return ''
+	}
 	const formatConfigInputValue = function (value, type) {
 		if (value === undefined || value === null) {
 			if (type === 'array') return '[]'
@@ -3488,6 +3497,7 @@
 				row.style.top = Math.round(rect.top) + 'px'
 				row.style.width = Math.round(rect.width) + 'px'
 				row.style.height = Math.round(rect.height) + 'px'
+				panel.appendChild(row)
 				event.preventDefault()
 				event.stopPropagation()
 				moveHandler = function (moveEvent) {
@@ -3735,10 +3745,14 @@
 				configScroll.addEventListener('wheel', function (event) {
 					event.stopPropagation()
 				}, { passive: true })
+				let previousConfigSection = ''
 				for (const item of modConfig.schema) {
 					const type = getConfigType(item)
 					const value = modConfig.values[item.key]
 					const field = element('label', 'modloader-config-field')
+					const configSection = getConfigSectionId(item)
+					if (item.dividerBefore || item.separatorBefore || (configSection && previousConfigSection && configSection !== previousConfigSection)) field.classList.add('modloader-config-section-start')
+					previousConfigSection = configSection || ''
 					const text = element('span', 'modloader-config-text')
 					const localizedConfigLabel = getLocalizedConfigText(mod.manifest, item, 'label', item.key)
 					const localizedConfigDescription = getLocalizedConfigText(mod.manifest, item, 'description', '')

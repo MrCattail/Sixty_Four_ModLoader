@@ -40,21 +40,24 @@
       "label": "Reality auto collect",
       "default": true,
       "description": "Automatically collect ready Reality / soul power in the void world.",
-      "reloadPolicy": "hot"
+      "reloadPolicy": "hot",
+      "section": "realityAutoCollect"
     },
     "enableScanRealitySurges": {
       "type": "boolean",
       "label": "Scan reality surges",
       "default": true,
       "description": "Create random reality-plane surges when a supercritical kernel lands.",
-      "reloadPolicy": "hot"
+      "reloadPolicy": "hot",
+      "section": "scanRealitySurges"
     },
     "enableScanRealitySlider": {
       "type": "boolean",
       "label": "Supercritical kernel slider",
       "default": true,
       "description": "Show the supercritical kernel range and Reality infusion slider on its shop card.",
-      "reloadPolicy": "hot"
+      "reloadPolicy": "hot",
+      "section": "scanRealitySurges"
     },
     "surgeCount": {
       "type": "number",
@@ -64,7 +67,8 @@
       "max": 64,
       "step": 1,
       "description": "Number of random surges to create when a supercritical kernel lands.",
-      "reloadPolicy": "hot"
+      "reloadPolicy": "hot",
+      "section": "scanRealitySurges"
     },
     "surgeRadius": {
       "type": "number",
@@ -74,14 +78,16 @@
       "max": 64,
       "step": 1,
       "description": "Circular radius, in cells, used to search for empty reality-plane spawn spots.",
-      "reloadPolicy": "hot"
+      "reloadPolicy": "hot",
+      "section": "scanRealitySurges"
     },
     "enableSuperSilo": {
       "type": "boolean",
       "label": "Super Silo",
       "default": true,
       "description": "Keep activated silos filled with the configured long fill amount.",
-      "reloadPolicy": "hot"
+      "reloadPolicy": "hot",
+      "section": "superSilo"
     },
     "fillAmount": {
       "type": "number",
@@ -90,14 +96,16 @@
       "min": 1,
       "step": 1,
       "description": "Fill value assigned to activated silos.",
-      "reloadPolicy": "hot"
+      "reloadPolicy": "hot",
+      "section": "superSilo"
     },
     "enableHollowVentReality": {
       "type": "boolean",
       "label": "Hollow vent Reality source",
       "default": true,
       "description": "Let hollow vents grow Reality symbols that are automatically harvested through the void altar.",
-      "reloadPolicy": "hot"
+      "reloadPolicy": "hot",
+      "section": "hollowVentReality"
     },
     "ventRealityInterval": {
       "type": "number",
@@ -107,7 +115,8 @@
       "max": 3600,
       "step": 1,
       "description": "Seconds each hollow vent takes to grow a Reality symbol.",
-      "reloadPolicy": "hot"
+      "reloadPolicy": "hot",
+      "section": "hollowVentReality"
     },
     "ventRealityAmount": {
       "type": "number",
@@ -117,7 +126,8 @@
       "max": 1000000,
       "step": 0.01,
       "description": "Reality gained from each small hollow vent symbol.",
-      "reloadPolicy": "hot"
+      "reloadPolicy": "hot",
+      "section": "hollowVentReality"
     },
     "ventRealityLargeMultiplier": {
       "type": "number",
@@ -127,7 +137,8 @@
       "max": 1000000,
       "step": 0.1,
       "description": "Multiplier applied to the large hollow vent Reality output.",
-      "reloadPolicy": "hot"
+      "reloadPolicy": "hot",
+      "section": "hollowVentReality"
     }
   },
   "description": "Combines Auto Reality Collect, Scan Reality Surges, and Super Silo into one TweaksX mod.",

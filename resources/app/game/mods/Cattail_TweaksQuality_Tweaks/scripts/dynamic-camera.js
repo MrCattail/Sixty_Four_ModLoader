@@ -1,7 +1,9 @@
 (function () {
-	const MOD_ID = 'Cattail_TweaksQuality_Dynamic-Camera'
+	const MOD_ID = 'Cattail_TweaksQuality_Tweaks'
+	const LEGACY_MOD_ID = 'Cattail_TweaksQuality_Dynamic-Camera'
 	const installedKey = '__cattailDynamicCameraInstalled'
 	const stateKey = 'modloader:' + MOD_ID + ':state'
+	const legacyStateKey = 'modloader:' + LEGACY_MOD_ID + ':state'
 	const pitchConfigKey = 'cameraPitch'
 	const yawConfigKey = 'cameraYaw'
 	const legacyPitchConfigKey = 'defaultPitch'
@@ -29,6 +31,7 @@
 	ModLoader.register({
 		id: MOD_ID,
 		init(api) {
+			migrateLegacyDynamicCameraConfig(api)
 			api.on('afterVanillaScripts', function () {
 				installDynamicCamera(api)
 			})
@@ -294,7 +297,7 @@
 	function readSavedState(api) {
 		const defaults = createDefaultState(api)
 		try {
-			const parsed = JSON.parse(localStorage.getItem(stateKey) || 'null')
+			const parsed = JSON.parse(localStorage.getItem(stateKey) || localStorage.getItem(legacyStateKey) || 'null')
 			if (parsed && typeof parsed === 'object') {
 				if (!hasStoredConfig(pitchConfigKey)) defaults.pitch = clamp(Number(parsed.pitch), minPitch, maxPitch)
 				if (!hasStoredConfig(yawConfigKey)) defaults.yaw = normalizeRadians(Number(parsed.yaw) || 0)
@@ -473,23 +476,56 @@
 	}
 
 	function readNumberConfigWithFallback(api, key, legacyKey, fallback) {
-		if (hasStoredConfig(key)) return readStoredConfigNumber(key, fallback)
-		if (hasStoredConfig(legacyKey)) return readStoredConfigNumber(legacyKey, fallback)
+		if (hasStoredConfig(key)) return readStoredConfigNumber(MOD_ID, key, fallback)
+		if (hasStoredConfig(legacyKey)) return readStoredConfigNumber(MOD_ID, legacyKey, fallback)
+		if (hasLegacyStoredConfig(key)) return readStoredConfigNumber(LEGACY_MOD_ID, key, fallback)
+		if (hasLegacyStoredConfig(legacyKey)) return readStoredConfigNumber(LEGACY_MOD_ID, legacyKey, fallback)
 		const value = Number(api?.config?.get(key, fallback))
 		return Number.isFinite(value) ? value : fallback
 	}
 
+	function migrateLegacyDynamicCameraConfig(api) {
+		try {
+			migrateLegacyConfigValue('enableDynamicCamera', ['enableDynamicCamera'])
+			migrateLegacyConfigValue(pitchConfigKey, [pitchConfigKey, legacyPitchConfigKey])
+			migrateLegacyConfigValue(yawConfigKey, [yawConfigKey, legacyYawConfigKey])
+			if (localStorage.getItem(stateKey) === null) {
+				const legacyState = localStorage.getItem(legacyStateKey)
+				if (legacyState !== null) localStorage.setItem(stateKey, legacyState)
+			}
+		} catch (error) {}
+	}
+
+	function migrateLegacyConfigValue(targetKey, legacyKeys) {
+		if (localStorage.getItem(configStorageKey(MOD_ID, targetKey)) !== null) return
+		for (let i = 0; i < legacyKeys.length; i++) {
+			const legacyRaw = localStorage.getItem(configStorageKey(LEGACY_MOD_ID, legacyKeys[i]))
+			if (legacyRaw !== null) {
+				localStorage.setItem(configStorageKey(MOD_ID, targetKey), legacyRaw)
+				return
+			}
+		}
+	}
+
 	function hasStoredConfig(key) {
 		try {
-			return localStorage.getItem(configStorageKey(key)) !== null
+			return localStorage.getItem(configStorageKey(MOD_ID, key)) !== null
 		} catch (error) {
 			return false
 		}
 	}
 
-	function readStoredConfigNumber(key, fallback) {
+	function hasLegacyStoredConfig(key) {
 		try {
-			const raw = localStorage.getItem(configStorageKey(key))
+			return localStorage.getItem(configStorageKey(LEGACY_MOD_ID, key)) !== null
+		} catch (error) {
+			return false
+		}
+	}
+
+	function readStoredConfigNumber(modId, key, fallback) {
+		try {
+			const raw = localStorage.getItem(configStorageKey(modId, key))
 			const value = raw === null ? fallback : Number(JSON.parse(raw))
 			return Number.isFinite(value) ? value : fallback
 		} catch (error) {
@@ -497,8 +533,8 @@
 		}
 	}
 
-	function configStorageKey(key) {
-		return 'modloader:' + MOD_ID + ':config:' + key
+	function configStorageKey(modId, key) {
+		return 'modloader:' + modId + ':config:' + key
 	}
 
 	function isEnabled(api) {

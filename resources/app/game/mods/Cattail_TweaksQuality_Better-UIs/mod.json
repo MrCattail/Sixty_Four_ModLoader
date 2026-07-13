@@ -26,19 +26,22 @@
       "type": "boolean",
       "label": "Shop categories",
       "default": true,
-      "description": "Show the optional categorized compact building shop view."
+      "description": "Show the optional categorized compact building shop view.",
+      "section": "shopCategories"
     },
     "enableSaveSlots": {
       "type": "boolean",
       "label": "Save slots",
       "default": true,
-      "description": "Show the in-game save-slot page with import and export actions."
+      "description": "Show the in-game save-slot page with import and export actions.",
+      "section": "saveSlots"
     },
     "enableLanguageMenu": {
       "type": "boolean",
       "label": "Language menu",
       "default": true,
-      "description": "Use the scrollable language selection page on the splash menu."
+      "description": "Use the scrollable language selection page on the splash menu.",
+      "section": "languageMenu"
     }
   },
   "description": "Combines shop categories, save slots, and the language menu into one multi-entry interface quality mod.",

@@ -20,7 +20,8 @@
       "type": "string",
       "label": "Cookie direction password",
       "default": "",
-      "description": "Enter cookie to show the cookie direction indicator before Cookie Clicker is achieved."
+      "description": "Enter cookie to show the cookie direction indicator before Cookie Clicker is achieved.",
+      "section": "cookieDirectionPassword"
     },
     "resourceSourceLineRenderer": {
       "type": "slider",
@@ -43,7 +44,8 @@
         "sch": "选择资源来源连线的渲染方式。游戏中按 O 也会切换这个值。",
         "modsch": "选择资源来源连线的渲染方式。游戏中按 O 也会切换这个值。"
       },
-      "reloadPolicy": "hot"
+      "reloadPolicy": "hot",
+      "section": "resourceSourceLineRenderer"
     }
   },
   "description": "Adds Alt+Shift dynamic building detail panels and shop build-availability countdowns without modifying vanilla scripts.",

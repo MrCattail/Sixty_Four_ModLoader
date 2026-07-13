@@ -21,6 +21,7 @@
     "scripts/chasm-line-renderer.js",
     "scripts/floor-grid-lines.js",
     "scripts/play-time-counter.js",
+    "scripts/dynamic-camera.js",
     "scripts/shift-ctrl-zoom-disable.js",
     "scripts/view-distance.js"
   ],
@@ -28,7 +29,8 @@
     "Cattail_TweaksQuality_View-Distance",
     "Cattail_TweaksQuality_Ending-Skip",
     "Cattail_TweaksQuality_Accessibility-Buttons",
-    "Cattail_Tweaks_Explainer-Language-Fix"
+    "Cattail_Tweaks_Explainer-Language-Fix",
+    "Cattail_TweaksQuality_Dynamic-Camera"
   ],
   "config": {
     "enableExplainerFix": {
@@ -36,47 +38,62 @@
       "label": "Explainer fix",
       "default": true,
       "description": "Refresh pulsing explainer hints after language changes and use readable light text in the void.",
-      "reloadPolicy": "hot"
+      "reloadPolicy": "hot",
+      "section": "explainerFix"
     },
     "enableEndingSkip": {
       "type": "boolean",
       "label": "Ending skip",
       "default": true,
-      "description": "Show a skip button during the pinhole ending and credits sequence."
+      "description": "Show a skip button during the pinhole ending and credits sequence.",
+      "section": "endingSkip"
     },
     "enableAccessibilityButtons": {
       "type": "boolean",
       "label": "Accessibility buttons",
       "default": true,
-      "description": "Show the bottom accessibility control bar and reality-floor color palette."
+      "description": "Show the bottom accessibility control bar and reality-floor color palette.",
+      "section": "accessibilityButtons"
     },
     "enableStabilizerSurgeFlashReduction": {
       "type": "boolean",
       "label": "Stabilizer surge flash reduction",
       "default": true,
       "description": "After the void altar exists, hide full-screen flashes caused by stabilizer-triggered surge effects.",
-      "reloadPolicy": "hot"
+      "reloadPolicy": "hot",
+      "section": "stabilizerSurgeFlashReduction"
     },
     "enableVoidReturnFadeSkip": {
       "type": "boolean",
       "label": "Skip void return fade",
       "default": true,
       "description": "When returning from the void to reality, remove the long white recovery fade and show the clear view immediately.",
-      "reloadPolicy": "hot"
+      "reloadPolicy": "hot",
+      "section": "voidReturnFadeSkip"
     },
     "enableResourceGlowColors": {
       "type": "boolean",
       "label": "Resource glow colors",
       "default": true,
       "description": "Color resource icon glows by resource, with optional per-resource overrides.",
-      "reloadPolicy": "hot"
+      "reloadPolicy": "hot",
+      "section": "resourceGlowColors"
+    },
+    "resourceGlowColors": {
+      "type": "resourceColors",
+      "label": "Resource glow palette",
+      "default": {},
+      "description": "Per-resource glow color overrides. Empty rows use each resource's native color.",
+      "reloadPolicy": "hot",
+      "section": "resourceGlowColors"
     },
     "enableChasmLineRenderer": {
       "type": "boolean",
       "label": "Chasm line renderer",
       "default": true,
       "description": "Allow this mod to replace the chasm-to-resource lines with the selected renderer.",
-      "reloadPolicy": "hot"
+      "reloadPolicy": "hot",
+      "section": "chasmLineRenderer"
     },
     "chasmLineRendererMode": {
       "type": "slider",
@@ -142,21 +159,24 @@
         "gpu": 1
       },
       "description": "Canvas 2D uses the original game drawing. WebGL renders the same chasm-to-resource curves through a GPU-backed canvas.",
-      "reloadPolicy": "hot"
+      "reloadPolicy": "hot",
+      "section": "chasmLineRenderer"
     },
     "enableChasmLineDistanceOverride": {
       "type": "boolean",
       "label": "Chasm lines ignore distance",
       "default": false,
       "description": "Keep rendering chasm-to-resource lines even when the chasm is outside the normal visible range.",
-      "reloadPolicy": "hot"
+      "reloadPolicy": "hot",
+      "section": "chasmLineRenderer"
     },
     "enableFloorGridLines": {
       "type": "boolean",
       "label": "Floor grid outlines",
       "default": false,
       "description": "Draw thin outlines around the in-game floor cells.",
-      "reloadPolicy": "hot"
+      "reloadPolicy": "hot",
+      "section": "floorGridLines"
     },
     "floorGridLineRealityColor": {
       "type": "color",
@@ -187,7 +207,8 @@
         "no": "Auto"
       },
       "description": "Leave empty to use the default dark gray outline in reality.",
-      "reloadPolicy": "hot"
+      "reloadPolicy": "hot",
+      "section": "floorGridLines"
     },
     "floorGridLineVoidColor": {
       "type": "color",
@@ -218,21 +239,16 @@
         "no": "Auto"
       },
       "description": "Leave empty to use the default white outline in the void.",
-      "reloadPolicy": "hot"
+      "reloadPolicy": "hot",
+      "section": "floorGridLines"
     },
     "enablePlayTimeCounter": {
       "type": "boolean",
       "label": "Play time counter",
       "default": true,
       "description": "Show the active run play-time counter on the game canvas.",
-      "reloadPolicy": "hot"
-    },
-    "disableShiftCtrlZoomShortcut": {
-      "type": "boolean",
-      "label": "Disable Shift/Ctrl zoom shortcut",
-      "default": true,
-      "description": "Prevent pressing Shift or Ctrl alone from resetting the camera zoom, while keeping Shift/Ctrl + wheel zooming available.",
-      "reloadPolicy": "hot"
+      "reloadPolicy": "hot",
+      "section": "playTimeCounter"
     },
     "playTimeCounterPosition": {
       "type": "slider",
@@ -326,20 +342,55 @@
         "bottom right": 2,
         "bottom": 2,
         "right": 2
-      }
+      },
+      "section": "playTimeCounter"
     },
-    "resourceGlowColors": {
-      "type": "resourceColors",
-      "label": "Resource glow palette",
-      "default": {},
-      "description": "Per-resource glow color overrides. Empty rows use each resource's native color.",
-      "reloadPolicy": "hot"
+    "disableShiftCtrlZoomShortcut": {
+      "type": "boolean",
+      "label": "Disable Shift/Ctrl zoom shortcut",
+      "default": true,
+      "description": "Prevent pressing Shift or Ctrl alone from resetting the camera zoom, while keeping Shift/Ctrl + wheel zooming available.",
+      "reloadPolicy": "hot",
+      "section": "shiftCtrlZoomShortcut"
+    },
+    "enableDynamicCamera": {
+      "type": "boolean",
+      "label": "Dynamic camera",
+      "default": true,
+      "description": "Enable keyboard-controlled camera pitch and rotation.",
+      "reloadPolicy": "hot",
+      "section": "dynamicCamera"
+    },
+    "cameraPitch": {
+      "type": "slider",
+      "valueType": "number",
+      "label": "Camera pitch",
+      "default": 0.5,
+      "min": 0.18,
+      "max": 1.15,
+      "step": 0.01,
+      "description": "Live pitch control. 0.50 matches vanilla; larger values look more top-down.",
+      "reloadPolicy": "hot",
+      "section": "dynamicCamera"
+    },
+    "cameraYaw": {
+      "type": "slider",
+      "valueType": "number",
+      "label": "Camera rotation",
+      "default": 0,
+      "min": -180,
+      "max": 180,
+      "step": 1,
+      "description": "Live rotation control in degrees.",
+      "reloadPolicy": "hot",
+      "section": "dynamicCamera"
     },
     "enableViewDistance": {
       "type": "boolean",
       "label": "View distance limits",
       "default": true,
-      "description": "Use expanded camera zoom limits."
+      "description": "Use expanded camera zoom limits.",
+      "section": "viewDistance"
     },
     "farthestZoom": {
       "type": "number",
@@ -348,7 +399,8 @@
       "min": 0.03,
       "max": 1,
       "step": 0.01,
-      "description": "Lower values show more of the world. Vanilla far limit is 0.3."
+      "description": "Lower values show more of the world. Vanilla far limit is 0.3.",
+      "section": "viewDistance"
     },
     "closestZoom": {
       "type": "number",
@@ -357,7 +409,8 @@
       "min": 1,
       "max": 24,
       "step": 0.1,
-      "description": "Higher values zoom closer to the world. Vanilla near limit is 2."
+      "description": "Higher values zoom closer to the world. Vanilla near limit is 2.",
+      "section": "viewDistance"
     },
     "fallbackZoom": {
       "type": "number",
@@ -366,10 +419,11 @@
       "min": 0.03,
       "max": 24,
       "step": 0.01,
-      "description": "Used when the saved zoom value is missing or invalid."
+      "description": "Used when the saved zoom value is missing or invalid.",
+      "section": "viewDistance"
     }
   },
-  "description": "Combines view distance limits, ending skip, accessibility buttons, stabilizer surge flash reduction, void return fade skip, resource glow colors, chasm line rendering, floor grid outlines, play-time counter, Shift/Ctrl zoom shortcut control, and explainer fixes into one multi-entry quality mod.",
+  "description": "Combines view distance limits, dynamic camera projection, ending skip, accessibility buttons, stabilizer surge flash reduction, void return fade skip, resource glow colors, chasm line rendering, floor grid outlines, play-time counter, Shift/Ctrl zoom shortcut control, and explainer fixes into one multi-entry quality mod.",
   "reloadOnConfigChange": true,
   "translations": {
     "sch": {
@@ -455,6 +509,18 @@
         "disableShiftCtrlZoomShortcut": {
           "label": "禁用 Shift/Ctrl 单按缩放",
           "description": "阻止单独按下 Shift 或 Ctrl 时重置镜头缩放，同时保留 Shift/Ctrl + 滚轮缩放。"
+        },
+        "enableDynamicCamera": {
+          "label": "动态镜头",
+          "description": "启用可用快捷键控制的镜头倾斜和旋转。"
+        },
+        "cameraPitch": {
+          "label": "镜头倾斜角度",
+          "description": "实时调整倾斜角度。0.50 等于原版；数值越大越接近俯视。"
+        },
+        "cameraYaw": {
+          "label": "镜头旋转角度",
+          "description": "实时调整旋转角度，单位为度。"
         }
       }
     },
@@ -541,6 +607,18 @@
         "disableShiftCtrlZoomShortcut": {
           "label": "禁用 Shift/Ctrl 单按缩放",
           "description": "阻止单独按下 Shift 或 Ctrl 时重置镜头缩放，同时保留 Shift/Ctrl + 滚轮缩放。"
+        },
+        "enableDynamicCamera": {
+          "label": "动态镜头",
+          "description": "启用可用快捷键控制的镜头倾斜和旋转。"
+        },
+        "cameraPitch": {
+          "label": "镜头倾斜角度",
+          "description": "实时调整倾斜角度。0.50 等于原版；数值越大越接近俯视。"
+        },
+        "cameraYaw": {
+          "label": "镜头旋转角度",
+          "description": "实时调整旋转角度，单位为度。"
         }
       }
     },
@@ -616,6 +694,18 @@
         "disableShiftCtrlZoomShortcut": {
           "label": "Disable Shift/Ctrl zoom shortcut",
           "description": "Prevent pressing Shift or Ctrl alone from resetting the camera zoom, while keeping Shift/Ctrl + wheel zooming available."
+        },
+        "enableDynamicCamera": {
+          "label": "Dynamic camera",
+          "description": "Enable keyboard-controlled camera pitch and rotation."
+        },
+        "cameraPitch": {
+          "label": "Camera pitch",
+          "description": "Live pitch control. 0.50 matches vanilla; larger values look more top-down."
+        },
+        "cameraYaw": {
+          "label": "Camera rotation",
+          "description": "Live rotation control in degrees."
         }
       }
     },
@@ -691,6 +781,18 @@
         "disableShiftCtrlZoomShortcut": {
           "label": "Otklyuchit Shift/Ctrl zoom",
           "description": "Ne pozvolyaet odinochnomu Shift ili Ctrl sbrosit masshtab kamery, no ostavlyaet Shift/Ctrl + koleso."
+        },
+        "enableDynamicCamera": {
+          "label": "Dinamicheskaya kamera",
+          "description": "Vklyuchaet naklon i povorot kamery s upravleniem klavishami."
+        },
+        "cameraPitch": {
+          "label": "Naklon kamery",
+          "description": "Zhivaya nastroika naklona. 0.50 kak v originale; bolshe znachit vid sverkhu."
+        },
+        "cameraYaw": {
+          "label": "Povorot kamery",
+          "description": "Zhivaya nastroika povorota v gradusakh."
         }
       }
     },
@@ -766,6 +868,18 @@
         "disableShiftCtrlZoomShortcut": {
           "label": "Shift/Ctrl-Zoom deaktivieren",
           "description": "Verhindert, dass Shift oder Ctrl allein den Kamerazoom zuruecksetzt, laesst aber Shift/Ctrl + Mausrad aktiv."
+        },
+        "enableDynamicCamera": {
+          "label": "Dynamische Kamera",
+          "description": "Aktiviert Kameraneigung und Drehung per Tastatur."
+        },
+        "cameraPitch": {
+          "label": "Kameraneigung",
+          "description": "Live-Neigung. 0.50 entspricht Vanilla; hoehere Werte wirken mehr von oben."
+        },
+        "cameraYaw": {
+          "label": "Kameradrehung",
+          "description": "Live-Drehung in Grad."
         }
       }
     },
@@ -841,6 +955,18 @@
         "disableShiftCtrlZoomShortcut": {
           "label": "Desativar zoom Shift/Ctrl",
           "description": "Impede Shift ou Ctrl sozinho de redefinir o zoom da camera, mantendo Shift/Ctrl + roda."
+        },
+        "enableDynamicCamera": {
+          "label": "Camera dinamica",
+          "description": "Ativa inclinacao e rotacao da camera por teclado."
+        },
+        "cameraPitch": {
+          "label": "Inclinacao da camera",
+          "description": "Controle ao vivo. 0.50 equivale ao original; valores maiores ficam mais de cima."
+        },
+        "cameraYaw": {
+          "label": "Rotacao da camera",
+          "description": "Controle ao vivo em graus."
         }
       }
     },
@@ -916,6 +1042,18 @@
         "disableShiftCtrlZoomShortcut": {
           "label": "Disattiva zoom Shift/Ctrl",
           "description": "Evita che Shift o Ctrl da soli ripristinino lo zoom, mantenendo Shift/Ctrl + rotellina."
+        },
+        "enableDynamicCamera": {
+          "label": "Camera dinamica",
+          "description": "Abilita inclinazione e rotazione della camera da tastiera."
+        },
+        "cameraPitch": {
+          "label": "Inclinazione camera",
+          "description": "Controllo live. 0.50 corrisponde al vanilla; valori piu alti sono piu dall alto."
+        },
+        "cameraYaw": {
+          "label": "Rotazione camera",
+          "description": "Controllo live in gradi."
         }
       }
     },
@@ -991,6 +1129,18 @@
         "disableShiftCtrlZoomShortcut": {
           "label": "Desactivar zoom Shift/Ctrl",
           "description": "Evita que Shift o Ctrl solos reinicien el zoom, pero mantiene Shift/Ctrl + rueda."
+        },
+        "enableDynamicCamera": {
+          "label": "Camara dinamica",
+          "description": "Activa inclinacion y rotacion de la camara con teclado."
+        },
+        "cameraPitch": {
+          "label": "Inclinacion de camara",
+          "description": "Control en vivo. 0.50 coincide con vanilla; valores mayores se ven mas desde arriba."
+        },
+        "cameraYaw": {
+          "label": "Rotacion de camara",
+          "description": "Control en vivo en grados."
         }
       }
     },
@@ -1066,6 +1216,18 @@
         "disableShiftCtrlZoomShortcut": {
           "label": "Desactiver le zoom Shift/Ctrl",
           "description": "Empeche Shift ou Ctrl seuls de reinitialiser le zoom, tout en gardant Shift/Ctrl + molette."
+        },
+        "enableDynamicCamera": {
+          "label": "Camera dynamique",
+          "description": "Active inclinaison et rotation de camera au clavier."
+        },
+        "cameraPitch": {
+          "label": "Inclinaison camera",
+          "description": "Controle en direct. 0.50 correspond au jeu original; plus haut donne une vue plus verticale."
+        },
+        "cameraYaw": {
+          "label": "Rotation camera",
+          "description": "Controle en direct en degres."
         }
       }
     },
@@ -1141,6 +1303,18 @@
         "disableShiftCtrlZoomShortcut": {
           "label": "Shift/Ctrl-zoom uitschakelen",
           "description": "Voorkomt dat Shift of Ctrl alleen de camerazoom reset, maar behoudt Shift/Ctrl + muiswiel."
+        },
+        "enableDynamicCamera": {
+          "label": "Dynamische camera",
+          "description": "Schakelt camerakanteling en rotatie via toetsenbord in."
+        },
+        "cameraPitch": {
+          "label": "Camerakanteling",
+          "description": "Live kanteling. 0.50 is vanilla; hogere waarden lijken meer van boven."
+        },
+        "cameraYaw": {
+          "label": "Camerarotatie",
+          "description": "Live rotatie in graden."
         }
       }
     },
@@ -1216,6 +1390,18 @@
         "disableShiftCtrlZoomShortcut": {
           "label": "Vypnout zoom Shift/Ctrl",
           "description": "Zabrani samotnemu Shift nebo Ctrl resetovat zoom kamery, ale ponecha Shift/Ctrl + kolecko."
+        },
+        "enableDynamicCamera": {
+          "label": "Dynamicka kamera",
+          "description": "Zapne naklon a otaceni kamery ovladane klavesnici."
+        },
+        "cameraPitch": {
+          "label": "Naklon kamery",
+          "description": "Ziva zmena naklonu. 0.50 odpovida puvodni hre; vyssi je vice shora."
+        },
+        "cameraYaw": {
+          "label": "Otoceni kamery",
+          "description": "Ziva zmena otoceni ve stupnich."
         }
       }
     },
@@ -1291,6 +1477,18 @@
         "disableShiftCtrlZoomShortcut": {
           "label": "Wylacz zoom Shift/Ctrl",
           "description": "Blokuje reset zoomu po samym Shift lub Ctrl, ale zostawia Shift/Ctrl + kolko."
+        },
+        "enableDynamicCamera": {
+          "label": "Dynamiczna kamera",
+          "description": "Wlacza pochylenie i obrot kamery sterowane klawiatura."
+        },
+        "cameraPitch": {
+          "label": "Pochylenie kamery",
+          "description": "Sterowanie na zywo. 0.50 jak w oryginale; wyzsze wartosci wygladaja bardziej z gory."
+        },
+        "cameraYaw": {
+          "label": "Obrot kamery",
+          "description": "Sterowanie na zywo w stopniach."
         }
       }
     },
@@ -1366,6 +1564,18 @@
         "disableShiftCtrlZoomShortcut": {
           "label": "Disable Shift/Ctrl zoom shortcut",
           "description": "Prevent Shift or Ctrl alone from resetting camera zoom; Shift/Ctrl + wheel still works."
+        },
+        "enableDynamicCamera": {
+          "label": "Dynamic camera",
+          "description": "Enable keyboard-controlled camera pitch and rotation."
+        },
+        "cameraPitch": {
+          "label": "Camera pitch",
+          "description": "Live pitch control. 0.50 matches vanilla; larger values look more top-down."
+        },
+        "cameraYaw": {
+          "label": "Camera rotation",
+          "description": "Live rotation control in degrees."
         }
       }
     },
@@ -1441,6 +1651,18 @@
         "disableShiftCtrlZoomShortcut": {
           "label": "Disable Shift/Ctrl zoom shortcut",
           "description": "Prevent Shift or Ctrl alone from resetting camera zoom; Shift/Ctrl + wheel still works."
+        },
+        "enableDynamicCamera": {
+          "label": "Dynamic camera",
+          "description": "Enable keyboard-controlled camera pitch and rotation."
+        },
+        "cameraPitch": {
+          "label": "Camera pitch",
+          "description": "Live pitch control. 0.50 matches vanilla; larger values look more top-down."
+        },
+        "cameraYaw": {
+          "label": "Camera rotation",
+          "description": "Live rotation control in degrees."
         }
       }
     },
@@ -1516,6 +1738,18 @@
         "disableShiftCtrlZoomShortcut": {
           "label": "停用 Shift/Ctrl 單按縮放",
           "description": "阻止單獨按下 Shift 或 Ctrl 時重置鏡頭縮放，同時保留 Shift/Ctrl + 滾輪縮放。"
+        },
+        "enableDynamicCamera": {
+          "label": "動態鏡頭",
+          "description": "啟用可用快捷鍵控制的鏡頭傾斜和旋轉。"
+        },
+        "cameraPitch": {
+          "label": "鏡頭傾斜角度",
+          "description": "即時調整傾斜角度。0.50 等於原版；數值越大越接近俯視。"
+        },
+        "cameraYaw": {
+          "label": "鏡頭旋轉角度",
+          "description": "即時調整旋轉角度，單位為度。"
         }
       }
     },
@@ -1591,6 +1825,18 @@
         "disableShiftCtrlZoomShortcut": {
           "label": "Disable Shift/Ctrl zoom shortcut",
           "description": "Prevent Shift or Ctrl alone from resetting camera zoom; Shift/Ctrl + wheel still works."
+        },
+        "enableDynamicCamera": {
+          "label": "Dynamic camera",
+          "description": "Enable keyboard-controlled camera pitch and rotation."
+        },
+        "cameraPitch": {
+          "label": "Camera pitch",
+          "description": "Live pitch control. 0.50 matches vanilla; larger values look more top-down."
+        },
+        "cameraYaw": {
+          "label": "Camera rotation",
+          "description": "Live rotation control in degrees."
         }
       }
     },
@@ -1666,6 +1912,18 @@
         "disableShiftCtrlZoomShortcut": {
           "label": "Shift/Ctrl zoom kikapcsolasa",
           "description": "Megakadalyozza, hogy a Shift vagy Ctrl onmagaban visszaallitsa a kamera zoomot, de a Shift/Ctrl + gorgo mukodik."
+        },
+        "enableDynamicCamera": {
+          "label": "Dinamikus kamera",
+          "description": "Bekapcsolja a billentyuzettel vezerelt kamera dolest es forgatast."
+        },
+        "cameraPitch": {
+          "label": "Kamera doles",
+          "description": "Elo dolesvezerles. 0.50 az eredeti; nagyobb ertek felulnezetesebb."
+        },
+        "cameraYaw": {
+          "label": "Kamera forgatas",
+          "description": "Elo forgatas fokokban."
         }
       }
     },
@@ -1741,6 +1999,18 @@
         "disableShiftCtrlZoomShortcut": {
           "label": "Izslegt Shift/Ctrl talummainu",
           "description": "Neatlauj Shift vai Ctrl vieniem pasiem atiestatit kameras talummainu, bet Shift/Ctrl + ritenis paliek."
+        },
+        "enableDynamicCamera": {
+          "label": "Dinamiska kamera",
+          "description": "Iesledz ar tastaturu vadamu kameras slipumu un rotaciju."
+        },
+        "cameraPitch": {
+          "label": "Kameras slipums",
+          "description": "Tiesraides slipuma kontrole. 0.50 atbilst originalam; lielakas vertibas ir tuvak skatam no augsas."
+        },
+        "cameraYaw": {
+          "label": "Kameras rotacija",
+          "description": "Tiesraides rotacija grados."
         }
       }
     },
@@ -1816,6 +2086,18 @@
         "disableShiftCtrlZoomShortcut": {
           "label": "Dezactiveaza zoom Shift/Ctrl",
           "description": "Impiedica Shift sau Ctrl singur sa reseteze zoomul camerei, dar pastreaza Shift/Ctrl + rotita."
+        },
+        "enableDynamicCamera": {
+          "label": "Camera dinamica",
+          "description": "Activeaza inclinarea si rotatia camerei controlate din tastatura."
+        },
+        "cameraPitch": {
+          "label": "Inclinare camera",
+          "description": "Control live. 0.50 este ca in jocul original; valori mai mari arata mai de sus."
+        },
+        "cameraYaw": {
+          "label": "Rotatie camera",
+          "description": "Control live in grade."
         }
       }
     },
@@ -1891,6 +2173,18 @@
         "disableShiftCtrlZoomShortcut": {
           "label": "Deaktiver Shift/Ctrl-zoom",
           "description": "Hindrer Shift eller Ctrl alene i a nullstille kamerazoom, men beholder Shift/Ctrl + hjul."
+        },
+        "enableDynamicCamera": {
+          "label": "Dynamisk kamera",
+          "description": "Aktiver kameravinkel og rotasjon styrt med tastatur."
+        },
+        "cameraPitch": {
+          "label": "Kameravinkel",
+          "description": "Direkte vinkelkontroll. 0.50 er som originalt; hoyere verdier ser mer ovenfra."
+        },
+        "cameraYaw": {
+          "label": "Kamerarotasjon",
+          "description": "Direkte rotasjon i grader."
         }
       }
     }
