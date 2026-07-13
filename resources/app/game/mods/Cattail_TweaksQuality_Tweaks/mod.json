@@ -12,18 +12,18 @@
     "gameLanguage": true
   },
   "entries": [
+    "scripts/shift-ctrl-zoom-disable.js",
+    "scripts/view-distance.js",
+    "scripts/void-return-fade-skip.js",
+    "scripts/stabilizer-surge-flash-reduction.js",
+    "scripts/resource-glow-colors.js",
     "scripts/explainer-fix.js",
     "scripts/ending-skip.js",
     "scripts/accessibility-buttons.js",
-    "scripts/stabilizer-surge-flash-reduction.js",
-    "scripts/void-return-fade-skip.js",
-    "scripts/resource-glow-colors.js",
     "scripts/chasm-line-renderer.js",
     "scripts/floor-grid-lines.js",
     "scripts/play-time-counter.js",
-    "scripts/dynamic-camera.js",
-    "scripts/shift-ctrl-zoom-disable.js",
-    "scripts/view-distance.js"
+    "scripts/dynamic-camera.js"
   ],
   "conflicts": [
     "Cattail_TweaksQuality_View-Distance",

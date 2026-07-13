@@ -723,36 +723,37 @@
 			#modloader-panel .modloader-mod-manager::-webkit-scrollbar-track { background: transparent; }
 			#modloader-panel .modloader-mod-manager::-webkit-scrollbar-thumb { border-radius: 999px; background: rgba(185,185,185,.48); }
 			#modloader-panel .modloader-mod-manager::-webkit-scrollbar-thumb:hover { background: rgba(210,210,210,.62); }
-			#modloader-panel .modloader-mod-row { position: relative; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 10px; align-items: flex-start; padding: 9px; border: 1px solid rgba(255,255,255,.1); border-radius: 7px; background: rgba(255,255,255,.045); transition: border-color .14s ease, background .14s ease, box-shadow .14s ease, opacity .14s ease; }
+			#modloader-panel .modloader-mod-row { --modloader-row-gap: 10px; --modloader-row-padding: 9px; --modloader-row-radius: 7px; --modloader-row-font-size: 13px; --modloader-row-check-offset: 2px; --modloader-row-actions-gap: 2px; --modloader-row-index-width: 13px; --modloader-row-index-size: 11px; --modloader-row-action-size: 25px; --modloader-row-action-radius: 5px; --modloader-row-sort-x: 7px; --modloader-row-sort-y: 7px; --modloader-row-sort-width: 11px; --modloader-row-sort-height: 2px; --modloader-row-sort-shadow-1: 5px; --modloader-row-sort-shadow-2: 10px; --modloader-row-delete-body-x: 8px; --modloader-row-delete-body-y: 9px; --modloader-row-delete-body-width: 9px; --modloader-row-delete-body-height: 10px; --modloader-row-delete-border: 2px; --modloader-row-delete-radius-small: 1px; --modloader-row-delete-radius-large: 3px; --modloader-row-delete-lid-x: 7px; --modloader-row-delete-lid-y: 6px; --modloader-row-delete-lid-width: 11px; --modloader-row-delete-lid-height: 2px; --modloader-row-delete-lid-shadow-x: 3px; --modloader-row-delete-lid-shadow-y: -3px; --modloader-row-delete-lid-shadow-spread: -1px; --modloader-row-title-gap: 8px; --modloader-row-meta-gap: 3px; --modloader-row-warning-gap: 5px; --modloader-row-switch-width: 46px; --modloader-row-switch-height: 24px; --modloader-row-switch-knob: 20px; --modloader-row-switch-pad: 2px; --modloader-row-switch-slide: 22px; --modloader-row-switch-label-off: 6px; --modloader-row-switch-label-on: 7px; --modloader-row-switch-label-size: 9px; --modloader-row-switch-letter-spacing: .25px; position: relative; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: var(--modloader-row-gap); align-items: flex-start; padding: var(--modloader-row-padding); border: 1px solid rgba(255,255,255,.1); border-radius: var(--modloader-row-radius); background: rgba(255,255,255,.045); font-size: var(--modloader-row-font-size); line-height: 1.45; transition: border-color .14s ease, background .14s ease, box-shadow .14s ease, opacity .14s ease; }
 			#modloader-panel .modloader-mod-row-configurable { cursor: pointer; }
 			#modloader-panel .modloader-mod-row-configurable:hover { border-color: rgba(207,233,255,.28); }
 			#modloader-panel .modloader-mod-row-expanded { border-color: rgba(207,233,255,.5); box-shadow: 0 8px 22px rgba(0,0,0,.16); }
 			#modloader-panel .modloader-mod-row-moving { z-index: 3; will-change: transform; }
-			#modloader-panel .modloader-mod-row-dragging { z-index: 6; opacity: .96; box-shadow: 0 14px 34px rgba(0,0,0,.36); pointer-events: none; }
-			#modloader-panel .modloader-mod-sort-placeholder { min-height: 24px; border: 1px dashed rgba(207,233,255,.34); border-radius: 7px; background: rgba(207,233,255,.055); box-sizing: border-box; transition: height .16s ease, min-height .16s ease, background .16s ease, border-color .16s ease; }
+			#modloader-panel .modloader-mod-row-dragging { --modloader-row-gap: 11px; --modloader-row-padding: 9.9px; --modloader-row-radius: 7.7px; --modloader-row-font-size: 14.3px; --modloader-row-check-offset: 2.2px; --modloader-row-actions-gap: 2.2px; --modloader-row-index-width: 14.3px; --modloader-row-index-size: 12.1px; --modloader-row-action-size: 27.5px; --modloader-row-action-radius: 5.5px; --modloader-row-sort-x: 7.7px; --modloader-row-sort-y: 7.7px; --modloader-row-sort-width: 12.1px; --modloader-row-sort-height: 2.2px; --modloader-row-sort-shadow-1: 5.5px; --modloader-row-sort-shadow-2: 11px; --modloader-row-delete-body-x: 8.8px; --modloader-row-delete-body-y: 9.9px; --modloader-row-delete-body-width: 9.9px; --modloader-row-delete-body-height: 11px; --modloader-row-delete-border: 2.2px; --modloader-row-delete-radius-small: 1.1px; --modloader-row-delete-radius-large: 3.3px; --modloader-row-delete-lid-x: 7.7px; --modloader-row-delete-lid-y: 6.6px; --modloader-row-delete-lid-width: 12.1px; --modloader-row-delete-lid-height: 2.2px; --modloader-row-delete-lid-shadow-x: 3.3px; --modloader-row-delete-lid-shadow-y: -3.3px; --modloader-row-delete-lid-shadow-spread: -1.1px; --modloader-row-title-gap: 8.8px; --modloader-row-meta-gap: 3.3px; --modloader-row-warning-gap: 5.5px; --modloader-row-switch-width: 50.6px; --modloader-row-switch-height: 26.4px; --modloader-row-switch-knob: 22px; --modloader-row-switch-pad: 2.2px; --modloader-row-switch-slide: 24.2px; --modloader-row-switch-label-off: 6.6px; --modloader-row-switch-label-on: 7.7px; --modloader-row-switch-label-size: 9.9px; --modloader-row-switch-letter-spacing: .275px; z-index: 6; opacity: 1; border-color: rgba(207,233,255,.48); background: rgba(16,22,28,.82); box-shadow: 0 22px 48px rgba(0,0,0,.52), 0 0 0 1px rgba(207,233,255,.13), inset 0 1px 0 rgba(255,255,255,.1); backdrop-filter: blur(14px) saturate(1.18); -webkit-backdrop-filter: blur(14px) saturate(1.18); pointer-events: none; will-change: left, top; }
+			#modloader-panel.modloader-panel-theme-light .modloader-mod-row-dragging { border-color: rgba(18,20,22,.22); background: rgba(250,250,247,.86); box-shadow: 0 20px 42px rgba(0,0,0,.22), 0 0 0 1px rgba(18,20,22,.08), inset 0 1px 0 rgba(255,255,255,.7); }
+			#modloader-panel .modloader-mod-sort-placeholder { min-height: 24px; border: 1px solid transparent; border-radius: 7px; background: transparent; box-sizing: border-box; transition: height .16s ease, min-height .16s ease; }
 			#modloader-panel .modloader-mod-row-selected { border-color: rgba(174, 231, 160, .42); background: rgba(120, 190, 120, .08); }
 			#modloader-panel .modloader-mod-row-problem { border-color: rgba(255, 196, 87, .48); }
-			#modloader-panel .modloader-mod-check { margin-top: 2px; }
+			#modloader-panel .modloader-mod-check { margin-top: var(--modloader-row-check-offset); }
 			#modloader-panel .modloader-mod-main { min-width: 0; }
-			#modloader-panel .modloader-mod-actions { display: inline-flex; align-items: center; justify-content: flex-end; gap: 2px; padding-top: 0; }
-			#modloader-panel .modloader-mod-index { min-width: 13px; border: 0; padding: 0; background: transparent; color: rgba(255,255,255,.5); text-align: right; font: 700 11px/1 Montserrat, Arial, sans-serif; pointer-events: none; }
-			#modloader-panel .modloader-mod-delete, #modloader-panel .modloader-mod-sort { position: relative; width: 25px; height: 25px; border: 0; border-radius: 5px; background: transparent; color: rgba(255,255,255,.56); cursor: pointer; }
+			#modloader-panel .modloader-mod-actions { display: inline-flex; align-items: center; justify-content: flex-end; gap: var(--modloader-row-actions-gap); padding-top: 0; }
+			#modloader-panel .modloader-mod-index { min-width: var(--modloader-row-index-width); border: 0; padding: 0; background: transparent; color: rgba(255,255,255,.5); text-align: right; font-weight: 700; font-size: var(--modloader-row-index-size); line-height: 1; font-family: Montserrat, Arial, sans-serif; pointer-events: none; }
+			#modloader-panel .modloader-mod-delete, #modloader-panel .modloader-mod-sort { position: relative; width: var(--modloader-row-action-size); height: var(--modloader-row-action-size); border: 0; border-radius: var(--modloader-row-action-radius); background: transparent; color: rgba(255,255,255,.56); cursor: pointer; }
 			#modloader-panel .modloader-mod-sort { cursor: grab; touch-action: none; }
 			#modloader-panel .modloader-mod-sort:active { cursor: grabbing; }
-			#modloader-panel .modloader-mod-sort:before { content: ''; position: absolute; left: 7px; top: 7px; width: 11px; height: 2px; border-radius: 999px; background: currentColor; box-shadow: 0 5px 0 currentColor, 0 10px 0 currentColor; }
+			#modloader-panel .modloader-mod-sort:before { content: ''; position: absolute; left: var(--modloader-row-sort-x); top: var(--modloader-row-sort-y); width: var(--modloader-row-sort-width); height: var(--modloader-row-sort-height); border-radius: 999px; background: currentColor; box-shadow: 0 var(--modloader-row-sort-shadow-1) 0 currentColor, 0 var(--modloader-row-sort-shadow-2) 0 currentColor; }
 			#modloader-panel .modloader-mod-delete:hover { color: #ffb0b0; background: rgba(255,96,96,.1); }
 			#modloader-panel .modloader-mod-sort:hover { color: rgba(255,255,255,.86); background: rgba(255,255,255,.08); }
-			#modloader-panel .modloader-mod-delete:before { content: ''; position: absolute; left: 8px; top: 9px; width: 9px; height: 10px; border: 2px solid currentColor; border-top: 0; border-radius: 1px 1px 3px 3px; box-sizing: border-box; }
-			#modloader-panel .modloader-mod-delete:after { content: ''; position: absolute; left: 7px; top: 6px; width: 11px; height: 2px; border-radius: 999px; background: currentColor; box-shadow: 3px -3px 0 -1px currentColor; }
-			#modloader-panel .modloader-mod-title { display: flex; flex-wrap: wrap; gap: 8px; align-items: baseline; }
+			#modloader-panel .modloader-mod-delete:before { content: ''; position: absolute; left: var(--modloader-row-delete-body-x); top: var(--modloader-row-delete-body-y); width: var(--modloader-row-delete-body-width); height: var(--modloader-row-delete-body-height); border: var(--modloader-row-delete-border) solid currentColor; border-top: 0; border-radius: var(--modloader-row-delete-radius-small) var(--modloader-row-delete-radius-small) var(--modloader-row-delete-radius-large) var(--modloader-row-delete-radius-large); box-sizing: border-box; }
+			#modloader-panel .modloader-mod-delete:after { content: ''; position: absolute; left: var(--modloader-row-delete-lid-x); top: var(--modloader-row-delete-lid-y); width: var(--modloader-row-delete-lid-width); height: var(--modloader-row-delete-lid-height); border-radius: 999px; background: currentColor; box-shadow: var(--modloader-row-delete-lid-shadow-x) var(--modloader-row-delete-lid-shadow-y) 0 var(--modloader-row-delete-lid-shadow-spread) currentColor; }
+			#modloader-panel .modloader-mod-title { display: flex; flex-wrap: wrap; gap: var(--modloader-row-title-gap); align-items: baseline; }
 			#modloader-panel .modloader-mod-path { font-weight: 600; overflow-wrap: anywhere; }
 			#modloader-panel .modloader-mod-version { color: rgba(255,255,255,.58); }
 			#modloader-panel.modloader-panel-theme-light .modloader-mod-delete, #modloader-panel.modloader-panel-theme-light .modloader-mod-sort { color: rgba(18,20,22,.46); }
 			#modloader-panel.modloader-panel-theme-light .modloader-mod-sort:hover { color: rgba(18,20,22,.76); background: rgba(0,0,0,.06); }
 			#modloader-panel.modloader-panel-theme-light .modloader-mod-index { color: rgba(18,20,22,.46); }
 			#modloader-panel .modloader-mod-name { color: rgba(255,255,255,.72); overflow-wrap: anywhere; }
-			#modloader-panel .modloader-mod-meta { margin-top: 3px; color: rgba(255,255,255,.62); overflow-wrap: anywhere; }
-			#modloader-panel .modloader-mod-warning { display: none; margin-top: 5px; color: #ffe1a3; overflow-wrap: anywhere; }
+			#modloader-panel .modloader-mod-meta { margin-top: var(--modloader-row-meta-gap); color: rgba(255,255,255,.62); overflow-wrap: anywhere; }
+			#modloader-panel .modloader-mod-warning { display: none; margin-top: var(--modloader-row-warning-gap); color: #ffe1a3; overflow-wrap: anywhere; }
 			#modloader-panel .modloader-mod-warning.active { display: block; }
 			#modloader-panel .modloader-mod-config { max-height: 0; margin-top: 0; padding-top: 0; border-top: 1px solid transparent; opacity: 0; overflow: hidden; pointer-events: none; transform: translateY(-4px); transition: max-height .2s ease, margin-top .2s ease, padding-top .2s ease, border-top-color .2s ease, opacity .16s ease, transform .2s ease; }
 			#modloader-panel .modloader-mod-row-expanded .modloader-mod-config { max-height: min(42vh, 380px); margin-top: 8px; padding-top: 8px; border-top-color: rgba(255,255,255,.09); opacity: 1; pointer-events: auto; transform: translateY(0); }
@@ -800,6 +801,11 @@
 			#modloader-panel .modloader-switch-input:checked:hover:not(:disabled) { box-shadow: inset 0 2px 5px rgba(0,0,0,.16), inset 0 -1px 0 rgba(255,255,255,.36), inset 0 0 0 1px rgba(255,255,255,.3), 0 0 14px rgba(227,253,67,1), 0 0 32px rgba(166,242,70,.78), 0 0 58px rgba(166,242,70,.44), 0 0 86px rgba(76,185,107,.28); }
 			#modloader-panel .modloader-switch-input:focus-visible { box-shadow: inset 0 2px 6px rgba(0,0,0,.42), inset 0 0 0 1px rgba(255,255,255,.16), 0 0 0 2px rgba(124,238,153,.34), 0 0 14px rgba(124,238,153,.24); }
 			#modloader-panel .modloader-switch-input:disabled { cursor: default; opacity: .45; }
+			#modloader-panel .modloader-mod-row .modloader-switch-input { width: var(--modloader-row-switch-width); height: var(--modloader-row-switch-height); }
+			#modloader-panel .modloader-mod-row .modloader-switch-input:before { left: var(--modloader-row-switch-pad); top: var(--modloader-row-switch-pad); width: var(--modloader-row-switch-knob); height: var(--modloader-row-switch-knob); }
+			#modloader-panel .modloader-mod-row .modloader-switch-input:after { right: var(--modloader-row-switch-label-off); font-size: var(--modloader-row-switch-label-size); letter-spacing: var(--modloader-row-switch-letter-spacing); }
+			#modloader-panel .modloader-mod-row .modloader-switch-input:checked:before { transform: translateX(var(--modloader-row-switch-slide)); }
+			#modloader-panel .modloader-mod-row .modloader-switch-input:checked:after { left: var(--modloader-row-switch-label-on); right: auto; }
 			#modloader-panel textarea.modloader-config-input { min-height: 54px; resize: vertical; }
 			#modloader-panel .modloader-config-input:focus { border-color: rgba(207, 233, 255, .5); }
 			#modloader-panel .modloader-config-field-invalid .modloader-config-input { border-color: rgba(255, 96, 96, .72); }
@@ -3493,11 +3499,21 @@
 				list.insertBefore(placeholder, row)
 				row.classList.add('modloader-mod-row-dragging')
 				row.style.position = 'fixed'
-				row.style.left = Math.round(rect.left) + 'px'
-				row.style.top = Math.round(rect.top) + 'px'
-				row.style.width = Math.round(rect.width) + 'px'
-				row.style.height = Math.round(rect.height) + 'px'
+				const dragScale = 1.1
+				const scaledWidth = rect.width * dragScale
+				const scaledHeight = rect.height * dragScale
+				const visualOffsetY = rect.height / 2 + (offsetY - rect.height / 2) * dragScale
+				const updateDraggedRowPosition = function (clientY) {
+					row.style.top = Math.round(clientY - visualOffsetY) + 'px'
+				}
+				const rowStyle = window.getComputedStyle(row)
+				const horizontalFrame = parseFloat(rowStyle.paddingLeft) + parseFloat(rowStyle.paddingRight) + parseFloat(rowStyle.borderLeftWidth) + parseFloat(rowStyle.borderRightWidth)
+				const verticalFrame = parseFloat(rowStyle.paddingTop) + parseFloat(rowStyle.paddingBottom) + parseFloat(rowStyle.borderTopWidth) + parseFloat(rowStyle.borderBottomWidth)
+				row.style.left = Math.round(rect.left - (scaledWidth - rect.width) / 2) + 'px'
+				row.style.width = Math.max(0, Math.round(scaledWidth - horizontalFrame)) + 'px'
+				row.style.height = Math.max(0, Math.round(scaledHeight - verticalFrame)) + 'px'
 				panel.appendChild(row)
+				updateDraggedRowPosition(event.clientY)
 				event.preventDefault()
 				event.stopPropagation()
 				moveHandler = function (moveEvent) {
@@ -3505,8 +3521,7 @@
 					const dx = moveEvent.clientX - startX
 					const dy = moveEvent.clientY - startY
 					if (Math.abs(dx) + Math.abs(dy) > 3) moved = true
-					row.style.left = Math.round(moveEvent.clientX - offsetX) + 'px'
-					row.style.top = Math.round(moveEvent.clientY - offsetY) + 'px'
+					updateDraggedRowPosition(moveEvent.clientY)
 					const listRect = list.getBoundingClientRect()
 					if (moveEvent.clientY < listRect.top + 28) list.scrollTop -= 12
 					else if (moveEvent.clientY > listRect.bottom - 28) list.scrollTop += 12
