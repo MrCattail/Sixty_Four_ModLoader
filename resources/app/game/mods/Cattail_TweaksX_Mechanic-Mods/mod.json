@@ -27,6 +27,7 @@
     "scripts/scan-reality-surges.js",
     "scripts/scan-reality-slider.js",
     "scripts/hollow-vent-reality.js",
+    "scripts/flat-build-costs.js",
     "scripts/super-silo.js"
   ],
   "conflicts": [
@@ -139,6 +140,14 @@
       "description": "Multiplier applied to the large hollow vent Reality output.",
       "reloadPolicy": "hot",
       "section": "hollowVentReality"
+    },
+    "enableFlatBuildCosts": {
+      "type": "boolean",
+      "label": "Disable build cost scaling",
+      "default": true,
+      "description": "Keep every building at its base construction cost instead of scaling by existing building count.",
+      "reloadPolicy": "hot",
+      "section": "flatBuildCosts"
     }
   },
   "description": "Combines Auto Reality Collect, Scan Reality Surges, and Super Silo into one TweaksX mod.",
@@ -190,6 +199,10 @@
         "ventRealityLargeMultiplier": {
           "label": "Large vent multiplier",
           "description": "Multiplier applied to the large hollow vent Reality output."
+        },
+        "enableFlatBuildCosts": {
+          "label": "Disable build cost scaling",
+          "description": "Keep every building at its base construction cost instead of scaling by existing building count."
         }
       }
     },
@@ -240,6 +253,10 @@
         "ventRealityLargeMultiplier": {
           "label": "Множитель большого вентиля",
           "description": "Множитель выхода Reality для большого полого вентиля."
+        },
+        "enableFlatBuildCosts": {
+          "label": "Отключить рост цены строительства",
+          "description": "Каждое здание сохраняет базовую цену строительства и не дорожает от количества уже построенных."
         }
       }
     },
@@ -290,6 +307,10 @@
         "ventRealityLargeMultiplier": {
           "label": "Multiplikator großer Vents",
           "description": "Multiplikator für den Reality-Ertrag des großen Hohl-Vents."
+        },
+        "enableFlatBuildCosts": {
+          "label": "Baukosten-Skalierung aus",
+          "description": "Jedes Gebäude behält seine Grundbaukosten, statt mit der vorhandenen Anzahl teurer zu werden."
         }
       }
     },
@@ -340,6 +361,10 @@
         "ventRealityLargeMultiplier": {
           "label": "Multiplicador do vent grande",
           "description": "Multiplicador aplicado à produção de Reality do vent oco grande."
+        },
+        "enableFlatBuildCosts": {
+          "label": "Desativar escala de custo de construção",
+          "description": "Cada construção mantém o custo base, sem aumentar conforme a quantidade já construída."
         }
       }
     },
@@ -390,6 +415,10 @@
         "ventRealityLargeMultiplier": {
           "label": "Moltiplicatore vento grande",
           "description": "Moltiplicatore applicato alla produzione Reality del grande vento cavo."
+        },
+        "enableFlatBuildCosts": {
+          "label": "Disattiva scala costi costruzione",
+          "description": "Ogni edificio mantiene il costo base invece di aumentare in base a quelli già costruiti."
         }
       }
     },
@@ -440,6 +469,10 @@
         "ventRealityLargeMultiplier": {
           "label": "Multiplicador de vent grande",
           "description": "Multiplicador aplicado a la producción de Reality del vent hueco grande."
+        },
+        "enableFlatBuildCosts": {
+          "label": "Desactivar escala de coste de construcción",
+          "description": "Cada edificio mantiene su coste base y no aumenta según la cantidad ya construida."
         }
       }
     },
@@ -490,6 +523,10 @@
         "ventRealityLargeMultiplier": {
           "label": "Multiplicateur du grand évent",
           "description": "Multiplicateur appliqué à la production Reality du grand évent creux."
+        },
+        "enableFlatBuildCosts": {
+          "label": "Désactiver l’échelle du coût de construction",
+          "description": "Chaque bâtiment garde son coût de base au lieu d’augmenter avec le nombre déjà construit."
         }
       }
     },
@@ -540,6 +577,10 @@
         "ventRealityLargeMultiplier": {
           "label": "Vermenigvuldiger grote vent",
           "description": "Vermenigvuldiger voor de Reality-opbrengst van de grote holle vent."
+        },
+        "enableFlatBuildCosts": {
+          "label": "Bouwkostenschaal uit",
+          "description": "Elk gebouw behoudt zijn basisbouwkosten in plaats van duurder te worden door het aantal bestaande gebouwen."
         }
       }
     },
@@ -590,6 +631,10 @@
         "ventRealityLargeMultiplier": {
           "label": "Násobitel velkého průduchu",
           "description": "Násobitel výstupu Reality u velkého dutého průduchu."
+        },
+        "enableFlatBuildCosts": {
+          "label": "Vypnout škálování stavební ceny",
+          "description": "Každá stavba si ponechá základní cenu a nezdražuje podle počtu již postavených kusů."
         }
       }
     },
@@ -640,6 +685,10 @@
         "ventRealityLargeMultiplier": {
           "label": "Mnożnik dużego ujścia",
           "description": "Mnożnik produkcji Reality dużego pustego ujścia."
+        },
+        "enableFlatBuildCosts": {
+          "label": "Wyłącz skalowanie kosztu budowy",
+          "description": "Każdy budynek zachowuje bazowy koszt budowy zamiast drożeć wraz z liczbą już zbudowanych."
         }
       }
     },
@@ -690,6 +739,10 @@
         "ventRealityLargeMultiplier": {
           "label": "大ベント倍率",
           "description": "大きな空洞ベントのReality出力に適用する倍率。"
+        },
+        "enableFlatBuildCosts": {
+          "label": "建設コスト倍率を無効化",
+          "description": "各建物の建設コストを基礎価格のままにし、建設済み数で上昇しないようにします。"
         }
       }
     },
@@ -740,6 +793,10 @@
         "ventRealityLargeMultiplier": {
           "label": "큰 통풍구 배율",
           "description": "큰 빈 통풍구의 Reality 생산량에 적용되는 배율."
+        },
+        "enableFlatBuildCosts": {
+          "label": "건설 비용 배율 끄기",
+          "description": "모든 건물이 기존 건설 수에 따라 비싸지지 않고 기본 건설 비용을 유지합니다."
         }
       }
     },
@@ -790,6 +847,10 @@
         "ventRealityLargeMultiplier": {
           "label": "大空心石现实渗入倍率",
           "description": "大空心石渗入的现实的数量倍率。"
+        },
+        "enableFlatBuildCosts": {
+          "label": "关闭建造耗材倍率",
+          "description": "每个建筑始终按基础耗材价格建造，不再随已建数量提高。"
         }
       }
     },
@@ -840,6 +901,10 @@
         "ventRealityLargeMultiplier": {
           "label": "大噴口倍率",
           "description": "套用於大空心噴口 Reality 產出的倍率。"
+        },
+        "enableFlatBuildCosts": {
+          "label": "關閉建造耗材倍率",
+          "description": "每個建築始終按基礎耗材價格建造，不再隨已建數量提高。"
         }
       }
     },
@@ -890,6 +955,10 @@
         "ventRealityLargeMultiplier": {
           "label": "ตัวคูณช่องใหญ่",
           "description": "ตัวคูณผลผลิต Reality ของช่องกลวงขนาดใหญ่"
+        },
+        "enableFlatBuildCosts": {
+          "label": "ปิดการเพิ่มต้นทุนก่อสร้าง",
+          "description": "สิ่งปลูกสร้างทุกชนิดใช้ต้นทุนพื้นฐานเสมอ ไม่เพิ่มตามจำนวนที่สร้างไว้แล้ว"
         }
       }
     },
@@ -940,6 +1009,10 @@
         "ventRealityLargeMultiplier": {
           "label": "Nagy nyílás szorzó",
           "description": "A nagy üreges nyílás Reality termelésére alkalmazott szorzó."
+        },
+        "enableFlatBuildCosts": {
+          "label": "Építési költség skálázása ki",
+          "description": "Minden épület megtartja az alap építési költségét, és nem drágul a már megépített darabszám alapján."
         }
       }
     },
@@ -990,6 +1063,10 @@
         "ventRealityLargeMultiplier": {
           "label": "Lielās atveres reizinātājs",
           "description": "Reizinātājs lielās dobās atveres Reality ieguvei."
+        },
+        "enableFlatBuildCosts": {
+          "label": "Izslēgt būves izmaksu mērogošanu",
+          "description": "Katra būve saglabā pamata būvniecības izmaksas, nevis kļūst dārgāka pēc jau uzbūvētā skaita."
         }
       }
     },
@@ -1040,6 +1117,10 @@
         "ventRealityLargeMultiplier": {
           "label": "Multiplicator vent mare",
           "description": "Multiplicator aplicat producției Reality a ventului gol mare."
+        },
+        "enableFlatBuildCosts": {
+          "label": "Dezactivează scalarea costului de construire",
+          "description": "Fiecare clădire păstrează costul de bază, fără să crească după numărul deja construit."
         }
       }
     },
@@ -1090,6 +1171,10 @@
         "ventRealityLargeMultiplier": {
           "label": "Multiplikator for stor ventil",
           "description": "Multiplikator brukt på Reality-produksjonen til den store hule ventilen."
+        },
+        "enableFlatBuildCosts": {
+          "label": "Slå av byggkostnadsskalering",
+          "description": "Hver bygning beholder grunnkostnaden i stedet for å bli dyrere ut fra antallet som allerede er bygget."
         }
       }
     },
@@ -1140,6 +1225,10 @@
         "ventRealityLargeMultiplier": {
           "label": "大空心石现实渗入倍率",
           "description": "大空心石渗入的现实的数量倍率。"
+        },
+        "enableFlatBuildCosts": {
+          "label": "关闭建造耗材倍率",
+          "description": "每个建筑始终按基础耗材价格建造，不再随已建数量提高。"
         }
       }
     }

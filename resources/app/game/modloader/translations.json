@@ -472,7 +472,7 @@
               "description": "新增在结局和致谢名单的跳过功能。"
             },
             "enableAccessibilityButtons": {
-              "label": "辅助按钮",
+              "label": "游戏内设置按钮",
               "description": "鼠标移动到底部中间时会弹出设置按钮。"
             },
             "enableStabilizerSurgeFlashReduction": {
@@ -497,8 +497,8 @@
               }
             },
             "resourceGlowColors": {
-              "label": "资源发光颜色调色板",
-              "description": "可自定义设置每周资源的发光颜色。"
+              "label": "资源发光颜色自定义",
+              "description": "可自定义设置每种资源的发光颜色。"
             },
             "enableViewDistance": {
               "label": "禁用视野距离限制",
@@ -549,7 +549,7 @@
               "description": "从虚空维度返回现实维度时，移除长时间的白色淡出效果，直接显示清晰画面。"
             },
             "enableExplainerFix": {
-              "label": "提示修复",
+              "label": "提示句修复",
               "description": "修复提示语在切换语言后不刷新，并让虚空世界里的提示文字变成亮色以便看清。"
             }
           }
@@ -732,7 +732,7 @@
           }
         },
         "Cattail_TweaksQuality_Custom-Background-Color": {
-          "name": "自定义背景颜色",
+          "name": "背景颜色自定义",
           "description": "清理现实世界机器贴图，让烘焙的白色底色变透明，并将烘焙地面阴影渲染为中性透明阴影。",
           "config": {
             "globalThresholds": {
@@ -849,7 +849,7 @@
               "description": "从虚空维度返回现实维度时，移除长时间的白色淡出效果，直接显示清晰画面。"
             },
             "enableExplainerFix": {
-              "label": "提示修复",
+              "label": "提示句修复",
               "description": "修复提示语在切换语言后不刷新，并让虚空世界里的提示文字变成亮色以便看清。"
             }
           }

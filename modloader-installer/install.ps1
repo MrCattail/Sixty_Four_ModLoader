@@ -227,6 +227,13 @@ if ($SkipMods) {
 	}
 }
 
+$sourceInstaller = Join-Path $sourceRoot 'modloader-installer'
+$targetInstaller = Join-Path $targetRoot 'modloader-installer'
+if (Test-Path -LiteralPath $sourceInstaller) {
+	Copy-DirectoryContents -Source $sourceInstaller -Target $targetInstaller
+	Write-Host 'Updated modloader-installer files.'
+}
+
 $verify = Join-Path $targetGame 'modloader\tools\verify.ps1'
 if (Test-Path -LiteralPath $verify) {
 	& powershell -NoProfile -ExecutionPolicy Bypass -File $verify

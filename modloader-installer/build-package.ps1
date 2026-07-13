@@ -103,14 +103,18 @@ $packageReadme = @'
 ## Easy Install
 
 1. Extract this zip into the Sixty Four `win-unpacked` folder.
-2. Open `modloader-installer`.
-3. Double-click `Install ModLoader.cmd`.
-4. Start the game.
-5. Press `Ctrl+M` to open the ModLoader panel.
+2. Open `modloader-installer` and double-click `Install ModLoader.cmd`.
+3. Start the game.
+4. Press `Ctrl+M` to open the ModLoader panel.
 
 The folder should contain `sixtyfour.exe`, `resources`, and
 `modloader-installer` at the same level. This package does not include copied
 Sixty Four source files; the installer patches the local game files in place.
+
+If Windows extracts the zip into `win-unpacked\SixtyFour-ModLoader`, open
+`SixtyFour-ModLoader\modloader-installer` and run `Install ModLoader.cmd` there.
+The installer will detect the nested package and install into the parent
+`win-unpacked` folder automatically.
 
 ## Easy Update
 

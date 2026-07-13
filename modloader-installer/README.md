@@ -13,9 +13,13 @@ D:\Steam\steamapps\common\Sixty Four\win-unpacked
 For most players:
 
 1. Extract the ModLoader zip into the Sixty Four `win-unpacked` folder.
-2. Open `modloader-installer`.
-3. Double-click `Install ModLoader.cmd`.
-4. Start the game and press `Ctrl+M`.
+2. Open `modloader-installer` and double-click `Install ModLoader.cmd`.
+3. Start the game and press `Ctrl+M`.
+
+If Windows extracts the zip into a new `SixtyFour-ModLoader` folder inside
+`win-unpacked`, open `SixtyFour-ModLoader\modloader-installer` and double-click
+`Install ModLoader.cmd` there. The installer will detect the nested package and
+install into the parent `win-unpacked` folder automatically.
 
 Use `modloader-installer\update.cmd` to update from any newer ModLoader zip,
 `modloader-installer\Uninstall ModLoader.cmd` to restore the latest install backup, or
@@ -63,6 +67,7 @@ The installer:
 - backs up core files to `resources/app/game/modloader/state/install-backups/`
 - patches the local game files with the ModLoader hooks
 - copies `modloader/`
+- copies `modloader-installer/` into the game folder for future updates
 - copies mod folders and templates
 - keeps an existing `mods/enabled.json`
 - runs `verify.ps1`
