@@ -8,6 +8,9 @@
     "version": "0.1.2"
   },
   "loaderVersion": ">=0.1.0",
+  "languageSupport": {
+    "gameLanguage": true
+  },
   "entry": "scripts/main.js",
   "dependencies": [
     "Cattail_TweaksQuality_Tweaks"

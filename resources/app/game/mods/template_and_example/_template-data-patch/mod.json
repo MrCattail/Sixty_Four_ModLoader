@@ -3,6 +3,11 @@
   "name": "Template Data Patch",
   "version": "0.1.0",
   "loaderVersion": ">=0.1.0",
-  "data": ["data/patch.json"],
+  "languageSupport": {
+    "gameLanguage": false
+  },
+  "data": [
+    "data/patch.json"
+  ],
   "description": "Template for declarative data patches. Do not enable directly."
 }

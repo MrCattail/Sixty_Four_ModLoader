@@ -70,6 +70,21 @@ labels follow the current game language where ModLoader translations exist.
 The lower-left status line also shows the loader version, enabled mod count,
 and `Ctrl+M` reminder.
 
+## Translation Catalog
+
+Open `Ctrl+M` -> Menu Settings -> `translations` to create or open
+`resources/app/game/modloader/translations.json`. The file is organized as
+`language -> modloader/mods -> text` and can override ModLoader panel labels,
+mod names/descriptions, config labels/descriptions, and slider value labels.
+
+Mods can declare whether they follow the game's language switching with:
+
+```json
+"languageSupport": { "gameLanguage": true }
+```
+
+The catalog only changes display text at runtime. It is local user data and is
+excluded from release packages so updates do not overwrite a player's edits.
 ## Example Building
 
 Enable the entity example with:

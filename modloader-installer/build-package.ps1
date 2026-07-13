@@ -76,7 +76,7 @@ Copy-DirectoryFiltered `
 Copy-DirectoryFiltered `
 	-Source (Join-Path $packageRoot 'resources\app\game\modloader') `
 	-Target (Join-Path $stagingRoot 'resources\app\game\modloader') `
-	-ExcludePrefixes @('state/')
+	-ExcludePrefixes @('state/', 'translations.json')
 
 Copy-DirectoryFiltered `
 	-Source (Join-Path $packageRoot 'resources\app\game\mods') `

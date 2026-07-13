@@ -3,6 +3,9 @@
   "name": "Template Building",
   "version": "0.1.0",
   "loaderVersion": ">=0.1.0",
+  "languageSupport": {
+    "gameLanguage": true
+  },
   "entry": "scripts/main.js",
   "config": {
     "basePrice": {

@@ -8,6 +8,9 @@
     "version": "0.1.0"
   },
   "loaderVersion": ">=0.1.0",
+  "languageSupport": {
+    "gameLanguage": true
+  },
   "entry": "scripts/main.js",
   "locale": [
     "locale/dynamic-details.json"

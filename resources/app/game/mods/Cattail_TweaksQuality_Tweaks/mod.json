@@ -8,8 +8,11 @@
     "version": "0.1.0"
   },
   "loaderVersion": ">=0.1.0",
+  "languageSupport": {
+    "gameLanguage": true
+  },
   "entries": [
-    "scripts/explainer-language-fix.js",
+    "scripts/explainer-fix.js",
     "scripts/ending-skip.js",
     "scripts/accessibility-buttons.js",
     "scripts/stabilizer-surge-flash-reduction.js",
@@ -27,11 +30,12 @@
     "Cattail_Tweaks_Explainer-Language-Fix"
   ],
   "config": {
-    "enableExplainerLanguageFix": {
+    "enableExplainerFix": {
       "type": "boolean",
-      "label": "Explainer language fix",
+      "label": "Explainer fix",
       "default": true,
-      "description": "Refresh pulsing explainer hints immediately after language changes."
+      "description": "Refresh pulsing explainer hints after language changes and use readable light text in the void.",
+      "reloadPolicy": "hot"
     },
     "enableEndingSkip": {
       "type": "boolean",
@@ -225,8 +229,8 @@
     "playTimeCounterPosition": {
       "type": "slider",
       "label": "Play time counter position",
-      "default": 0,
-      "description": "Slide between bottom-right, top-center, and bottom-left.",
+      "default": 2,
+      "description": "Slide between bottom-left, top-center, and bottom-right.",
       "reloadPolicy": "hot",
       "valueType": "integer",
       "min": 0,
@@ -234,26 +238,26 @@
       "step": 1,
       "valueLabels": {
         "0": {
-          "en": "bottom-right",
-          "sch": "右下角",
-          "modsch": "右下角",
-          "ru": "Внизу справа",
-          "de": "Unten rechts",
-          "ptbr": "Inferior direito",
-          "it": "In basso a destra",
-          "es": "Abajo derecha",
-          "fr": "En bas a droite",
-          "nl": "Rechtsonder",
-          "cz": "Vpravo dole",
-          "pl": "Prawy dol",
-          "jp": "右下",
-          "kr": "오른쪽 아래",
-          "tch": "右下角",
-          "thai": "มุมขวาล่าง",
-          "hu": "Jobb also",
-          "lv": "Apaksa pa labi",
-          "ro": "Jos dreapta",
-          "no": "Nederst til hoyre"
+          "en": "bottom-left",
+          "sch": "左下角",
+          "modsch": "左下角",
+          "ru": "Внизу слева",
+          "de": "Unten links",
+          "ptbr": "Inferior esquerdo",
+          "it": "In basso a sinistra",
+          "es": "Abajo izquierda",
+          "fr": "En bas a gauche",
+          "nl": "Linksonder",
+          "cz": "Vlevo dole",
+          "pl": "Lewy dol",
+          "jp": "左下",
+          "kr": "왼쪽 아래",
+          "tch": "左下角",
+          "thai": "มุมซ้ายล่าง",
+          "hu": "Bal also",
+          "lv": "Apaksa pa kreisi",
+          "ro": "Jos stanga",
+          "no": "Nederst til venstre"
         },
         "1": {
           "en": "top-center",
@@ -278,42 +282,42 @@
           "no": "Overst i midten"
         },
         "2": {
-          "en": "bottom-left",
-          "sch": "左下角",
-          "modsch": "左下角",
-          "ru": "Внизу слева",
-          "de": "Unten links",
-          "ptbr": "Inferior esquerdo",
-          "it": "In basso a sinistra",
-          "es": "Abajo izquierda",
-          "fr": "En bas a gauche",
-          "nl": "Linksonder",
-          "cz": "Vlevo dole",
-          "pl": "Lewy dol",
-          "jp": "左下",
-          "kr": "왼쪽 아래",
-          "tch": "左下角",
-          "thai": "มุมซ้ายล่าง",
-          "hu": "Bal also",
-          "lv": "Apaksa pa kreisi",
-          "ro": "Jos stanga",
-          "no": "Nederst til venstre"
+          "en": "bottom-right",
+          "sch": "右下角",
+          "modsch": "右下角",
+          "ru": "Внизу справа",
+          "de": "Unten rechts",
+          "ptbr": "Inferior direito",
+          "it": "In basso a destra",
+          "es": "Abajo derecha",
+          "fr": "En bas a droite",
+          "nl": "Rechtsonder",
+          "cz": "Vpravo dole",
+          "pl": "Prawy dol",
+          "jp": "右下",
+          "kr": "오른쪽 아래",
+          "tch": "右下角",
+          "thai": "มุมขวาล่าง",
+          "hu": "Jobb also",
+          "lv": "Apaksa pa labi",
+          "ro": "Jos dreapta",
+          "no": "Nederst til hoyre"
         }
       },
       "valueAliases": {
-        "bottom-right": 0,
-        "bottom right": 0,
-        "bottom": 0,
-        "right": 0,
+        "bottom-left": 0,
+        "bottom left": 0,
+        "left-bottom": 0,
+        "left bottom": 0,
+        "left": 0,
         "top-center": 1,
         "top center": 1,
         "center-top": 1,
         "top": 1,
-        "bottom-left": 2,
-        "bottom left": 2,
-        "left-bottom": 2,
-        "left bottom": 2,
-        "left": 2
+        "bottom-right": 2,
+        "bottom right": 2,
+        "bottom": 2,
+        "right": 2
       }
     },
     "resourceGlowColors": {
@@ -357,17 +361,13 @@
       "description": "Used when the saved zoom value is missing or invalid."
     }
   },
-  "description": "Combines view distance limits, ending skip, accessibility buttons, stabilizer surge flash reduction, void return fade skip, resource glow colors, chasm line rendering, floor grid outlines, play-time counter, and dynamic explainer language refresh into one multi-entry quality mod.",
+  "description": "Combines view distance limits, ending skip, accessibility buttons, stabilizer surge flash reduction, void return fade skip, resource glow colors, chasm line rendering, floor grid outlines, play-time counter, and explainer fixes into one multi-entry quality mod.",
   "reloadOnConfigChange": true,
   "translations": {
     "sch": {
       "name": "优化和修复",
       "description": "优化和修复游戏中的部分内容。",
       "config": {
-        "enableExplainerLanguageFix": {
-          "label": "提示语言修复",
-          "description": "修复了切换语言后提示不跟随语言切换的问题。"
-        },
         "enableEndingSkip": {
           "label": "结局跳过",
           "description": "新增在结局和致谢名单的跳过功能。"
@@ -425,7 +425,7 @@
           "description": "无论距离多远，逆裂缝的绘线都会保持渲染。"
         },
         "enableFloorGridLines": {
-          "label": "显示地板方格边框",
+          "label": "地板方格边框显示",
           "description": "新增地板方格边框，方便数格子。"
         },
         "floorGridLineRealityColor": {
@@ -439,6 +439,10 @@
         "enableVoidReturnFadeSkip": {
           "label": "禁用回到现实白屏淡出效果",
           "description": "从虚空维度返回现实维度时，移除长时间的白色淡出效果，直接显示清晰画面。"
+        },
+        "enableExplainerFix": {
+          "label": "提示修复",
+          "description": "修复提示语在切换语言后不刷新，并让虚空世界里的提示文字变成亮色以便看清。"
         }
       }
     },
@@ -446,10 +450,6 @@
       "name": "优化和修复",
       "description": "优化和修复游戏中的部分内容。",
       "config": {
-        "enableExplainerLanguageFix": {
-          "label": "提示语言修复",
-          "description": "修复了切换语言后提示不跟随语言切换的问题。"
-        },
         "enableEndingSkip": {
           "label": "结局跳过",
           "description": "新增在结局和致谢名单的跳过功能。"
@@ -521,15 +521,16 @@
         "enableVoidReturnFadeSkip": {
           "label": "禁用回到现实白屏淡出效果",
           "description": "从虚空维度返回现实维度时，移除长时间的白色淡出效果，直接显示清晰画面。"
+        },
+        "enableExplainerFix": {
+          "label": "提示修复",
+          "description": "修复提示语在切换语言后不刷新，并让虚空世界里的提示文字变成亮色以便看清。"
         }
       }
     },
     "en": {
       "name": "Tweaks",
       "config": {
-        "enableExplainerLanguageFix": {
-          "label": "Explainer language fix"
-        },
         "enableEndingSkip": {
           "label": "Ending skip"
         },
@@ -547,7 +548,7 @@
         },
         "playTimeCounterPosition": {
           "label": "Play time counter position",
-          "description": "Slide between bottom-right, top-center, and bottom-left."
+          "description": "Slide between bottom-left, top-center, and bottom-right."
         },
         "resourceGlowColors": {
           "label": "Resource glow palette"
@@ -591,15 +592,16 @@
         "enableVoidReturnFadeSkip": {
           "label": "Skip void return fade",
           "description": "When returning from the void to reality, remove the long white recovery fade and show the clear view immediately."
+        },
+        "enableExplainerFix": {
+          "label": "Explainer fix",
+          "description": "Refresh pulsing explainer hints after language changes and use readable light text in the void."
         }
       }
     },
     "ru": {
       "name": "Настройки удобства",
       "config": {
-        "enableExplainerLanguageFix": {
-          "label": "Исправление языка подсказок"
-        },
         "enableEndingSkip": {
           "label": "Пропуск концовки"
         },
@@ -617,7 +619,7 @@
         },
         "playTimeCounterPosition": {
           "label": "Позиция счетчика времени",
-          "description": "Slide between bottom-right, top-center, and bottom-left."
+          "description": "Slide between bottom-left, top-center, and bottom-right."
         },
         "resourceGlowColors": {
           "label": "Палитра свечения ресурсов"
@@ -661,15 +663,16 @@
         "enableVoidReturnFadeSkip": {
           "label": "Propusk belogo zatuhaniya iz pustoty",
           "description": "Pri vozvrate iz pustoty v realnost ubiraet dolgoe beloe vosstanovlenie i srazu pokazyvaet chetkiy vid."
+        },
+        "enableExplainerFix": {
+          "label": "Ispravlenie podskazok",
+          "description": "Obnovlyaet pulsiruyushchie podskazki posle smeny yazyka i delaet tekst svetlym v pustote."
         }
       }
     },
     "de": {
       "name": "Komfortanpassungen",
       "config": {
-        "enableExplainerLanguageFix": {
-          "label": "Hinweis-Sprachfix"
-        },
         "enableEndingSkip": {
           "label": "Ende überspringen"
         },
@@ -687,7 +690,7 @@
         },
         "playTimeCounterPosition": {
           "label": "Position des Spielzeitzählers",
-          "description": "Slide between bottom-right, top-center, and bottom-left."
+          "description": "Slide between bottom-left, top-center, and bottom-right."
         },
         "resourceGlowColors": {
           "label": "Ressourcen-Leuchtpalette"
@@ -731,15 +734,16 @@
         "enableVoidReturnFadeSkip": {
           "label": "Rueckkehr-Fade aus der Leere ueberspringen",
           "description": "Beim Zurueckkehren aus der Leere zur Realitaet wird die lange weisse Aufhellung entfernt."
+        },
+        "enableExplainerFix": {
+          "label": "Hinweis-Fix",
+          "description": "Aktualisiert pulsierende Hinweise nach Sprachwechseln und nutzt gut lesbaren hellen Text in der Leere."
         }
       }
     },
     "ptbr": {
       "name": "Ajustes de qualidade",
       "config": {
-        "enableExplainerLanguageFix": {
-          "label": "Correção do idioma das dicas"
-        },
         "enableEndingSkip": {
           "label": "Pular final"
         },
@@ -757,7 +761,7 @@
         },
         "playTimeCounterPosition": {
           "label": "Posição do contador de tempo",
-          "description": "Slide between bottom-right, top-center, and bottom-left."
+          "description": "Slide between bottom-left, top-center, and bottom-right."
         },
         "resourceGlowColors": {
           "label": "Paleta de brilho dos recursos"
@@ -801,15 +805,16 @@
         "enableVoidReturnFadeSkip": {
           "label": "Pular fade ao voltar do vazio",
           "description": "Ao voltar do vazio para a realidade, remove o longo fade branco e mostra a tela nitida imediatamente."
+        },
+        "enableExplainerFix": {
+          "label": "Correcao dos avisos",
+          "description": "Atualiza avisos pulsantes apos mudar o idioma e usa texto claro legivel no vazio."
         }
       }
     },
     "it": {
       "name": "Migliorie",
       "config": {
-        "enableExplainerLanguageFix": {
-          "label": "Correzione lingua suggerimenti"
-        },
         "enableEndingSkip": {
           "label": "Salta finale"
         },
@@ -827,7 +832,7 @@
         },
         "playTimeCounterPosition": {
           "label": "Posizione contatore tempo",
-          "description": "Slide between bottom-right, top-center, and bottom-left."
+          "description": "Slide between bottom-left, top-center, and bottom-right."
         },
         "resourceGlowColors": {
           "label": "Tavolozza bagliore risorse"
@@ -871,15 +876,16 @@
         "enableVoidReturnFadeSkip": {
           "label": "Salta dissolvenza ritorno dal vuoto",
           "description": "Quando torni dal vuoto alla realta, rimuove la lunga dissolvenza bianca e mostra subito la vista chiara."
+        },
+        "enableExplainerFix": {
+          "label": "Correzione suggerimenti",
+          "description": "Aggiorna i suggerimenti pulsanti dopo il cambio lingua e usa testo chiaro leggibile nel vuoto."
         }
       }
     },
     "es": {
       "name": "Ajustes de calidad",
       "config": {
-        "enableExplainerLanguageFix": {
-          "label": "Corrección de idioma de pistas"
-        },
         "enableEndingSkip": {
           "label": "Saltar final"
         },
@@ -897,7 +903,7 @@
         },
         "playTimeCounterPosition": {
           "label": "Posición del contador de tiempo",
-          "description": "Slide between bottom-right, top-center, and bottom-left."
+          "description": "Slide between bottom-left, top-center, and bottom-right."
         },
         "resourceGlowColors": {
           "label": "Paleta de brillo de recursos"
@@ -941,15 +947,16 @@
         "enableVoidReturnFadeSkip": {
           "label": "Omitir fundido al volver del vacio",
           "description": "Al volver del vacio a la realidad, elimina el largo fundido blanco y muestra la vista clara de inmediato."
+        },
+        "enableExplainerFix": {
+          "label": "Correccion de avisos",
+          "description": "Actualiza los avisos pulsantes tras cambiar idioma y usa texto claro legible en el vacio."
         }
       }
     },
     "fr": {
       "name": "Ajustements pratiques",
       "config": {
-        "enableExplainerLanguageFix": {
-          "label": "Correction langue des astuces"
-        },
         "enableEndingSkip": {
           "label": "Sauter la fin"
         },
@@ -967,7 +974,7 @@
         },
         "playTimeCounterPosition": {
           "label": "Position du compteur de temps",
-          "description": "Slide between bottom-right, top-center, and bottom-left."
+          "description": "Slide between bottom-left, top-center, and bottom-right."
         },
         "resourceGlowColors": {
           "label": "Palette de halo des ressources"
@@ -1011,15 +1018,16 @@
         "enableVoidReturnFadeSkip": {
           "label": "Ignorer le fondu de retour du vide",
           "description": "Au retour du vide vers la realite, supprime le long fondu blanc et affiche tout de suite une vue nette."
+        },
+        "enableExplainerFix": {
+          "label": "Correctif des indices",
+          "description": "Actualise les indices pulses apres les changements de langue et utilise un texte clair lisible dans le vide."
         }
       }
     },
     "nl": {
       "name": "Kwaliteitsaanpassingen",
       "config": {
-        "enableExplainerLanguageFix": {
-          "label": "Taalfix voor hints"
-        },
         "enableEndingSkip": {
           "label": "Einde overslaan"
         },
@@ -1037,7 +1045,7 @@
         },
         "playTimeCounterPosition": {
           "label": "Positie speeltijdteller",
-          "description": "Slide between bottom-right, top-center, and bottom-left."
+          "description": "Slide between bottom-left, top-center, and bottom-right."
         },
         "resourceGlowColors": {
           "label": "Gloedpalet van grondstoffen"
@@ -1081,15 +1089,16 @@
         "enableVoidReturnFadeSkip": {
           "label": "Witte fade na leegte overslaan",
           "description": "Bij terugkeer uit de leegte naar realiteit wordt de lange witte fade verwijderd."
+        },
+        "enableExplainerFix": {
+          "label": "Hint-fix",
+          "description": "Vernieuwt pulserende hints na taalwijzigingen en gebruikt leesbare lichte tekst in de leegte."
         }
       }
     },
     "cz": {
       "name": "Vylepšení",
       "config": {
-        "enableExplainerLanguageFix": {
-          "label": "Oprava jazyka nápověd"
-        },
         "enableEndingSkip": {
           "label": "Přeskočení konce"
         },
@@ -1107,7 +1116,7 @@
         },
         "playTimeCounterPosition": {
           "label": "Poloha počítadla času",
-          "description": "Slide between bottom-right, top-center, and bottom-left."
+          "description": "Slide between bottom-left, top-center, and bottom-right."
         },
         "resourceGlowColors": {
           "label": "Paleta záře surovin"
@@ -1151,15 +1160,16 @@
         "enableVoidReturnFadeSkip": {
           "label": "Preskocit bile blednuti z prazdnoty",
           "description": "Pri navratu z prazdnoty do reality odstrani dlouhe bile dozneni a hned ukaze cisty obraz."
+        },
+        "enableExplainerFix": {
+          "label": "Oprava napoved",
+          "description": "Obnovuje pulzujici napovedy po zmene jazyka a v prazdnote pouziva citelny svetly text."
         }
       }
     },
     "pl": {
       "name": "Usprawnienia",
       "config": {
-        "enableExplainerLanguageFix": {
-          "label": "Naprawa języka podpowiedzi"
-        },
         "enableEndingSkip": {
           "label": "Pomijanie zakończenia"
         },
@@ -1177,7 +1187,7 @@
         },
         "playTimeCounterPosition": {
           "label": "Pozycja licznika czasu",
-          "description": "Slide between bottom-right, top-center, and bottom-left."
+          "description": "Slide between bottom-left, top-center, and bottom-right."
         },
         "resourceGlowColors": {
           "label": "Paleta poświaty zasobów"
@@ -1221,15 +1231,16 @@
         "enableVoidReturnFadeSkip": {
           "label": "Pomin biale zanikanie po pustce",
           "description": "Po powrocie z pustki do rzeczywistosci usuwa dlugie biale zanikanie i od razu pokazuje czysty obraz."
+        },
+        "enableExplainerFix": {
+          "label": "Poprawka podpowiedzi",
+          "description": "Odswieza pulsujace podpowiedzi po zmianie jezyka i uzywa jasnego tekstu w pustce."
         }
       }
     },
     "jp": {
       "name": "便利調整",
       "config": {
-        "enableExplainerLanguageFix": {
-          "label": "ヒント言語修正"
-        },
         "enableEndingSkip": {
           "label": "エンディングスキップ"
         },
@@ -1247,7 +1258,7 @@
         },
         "playTimeCounterPosition": {
           "label": "プレイ時間カウンター位置",
-          "description": "Slide between bottom-right, top-center, and bottom-left."
+          "description": "Slide between bottom-left, top-center, and bottom-right."
         },
         "resourceGlowColors": {
           "label": "資源の光輪パレット"
@@ -1291,15 +1302,16 @@
         "enableVoidReturnFadeSkip": {
           "label": "Skip void return fade",
           "description": "Remove the long white recovery fade when returning from the void to reality."
+        },
+        "enableExplainerFix": {
+          "label": "Explainer fix",
+          "description": "Refresh explainer hints after language changes and use light text in the void."
         }
       }
     },
     "kr": {
       "name": "편의성 조정",
       "config": {
-        "enableExplainerLanguageFix": {
-          "label": "힌트 언어 수정"
-        },
         "enableEndingSkip": {
           "label": "엔딩 건너뛰기"
         },
@@ -1317,7 +1329,7 @@
         },
         "playTimeCounterPosition": {
           "label": "플레이 시간 카운터 위치",
-          "description": "Slide between bottom-right, top-center, and bottom-left."
+          "description": "Slide between bottom-left, top-center, and bottom-right."
         },
         "resourceGlowColors": {
           "label": "자원 발광 팔레트"
@@ -1361,15 +1373,16 @@
         "enableVoidReturnFadeSkip": {
           "label": "Skip void return fade",
           "description": "Remove the long white recovery fade when returning from the void to reality."
+        },
+        "enableExplainerFix": {
+          "label": "Explainer fix",
+          "description": "Refresh explainer hints after language changes and use light text in the void."
         }
       }
     },
     "tch": {
       "name": "便利調整",
       "config": {
-        "enableExplainerLanguageFix": {
-          "label": "提示語言修復"
-        },
         "enableEndingSkip": {
           "label": "結局跳過"
         },
@@ -1431,15 +1444,16 @@
         "enableVoidReturnFadeSkip": {
           "label": "跳過虛空返回白色恢復效果",
           "description": "從虛空世界返回現實世界時，移除長時間白色恢復淡出，直接顯示清晰畫面。"
+        },
+        "enableExplainerFix": {
+          "label": "提示修復",
+          "description": "修復提示語在切換語言後不刷新，並讓虛空世界裡的提示文字變成亮色以便看清。"
         }
       }
     },
     "thai": {
       "name": "การปรับแต่งความสะดวก",
       "config": {
-        "enableExplainerLanguageFix": {
-          "label": "แก้ภาษาคำแนะนำ"
-        },
         "enableEndingSkip": {
           "label": "ข้ามตอนจบ"
         },
@@ -1457,7 +1471,7 @@
         },
         "playTimeCounterPosition": {
           "label": "ตำแหน่งตัวนับเวลาเล่น",
-          "description": "Slide between bottom-right, top-center, and bottom-left."
+          "description": "Slide between bottom-left, top-center, and bottom-right."
         },
         "resourceGlowColors": {
           "label": "พาเลตแสงทรัพยากร"
@@ -1501,15 +1515,16 @@
         "enableVoidReturnFadeSkip": {
           "label": "Skip void return fade",
           "description": "Remove the long white recovery fade when returning from the void to reality."
+        },
+        "enableExplainerFix": {
+          "label": "Explainer fix",
+          "description": "Refresh explainer hints after language changes and use light text in the void."
         }
       }
     },
     "hu": {
       "name": "Kényelmi finomítások",
       "config": {
-        "enableExplainerLanguageFix": {
-          "label": "Tippnyelv javítása"
-        },
         "enableEndingSkip": {
           "label": "Befejezés átugrása"
         },
@@ -1527,7 +1542,7 @@
         },
         "playTimeCounterPosition": {
           "label": "Játékidő-számláló helye",
-          "description": "Slide between bottom-right, top-center, and bottom-left."
+          "description": "Slide between bottom-left, top-center, and bottom-right."
         },
         "resourceGlowColors": {
           "label": "Erőforrás-fény paletta"
@@ -1571,15 +1586,16 @@
         "enableVoidReturnFadeSkip": {
           "label": "Urbeli visszateres feher fade kihagyasa",
           "description": "Az urbol a valosagba visszaterve eltavolitja a hosszu feher atmenetet."
+        },
+        "enableExplainerFix": {
+          "label": "Tipp javitas",
+          "description": "Nyelvvaltas utan frissiti a pulzalo tippeket, es az urben vilagos, olvashato szoveget hasznal."
         }
       }
     },
     "lv": {
       "name": "Ērtības uzlabojumi",
       "config": {
-        "enableExplainerLanguageFix": {
-          "label": "Padomu valodas labojums"
-        },
         "enableEndingSkip": {
           "label": "Beigu izlaišana"
         },
@@ -1597,7 +1613,7 @@
         },
         "playTimeCounterPosition": {
           "label": "Spēles laika skaitītāja vieta",
-          "description": "Slide between bottom-right, top-center, and bottom-left."
+          "description": "Slide between bottom-left, top-center, and bottom-right."
         },
         "resourceGlowColors": {
           "label": "Resursu spīduma palete"
@@ -1641,15 +1657,16 @@
         "enableVoidReturnFadeSkip": {
           "label": "Izlaist balto atgriesanos no tuksuma",
           "description": "Atgriezoties no tuksuma realitate, nonem ilgo balto parpludumu un uzreiz rada skaidru skatu."
+        },
+        "enableExplainerFix": {
+          "label": "Padomu labojums",
+          "description": "Atsvaidzina pulsojosus padomus pec valodas mainas un tuksumaa izmanto gaisu, salasamu tekstu."
         }
       }
     },
     "ro": {
       "name": "Ajustări utile",
       "config": {
-        "enableExplainerLanguageFix": {
-          "label": "Corecție limbă indicii"
-        },
         "enableEndingSkip": {
           "label": "Sari peste final"
         },
@@ -1667,7 +1684,7 @@
         },
         "playTimeCounterPosition": {
           "label": "Poziție contor timp",
-          "description": "Slide between bottom-right, top-center, and bottom-left."
+          "description": "Slide between bottom-left, top-center, and bottom-right."
         },
         "resourceGlowColors": {
           "label": "Paletă halou resurse"
@@ -1711,15 +1728,16 @@
         "enableVoidReturnFadeSkip": {
           "label": "Sari peste fade-ul din vid",
           "description": "La revenirea din vid in realitate, elimina estomparea alba lunga si arata imediat imaginea clara."
+        },
+        "enableExplainerFix": {
+          "label": "Corectie indicii",
+          "description": "Actualizeaza indiciile pulsante dupa schimbarea limbii si foloseste text luminos in vid."
         }
       }
     },
     "no": {
       "name": "Praktiske justeringer",
       "config": {
-        "enableExplainerLanguageFix": {
-          "label": "Språkfiks for hint"
-        },
         "enableEndingSkip": {
           "label": "Hopp over slutt"
         },
@@ -1737,7 +1755,7 @@
         },
         "playTimeCounterPosition": {
           "label": "Plassering av spilletidteller",
-          "description": "Slide between bottom-right, top-center, and bottom-left."
+          "description": "Slide between bottom-left, top-center, and bottom-right."
         },
         "resourceGlowColors": {
           "label": "Glødepalett for ressurser"
@@ -1781,6 +1799,10 @@
         "enableVoidReturnFadeSkip": {
           "label": "Hopp over hvit fade fra tomrom",
           "description": "Nar du gar fra tomrommet tilbake til virkeligheten, fjernes den lange hvite faden."
+        },
+        "enableExplainerFix": {
+          "label": "Hint-fiks",
+          "description": "Oppdaterer pulserende hint etter sprakbytte og bruker lys, lesbar tekst i tomrommet."
         }
       }
     }

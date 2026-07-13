@@ -8,6 +8,9 @@
     "version": "0.1.0"
   },
   "loaderVersion": ">=0.1.0",
+  "languageSupport": {
+    "gameLanguage": true
+  },
   "languages": [
     "modsch"
   ],

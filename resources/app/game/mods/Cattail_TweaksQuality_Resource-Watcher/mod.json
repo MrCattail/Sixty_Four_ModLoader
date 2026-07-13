@@ -8,6 +8,9 @@
     "version": "0.1.0"
   },
   "loaderVersion": ">=0.1.0",
+  "languageSupport": {
+    "gameLanguage": true
+  },
   "entry": "scripts/main.js",
   "description": "Adds a bottom-right resource watcher button that shrinks the game into an always-on-top resource monitor without changing vanilla scripts. Integrates with Dynamic Details resource-source data when that mod is enabled.",
   "translations": {

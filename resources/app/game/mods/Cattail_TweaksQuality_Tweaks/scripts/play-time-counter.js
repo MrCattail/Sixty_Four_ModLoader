@@ -74,10 +74,10 @@
 	}
 
 	function getPlayTimeCounterPositionMode(api) {
-		const raw = readConfigWithLegacy(api, 'playTimeCounterPosition', 0)
+		const raw = readConfigWithLegacy(api, 'playTimeCounterPosition', 2)
 		const normalized = normalizePlayTimeCounterPositionValue(raw)
 		if (normalized === 1) return topPosition
-		if (normalized === 2) return leftPosition
+		if (normalized === 0) return leftPosition
 		return defaultPosition
 	}
 
@@ -150,14 +150,19 @@
 	function migrateLegacyPlayTimeCounterConfig(api) {
 		try {
 			const ownKey = configStorageKey(api.id, 'playTimeCounterPosition')
+			const migratedKey = configStorageKey(api.id, 'playTimeCounterPositionOrderV2')
+			const migrated = localStorage.getItem(migratedKey) === 'true'
 			const ownRaw = localStorage.getItem(ownKey)
 			if (ownRaw !== null) {
-				localStorage.setItem(ownKey, JSON.stringify(normalizePlayTimeCounterPositionValue(parseStoredConfigValue(ownRaw))))
+				const value = parseStoredConfigValue(ownRaw)
+				localStorage.setItem(ownKey, JSON.stringify(normalizePlayTimeCounterPositionValue(migrated ? value : convertLegacyPlayTimeCounterPositionValue(value))))
+				localStorage.setItem(migratedKey, 'true')
 				return
 			}
 			const legacyRaw = localStorage.getItem(configStorageKey(LEGACY_MOD_ID, 'playTimeCounterPosition'))
 			if (legacyRaw !== null) {
-				localStorage.setItem(ownKey, JSON.stringify(normalizePlayTimeCounterPositionValue(parseStoredConfigValue(legacyRaw))))
+				localStorage.setItem(ownKey, JSON.stringify(normalizePlayTimeCounterPositionValue(convertLegacyPlayTimeCounterPositionValue(parseStoredConfigValue(legacyRaw)))))
+				localStorage.setItem(migratedKey, 'true')
 			}
 		} catch (error) {}
 	}
@@ -165,11 +170,22 @@
 	function normalizePlayTimeCounterPositionValue(value) {
 		if (value === 1 || value === true) return 1
 		if (value === 2) return 2
-		if (value === 0 || value === false) return 0
+		if (value === 0) return 0
+		if (value === false) return 2
 		const text = String(value ?? '').trim().toLowerCase()
 		if (text === '1' || text === 'top' || text === 'top-center' || text === 'top center' || text === 'center-top') return 1
-		if (text === '2' || text === 'left' || text === 'bottom-left' || text === 'bottom left' || text === 'left-bottom' || text === 'left bottom') return 2
-		return 0
+		if (text === '0' || text === 'left' || text === 'bottom-left' || text === 'bottom left' || text === 'left-bottom' || text === 'left bottom') return 0
+		if (text === '2' || text === 'right' || text === 'bottom-right' || text === 'bottom right') return 2
+		return 2
+	}
+
+	function convertLegacyPlayTimeCounterPositionValue(value) {
+		if (value === 0 || value === false) return 2
+		if (value === 2) return 0
+		const text = String(value ?? '').trim().toLowerCase()
+		if (text === '0') return 2
+		if (text === '2') return 0
+		return value
 	}
 	function readConfigWithLegacy(api, key, fallback) {
 		try {

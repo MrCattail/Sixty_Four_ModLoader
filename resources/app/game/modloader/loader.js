@@ -2,7 +2,7 @@
 	'use strict'
 
 	const state = {
-		version: '0.1.1',
+		version: '0.1.2',
 		booted: false,
 		mods: [],
 		modById: {},
@@ -24,6 +24,11 @@
 		statusLogoTimer: null,
 		statusDragging: false,
 		modFileTools: undefined,
+		translationCatalog: null,
+		translationCatalogMtimeMs: -1,
+		translationCatalogWatcher: null,
+		translationCatalogWatchTimer: null,
+		translationCatalogReadFailed: false,
 		game: null,
 		languagePatched: false,
 		panelMessage: '',
@@ -376,14 +381,16 @@
 	}
 	const PANEL_TEXT = {
 		en: {
-			close: 'Close', hideToEdge: 'Hide to edge', showFromEdge: 'Show ModLoader menu', menuSettings: 'Menu Settings', themeMode: 'Theme', darkMode: 'Dark', lightMode: 'Light', hideMode: 'Auto-hide mode', autoHide: 'Auto-hide', manualHide: 'Manual', sortMod: 'Sort mod', autoHideDelay: 'Auto-hide delay', secondsSuffix: 's', hideMenuDetails: 'Hide menu details', hideModFileDetails: 'Hide mod file details', show: 'Show', hide: 'Hide', installedMods: 'Installed mods', enabledEntries: 'Enabled entries', loadedMods: 'Loaded mods', issues: 'Issues', dataPatches: 'Data patches', wordPatches: 'Word patches', registeredLanguages: 'Registered languages', orphanEntities: 'Orphan entities', modManager: 'Mod Manager', selectAll: 'all', toggleNote: 'Toggle mods or edit config below.', changesRequireReload: 'Changes require reload.', configSaveNote: 'Config saved to localStorage; some mods need reload.', saveReload: 'Save & Reload', saveConfig: 'Save Config', insert: 'insert', folder: 'folder', deleteMod: 'Delete mod', config: 'Config', recentLog: 'Recent Log', noLogEntries: 'No log entries.', noModsFound: 'No mods with mod.json were found.', fileAccessUnavailable: 'File access is unavailable.', fileAccessLoadedOnly: 'File access is unavailable, so only loaded mods can be shown.', reloadHot: 'hot capable, reload now', reloadRestart: 'restart required', reloadRequired: 'reload required', idPrefix: 'id: {value}', uniquePrefix: 'unique: {value}', depsPrefix: 'deps: {value}', conflictsPrefix: 'conflicts: {value}', missingDependencies: 'Missing dependencies: {value}', conflictsEnabled: 'Conflicts enabled: {value}', savedReloading: 'Saved. Reloading...', saveFailed: 'Save failed: {value}', configSaved: 'Config saved.', noChanges: 'No changes to save.', changesCanceled: 'Canceled unsaved changes.', openFolderFailed: 'Could not open folder: {value}', deleteTitle: 'Delete Mod?', deleteMessage: 'Delete {name} from the mods folder? This cannot be undone.', deleteConfirm: 'Delete', cancel: 'Cancel', replaceTitle: 'Replace Mod?', replaceMessage: 'mods already contains {name}. Replace it with the imported mod?', replaceConfirm: 'Replace', deletedMod: 'Deleted {name}. Reload to unload already running code.', deleteFailed: 'Delete failed: {value}', importHint: 'Drop a file here or paste', importDetail: 'Drag a mod zip here, or copy a zip file and press paste. ModLoader will unpack it into the mods folder automatically.', importWaiting: 'Waiting for a zip file...', importNoZip: 'Drop or paste a .zip file.', importNoPath: 'Could not read the file path from the dropped file.', importing: 'Importing {name}...', importedMod: 'Imported {name}. Enable it and Save & Reload when ready.', importFailed: 'Import failed: {value}', importModeOff: 'Back to mod list', invalidZip: 'Only .zip mod packages can be imported.', zipNoMod: 'The zip does not contain a mod.json.', zipMultipleMods: 'The zip contains multiple mod folders; import one mod at a time.', zipExtractFailed: 'Could not extract zip: {value}', folderOpened: 'Opened mods folder.', replaceRenamedUniqueTitle: 'Update Renamed Mod?', replaceRenamedUniqueMessage: 'The new file has the same mod unique code as an installed mod. It is probably an update and rename.\n{oldName} -> {newName}\nReplace the old file?', replaceRenamedPreviousTitle: 'Mod Rename Detected', replaceRenamedPreviousMessage: 'This new file appears to be a rename of an installed file.\n{oldName} -> {newName}\nReplace the old file?', replaceOld: 'Replace', keepImported: 'Do not replace (add new file)', uniqueCodeEditTitle: 'Recommend changing mod unique code', uniqueCodeEditMessage: 'These two mods will share the same mod unique code. Change the imported mod unique code before adding it?', uniqueCodeLabel: 'Mod unique code', uniqueCodeConfirm: 'Confirm', uniqueCodeSkip: 'No', manifestReadFailed: 'Could not read mod.json: {value}'
+			close: 'Close', hideToEdge: 'Hide to edge', showFromEdge: 'Show ModLoader menu', menuSettings: 'Menu Settings', themeMode: 'Theme', darkMode: 'Dark', lightMode: 'Light', hideMode: 'Auto-hide mode', autoHide: 'Auto-hide', manualHide: 'Manual', sortMod: 'Sort mod', autoHideDelay: 'Auto-hide delay', secondsSuffix: 's', hideMenuDetails: 'Hide menu details', hideModFileDetails: 'Hide mod file details', show: 'Show', hide: 'Hide', installedMods: 'Installed mods', enabledEntries: 'Enabled entries', loadedMods: 'Loaded mods', issues: 'Issues', dataPatches: 'Data patches', wordPatches: 'Word patches', registeredLanguages: 'Registered languages', orphanEntities: 'Orphan entities', modManager: 'Mod Manager', selectAll: 'all', toggleNote: 'Toggle mods or edit config below.', changesRequireReload: 'Changes require reload.', configSaveNote: 'Config saved to localStorage; some mods need reload.', saveReload: 'Save & Reload', saveConfig: 'Save Config', insert: 'insert', folder: 'folder', deleteMod: 'Delete mod', config: 'Config', recentLog: 'Recent Log', noLogEntries: 'No log entries.', noModsFound: 'No mods with mod.json were found.', fileAccessUnavailable: 'File access is unavailable.', fileAccessLoadedOnly: 'File access is unavailable, so only loaded mods can be shown.', reloadHot: 'hot capable, reload now', reloadRestart: 'restart required', reloadRequired: 'reload required', idPrefix: 'id: {value}', uniquePrefix: 'unique: {value}', depsPrefix: 'deps: {value}', conflictsPrefix: 'conflicts: {value}', missingDependencies: 'Missing dependencies: {value}', conflictsEnabled: 'Conflicts enabled: {value}', savedReloading: 'Saved. Reloading...', saveFailed: 'Save failed: {value}', configSaved: 'Config saved.', noChanges: 'No changes to save.', changesCanceled: 'Canceled unsaved changes.', openFolderFailed: 'Could not open folder: {value}', deleteTitle: 'Delete Mod?', deleteMessage: 'Delete {name} from the mods folder? This cannot be undone.', deleteConfirm: 'Delete', cancel: 'Cancel', replaceTitle: 'Replace Mod?', replaceMessage: 'mods already contains {name}. Replace it with the imported mod?', replaceConfirm: 'Replace', deletedMod: 'Deleted {name}. Reload to unload already running code.', deleteFailed: 'Delete failed: {value}', importHint: 'Drop a file here or paste', importDetail: 'Drag a mod zip here, or copy a zip file and press paste. ModLoader will unpack it into the mods folder automatically.', importWaiting: 'Waiting for a zip file...', importNoZip: 'Drop or paste a .zip file.', importNoPath: 'Could not read the file path from the dropped file.', importing: 'Importing {name}...', importedMod: 'Imported {name}. Enable it and Save & Reload when ready.', importFailed: 'Import failed: {value}', importModeOff: 'Back to mod list', invalidZip: 'Only .zip mod packages can be imported.', zipNoMod: 'The zip does not contain a mod.json.', zipMultipleMods: 'The zip contains multiple mod folders; import one mod at a time.', zipExtractFailed: 'Could not extract zip: {value}', folderOpened: 'Opened mods folder.', replaceRenamedUniqueTitle: 'Update Renamed Mod?', replaceRenamedUniqueMessage: 'The new file has the same mod unique code as an installed mod. It is probably an update and rename.\n{oldName} -> {newName}\nReplace the old file?', replaceRenamedPreviousTitle: 'Mod Rename Detected', replaceRenamedPreviousMessage: 'This new file appears to be a rename of an installed file.\n{oldName} -> {newName}\nReplace the old file?', replaceOld: 'Replace', keepImported: 'Do not replace (add new file)', uniqueCodeEditTitle: 'Recommend changing mod unique code', uniqueCodeEditMessage: 'These two mods will share the same mod unique code. Change the imported mod unique code before adding it?', uniqueCodeLabel: 'Mod unique code', uniqueCodeConfirm: 'Confirm', uniqueCodeSkip: 'No', manifestReadFailed: 'Could not read mod.json: {value}', translationFile: 'translations', translationFileTitle: 'Open translation file', translationFileSynced: 'Translation file synced: {path}', translationFileFailed: 'Translation file failed: {value}'
 		},
 		sch: {
-			close: '\u5173\u95ed', hideToEdge: '\u9690\u85cf\u5230\u8fb9\u7f18', showFromEdge: '\u663e\u793a ModLoader \u83dc\u5355', menuSettings: 'Mod \u83dc\u5355\u8bbe\u7f6e', themeMode: '\u4eae\u8272 / \u6697\u8272\u6a21\u5f0f', darkMode: '\u6697\u8272', lightMode: '\u4eae\u8272', hideMode: '\u81ea\u52a8\u9690\u85cf\u6a21\u5f0f', autoHide: '\u81ea\u52a8\u9690\u85cf', manualHide: '\u624b\u52a8\u9690\u85cf', sortMod: '\u6392\u5e8f mod', autoHideDelay: '\u81ea\u52a8\u9690\u85cf\u79d2\u6570', secondsSuffix: '\u79d2', hideMenuDetails: '\u9690\u85cf\u83dc\u5355\u8be6\u60c5', hideModFileDetails: '\u9690\u85cf mod \u6587\u4ef6\u8be6\u60c5', show: '\u663e\u793a', hide: '\u9690\u85cf', installedMods: '\u5df2\u5b89\u88c5 mod', enabledEntries: '\u542f\u7528\u6761\u76ee', loadedMods: '\u5df2\u52a0\u8f7d mod', issues: '\u95ee\u9898', dataPatches: '\u6570\u636e\u8865\u4e01', wordPatches: '\u6587\u672c\u8865\u4e01', registeredLanguages: '\u5df2\u6ce8\u518c\u8bed\u8a00', orphanEntities: '\u5b64\u7acb\u5b9e\u4f53', modManager: 'Mod \u7ba1\u7406', selectAll: '\u5168\u9009', toggleNote: '\u5728\u4e0b\u65b9\u5f00\u5173 mod \u6216\u7f16\u8f91\u914d\u7f6e\u3002', changesRequireReload: '\u6539\u52a8\u9700\u8981 reload\u3002', configSaveNote: '\u914d\u7f6e\u5df2\u4fdd\u5b58\u5230 localStorage\uff1b\u90e8\u5206 mod \u9700\u8981 reload \u751f\u6548\u3002', saveReload: '\u4fdd\u5b58\u5e76 Reload', saveConfig: '\u4fdd\u5b58\u914d\u7f6e', insert: '\u5bfc\u5165', folder: '\u6587\u4ef6\u5939', deleteMod: '\u5220\u9664 mod', config: '\u914d\u7f6e', recentLog: '\u6700\u8fd1\u65e5\u5fd7', noLogEntries: '\u6682\u65e0\u65e5\u5fd7\u3002', noModsFound: '\u6ca1\u6709\u627e\u5230\u5e26 mod.json \u7684 mod\u3002', fileAccessUnavailable: '\u6587\u4ef6\u8bbf\u95ee\u4e0d\u53ef\u7528\u3002', fileAccessLoadedOnly: '\u6587\u4ef6\u8bbf\u95ee\u4e0d\u53ef\u7528\uff0c\u6240\u4ee5\u53ea\u80fd\u663e\u793a\u5df2\u52a0\u8f7d\u7684 mod\u3002', reloadHot: '\u652f\u6301\u70ed\u5f00\u5173\uff0c\u5f53\u524d\u4ecd\u5efa\u8bae reload', reloadRestart: '\u9700\u8981\u91cd\u542f', reloadRequired: '\u9700\u8981 reload', idPrefix: 'id\uff1a{value}', uniquePrefix: '\u552f\u4e00\u7801\uff1a{value}', depsPrefix: '\u4f9d\u8d56\uff1a{value}', conflictsPrefix: '\u51b2\u7a81\uff1a{value}', missingDependencies: '\u7f3a\u5c11\u4f9d\u8d56\uff1a{value}', conflictsEnabled: '\u5df2\u542f\u7528\u51b2\u7a81\uff1a{value}', savedReloading: '\u5df2\u4fdd\u5b58\uff0c\u6b63\u5728 reload...', saveFailed: '\u4fdd\u5b58\u5931\u8d25\uff1a{value}', configSaved: '\u914d\u7f6e\u5df2\u4fdd\u5b58\u3002', noChanges: '\u6ca1\u6709\u9700\u8981\u4fdd\u5b58\u7684\u6539\u52a8\u3002', changesCanceled: '\u5df2\u53d6\u6d88\u672a\u4fdd\u5b58\u7684\u6539\u52a8\u3002', openFolderFailed: '\u65e0\u6cd5\u6253\u5f00\u6587\u4ef6\u5939\uff1a{value}', deleteTitle: '\u5220\u9664 Mod\uff1f', deleteMessage: '\u4ece mods \u6587\u4ef6\u5939\u5220\u9664 {name}\uff1f\u8fd9\u4e2a\u64cd\u4f5c\u4e0d\u80fd\u64a4\u9500\u3002', deleteConfirm: '\u5220\u9664', cancel: '\u53d6\u6d88', replaceTitle: '\u66ff\u6362 Mod\uff1f', replaceMessage: 'mods \u91cc\u5df2\u7ecf\u6709 {name}\u3002\u662f\u5426\u7528\u5bfc\u5165\u7684 mod \u66ff\u6362\u5b83\uff1f', replaceConfirm: '\u66ff\u6362', deletedMod: '\u5df2\u5220\u9664 {name}\u3002\u5df2\u7ecf\u8fd0\u884c\u7684\u4ee3\u7801\u9700\u8981 reload \u624d\u4f1a\u5378\u8f7d\u3002', deleteFailed: '\u5220\u9664\u5931\u8d25\uff1a{value}', importHint: '\u628a\u6587\u4ef6\u62d6\u5230\u8fd9\u91cc\u6216\u590d\u5236', importDetail: '\u53ef\u4ee5\u628a mod zip \u5305\u76f4\u63a5\u62d6\u5165\uff0c\u6216\u8005\u590d\u5236 zip \u5305\u540e\u5728\u8fd9\u91cc\u6309\u7c98\u8d34\u5feb\u6377\u952e\uff0cModLoader \u4f1a\u81ea\u52a8\u89e3\u5305\u5230 mods \u6587\u4ef6\u5939\u3002', importWaiting: '\u7b49\u5f85 zip \u6587\u4ef6...', importNoZip: '\u8bf7\u62d6\u5165\u6216\u7c98\u8d34 .zip \u6587\u4ef6\u3002', importNoPath: '\u65e0\u6cd5\u8bfb\u53d6\u8be5\u6587\u4ef6\u8def\u5f84\u3002', importing: '\u6b63\u5728\u5bfc\u5165 {name}...', importedMod: '\u5df2\u5bfc\u5165 {name}\u3002\u9700\u8981\u65f6\u52fe\u9009\u5b83\u5e76\u4fdd\u5b58 reload\u3002', importFailed: '\u5bfc\u5165\u5931\u8d25\uff1a{value}', importModeOff: '\u8fd4\u56de mod \u5217\u8868', invalidZip: '\u53ea\u80fd\u5bfc\u5165 .zip mod \u5305\u3002', zipNoMod: '\u8fd9\u4e2a zip \u5185\u6ca1\u6709 mod.json\u3002', zipMultipleMods: '\u8fd9\u4e2a zip \u5305\u542b\u591a\u4e2a mod \u6587\u4ef6\u5939\uff1b\u8bf7\u4e00\u6b21\u5bfc\u5165\u4e00\u4e2a mod\u3002', zipExtractFailed: '\u65e0\u6cd5\u89e3\u538b zip\uff1a{value}', folderOpened: '\u5df2\u6253\u5f00 mods \u6587\u4ef6\u5939\u3002', replaceRenamedUniqueTitle: '\u53d1\u73b0\u540c\u552f\u4e00\u7801 Mod', replaceRenamedUniqueMessage: '\u65b0\u6587\u4ef6\u8ddf\u5df2\u6709\u6587\u4ef6\u6709\u76f8\u540c\u7684 mod \u552f\u4e00\u7801\uff0c\u5b83\u5f88\u53ef\u80fd\u662f\u65e7\u6587\u4ef6\u7684\u66f4\u65b0\u548c\u6539\u540d\u3002\n{oldName} \u2192 {newName}\n\u662f\u5426\u8986\u76d6\u65e7\u6587\u4ef6\uff1f', replaceRenamedPreviousTitle: '\u53d1\u73b0 Mod \u6539\u540d', replaceRenamedPreviousMessage: '\u8fd9\u4e2a\u65b0\u6587\u4ef6\u662f\u5df2\u6709\u6587\u4ef6\u7684\u6539\u540d\u3002\n{oldName} \u2192 {newName}\n\u662f\u5426\u8986\u76d6\u65e7\u6587\u4ef6\uff1f', replaceOld: '\u8986\u76d6', keepImported: '\u4e0d\u8986\u76d6\uff08\u52a0\u5165\u65b0\u6587\u4ef6\uff09', uniqueCodeEditTitle: '\u63a8\u8350\u4fee\u6539 mod \u552f\u4e00\u7801', uniqueCodeEditMessage: '\u8fd9\u4e24\u4e2a mod \u4f1a\u5171\u7528\u540c\u4e00\u4e2a mod \u552f\u4e00\u7801\u3002\u662f\u5426\u5728\u52a0\u5165\u65b0\u6587\u4ef6\u524d\u4fee\u6539\u5bfc\u5165 mod \u7684\u552f\u4e00\u7801\uff1f', uniqueCodeLabel: 'mod \u552f\u4e00\u7801', uniqueCodeConfirm: '\u786e\u8ba4\u4fee\u6539', uniqueCodeSkip: '\u5426\uff08\u4e0d\u4fee\u6539\uff09', manifestReadFailed: '\u65e0\u6cd5\u8bfb\u53d6 mod.json\uff1a{value}'
+			close: '\u5173\u95ed', hideToEdge: '\u9690\u85cf\u5230\u8fb9\u7f18', showFromEdge: '\u663e\u793a ModLoader \u83dc\u5355', menuSettings: 'Mod \u83dc\u5355\u8bbe\u7f6e', themeMode: '\u4eae\u8272 / \u6697\u8272\u6a21\u5f0f', darkMode: '\u6697\u8272', lightMode: '\u4eae\u8272', hideMode: '\u81ea\u52a8\u9690\u85cf\u6a21\u5f0f', autoHide: '\u81ea\u52a8\u9690\u85cf', manualHide: '\u624b\u52a8\u9690\u85cf', sortMod: '\u6392\u5e8f mod', autoHideDelay: '\u81ea\u52a8\u9690\u85cf\u79d2\u6570', secondsSuffix: '\u79d2', hideMenuDetails: '\u9690\u85cf\u83dc\u5355\u8be6\u60c5', hideModFileDetails: '\u9690\u85cf mod \u6587\u4ef6\u8be6\u60c5', show: '\u663e\u793a', hide: '\u9690\u85cf', installedMods: '\u5df2\u5b89\u88c5 mod', enabledEntries: '\u542f\u7528\u6761\u76ee', loadedMods: '\u5df2\u52a0\u8f7d mod', issues: '\u95ee\u9898', dataPatches: '\u6570\u636e\u8865\u4e01', wordPatches: '\u6587\u672c\u8865\u4e01', registeredLanguages: '\u5df2\u6ce8\u518c\u8bed\u8a00', orphanEntities: '\u5b64\u7acb\u5b9e\u4f53', modManager: 'Mod \u7ba1\u7406', selectAll: '\u5168\u9009', toggleNote: '\u5728\u4e0b\u65b9\u5f00\u5173 mod \u6216\u7f16\u8f91\u914d\u7f6e\u3002', changesRequireReload: '\u6539\u52a8\u9700\u8981 reload\u3002', configSaveNote: '\u914d\u7f6e\u5df2\u4fdd\u5b58\u5230 localStorage\uff1b\u90e8\u5206 mod \u9700\u8981 reload \u751f\u6548\u3002', saveReload: '\u4fdd\u5b58\u5e76 Reload', saveConfig: '\u4fdd\u5b58\u914d\u7f6e', insert: '\u5bfc\u5165', folder: '\u6587\u4ef6\u5939', deleteMod: '\u5220\u9664 mod', config: '\u914d\u7f6e', recentLog: '\u6700\u8fd1\u65e5\u5fd7', noLogEntries: '\u6682\u65e0\u65e5\u5fd7\u3002', noModsFound: '\u6ca1\u6709\u627e\u5230\u5e26 mod.json \u7684 mod\u3002', fileAccessUnavailable: '\u6587\u4ef6\u8bbf\u95ee\u4e0d\u53ef\u7528\u3002', fileAccessLoadedOnly: '\u6587\u4ef6\u8bbf\u95ee\u4e0d\u53ef\u7528\uff0c\u6240\u4ee5\u53ea\u80fd\u663e\u793a\u5df2\u52a0\u8f7d\u7684 mod\u3002', reloadHot: '\u652f\u6301\u70ed\u5f00\u5173\uff0c\u5f53\u524d\u4ecd\u5efa\u8bae reload', reloadRestart: '\u9700\u8981\u91cd\u542f', reloadRequired: '\u9700\u8981 reload', idPrefix: 'id\uff1a{value}', uniquePrefix: '\u552f\u4e00\u7801\uff1a{value}', depsPrefix: '\u4f9d\u8d56\uff1a{value}', conflictsPrefix: '\u51b2\u7a81\uff1a{value}', missingDependencies: '\u7f3a\u5c11\u4f9d\u8d56\uff1a{value}', conflictsEnabled: '\u5df2\u542f\u7528\u51b2\u7a81\uff1a{value}', savedReloading: '\u5df2\u4fdd\u5b58\uff0c\u6b63\u5728 reload...', saveFailed: '\u4fdd\u5b58\u5931\u8d25\uff1a{value}', configSaved: '\u914d\u7f6e\u5df2\u4fdd\u5b58\u3002', noChanges: '\u6ca1\u6709\u9700\u8981\u4fdd\u5b58\u7684\u6539\u52a8\u3002', changesCanceled: '\u5df2\u53d6\u6d88\u672a\u4fdd\u5b58\u7684\u6539\u52a8\u3002', openFolderFailed: '\u65e0\u6cd5\u6253\u5f00\u6587\u4ef6\u5939\uff1a{value}', deleteTitle: '\u5220\u9664 Mod\uff1f', deleteMessage: '\u4ece mods \u6587\u4ef6\u5939\u5220\u9664 {name}\uff1f\u8fd9\u4e2a\u64cd\u4f5c\u4e0d\u80fd\u64a4\u9500\u3002', deleteConfirm: '\u5220\u9664', cancel: '\u53d6\u6d88', replaceTitle: '\u66ff\u6362 Mod\uff1f', replaceMessage: 'mods \u91cc\u5df2\u7ecf\u6709 {name}\u3002\u662f\u5426\u7528\u5bfc\u5165\u7684 mod \u66ff\u6362\u5b83\uff1f', replaceConfirm: '\u66ff\u6362', deletedMod: '\u5df2\u5220\u9664 {name}\u3002\u5df2\u7ecf\u8fd0\u884c\u7684\u4ee3\u7801\u9700\u8981 reload \u624d\u4f1a\u5378\u8f7d\u3002', deleteFailed: '\u5220\u9664\u5931\u8d25\uff1a{value}', importHint: '\u628a\u6587\u4ef6\u62d6\u5230\u8fd9\u91cc\u6216\u590d\u5236', importDetail: '\u53ef\u4ee5\u628a mod zip \u5305\u76f4\u63a5\u62d6\u5165\uff0c\u6216\u8005\u590d\u5236 zip \u5305\u540e\u5728\u8fd9\u91cc\u6309\u7c98\u8d34\u5feb\u6377\u952e\uff0cModLoader \u4f1a\u81ea\u52a8\u89e3\u5305\u5230 mods \u6587\u4ef6\u5939\u3002', importWaiting: '\u7b49\u5f85 zip \u6587\u4ef6...', importNoZip: '\u8bf7\u62d6\u5165\u6216\u7c98\u8d34 .zip \u6587\u4ef6\u3002', importNoPath: '\u65e0\u6cd5\u8bfb\u53d6\u8be5\u6587\u4ef6\u8def\u5f84\u3002', importing: '\u6b63\u5728\u5bfc\u5165 {name}...', importedMod: '\u5df2\u5bfc\u5165 {name}\u3002\u9700\u8981\u65f6\u52fe\u9009\u5b83\u5e76\u4fdd\u5b58 reload\u3002', importFailed: '\u5bfc\u5165\u5931\u8d25\uff1a{value}', importModeOff: '\u8fd4\u56de mod \u5217\u8868', invalidZip: '\u53ea\u80fd\u5bfc\u5165 .zip mod \u5305\u3002', zipNoMod: '\u8fd9\u4e2a zip \u5185\u6ca1\u6709 mod.json\u3002', zipMultipleMods: '\u8fd9\u4e2a zip \u5305\u542b\u591a\u4e2a mod \u6587\u4ef6\u5939\uff1b\u8bf7\u4e00\u6b21\u5bfc\u5165\u4e00\u4e2a mod\u3002', zipExtractFailed: '\u65e0\u6cd5\u89e3\u538b zip\uff1a{value}', folderOpened: '\u5df2\u6253\u5f00 mods \u6587\u4ef6\u5939\u3002', replaceRenamedUniqueTitle: '\u53d1\u73b0\u540c\u552f\u4e00\u7801 Mod', replaceRenamedUniqueMessage: '\u65b0\u6587\u4ef6\u8ddf\u5df2\u6709\u6587\u4ef6\u6709\u76f8\u540c\u7684 mod \u552f\u4e00\u7801\uff0c\u5b83\u5f88\u53ef\u80fd\u662f\u65e7\u6587\u4ef6\u7684\u66f4\u65b0\u548c\u6539\u540d\u3002\n{oldName} \u2192 {newName}\n\u662f\u5426\u8986\u76d6\u65e7\u6587\u4ef6\uff1f', replaceRenamedPreviousTitle: '\u53d1\u73b0 Mod \u6539\u540d', replaceRenamedPreviousMessage: '\u8fd9\u4e2a\u65b0\u6587\u4ef6\u662f\u5df2\u6709\u6587\u4ef6\u7684\u6539\u540d\u3002\n{oldName} \u2192 {newName}\n\u662f\u5426\u8986\u76d6\u65e7\u6587\u4ef6\uff1f', replaceOld: '\u8986\u76d6', keepImported: '\u4e0d\u8986\u76d6\uff08\u52a0\u5165\u65b0\u6587\u4ef6\uff09', uniqueCodeEditTitle: '\u63a8\u8350\u4fee\u6539 mod \u552f\u4e00\u7801', uniqueCodeEditMessage: '\u8fd9\u4e24\u4e2a mod \u4f1a\u5171\u7528\u540c\u4e00\u4e2a mod \u552f\u4e00\u7801\u3002\u662f\u5426\u5728\u52a0\u5165\u65b0\u6587\u4ef6\u524d\u4fee\u6539\u5bfc\u5165 mod \u7684\u552f\u4e00\u7801\uff1f', uniqueCodeLabel: 'mod \u552f\u4e00\u7801', uniqueCodeConfirm: '\u786e\u8ba4\u4fee\u6539', uniqueCodeSkip: '\u5426\uff08\u4e0d\u4fee\u6539\uff09', manifestReadFailed: '\u65e0\u6cd5\u8bfb\u53d6 mod.json\uff1a{value}', translationFile: '\u7ffb\u8bd1', translationFileTitle: '\u6253\u5f00\u7ffb\u8bd1\u6587\u4ef6', translationFileSynced: '\u7ffb\u8bd1\u6587\u4ef6\u5df2\u540c\u6b65\uff1a{path}', translationFileFailed: '\u7ffb\u8bd1\u6587\u4ef6\u5931\u8d25\uff1a{value}'
 		}
 	}
 	PANEL_TEXT.modsch = PANEL_TEXT.sch
 	PANEL_TEXT.tch = PANEL_TEXT.sch
+	const TRANSLATION_CATALOG_FILE = 'translations.json'
+	const TRANSLATION_CATALOG_VERSION = 1
 	const getPanelLanguage = function () {
 		const language = state.game?.language || ''
 		if (language === 'sch' || language === 'modsch') return 'sch'
@@ -391,9 +398,26 @@
 		return 'en'
 	}
 
+	const getCatalogLanguageGroup = function (language) {
+		const languages = state.translationCatalog?.languages
+		if (!languages || typeof languages !== 'object' || Array.isArray(languages)) return null
+		const raw = String(state.game?.language || '').trim().toLowerCase()
+		if (raw && languages[raw]) return languages[raw]
+		if (languages[language]) return languages[language]
+		if (language === 'sch') return languages.modsch || languages['zh-cn'] || languages.zh || null
+		if (language === 'tch') return languages['zh-tw'] || languages.sch || null
+		return null
+	}
+
+	const getCatalogPanelText = function (language, key) {
+		const group = getCatalogLanguageGroup(language)
+		const value = group?.modloader?.[key]
+		return typeof value === 'string' ? value : ''
+	}
+
 	const t = function (key, values) {
 		const language = getPanelLanguage()
-		const source = PANEL_TEXT[language]?.[key] || PANEL_TEXT.en[key] || key
+		const source = getCatalogPanelText(language, key) || PANEL_TEXT[language]?.[key] || PANEL_TEXT.en[key] || key
 		return source.replace(/\{(\w+)\}/g, function (match, name) {
 			return values && values[name] !== undefined ? String(values[name]) : match
 		})
@@ -471,6 +495,19 @@
 		}
 		const direct = pickLocalizedText(item?.translations?.[key], candidates) || pickLocalizedText(item?.[key], candidates)
 		return direct || fallback || ''
+	}
+
+	const getLocalizedConfigValueLabels = function (manifest, item) {
+		const candidates = getLocaleCandidates()
+		const translations = getManifestTranslationRoot(manifest)
+		if (!translations || !item?.key) return null
+		for (const language of candidates) {
+			const group = translations[language]
+			const configGroup = group?.config || group?.configs
+			const value = configGroup?.[item.key]?.valueLabels || configGroup?.[item.key]?.sliderLabels
+			if (Array.isArray(value) || isLocaleObject(value)) return value
+		}
+		return null
 	}
 
 	const getLocalizedModName = function (mod) {
@@ -671,6 +708,7 @@
 			#modloader-panel .modloader-action-icon-plus:after { transform: translate(-50%, -50%) rotate(90deg); }
 			#modloader-panel .modloader-action-icon-folder { width: 16px; height: 12px; margin-top: 3px; border-radius: 3px; background: currentColor; }
 			#modloader-panel .modloader-action-icon-folder:before { content: ''; position: absolute; left: 2px; top: -2px; width: 6px; height: 3px; border-radius: 2px 2px 0 0; background: currentColor; }
+			#modloader-panel .modloader-action-icon-translation:before { content: 'Aa'; position: absolute; left: 50%; top: 50%; transform: translate(-50%, -52%); font: 700 10px/1 Montserrat, Arial, sans-serif; letter-spacing: -.5px; }
 			#modloader-panel .modloader-panel-error { margin: 8px 0; padding: 8px; border-radius: 6px; background: rgba(255, 96, 96, .14); color: #ffb0b0; }
 			#modloader-panel .modloader-import-zone { display: grid; place-items: center; min-height: 0; max-height: 0; opacity: 0; overflow: hidden; border: 1px solid transparent; border-radius: 7px; background: rgba(0,0,0,.16); box-shadow: inset 0 1px 18px rgba(0,0,0,.28); transform: translateY(-8px); transition: max-height .22s ease, min-height .22s ease, opacity .16s ease, transform .22s ease, border-color .16s ease; }
 			#modloader-panel .modloader-import-zone.active { min-height: 220px; max-height: 320px; opacity: 1; transform: translateY(0); border-color: rgba(255,255,255,.09); }
@@ -847,6 +885,307 @@
 		return state.modFileTools
 	}
 
+	const getTranslationCatalogPath = function () {
+		const tools = getModFileTools()
+		if (!tools) throw new Error(t('fileAccessUnavailable'))
+		return tools.path.join(tools.gameRoot, 'modloader', TRANSLATION_CATALOG_FILE)
+	}
+
+	const isLanguageSupportDeclared = function (manifest) {
+		const value = manifest?.languageSupport ?? manifest?.localizationSupport ?? manifest?.i18nSupport
+		if (typeof value === 'boolean') return value
+		if (isLocaleObject(value)) {
+			for (const key of [ 'gameLanguage', 'gameLanguages', 'modMenu', 'manifest', 'translations', 'enabled' ]) {
+				if (value[key] !== undefined) return value[key] !== false
+			}
+		}
+		return null
+	}
+
+	const modSupportsGameLanguage = function (manifest) {
+		const declared = isLanguageSupportDeclared(manifest)
+		if (declared !== null) return declared
+		return !!(getManifestTranslationRoot(manifest) || isLocaleObject(manifest?.words) || Array.isArray(manifest?.locale) || Array.isArray(manifest?.languages))
+	}
+
+	const normalizeTranslationCatalog = function (value) {
+		const catalog = isLocaleObject(value) ? value : {}
+		if (!Number.isFinite(Number(catalog.version))) catalog.version = TRANSLATION_CATALOG_VERSION
+		if (!isLocaleObject(catalog.languages)) catalog.languages = {}
+		return catalog
+	}
+
+	const mergeMissingCatalogDefaults = function (target, defaults) {
+		if (Array.isArray(defaults)) {
+			if (!Array.isArray(target)) return defaults.slice()
+			const out = target.slice()
+			defaults.forEach(function (value, index) {
+				if (out[index] === undefined) out[index] = clone(value)
+				else out[index] = mergeMissingCatalogDefaults(out[index], value)
+			})
+			return out
+		}
+		if (isLocaleObject(defaults)) {
+			const out = isLocaleObject(target) ? target : {}
+			for (const key in defaults) out[key] = mergeMissingCatalogDefaults(out[key], defaults[key])
+			return out
+		}
+		return target === undefined ? defaults : target
+	}
+
+	const ensureCatalogLanguage = function (catalog, language) {
+		const key = String(language || '').trim()
+		if (!key) return null
+		if (!isLocaleObject(catalog.languages[key])) catalog.languages[key] = { modloader: {}, mods: {} }
+		if (!isLocaleObject(catalog.languages[key].modloader)) catalog.languages[key].modloader = {}
+		if (!isLocaleObject(catalog.languages[key].mods)) catalog.languages[key].mods = {}
+		return catalog.languages[key]
+	}
+
+	const ensureCatalogMod = function (catalog, language, modId) {
+		const group = ensureCatalogLanguage(catalog, language)
+		if (!group) return null
+		const key = String(modId || '').trim()
+		if (!key) return null
+		if (!isLocaleObject(group.mods[key])) group.mods[key] = {}
+		return group.mods[key]
+	}
+
+	const setCatalogModText = function (catalog, language, modId, key, value) {
+		if (typeof value !== 'string' || value === '') return
+		const mod = ensureCatalogMod(catalog, language, modId)
+		if (mod && mod[key] === undefined) mod[key] = value
+	}
+
+	const setCatalogConfigText = function (catalog, language, modId, configKey, key, value) {
+		if (typeof value !== 'string' || value === '') return
+		const mod = ensureCatalogMod(catalog, language, modId)
+		if (!mod) return
+		if (!isLocaleObject(mod.config)) mod.config = {}
+		if (!isLocaleObject(mod.config[configKey])) mod.config[configKey] = {}
+		if (mod.config[configKey][key] === undefined) mod.config[configKey][key] = value
+	}
+
+	const setCatalogConfigValueLabels = function (catalog, language, modId, configKey, labels) {
+		if (!Array.isArray(labels) && !isLocaleObject(labels)) return
+		const mod = ensureCatalogMod(catalog, language, modId)
+		if (!mod) return
+		if (!isLocaleObject(mod.config)) mod.config = {}
+		if (!isLocaleObject(mod.config[configKey])) mod.config[configKey] = {}
+		mod.config[configKey].valueLabels = mergeMissingCatalogDefaults(mod.config[configKey].valueLabels, labels)
+	}
+
+	const collectLocalizedField = function (catalog, modId, field, key, fallbackLanguage) {
+		if (typeof field === 'string') setCatalogModText(catalog, fallbackLanguage || 'en', modId, key, field)
+		else if (isLocaleObject(field)) for (const language in field) setCatalogModText(catalog, language, modId, key, field[language])
+	}
+
+	const collectLocalizedConfigField = function (catalog, modId, configKey, field, key, fallbackLanguage) {
+		if (typeof field === 'string') setCatalogConfigText(catalog, fallbackLanguage || 'en', modId, configKey, key, field)
+		else if (isLocaleObject(field)) for (const language in field) setCatalogConfigText(catalog, language, modId, configKey, key, field[language])
+	}
+
+	const collectLocalizedValueLabels = function (catalog, modId, configKey, source, fallbackLanguage) {
+		if (Array.isArray(source)) {
+			const byLanguage = {}
+			source.forEach(function (entry, index) {
+				if (typeof entry === 'string') {
+					byLanguage[fallbackLanguage || 'en'] = byLanguage[fallbackLanguage || 'en'] || []
+					byLanguage[fallbackLanguage || 'en'][index] = entry
+				} else if (isLocaleObject(entry)) {
+					for (const language in entry) {
+						byLanguage[language] = byLanguage[language] || []
+						byLanguage[language][index] = entry[language]
+					}
+				}
+			})
+			for (const language in byLanguage) setCatalogConfigValueLabels(catalog, language, modId, configKey, byLanguage[language])
+		} else if (isLocaleObject(source)) {
+			for (const valueKey in source) {
+				const entry = source[valueKey]
+				if (typeof entry === 'string') {
+					const labels = {}
+					labels[valueKey] = entry
+					setCatalogConfigValueLabels(catalog, fallbackLanguage || 'en', modId, configKey, labels)
+				} else if (isLocaleObject(entry)) {
+					for (const language in entry) {
+						const labels = {}
+						labels[valueKey] = entry[language]
+						setCatalogConfigValueLabels(catalog, language, modId, configKey, labels)
+					}
+				}
+			}
+		}
+	}
+
+	const addModManifestToTranslationCatalog = function (catalog, mod) {
+		const manifest = mod?.manifest || {}
+		const modId = String(manifest.id || mod?.id || mod?.path || '').trim()
+		if (!modId || !modSupportsGameLanguage(manifest)) return
+		collectLocalizedField(catalog, modId, manifest.name, 'name', 'en')
+		collectLocalizedField(catalog, modId, manifest.description, 'description', 'en')
+		const translations = getManifestTranslationRoot(manifest)
+		if (translations) {
+			for (const language in translations) {
+				const group = translations[language]
+				if (!isLocaleObject(group)) continue
+				setCatalogModText(catalog, language, modId, 'name', group.name)
+				setCatalogModText(catalog, language, modId, 'description', group.description)
+				const configGroup = group.config || group.configs
+				if (isLocaleObject(configGroup)) {
+					for (const configKey in configGroup) {
+						const configText = configGroup[configKey]
+						if (!isLocaleObject(configText)) continue
+						setCatalogConfigText(catalog, language, modId, configKey, 'label', configText.label)
+						setCatalogConfigText(catalog, language, modId, configKey, 'description', configText.description)
+						setCatalogConfigValueLabels(catalog, language, modId, configKey, configText.valueLabels || configText.sliderLabels)
+					}
+				}
+			}
+		}
+		for (const item of normalizeConfigSchema(manifest.config)) {
+			collectLocalizedConfigField(catalog, modId, item.key, item.label, 'label', 'en')
+			collectLocalizedConfigField(catalog, modId, item.key, item.description, 'description', 'en')
+			collectLocalizedConfigField(catalog, modId, item.key, item.translations?.label, 'label', '')
+			collectLocalizedConfigField(catalog, modId, item.key, item.translations?.description, 'description', '')
+			collectLocalizedValueLabels(catalog, modId, item.key, item.valueLabels || item.sliderLabels, 'en')
+		}
+	}
+
+	const createTranslationCatalogSnapshot = function (mods) {
+		const catalog = {
+			version: TRANSLATION_CATALOG_VERSION,
+			description: 'Edit this file to override ModLoader menu text and mod manifest/config translations. The structure is language -> modloader/mods -> text.',
+			languages: {}
+		}
+		for (const language of Object.keys(PANEL_TEXT)) {
+			const group = ensureCatalogLanguage(catalog, language)
+			Object.assign(group.modloader, clone(PANEL_TEXT[language]))
+		}
+		for (const mod of mods || []) addModManifestToTranslationCatalog(catalog, mod)
+		return catalog
+	}
+
+	const getCatalogModPatch = function (languageGroup, modId, modPath) {
+		const mods = languageGroup?.mods
+		if (!isLocaleObject(mods)) return null
+		return mods[modId] || mods[modPath] || null
+	}
+
+	const applyTranslationCatalogToManifest = function (manifest, modId, modPath) {
+		const catalog = state.translationCatalog
+		if (!catalog || !isLocaleObject(catalog.languages) || !isLocaleObject(manifest)) return manifest
+		for (const language in catalog.languages) {
+			const patch = getCatalogModPatch(catalog.languages[language], modId || manifest.id, modPath)
+			if (!isLocaleObject(patch)) continue
+			if (!isLocaleObject(manifest.translations)) manifest.translations = {}
+			if (!isLocaleObject(manifest.translations[language])) manifest.translations[language] = {}
+			const target = manifest.translations[language]
+			if (typeof patch.name === 'string') target.name = patch.name
+			if (typeof patch.description === 'string') target.description = patch.description
+			if (isLocaleObject(patch.config)) {
+				if (!isLocaleObject(target.config)) target.config = {}
+				for (const configKey in patch.config) {
+					const source = patch.config[configKey]
+					if (!isLocaleObject(source)) continue
+					if (!isLocaleObject(target.config[configKey])) target.config[configKey] = {}
+					if (typeof source.label === 'string') target.config[configKey].label = source.label
+					if (typeof source.description === 'string') target.config[configKey].description = source.description
+					if (Array.isArray(source.valueLabels) || isLocaleObject(source.valueLabels)) target.config[configKey].valueLabels = clone(source.valueLabels)
+				}
+			}
+		}
+		return manifest
+	}
+
+	const applyTranslationCatalogToLoadedMods = function () {
+		for (const mod of state.mods) {
+			if (!mod?.baseManifest) continue
+			mod.manifest = applyTranslationCatalogToManifest(clone(mod.baseManifest), mod.id, mod.path)
+		}
+	}
+
+	const readTranslationCatalogFromDisk = function (options) {
+		const config = options || {}
+		const tools = getModFileTools()
+		if (!tools) return null
+		const catalogPath = getTranslationCatalogPath()
+		try {
+			if (!tools.fs.existsSync(catalogPath)) {
+				if (state.translationCatalog) {
+					state.translationCatalog = null
+					state.translationCatalogMtimeMs = -1
+					applyTranslationCatalogToLoadedMods()
+				}
+				return null
+			}
+			const stat = tools.fs.statSync(catalogPath)
+			if (!config.force && state.translationCatalog && state.translationCatalogMtimeMs === stat.mtimeMs) return state.translationCatalog
+			const catalog = normalizeTranslationCatalog(JSON.parse(tools.fs.readFileSync(catalogPath, 'utf8')))
+			state.translationCatalog = catalog
+			state.translationCatalogMtimeMs = stat.mtimeMs
+			state.translationCatalogReadFailed = false
+			applyTranslationCatalogToLoadedMods()
+			return catalog
+		} catch (error) {
+			if (!config.silent) throw error
+			if (!state.translationCatalogReadFailed) addIssue('warn', 'translation-catalog-read-failed', 'failed to read modloader/translations.json', error.message)
+			state.translationCatalogReadFailed = true
+			return state.translationCatalog
+		}
+	}
+
+	const ensureTranslationCatalogWatcher = function () {
+		const tools = getModFileTools()
+		if (!tools || state.translationCatalogWatcher) return
+		let catalogPath = ''
+		try {
+			catalogPath = getTranslationCatalogPath()
+			if (!tools.fs.existsSync(catalogPath)) return
+			state.translationCatalogWatcher = tools.fs.watch(catalogPath, { persistent: false }, function () {
+				if (state.translationCatalogWatchTimer) clearTimeout(state.translationCatalogWatchTimer)
+				state.translationCatalogWatchTimer = setTimeout(function () {
+					state.translationCatalogWatchTimer = null
+					readTranslationCatalogFromDisk({ force: true, silent: true })
+					requestAnimationFrame(refreshOpenPanel)
+				}, 160)
+			})
+		} catch (error) {
+			warn('Failed to watch translation catalog.', error)
+		}
+	}
+
+	const syncTranslationCatalogFile = function (mods) {
+		const tools = getModFileTools()
+		if (!tools) throw new Error(t('fileAccessUnavailable'))
+		const catalogPath = getTranslationCatalogPath()
+		tools.fs.mkdirSync(tools.path.dirname(catalogPath), { recursive: true })
+		let current = null
+		if (tools.fs.existsSync(catalogPath)) current = normalizeTranslationCatalog(JSON.parse(tools.fs.readFileSync(catalogPath, 'utf8')))
+		const snapshot = createTranslationCatalogSnapshot(mods || [])
+		const merged = mergeMissingCatalogDefaults(current || {}, snapshot)
+		const before = current ? JSON.stringify(current, null, 2) + '\n' : ''
+		const after = JSON.stringify(merged, null, 2) + '\n'
+		if (before !== after) tools.fs.writeFileSync(catalogPath, after, 'utf8')
+		state.translationCatalog = merged
+		try { state.translationCatalogMtimeMs = tools.fs.statSync(catalogPath).mtimeMs } catch (error) { state.translationCatalogMtimeMs = -1 }
+		state.translationCatalogReadFailed = false
+		applyTranslationCatalogToLoadedMods()
+		ensureTranslationCatalogWatcher()
+		return { path: catalogPath, created: !current, updated: before !== after }
+	}
+
+	const openTranslationCatalogFile = async function (catalogPath) {
+		const tools = getModFileTools()
+		if (!tools) throw new Error(t('fileAccessUnavailable'))
+		if (tools.shell?.openPath) {
+			const result = await tools.shell.openPath(catalogPath)
+			if (result) throw new Error(result)
+			return
+		}
+		tools.childProcess.spawn('explorer.exe', [catalogPath], { detached: true, stdio: 'ignore', windowsHide: true }).unref()
+	}
+
 	const getEnabledPathSet = function () {
 		const selected = new Set()
 		for (const entry of state.enabledEntries) selected.add(entry.path)
@@ -877,9 +1216,11 @@
 					} catch (error) {
 						loadError = error.message
 					}
+					const modId = manifest.id || name
+					manifest = applyTranslationCatalogToManifest(manifest, modId, name)
 					const mod = {
 						path: name,
-						id: manifest.id || name,
+						id: modId,
 						manifest,
 						enabled: enabled.has(name),
 						loadError
@@ -1202,6 +1543,8 @@
 	const readConfigForPanel = function (mod) {
 		const schema = normalizeConfigSchema(mod.manifest.config).map(function (item) {
 			item = clone(item)
+			const localizedValueLabels = getLocalizedConfigValueLabels(mod.manifest, item)
+			if (localizedValueLabels) item.valueLabels = clone(localizedValueLabels)
 			item.type = getConfigType(item)
 			return item
 		})
@@ -2630,6 +2973,8 @@
 		if (!document.body) return
 		loadPanelState()
 		ensurePanelStyle()
+		readTranslationCatalogFromDisk({ silent: true })
+		ensureTranslationCatalogWatcher()
 
 		const available = readAvailableMods()
 		const mods = available.mods
@@ -2779,6 +3124,26 @@
 				clearPanelAutoHideTimer()
 			}
 		})
+		const addSettingsButtonRow = function (label, buttonLabel, title) {
+			const row = element('div', 'modloader-panel-settings-row')
+			row.appendChild(element('span', '', label))
+			const button = createPanelActionButton('translation', buttonLabel, title)
+			button.disabled = !getModFileTools()
+			button.onclick = async function (event) {
+				event.preventDefault()
+				try {
+					const availableMods = readAvailableMods().mods
+					const result = syncTranslationCatalogFile(availableMods)
+					await openTranslationCatalogFile(result.path)
+					state.panelMessage = t('translationFileSynced', { path: result.path })
+				} catch (error) {
+					state.panelMessage = t('translationFileFailed', { value: error.message })
+				}
+				renderPanel()
+			}
+			row.appendChild(button)
+			settingsPage.appendChild(row)
+		}
 		addSettingsNumberRow(t('autoHideDelay'), state.panelSettings.autoHideSeconds, function (value) {
 			state.panelSettings.autoHideSeconds = value
 		})
@@ -2790,6 +3155,7 @@
 			{ value: false, label: t('show') },
 			{ value: true, label: t('hide') }
 		], state.panelSettings.hideModFileDetails, function (value) { state.panelSettings.hideModFileDetails = value })
+		addSettingsButtonRow(t('translationFile'), t('translationFile'), t('translationFileTitle'))
 		panel.appendChild(settingsPage)
 
 		const panelMouseEnter = function () { clearPanelAutoHideTimer() }
@@ -4034,14 +4400,17 @@
 			if (state.booted) return state
 			state.booted = true
 
+			readTranslationCatalogFromDisk({ silent: true })
+			ensureTranslationCatalogWatcher()
 			state.enabledConfig = await readJson('mods/enabled.json', { mods: [] })
 			state.enabledEntries = normalizeEnabled(state.enabledConfig)
 			for (const entry of state.enabledEntries) {
 				try {
 					const basePath = `mods/${entry.path}/`
-					const manifest = await readJson(`${basePath}mod.json`)
-					const id = manifest.id || entry.id || entry.path
-					const mod = { id, path: entry.path, basePath, manifest, loaded: false }
+					const baseManifest = await readJson(`${basePath}mod.json`)
+					const id = baseManifest.id || entry.id || entry.path
+					const manifest = applyTranslationCatalogToManifest(clone(baseManifest), id, entry.path)
+					const mod = { id, path: entry.path, basePath, manifest, baseManifest: clone(baseManifest), loaded: false }
 					state.mods.push(mod)
 					if (state.modById[id]) addIssue('error', 'duplicate-mod-id', `multiple enabled mods use id ${id}`, entry.path)
 					state.modById[id] = mod

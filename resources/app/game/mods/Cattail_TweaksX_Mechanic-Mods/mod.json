@@ -18,11 +18,15 @@
     }
   ],
   "loaderVersion": ">=0.1.0",
+  "languageSupport": {
+    "gameLanguage": true
+  },
   "entries": [
     "scripts/config-migration.js",
     "scripts/reality-auto-collect.js",
     "scripts/scan-reality-surges.js",
     "scripts/scan-reality-slider.js",
+    "scripts/hollow-vent-reality.js",
     "scripts/super-silo.js"
   ],
   "conflicts": [
@@ -87,6 +91,43 @@
       "step": 1,
       "description": "Fill value assigned to activated silos.",
       "reloadPolicy": "hot"
+    },
+    "enableHollowVentReality": {
+      "type": "boolean",
+      "label": "Hollow vent Reality source",
+      "default": true,
+      "description": "Let hollow vents grow Reality symbols that are automatically harvested through the void altar.",
+      "reloadPolicy": "hot"
+    },
+    "ventRealityInterval": {
+      "type": "number",
+      "label": "Vent production time",
+      "default": 30,
+      "min": 1,
+      "max": 3600,
+      "step": 1,
+      "description": "Seconds each hollow vent takes to grow a Reality symbol.",
+      "reloadPolicy": "hot"
+    },
+    "ventRealityAmount": {
+      "type": "number",
+      "label": "Small vent Reality",
+      "default": 1,
+      "min": 0,
+      "max": 1000000,
+      "step": 0.01,
+      "description": "Reality gained from each small hollow vent symbol.",
+      "reloadPolicy": "hot"
+    },
+    "ventRealityLargeMultiplier": {
+      "type": "number",
+      "label": "Large vent multiplier",
+      "default": 4,
+      "min": 0,
+      "max": 1000000,
+      "step": 0.1,
+      "description": "Multiplier applied to the large hollow vent Reality output.",
+      "reloadPolicy": "hot"
     }
   },
   "description": "Combines Auto Reality Collect, Scan Reality Surges, and Super Silo into one TweaksX mod.",
@@ -122,6 +163,22 @@
         "enableScanRealitySlider": {
           "label": "Supercritical kernel slider",
           "description": "Show the supercritical kernel range and Reality infusion slider on its shop card."
+        },
+        "enableHollowVentReality": {
+          "label": "Hollow vent Reality source",
+          "description": "Let hollow vents grow Reality symbols that are automatically harvested through the void altar."
+        },
+        "ventRealityInterval": {
+          "label": "Vent production time",
+          "description": "Seconds each hollow vent takes to grow a Reality symbol."
+        },
+        "ventRealityAmount": {
+          "label": "Small vent Reality",
+          "description": "Reality gained from each small hollow vent symbol."
+        },
+        "ventRealityLargeMultiplier": {
+          "label": "Large vent multiplier",
+          "description": "Multiplier applied to the large hollow vent Reality output."
         }
       }
     },
@@ -156,6 +213,22 @@
         "enableScanRealitySlider": {
           "label": "Ползунок сверхкритического ядра",
           "description": "Показывает диаметр области и ползунок вливания Reality на карточке покупки сверхкритического ядра."
+        },
+        "enableHollowVentReality": {
+          "label": "Источник Reality из полых вентилей",
+          "description": "Полые вентили выращивают символы Reality, которые автоматически собираются через алтарь пустоты."
+        },
+        "ventRealityInterval": {
+          "label": "Время производства вентиля",
+          "description": "Сколько секунд полый вентиль выращивает символ Reality."
+        },
+        "ventRealityAmount": {
+          "label": "Reality малого вентиля",
+          "description": "Количество Reality от символа малого полого вентиля."
+        },
+        "ventRealityLargeMultiplier": {
+          "label": "Множитель большого вентиля",
+          "description": "Множитель выхода Reality для большого полого вентиля."
         }
       }
     },
@@ -190,6 +263,22 @@
         "enableScanRealitySlider": {
           "label": "Regler für superkritischen Kern",
           "description": "Zeigt den Reichweitendurchmesser und den Reality-Infusionsregler auf der Kaufkarte des superkritischen Kerns."
+        },
+        "enableHollowVentReality": {
+          "label": "Reality-Quelle aus Hohl-Vents",
+          "description": "Hohl-Vents lassen Reality-Symbole wachsen, die automatisch über den Leerenaltar geerntet werden."
+        },
+        "ventRealityInterval": {
+          "label": "Vent-Produktionszeit",
+          "description": "Sekunden, die ein Hohl-Vent braucht, um ein Reality-Symbol wachsen zu lassen."
+        },
+        "ventRealityAmount": {
+          "label": "Reality kleiner Vents",
+          "description": "Reality-Ertrag jedes Symbols eines kleinen Hohl-Vents."
+        },
+        "ventRealityLargeMultiplier": {
+          "label": "Multiplikator großer Vents",
+          "description": "Multiplikator für den Reality-Ertrag des großen Hohl-Vents."
         }
       }
     },
@@ -224,6 +313,22 @@
         "enableScanRealitySlider": {
           "label": "Controle do núcleo supercrítico",
           "description": "Mostra o diâmetro do alcance e o controle de infusão de Reality no cartão de compra do núcleo supercrítico."
+        },
+        "enableHollowVentReality": {
+          "label": "Fonte de Reality dos vents ocos",
+          "description": "Vents ocos geram símbolos de Reality que são coletados automaticamente pelo altar do vazio."
+        },
+        "ventRealityInterval": {
+          "label": "Tempo de produção do vent",
+          "description": "Segundos para cada vent oco gerar um símbolo de Reality."
+        },
+        "ventRealityAmount": {
+          "label": "Reality do vent pequeno",
+          "description": "Reality obtida de cada símbolo de vent oco pequeno."
+        },
+        "ventRealityLargeMultiplier": {
+          "label": "Multiplicador do vent grande",
+          "description": "Multiplicador aplicado à produção de Reality do vent oco grande."
         }
       }
     },
@@ -258,6 +363,22 @@
         "enableScanRealitySlider": {
           "label": "Cursore nucleo supercritico",
           "description": "Mostra il diametro del raggio e il cursore di infusione Reality sulla scheda di acquisto del nucleo supercritico."
+        },
+        "enableHollowVentReality": {
+          "label": "Fonte Reality dei venti cavi",
+          "description": "I venti cavi fanno crescere simboli Reality raccolti automaticamente tramite l’altare del vuoto."
+        },
+        "ventRealityInterval": {
+          "label": "Tempo produzione vent",
+          "description": "Secondi necessari a ogni vento cavo per far crescere un simbolo Reality."
+        },
+        "ventRealityAmount": {
+          "label": "Reality vento piccolo",
+          "description": "Reality ottenuta da ogni simbolo di un piccolo vento cavo."
+        },
+        "ventRealityLargeMultiplier": {
+          "label": "Moltiplicatore vento grande",
+          "description": "Moltiplicatore applicato alla produzione Reality del grande vento cavo."
         }
       }
     },
@@ -292,6 +413,22 @@
         "enableScanRealitySlider": {
           "label": "Control del núcleo supercrítico",
           "description": "Muestra el diámetro de alcance y el control de inyección de Reality en la tarjeta de compra del núcleo supercrítico."
+        },
+        "enableHollowVentReality": {
+          "label": "Fuente de Reality de vents huecos",
+          "description": "Los vents huecos cultivan símbolos de Reality que se recogen automáticamente mediante el altar del vacío."
+        },
+        "ventRealityInterval": {
+          "label": "Tiempo de producción del vent",
+          "description": "Segundos que tarda cada vent hueco en cultivar un símbolo de Reality."
+        },
+        "ventRealityAmount": {
+          "label": "Reality de vent pequeño",
+          "description": "Reality obtenida de cada símbolo de vent hueco pequeño."
+        },
+        "ventRealityLargeMultiplier": {
+          "label": "Multiplicador de vent grande",
+          "description": "Multiplicador aplicado a la producción de Reality del vent hueco grande."
         }
       }
     },
@@ -326,6 +463,22 @@
         "enableScanRealitySlider": {
           "label": "Curseur du noyau supercritique",
           "description": "Affiche le diamètre de portée et le curseur d’injection de Reality sur la carte d’achat du noyau supercritique."
+        },
+        "enableHollowVentReality": {
+          "label": "Source Reality des évents creux",
+          "description": "Les évents creux font pousser des symboles Reality automatiquement récoltés par l’autel du vide."
+        },
+        "ventRealityInterval": {
+          "label": "Temps de production de l’évent",
+          "description": "Secondes nécessaires à chaque évent creux pour faire pousser un symbole Reality."
+        },
+        "ventRealityAmount": {
+          "label": "Reality du petit évent",
+          "description": "Reality obtenue pour chaque symbole de petit évent creux."
+        },
+        "ventRealityLargeMultiplier": {
+          "label": "Multiplicateur du grand évent",
+          "description": "Multiplicateur appliqué à la production Reality du grand évent creux."
         }
       }
     },
@@ -360,6 +513,22 @@
         "enableScanRealitySlider": {
           "label": "Schuif voor superkritische kern",
           "description": "Toont de bereikdiameter en Reality-injectieschuif op de aankoopkaart van de superkritische kern."
+        },
+        "enableHollowVentReality": {
+          "label": "Reality-bron uit holle vents",
+          "description": "Holle vents laten Reality-symbolen groeien die automatisch via het leegte-altaar worden geoogst."
+        },
+        "ventRealityInterval": {
+          "label": "Productietijd vent",
+          "description": "Seconden die elke holle vent nodig heeft om een Reality-symbool te laten groeien."
+        },
+        "ventRealityAmount": {
+          "label": "Reality kleine vent",
+          "description": "Reality uit elk symbool van een kleine holle vent."
+        },
+        "ventRealityLargeMultiplier": {
+          "label": "Vermenigvuldiger grote vent",
+          "description": "Vermenigvuldiger voor de Reality-opbrengst van de grote holle vent."
         }
       }
     },
@@ -394,6 +563,22 @@
         "enableScanRealitySlider": {
           "label": "Posuvník superkritického jádra",
           "description": "Zobrazí průměr dosahu a posuvník vložení Reality na nákupní kartě superkritického jádra."
+        },
+        "enableHollowVentReality": {
+          "label": "Zdroj Reality z dutých průduchů",
+          "description": "Duté průduchy pěstují symboly Reality, které se automaticky sklidí přes oltář prázdnoty."
+        },
+        "ventRealityInterval": {
+          "label": "Doba produkce průduchu",
+          "description": "Kolik sekund potřebuje dutý průduch k vypěstování symbolu Reality."
+        },
+        "ventRealityAmount": {
+          "label": "Reality malého průduchu",
+          "description": "Reality získaná z každého symbolu malého dutého průduchu."
+        },
+        "ventRealityLargeMultiplier": {
+          "label": "Násobitel velkého průduchu",
+          "description": "Násobitel výstupu Reality u velkého dutého průduchu."
         }
       }
     },
@@ -428,6 +613,22 @@
         "enableScanRealitySlider": {
           "label": "Suwak superkrytycznego jądra",
           "description": "Pokazuje średnicę zasięgu i suwak wlewu Reality na karcie zakupu superkrytycznego jądra."
+        },
+        "enableHollowVentReality": {
+          "label": "Źródło Reality z pustych ujść",
+          "description": "Puste ujścia hodują symbole Reality automatycznie zbierane przez ołtarz pustki."
+        },
+        "ventRealityInterval": {
+          "label": "Czas produkcji ujścia",
+          "description": "Sekundy potrzebne pustemu ujściu na wyhodowanie symbolu Reality."
+        },
+        "ventRealityAmount": {
+          "label": "Reality małego ujścia",
+          "description": "Reality uzyskiwana z każdego symbolu małego pustego ujścia."
+        },
+        "ventRealityLargeMultiplier": {
+          "label": "Mnożnik dużego ujścia",
+          "description": "Mnożnik produkcji Reality dużego pustego ujścia."
         }
       }
     },
@@ -462,6 +663,22 @@
         "enableScanRealitySlider": {
           "label": "超臨界コアスライダー",
           "description": "超臨界コアの購入カードに範囲直径とReality注入スライダーを表示します。"
+        },
+        "enableHollowVentReality": {
+          "label": "空洞ベントのReality源",
+          "description": "空洞ベントがRealityシンボルを育て、虚空祭壇を通して自動収穫します。"
+        },
+        "ventRealityInterval": {
+          "label": "ベント生産時間",
+          "description": "各空洞ベントがRealityシンボルを育てる秒数。"
+        },
+        "ventRealityAmount": {
+          "label": "小ベントReality",
+          "description": "小さな空洞ベントのシンボル1つから得るReality。"
+        },
+        "ventRealityLargeMultiplier": {
+          "label": "大ベント倍率",
+          "description": "大きな空洞ベントのReality出力に適用する倍率。"
         }
       }
     },
@@ -496,6 +713,22 @@
         "enableScanRealitySlider": {
           "label": "초임계 핵 슬라이더",
           "description": "초임계 핵 구매 카드에 범위 지름과 Reality 주입 슬라이더를 표시합니다."
+        },
+        "enableHollowVentReality": {
+          "label": "빈 통풍구 Reality 원천",
+          "description": "빈 통풍구가 Reality 상징을 키우고 공허 제단을 통해 자동 수확합니다."
+        },
+        "ventRealityInterval": {
+          "label": "통풍구 생산 시간",
+          "description": "각 빈 통풍구가 Reality 상징을 키우는 초 단위 시간."
+        },
+        "ventRealityAmount": {
+          "label": "작은 통풍구 Reality",
+          "description": "작은 빈 통풍구 상징 하나에서 얻는 Reality."
+        },
+        "ventRealityLargeMultiplier": {
+          "label": "큰 통풍구 배율",
+          "description": "큰 빈 통풍구의 Reality 생산량에 적용되는 배율."
         }
       }
     },
@@ -530,6 +763,22 @@
         "enableScanRealitySlider": {
           "label": "可控超临界内核",
           "description": "可以注入现实来提升超临界内核的威力。"
+        },
+        "enableHollowVentReality": {
+          "label": "虚空维度裂缝现实渗入",
+          "description": "空心石在虚空维度的穿孔裂缝会持续渗入现实。"
+        },
+        "ventRealityInterval": {
+          "label": "现实渗入时间",
+          "description": "每个现实渗入所需的秒数。"
+        },
+        "ventRealityAmount": {
+          "label": "现实渗入数量",
+          "description": "每个空心石渗入的现实的数量。"
+        },
+        "ventRealityLargeMultiplier": {
+          "label": "大空心石现实渗入倍率",
+          "description": "大空心石渗入的现实的数量倍率。"
         }
       }
     },
@@ -564,6 +813,22 @@
         "enableScanRealitySlider": {
           "label": "超臨界核心滑桿",
           "description": "在超臨界核心購買卡片上顯示範圍直徑和 Reality 注入滑桿。"
+        },
+        "enableHollowVentReality": {
+          "label": "空心噴口 Reality 來源",
+          "description": "讓空心石噴口生長 Reality 符號，並透過虛空祭壇自動收割。"
+        },
+        "ventRealityInterval": {
+          "label": "噴口生產時間",
+          "description": "每個空心噴口生長一個 Reality 符號所需的秒數。"
+        },
+        "ventRealityAmount": {
+          "label": "小噴口 Reality",
+          "description": "每個小空心噴口符號提供的 Reality。"
+        },
+        "ventRealityLargeMultiplier": {
+          "label": "大噴口倍率",
+          "description": "套用於大空心噴口 Reality 產出的倍率。"
         }
       }
     },
@@ -598,6 +863,22 @@
         "enableScanRealitySlider": {
           "label": "แถบเลื่อนแกนเหนือวิกฤต",
           "description": "แสดงเส้นผ่านศูนย์กลางระยะและแถบเลื่อนเติม Reality บนการ์ดซื้อแกนเหนือวิกฤต"
+        },
+        "enableHollowVentReality": {
+          "label": "แหล่ง Reality จากช่องกลวง",
+          "description": "ช่องกลวงจะปลูกสัญลักษณ์ Reality และเก็บเกี่ยวอัตโนมัติผ่านแท่นบูชาความว่างเปล่า"
+        },
+        "ventRealityInterval": {
+          "label": "เวลาผลิตของช่อง",
+          "description": "จำนวนวินาทีที่ช่องกลวงใช้ปลูกสัญลักษณ์ Reality หนึ่งอัน"
+        },
+        "ventRealityAmount": {
+          "label": "Reality จากช่องเล็ก",
+          "description": "Reality ที่ได้จากสัญลักษณ์ของช่องกลวงขนาดเล็กแต่ละอัน"
+        },
+        "ventRealityLargeMultiplier": {
+          "label": "ตัวคูณช่องใหญ่",
+          "description": "ตัวคูณผลผลิต Reality ของช่องกลวงขนาดใหญ่"
         }
       }
     },
@@ -632,6 +913,22 @@
         "enableScanRealitySlider": {
           "label": "Szuperkritikus mag csúszka",
           "description": "Megjeleníti a hatótáv átmérőjét és a Reality-betöltés csúszkáját a szuperkritikus mag vásárlási kártyáján."
+        },
+        "enableHollowVentReality": {
+          "label": "Reality-forrás üreges nyílásokból",
+          "description": "Az üreges nyílások Reality szimbólumokat növesztenek, amelyeket az üresség oltára automatikusan begyűjt."
+        },
+        "ventRealityInterval": {
+          "label": "Nyílás termelési ideje",
+          "description": "Másodperc, amíg egy üreges nyílás Reality szimbólumot növeszt."
+        },
+        "ventRealityAmount": {
+          "label": "Kis nyílás Reality",
+          "description": "Reality mennyiség minden kis üreges nyílás szimbólumából."
+        },
+        "ventRealityLargeMultiplier": {
+          "label": "Nagy nyílás szorzó",
+          "description": "A nagy üreges nyílás Reality termelésére alkalmazott szorzó."
         }
       }
     },
@@ -666,6 +963,22 @@
         "enableScanRealitySlider": {
           "label": "Superkritiskā kodola slīdnis",
           "description": "Rāda diapazona diametru un Reality ieplūdes slīdni superkritiskā kodola iegādes kartītē."
+        },
+        "enableHollowVentReality": {
+          "label": "Reality avots no dobajām atverēm",
+          "description": "Dobās atveres audzē Reality simbolus, kas automātiski tiek savākti caur tukšuma altāri."
+        },
+        "ventRealityInterval": {
+          "label": "Atveres ražošanas laiks",
+          "description": "Sekundes, kas dobajai atverei vajadzīgas Reality simbola izaudzēšanai."
+        },
+        "ventRealityAmount": {
+          "label": "Mazās atveres Reality",
+          "description": "Reality daudzums no katra mazās dobās atveres simbola."
+        },
+        "ventRealityLargeMultiplier": {
+          "label": "Lielās atveres reizinātājs",
+          "description": "Reizinātājs lielās dobās atveres Reality ieguvei."
         }
       }
     },
@@ -700,6 +1013,22 @@
         "enableScanRealitySlider": {
           "label": "Glisor nucleu supercritic",
           "description": "Afișează diametrul razei și glisorul de infuzie Reality pe cardul de cumpărare al nucleului supercritic."
+        },
+        "enableHollowVentReality": {
+          "label": "Sursă Reality din venturi goale",
+          "description": "Venturile goale cresc simboluri Reality colectate automat prin altarul vidului."
+        },
+        "ventRealityInterval": {
+          "label": "Timp producție vent",
+          "description": "Secunde necesare unui vent gol pentru a crește un simbol Reality."
+        },
+        "ventRealityAmount": {
+          "label": "Reality vent mic",
+          "description": "Reality obținută din fiecare simbol al unui vent gol mic."
+        },
+        "ventRealityLargeMultiplier": {
+          "label": "Multiplicator vent mare",
+          "description": "Multiplicator aplicat producției Reality a ventului gol mare."
         }
       }
     },
@@ -734,6 +1063,22 @@
         "enableScanRealitySlider": {
           "label": "Skyver for superkritisk kjerne",
           "description": "Viser rekkeviddediameteren og Reality-infusjonsskyveren på kjøpskortet for den superkritiske kjernen."
+        },
+        "enableHollowVentReality": {
+          "label": "Reality-kilde fra hule ventiler",
+          "description": "Hule ventiler dyrker Reality-symboler som automatisk høstes gjennom tomhetsalteret."
+        },
+        "ventRealityInterval": {
+          "label": "Produksjonstid for ventil",
+          "description": "Sekunder hver hul ventil bruker på å dyrke et Reality-symbol."
+        },
+        "ventRealityAmount": {
+          "label": "Reality fra liten ventil",
+          "description": "Reality fra hvert symbol i en liten hul ventil."
+        },
+        "ventRealityLargeMultiplier": {
+          "label": "Multiplikator for stor ventil",
+          "description": "Multiplikator brukt på Reality-produksjonen til den store hule ventilen."
         }
       }
     },
@@ -768,6 +1113,22 @@
         "enableScanRealitySlider": {
           "label": "可控超临界内核",
           "description": "可以注入现实来提升超临界内核的威力。"
+        },
+        "enableHollowVentReality": {
+          "label": "虚空维度裂缝现实渗入",
+          "description": "空心石在虚空维度的穿孔裂缝会持续渗入现实。"
+        },
+        "ventRealityInterval": {
+          "label": "现实渗入时间",
+          "description": "每个现实渗入所需的秒数。"
+        },
+        "ventRealityAmount": {
+          "label": "现实渗入数量",
+          "description": "每个空心石渗入的现实的数量。"
+        },
+        "ventRealityLargeMultiplier": {
+          "label": "大空心石现实渗入倍率",
+          "description": "大空心石渗入的现实的数量倍率。"
         }
       }
     }

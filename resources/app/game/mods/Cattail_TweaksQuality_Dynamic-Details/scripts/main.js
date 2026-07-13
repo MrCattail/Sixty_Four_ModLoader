@@ -3609,16 +3609,25 @@ ModLoader.register({
 
 			if (source?.kind === 'entity' && source.name) {
 				if (drawResourceSourceShopIcon(game, source.name, x, y, size)) return
-				if (source.entity?.sprite) {
+				const entity = getResourceSourceEntityForIcon(game, source)
+				if (entity?.sprite) {
 					game.ctx.save()
 					clipIconRect(game.ctx, x, y, size)
-					profileResourceSource('resource.icon.entitySprite.render', () => source.entity.sprite.renderXY([x, y + size * 0.22], 0, false, Math.max(0.12, size / Math.max(1, (game.unit || 1) * 1.65))), () => ({ name: source.name, size: Math.round(size * 100) / 100 }))
+					profileResourceSource('resource.icon.entitySprite.render', () => entity.sprite.renderXY([x, y + size * 0.22], 0, false, Math.max(0.12, size / Math.max(1, (game.unit || 1) * 1.65))), () => ({ name: source.name, size: Math.round(size * 100) / 100 }))
 					game.ctx.restore()
 					return
 				}
 			}
 
 			drawResourceSourcePlaceholder(game, x, y, size)
+		}
+
+		function getResourceSourceEntityForIcon(game, source) {
+			if (source?.entity?.sprite) return source.entity
+			if (!game || !source?.name || !Array.isArray(source.position)) return null
+			const cell = [Math.floor(source.position[0]), Math.floor(source.position[1])]
+			const entity = game.entityAtCoordinates?.(cell)
+			return entity?.name === source.name ? entity : null
 		}
 
 		function drawResourceSourceResourceIcon(game, resourceId, x, y, size) {
