@@ -1,4 +1,4 @@
-const { BrowserWindow, ipcMain, screen } = require('electron')
+const { app, BrowserWindow, ipcMain, screen } = require('electron')
 const fs = require('fs')
 const path = require('path')
 const { spawn } = require('child_process')
@@ -11,6 +11,98 @@ function runtimeLog(...args){
   } catch (e) {}
 }
 
+function readJsonFile(filePath, fallback){
+  try {
+    return JSON.parse(fs.readFileSync(filePath, 'utf8'))
+  } catch (e) {
+    return fallback
+  }
+}
+
+function normalizeEnabledEntries(enabled){
+  const list = Array.isArray(enabled) ? enabled : enabled?.mods || []
+  return list.map(entry=>{
+    if (typeof entry === 'string') return { path: entry, enabled: true }
+    return {
+      path: entry?.path || entry?.id,
+      id: entry?.id,
+      enabled: entry?.enabled !== false
+    }
+  }).filter(entry=>entry.enabled && entry.path)
+}
+
+function applyModloaderMainProcessManifests(){
+  const modsDir = path.resolve(__dirname, '..', 'mods')
+  const enabled = readJsonFile(path.join(modsDir, 'enabled.json'), { mods: [] })
+  const requests = {
+    forceWaveAudio: false,
+    enableExclusiveAudio: false,
+    trySupportedChannelLayouts: false,
+    disableOutOfProcessAudioService: false,
+    enableChromiumAudioLog: false,
+    mods: []
+  }
+
+  for (const entry of normalizeEnabledEntries(enabled)) {
+    const manifest = readJsonFile(path.join(modsDir, entry.path, 'mod.json'), null)
+    const audio = manifest?.mainProcess?.audio || manifest?.audioCompatibility
+    if (!audio || typeof audio !== 'object') continue
+    const modId = manifest.id || entry.id || entry.path
+    let requested = false
+    if (audio.forceWaveAudio === true) {
+      requests.forceWaveAudio = true
+      requested = true
+    }
+    if (audio.enableExclusiveAudio === true) {
+      requests.enableExclusiveAudio = true
+      requested = true
+    }
+    if (audio.trySupportedChannelLayouts === true) {
+      requests.trySupportedChannelLayouts = true
+      requested = true
+    }
+    if (audio.disableOutOfProcessAudioService === true) {
+      requests.disableOutOfProcessAudioService = true
+      requested = true
+    }
+    if (audio.enableChromiumAudioLog === true || audio.chromiumAudioLog === true) {
+      requests.enableChromiumAudioLog = true
+      requested = true
+    }
+    if (requested) requests.mods.push(modId)
+  }
+
+  if (requests.forceWaveAudio) app.commandLine.appendSwitch('force-wave-audio')
+  if (requests.enableExclusiveAudio) app.commandLine.appendSwitch('enable-exclusive-audio')
+  if (requests.trySupportedChannelLayouts) app.commandLine.appendSwitch('try-supported-channel-layouts')
+  if (requests.disableOutOfProcessAudioService) app.commandLine.appendSwitch('disable-features', 'AudioServiceOutOfProcess')
+  let chromiumAudioLogPath = ''
+  if (requests.enableChromiumAudioLog) {
+    chromiumAudioLogPath = path.join(__dirname, 'state', 'chromium-audio.log')
+    app.commandLine.appendSwitch('enable-logging', 'file')
+    app.commandLine.appendSwitch('log-file', chromiumAudioLogPath)
+    app.commandLine.appendSwitch('log-level', '0')
+    app.commandLine.appendSwitch('v', '1')
+    app.commandLine.appendSwitch('vmodule', '*audio*=2,*media*=2,*wasapi*=2')
+  }
+  if (requests.mods.length) {
+    const applied = {
+      forceWaveAudio: app.commandLine.hasSwitch?.('force-wave-audio') || false,
+      enableExclusiveAudio: app.commandLine.hasSwitch?.('enable-exclusive-audio') || false,
+      trySupportedChannelLayouts: app.commandLine.hasSwitch?.('try-supported-channel-layouts') || false,
+      disableFeatures: app.commandLine.getSwitchValue?.('disable-features') || '',
+      enableLogging: app.commandLine.getSwitchValue?.('enable-logging') || '',
+      logFile: app.commandLine.getSwitchValue?.('log-file') || '',
+      logLevel: app.commandLine.getSwitchValue?.('log-level') || '',
+      v: app.commandLine.getSwitchValue?.('v') || '',
+      vmodule: app.commandLine.getSwitchValue?.('vmodule') || '',
+      chromiumAudioLogPath
+    }
+    runtimeLog('mainProcessAudioCompatibility', { requested: requests, applied })
+  }
+}
+
+applyModloaderMainProcessManifests()
 const modloaderWindows = new Map()
 let modloaderParentWindowState = null
 const modloaderWindowMargin = 12

@@ -12,6 +12,7 @@ $checks = @(
 	[ordered]@{ file = '..\main.js'; pattern = 'ModLoaderMainProcess.attachWindow(win)'; description = 'main process bridge support' },
 	[ordered]@{ file = '..\main.js'; pattern = 'toggleDevTools'; description = 'DevTools shortcut/menu support' },
 	[ordered]@{ file = 'modloader\main-process.js'; pattern = 'module.exports'; description = 'main process window module' },
+	[ordered]@{ file = 'modloader\main-process.js'; pattern = 'applyModloaderMainProcessManifests'; description = 'main process manifest support' },
 	[ordered]@{ file = 'modloader\loader.js'; pattern = 'window.ModLoader = api'; description = 'loader exports API' }
 )
 

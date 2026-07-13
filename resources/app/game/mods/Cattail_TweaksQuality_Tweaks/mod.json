@@ -21,6 +21,7 @@
     "scripts/chasm-line-renderer.js",
     "scripts/floor-grid-lines.js",
     "scripts/play-time-counter.js",
+    "scripts/shift-ctrl-zoom-disable.js",
     "scripts/view-distance.js"
   ],
   "conflicts": [
@@ -226,6 +227,13 @@
       "description": "Show the active run play-time counter on the game canvas.",
       "reloadPolicy": "hot"
     },
+    "disableShiftCtrlZoomShortcut": {
+      "type": "boolean",
+      "label": "Disable Shift/Ctrl zoom shortcut",
+      "default": true,
+      "description": "Prevent pressing Shift or Ctrl alone from resetting the camera zoom, while keeping Shift/Ctrl + wheel zooming available.",
+      "reloadPolicy": "hot"
+    },
     "playTimeCounterPosition": {
       "type": "slider",
       "label": "Play time counter position",
@@ -361,7 +369,7 @@
       "description": "Used when the saved zoom value is missing or invalid."
     }
   },
-  "description": "Combines view distance limits, ending skip, accessibility buttons, stabilizer surge flash reduction, void return fade skip, resource glow colors, chasm line rendering, floor grid outlines, play-time counter, and explainer fixes into one multi-entry quality mod.",
+  "description": "Combines view distance limits, ending skip, accessibility buttons, stabilizer surge flash reduction, void return fade skip, resource glow colors, chasm line rendering, floor grid outlines, play-time counter, Shift/Ctrl zoom shortcut control, and explainer fixes into one multi-entry quality mod.",
   "reloadOnConfigChange": true,
   "translations": {
     "sch": {
@@ -443,6 +451,10 @@
         "enableExplainerFix": {
           "label": "提示修复",
           "description": "修复提示语在切换语言后不刷新，并让虚空世界里的提示文字变成亮色以便看清。"
+        },
+        "disableShiftCtrlZoomShortcut": {
+          "label": "禁用 Shift/Ctrl 单按缩放",
+          "description": "阻止单独按下 Shift 或 Ctrl 时重置镜头缩放，同时保留 Shift/Ctrl + 滚轮缩放。"
         }
       }
     },
@@ -525,6 +537,10 @@
         "enableExplainerFix": {
           "label": "提示修复",
           "description": "修复提示语在切换语言后不刷新，并让虚空世界里的提示文字变成亮色以便看清。"
+        },
+        "disableShiftCtrlZoomShortcut": {
+          "label": "禁用 Shift/Ctrl 单按缩放",
+          "description": "阻止单独按下 Shift 或 Ctrl 时重置镜头缩放，同时保留 Shift/Ctrl + 滚轮缩放。"
         }
       }
     },
@@ -596,6 +612,10 @@
         "enableExplainerFix": {
           "label": "Explainer fix",
           "description": "Refresh pulsing explainer hints after language changes and use readable light text in the void."
+        },
+        "disableShiftCtrlZoomShortcut": {
+          "label": "Disable Shift/Ctrl zoom shortcut",
+          "description": "Prevent pressing Shift or Ctrl alone from resetting the camera zoom, while keeping Shift/Ctrl + wheel zooming available."
         }
       }
     },
@@ -667,6 +687,10 @@
         "enableExplainerFix": {
           "label": "Ispravlenie podskazok",
           "description": "Obnovlyaet pulsiruyushchie podskazki posle smeny yazyka i delaet tekst svetlym v pustote."
+        },
+        "disableShiftCtrlZoomShortcut": {
+          "label": "Otklyuchit Shift/Ctrl zoom",
+          "description": "Ne pozvolyaet odinochnomu Shift ili Ctrl sbrosit masshtab kamery, no ostavlyaet Shift/Ctrl + koleso."
         }
       }
     },
@@ -738,6 +762,10 @@
         "enableExplainerFix": {
           "label": "Hinweis-Fix",
           "description": "Aktualisiert pulsierende Hinweise nach Sprachwechseln und nutzt gut lesbaren hellen Text in der Leere."
+        },
+        "disableShiftCtrlZoomShortcut": {
+          "label": "Shift/Ctrl-Zoom deaktivieren",
+          "description": "Verhindert, dass Shift oder Ctrl allein den Kamerazoom zuruecksetzt, laesst aber Shift/Ctrl + Mausrad aktiv."
         }
       }
     },
@@ -809,6 +837,10 @@
         "enableExplainerFix": {
           "label": "Correcao dos avisos",
           "description": "Atualiza avisos pulsantes apos mudar o idioma e usa texto claro legivel no vazio."
+        },
+        "disableShiftCtrlZoomShortcut": {
+          "label": "Desativar zoom Shift/Ctrl",
+          "description": "Impede Shift ou Ctrl sozinho de redefinir o zoom da camera, mantendo Shift/Ctrl + roda."
         }
       }
     },
@@ -880,6 +912,10 @@
         "enableExplainerFix": {
           "label": "Correzione suggerimenti",
           "description": "Aggiorna i suggerimenti pulsanti dopo il cambio lingua e usa testo chiaro leggibile nel vuoto."
+        },
+        "disableShiftCtrlZoomShortcut": {
+          "label": "Disattiva zoom Shift/Ctrl",
+          "description": "Evita che Shift o Ctrl da soli ripristinino lo zoom, mantenendo Shift/Ctrl + rotellina."
         }
       }
     },
@@ -951,6 +987,10 @@
         "enableExplainerFix": {
           "label": "Correccion de avisos",
           "description": "Actualiza los avisos pulsantes tras cambiar idioma y usa texto claro legible en el vacio."
+        },
+        "disableShiftCtrlZoomShortcut": {
+          "label": "Desactivar zoom Shift/Ctrl",
+          "description": "Evita que Shift o Ctrl solos reinicien el zoom, pero mantiene Shift/Ctrl + rueda."
         }
       }
     },
@@ -1022,6 +1062,10 @@
         "enableExplainerFix": {
           "label": "Correctif des indices",
           "description": "Actualise les indices pulses apres les changements de langue et utilise un texte clair lisible dans le vide."
+        },
+        "disableShiftCtrlZoomShortcut": {
+          "label": "Desactiver le zoom Shift/Ctrl",
+          "description": "Empeche Shift ou Ctrl seuls de reinitialiser le zoom, tout en gardant Shift/Ctrl + molette."
         }
       }
     },
@@ -1093,6 +1137,10 @@
         "enableExplainerFix": {
           "label": "Hint-fix",
           "description": "Vernieuwt pulserende hints na taalwijzigingen en gebruikt leesbare lichte tekst in de leegte."
+        },
+        "disableShiftCtrlZoomShortcut": {
+          "label": "Shift/Ctrl-zoom uitschakelen",
+          "description": "Voorkomt dat Shift of Ctrl alleen de camerazoom reset, maar behoudt Shift/Ctrl + muiswiel."
         }
       }
     },
@@ -1164,6 +1212,10 @@
         "enableExplainerFix": {
           "label": "Oprava napoved",
           "description": "Obnovuje pulzujici napovedy po zmene jazyka a v prazdnote pouziva citelny svetly text."
+        },
+        "disableShiftCtrlZoomShortcut": {
+          "label": "Vypnout zoom Shift/Ctrl",
+          "description": "Zabrani samotnemu Shift nebo Ctrl resetovat zoom kamery, ale ponecha Shift/Ctrl + kolecko."
         }
       }
     },
@@ -1235,6 +1287,10 @@
         "enableExplainerFix": {
           "label": "Poprawka podpowiedzi",
           "description": "Odswieza pulsujace podpowiedzi po zmianie jezyka i uzywa jasnego tekstu w pustce."
+        },
+        "disableShiftCtrlZoomShortcut": {
+          "label": "Wylacz zoom Shift/Ctrl",
+          "description": "Blokuje reset zoomu po samym Shift lub Ctrl, ale zostawia Shift/Ctrl + kolko."
         }
       }
     },
@@ -1306,6 +1362,10 @@
         "enableExplainerFix": {
           "label": "Explainer fix",
           "description": "Refresh explainer hints after language changes and use light text in the void."
+        },
+        "disableShiftCtrlZoomShortcut": {
+          "label": "Disable Shift/Ctrl zoom shortcut",
+          "description": "Prevent Shift or Ctrl alone from resetting camera zoom; Shift/Ctrl + wheel still works."
         }
       }
     },
@@ -1377,6 +1437,10 @@
         "enableExplainerFix": {
           "label": "Explainer fix",
           "description": "Refresh explainer hints after language changes and use light text in the void."
+        },
+        "disableShiftCtrlZoomShortcut": {
+          "label": "Disable Shift/Ctrl zoom shortcut",
+          "description": "Prevent Shift or Ctrl alone from resetting camera zoom; Shift/Ctrl + wheel still works."
         }
       }
     },
@@ -1448,6 +1512,10 @@
         "enableExplainerFix": {
           "label": "提示修復",
           "description": "修復提示語在切換語言後不刷新，並讓虛空世界裡的提示文字變成亮色以便看清。"
+        },
+        "disableShiftCtrlZoomShortcut": {
+          "label": "停用 Shift/Ctrl 單按縮放",
+          "description": "阻止單獨按下 Shift 或 Ctrl 時重置鏡頭縮放，同時保留 Shift/Ctrl + 滾輪縮放。"
         }
       }
     },
@@ -1519,6 +1587,10 @@
         "enableExplainerFix": {
           "label": "Explainer fix",
           "description": "Refresh explainer hints after language changes and use light text in the void."
+        },
+        "disableShiftCtrlZoomShortcut": {
+          "label": "Disable Shift/Ctrl zoom shortcut",
+          "description": "Prevent Shift or Ctrl alone from resetting camera zoom; Shift/Ctrl + wheel still works."
         }
       }
     },
@@ -1590,6 +1662,10 @@
         "enableExplainerFix": {
           "label": "Tipp javitas",
           "description": "Nyelvvaltas utan frissiti a pulzalo tippeket, es az urben vilagos, olvashato szoveget hasznal."
+        },
+        "disableShiftCtrlZoomShortcut": {
+          "label": "Shift/Ctrl zoom kikapcsolasa",
+          "description": "Megakadalyozza, hogy a Shift vagy Ctrl onmagaban visszaallitsa a kamera zoomot, de a Shift/Ctrl + gorgo mukodik."
         }
       }
     },
@@ -1661,6 +1737,10 @@
         "enableExplainerFix": {
           "label": "Padomu labojums",
           "description": "Atsvaidzina pulsojosus padomus pec valodas mainas un tuksumaa izmanto gaisu, salasamu tekstu."
+        },
+        "disableShiftCtrlZoomShortcut": {
+          "label": "Izslegt Shift/Ctrl talummainu",
+          "description": "Neatlauj Shift vai Ctrl vieniem pasiem atiestatit kameras talummainu, bet Shift/Ctrl + ritenis paliek."
         }
       }
     },
@@ -1732,6 +1812,10 @@
         "enableExplainerFix": {
           "label": "Corectie indicii",
           "description": "Actualizeaza indiciile pulsante dupa schimbarea limbii si foloseste text luminos in vid."
+        },
+        "disableShiftCtrlZoomShortcut": {
+          "label": "Dezactiveaza zoom Shift/Ctrl",
+          "description": "Impiedica Shift sau Ctrl singur sa reseteze zoomul camerei, dar pastreaza Shift/Ctrl + rotita."
         }
       }
     },
@@ -1803,6 +1887,10 @@
         "enableExplainerFix": {
           "label": "Hint-fiks",
           "description": "Oppdaterer pulserende hint etter sprakbytte og bruker lys, lesbar tekst i tomrommet."
+        },
+        "disableShiftCtrlZoomShortcut": {
+          "label": "Deaktiver Shift/Ctrl-zoom",
+          "description": "Hindrer Shift eller Ctrl alene i a nullstille kamerazoom, men beholder Shift/Ctrl + hjul."
         }
       }
     }
