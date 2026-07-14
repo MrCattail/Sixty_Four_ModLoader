@@ -593,7 +593,7 @@ ModLoader.register({
 		}
 
 		function getResourceGlowColor(game, resourceId) {
-			const overrides = previewColors === null ? readObject(api.config.get('resourceGlowColors', {})) : previewColors
+			const overrides = mergeObjects(getResourceGlowDefaultColors(), previewColors === null ? readObject(api.config.get('resourceGlowColors', {})) : previewColors)
 			const override = overrides[resourceId] ?? overrides[String(resourceId)] ?? overrides['r' + resourceId]
 			return normalizeHexColor(override) || getDefaultResourceColor(game, resourceId) || '#FFFFFF'
 		}
@@ -605,6 +605,16 @@ ModLoader.register({
 
 		function readObject(value) {
 			return value && typeof value === 'object' && !Array.isArray(value) ? value : {}
+		}
+
+		function getResourceGlowDefaultColors() {
+			const schema = typeof api.config.schema === 'function' ? api.config.schema() : []
+			const item = Array.isArray(schema) ? schema.find(function (entry) { return entry?.key === 'resourceGlowColors' }) : null
+			return readObject(item?.default)
+		}
+
+		function mergeObjects(base, override) {
+			return Object.assign({}, readObject(base), readObject(override))
 		}
 
 		function normalizeHexColor(value) {

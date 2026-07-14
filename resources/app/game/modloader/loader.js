@@ -641,8 +641,8 @@
 			#modloader-panel.modloader-panel-hidden-top .modloader-panel-tab { border-radius: 0 0 8px 8px; }
 			#modloader-panel.modloader-panel-hidden-bottom .modloader-panel-tab { border-radius: 8px 8px 0 0; }
 			#modloader-panel .modloader-panel-tab-logo { width: 24px; height: 24px; border-radius: 5px; background: url('img/logo/sheet.png'); background-size: 400% 200%; box-shadow: inset 0 0 0 1px rgba(255,255,255,.14), 0 2px 8px rgba(0,0,0,.22); }
-			#modloader-panel .modloader-panel-settings-page { display: none; gap: 9px; margin: 0 0 12px; padding: 10px 0 11px; border-top: 1px solid rgba(255,255,255,.09); border-bottom: 1px solid rgba(255,255,255,.09); }
-			#modloader-panel .modloader-panel-settings-page.active { display: grid; }
+			#modloader-panel .modloader-panel-settings-page { display: grid; gap: 9px; max-height: 0; margin: 0; padding: 0; border-top: 1px solid transparent; border-bottom: 1px solid transparent; opacity: 0; overflow: hidden; pointer-events: none; transform: translateY(-5px); transition: max-height .28s cubic-bezier(.18, .86, .2, 1), margin-bottom .28s cubic-bezier(.18, .86, .2, 1), padding-top .28s cubic-bezier(.18, .86, .2, 1), padding-bottom .28s cubic-bezier(.18, .86, .2, 1), border-color .24s ease, opacity .2s ease, transform .28s cubic-bezier(.18, .86, .2, 1); }
+			#modloader-panel .modloader-panel-settings-page.active { max-height: min(42vh, 420px); margin-bottom: 12px; padding: 10px 0 11px; border-color: rgba(255,255,255,.09); opacity: 1; pointer-events: auto; transform: translateY(0); }
 			#modloader-panel .modloader-panel-settings-title { color: rgba(255,255,255,.86); font-weight: 600; }
 			#modloader-panel .modloader-panel-settings-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; color: rgba(255,255,255,.72); }
 			#modloader-panel .modloader-panel-settings-options { display: inline-flex; align-items: center; gap: 4px; padding: 2px; border-radius: 7px; background: rgba(255,255,255,.07); }
@@ -657,7 +657,7 @@
 			#modloader-panel.modloader-panel-theme-light .modloader-panel-settings-title, #modloader-panel.modloader-panel-theme-light .modloader-panel-value, #modloader-panel.modloader-panel-theme-light .modloader-mod-path, #modloader-panel.modloader-panel-theme-light .modloader-mod-label, #modloader-panel.modloader-panel-theme-light .modloader-mod-config-title, #modloader-panel.modloader-panel-theme-light .modloader-config-label { color: rgba(18,20,22,.9); }
 			#modloader-panel.modloader-panel-theme-light .modloader-panel-close, #modloader-panel.modloader-panel-theme-light .modloader-panel-edge, #modloader-panel.modloader-panel-theme-light .modloader-panel-settings { color: rgba(18,20,22,.72); }
 			#modloader-panel.modloader-panel-theme-light .modloader-panel-settings.active, #modloader-panel.modloader-panel-theme-light .modloader-panel-edge:hover:not(:disabled), #modloader-panel.modloader-panel-theme-light .modloader-panel-settings:hover, #modloader-panel.modloader-panel-theme-light .modloader-panel-close:hover { color: #111; background: rgba(0,0,0,.08); }
-			#modloader-panel.modloader-panel-theme-light .modloader-panel-settings-page { border-color: rgba(0,0,0,.1); }
+			#modloader-panel.modloader-panel-theme-light .modloader-panel-settings-page.active { border-color: rgba(0,0,0,.1); }
 			#modloader-panel.modloader-panel-theme-light .modloader-panel-settings-options { background: rgba(0,0,0,.06); }
 			#modloader-panel.modloader-panel-theme-light .modloader-panel-settings-option { color: rgba(18,20,22,.66); }
 			#modloader-panel.modloader-panel-theme-light .modloader-panel-settings-option.active { background: rgba(18,20,22,.9); color: #fff; }
@@ -676,7 +676,7 @@
 			#modloader-panel.modloader-panel-theme-light .modloader-config-slider-range::-webkit-slider-runnable-track { background: linear-gradient(90deg, rgba(18,20,22,.52) 0 var(--modloader-slider-fill, 0%), rgba(0,0,0,.12) var(--modloader-slider-fill, 0%) 100%); box-shadow: inset 0 1px 2px rgba(0,0,0,.18); }
 			#modloader-panel.modloader-panel-theme-light .modloader-config-slider-range::-moz-range-track { background: rgba(0,0,0,.12); box-shadow: inset 0 1px 2px rgba(0,0,0,.18); }
 			#modloader-panel.modloader-panel-theme-light .modloader-config-slider-range::-moz-range-progress { background: rgba(18,20,22,.52); }
-			#modloader-panel.modloader-panel-theme-light .modloader-action-button, #modloader-panel.modloader-panel-theme-light .modloader-modal-button, #modloader-panel.modloader-panel-theme-light .modloader-resource-color-reset, #modloader-panel.modloader-panel-theme-light .modloader-resource-color-share-button, #modloader-panel.modloader-panel-theme-light .modloader-color-reset { background: rgba(0,0,0,.055); border-color: rgba(0,0,0,.12); color: rgba(18,20,22,.78); }
+			#modloader-panel.modloader-panel-theme-light .modloader-action-button, #modloader-panel.modloader-panel-theme-light .modloader-modal-button, #modloader-panel.modloader-panel-theme-light .modloader-resource-color-reset, #modloader-panel.modloader-panel-theme-light .modloader-resource-color-share-button, #modloader-panel.modloader-panel-theme-light .modloader-color-reset, #modloader-panel.modloader-panel-theme-light .modloader-config-number-reset { background: rgba(0,0,0,.055); border-color: rgba(0,0,0,.12); color: rgba(18,20,22,.78); }
 			#modloader-panel.modloader-panel-theme-light .modloader-resource-color-share-status { color: rgba(18,20,22,.54); }
 			#modloader-panel.modloader-panel-theme-light .modloader-panel-tab { background: rgba(248,248,246,.95); border-color: rgba(0,0,0,.12); }
 			#modloader-panel .modloader-panel-summary { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px 12px; margin: 8px 0 12px; }
@@ -729,6 +729,7 @@
 			#modloader-panel .modloader-mod-row-configurable:hover { border-color: rgba(207,233,255,.28); }
 			#modloader-panel .modloader-mod-row-expanded { border-color: rgba(207,233,255,.5); box-shadow: 0 8px 22px rgba(0,0,0,.16); }
 			#modloader-panel .modloader-mod-row-moving { z-index: 3; will-change: transform; }
+			#modloader-panel .modloader-mod-row-dropping { z-index: 5; pointer-events: none; will-change: transform; }
 			#modloader-panel .modloader-mod-row-dragging { --modloader-row-gap: 11px; --modloader-row-padding: 9.9px; --modloader-row-radius: 7.7px; --modloader-row-font-size: 14.3px; --modloader-row-check-offset: 2.2px; --modloader-row-actions-gap: 2.2px; --modloader-row-index-width: 14.3px; --modloader-row-index-size: 12.1px; --modloader-row-action-size: 27.5px; --modloader-row-action-radius: 5.5px; --modloader-row-sort-x: 7.7px; --modloader-row-sort-y: 7.7px; --modloader-row-sort-width: 12.1px; --modloader-row-sort-height: 2.2px; --modloader-row-sort-shadow-1: 5.5px; --modloader-row-sort-shadow-2: 11px; --modloader-row-delete-body-x: 8.8px; --modloader-row-delete-body-y: 9.9px; --modloader-row-delete-body-width: 9.9px; --modloader-row-delete-body-height: 11px; --modloader-row-delete-border: 2.2px; --modloader-row-delete-radius-small: 1.1px; --modloader-row-delete-radius-large: 3.3px; --modloader-row-delete-lid-x: 7.7px; --modloader-row-delete-lid-y: 6.6px; --modloader-row-delete-lid-width: 12.1px; --modloader-row-delete-lid-height: 2.2px; --modloader-row-delete-lid-shadow-x: 3.3px; --modloader-row-delete-lid-shadow-y: -3.3px; --modloader-row-delete-lid-shadow-spread: -1.1px; --modloader-row-title-gap: 8.8px; --modloader-row-meta-gap: 3.3px; --modloader-row-warning-gap: 5.5px; --modloader-row-switch-width: 50.6px; --modloader-row-switch-height: 26.4px; --modloader-row-switch-knob: 22px; --modloader-row-switch-pad: 2.2px; --modloader-row-switch-slide: 24.2px; --modloader-row-switch-label-off: 6.6px; --modloader-row-switch-label-on: 7.7px; --modloader-row-switch-label-size: 9.9px; --modloader-row-switch-letter-spacing: .275px; z-index: 6; opacity: 1; border-color: rgba(207,233,255,.48); background: rgba(16,22,28,.82); box-shadow: 0 22px 48px rgba(0,0,0,.52), 0 0 0 1px rgba(207,233,255,.13), inset 0 1px 0 rgba(255,255,255,.1); backdrop-filter: blur(14px) saturate(1.18); -webkit-backdrop-filter: blur(14px) saturate(1.18); pointer-events: none; will-change: left, top; }
 			#modloader-panel.modloader-panel-theme-light .modloader-mod-row-dragging { border-color: rgba(18,20,22,.22); background: rgba(250,250,247,.86); box-shadow: 0 20px 42px rgba(0,0,0,.22), 0 0 0 1px rgba(18,20,22,.08), inset 0 1px 0 rgba(255,255,255,.7); }
 			#modloader-panel .modloader-mod-sort-placeholder { min-height: 24px; border: 1px solid transparent; border-radius: 7px; background: transparent; box-sizing: border-box; transition: height .16s ease, min-height .16s ease; }
@@ -756,7 +757,7 @@
 			#modloader-panel .modloader-mod-meta { margin-top: var(--modloader-row-meta-gap); color: rgba(255,255,255,.62); overflow-wrap: anywhere; }
 			#modloader-panel .modloader-mod-warning { display: none; margin-top: var(--modloader-row-warning-gap); color: #ffe1a3; overflow-wrap: anywhere; }
 			#modloader-panel .modloader-mod-warning.active { display: block; }
-			#modloader-panel .modloader-mod-config { max-height: 0; margin-top: 0; padding-top: 0; border-top: 1px solid transparent; opacity: 0; overflow: hidden; pointer-events: none; transform: translateY(-4px); transition: max-height .2s ease, margin-top .2s ease, padding-top .2s ease, border-top-color .2s ease, opacity .16s ease, transform .2s ease; }
+			#modloader-panel .modloader-mod-config { max-height: 0; margin-top: 0; padding-top: 0; border-top: 1px solid transparent; opacity: 0; overflow: hidden; pointer-events: none; transform: translateY(-4px); transition: max-height .32s cubic-bezier(.18, .86, .2, 1), margin-top .32s cubic-bezier(.18, .86, .2, 1), padding-top .32s cubic-bezier(.18, .86, .2, 1), border-top-color .24s ease, opacity .22s ease, transform .32s cubic-bezier(.18, .86, .2, 1); }
 			#modloader-panel .modloader-mod-row-expanded .modloader-mod-config { max-height: min(42vh, 380px); margin-top: 8px; padding-top: 8px; border-top-color: rgba(255,255,255,.09); opacity: 1; pointer-events: auto; transform: translateY(0); }
 			#modloader-panel .modloader-mod-config-title { margin-bottom: 5px; color: rgba(255,255,255,.72); font-weight: 600; }
 			#modloader-panel .modloader-mod-config-scroll { max-height: min(34vh, 310px); overflow-x: hidden; overflow-y: auto; padding-right: 5px; scrollbar-gutter: stable; scrollbar-width: thin; scrollbar-color: rgba(185,185,185,.48) transparent; }
@@ -790,6 +791,10 @@
 			#modloader-panel .modloader-config-label { display: block; color: rgba(255,255,255,.86); overflow-wrap: anywhere; }
 			#modloader-panel .modloader-config-meta { display: block; font-size: 11px; color: rgba(255,255,255,.48); overflow-wrap: anywhere; }
 			#modloader-panel input.modloader-config-input:not([type="checkbox"]), #modloader-panel textarea.modloader-config-input, #modloader-panel select.modloader-config-input { box-sizing: border-box; width: 100%; min-width: 0; border: 1px solid rgba(255,255,255,.16); border-radius: 5px; padding: 5px 6px; background: rgba(0,0,0,.22); color: rgba(255,255,255,.92); outline: none; }
+			#modloader-panel .modloader-config-number { display: grid; grid-template-columns: minmax(0, 1fr) 28px; gap: 5px; align-items: center; min-width: 0; }
+			#modloader-panel .modloader-config-number-reset { height: 28px; border: 1px solid rgba(255,255,255,.14); border-radius: 5px; padding: 0; background: rgba(255,255,255,.08); color: rgba(255,255,255,.78); cursor: pointer; font: 700 13px/1 Montserrat, Arial, sans-serif; }
+			#modloader-panel .modloader-config-number-reset:hover { background: rgba(255,255,255,.14); color: rgba(255,255,255,.94); }
+			#modloader-panel .modloader-config-number-reset:disabled { cursor: default; opacity: .45; }
 			#modloader-panel .modloader-config-slider { display: grid; grid-template-columns: minmax(0, 1fr) 66px; gap: 4px 8px; align-items: center; width: 100%; min-width: 0; --modloader-slider-thumb-half: 14px; }
 			#modloader-panel .modloader-config-slider-labeled { grid-template-columns: minmax(0, 1fr); }
 			#modloader-panel .modloader-config-slider-range { appearance: none; -webkit-appearance: none; width: 100%; min-width: 0; height: 32px; margin: 0; background: transparent; cursor: grab; outline: none; }
@@ -1918,6 +1923,7 @@
 	}
 	const getResourceColorConfigRows = function (item, value) {
 		const overrides = isObject(value) ? value : {}
+		const defaultOverrides = isObject(item?.default) ? item.default : {}
 		const gameResources = state.game?.codex?.resources || []
 		const manifestResources = Array.isArray(item.resources) ? item.resources : (Array.isArray(item.rows) ? item.rows : (Array.isArray(item.colors) ? item.colors : []))
 		const count = Math.max(Number(item.count) || 0, gameResources.length, manifestResources.length, 10)
@@ -1931,8 +1937,10 @@
 			const resource = gameResources[resourceIndex] || gameResources[i] || {}
 			let iconIndex = getFiniteConfigNumber(manifestResource.iconIndex ?? manifestResource.icon ?? resourceIndex)
 			if (iconIndex === null) iconIndex = i
-			const defaultColor = normalizePanelHexColor(manifestResource.defaultColor) || normalizePanelHexColor(resource?.triplet?.[2]) || normalizePanelHexColor(resource?.triplet?.[1]) || normalizePanelHexColor(resource?.triplet?.[0]) || normalizePanelHexColor(manifestResource.color) || '#FFFFFF'
-			const override = overrides[id] ?? overrides[String(id)] ?? overrides[i] ?? overrides[String(i)] ?? overrides['r' + id] ?? overrides['r' + i]
+			const nativeDefaultColor = normalizePanelHexColor(manifestResource.defaultColor) || normalizePanelHexColor(resource?.triplet?.[2]) || normalizePanelHexColor(resource?.triplet?.[1]) || normalizePanelHexColor(resource?.triplet?.[0]) || normalizePanelHexColor(manifestResource.color) || '#FFFFFF'
+			const defaultOverride = getResourceColorConfigValue(defaultOverrides, id, i)
+			const defaultColor = normalizePanelHexColor(defaultOverride) || nativeDefaultColor
+			const override = getResourceColorConfigValue(overrides, id, i)
 			rows.push({
 				id,
 				name: pickLocalizedText(manifestResource.name || manifestResource.label, getLocaleCandidates()) || String(resource.name || manifestResource.name || manifestResource.label || ('Resource ' + (i + 1))),
@@ -1943,6 +1951,10 @@
 			})
 		}
 		return rows
+	}
+	const getResourceColorConfigValue = function (source, id, index) {
+		if (!isObject(source)) return undefined
+		return source[id] ?? source[String(id)] ?? source[index] ?? source[String(index)] ?? source['r' + id] ?? source['r' + index]
 	}
 	const getSliderAliasNumber = function (item, value) {
 		const aliases = item?.valueAliases || item?.sliderAliases
@@ -2192,7 +2204,7 @@
 	}
 
 	const getColorConfigDisplayDefault = function (item) {
-		return normalizePanelHexColor(item?.defaultColor) || normalizePanelHexColor(item?.colorDefault) || normalizePanelHexColor(item?.default) || '#FFFFFF'
+		return normalizePanelHexColor(item?.default) || normalizePanelHexColor(item?.defaultColor) || normalizePanelHexColor(item?.colorDefault) || '#FFFFFF'
 	}
 
 	const createColorConfigInput = function (item, value) {
@@ -2225,6 +2237,17 @@
 			textInput.value = auto ? '' : displayDefault
 			syncAutoPlaceholder()
 		}
+		const setDefault = function () {
+			const defaultColor = normalizePanelHexColor(item?.default)
+			if (allowAuto && !defaultColor) {
+				setAuto()
+				return
+			}
+			auto = false
+			picker.value = defaultColor || displayDefault
+			textInput.value = picker.value
+			syncAutoPlaceholder()
+		}
 		const markManual = function () {
 			auto = false
 			syncAutoPlaceholder()
@@ -2249,7 +2272,7 @@
 		})
 		reset.addEventListener('click', function (event) {
 			event.preventDefault()
-			setAuto()
+			setDefault()
 			root.dispatchEvent(new Event('input', { bubbles: true }))
 		})
 
@@ -2273,6 +2296,51 @@
 		root.append(picker, textInput, reset)
 		return root
 	}
+
+	const getNumberConfigResetValue = function (item, type) {
+		let value = getFiniteConfigNumber(item.default)
+		if (value === null) value = getFiniteConfigNumber(item.min)
+		if (value === null) value = 0
+		if (getNumberConfigType(item, type) === 'integer' || getNumberConfigType(item, type) === 'int') value = Math.round(value)
+		return value
+	}
+
+	const createNumberConfigInput = function (item, value, type) {
+		const root = element('div', 'modloader-config-number')
+		const input = element('input', 'modloader-config-input')
+		input.type = 'number'
+		input.value = formatConfigInputValue(value, type)
+		input.step = getConfigNumberStep(item, type)
+		if (item.min !== undefined) input.min = String(item.min)
+		if (item.max !== undefined) input.max = String(item.max)
+
+		const reset = element('button', 'modloader-config-number-reset', '↺')
+		reset.type = 'button'
+		reset.title = getInlineLocalizedText(CONFIG_INLINE_TEXT.reset)
+		reset.setAttribute('aria-label', getInlineLocalizedText(CONFIG_INLINE_TEXT.reset))
+		reset.addEventListener('click', function (event) {
+			event.preventDefault()
+			event.stopPropagation()
+			input.value = formatConfigInputValue(getNumberConfigResetValue(item, type), type)
+			input.dispatchEvent(new Event('input', { bubbles: true }))
+		})
+
+		Object.defineProperty(root, 'value', {
+			get() { return input.value },
+			set(nextValue) { input.value = nextValue }
+		})
+		Object.defineProperty(root, 'disabled', {
+			get() { return input.disabled },
+			set(nextValue) {
+				input.disabled = !!nextValue
+				reset.disabled = !!nextValue
+			}
+		})
+
+		root.append(input, reset)
+		return root
+	}
+
 	const createConfigInput = function (item, value) {
 		const type = getConfigType(item)
 		if (isResourceColorsConfigItem(item, type)) return createResourceColorsInput(item, value)
@@ -2285,11 +2353,7 @@
 			input.setAttribute('role', 'switch')
 			input.checked = value === undefined ? !!item.default : !!value
 		} else if (isNumberConfigType(type)) {
-			input.type = 'number'
-			input.value = formatConfigInputValue(value, type)
-			input.step = getConfigNumberStep(item, type)
-			if (item.min !== undefined) input.min = String(item.min)
-			if (item.max !== undefined) input.max = String(item.max)
+			return createNumberConfigInput(item, value, type)
 		} else if (type === 'array' || type === 'object') {
 			input.spellcheck = false
 			input.value = formatConfigInputValue(value, type)
@@ -2916,21 +2980,39 @@
 		}
 	}
 
+	const syncPanelSettingsPageState = function (panel) {
+		if (!panel) return
+		panel.classList.toggle('modloader-panel-settings-open', state.panelSettingsOpen)
+		const settingsButton = panel.querySelector('.modloader-panel-settings')
+		const settingsPage = panel.querySelector('.modloader-panel-settings-page')
+		if (settingsButton) {
+			settingsButton.classList.toggle('active', state.panelSettingsOpen)
+			settingsButton.setAttribute('aria-expanded', state.panelSettingsOpen ? 'true' : 'false')
+		}
+		if (settingsPage) {
+			settingsPage.classList.toggle('active', state.panelSettingsOpen)
+			settingsPage.setAttribute('aria-hidden', state.panelSettingsOpen ? 'false' : 'true')
+			settingsPage.inert = !state.panelSettingsOpen
+		}
+	}
+
 	const applyPanelSettings = function (panel) {
 		panel.classList.toggle('modloader-panel-theme-light', state.panelSettings.theme === 'light')
-		panel.classList.toggle('modloader-panel-settings-open', state.panelSettingsOpen)
 		panel.classList.toggle('modloader-panel-manual-hide', !isPanelAutoHideEnabled())
+		syncPanelSettingsPageState(panel)
 		if (!isPanelAutoHideEnabled()) clearPanelAutoHideTimer()
+	}
+
+	const togglePanelSettingsPage = function (panel) {
+		state.panelSettingsOpen = !state.panelSettingsOpen
+		syncPanelSettingsPageState(panel)
+		savePanelState()
 	}
 
 	const closePanelSettingsPage = function (panel) {
 		if (!state.panelSettingsOpen) return
 		state.panelSettingsOpen = false
-		panel.classList.remove('modloader-panel-settings-open')
-		const settingsButton = panel.querySelector('.modloader-panel-settings')
-		const settingsPage = panel.querySelector('.modloader-panel-settings-page')
-		if (settingsButton) settingsButton.classList.remove('active')
-		if (settingsPage) settingsPage.classList.remove('active')
+		syncPanelSettingsPageState(panel)
 	}
 
 	const applyPanelHiddenPosition = function (panel) {
@@ -3158,8 +3240,7 @@
 		settings.onclick = function (event) {
 			event.preventDefault()
 			event.stopPropagation()
-			state.panelSettingsOpen = !state.panelSettingsOpen
-			renderPanel()
+			togglePanelSettingsPage(panel)
 		}
 		const hide = element('button', 'modloader-panel-edge')
 		hide.type = 'button'
@@ -3403,7 +3484,7 @@
 			row.style.transition = 'none'
 			row.style.transform = `translate(${dx}px, ${dy}px)`
 			row.getBoundingClientRect()
-			row.style.transition = 'transform .22s cubic-bezier(.2, .8, .2, 1)'
+			row.style.transition = 'transform .34s cubic-bezier(.16, .88, .2, 1)'
 			row.style.transform = ''
 			let finished = false
 			let fallbackTimer = null
@@ -3419,7 +3500,7 @@
 				if (done) done()
 			}
 			row.addEventListener('transitionend', cleanup)
-			fallbackTimer = setTimeout(cleanup, 280)
+			fallbackTimer = setTimeout(cleanup, 430)
 		}
 
 		const collapseConfigRow = function (rowModel, moveBack) {
@@ -3438,7 +3519,7 @@
 					restoreRowPosition(rowModel)
 					list.scrollTop = rowModel.configScrollTop || 0
 				}, function () { configAnimating = false })
-			}, 170)
+			}, 340)
 		}
 
 		const expandConfigRow = function (rowModel) {
@@ -3560,12 +3641,50 @@
 			animateSortRowsFromRects(firstRects)
 		}
 
+		const animateSortDrop = function (row, floatingRect) {
+			const finalRect = row.getBoundingClientRect()
+			if (!finalRect.width || !finalRect.height) return
+			const floatingCenterX = floatingRect.left + floatingRect.width / 2
+			const floatingCenterY = floatingRect.top + floatingRect.height / 2
+			const finalCenterX = finalRect.left + finalRect.width / 2
+			const finalCenterY = finalRect.top + finalRect.height / 2
+			const dx = floatingCenterX - finalCenterX
+			const dy = floatingCenterY - finalCenterY
+			const scaleX = Math.max(.01, floatingRect.width / finalRect.width)
+			const scaleY = Math.max(.01, floatingRect.height / finalRect.height)
+			row.classList.add('modloader-mod-row-dropping')
+			row.style.transition = 'none'
+			row.style.transformOrigin = 'center center'
+			row.style.transform = `translate(${Math.round(dx)}px, ${Math.round(dy)}px) scale(${scaleX.toFixed(4)}, ${scaleY.toFixed(4)})`
+			row.getBoundingClientRect()
+			row.style.transition = 'transform .22s cubic-bezier(.18, .86, .2, 1)'
+			row.style.transform = ''
+			let finished = false
+			let fallbackTimer = null
+			const cleanup = function (event) {
+				if (event && event.target !== row) return
+				if (finished) return
+				finished = true
+				if (fallbackTimer) clearTimeout(fallbackTimer)
+				row.removeEventListener('transitionend', cleanup)
+				row.classList.remove('modloader-mod-row-dropping')
+				row.style.transition = ''
+				row.style.transform = ''
+				row.style.transformOrigin = ''
+			}
+			row.addEventListener('transitionend', cleanup)
+			fallbackTimer = setTimeout(cleanup, 300)
+		}
+
+
 		const finishSortDrag = function (rowModel, placeholder, moved) {
 			const row = rowModel.container
+			const floatingRect = row.getBoundingClientRect()
+			const firstRects = captureSortRects(row)
 			const beforeNode = placeholder.parentNode === list ? placeholder : null
 			if (beforeNode) list.insertBefore(row, beforeNode)
 			if (placeholder.parentNode) placeholder.remove()
-			row.classList.remove('modloader-mod-row-dragging')
+			row.classList.remove('modloader-mod-row-dragging', 'modloader-mod-row-lifting')
 			row.style.position = ''
 			row.style.left = ''
 			row.style.top = ''
@@ -3573,6 +3692,8 @@
 			row.style.height = ''
 			row.style.transform = ''
 			row.style.transition = ''
+			animateSortDrop(row, floatingRect)
+			animateSortRowsFromRects(firstRects)
 			if (!moved) return
 			const ordered = []
 			for (const child of Array.from(list.children)) {
@@ -3615,16 +3736,22 @@
 				offsetY = event.clientY - rect.top
 				moved = false
 				placeholder = element('div', 'modloader-mod-sort-placeholder')
-				placeholder.style.height = Math.max(24, Math.round(rect.height * .55)) + 'px'
+				const targetPlaceholderHeight = Math.max(24, Math.round(rect.height * .55))
+				placeholder.style.height = Math.round(rect.height) + 'px'
 				list.insertBefore(placeholder, row)
+				requestAnimationFrame(function () {
+					if (placeholder?.parentNode) placeholder.style.height = targetPlaceholderHeight + 'px'
+				})
+				row.classList.remove('modloader-mod-row-dropping', 'modloader-mod-row-lifting')
 				row.classList.add('modloader-mod-row-dragging')
 				row.style.position = 'fixed'
 				const dragScale = 1.1
 				const scaledWidth = rect.width * dragScale
 				const scaledHeight = rect.height * dragScale
-				const visualOffsetY = rect.height / 2 + (offsetY - rect.height / 2) * dragScale
+				const dragCenterOffsetY = event.clientY - (rect.top + rect.height / 2)
 				const updateDraggedRowPosition = function (clientY) {
-					row.style.top = Math.round(clientY - visualOffsetY) + 'px'
+					const centerY = clientY - dragCenterOffsetY
+					row.style.top = Math.round(centerY - scaledHeight / 2) + 'px'
 				}
 				const rowStyle = window.getComputedStyle(row)
 				const horizontalFrame = parseFloat(rowStyle.paddingLeft) + parseFloat(rowStyle.paddingRight) + parseFloat(rowStyle.borderLeftWidth) + parseFloat(rowStyle.borderRightWidth)
@@ -3632,8 +3759,14 @@
 				row.style.left = Math.round(rect.left - (scaledWidth - rect.width) / 2) + 'px'
 				row.style.width = Math.max(0, Math.round(scaledWidth - horizontalFrame)) + 'px'
 				row.style.height = Math.max(0, Math.round(scaledHeight - verticalFrame)) + 'px'
+				row.style.transformOrigin = 'center center'
+				row.style.transition = 'none'
+				row.style.transform = `scale(${(1 / dragScale).toFixed(4)})`
 				panel.appendChild(row)
 				updateDraggedRowPosition(event.clientY)
+				row.getBoundingClientRect()
+				row.style.transition = 'transform .18s cubic-bezier(.16, .86, .22, 1)'
+				row.style.transform = ''
 				event.preventDefault()
 				event.stopPropagation()
 				moveHandler = function (moveEvent) {
@@ -4029,7 +4162,7 @@
 				const createConfigField = function (item, target) {
 					const type = getConfigType(item)
 					const value = modConfig.values[item.key]
-					const field = element('label', 'modloader-config-field')
+					const field = element(type === 'boolean' ? 'div' : 'label', 'modloader-config-field')
 					const text = element('span', 'modloader-config-text')
 					const localizedConfigLabel = getLocalizedConfigText(mod.manifest, item, 'label', item.key)
 					const localizedConfigDescription = getLocalizedConfigText(mod.manifest, item, 'description', '')

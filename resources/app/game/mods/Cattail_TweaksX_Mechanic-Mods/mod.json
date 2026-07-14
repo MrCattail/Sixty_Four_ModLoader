@@ -60,6 +60,14 @@
       "reloadPolicy": "hot",
       "section": "scanRealitySurges"
     },
+    "enableScanRealitySurgesSliderStrength": {
+      "type": "boolean",
+      "label": "Scale surge strength by Reality infusion",
+      "default": true,
+      "description": "Use the supercritical kernel slider Reality infusion to scale surge count and spawn radius.",
+      "reloadPolicy": "hot",
+      "section": "scanRealitySurges"
+    },
     "surgeCount": {
       "type": "number",
       "label": "Surge count",
@@ -93,7 +101,7 @@
     "fillAmount": {
       "type": "number",
       "label": "Long fill amount",
-      "default": 100000000000,
+      "default": 1000000,
       "min": 1,
       "step": 1,
       "description": "Fill value assigned to activated silos.",
@@ -111,7 +119,7 @@
     "ventRealityInterval": {
       "type": "number",
       "label": "Vent production time",
-      "default": 30,
+      "default": 8,
       "min": 1,
       "max": 3600,
       "step": 1,
@@ -122,7 +130,7 @@
     "ventRealityAmount": {
       "type": "number",
       "label": "Small vent Reality",
-      "default": 1,
+      "default": 64,
       "min": 0,
       "max": 1000000,
       "step": 0.01,
@@ -133,7 +141,7 @@
     "ventRealityLargeMultiplier": {
       "type": "number",
       "label": "Large vent multiplier",
-      "default": 4,
+      "default": 8,
       "min": 0,
       "max": 1000000,
       "step": 0.1,
@@ -144,7 +152,7 @@
     "enableFlatBuildCosts": {
       "type": "boolean",
       "label": "Disable build cost scaling",
-      "default": true,
+      "default": false,
       "description": "Keep every building at its base construction cost instead of scaling by existing building count.",
       "reloadPolicy": "hot",
       "section": "flatBuildCosts"
@@ -183,6 +191,10 @@
         "enableScanRealitySlider": {
           "label": "Supercritical kernel slider",
           "description": "Show the supercritical kernel range and Reality infusion slider on its shop card."
+        },
+        "enableScanRealitySurgesSliderStrength": {
+          "label": "Strength follows Reality infusion",
+          "description": "When enabled, surge count and spawn radius scale with the supercritical kernel Reality infusion; when disabled, the configured count and radius are used."
         },
         "enableHollowVentReality": {
           "label": "Hollow vent Reality source",
@@ -238,6 +250,10 @@
           "label": "Ползунок сверхкритического ядра",
           "description": "Показывает диаметр области и ползунок вливания Reality на карточке покупки сверхкритического ядра."
         },
+        "enableScanRealitySurgesSliderStrength": {
+          "label": "Сила зависит от вливания Reality",
+          "description": "When enabled, surge count and spawn radius scale with the supercritical kernel Reality infusion; when disabled, the configured count and radius are used."
+        },
         "enableHollowVentReality": {
           "label": "Источник Reality из полых вентилей",
           "description": "Полые вентили выращивают символы Reality, которые автоматически собираются через алтарь пустоты."
@@ -291,6 +307,10 @@
         "enableScanRealitySlider": {
           "label": "Regler für superkritischen Kern",
           "description": "Zeigt den Reichweitendurchmesser und den Reality-Infusionsregler auf der Kaufkarte des superkritischen Kerns."
+        },
+        "enableScanRealitySurgesSliderStrength": {
+          "label": "Staerke folgt Reality-Infusion",
+          "description": "When enabled, surge count and spawn radius scale with the supercritical kernel Reality infusion; when disabled, the configured count and radius are used."
         },
         "enableHollowVentReality": {
           "label": "Reality-Quelle aus Hohl-Vents",
@@ -346,6 +366,10 @@
           "label": "Controle do núcleo supercrítico",
           "description": "Mostra o diâmetro do alcance e o controle de infusão de Reality no cartão de compra do núcleo supercrítico."
         },
+        "enableScanRealitySurgesSliderStrength": {
+          "label": "Forca pela infusao Reality",
+          "description": "When enabled, surge count and spawn radius scale with the supercritical kernel Reality infusion; when disabled, the configured count and radius are used."
+        },
         "enableHollowVentReality": {
           "label": "Fonte de Reality dos vents ocos",
           "description": "Vents ocos geram símbolos de Reality que são coletados automaticamente pelo altar do vazio."
@@ -399,6 +423,10 @@
         "enableScanRealitySlider": {
           "label": "Cursore nucleo supercritico",
           "description": "Mostra il diametro del raggio e il cursore di infusione Reality sulla scheda di acquisto del nucleo supercritico."
+        },
+        "enableScanRealitySurgesSliderStrength": {
+          "label": "Forza da infusione Reality",
+          "description": "When enabled, surge count and spawn radius scale with the supercritical kernel Reality infusion; when disabled, the configured count and radius are used."
         },
         "enableHollowVentReality": {
           "label": "Fonte Reality dei venti cavi",
@@ -454,6 +482,10 @@
           "label": "Control del núcleo supercrítico",
           "description": "Muestra el diámetro de alcance y el control de inyección de Reality en la tarjeta de compra del núcleo supercrítico."
         },
+        "enableScanRealitySurgesSliderStrength": {
+          "label": "Fuerza por inyeccion Reality",
+          "description": "When enabled, surge count and spawn radius scale with the supercritical kernel Reality infusion; when disabled, the configured count and radius are used."
+        },
         "enableHollowVentReality": {
           "label": "Fuente de Reality de vents huecos",
           "description": "Los vents huecos cultivan símbolos de Reality que se recogen automáticamente mediante el altar del vacío."
@@ -507,6 +539,10 @@
         "enableScanRealitySlider": {
           "label": "Curseur du noyau supercritique",
           "description": "Affiche le diamètre de portée et le curseur d’injection de Reality sur la carte d’achat du noyau supercritique."
+        },
+        "enableScanRealitySurgesSliderStrength": {
+          "label": "Puissance par injection Reality",
+          "description": "When enabled, surge count and spawn radius scale with the supercritical kernel Reality infusion; when disabled, the configured count and radius are used."
         },
         "enableHollowVentReality": {
           "label": "Source Reality des évents creux",
@@ -562,6 +598,10 @@
           "label": "Schuif voor superkritische kern",
           "description": "Toont de bereikdiameter en Reality-injectieschuif op de aankoopkaart van de superkritische kern."
         },
+        "enableScanRealitySurgesSliderStrength": {
+          "label": "Kracht volgt Reality-injectie",
+          "description": "When enabled, surge count and spawn radius scale with the supercritical kernel Reality infusion; when disabled, the configured count and radius are used."
+        },
         "enableHollowVentReality": {
           "label": "Reality-bron uit holle vents",
           "description": "Holle vents laten Reality-symbolen groeien die automatisch via het leegte-altaar worden geoogst."
@@ -615,6 +655,10 @@
         "enableScanRealitySlider": {
           "label": "Posuvník superkritického jádra",
           "description": "Zobrazí průměr dosahu a posuvník vložení Reality na nákupní kartě superkritického jádra."
+        },
+        "enableScanRealitySurgesSliderStrength": {
+          "label": "Sila podle vlozene Reality",
+          "description": "When enabled, surge count and spawn radius scale with the supercritical kernel Reality infusion; when disabled, the configured count and radius are used."
         },
         "enableHollowVentReality": {
           "label": "Zdroj Reality z dutých průduchů",
@@ -670,6 +714,10 @@
           "label": "Suwak superkrytycznego jądra",
           "description": "Pokazuje średnicę zasięgu i suwak wlewu Reality na karcie zakupu superkrytycznego jądra."
         },
+        "enableScanRealitySurgesSliderStrength": {
+          "label": "Sila wedlug wlewu Reality",
+          "description": "When enabled, surge count and spawn radius scale with the supercritical kernel Reality infusion; when disabled, the configured count and radius are used."
+        },
         "enableHollowVentReality": {
           "label": "Źródło Reality z pustych ujść",
           "description": "Puste ujścia hodują symbole Reality automatycznie zbierane przez ołtarz pustki."
@@ -723,6 +771,10 @@
         "enableScanRealitySlider": {
           "label": "超臨界コアスライダー",
           "description": "超臨界コアの購入カードに範囲直径とReality注入スライダーを表示します。"
+        },
+        "enableScanRealitySurgesSliderStrength": {
+          "label": "Reality注入で強度決定",
+          "description": "When enabled, surge count and spawn radius scale with the supercritical kernel Reality infusion; when disabled, the configured count and radius are used."
         },
         "enableHollowVentReality": {
           "label": "空洞ベントのReality源",
@@ -778,6 +830,10 @@
           "label": "초임계 핵 슬라이더",
           "description": "초임계 핵 구매 카드에 범위 지름과 Reality 주입 슬라이더를 표시합니다."
         },
+        "enableScanRealitySurgesSliderStrength": {
+          "label": "Reality 주입으로 강도 결정",
+          "description": "When enabled, surge count and spawn radius scale with the supercritical kernel Reality infusion; when disabled, the configured count and radius are used."
+        },
         "enableHollowVentReality": {
           "label": "빈 통풍구 Reality 원천",
           "description": "빈 통풍구가 Reality 상징을 키우고 공허 제단을 통해 자동 수확합니다."
@@ -831,6 +887,10 @@
         "enableScanRealitySlider": {
           "label": "可控超临界内核",
           "description": "可以注入现实来提升超临界内核的威力。"
+        },
+        "enableScanRealitySurgesSliderStrength": {
+          "label": "根据现实注入多少决定强度",
+          "description": "开启后，浪涌数量和生成半径会根据超临界内核注入的现实调整；关闭后使用配置里的数量和生成半径。"
         },
         "enableHollowVentReality": {
           "label": "虚空维度裂缝现实渗入",
@@ -886,6 +946,10 @@
           "label": "超臨界核心滑桿",
           "description": "在超臨界核心購買卡片上顯示範圍直徑和 Reality 注入滑桿。"
         },
+        "enableScanRealitySurgesSliderStrength": {
+          "label": "根據現實注入多少決定強度",
+          "description": "開啟後，浪湧數量和生成半徑會根據超臨界核心注入的現實調整；關閉後使用配置裡的數量和生成半徑。"
+        },
         "enableHollowVentReality": {
           "label": "空心噴口 Reality 來源",
           "description": "讓空心石噴口生長 Reality 符號，並透過虛空祭壇自動收割。"
@@ -939,6 +1003,10 @@
         "enableScanRealitySlider": {
           "label": "แถบเลื่อนแกนเหนือวิกฤต",
           "description": "แสดงเส้นผ่านศูนย์กลางระยะและแถบเลื่อนเติม Reality บนการ์ดซื้อแกนเหนือวิกฤต"
+        },
+        "enableScanRealitySurgesSliderStrength": {
+          "label": "พลังตามการเติม Reality",
+          "description": "When enabled, surge count and spawn radius scale with the supercritical kernel Reality infusion; when disabled, the configured count and radius are used."
         },
         "enableHollowVentReality": {
           "label": "แหล่ง Reality จากช่องกลวง",
@@ -994,6 +1062,10 @@
           "label": "Szuperkritikus mag csúszka",
           "description": "Megjeleníti a hatótáv átmérőjét és a Reality-betöltés csúszkáját a szuperkritikus mag vásárlási kártyáján."
         },
+        "enableScanRealitySurgesSliderStrength": {
+          "label": "Ero a Reality-betoltestol",
+          "description": "When enabled, surge count and spawn radius scale with the supercritical kernel Reality infusion; when disabled, the configured count and radius are used."
+        },
         "enableHollowVentReality": {
           "label": "Reality-forrás üreges nyílásokból",
           "description": "Az üreges nyílások Reality szimbólumokat növesztenek, amelyeket az üresség oltára automatikusan begyűjt."
@@ -1047,6 +1119,10 @@
         "enableScanRealitySlider": {
           "label": "Superkritiskā kodola slīdnis",
           "description": "Rāda diapazona diametru un Reality ieplūdes slīdni superkritiskā kodola iegādes kartītē."
+        },
+        "enableScanRealitySurgesSliderStrength": {
+          "label": "Speks pec Reality iepludes",
+          "description": "When enabled, surge count and spawn radius scale with the supercritical kernel Reality infusion; when disabled, the configured count and radius are used."
         },
         "enableHollowVentReality": {
           "label": "Reality avots no dobajām atverēm",
@@ -1102,6 +1178,10 @@
           "label": "Glisor nucleu supercritic",
           "description": "Afișează diametrul razei și glisorul de infuzie Reality pe cardul de cumpărare al nucleului supercritic."
         },
+        "enableScanRealitySurgesSliderStrength": {
+          "label": "Putere dupa infuzia Reality",
+          "description": "When enabled, surge count and spawn radius scale with the supercritical kernel Reality infusion; when disabled, the configured count and radius are used."
+        },
         "enableHollowVentReality": {
           "label": "Sursă Reality din venturi goale",
           "description": "Venturile goale cresc simboluri Reality colectate automat prin altarul vidului."
@@ -1156,6 +1236,10 @@
           "label": "Skyver for superkritisk kjerne",
           "description": "Viser rekkeviddediameteren og Reality-infusjonsskyveren på kjøpskortet for den superkritiske kjernen."
         },
+        "enableScanRealitySurgesSliderStrength": {
+          "label": "Styrke folger Reality-infusjon",
+          "description": "When enabled, surge count and spawn radius scale with the supercritical kernel Reality infusion; when disabled, the configured count and radius are used."
+        },
         "enableHollowVentReality": {
           "label": "Reality-kilde fra hule ventiler",
           "description": "Hule ventiler dyrker Reality-symboler som automatisk høstes gjennom tomhetsalteret."
@@ -1209,6 +1293,10 @@
         "enableScanRealitySlider": {
           "label": "可控超临界内核",
           "description": "可以注入现实来提升超临界内核的威力。"
+        },
+        "enableScanRealitySurgesSliderStrength": {
+          "label": "根据现实注入多少决定强度",
+          "description": "开启后，浪涌数量和生成半径会根据超临界内核注入的现实调整；关闭后使用配置里的数量和生成半径。"
         },
         "enableHollowVentReality": {
           "label": "虚空维度裂缝现实渗入",

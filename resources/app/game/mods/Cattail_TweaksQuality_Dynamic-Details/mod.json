@@ -11,17 +11,91 @@
   "languageSupport": {
     "gameLanguage": true
   },
-  "entry": "scripts/main.js",
   "locale": [
     "locale/dynamic-details.json"
   ],
   "config": {
+    "enableBuildingDetails": {
+      "type": "boolean",
+      "label": {
+        "en": "Building detail cards",
+        "sch": "建筑信息卡片扩展",
+        "modsch": "建筑信息卡片扩展"
+      },
+      "default": true,
+      "description": {
+        "en": "Show extended Alt+Shift building detail cards and related card controls.",
+        "sch": "显示 Alt+Shift 建筑信息卡片扩展和相关卡片控制。",
+        "modsch": "显示 Alt+Shift 建筑信息卡片扩展和相关卡片控制。"
+      },
+      "section": "buildingDetails"
+    },
+    "enableResourceSourceDetails": {
+      "type": "boolean",
+      "label": {
+        "en": "Resource source details",
+        "sch": "资源来源信息和连线",
+        "modsch": "资源来源信息和连线"
+      },
+      "default": true,
+      "description": {
+        "en": "Show resource source/consumer panels and source tracing lines.",
+        "sch": "显示资源获取/消耗来源信息和来源连线。",
+        "modsch": "显示资源获取/消耗来源信息和来源连线。"
+      },
+      "section": "resourceSourceDetails"
+    },
+    "enableCoordinateOverlay": {
+      "type": "boolean",
+      "label": {
+        "en": "Mouse coordinate hint",
+        "sch": "鼠标坐标提示",
+        "modsch": "鼠标坐标提示"
+      },
+      "default": true,
+      "description": {
+        "en": "Show the current tile coordinate near the cursor or building card.",
+        "sch": "在鼠标附近或建筑卡片旁显示当前地块坐标。",
+        "modsch": "在鼠标附近或建筑卡片旁显示当前地块坐标。"
+      },
+      "section": "coordinateOverlay"
+    },
+    "enableDirectionPointers": {
+      "type": "boolean",
+      "label": {
+        "en": "Direction pointers",
+        "sch": "重要建筑方向指针",
+        "modsch": "重要建筑方向指针"
+      },
+      "default": true,
+      "description": {
+        "en": "Show cursor-side direction indicators for important buildings and world origin.",
+        "sch": "显示指向重要建筑和世界原点的鼠标周边方向指示。",
+        "modsch": "显示指向重要建筑和世界原点的鼠标周边方向指示。"
+      },
+      "section": "directionPointers"
+    },
+    "enableBuildCountdown": {
+      "type": "boolean",
+      "label": {
+        "en": "Shop build countdown",
+        "sch": "商店建造倒计时",
+        "modsch": "商店建造倒计时"
+      },
+      "default": true,
+      "description": {
+        "en": "Show estimated time until unaffordable shop buildings become buildable.",
+        "sch": "显示资源不足建筑距离可建造的预计倒计时。",
+        "modsch": "显示资源不足建筑距离可建造的预计倒计时。"
+      },
+      "section": "buildCountdown"
+    },
     "cookieDirectionPassword": {
       "type": "string",
       "label": "Cookie direction password",
       "default": "",
       "description": "Enter cookie to show the cookie direction indicator before Cookie Clicker is achieved.",
-      "section": "cookieDirectionPassword"
+      "section": "directionPointers"
     },
     "resourceSourceLineRenderer": {
       "type": "slider",
@@ -45,10 +119,10 @@
         "modsch": "选择资源来源连线的渲染方式。游戏中按 O 也会切换这个值。"
       },
       "reloadPolicy": "hot",
-      "section": "resourceSourceLineRenderer"
+      "section": "resourceSourceDetails"
     }
   },
-  "description": "Adds Alt+Shift dynamic building detail panels and shop build-availability countdowns without modifying vanilla scripts.",
+  "description": "Adds modular dynamic building detail cards, resource source panels and lines, coordinate hints, direction pointers, and shop build-availability countdowns without modifying vanilla scripts.",
   "translations": {
     "sch": {
       "name": "动态详情",
@@ -57,6 +131,21 @@
         "cookieDirectionPassword": {
           "label": "饼干方向密码",
           "description": "输入 cookie 可在达成 Cookie Clicker 前显示饼干方向指示。"
+        },
+        "enableBuildingDetails": {
+          "label": "建筑信息卡片扩展"
+        },
+        "enableResourceSourceDetails": {
+          "label": "资源来源信息和连线"
+        },
+        "enableCoordinateOverlay": {
+          "label": "鼠标坐标提示"
+        },
+        "enableDirectionPointers": {
+          "label": "重要建筑方向指针"
+        },
+        "enableBuildCountdown": {
+          "label": "商店建造倒计时"
         }
       }
     },
@@ -67,6 +156,21 @@
         "cookieDirectionPassword": {
           "label": "饼干方向密码",
           "description": "输入 cookie 可在达成 Cookie Clicker 前显示饼干方向指示。"
+        },
+        "enableBuildingDetails": {
+          "label": "建筑信息卡片扩展"
+        },
+        "enableResourceSourceDetails": {
+          "label": "资源来源信息和连线"
+        },
+        "enableCoordinateOverlay": {
+          "label": "鼠标坐标提示"
+        },
+        "enableDirectionPointers": {
+          "label": "重要建筑方向指针"
+        },
+        "enableBuildCountdown": {
+          "label": "商店建造倒计时"
         }
       }
     },
@@ -76,7 +180,8 @@
         "cookieDirectionPassword": {
           "label": "Cookie direction password"
         }
-      }
+      },
+      "description": "Adds modular dynamic building detail cards, resource source panels and lines, coordinate hints, direction pointers, and shop build-availability countdowns without modifying vanilla scripts."
     },
     "ru": {
       "name": "Динамические сведения",
@@ -214,5 +319,13 @@
         }
       }
     }
-  }
+  },
+  "entries": [
+    "scripts/core.js",
+    "scripts/building-details.js",
+    "scripts/resource-source.js",
+    "scripts/coordinate-overlay.js",
+    "scripts/direction-pointers.js",
+    "scripts/build-countdown.js"
+  ]
 }

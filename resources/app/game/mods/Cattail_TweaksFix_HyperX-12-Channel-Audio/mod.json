@@ -13,19 +13,19 @@
     "enableStereoOutputFix": {
       "type": "boolean",
       "label": "Force stereo WebAudio output",
-      "default": true,
+      "default": false,
       "description": "Keeps the game's WebAudio destination at 2 channels to avoid silent output on 12-channel virtual audio drivers."
     },
     "logAudioDiagnostics": {
       "type": "boolean",
       "label": "Log audio diagnostics",
-      "default": true,
+      "default": false,
       "description": "Prints WebAudio channel information to the console after audio starts."
     },
     "bypassStereoPanner": {
       "type": "boolean",
       "label": "Bypass WebAudio stereo panner",
-      "default": true,
+      "default": false,
       "description": "Routes SFX through a plain stereo gain node when Chromium reports silent output on the HyperX 12-channel endpoint. This disables left/right SFX positioning."
     }
   },

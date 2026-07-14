@@ -94,21 +94,56 @@ ModLoader.register({
 		let hintInfoOpaque = false
 		let resourceSourceProfilerEnabled = false
 
-		api.on('afterVanillaScripts', function () {
-			if (typeof Cloud === 'undefined' || typeof Entity === 'undefined') return
+		const namespace = window.CattailDynamicDetails = window.CattailDynamicDetails || {}
 
+		namespace.installBuildingDetails = function () {
+			if (namespace.buildingDetailsInstalled) return
+			if (typeof Cloud === 'undefined' || typeof Entity === 'undefined') return
+			namespace.buildingDetailsInstalled = true
 			installStyles()
 			patchShortcutHints()
 			patchCloudUpdate()
 			patchHintProducers()
 			patchMeasuredOutputs()
 			installDetailToggle()
-			installCoordinateToggle()
+			installOpacityControls()
+			patchTransientCubeHints()
+		}
+
+		namespace.installResourceSources = function () {
+			if (namespace.resourceSourcesInstalled) return
+			if (typeof Game === 'undefined') return
+			namespace.resourceSourcesInstalled = true
+			installDetailToggle()
 			installOpacityControls()
 			patchTransientCubeHints()
 			installResourceSourceTracking()
+		}
+
+		namespace.installCoordinateOverlay = function () {
+			if (namespace.coordinateOverlayInstalled) return
+			if (typeof Game === 'undefined') return
+			namespace.coordinateOverlayInstalled = true
+			installCoordinateToggle()
+			patchTransientCubeHints()
+		}
+
+		namespace.installDirectionPointers = function () {
+			if (namespace.directionPointersInstalled) return
+			if (typeof Game === 'undefined') return
+			namespace.directionPointersInstalled = true
+			installCoordinateToggle()
+			patchTransientCubeHints()
+		}
+
+		namespace.installShopBuildCountdown = function () {
+			if (namespace.shopBuildCountdownInstalled) return
+			if (typeof Shop === 'undefined') return
+			namespace.shopBuildCountdownInstalled = true
 			installBuildCountdown()
-		})
+		}
+
+		namespace.isReady = true
 
 		function patchCloudUpdate() {
 			api.patch(Cloud.prototype, 'update', function (original) {
@@ -323,7 +358,7 @@ ModLoader.register({
 		}
 
 		function isDetailActive(game) {
-			return !!(isDetailToggleActive(game) || (game?.altActive && game?.shiftPressed))
+			return !!(isBuildingDetailsFeatureEnabled() && (isDetailToggleActive(game) || (game?.altActive && game?.shiftPressed)))
 		}
 
 		function installDetailToggle() {
@@ -333,12 +368,12 @@ ModLoader.register({
 				if (!isDetailToggleEvent(event) || event.repeat) return
 				const game = lastGame
 				if (!game) return
-				if (isResourceSourceContext(game)) {
+				if (isResourceSourceFeatureEnabled() && isResourceSourceContext(game)) {
 					const wasActive = isResourceSourceToggleActive(game)
 					const previousResource = Number.isInteger(game[resourceSourceLastResourceKey]) ? game[resourceSourceLastResourceKey] : null
 					const selectedResource = getResourceSourceSelectedResourceId(game)
 					setResourceSourceToggle(game, !wasActive || (Number.isInteger(selectedResource) && selectedResource !== previousResource))
-				} else if (isBuildingDetailContext(game)) {
+				} else if (isBuildingDetailsFeatureEnabled() && isBuildingDetailContext(game)) {
 					setDetailToggle(game, !isDetailToggleActive(game))
 				} else {
 					return
@@ -361,16 +396,17 @@ ModLoader.register({
 		}
 
 		function isResourceSourceToggleActive(game) {
+			if (!isResourceSourceFeatureEnabled()) return false
 			initializeResourceSourcePreferences(game)
 			return !!game?.[resourceSourceToggleKey]
 		}
 
 		function isResourceSourceContext(game) {
-			return Number.isInteger(game?.hoveredResource)
+			return !!(isResourceSourceFeatureEnabled() && Number.isInteger(game?.hoveredResource))
 		}
 
 		function isBuildingDetailContext(game) {
-			return !!(game?.hoveredEntity || shouldUseTransientCubeHint(game))
+			return !!(isBuildingDetailsFeatureEnabled() && (game?.hoveredEntity || shouldUseTransientCubeHint(game)))
 		}
 
 		function installCoordinateToggle() {
@@ -470,6 +506,26 @@ ModLoader.register({
 
 		function getModConfigStorageKey(key) {
 			return 'modloader:' + api.id + ':config:' + key
+		}
+
+		function isFeatureEnabled(key, fallback = true) {
+			return api.config.get(key, fallback) !== false
+		}
+
+		function isBuildingDetailsFeatureEnabled() {
+			return isFeatureEnabled('enableBuildingDetails')
+		}
+
+		function isResourceSourceFeatureEnabled() {
+			return isFeatureEnabled('enableResourceSourceDetails')
+		}
+
+		function isCoordinateOverlayFeatureEnabled() {
+			return isFeatureEnabled('enableCoordinateOverlay')
+		}
+
+		function isDirectionPointersFeatureEnabled() {
+			return isFeatureEnabled('enableDirectionPointers')
 		}
 		function installOpacityControls() {
 			if (window._cattailDynamicDetailsOpacityInstalled) return
@@ -631,11 +687,12 @@ ModLoader.register({
 		}
 
 		function patchTransientCubeHints() {
-			if (typeof Game === 'undefined') return
+			if (typeof Game === 'undefined' || window._cattailDynamicCursorOverlayInstalled) return
+			window._cattailDynamicCursorOverlayInstalled = true
 			api.patch(Game.prototype, 'renderCursor', function (original) {
 				return function (...args) {
 					lastGame = this
-					const locked = isDetailToggleActive(this)
+					const locked = isBuildingDetailsFeatureEnabled() && isDetailToggleActive(this)
 					const previousAlt = this.altActive
 					const previousShift = this.shiftPressed
 					const previousHovered = this.hoveredEntity
@@ -667,7 +724,10 @@ ModLoader.register({
 		}
 
 		function renderCoordinateOverlay(game) {
-			if (!shouldShowCoordinateOverlay(game)) return
+			if (!shouldShowCoordinateOverlay(game)) {
+				renderCoordinateDirectionIndicators(game)
+				return
+			}
 			const cell = game.hoveredCell
 			const text = 'X: ' + cell[0] + ' Y: ' + cell[1]
 			const ctx = game.ctx
@@ -804,6 +864,7 @@ ModLoader.register({
 
 		function shouldShowCoordinateDirectionIndicators(game) {
 			return !!(
+				isDirectionPointersFeatureEnabled() &&
 				isCoordinateEmptyCellContext(game) &&
 				(isCoordinateToggleActive(game) || (game.altActive && game.shiftPressed))
 			)
@@ -912,6 +973,7 @@ ModLoader.register({
 
 		function shouldShowCoordinateOverlay(game) {
 			return !!(
+				isCoordinateOverlayFeatureEnabled() &&
 				game &&
 				(game.mouse?.cursorVisible !== false) &&
 				Array.isArray(game.hoveredCell) &&
@@ -930,6 +992,7 @@ ModLoader.register({
 		}
 		function shouldUseTransientCubeHint(game) {
 			return !!(
+				isBuildingDetailsFeatureEnabled() &&
 				game &&
 				isDetailActive(game) &&
 				!game.plane &&
@@ -3171,7 +3234,10 @@ ModLoader.register({
 			canvas.style.zIndex = '1'
 			canvas.style.display = 'none'
 			const gl = profileResourceSource('resource.links.webgl.context', () => canvas.getContext('webgl2', { alpha: true, premultipliedAlpha: false, antialias: true }), () => getResourceSourceProfileDetail(game, getResourceSourceFocusResourceId(game)))
-			if (!gl) return null
+			if (!gl) {
+				setResourceSourceGpuLineMode(game, false)
+				return null
+			}
 			try {
 				const lineProgram = profileResourceSource('resource.links.webgl.lineProgram', () => createResourceSourceGpuProgram(gl, getResourceSourceGpuLineVertexShader(), getResourceSourceGpuLineFragmentShader()), () => getResourceSourceProfileDetail(game, getResourceSourceFocusResourceId(game)))
 				const pointProgram = profileResourceSource('resource.links.webgl.pointProgram', () => createResourceSourceGpuProgram(gl, getResourceSourceGpuPointVertexShader(), getResourceSourceGpuPointFragmentShader()), () => getResourceSourceProfileDetail(game, getResourceSourceFocusResourceId(game)))
@@ -3193,7 +3259,7 @@ ModLoader.register({
 				return renderer
 			} catch (error) {
 				canvas.remove()
-				game[resourceSourceGpuLineModeKey] = false
+				setResourceSourceGpuLineMode(game, false)
 				return null
 			}
 		}

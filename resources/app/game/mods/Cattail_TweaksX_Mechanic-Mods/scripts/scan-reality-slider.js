@@ -6,6 +6,8 @@
 	const SCAN_RADIUS_KEY = '__cattailScanRealitySliderRadius'
 	const SCAN_REALITY_KEY = '__cattailScanRealitySliderReality'
 	const HELD_PRICE_SIGNATURE_KEY = '__cattailScanRealitySliderHeldPriceSignature'
+	const SHARED_DIAMETER_KEY = '__cattailScanRealitySliderDiameter'
+	const SHARED_ENABLED_KEY = '__cattailScanRealitySliderEnabled'
 	const STYLE_ID = 'cattail-scan-reality-slider-style'
 
 	const VANILLA_DIAMETER = 32
@@ -142,6 +144,7 @@
 			api.on('afterVanillaScripts', function () {
 				if (typeof Game === 'undefined' || typeof Shop === 'undefined' || typeof Scan === 'undefined') return
 
+				publishSharedScanTuning(api)
 				installStyles()
 				patchScanPrice(api)
 				patchScanPlacement(api)
@@ -356,12 +359,14 @@
 		const diameter = options.light ? clampVisualDiameter(value) : clampDiameter(value)
 		if (options.light) {
 			previewDiameter = diameter
+			publishSharedScanTuning(api, diameter)
 			syncScanControls(shop, api)
 			return
 		}
 
 		previewDiameter = null
 		writeStoredDiameter(diameter)
+		publishSharedScanTuning(api, diameter)
 		syncScanControls(shop, api)
 		refreshShopPrices(shop)
 	}
@@ -370,6 +375,7 @@
 		const diameter = previewDiameter === null ? readStoredDiameter() : clampDiameter(previewDiameter)
 		previewDiameter = null
 		writeStoredDiameter(diameter)
+		publishSharedScanTuning(api, diameter)
 		syncScanControls(shop, api)
 		refreshShopPrices(shop)
 	}
@@ -385,9 +391,11 @@
 	function syncScanControls(shop, api) {
 		if (!shop?.vessel) return
 		if (!isFeatureEnabled(api)) {
+			publishSharedScanTuning(api, null, false)
 			removeScanControls(shop)
 			return
 		}
+		publishSharedScanTuning(api, previewDiameter === null ? null : previewDiameter)
 		for (const control of shop.vessel.querySelectorAll('.cattail-scan-reality-slider')) {
 			syncOneControl(control, shop.master)
 		}
@@ -451,6 +459,7 @@
 
 	function applyTuningToScan(scan) {
 		const tuning = getCurrentTuning()
+		publishSharedDiameter(tuning.diameter, true)
 		scan[SCAN_RADIUS_KEY] = tuning.radius
 		scan[SCAN_REALITY_KEY] = tuning.reality
 	}
@@ -472,6 +481,19 @@
 	function writeStoredDiameter(diameter) {
 		if (typeof localStorage === 'undefined') return
 		localStorage.setItem(STORAGE_DIAMETER_KEY, String(clampDiameter(diameter)))
+	}
+
+	function publishSharedScanTuning(api, diameterOverride = null, enabledOverride = null) {
+		const enabled = enabledOverride === null ? isFeatureEnabled(api) : enabledOverride === true
+		const diameter = diameterOverride === null ? readStoredDiameter() : clampVisualDiameter(diameterOverride)
+		publishSharedDiameter(diameter, enabled)
+	}
+
+	function publishSharedDiameter(diameter, enabled) {
+		if (typeof window === 'undefined') return
+		window[SHARED_ENABLED_KEY] = enabled === true
+		if (enabled === true) window[SHARED_DIAMETER_KEY] = clampVisualDiameter(diameter)
+		else delete window[SHARED_DIAMETER_KEY]
 	}
 
 	function clampDiameter(value) {
