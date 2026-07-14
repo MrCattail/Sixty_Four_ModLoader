@@ -180,7 +180,7 @@
 				keys.yawRight = true
 				event.preventDefault()
 			} else if (code === 'KeyB') {
-				resetCamera(activeGame, api)
+				toggleCameraReset(activeGame, api)
 				event.preventDefault()
 			}
 		}, true)
@@ -316,17 +316,52 @@
 		}
 	}
 
-	function resetCamera(game, api) {
+	function toggleCameraReset(game, api) {
 		if (!game || !isEnabled(api)) return
-		game.__cattailDynamicCameraState = {
-			pitch: vanillaPitch,
-			yaw: 0,
-			lastFrameTime: 0,
-			lastSavedAt: 0,
-			lastInput: performance.now()
+		const state = ensureState(game, api)
+		const restoreState = state.restoreState
+		const restoreAvailable = isValidCameraSnapshot(restoreState)
+		const isReset = isVanillaCameraState(state)
+		const now = performance.now()
+		let shouldPersist = false
+
+		if (restoreAvailable && isReset) {
+			game.__cattailDynamicCameraState = {
+				pitch: clamp(Number(restoreState.pitch), minPitch, maxPitch),
+				yaw: normalizeRadians(Number(restoreState.yaw) || 0),
+				lastFrameTime: 0,
+				lastSavedAt: 0,
+				lastInput: now
+			}
+			shouldPersist = true
+		} else {
+			game.__cattailDynamicCameraState = {
+				pitch: vanillaPitch,
+				yaw: 0,
+				lastFrameTime: 0,
+				lastSavedAt: 0,
+				lastInput: now,
+				restoreState: {
+					pitch: clamp(Number(state.pitch), minPitch, maxPitch),
+					yaw: normalizeRadians(Number(state.yaw) || 0)
+				}
+			}
 		}
-		persistCameraConfig(api, game.__cattailDynamicCameraState)
+		if (shouldPersist) persistCameraConfig(api, game.__cattailDynamicCameraState)
 		game.processMousemove2?.()
+	}
+
+	function isVanillaCameraState(state) {
+		return Math.abs(clamp(Number(state?.pitch), minPitch, maxPitch) - vanillaPitch) < 0.0001 &&
+			Math.abs(normalizeRadians(Number(state?.yaw) || 0)) < 0.0001
+	}
+
+	function isValidCameraSnapshot(snapshot) {
+		return !!(
+			snapshot &&
+			Number.isFinite(Number(snapshot.pitch)) &&
+			Number.isFinite(Number(snapshot.yaw))
+		)
 	}
 
 	function persistCameraConfigThrottled(api, state) {
