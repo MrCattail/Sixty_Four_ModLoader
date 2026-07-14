@@ -359,7 +359,6 @@
 		const diameter = options.light ? clampVisualDiameter(value) : clampDiameter(value)
 		if (options.light) {
 			previewDiameter = diameter
-			publishSharedScanTuning(api, diameter)
 			syncScanControls(shop, api)
 			return
 		}
@@ -372,7 +371,9 @@
 	}
 
 	function finishSliderDrag(shop, api) {
-		const diameter = previewDiameter === null ? readStoredDiameter() : clampDiameter(previewDiameter)
+		if (previewDiameter === null) return
+
+		const diameter = clampDiameter(previewDiameter)
 		previewDiameter = null
 		writeStoredDiameter(diameter)
 		publishSharedScanTuning(api, diameter)
@@ -395,11 +396,13 @@
 			removeScanControls(shop)
 			return
 		}
-		publishSharedScanTuning(api, previewDiameter === null ? null : previewDiameter)
+
+		const isDraggingPreview = previewDiameter !== null
+		if (!isDraggingPreview) publishSharedScanTuning(api)
 		for (const control of shop.vessel.querySelectorAll('.cattail-scan-reality-slider')) {
 			syncOneControl(control, shop.master)
 		}
-		refreshHeldScanPrice(shop.master)
+		if (!isDraggingPreview) refreshHeldScanPrice(shop.master)
 	}
 
 	function syncOneControl(control, game) {

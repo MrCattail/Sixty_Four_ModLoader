@@ -45,6 +45,22 @@
       },
       "section": "resourceSourceDetails"
     },
+    "enableResourceSourceLineChart": {
+      "type": "boolean",
+      "label": {
+        "en": "Resource line chart",
+        "sch": "资源折线图",
+        "modsch": "资源折线图"
+      },
+      "default": true,
+      "description": {
+        "en": "While hovering resource icons, allow switching the vanilla bar chart to a merged-bucket line chart of the current resource amount.",
+        "sch": "鼠标悬停资源图标时，可将原版柱状图切换为当前资源数量的分级合并折线图。",
+        "modsch": "鼠标悬停资源图标时，可将原版柱状图切换为当前资源数量的分级合并折线图。"
+      },
+      "reloadPolicy": "hot",
+      "section": "resourceSourceDetails"
+    },
     "enableCoordinateOverlay": {
       "type": "boolean",
       "label": {
@@ -146,6 +162,10 @@
         },
         "enableBuildCountdown": {
           "label": "商店建造倒计时"
+        },
+        "enableResourceSourceLineChart": {
+          "label": "资源折线图",
+          "description": "鼠标悬停资源图标时，可将原版柱状图切换为当前资源数量的分级合并折线图。"
         }
       }
     },
@@ -171,6 +191,10 @@
         },
         "enableBuildCountdown": {
           "label": "商店建造倒计时"
+        },
+        "enableResourceSourceLineChart": {
+          "label": "资源折线图",
+          "description": "鼠标悬停资源图标时，可将原版柱状图切换为当前资源数量的分级合并折线图。"
         }
       }
     },
@@ -179,6 +203,10 @@
       "config": {
         "cookieDirectionPassword": {
           "label": "Cookie direction password"
+        },
+        "enableResourceSourceLineChart": {
+          "label": "Resource line chart",
+          "description": "While hovering resource icons, allow switching the vanilla bar chart to a merged-bucket line chart of the current resource amount."
         }
       },
       "description": "Adds modular dynamic building detail cards, resource source panels and lines, coordinate hints, direction pointers, and shop build-availability countdowns without modifying vanilla scripts."

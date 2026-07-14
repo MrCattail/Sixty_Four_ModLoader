@@ -25,6 +25,8 @@ ModLoader.register({
 		const resourceSourceGpuLineModeKey = '_cattailDynamicResourceSourceGpuLineMode'
 		const resourceSourceGpuRendererKey = '_cattailDynamicResourceSourceGpuRenderer'
 		const resourceSourceLineRendererConfigKey = 'resourceSourceLineRenderer'
+		const resourceSourceLineChartConfigKey = 'enableResourceSourceLineChart'
+		const resourceSourceLineChartStateKey = '_cattailDynamicResourceSourceLineChart'
 		const resourceSourceLineRendererCanvas = 0
 		const resourceSourceLineRendererWebgl = 1
 		const resourceSourceWarmupKey = '_cattailDynamicResourceSourceWarmup'
@@ -38,6 +40,7 @@ ModLoader.register({
 		const resourceSourceLineLockStorageKey = 'cattailDynamicResourceSourceLineLock'
 		const resourceSourceLineResourceStorageKey = 'cattailDynamicResourceSourceLineResource'
 		const resourceSourceGpuLineModeStorageKey = 'cattailDynamicResourceSourceGpuLineMode'
+		const resourceSourceLineChartModeStorageKey = 'cattailDynamicResourceSourceLineChartMode'
 		const resourceSourceWindowMs = 30000
 		const pumpSurgeDisplayMs = 2000
 		const resourceSourceMinAmount = 0.0001
@@ -47,6 +50,18 @@ ModLoader.register({
 		const resourceSourceMaxLinks = Number.POSITIVE_INFINITY
 		const resourceSourceGpuCurveSegments = 72
 		const resourceSourceConsumeColor = '#7a2b2b'
+		const resourceSourceChartGainColor = '#6ea56e'
+		const resourceSourceChartConsumeColor = '#C38C75'
+		const resourceSourceLineChartStages = [
+			{ from: 1, count: 10, to: 10 },
+			{ from: 10, count: 3, to: 30 },
+			{ from: 30, count: 2, to: 60 },
+			{ from: 60, count: 10, to: 600 },
+			{ from: 600, count: 3, to: 1800 },
+			{ from: 1800, count: 2, to: 3600 }
+		]
+		const resourceSourceLineChartMaxBuckets = 96
+		const resourceSourceLineChartWheelCooldownMs = 180
 		const resourceSourceProfilerStorageKey = 'cattailDynamicResourceSourceProfiler'
 		const resourceSourceProfilerSlowMs = 8
 		const resourceSourceProfilerVerySlowMs = 25
@@ -69,6 +84,9 @@ ModLoader.register({
 		let resourceSourceLongTaskObserver = null
 		let resourceSourceFrameLastTime = 0
 		let resourceSourceFrameLastLog = 0
+		let resourceSourceLineChartMode = true
+		let resourceSourceLineChartModeLoaded = false
+		let resourceSourceLineChartLastWheel = 0
 		const buildCountdownStateKey = '_cattailShopBuildCountdownState'
 		const buildCountdownElementKey = '_cattailShopBuildCountdownElement'
 		const buildCountdownNextRefreshKey = '_cattailShopBuildCountdownNextRefresh'
@@ -518,6 +536,27 @@ ModLoader.register({
 
 		function isResourceSourceFeatureEnabled() {
 			return isFeatureEnabled('enableResourceSourceDetails')
+		}
+
+		function isResourceSourceLineChartEnabled() {
+			return isResourceSourceFeatureEnabled() && isFeatureEnabled(resourceSourceLineChartConfigKey)
+		}
+
+		function isResourceSourceLineChartModeActive() {
+			loadResourceSourceLineChartMode()
+			return resourceSourceLineChartMode
+		}
+
+		function loadResourceSourceLineChartMode() {
+			if (resourceSourceLineChartModeLoaded) return
+			resourceSourceLineChartModeLoaded = true
+			resourceSourceLineChartMode = loadStoredBoolean(resourceSourceLineChartModeStorageKey, true)
+		}
+
+		function setResourceSourceLineChartMode(active) {
+			resourceSourceLineChartMode = !!active
+			resourceSourceLineChartModeLoaded = true
+			saveStoredBoolean(resourceSourceLineChartModeStorageKey, resourceSourceLineChartMode)
 		}
 
 		function isCoordinateOverlayFeatureEnabled() {
@@ -2218,6 +2257,7 @@ ModLoader.register({
 			if (typeof Game === 'undefined' || !Game.prototype) return
 
 			installResourceSourceGpuLineToggle()
+			installResourceSourceLineChartWheelToggle()
 			installResourceSourceProfilerToggle()
 			patchCubeResourceSourceAttribution()
 			patchMinedCubeResourceSourceAttribution()
@@ -2302,6 +2342,14 @@ ModLoader.register({
 				}
 			})
 
+			api.patch(Game.prototype, 'updateAnalytics', function (original) {
+				return function (...args) {
+					const result = original.apply(this, args)
+					recordResourceSourceLineChartSample(this)
+					return result
+				}
+			})
+
 			api.patch(Game.prototype, 'renderResources', function (original) {
 				return function (...args) {
 					profileResourceSource('resource.warmup.schedule', () => scheduleResourceSourceWarmup(this), () => getResourceSourceProfileDetail(this, getResourceSourceFocusResourceId(this)))
@@ -2331,6 +2379,11 @@ ModLoader.register({
 							() => getResourceSourceProfileDetail(this, getResourceSourceFocusResourceId(this))
 						)
 						profileResourceSource(
+							'resource.lineChart.render',
+							() => renderResourceSourceLineChart(this),
+							() => getResourceSourceProfileDetail(this, getResourceSourceFocusResourceId(this))
+						)
+						profileResourceSource(
 							'resource.panel.phase',
 							() => renderResourceSourcePanels(this),
 							() => getResourceSourceProfileDetail(this, getResourceSourceFocusResourceId(this))
@@ -2341,6 +2394,31 @@ ModLoader.register({
 					}
 				}
 			})
+		}
+
+		function installResourceSourceLineChartWheelToggle() {
+			if (window._cattailDynamicResourceSourceLineChartWheelInstalled) return
+			window._cattailDynamicResourceSourceLineChartWheelInstalled = true
+			addEventListener('wheel', function (event) {
+				const game = lastGame
+				if (!isResourceSourceLineChartWheelEvent(event, game)) return
+				event.preventDefault()
+				event.stopImmediatePropagation()
+				const now = performance.now()
+				if (now - resourceSourceLineChartLastWheel < resourceSourceLineChartWheelCooldownMs) return
+				resourceSourceLineChartLastWheel = now
+				setResourceSourceLineChartMode(!isResourceSourceLineChartModeActive())
+			}, { capture: true, passive: false })
+		}
+
+		function isResourceSourceLineChartWheelEvent(event, game) {
+			return !!(
+				isResourceSourceLineChartEnabled() &&
+				game &&
+				game.entitiesInGame?.mega1b &&
+				Number.isInteger(game.hoveredResource) &&
+				((event?.deltaY || 0) || (event?.deltaX || 0))
+			)
 		}
 
 		function installResourceSourceGpuLineToggle() {
@@ -3432,6 +3510,306 @@ ModLoader.register({
 			}
 			return [0.47, 0.47, 0.53, alpha]
 		}
+
+		function getResourceSourceLineChartState(game) {
+			if (!game) return null
+			if (!game[resourceSourceLineChartStateKey]) {
+				Object.defineProperty(game, resourceSourceLineChartStateKey, {
+					configurable: true,
+					value: { buckets: [], lastInstant: null }
+				})
+			}
+			const state = game[resourceSourceLineChartStateKey]
+			if (!Array.isArray(state.buckets)) state.buckets = []
+			return state
+		}
+
+		function recordResourceSourceLineChartSample(game) {
+			if (!isResourceSourceLineChartEnabled()) return
+			const analytics = game?.analytics
+			const instant = analytics?.instant
+			if (!Array.isArray(instant)) return
+			const state = getResourceSourceLineChartState(game)
+			if (!state) return
+			if (!state.lastInstant) {
+				state.lastInstant = instant
+				return
+			}
+			if (state.lastInstant === instant) return
+			state.lastInstant = instant
+			state.buckets.push(createResourceSourceLineChartBucket(game, instant))
+			compressResourceSourceLineChartBuckets(state.buckets)
+			trimResourceSourceLineChartBuckets(state.buckets)
+		}
+
+		function createResourceSourceLineChartBucket(game, instant) {
+			const count = resourceCountSize(game, Math.max(instant?.length || 0, game?.resources?.length || 0))
+			const values = new Array(count).fill(0)
+			for (let i = 0; i < count; i++) values[i] = Math.max(0, Number(game?.resources?.[i]) || 0)
+			return { duration: 1, values }
+		}
+
+		function compressResourceSourceLineChartBuckets(buckets) {
+			let changed = true
+			while (changed) {
+				changed = false
+				for (const stage of resourceSourceLineChartStages) {
+					const index = findResourceSourceLineChartCompressIndex(buckets, stage.from, stage.count)
+					if (index < 0) continue
+					const merged = mergeResourceSourceLineChartBuckets(buckets.slice(index, index + stage.count), stage.to)
+					buckets.splice(index, stage.count, merged)
+					changed = true
+					break
+				}
+			}
+		}
+
+		function findResourceSourceLineChartCompressIndex(buckets, duration, count) {
+			for (let i = 0; i <= buckets.length - count; i++) {
+				let matches = true
+				for (let j = 0; j < count; j++) {
+					if (buckets[i + j]?.duration !== duration) {
+						matches = false
+						break
+					}
+				}
+				if (matches) return i
+			}
+			return -1
+		}
+
+		function mergeResourceSourceLineChartBuckets(group, duration) {
+			const last = group[group.length - 1] || {}
+			const count = Math.max(...group.map((bucket) => bucket?.values?.length || 0), 10)
+			const values = new Array(count).fill(0)
+			for (let i = 0; i < count; i++) values[i] = Math.max(0, Number(last.values?.[i]) || 0)
+			return { duration, values }
+		}
+
+		function trimResourceSourceLineChartBuckets(buckets) {
+			while (buckets.length > resourceSourceLineChartMaxBuckets) buckets.shift()
+		}
+
+		function renderResourceSourceLineChart(game) {
+			if (!isResourceSourceLineChartEnabled() || !isResourceSourceLineChartModeActive()) return
+			if (!game?.entitiesInGame?.mega1b) return
+			const resourceId = Number.isInteger(game.hoveredResource) ? game.hoveredResource : null
+			if (!Number.isInteger(resourceId)) return
+			const graph = game.analytics?.graphs?.[resourceId]
+			if (!graph?.canvas) return
+			const state = getResourceSourceLineChartState(game)
+			const buckets = state?.buckets || []
+			if (!buckets.length) return
+			const home = game.resourceHomes?.[resourceId]
+			if (!Array.isArray(home)) return
+			const firstHome = game.resourceHomes?.[0] || home
+			const width = graph.canvas.width
+			const height = graph.canvas.height
+			const x = Math.max(firstHome[0] / 2, home[0] - width / 2)
+			const y = firstHome[1] * 2
+			drawResourceSourceLineChart(game, resourceId, buckets, x, y, width, height)
+		}
+
+		function drawResourceSourceLineChart(game, resourceId, buckets, x, y, width, height) {
+			const ctx = game.ctx
+			const pixelRatio = game.pixelRatio || 1
+			const padding = pixelRatio * 16
+			const halfHeight = height / 2
+			const fontSize = Math.max(7 * pixelRatio, halfHeight * 0.12)
+			const plotLeft = x + Math.max(pixelRatio * 5, padding * 0.35)
+			const plotRight = x + width - padding * 3.1
+			const plotTop = y + Math.max(pixelRatio * 5, padding * 0.28)
+			const plotBottom = y + height - padding * 1.35
+			const plotWidth = Math.max(pixelRatio, plotRight - plotLeft)
+			const plotHeight = Math.max(pixelRatio, plotBottom - plotTop)
+			const totalDuration = Math.max(1, buckets.reduce((total, bucket) => total + (Number(bucket.duration) || 0), 0))
+			const scale = getResourceSourceLineChartScale(game, buckets, resourceId)
+
+			ctx.save()
+			ctx.fillStyle = '#FFFFFFF6'
+			if (ctx.roundRect) {
+				ctx.beginPath()
+				ctx.roundRect(x, y, width, height, pixelRatio * 4)
+				ctx.closePath()
+				ctx.fill()
+			} else {
+				ctx.fillRect(x, y, width, height)
+			}
+
+			ctx.font = fontSize + 'px Montserrat, sans-serif'
+			drawResourceSourceLineChartGrid(game, ctx, plotLeft, plotRight, plotTop, plotBottom, plotWidth, plotHeight, scale, totalDuration, pixelRatio)
+			drawResourceSourceLineChartPath(ctx, buckets, resourceId, scale, totalDuration, plotLeft, plotRight, plotBottom, plotWidth, plotHeight, pixelRatio)
+			ctx.restore()
+		}
+
+		function drawResourceSourceLineChartGrid(game, ctx, plotLeft, plotRight, plotTop, plotBottom, plotWidth, plotHeight, scale, totalDuration, pixelRatio) {
+			ctx.fillStyle = '#000'
+			ctx.globalAlpha = 0.16
+			ctx.fillRect(plotLeft, plotBottom, plotWidth, pixelRatio)
+			ctx.fillRect(plotRight, plotTop, pixelRatio, plotHeight)
+
+			const firstOffset = Math.ceil((scale.min - scale.baseline) / scale.delta) * scale.delta
+			const lastOffset = Math.floor((scale.max - scale.baseline) / scale.delta) * scale.delta
+			const tickCount = Math.max(0, Math.floor((lastOffset - firstOffset) / scale.delta) + 1)
+			const skip = Math.max(1, Math.ceil(tickCount / 7))
+			let tickIndex = 0
+			for (let offset = firstOffset; offset <= lastOffset; offset += scale.delta) {
+				if (tickIndex++ % skip) continue
+				const value = scale.baseline + offset
+				const py = plotBottom - Math.max(0, Math.min(1, (value - scale.min) / scale.span)) * plotHeight
+				ctx.globalAlpha = Math.abs(offset) < 0.5 ? 0.16 : 0.1
+				ctx.fillRect(plotLeft, py, plotWidth, pixelRatio)
+				ctx.globalAlpha = 1
+				ctx.textAlign = 'left'
+				ctx.textBaseline = 'middle'
+				ctx.fillText(formatResourceSourceLineChartDelta(game, offset, scale.labelUnit), plotRight + pixelRatio * 4, py)
+			}
+
+			for (const age of [totalDuration, totalDuration / 2, 0]) {
+				const px = plotRight - age / totalDuration * plotWidth
+				ctx.globalAlpha = age > 0 && age < totalDuration ? 0.1 : 0.16
+				ctx.fillRect(px, plotTop, pixelRatio, plotHeight)
+				ctx.globalAlpha = 1
+				ctx.textAlign = 'center'
+				ctx.textBaseline = 'top'
+				ctx.fillText(formatResourceSourceLineChartDuration(age), px, plotBottom + pixelRatio * 3)
+			}
+			ctx.globalAlpha = 1
+		}
+
+		function drawResourceSourceLineChartPath(ctx, buckets, resourceId, scale, totalDuration, plotLeft, plotRight, plotBottom, plotWidth, plotHeight, pixelRatio) {
+			if (!buckets.length || !scale || scale.span <= 0) return
+			const points = []
+			let elapsed = 0
+			for (const bucket of buckets) {
+				const duration = Math.max(0.001, Number(bucket.duration) || 1)
+				const value = Math.max(0, Number(bucket?.values?.[resourceId]) || 0)
+				const px = plotLeft + Math.max(0, Math.min(1, (elapsed + duration / 2) / totalDuration)) * plotWidth
+				const py = plotBottom - Math.max(0, Math.min(1, (value - scale.min) / scale.span)) * plotHeight
+				points.push({ x: px, y: py, value })
+				elapsed += duration
+			}
+			if (points.length < 2) return
+			ctx.save()
+			ctx.lineWidth = Math.max(pixelRatio, pixelRatio * 1.35)
+			ctx.lineJoin = 'round'
+			ctx.lineCap = 'round'
+			for (let i = 1; i < points.length; i++) {
+				const previous = points[i - 1]
+				const current = points[i]
+				ctx.strokeStyle = current.value >= previous.value ? resourceSourceChartGainColor : resourceSourceChartConsumeColor
+				ctx.beginPath()
+				ctx.moveTo(previous.x, previous.y)
+				ctx.lineTo(current.x, current.y)
+				ctx.stroke()
+			}
+			ctx.restore()
+		}
+
+		function getResourceSourceLineChartScale(game, buckets, resourceId) {
+			let min = Infinity
+			let max = -Infinity
+			let latest = Math.max(0, Number(game?.resources?.[resourceId]) || 0)
+			let baseline = null
+			for (const bucket of buckets) {
+				const value = Math.max(0, Number(bucket?.values?.[resourceId]) || 0)
+				if (baseline === null) baseline = value
+				min = Math.min(min, value)
+				max = Math.max(max, value)
+				latest = value
+			}
+			if (!Number.isFinite(min) || !Number.isFinite(max)) {
+				min = latest
+				max = latest
+			}
+			if (baseline === null) baseline = latest
+
+			const speedSpan = getResourceSourceLineChartRateMagnitude(game, buckets, resourceId)
+			const visibleSpan = Math.max(max - min, speedSpan, 1)
+			const rounded = getResourceSourceLineChartRoundedSpan(visibleSpan)
+			const labelUnit = getResourceSourceLineChartLabelUnit(speedSpan || visibleSpan)
+			const halfSpan = rounded.max / 2
+			let minValue = latest - halfSpan
+			let maxValue = latest + halfSpan
+			if (min < minValue) {
+				minValue = min
+				maxValue = min + rounded.max
+			}
+			if (max > maxValue) {
+				maxValue = max
+				minValue = max - rounded.max
+			}
+			if (minValue < 0) {
+				maxValue -= minValue
+				minValue = 0
+			}
+			const span = Math.max(1, maxValue - minValue)
+			return { min: minValue, max: maxValue, span, delta: rounded.delta, baseline, labelUnit }
+		}
+
+		function getResourceSourceLineChartRoundedSpan(span) {
+			const safe = Math.max(1, Number(span) || 0)
+			const order = Math.max(1, String(Math.floor(safe)).length)
+			const delta = 10 ** (order - 1)
+			return { max: delta * (Math.floor(safe / delta) + 1), delta }
+		}
+
+		function getResourceSourceLineChartRateMagnitude(game, buckets, resourceId) {
+			const average = game?.analytics?.average?.[resourceId]
+			let speed = 0
+			if (Array.isArray(average)) {
+				speed = Math.max(speed, Math.abs(Number(average[0]) || 0), Math.abs(Number(average[1]) || 0))
+			}
+			let previous = null
+			for (const bucket of buckets) {
+				const value = Math.max(0, Number(bucket?.values?.[resourceId]) || 0)
+				if (previous) {
+					const duration = Math.max(0.001, Number(bucket.duration) || 1)
+					speed = Math.max(speed, Math.abs(value - previous.value) / duration)
+				}
+				previous = { value }
+			}
+			return speed
+		}
+
+		function getResourceSourceLineChartLabelUnit(value) {
+			const amount = Math.abs(Number(value) || 0)
+			if (amount >= 1e15) return { value: 1e15, suffix: 'q' }
+			if (amount >= 1e12) return { value: 1e12, suffix: 't' }
+			if (amount >= 1e9) return { value: 1e9, suffix: 'b' }
+			if (amount >= 1e6) return { value: 1e6, suffix: 'm' }
+			if (amount >= 1e3) return { value: 1e3, suffix: 'k' }
+			return { value: 1, suffix: '' }
+		}
+
+		function formatResourceSourceLineChartAmount(game, value, unit) {
+			if (unit && unit.value > 1) return formatResourceSourceLineChartAmountInUnit(value, unit)
+			if (game && typeof game.makeReadable === 'function') return game.makeReadable(value)
+			if (Math.abs(value) >= 1000000) return Math.round(value / 1000000) + 'm'
+			if (Math.abs(value) >= 1000) return Math.round(value / 1000) + 'k'
+			return String(Math.round(value))
+		}
+
+		function formatResourceSourceLineChartAmountInUnit(value, unit) {
+			const scaled = Math.abs(Number(value) || 0) / unit.value
+			const rounded = scaled >= 100 ? Math.round(scaled) : scaled >= 10 ? Math.round(scaled * 10) / 10 : Math.round(scaled * 100) / 100
+			return String(rounded).replace(/\.0+$/, '').replace(/(\.\d*[1-9])0+$/, '$1') + unit.suffix
+		}
+
+		function formatResourceSourceLineChartDelta(game, value, unit) {
+			if (Math.abs(value) < 0.5) return '0'
+			const sign = value > 0 ? '+' : '-'
+			return sign + formatResourceSourceLineChartAmount(game, Math.abs(value), unit)
+		}
+
+		function formatResourceSourceLineChartDuration(seconds) {
+			const value = Math.max(0, Number(seconds) || 0)
+			if (value < 60) return Math.round(value) + 's'
+			if (value < 3600) return Math.round(value / 60) + 'm'
+			const hours = value / 3600
+			return (hours >= 10 ? Math.round(hours) : Math.round(hours * 10) / 10) + 'h'
+		}
+
 		function renderResourceSourcePanels(game) {
 			if (!isResourceSourcePanelActive(game)) return
 			const resourceId = getResourceSourceFocusResourceId(game)

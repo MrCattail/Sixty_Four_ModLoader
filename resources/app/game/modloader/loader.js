@@ -791,8 +791,8 @@
 			#modloader-panel .modloader-config-label { display: block; color: rgba(255,255,255,.86); overflow-wrap: anywhere; }
 			#modloader-panel .modloader-config-meta { display: block; font-size: 11px; color: rgba(255,255,255,.48); overflow-wrap: anywhere; }
 			#modloader-panel input.modloader-config-input:not([type="checkbox"]), #modloader-panel textarea.modloader-config-input, #modloader-panel select.modloader-config-input { box-sizing: border-box; width: 100%; min-width: 0; border: 1px solid rgba(255,255,255,.16); border-radius: 5px; padding: 5px 6px; background: rgba(0,0,0,.22); color: rgba(255,255,255,.92); outline: none; }
-			#modloader-panel .modloader-config-number { display: grid; grid-template-columns: minmax(0, 1fr) 28px; gap: 5px; align-items: center; min-width: 0; }
-			#modloader-panel .modloader-config-number-reset { height: 28px; border: 1px solid rgba(255,255,255,.14); border-radius: 5px; padding: 0; background: rgba(255,255,255,.08); color: rgba(255,255,255,.78); cursor: pointer; font: 700 13px/1 Montserrat, Arial, sans-serif; }
+			#modloader-panel .modloader-config-number { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 5px; align-items: center; min-width: 0; }
+			#modloader-panel .modloader-config-number-reset { border: 1px solid rgba(255,255,255,.14); border-radius: 5px; padding: 5px 7px; background: rgba(255,255,255,.08); color: rgba(255,255,255,.78); cursor: pointer; }
 			#modloader-panel .modloader-config-number-reset:hover { background: rgba(255,255,255,.14); color: rgba(255,255,255,.94); }
 			#modloader-panel .modloader-config-number-reset:disabled { cursor: default; opacity: .45; }
 			#modloader-panel .modloader-config-slider { display: grid; grid-template-columns: minmax(0, 1fr) 66px; gap: 4px 8px; align-items: center; width: 100%; min-width: 0; --modloader-slider-thumb-half: 14px; }
@@ -2314,10 +2314,10 @@
 		if (item.min !== undefined) input.min = String(item.min)
 		if (item.max !== undefined) input.max = String(item.max)
 
-		const reset = element('button', 'modloader-config-number-reset', '↺')
+		const reset = element('button', 'modloader-config-number-reset', getInlineLocalizedText(CONFIG_INLINE_TEXT.reset))
 		reset.type = 'button'
-		reset.title = getInlineLocalizedText(CONFIG_INLINE_TEXT.reset)
-		reset.setAttribute('aria-label', getInlineLocalizedText(CONFIG_INLINE_TEXT.reset))
+		reset.title = getInlineLocalizedText(CONFIG_INLINE_TEXT.resetTitle)
+		reset.setAttribute('aria-label', getInlineLocalizedText(CONFIG_INLINE_TEXT.resetTitle))
 		reset.addEventListener('click', function (event) {
 			event.preventDefault()
 			event.stopPropagation()
