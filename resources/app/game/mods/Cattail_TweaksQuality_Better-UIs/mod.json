@@ -14,7 +14,8 @@
   "entries": [
     "scripts/shop-categories.js",
     "scripts/save-slots.js",
-    "scripts/language-menu.js"
+    "scripts/language-menu.js",
+    "scripts/settings-page.js"
   ],
   "conflicts": [
     "Cattail_TweaksQuality_Language-Menu",
@@ -42,6 +43,13 @@
       "default": true,
       "description": "Use the scrollable language selection page on the splash menu.",
       "section": "languageMenu"
+    },
+    "enableSettingsPage": {
+      "type": "boolean",
+      "label": "Settings page",
+      "default": true,
+      "description": "Add the in-game settings page to the splash menu.",
+      "section": "settingsPage"
     }
   },
   "description": "Combines shop categories, save slots, and the language menu into one multi-entry interface quality mod.",
@@ -62,6 +70,10 @@
         "enableLanguageMenu": {
           "label": "语言菜单",
           "description": "语言切换功能新增滚动列表。"
+        },
+        "enableSettingsPage": {
+          "label": "设置页面",
+          "description": "在主菜单新增游戏内设置页面。"
         }
       }
     },
@@ -80,6 +92,10 @@
         "enableLanguageMenu": {
           "label": "语言菜单",
           "description": "语言切换功能新增滚动列表。"
+        },
+        "enableSettingsPage": {
+          "label": "设置页面",
+          "description": "在主菜单新增游戏内设置页面。"
         }
       }
     },
@@ -94,6 +110,9 @@
         },
         "enableLanguageMenu": {
           "label": "Language menu"
+        },
+        "enableSettingsPage": {
+          "label": "Settings page"
         }
       }
     },
@@ -108,6 +127,9 @@
         },
         "enableLanguageMenu": {
           "label": "Меню языка"
+        },
+        "enableSettingsPage": {
+          "label": "Страница настроек"
         }
       }
     },
@@ -122,6 +144,9 @@
         },
         "enableLanguageMenu": {
           "label": "Sprachmenü"
+        },
+        "enableSettingsPage": {
+          "label": "Einstellungsseite"
         }
       }
     },
@@ -136,6 +161,9 @@
         },
         "enableLanguageMenu": {
           "label": "Menu de idioma"
+        },
+        "enableSettingsPage": {
+          "label": "Página de configurações"
         }
       }
     },
@@ -150,6 +178,9 @@
         },
         "enableLanguageMenu": {
           "label": "Menu lingua"
+        },
+        "enableSettingsPage": {
+          "label": "Pagina impostazioni"
         }
       }
     },
@@ -164,6 +195,9 @@
         },
         "enableLanguageMenu": {
           "label": "Menú de idioma"
+        },
+        "enableSettingsPage": {
+          "label": "Página de ajustes"
         }
       }
     },
@@ -178,6 +212,9 @@
         },
         "enableLanguageMenu": {
           "label": "Menu de langue"
+        },
+        "enableSettingsPage": {
+          "label": "Page des paramètres"
         }
       }
     },
@@ -192,6 +229,9 @@
         },
         "enableLanguageMenu": {
           "label": "Taalmenu"
+        },
+        "enableSettingsPage": {
+          "label": "Instellingenpagina"
         }
       }
     },
@@ -206,6 +246,9 @@
         },
         "enableLanguageMenu": {
           "label": "Nabídka jazyka"
+        },
+        "enableSettingsPage": {
+          "label": "Stránka nastavení"
         }
       }
     },
@@ -220,6 +263,9 @@
         },
         "enableLanguageMenu": {
           "label": "Menu języka"
+        },
+        "enableSettingsPage": {
+          "label": "Strona ustawień"
         }
       }
     },
@@ -234,6 +280,9 @@
         },
         "enableLanguageMenu": {
           "label": "言語メニュー"
+        },
+        "enableSettingsPage": {
+          "label": "設定ページ"
         }
       }
     },
@@ -248,6 +297,9 @@
         },
         "enableLanguageMenu": {
           "label": "언어 메뉴"
+        },
+        "enableSettingsPage": {
+          "label": "설정 페이지"
         }
       }
     },
@@ -262,6 +314,9 @@
         },
         "enableLanguageMenu": {
           "label": "語言選單"
+        },
+        "enableSettingsPage": {
+          "label": "設定頁面"
         }
       }
     },
@@ -276,6 +331,9 @@
         },
         "enableLanguageMenu": {
           "label": "เมนูภาษา"
+        },
+        "enableSettingsPage": {
+          "label": "หน้าการตั้งค่า"
         }
       }
     },
@@ -290,6 +348,9 @@
         },
         "enableLanguageMenu": {
           "label": "Nyelv menü"
+        },
+        "enableSettingsPage": {
+          "label": "Beállítások oldala"
         }
       }
     },
@@ -304,6 +365,9 @@
         },
         "enableLanguageMenu": {
           "label": "Valodas izvēlne"
+        },
+        "enableSettingsPage": {
+          "label": "Iestatījumu lapa"
         }
       }
     },
@@ -318,6 +382,9 @@
         },
         "enableLanguageMenu": {
           "label": "Meniu limbă"
+        },
+        "enableSettingsPage": {
+          "label": "Pagină de setări"
         }
       }
     },
@@ -332,6 +399,9 @@
         },
         "enableLanguageMenu": {
           "label": "Språkmeny"
+        },
+        "enableSettingsPage": {
+          "label": "Innstillingsside"
         }
       }
     }

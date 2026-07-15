@@ -53,12 +53,12 @@ ModLoader.register({
 		const resourceSourceChartGainColor = '#6ea56e'
 		const resourceSourceChartConsumeColor = '#C38C75'
 		const resourceSourceLineChartStages = [
-			{ from: 1, count: 10, to: 10 },
-			{ from: 10, count: 3, to: 30 },
-			{ from: 30, count: 2, to: 60 },
-			{ from: 60, count: 10, to: 600 },
-			{ from: 600, count: 3, to: 1800 },
-			{ from: 1800, count: 2, to: 3600 }
+			{ from: 1, count: 30, to: 10 },
+			{ from: 10, count: 6, to: 30 },
+			{ from: 30, count: 20, to: 60 },
+			{ from: 60, count: 30, to: 600 },
+			{ from: 600, count: 6, to: 1800 },
+			{ from: 1800, count: 4, to: 3600 }
 		]
 		const resourceSourceLineChartMaxBuckets = 96
 		const resourceSourceLineChartWheelCooldownMs = 180
@@ -2345,7 +2345,7 @@ ModLoader.register({
 			api.patch(Game.prototype, 'updateAnalytics', function (original) {
 				return function (...args) {
 					const result = original.apply(this, args)
-					recordResourceSourceLineChartSample(this)
+					recordResourceSourceLineChartSample(this, args[0])
 					return result
 				}
 			})
@@ -3516,7 +3516,7 @@ ModLoader.register({
 			if (!game[resourceSourceLineChartStateKey]) {
 				Object.defineProperty(game, resourceSourceLineChartStateKey, {
 					configurable: true,
-					value: { buckets: [], lastInstant: null }
+					value: { buckets: [] }
 				})
 			}
 			const state = game[resourceSourceLineChartStateKey]
@@ -3524,29 +3524,62 @@ ModLoader.register({
 			return state
 		}
 
-		function recordResourceSourceLineChartSample(game) {
+		function recordResourceSourceLineChartSample(game, elapsedMs) {
 			if (!isResourceSourceLineChartEnabled()) return
-			const analytics = game?.analytics
-			const instant = analytics?.instant
-			if (!Array.isArray(instant)) return
 			const state = getResourceSourceLineChartState(game)
 			if (!state) return
-			if (!state.lastInstant) {
-				state.lastInstant = instant
-				return
-			}
-			if (state.lastInstant === instant) return
-			state.lastInstant = instant
-			state.buckets.push(createResourceSourceLineChartBucket(game, instant))
+			const duration = getResourceSourceLineChartSampleDuration(elapsedMs)
+			if (duration <= 0) return
+			state.buckets.push(createResourceSourceLineChartBucket(game, duration))
+			compressResourceSourceLineChartSubsecondBuckets(state.buckets)
 			compressResourceSourceLineChartBuckets(state.buckets)
 			trimResourceSourceLineChartBuckets(state.buckets)
 		}
 
-		function createResourceSourceLineChartBucket(game, instant) {
-			const count = resourceCountSize(game, Math.max(instant?.length || 0, game?.resources?.length || 0))
+		function getResourceSourceLineChartSampleDuration(elapsedMs) {
+			const ms = Number(elapsedMs)
+			if (!Number.isFinite(ms) || ms <= 0) return 0
+			return Math.max(0.001, Math.min(1, ms / 1000))
+		}
+
+		function createResourceSourceLineChartBucket(game, duration) {
+			const analytics = game?.analytics
+			const count = resourceCountSize(game, Math.max(analytics?.instant?.length || 0, game?.resources?.length || 0))
 			const values = new Array(count).fill(0)
 			for (let i = 0; i < count; i++) values[i] = Math.max(0, Number(game?.resources?.[i]) || 0)
-			return { duration: 1, values }
+			return { duration, values }
+		}
+
+		function compressResourceSourceLineChartSubsecondBuckets(buckets) {
+			let changed = true
+			while (changed) {
+				changed = false
+				let start = -1
+				let total = 0
+				for (let i = 0; i < buckets.length; i++) {
+					const duration = Number(buckets[i]?.duration) || 0
+					if (duration > 0 && duration < 1) {
+						if (start < 0) start = i
+						total += duration
+						if (total >= 1) {
+							const group = buckets.slice(start, i + 1)
+							const replacement = [mergeResourceSourceLineChartBuckets(group, 1)]
+							const overflow = total - 1
+							if (overflow > 0.001) replacement.push(cloneResourceSourceLineChartBucket(group[group.length - 1], overflow))
+							buckets.splice(start, group.length, ...replacement)
+							changed = true
+							break
+						}
+					} else {
+						start = -1
+						total = 0
+					}
+				}
+			}
+		}
+
+		function cloneResourceSourceLineChartBucket(bucket, duration) {
+			return { duration, values: Array.isArray(bucket?.values) ? bucket.values.slice() : [] }
 		}
 
 		function compressResourceSourceLineChartBuckets(buckets) {
@@ -3556,8 +3589,8 @@ ModLoader.register({
 				for (const stage of resourceSourceLineChartStages) {
 					const index = findResourceSourceLineChartCompressIndex(buckets, stage.from, stage.count)
 					if (index < 0) continue
-					const merged = mergeResourceSourceLineChartBuckets(buckets.slice(index, index + stage.count), stage.to)
-					buckets.splice(index, stage.count, merged)
+					const merged = mergeResourceSourceLineChartStageBuckets(buckets.slice(index, index + stage.count), stage.from, stage.to)
+					buckets.splice(index, stage.count, ...merged)
 					changed = true
 					break
 				}
@@ -3578,6 +3611,17 @@ ModLoader.register({
 			return -1
 		}
 
+		function mergeResourceSourceLineChartStageBuckets(group, fromDuration, toDuration) {
+			const chunkSize = Math.max(1, Math.round(toDuration / fromDuration))
+			const merged = []
+			for (let i = 0; i < group.length; i += chunkSize) {
+				const chunk = group.slice(i, i + chunkSize)
+				const duration = chunk.length === chunkSize ? toDuration : chunk.reduce((total, bucket) => total + (Number(bucket?.duration) || 0), 0)
+				merged.push(mergeResourceSourceLineChartBuckets(chunk, duration))
+			}
+			return merged
+		}
+
 		function mergeResourceSourceLineChartBuckets(group, duration) {
 			const last = group[group.length - 1] || {}
 			const count = Math.max(...group.map((bucket) => bucket?.values?.length || 0), 10)
@@ -3587,7 +3631,17 @@ ModLoader.register({
 		}
 
 		function trimResourceSourceLineChartBuckets(buckets) {
-			while (buckets.length > resourceSourceLineChartMaxBuckets) buckets.shift()
+			while (countResourceSourceLineChartWholeBuckets(buckets) > resourceSourceLineChartMaxBuckets) {
+				const index = buckets.findIndex((bucket) => (Number(bucket?.duration) || 0) >= 1)
+				if (index < 0) break
+				buckets.splice(index, 1)
+			}
+		}
+
+		function countResourceSourceLineChartWholeBuckets(buckets) {
+			let count = 0
+			for (const bucket of buckets) if ((Number(bucket?.duration) || 0) >= 1) count++
+			return count
 		}
 
 		function renderResourceSourceLineChart(game) {
@@ -3654,7 +3708,9 @@ ModLoader.register({
 			const skip = Math.max(1, Math.ceil(tickCount / 7))
 			let tickIndex = 0
 			for (let offset = firstOffset; offset <= lastOffset; offset += scale.delta) {
-				if (tickIndex++ % skip) continue
+				const shouldDraw = Math.abs(offset) < 0.5 || tickIndex % skip === 0
+				tickIndex++
+				if (!shouldDraw) continue
 				const value = scale.baseline + offset
 				const py = plotBottom - Math.max(0, Math.min(1, (value - scale.min) / scale.span)) * plotHeight
 				ctx.globalAlpha = Math.abs(offset) < 0.5 ? 0.16 : 0.1
@@ -3662,7 +3718,7 @@ ModLoader.register({
 				ctx.globalAlpha = 1
 				ctx.textAlign = 'left'
 				ctx.textBaseline = 'middle'
-				ctx.fillText(formatResourceSourceLineChartDelta(game, offset, scale.labelUnit), plotRight + pixelRatio * 4, py)
+				ctx.fillText(formatResourceSourceLineChartDelta(game, offset, scale.labelUnit, scale.baseline), plotRight + pixelRatio * 4, py)
 			}
 
 			for (const age of [totalDuration, totalDuration / 2, 0]) {
@@ -3707,44 +3763,57 @@ ModLoader.register({
 		}
 
 		function getResourceSourceLineChartScale(game, buckets, resourceId) {
-			let min = Infinity
-			let max = -Infinity
-			let latest = Math.max(0, Number(game?.resources?.[resourceId]) || 0)
-			let baseline = null
-			for (const bucket of buckets) {
-				const value = Math.max(0, Number(bucket?.values?.[resourceId]) || 0)
-				if (baseline === null) baseline = value
-				min = Math.min(min, value)
-				max = Math.max(max, value)
-				latest = value
-			}
-			if (!Number.isFinite(min) || !Number.isFinite(max)) {
-				min = latest
-				max = latest
-			}
-			if (baseline === null) baseline = latest
-
+			const latest = getResourceSourceLineChartLatestValue(game, buckets, resourceId)
+			const recentRange = getResourceSourceLineChartRecentRange(buckets, resourceId, latest)
 			const speedSpan = getResourceSourceLineChartRateMagnitude(game, buckets, resourceId)
-			const visibleSpan = Math.max(max - min, speedSpan, 1)
-			const rounded = getResourceSourceLineChartRoundedSpan(visibleSpan)
-			const labelUnit = getResourceSourceLineChartLabelUnit(speedSpan || visibleSpan)
+			const lowerDeviation = Math.max(0, latest - recentRange.min)
+			const upperDeviation = Math.max(0, recentRange.max - latest)
+			const visibleHalfSpan = Math.max(lowerDeviation, upperDeviation, speedSpan * 5, 0.5)
+			const rounded = getResourceSourceLineChartRoundedSpan(Math.max(1, visibleHalfSpan * 2))
+			const labelUnit = getResourceSourceLineChartLabelUnit(speedSpan || rounded.delta)
 			const halfSpan = rounded.max / 2
 			let minValue = latest - halfSpan
 			let maxValue = latest + halfSpan
-			if (min < minValue) {
-				minValue = min
-				maxValue = min + rounded.max
-			}
-			if (max > maxValue) {
-				maxValue = max
-				minValue = max - rounded.max
-			}
 			if (minValue < 0) {
 				maxValue -= minValue
 				minValue = 0
 			}
 			const span = Math.max(1, maxValue - minValue)
-			return { min: minValue, max: maxValue, span, delta: rounded.delta, baseline, labelUnit }
+			return { min: minValue, max: maxValue, span, delta: rounded.delta, baseline: latest, labelUnit }
+		}
+
+		function getResourceSourceLineChartLatestValue(game, buckets, resourceId) {
+			for (let i = buckets.length - 1; i >= 0; i--) {
+				const value = Number(buckets[i]?.values?.[resourceId])
+				if (Number.isFinite(value)) return Math.max(0, value)
+			}
+			return Math.max(0, Number(game?.resources?.[resourceId]) || 0)
+		}
+
+		function getResourceSourceLineChartRecentRange(buckets, resourceId, fallbackValue) {
+			const recentWindowSeconds = 30
+			const fallback = Math.max(0, Number(fallbackValue) || 0)
+			let min = Infinity
+			let max = -Infinity
+			let elapsed = 0
+			let sampled = false
+			for (let i = buckets.length - 1; i >= 0; i--) {
+				const bucket = buckets[i]
+				const duration = Math.max(0.001, Number(bucket?.duration) || 1)
+				if (duration > 1 && sampled) break
+				if (duration > 1 && !sampled) continue
+				const value = Number(bucket?.values?.[resourceId])
+				if (Number.isFinite(value)) {
+					const amount = Math.max(0, value)
+					min = Math.min(min, amount)
+					max = Math.max(max, amount)
+					sampled = true
+				}
+				elapsed += duration
+				if (elapsed >= recentWindowSeconds && sampled) break
+			}
+			if (!Number.isFinite(min) || !Number.isFinite(max)) return { min: fallback, max: fallback }
+			return { min, max }
 		}
 
 		function getResourceSourceLineChartRoundedSpan(span) {
@@ -3759,15 +3828,17 @@ ModLoader.register({
 			let speed = 0
 			if (Array.isArray(average)) {
 				speed = Math.max(speed, Math.abs(Number(average[0]) || 0), Math.abs(Number(average[1]) || 0))
+				if (speed > 0) return speed
 			}
 			let previous = null
 			for (const bucket of buckets) {
+				const duration = Math.max(0.001, Number(bucket?.duration) || 1)
 				const value = Math.max(0, Number(bucket?.values?.[resourceId]) || 0)
-				if (previous) {
-					const duration = Math.max(0.001, Number(bucket.duration) || 1)
-					speed = Math.max(speed, Math.abs(value - previous.value) / duration)
+				if (previous && duration <= 1 && previous.duration <= 1) {
+					const seconds = Math.max(0.001, duration)
+					speed = Math.max(speed, Math.abs(value - previous.value) / seconds)
 				}
-				previous = { value }
+				previous = { value, duration }
 			}
 			return speed
 		}
@@ -3796,14 +3867,16 @@ ModLoader.register({
 			return String(rounded).replace(/\.0+$/, '').replace(/(\.\d*[1-9])0+$/, '$1') + unit.suffix
 		}
 
-		function formatResourceSourceLineChartDelta(game, value, unit) {
-			if (Math.abs(value) < 0.5) return '0'
+		function formatResourceSourceLineChartDelta(game, value, unit, baseline) {
+			if (Math.abs(value) < 0.5) return formatResourceSourceLineChartAmount(game, Math.max(0, Number(baseline) || 0))
 			const sign = value > 0 ? '+' : '-'
 			return sign + formatResourceSourceLineChartAmount(game, Math.abs(value), unit)
 		}
 
 		function formatResourceSourceLineChartDuration(seconds) {
 			const value = Math.max(0, Number(seconds) || 0)
+			if (value <= 0) return '0ms'
+			if (value < 1) return Math.max(1, Math.round(value * 1000)) + 'ms'
 			if (value < 60) return Math.round(value) + 's'
 			if (value < 3600) return Math.round(value / 60) + 'm'
 			const hours = value / 3600
