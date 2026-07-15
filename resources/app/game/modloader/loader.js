@@ -357,6 +357,495 @@
 		return function () { unregisterUiButton(modId, id, options.element) }
 	}
 
+	const uiPages = []
+	let uiPagesInstalled = false
+	let uiPagesCurrentGame = null
+	let uiPagesActivePage = null
+	let uiPagesActiveSplash = null
+
+	const uiPageKey = function (modId, id) {
+		return `${modId || 'anonymous'}:${id || 'page'}`
+	}
+
+	const createUiPagesApi = function (modId) {
+		return {
+			register(options) { return registerUiPage(modId, options) },
+			open(id, splash) { return openUiPage(modId, id, splash) },
+			close(id) { return closeUiPage(modId, id) },
+			refresh(id) { return refreshUiPage(modId, id) },
+			isActive(id) { return isUiPageActive(modId, id) },
+			currentGame() { return uiPagesActiveSplash?.master || uiPagesCurrentGame },
+			installHorizontalWheel,
+			installTransientScrollbar,
+			installInertialScroll,
+			originalBackLabel,
+			normalizeGameText,
+			resetViewportScroll,
+			createRule
+		}
+	}
+
+	const registerUiPage = function (modId, options) {
+		const page = normalizeUiPage(modId, options)
+		const index = uiPages.findIndex(function (item) { return item.key === page.key })
+		if (index >= 0) uiPages[index] = page
+		else uiPages.push(page)
+		ensureUiPagesInstalled()
+		if (uiPagesInstalled && uiPagesCurrentGame?.splash) attachUiPageButton(uiPagesCurrentGame.splash, page)
+		return {
+			open(splash) { openUiPage(modId, page.id, splash) },
+			close() { closeUiPage(modId, page.id) },
+			refresh() { refreshUiPage(modId, page.id) },
+			isActive() { return isUiPageActive(modId, page.id) }
+		}
+	}
+
+	const normalizeUiPage = function (modId, options) {
+		if (!options?.id) throw new Error('ModLoader UI page registration requires an id.')
+		const id = String(options.id)
+		const prefix = options.prefix || `modloader-ui-${saveSafeText(modId || 'anonymous')}-${saveSafeText(id)}`
+		return Object.assign({
+			id,
+			key: uiPageKey(modId, id),
+			modId: modId || 'anonymous',
+			prefix,
+			activeClass: prefix + '-active',
+			buttonClass: prefix + '-button',
+			pageClass: prefix + '-page',
+			contentClass: prefix + '-content',
+			scrollbarVisibleClass: prefix + '-scrollbar-visible',
+			brandClass: prefix + '-brand',
+			logoClass: prefix + '-logo',
+			logoMarkClass: prefix + '-logo-mark',
+			subtitleClass: prefix + '-subtitle',
+			backClass: prefix + '-back',
+			width: '760px',
+			contentHeight: '560px',
+			mobileContentHeight: '610px',
+			contentOffset: '335px',
+			mobileContentOffset: '310px',
+			inertialScroll: false
+		}, options)
+	}
+
+	const ensureUiPagesInstalled = function () {
+		if (uiPagesInstalled || typeof Splash === 'undefined' || typeof Game === 'undefined') return
+		uiPagesInstalled = true
+		installUiPageStyles()
+		patchUiPageSplash('init')
+		patchUiPageSplash('initMobile')
+		window.addEventListener('keydown', handleUiPageEscape, true)
+		api.patch(Game.prototype, 'changeLanguage', function (original) {
+			return function (id) {
+				const openPageKey = uiPagesActivePage?.key
+				const scrollTop = uiPagesActiveSplash?.element?.querySelector('.modloader-ui-page-content')?.scrollTop || 0
+				const result = original.call(this, id)
+				uiPagesCurrentGame = this
+				uiPagesActivePage = null
+				uiPagesActiveSplash = null
+				if (openPageKey) {
+					const page = findUiPageByKey(openPageKey)
+					if (page) showUiPage(page, this.splash, { scrollTop })
+				} else attachAllUiPages(this.splash)
+				return result
+			}
+		})
+	}
+
+	const patchUiPageSplash = function (methodName) {
+		api.patch(Splash.prototype, methodName, function (original) {
+			return function (...args) {
+				const result = original.apply(this, args)
+				uiPagesCurrentGame = this.master
+				attachAllUiPages(this)
+				return result
+			}
+		})
+	}
+
+	const attachAllUiPages = function (splash) {
+		if (!splash?.element) return
+		for (const page of uiPages) attachUiPageButton(splash, page)
+	}
+
+	const attachUiPageButton = function (splash, page) {
+		if (page.enabled && page.enabled(createUiPageContext(page, splash)) === false) return
+		const menu = splash.element.querySelector('.menu')
+		let button = page.findButton ? page.findButton(splash, menu) : splash.element.querySelector('.' + page.buttonClass)
+		if (!button) {
+			if (!menu) return
+			button = document.createElement('div')
+			button.classList.add('menuItem')
+			const anchor = page.insertBefore ? page.insertBefore(splash, menu) : menu.querySelector('.resetProgressbar')?.closest('.menuItem')
+			if (anchor) menu.insertBefore(button, anchor)
+			else menu.append(button)
+			if (Array.isArray(splash.items)) {
+				const anchorIndex = anchor ? splash.items.indexOf(anchor) : -1
+				if (anchorIndex >= 0) splash.items.splice(anchorIndex, 0, button)
+				else splash.items.push(button)
+			}
+		}
+		button.classList.add(page.buttonClass)
+		updateUiPageButton(button, page, splash)
+		if (button.dataset.modloaderUiPageKey === page.key) return
+		button.dataset.modloaderUiPageKey = page.key
+		const openPage = function (event) {
+			event?.preventDefault()
+			event?.stopPropagation()
+			showUiPage(page, splash)
+		}
+		button.onclick = openPage
+		button.ontouchstart = openPage
+	}
+
+	const updateUiPageButton = function (button, page, splash) {
+		const ctx = createUiPageContext(page, splash)
+		if (page.updateButton) {
+			page.updateButton(button, ctx)
+			return
+		}
+		button.textContent = resolveUiPageLabel(page.menuLabel, splash.master, page.id)
+	}
+
+	const openUiPage = function (modId, id, splash) {
+		const page = findUiPage(modId, id)
+		if (page) showUiPage(page, splash || uiPagesCurrentGame?.splash)
+	}
+
+	const closeUiPage = function (modId, id) {
+		if (!uiPagesActivePage || (id && uiPagesActivePage.key !== uiPageKey(modId, id))) return
+		hideUiPage(uiPagesActivePage, uiPagesActiveSplash)
+	}
+
+	const refreshUiPage = function (modId, id) {
+		const key = id ? uiPageKey(modId, id) : null
+		if (uiPagesActivePage && (!key || uiPagesActivePage.key === key)) {
+			renderUiPage(uiPagesActivePage, uiPagesActiveSplash, uiPagesActiveSplash?.element?.querySelector('.' + uiPagesActivePage.pageClass))
+			return
+		}
+		if (uiPagesCurrentGame?.splash) attachAllUiPages(uiPagesCurrentGame.splash)
+	}
+
+	const isUiPageActive = function (modId, id) {
+		return !!uiPagesActivePage && uiPagesActivePage.key === uiPageKey(modId, id)
+	}
+
+	const showUiPage = function (page, splash, options = {}) {
+		if (!splash?.element) return
+		if (uiPagesActivePage && (uiPagesActivePage.key !== page.key || uiPagesActiveSplash !== splash)) hideUiPage(uiPagesActivePage, uiPagesActiveSplash)
+		let pageElement = splash.element.querySelector('.' + page.pageClass)
+		if (!pageElement) {
+			pageElement = document.createElement('div')
+			pageElement.className = classNames('modloader-ui-page', page.pageClass)
+			splash.element.append(pageElement)
+		}
+		uiPagesActivePage = page
+		uiPagesActiveSplash = splash
+		uiPagesCurrentGame = splash.master
+		splash.element.classList.add('modloader-ui-page-active', page.activeClass)
+		splash.selected = false
+		page.onOpen?.(createUiPageContext(page, splash, pageElement, null, options))
+		renderUiPage(page, splash, pageElement, options)
+	}
+
+	const hideUiPage = function (page, splash) {
+		page?.onClose?.(createUiPageContext(page, splash))
+		if (splash?.element) {
+			splash.element.classList.remove('modloader-ui-page-active', page.activeClass)
+			splash.element.querySelector('.' + page.pageClass)?.remove()
+		}
+		if (uiPagesActivePage?.key === page?.key) {
+			uiPagesActivePage = null
+			uiPagesActiveSplash = null
+		}
+	}
+
+	const renderUiPage = function (page, splash, pageElement, options = {}) {
+		if (!pageElement || !splash) return
+		const previousScrollTop = options.scrollTop ?? pageElement.querySelector('.modloader-ui-page-content')?.scrollTop ?? 0
+		setUiPageVariables(page, pageElement)
+		pageElement.innerHTML = ''
+		pageElement.append(renderUiPageBrand(page, splash))
+		const subtitle = document.createElement('div')
+		subtitle.className = classNames('modloader-ui-page-subtitle', page.subtitleClass)
+		subtitle.textContent = resolveUiPageLabel(page.title, splash.master, page.id)
+		pageElement.append(subtitle)
+		appendUiPageNodes(pageElement, page.renderBeforeContent?.(createUiPageContext(page, splash, pageElement, null, options)))
+		const content = document.createElement('div')
+		content.className = classNames('modloader-ui-page-content', page.contentClass)
+		installTransientScrollbar(content, page.scrollbarVisibleClass)
+		if (page.inertialScroll) installInertialScroll(content, page.inertialScroll)
+		const ctx = createUiPageContext(page, splash, pageElement, content, options)
+		appendUiPageNodes(content, page.renderContent?.(ctx))
+		pageElement.append(content)
+		if (previousScrollTop > 0) content.scrollTop = previousScrollTop
+		const back = document.createElement('button')
+		back.type = 'button'
+		back.className = classNames('modloader-ui-page-back', page.backClass)
+		back.textContent = resolveUiPageLabel(page.backLabel, splash.master, originalBackLabel(splash.master) || 'BACK')
+		back.onclick = function (event) {
+			event.preventDefault()
+			event.stopPropagation()
+			hideUiPage(page, splash)
+		}
+		back.ontouchstart = back.onclick
+		pageElement.append(back)
+		page.onAfterRender?.(ctx)
+	}
+
+	const renderUiPageBrand = function (page, splash) {
+		const brand = document.createElement('div')
+		brand.className = classNames('modloader-ui-page-brand', page.brandClass)
+		const left = document.createElement('div')
+		left.className = classNames('modloader-ui-page-logo', page.logoClass)
+		left.textContent = 'SIXTY'
+		const mark = document.createElement('div')
+		mark.className = classNames('modloader-ui-page-logo-mark', page.logoMarkClass)
+		mark.style.backgroundPosition = splash.sf?.style.backgroundPosition || '0 0'
+		const right = document.createElement('div')
+		right.className = classNames('modloader-ui-page-logo', page.logoClass)
+		right.textContent = 'FOUR'
+		brand.append(left, mark, right)
+		return brand
+	}
+
+	const setUiPageVariables = function (page, pageElement) {
+		pageElement.style.setProperty('--modloader-ui-page-width', page.width)
+		pageElement.style.setProperty('--modloader-ui-page-content-height', page.contentHeight)
+		pageElement.style.setProperty('--modloader-ui-page-mobile-content-height', page.mobileContentHeight)
+		pageElement.style.setProperty('--modloader-ui-page-content-offset', page.contentOffset)
+		pageElement.style.setProperty('--modloader-ui-page-mobile-content-offset', page.mobileContentOffset)
+	}
+
+	const createUiPageContext = function (page, splash, pageElement, content, options = {}) {
+		return {
+			id: page.id,
+			key: page.key,
+			modId: page.modId,
+			splash,
+			game: splash?.master || uiPagesCurrentGame,
+			page: pageElement,
+			pageElement,
+			content,
+			options,
+			shell: createUiPagesApi(page.modId),
+			refresh() { refreshUiPage(page.modId, page.id) },
+			close() { closeUiPage(page.modId, page.id) }
+		}
+	}
+
+	const handleUiPageEscape = function (event) {
+		if (!uiPagesActivePage || (event.key !== 'Escape' && event.keyCode !== 27)) return
+		const ctx = createUiPageContext(uiPagesActivePage, uiPagesActiveSplash, uiPagesActiveSplash?.element?.querySelector('.' + uiPagesActivePage.pageClass))
+		if (uiPagesActivePage.canCloseOnEscape?.(ctx, event) === false) return
+		event.preventDefault()
+		event.stopImmediatePropagation()
+		hideUiPage(uiPagesActivePage, uiPagesActiveSplash)
+	}
+
+	const findUiPage = function (modId, id) {
+		return findUiPageByKey(uiPageKey(modId, id))
+	}
+
+	const findUiPageByKey = function (key) {
+		return uiPages.find(function (page) { return page.key === key })
+	}
+
+	const resolveUiPageLabel = function (value, game, fallback) {
+		try {
+			if (typeof value === 'function') return value(game) || fallback
+			return value || fallback
+		} catch (error) {
+			warn('UI page label failed.', error)
+			return fallback
+		}
+	}
+
+	const appendUiPageNodes = function (parent, value) {
+		if (!value) return
+		if (Array.isArray(value)) {
+			for (const item of value) appendUiPageNodes(parent, item)
+			return
+		}
+		if (value instanceof Node) parent.append(value)
+	}
+
+	const classNames = function (...items) {
+		return items.filter(Boolean).join(' ')
+	}
+
+	const installHorizontalWheel = function (element) {
+		element.addEventListener('wheel', function (event) {
+			if (!event.cancelable) return
+			const amount = Math.abs(event.deltaX) > Math.abs(event.deltaY) ? event.deltaX : event.deltaY
+			if (!amount) return
+			event.preventDefault()
+			element.scrollLeft += amount
+		}, { passive: false })
+	}
+
+	const installTransientScrollbar = function (list, visibleClass) {
+		let timer
+		const reveal = function () {
+			list.classList.add('modloader-ui-page-scrollbar-visible')
+			if (visibleClass) list.classList.add(visibleClass)
+			clearTimeout(timer)
+			timer = setTimeout(function () {
+				list.classList.remove('modloader-ui-page-scrollbar-visible')
+				if (visibleClass) list.classList.remove(visibleClass)
+			}, 900)
+		}
+		list.onwheel = reveal
+		list.onscroll = reveal
+		list.onpointerdown = reveal
+	}
+
+	const installInertialScroll = function (list, options = {}) {
+		if (!list) return function () {}
+		if (list.__modloaderUiPageInertialScrollStop) list.__modloaderUiPageInertialScrollStop()
+		const settings = options === true ? {} : options || {}
+		let velocity = 0
+		let frame = 0
+		const friction = numericSetting(settings.friction, .88)
+		const directInfluence = numericSetting(settings.directInfluence, .30)
+		const tailInfluence = numericSetting(settings.tailInfluence, .13)
+		const maxVelocity = numericSetting(settings.maxVelocity, 34)
+		const stopThreshold = numericSetting(settings.stopThreshold, .35)
+		const clamp = function (value) {
+			const max = Math.max(0, list.scrollHeight - list.clientHeight)
+			return Math.min(max, Math.max(0, value))
+		}
+		const clampVelocity = function (value) {
+			return Math.min(maxVelocity, Math.max(-maxVelocity, value))
+		}
+		const stop = function () {
+			velocity = 0
+			if (frame) cancelAnimationFrame(frame)
+			frame = 0
+		}
+		const animate = function () {
+			frame = 0
+			if (Math.abs(velocity) < stopThreshold) {
+				velocity = 0
+				return
+			}
+			const before = list.scrollTop
+			list.scrollTop = clamp(before + velocity)
+			if (list.scrollTop === before) {
+				velocity = 0
+				return
+			}
+			velocity *= friction
+			frame = requestAnimationFrame(animate)
+		}
+		const onWheel = function (event) {
+			if (!event.cancelable || event.ctrlKey) return
+			const delta = normalizeWheelDelta(event, list)
+			if (!delta) return
+			event.preventDefault()
+			const before = list.scrollTop
+			list.scrollTop = clamp(before + delta * directInfluence)
+			if (list.scrollTop === before) {
+				velocity = 0
+				return
+			}
+			velocity = clampVelocity(velocity + delta * tailInfluence)
+			if (!frame) frame = requestAnimationFrame(animate)
+		}
+		list.addEventListener('wheel', onWheel, { passive: false })
+		list.addEventListener('pointerdown', stop, true)
+		const cleanup = function () {
+			stop()
+			list.removeEventListener('wheel', onWheel)
+			list.removeEventListener('pointerdown', stop, true)
+			if (list.__modloaderUiPageInertialScrollStop === cleanup) delete list.__modloaderUiPageInertialScrollStop
+		}
+		list.__modloaderUiPageInertialScrollStop = cleanup
+		return cleanup
+	}
+
+	const normalizeWheelDelta = function (event, list) {
+		if (event.deltaMode === 1) return event.deltaY * 32
+		if (event.deltaMode === 2) return event.deltaY * list.clientHeight
+		return event.deltaY
+	}
+
+	const numericSetting = function (value, fallback) {
+		return Number.isFinite(value) ? value : fallback
+	}
+
+	const originalBackLabel = function (game) {
+		try {
+			return normalizeGameText(game?.pronounce?.('splash', 'deglory'))
+		} catch (error) {
+			return ''
+		}
+	}
+
+	const normalizeGameText = function (value) {
+		const raw = String(value || '').trim()
+		if (!raw) return ''
+		const box = document.createElement('div')
+		box.innerHTML = raw
+		return (box.textContent || box.innerText || raw).trim()
+	}
+
+	const resetViewportScroll = function () {
+		if (document?.documentElement) document.documentElement.scrollTop = 0
+		if (document?.body) document.body.scrollTop = 0
+		if (typeof window?.scrollTo === 'function') window.scrollTo(0, 0)
+	}
+
+	const createRule = function (options = {}) {
+		const rule = document.createElement('div')
+		rule.className = options.className || (options.strong ? 'modloader-ui-page-rule-strong' : 'modloader-ui-page-rule')
+		return rule
+	}
+
+	const installUiPageStyles = function () {
+		if (document.getElementById('modloader-ui-page-style')) return
+		const style = document.createElement('style')
+		style.id = 'modloader-ui-page-style'
+		style.textContent = `
+			.splash.modloader-ui-page-active { background:#000000F9; color:#fff; }
+			.splash.modloader-ui-page-active .menu,
+			.splash.modloader-ui-page-active .credit,
+			.splash.modloader-ui-page-active .publisher,
+			.splash.modloader-ui-page-active .flashlight,
+			.splash.modloader-ui-page-active .chill,
+			.splash.modloader-ui-page-active .fullscreen,
+			.splash.modloader-ui-page-active .discord,
+			.splash.modloader-ui-page-active .backupVessel,
+			.splash.modloader-ui-page-active .gloryButton,
+			.splash.modloader-ui-page-active > .headerBox,
+			.splash.modloader-ui-page-active > .sixtyFour { display:none !important; }
+			.modloader-ui-page { position:absolute; inset:0; display:flex; flex-direction:column; justify-content:center; box-sizing:border-box; padding:clamp(16px,3vh,36px) max(36px,5vw) 18px; color:#fff; background:transparent; font-family:Montserrat,Arial,sans-serif; overflow:hidden; }
+			.modloader-ui-page-brand { display:flex; align-items:center; justify-content:center; gap:32px; margin:0 auto 14px; }
+			.modloader-ui-page-logo-mark { flex:0 0 auto; width:92px; height:92px; margin:0; background:url('img/logo/sheet.png'); background-size:400% 200%; }
+			.modloader-ui-page-logo { text-align:center; font:54px Montserrat,Arial,sans-serif; letter-spacing:16px; white-space:nowrap; }
+			.modloader-ui-page-subtitle { margin:0 auto 20px; text-align:center; font:23px Montserrat,Arial,sans-serif; letter-spacing:9px; color:#fffc; text-transform:uppercase; }
+			.modloader-ui-page-content { box-sizing:border-box; width:min(var(--modloader-ui-page-width,760px),100%); height:min(var(--modloader-ui-page-content-height,560px),calc(100vh - var(--modloader-ui-page-content-offset,335px))); margin:0 auto; padding:10px 24px 14px 0; overflow-x:hidden; overflow-y:auto; scrollbar-width:thin; scrollbar-color:transparent transparent; transition:scrollbar-color .28s ease; outline:none; }
+			.modloader-ui-page-content:hover, .modloader-ui-page-content:active, .modloader-ui-page-content.modloader-ui-page-scrollbar-visible { scrollbar-color:#fffc #fff2; }
+			.modloader-ui-page-content::-webkit-scrollbar { width:10px; }
+			.modloader-ui-page-content::-webkit-scrollbar-track { background:transparent; transition:background .28s ease; }
+			.modloader-ui-page-content::-webkit-scrollbar-thumb { border:0; border-radius:0; background:transparent; transition:background .28s ease; }
+			.modloader-ui-page-content:hover::-webkit-scrollbar-track, .modloader-ui-page-content:active::-webkit-scrollbar-track, .modloader-ui-page-content.modloader-ui-page-scrollbar-visible::-webkit-scrollbar-track { background:linear-gradient(to right, transparent 4px, rgba(255,255,255,.16) 4px, rgba(255,255,255,.16) 6px, transparent 6px); }
+			.modloader-ui-page-content:hover::-webkit-scrollbar-thumb, .modloader-ui-page-content:active::-webkit-scrollbar-thumb, .modloader-ui-page-content.modloader-ui-page-scrollbar-visible::-webkit-scrollbar-thumb { background:linear-gradient(to right, transparent 4px, rgba(255,255,255,.78) 4px, rgba(255,255,255,.78) 6px, transparent 6px); }
+			.modloader-ui-page-back { appearance:none; display:block; box-sizing:border-box; width:min(var(--modloader-ui-page-width,760px),100%); margin:22px auto 0; padding:0; border:0; background:transparent; color:inherit; text-align:right; font:23px Montserrat,Arial,sans-serif; letter-spacing:6px; cursor:pointer; transition:color .18s ease; }
+			.modloader-ui-page-back:hover { color:#b56b87; }
+			.modloader-ui-page-rule { width:min(var(--modloader-ui-page-width,760px),100%); height:1px; margin:0 auto; background:rgba(255,255,255,.72); }
+			.modloader-ui-page-rule-strong { height:4px; width:calc(100% - 4px); margin:0 0 2px; background:rgba(255,255,255,.9); }
+			.splash.mobile .modloader-ui-page { padding:5vh 5vw 24px; }
+			.splash.mobile .modloader-ui-page-brand { gap:4vw; }
+			.splash.mobile .modloader-ui-page-logo-mark { width:16vw; height:16vw; max-width:74px; max-height:74px; }
+			.splash.mobile .modloader-ui-page-logo { font-size:min(8vw,34px); letter-spacing:min(2.2vw,9px); }
+			.splash.mobile .modloader-ui-page-subtitle { font-size:min(5vw,18px); letter-spacing:min(2vw,6px); }
+			.splash.mobile .modloader-ui-page-content { height:min(var(--modloader-ui-page-mobile-content-height,610px),calc(100vh - var(--modloader-ui-page-mobile-content-offset,310px))); padding-right:14px; }
+			.splash.mobile .modloader-ui-page-back { font-size:min(5vw,20px); }
+			@media (max-width:860px) { .modloader-ui-page { padding-left:5vw; padding-right:5vw; } .modloader-ui-page-logo { font-size:34px; letter-spacing:10px; } }
+		`
+		document.head.append(style)
+	}
 	const createUiApi = function (modId) {
 		return {
 			registerCornerButton(options) { return registerUiButton(modId, options) },
@@ -364,7 +853,8 @@
 			unregisterCornerButton(id) { return unregisterUiButton(modId, id) },
 			unregisterButton(id) { return unregisterUiButton(modId, id) },
 			refreshCornerButtons: syncUiDocks,
-			refreshButtons: syncUiDocks
+			refreshButtons: syncUiDocks,
+			pages: createUiPagesApi(modId)
 		}
 	}
 	const element = function (tag, className, text) {
@@ -4926,6 +5416,7 @@
 			if (name === 'beforeVanillaScripts') await api.boot()
 			if (name === 'afterVanillaScripts') {
 				await api.loadEntries()
+				if (uiPages.length) ensureUiPagesInstalled()
 				installLanguageBridge()
 			}
 			if (name === 'afterGameInit') {

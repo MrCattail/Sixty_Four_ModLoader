@@ -150,8 +150,10 @@
 			const game = activeGame
 			if (!game) return
 			const state = ensureState(game, api)
+			const pivot = captureMousePivot(game)
 			if (detail.key === pitchConfigKey) state.pitch = clamp(Number(detail.value), minPitch, maxPitch)
 			if (detail.key === yawConfigKey) state.yaw = normalizeRadians(Number(detail.value) * Math.PI / 180)
+			restoreMousePivot(game, pivot)
 			state.lastInput = performance.now()
 			game.processMousemove2?.()
 		}, true)
@@ -201,9 +203,11 @@
 			const game = activeGame
 			if (!game) return
 			const state = ensureState(game, api)
+			const pivot = captureMousePivot(game)
 			const direction = normalizeWheelDirection(event)
 			if (keys.tiltWheel) state.pitch = clamp(state.pitch - direction * 0.035, minPitch, maxPitch)
 			if (keys.rotateWheel) state.yaw = normalizeRadians(state.yaw + direction * Math.PI / 72)
+			restoreMousePivot(game, pivot)
 			state.lastInput = performance.now()
 			persistCameraConfig(api, state)
 			game.processMousemove2?.()
@@ -245,6 +249,7 @@
 		let changed = false
 		const pitchDirection = (keys.pitchUp ? 1 : 0) - (keys.pitchDown ? 1 : 0)
 		const yawDirection = (keys.yawRight ? 1 : 0) - (keys.yawLeft ? 1 : 0)
+		const pivot = (pitchDirection || yawDirection) ? captureMousePivot(game) : null
 		if (pitchDirection) {
 			state.pitch = clamp(state.pitch + pitchDirection * dt * 0.00045, minPitch, maxPitch)
 			changed = true
@@ -254,6 +259,7 @@
 			changed = true
 		}
 		if (changed) {
+			restoreMousePivot(game, pivot)
 			state.lastInput = now
 			persistCameraConfigThrottled(api, state)
 			game.processMousemove2?.()
@@ -323,6 +329,7 @@
 		const restoreAvailable = isValidCameraSnapshot(restoreState)
 		const isReset = isVanillaCameraState(state)
 		const now = performance.now()
+		const pivot = captureMousePivot(game)
 		let shouldPersist = false
 
 		if (restoreAvailable && isReset) {
@@ -347,8 +354,39 @@
 				}
 			}
 		}
+		restoreMousePivot(game, pivot)
 		if (shouldPersist) persistCameraConfig(api, game.__cattailDynamicCameraState)
 		game.processMousemove2?.()
+	}
+
+	function captureMousePivot(game) {
+		try {
+			if (!game?.mouse || !Array.isArray(game.mouse.offsetxy) || typeof game.xyToUV !== 'function') return null
+			const xy = [Number(game.mouse.offsetxy[0]), Number(game.mouse.offsetxy[1])]
+			if (!Number.isFinite(xy[0]) || !Number.isFinite(xy[1])) return null
+			const uv = game.xyToUV(xy)
+			if (!Array.isArray(uv) || !Number.isFinite(uv[0]) || !Number.isFinite(uv[1])) return null
+			return { xy: xy, uv: [uv[0], uv[1]] }
+		} catch (error) {
+			return null
+		}
+	}
+
+	function restoreMousePivot(game, pivot) {
+		try {
+			if (!pivot || !game?.translation || typeof game.uvToXY !== 'function') return
+			const projected = game.uvToXY(pivot.uv)
+			if (!Array.isArray(projected) || !Number.isFinite(projected[0]) || !Number.isFinite(projected[1])) return
+			const pixelRatio = Number(game.pixelRatio) || 1
+			const zoom = Number(game.zoom) || 1
+			if (!Number.isFinite(pixelRatio) || !Number.isFinite(zoom) || Math.abs(zoom) < minDeterminant) return
+			const target = [
+				pivot.xy[0] * pixelRatio - (Number(game.w2) || 0),
+				pivot.xy[1] * pixelRatio - (Number(game.h2) || 0)
+			]
+			game.translation[0] += (projected[0] - target[0]) / zoom
+			game.translation[1] += (projected[1] - target[1]) / zoom
+		} catch (error) {}
 	}
 
 	function isVanillaCameraState(state) {

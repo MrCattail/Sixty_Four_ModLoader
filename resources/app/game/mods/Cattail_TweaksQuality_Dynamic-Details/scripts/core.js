@@ -905,7 +905,8 @@ ModLoader.register({
 			return !!(
 				isDirectionPointersFeatureEnabled() &&
 				isCoordinateEmptyCellContext(game) &&
-				(isCoordinateToggleActive(game) || (game.altActive && game.shiftPressed))
+				game.altActive &&
+				game.shiftPressed
 			)
 		}
 

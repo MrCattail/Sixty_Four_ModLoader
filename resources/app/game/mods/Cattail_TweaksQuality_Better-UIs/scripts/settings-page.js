@@ -2,11 +2,7 @@ ModLoader.register({
 	id: 'Cattail_TweaksQuality_Better-UIs',
 	init(api) {
 		if (api.config.get('enableSettingsPage', true) === false) return
-		const pageShell = window.CattailBetterUisPages
-		if (!pageShell) {
-			console.warn('[Better UIs Settings] page-shell.js must be loaded before settings-page.js.')
-			return
-		}
+		const pageShell = api.ui.pages
 
 		let activeSplash = null
 		let currentGame = null
@@ -78,6 +74,7 @@ ModLoader.register({
 			mobileContentHeight: '610px',
 			contentOffset: '335px',
 			mobileContentOffset: '310px',
+			inertialScroll: { friction: .88, directInfluence: .30, tailInfluence: .13, maxVelocity: 34, stopThreshold: .35 },
 			menuLabel(game) { return text(game, 'menu') },
 			title(game) { return text(game, 'title') },
 			backLabel(game) { return pageShell.originalBackLabel(game) || 'BACK' },
@@ -481,12 +478,12 @@ ModLoader.register({
 			const style = document.createElement('style')
 			style.id = 'cattail-settings-style'
 			style.textContent = `
-				.cattail-settings-tabs { display:flex; align-items:center; gap:38px; box-sizing:border-box; width:min(var(--cattail-better-ui-page-width,1120px),100%); min-height:48px; margin:0 auto; padding:0 0 8px; overflow-x:auto; overflow-y:hidden; scrollbar-width:none; }
+				.cattail-settings-tabs { display:flex; align-items:center; gap:38px; box-sizing:border-box; width:min(var(--modloader-ui-page-width,1120px),100%); min-height:48px; margin:0 auto; padding:0 0 8px; overflow-x:auto; overflow-y:hidden; scrollbar-width:none; }
 				.cattail-settings-tabs::-webkit-scrollbar { display:none; }
 				.cattail-settings-tab { appearance:none; flex:0 0 auto; border:0; background:transparent; color:rgba(255,255,255,.64); font:22px/1.2 Montserrat,Arial,sans-serif; letter-spacing:5px; padding:7px 0 9px; cursor:pointer; transition:color .18s ease,transform .18s ease; }
 				.cattail-settings-tab:hover, .cattail-settings-tab-active { color:#fff; }
 				.cattail-settings-tab-active { transform:translateY(-1px); }
-				.cattail-settings-rule { width:min(var(--cattail-better-ui-page-width,1120px),100%); height:1px; margin:0 auto 0; background:rgba(255,255,255,.72); }
+				.cattail-settings-rule { width:min(var(--modloader-ui-page-width,1120px),100%); height:1px; margin:0 auto 0; background:rgba(255,255,255,.72); }
 				.cattail-settings-section-title, .cattail-settings-empty, .cattail-settings-notice { min-height:54px; display:flex; align-items:center; box-sizing:border-box; padding:14px 18px; border-bottom:1px solid rgba(255,255,255,.38); font:20px/1.35 Montserrat,Arial,sans-serif; letter-spacing:3px; color:rgba(255,255,255,.72); }
 				.cattail-settings-notice { color:#b56b87; }
 				.cattail-settings-row { display:grid; grid-template-columns:minmax(260px,.8fr) minmax(300px,1fr) minmax(180px,.55fr); align-items:center; gap:28px; min-height:78px; box-sizing:border-box; padding:15px 18px; border-bottom:1px solid rgba(255,255,255,.38); transition:background .18s ease; }

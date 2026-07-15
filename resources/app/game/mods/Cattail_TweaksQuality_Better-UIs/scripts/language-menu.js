@@ -4,6 +4,7 @@ ModLoader.register({
 		if (api.config.get('enableLanguageMenu', true) === false) return
 
 		let activeSplash = null
+		const pageShell = api.ui.pages
 
 		const fallbackLanguageLabels = {
 			en: 'English',
@@ -28,64 +29,45 @@ ModLoader.register({
 			modsch: 'Simplified Chinese Plus'
 		}
 
-		api.on('afterVanillaScripts', function () {
-			if (typeof Splash === 'undefined' || typeof Game === 'undefined') return
-
-			installStyles()
-			patchSplash(api, 'init')
-			patchSplash(api, 'initMobile')
-			window.addEventListener('keydown', handleEscape, true)
-
-			api.patch(Game.prototype, 'changeLanguage', function (original) {
-				return function (id) {
-					const wasOpen = this.splash?.element?.classList.contains('cattail-language-menu-active')
-					const scrollTop = wasOpen ? this.splash.element.querySelector('.cattail-language-menu-list')?.scrollTop : null
-					const result = original.call(this, id)
-					if (wasOpen) showLanguagePage(this.splash, { scrollTop })
-					else refreshLanguageButton(this.splash)
-					return result
-				}
-			})
+		pageShell.register({
+			id: 'languageMenu',
+			prefix: 'cattail-language-menu',
+			width: '760px',
+			contentClass: 'cattail-language-menu-list',
+			scrollbarVisibleClass: 'cattail-language-menu-scrollbar-visible',
+			contentHeight: '660px',
+			mobileContentHeight: '620px',
+			contentOffset: '280px',
+			mobileContentOffset: '270px',
+			inertialScroll: { friction: .88, directInfluence: .30, tailInfluence: .13, maxVelocity: 34, stopThreshold: .35 },
+			findButton(splash) { return findLanguageButton(splash) },
+			updateButton(button, ctx) {
+				button.innerHTML = ctx.splash?.texts?.language || button.innerHTML
+			},
+			title(game) { return languageTitle(game?.splash, readWords(game)) },
+			backLabel(game) { return backLabel(game) },
+			onOpen(ctx) {
+				activeSplash = ctx.splash
+				pageShell.resetViewportScroll()
+			},
+			onClose() {
+				activeSplash = null
+				pageShell.resetViewportScroll()
+			},
+			renderContent(ctx) {
+				activeSplash = ctx.splash
+				renderLanguageContent(ctx)
+			},
+			onAfterRender(ctx) {
+				const selected = ctx.content?.querySelector('.cattail-language-menu-option-selected')
+				if (typeof ctx.options?.scrollTop !== 'number') centerSelectedOption(ctx.content, selected)
+				pageShell.resetViewportScroll()
+			}
 		})
 
-		function patchSplash(api, methodName) {
-			api.patch(Splash.prototype, methodName, function (original) {
-				return function (...args) {
-					const result = original.apply(this, args)
-					attachLanguageMenu(this)
-					return result
-				}
-			})
-		}
-
-		function attachLanguageMenu(splash) {
-			const button = findLanguageButton(splash)
-			if (!button) return
-
-			button.classList.add('cattail-language-menu-button')
-			button.innerHTML = splash.texts?.language || button.innerHTML
-
-			if (button.dataset.cattailLanguageMenu === '1') return
-			button.dataset.cattailLanguageMenu = '1'
-
-			const open = function (event) {
-				event?.preventDefault()
-				event?.stopPropagation()
-				showLanguagePage(splash)
-			}
-
-			button.onclick = open
-			button.ontouchstart = open
-		}
-
-		function refreshLanguageButton(splash) {
-			if (!splash?.element) return
-			const button = findLanguageButton(splash)
-			if (!button) return
-			button.classList.add('cattail-language-menu-button')
-			button.innerHTML = splash.texts?.language || button.innerHTML
-			if (button.dataset.cattailLanguageMenu !== '1') attachLanguageMenu(splash)
-		}
+		api.on('afterVanillaScripts', function () {
+			installStyles()
+		})
 
 		function findLanguageButton(splash) {
 			const item = Array.isArray(splash?.items) ? splash.items[2] : null
@@ -103,96 +85,18 @@ ModLoader.register({
 			return null
 		}
 
-		function showLanguagePage(splash, options = {}) {
-			if (!splash?.element) return
-
-			let page = splash.element.querySelector('.cattail-language-menu-page')
-			if (!page) {
-				page = document.createElement('div')
-				page.className = 'cattail-language-menu-page'
-				splash.element.append(page)
-			}
-
-			activeSplash = splash
-			splash.element.classList.add('cattail-language-menu-active')
-			splash.selected = false
-			resetViewportScroll()
-			renderLanguagePage(splash, page, options)
-		}
-
-		function hideLanguagePage(splash) {
-			if (!splash?.element) return
-			splash.element.classList.remove('cattail-language-menu-active')
-			splash.element.querySelector('.cattail-language-menu-page')?.remove()
-			resetViewportScroll()
-			if (activeSplash === splash) activeSplash = null
-		}
-
-		function handleEscape(event) {
-			if (!activeSplash?.element?.classList.contains('cattail-language-menu-active')) return
-			if (event.key !== 'Escape' && event.keyCode !== 27) return
-			event.preventDefault()
-			event.stopPropagation()
-			hideLanguagePage(activeSplash)
-		}
-
-		function renderLanguagePage(splash, page, options = {}) {
-			const game = splash.master
+		function renderLanguageContent(ctx) {
+			const game = ctx.game
 			const words = readWords(game)
 			const rawLanguages = Array.isArray(game?.languages) ? game.languages : []
 			const languages = rawLanguages
 				.map(function (id, index) { return { id, index } })
 				.filter(function (entry) { return languageIsAvailable(words, entry.id) })
-			page.innerHTML = ''
-
-			const brand = document.createElement('div')
-			brand.className = 'cattail-language-menu-brand'
-			const logoLeft = document.createElement('div')
-			logoLeft.className = 'cattail-language-menu-logo'
-			logoLeft.textContent = 'SIXTY'
-			const logoMark = document.createElement('div')
-			logoMark.className = 'cattail-language-menu-logo-mark'
-			logoMark.style.backgroundPosition = splash.sf?.style.backgroundPosition || '0 0'
-			const logoRight = document.createElement('div')
-			logoRight.className = 'cattail-language-menu-logo'
-			logoRight.textContent = 'FOUR'
-			brand.append(logoLeft, logoMark, logoRight)
-			page.append(brand)
-
-			const subtitle = document.createElement('div')
-			subtitle.className = 'cattail-language-menu-subtitle'
-			subtitle.textContent = languageTitle(splash, words)
-			page.append(subtitle)
-
-			const list = document.createElement('div')
-			list.className = 'cattail-language-menu-list'
-			installTransientScrollbar(list)
-			installInertialScroll(list)
 
 			for (const entry of languages) {
-				list.append(renderLanguageOption(splash, words, entry.id, entry.index))
+				ctx.content.append(renderLanguageOption(ctx.splash, words, entry.id, entry.index))
 			}
-
-			page.append(list)
-
-			const back = document.createElement('button')
-			back.type = 'button'
-			back.className = 'cattail-language-menu-back'
-			back.textContent = backLabel(game)
-			back.onclick = function (event) {
-				event.preventDefault()
-				event.stopPropagation()
-				hideLanguagePage(splash)
-			}
-			back.ontouchstart = back.onclick
-			page.append(back)
-
-			const selected = list.querySelector('.cattail-language-menu-option-selected')
-			if (typeof options.scrollTop === 'number') restoreListScroll(list, options.scrollTop)
-			else centerSelectedOption(list, selected)
-			resetViewportScroll()
 		}
-
 		function centerSelectedOption(list, selected) {
 			if (!list || !selected) return
 			const listRect = list.getBoundingClientRect()
@@ -201,18 +105,6 @@ ModLoader.register({
 			const target = selectedTop - (list.clientHeight - selected.offsetHeight) / 2
 			const max = Math.max(0, list.scrollHeight - list.clientHeight)
 			list.scrollTop = Math.min(max, Math.max(0, target))
-		}
-
-		function restoreListScroll(list, scrollTop) {
-			if (!list) return
-			const max = Math.max(0, list.scrollHeight - list.clientHeight)
-			list.scrollTop = Math.min(max, Math.max(0, scrollTop))
-		}
-
-		function resetViewportScroll() {
-			if (document?.documentElement) document.documentElement.scrollTop = 0
-			if (document?.body) document.body.scrollTop = 0
-			if (typeof window?.scrollTo === 'function') window.scrollTo(0, 0)
 		}
 
 		function renderLanguageOption(splash, words, id, index) {
@@ -299,78 +191,6 @@ ModLoader.register({
 
 		function languageCodeLabel(id) {
 			return String(id || '').replace(/[^a-z0-9_-]/gi, '').toUpperCase()
-		}
-
-		function installTransientScrollbar(list) {
-			let timer
-			const reveal = function () {
-				list.classList.add('cattail-language-menu-scrollbar-visible')
-				clearTimeout(timer)
-				timer = setTimeout(function () {
-					list.classList.remove('cattail-language-menu-scrollbar-visible')
-				}, 900)
-			}
-			list.onwheel = reveal
-			list.onscroll = reveal
-			list.onpointerdown = reveal
-		}
-
-		function installInertialScroll(list) {
-			let velocity = 0
-			let frame = 0
-			const friction = .88
-			const directInfluence = .30
-			const tailInfluence = .13
-			const maxVelocity = 34
-
-			const clamp = function (value) {
-				const max = Math.max(0, list.scrollHeight - list.clientHeight)
-				return Math.min(max, Math.max(0, value))
-			}
-			const clampVelocity = function (value) {
-				return Math.min(maxVelocity, Math.max(-maxVelocity, value))
-			}
-			const stop = function () {
-				velocity = 0
-				if (frame) cancelAnimationFrame(frame)
-				frame = 0
-			}
-			const animate = function () {
-				frame = 0
-				if (Math.abs(velocity) < .35) {
-					velocity = 0
-					return
-				}
-				const before = list.scrollTop
-				list.scrollTop = clamp(before + velocity)
-				if (list.scrollTop === before) {
-					velocity = 0
-					return
-				}
-				velocity *= friction
-				frame = requestAnimationFrame(animate)
-			}
-			list.addEventListener('wheel', function (event) {
-				if (!event.cancelable || event.ctrlKey) return
-				const delta = normalizeWheelDelta(event, list)
-				if (!delta) return
-				event.preventDefault()
-				const before = list.scrollTop
-				list.scrollTop = clamp(before + delta * directInfluence)
-				if (list.scrollTop === before) {
-					velocity = 0
-					return
-				}
-				velocity = clampVelocity(velocity + delta * tailInfluence)
-				if (!frame) frame = requestAnimationFrame(animate)
-			}, { passive: false })
-			list.addEventListener('pointerdown', stop, true)
-		}
-
-		function normalizeWheelDelta(event, list) {
-			if (event.deltaMode === 1) return event.deltaY * 32
-			if (event.deltaMode === 2) return event.deltaY * list.clientHeight
-			return event.deltaY
 		}
 
 		function installStyles() {

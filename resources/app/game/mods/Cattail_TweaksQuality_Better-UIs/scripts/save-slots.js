@@ -8,23 +8,47 @@ ModLoader.register({
 		let activeSplash = null
 		let pendingConfirmation = null
 		let pendingImport = null
+		const pageShell = api.ui.pages
+
+		pageShell.register({
+			id: 'saveSlots',
+			prefix: 'cattail-save-slots',
+			width: '1760px',
+			contentClass: 'cattail-save-slots-list',
+			scrollbarVisibleClass: 'cattail-save-slots-scrollbar-visible',
+			contentHeight: '790px',
+			mobileContentHeight: '620px',
+			contentOffset: '318px',
+			mobileContentOffset: '300px',
+			inertialScroll: { friction: .88, directInfluence: .30, tailInfluence: .13, maxVelocity: 34, stopThreshold: .35 },
+			insertBefore(splash, menu) { return menu?.querySelector('.resetProgressbar')?.closest('.menuItem') },
+			menuLabel(game) { return text(game, 'menu') },
+			title(game) { return text(game, 'title') },
+			backLabel(game) { return text(game, 'back') },
+			onOpen(ctx) {
+				activeSplash = ctx.splash
+				ensureAutoSave(ctx.game)
+			},
+			onClose() {
+				pendingConfirmation = null
+				pendingImport = null
+				activeSplash = null
+			},
+			canCloseOnEscape(ctx, event) {
+				return !event.target?.classList?.contains('cattail-save-slots-name-input')
+			},
+			renderBeforeContent(ctx) {
+				return renderTransferBar(ctx.splash, ctx.page)
+			},
+			renderContent(ctx) {
+				activeSplash = ctx.splash
+				renderSlotsContent(ctx)
+			}
+		})
 
 		api.on('afterVanillaScripts', function () {
-			if (typeof Splash === 'undefined' || typeof Game === 'undefined') return
-
 			installStyles()
-			patchSplash(api, 'init')
-			patchSplash(api, 'initMobile')
-			window.addEventListener('keydown', handleEscape, true)
-			api.patch(Game.prototype, 'changeLanguage', function (original) {
-				return function (id) {
-					const wasOpen = this.splash?.element?.classList.contains('cattail-save-slots-active')
-					const result = original.call(this, id)
-					if (wasOpen) showSlotsPage(this.splash)
-					else refreshSaveSlotsLanguage(this.splash)
-					return result
-				}
-			})
+			if (typeof Game === 'undefined') return
 			api.patch(Game.prototype, 'saveGame', function (original) {
 				return function (...args) {
 					const before = localStorage.getItem(autoKey(this))
@@ -36,83 +60,30 @@ ModLoader.register({
 			})
 		})
 
-		function patchSplash(api, methodName) {
-			api.patch(Splash.prototype, methodName, function (original) {
-				return function (...args) {
-					const result = original.apply(this, args)
-					attachSaveMenu(this)
-					return result
-				}
-			})
+		function refreshOpenSlotsPage(game) {
+			if (!activeSplash || activeSplash.master !== game) return
+			if (!pageShell.isActive('saveSlots')) return
+			const page = activeSplash.element?.querySelector('.cattail-save-slots-page')
+			if (!page || page.querySelector('.cattail-save-slots-name-input') || pendingConfirmation) return
+			pageShell.refresh('saveSlots')
 		}
 
-		function attachSaveMenu(splash) {
-			if (!splash?.element) return
-
-			const existingButton = splash.element.querySelector('.cattail-save-slots-button')
-			if (existingButton) {
-				refreshSaveSlotsLanguage(splash)
-				return
-			}
-
-			const menu = splash.element.querySelector('.menu')
-			if (!menu) return
-
-			const saveButton = document.createElement('div')
-			saveButton.classList.add('menuItem', 'cattail-save-slots-button')
-			saveButton.textContent = text(splash.master, 'menu')
-
-			const reset = menu.querySelector('.resetProgressbar')?.closest('.menuItem')
-			if (reset) menu.insertBefore(saveButton, reset)
-			else menu.append(saveButton)
-
-			const open = function (event) {
-				event?.preventDefault()
-				event?.stopPropagation()
-				showSlotsPage(splash)
-			}
-
-			saveButton.onclick = open
-			saveButton.ontouchstart = open
-
-			if (Array.isArray(splash.items)) {
-				const resetIndex = reset ? splash.items.indexOf(reset) : -1
-				if (resetIndex >= 0) splash.items.splice(resetIndex, 0, saveButton)
-				else splash.items.push(saveButton)
-			}
+		function renderSlotsPage() {
+			pageShell.refresh('saveSlots')
 		}
 
-		function refreshSaveSlotsLanguage(splash) {
-			if (!splash?.element) return
-			const saveButton = splash.element.querySelector('.cattail-save-slots-button')
-			if (saveButton) saveButton.textContent = text(splash.master, 'menu')
-			const page = splash.element.querySelector('.cattail-save-slots-page')
-			if (page) renderSlotsPage(splash, page)
-		}
+		function renderSlotsContent(ctx) {
+			const game = ctx.game
+			const manualSlots = readManualSlots(game)
+			const autoSlot = getAutoSlot(game)
+			ctx.content.append(renderAutoSlot(ctx.splash, ctx.page, autoSlot))
 
-		function showSlotsPage(splash) {
-			ensureAutoSave(splash.master)
-			let page = splash.element.querySelector('.cattail-save-slots-page')
-			if (!page) {
-				page = document.createElement('div')
-				page.className = 'cattail-save-slots-page'
-				splash.element.append(page)
-			}
-			activeSplash = splash
-			splash.element.classList.add('cattail-save-slots-active')
-			splash.selected = false
-			renderSlotsPage(splash, page)
-		}
+			const strongRule = document.createElement('div')
+			strongRule.className = 'cattail-save-slots-rule-strong'
+			ctx.content.append(strongRule)
 
-		function hideSlotsPage(splash) {
-			pendingConfirmation = null
-			pendingImport = null
-			if (!splash?.element) return
-			splash.element.classList.remove('cattail-save-slots-active')
-			splash.element.querySelector('.cattail-save-slots-page')?.remove()
-			if (activeSplash === splash) activeSplash = null
+			for (let i = 0; i < manualSlotCount; i++) ctx.content.append(renderManualSlot(ctx.splash, ctx.page, manualSlots, i))
 		}
-
 		function ensureAutoSave(game) {
 			writeAutoSave(game)
 		}
@@ -123,77 +94,6 @@ ModLoader.register({
 			localStorage.setItem(autoKey(game), data)
 			game.spaceport?.send('save', data)
 			return data
-		}
-
-		function refreshOpenSlotsPage(game) {
-			if (!activeSplash || activeSplash.master !== game) return
-			if (!activeSplash.element?.classList.contains('cattail-save-slots-active')) return
-			const page = activeSplash.element.querySelector('.cattail-save-slots-page')
-			if (!page || page.querySelector('.cattail-save-slots-name-input') || pendingConfirmation) return
-			renderSlotsPage(activeSplash, page)
-		}
-
-		function handleEscape(event) {
-			if (!activeSplash?.element?.classList.contains('cattail-save-slots-active')) return
-			if (event.key !== 'Escape' && event.keyCode !== 27) return
-			if (event.target?.classList?.contains('cattail-save-slots-name-input')) return
-			event.preventDefault()
-			event.stopPropagation()
-			hideSlotsPage(activeSplash)
-		}
-
-		function renderSlotsPage(splash, page) {
-			const game = splash.master
-			const manualSlots = readManualSlots(game)
-			const autoSlot = getAutoSlot(game)
-			const previousScrollTop = page.querySelector('.cattail-save-slots-list')?.scrollTop || 0
-			page.innerHTML = ''
-
-			const brand = document.createElement('div')
-			brand.className = 'cattail-save-slots-brand'
-			const logoLeft = document.createElement('div')
-			logoLeft.className = 'cattail-save-slots-logo'
-			logoLeft.textContent = 'SIXTY'
-			const logoMark = document.createElement('div')
-			logoMark.className = 'cattail-save-slots-logo-mark'
-			logoMark.style.backgroundPosition = splash.sf?.style.backgroundPosition || '0 0'
-			const logoRight = document.createElement('div')
-			logoRight.className = 'cattail-save-slots-logo'
-			logoRight.textContent = 'FOUR'
-			brand.append(logoLeft, logoMark, logoRight)
-			page.append(brand)
-			const subtitle = document.createElement('div')
-			subtitle.className = 'cattail-save-slots-subtitle'
-			subtitle.textContent = text(game, 'title')
-			page.append(subtitle)
-			page.append(renderTransferBar(splash, page))
-
-			const list = document.createElement('div')
-			list.className = 'cattail-save-slots-list'
-			installTransientScrollbar(list)
-			list.append(renderAutoSlot(splash, page, autoSlot))
-
-			const strongRule = document.createElement('div')
-			strongRule.className = 'cattail-save-slots-rule-strong'
-			list.append(strongRule)
-
-			for (let i = 0; i < manualSlotCount; i++) list.append(renderManualSlot(splash, page, manualSlots, i))
-			page.append(list)
-			if (previousScrollTop > 0) {
-				list.scrollTop = previousScrollTop
-				list.classList.add('cattail-save-slots-scrollbar-visible')
-			}
-
-			const back = document.createElement('button')
-			back.type = 'button'
-			back.className = 'cattail-save-slots-back'
-			back.textContent = text(game, 'back')
-			back.onclick = function () { hideSlotsPage(splash) }
-			back.ontouchstart = function (event) {
-				event.preventDefault()
-				hideSlotsPage(splash)
-			}
-			page.append(back)
 		}
 
 		function renderAutoSlot(splash, page, autoSlot) {
@@ -626,17 +526,6 @@ ModLoader.register({
 			return button
 		}
 
-		function installTransientScrollbar(list) {
-			let timer
-			const reveal = function () {
-				list.classList.add('cattail-save-slots-scrollbar-visible')
-				clearTimeout(timer)
-				timer = setTimeout(function () { list.classList.remove('cattail-save-slots-scrollbar-visible') }, 900)
-			}
-			list.onwheel = reveal
-			list.onscroll = reveal
-			list.onpointerdown = reveal
-		}
 		function actionSeparator() {
 			const separator = document.createElement('span')
 			separator.className = 'cattail-save-slots-action-separator'
