@@ -2,7 +2,7 @@
 	'use strict'
 
 	const state = {
-		version: '0.1.2',
+		version: '0.1.3',
 		booted: false,
 		mods: [],
 		modById: {},
@@ -45,7 +45,13 @@
 		panelStateLoaded: false,
 		panelAutoHideTimer: null,
 		uiButtons: {},
-		uiDocks: {}
+		uiDocks: {},
+		gameHudHidden: false,
+		gameHudSnapshot: null,
+		gameHudItems: {},
+		gameHudInstalled: false,
+		gameHudRenderPatched: false,
+		gameHudAnimation: null
 	}
 
 	const addIssue = function (level, code, message, details) {
@@ -328,6 +334,7 @@
 		const entry = state.uiButtons[key]
 		if (!entry || (element && entry.element !== element)) return
 		delete state.uiButtons[key]
+		unregisterGameHudItem(modId, 'ui-button:' + id, entry.element)
 		entry.element?.classList.remove('modloader-ui-dock-button', 'modloader-ui-hide-mobile')
 		if (entry.element?.parentNode?.classList?.contains('modloader-ui-dock')) entry.element.remove()
 		syncUiDock(entry.dock)
@@ -341,9 +348,12 @@
 		const id = options.id || options.element.id || 'button'
 		const key = uiButtonKey(modId, id)
 		const dock = normalizeUiDockName(options.dock || options.anchor || options.position)
-		if (state.uiButtons[key]?.element && state.uiButtons[key].element !== options.element) {
-			state.uiButtons[key].element.classList.remove('modloader-ui-dock-button', 'modloader-ui-hide-mobile')
+		const previous = state.uiButtons[key]
+		if (previous?.element && previous.element !== options.element) {
+			unregisterGameHudItem(modId, 'ui-button:' + id, previous.element)
+			previous.element.classList.remove('modloader-ui-dock-button', 'modloader-ui-hide-mobile')
 		}
+		const gameHud = options.gameHud ?? options.hud ?? isGameHudDock(dock)
 		state.uiButtons[key] = {
 			id,
 			key,
@@ -351,10 +361,408 @@
 			element: options.element,
 			dock,
 			order: Number.isFinite(Number(options.order)) ? Number(options.order) : 100,
-			hideOnMobile: options.hideOnMobile !== false
+			hideOnMobile: options.hideOnMobile !== false,
+			gameHud: gameHud !== false
+		}
+		if (state.uiButtons[key].gameHud) {
+			registerGameHudItem(modId, { id: 'ui-button:' + id, element: options.element, side: options.hudSide || getGameHudSideForDock(dock), managed: true })
+		} else {
+			unregisterGameHudItem(modId, 'ui-button:' + id, options.element)
 		}
 		syncUiDock(dock)
 		return function () { unregisterUiButton(modId, id, options.element) }
+	}
+
+
+	const GAME_HUD_ANIMATION_MS = 260
+
+	const isGameHudDock = function (dock) {
+		return typeof dock === 'string' && dock.indexOf('game-') === 0
+	}
+
+	const getGameHudSideForDock = function (dock) {
+		const name = String(dock || '')
+		if (name.indexOf('top') >= 0) return 'top'
+		if (name.indexOf('bottom') >= 0) return 'bottom'
+		if (name.indexOf('left') >= 0) return 'left'
+		return 'right'
+	}
+
+	const normalizeGameHudSide = function (side) {
+		const value = String(side || '').toLowerCase()
+		if (value.indexOf('top') >= 0) return 'top'
+		if (value.indexOf('bottom') >= 0) return 'bottom'
+		if (value.indexOf('left') >= 0) return 'left'
+		if (value.indexOf('right') >= 0) return 'right'
+		return 'right'
+	}
+
+	const gameHudKey = function (modId, id) {
+		return (modId || 'anonymous') + ':' + (id || 'hud')
+	}
+
+	const ensureGameHudStyle = function () {
+		if (document.getElementById('modloader-game-hud-style')) return
+		const style = document.createElement('style')
+		style.id = 'modloader-game-hud-style'
+		style.textContent = [
+			'body.modloader-game-hud-ready .shop,',
+			'body.modloader-game-hud-ready .shopToggle,',
+			'body.modloader-game-hud-ready .chatIcon,',
+			'body.modloader-game-hud-ready .messenger,',
+			'body.modloader-game-hud-ready .hintBubble,',
+			'body.modloader-game-hud-ready .explainer,',
+			'body.modloader-game-hud-ready .shopGamepadHint,',
+			'body.modloader-game-hud-ready .mobileToggle,',
+			'body.modloader-game-hud-ready .mobileEraser,',
+			'body.modloader-game-hud-ready .mobileRelocator,',
+			'body.modloader-game-hud-ready .mobileChat,',
+			'body.modloader-game-hud-ready .mobileMenu,',
+			'body.modloader-game-hud-ready .modloader-ui-dock-game-bottom-right,',
+			'body.modloader-game-hud-ready .modloader-ui-dock-game-top-right,',
+			'body.modloader-game-hud-ready .modloader-game-hud-item { transition: transform .26s cubic-bezier(.2,.8,.2,1), opacity .18s ease, filter .26s ease; will-change: transform, opacity; }',
+			'body.modloader-game-hud-hidden .shop { transform: translateX(calc(100% + 32px)); opacity: 0; pointer-events: none; }',
+			'body.modloader-game-hud-hidden .shopToggle,',
+			'body.modloader-game-hud-hidden .chatIcon,',
+			'body.modloader-game-hud-hidden .explainer,',
+			'body.modloader-game-hud-hidden .modloader-ui-dock-game-bottom-right { transform: translateY(calc(100% + 32px)); opacity: 0; pointer-events: none; }',
+			'body.modloader-game-hud-hidden .messenger { transform: translateX(calc(-100% - 32px)); opacity: 0; pointer-events: none; }',
+			'body.modloader-game-hud-hidden .hintBubble { transform: translateX(calc(100vw + 32px)); opacity: 0; pointer-events: none; }',
+			'body.modloader-game-hud-hidden .shopGamepadHint,',
+			'body.modloader-game-hud-hidden .modloader-ui-dock-game-top-right { transform: translateY(calc(-100% - 32px)); opacity: 0; pointer-events: none; }',
+			'body.modloader-game-hud-hidden .mobileToggle,',
+			'body.modloader-game-hud-hidden .mobileEraser,',
+			'body.modloader-game-hud-hidden .mobileRelocator,',
+			'body.modloader-game-hud-hidden .mobileChat,',
+			'body.modloader-game-hud-hidden .mobileMenu { transform: translate(-50%, calc(100% + 40px)) !important; opacity: 0; pointer-events: none; }',
+			'body.modloader-game-hud-hidden .modloader-game-hud-side-left { transform: translateX(calc(-100vw - 32px)) !important; opacity: 0; pointer-events: none; }',
+			'body.modloader-game-hud-hidden .modloader-game-hud-side-right { transform: translateX(calc(100vw + 32px)) !important; opacity: 0; pointer-events: none; }',
+			'body.modloader-game-hud-hidden .modloader-game-hud-side-top { transform: translateY(calc(-100vh - 32px)) !important; opacity: 0; pointer-events: none; }',
+			'body.modloader-game-hud-hidden .modloader-game-hud-side-bottom { transform: translateY(calc(100vh + 32px)) !important; opacity: 0; pointer-events: none; }'
+		].join('\n')
+		document.head.appendChild(style)
+	}
+
+	const applyGameHudBodyClass = function () {
+		if (!document.body) return
+		document.body.classList.add('modloader-game-hud-ready')
+		document.body.classList.toggle('modloader-game-hud-hidden', !!state.gameHudHidden)
+	}
+
+	const getGameHudGame = function (game) {
+		return game || state.game || uiPagesCurrentGame || null
+	}
+
+	const isEditableGameHudTarget = function (target) {
+		if (!target) return false
+		if (target.isContentEditable) return true
+		const tag = String(target.tagName || '').toLowerCase()
+		return tag === 'input' || tag === 'textarea' || tag === 'select'
+	}
+
+	const handleGameHudHotkey = function (event) {
+		if (event.defaultPrevented || event.repeat || event.ctrlKey || event.altKey || event.metaKey) return
+		if (isEditableGameHudTarget(event.target)) return
+		const key = String(event.key || '').toLowerCase()
+		if (key !== 'h' && event.keyCode !== 72) return
+		event.preventDefault()
+		event.stopImmediatePropagation()
+		toggleGameHudHidden()
+	}
+
+	const getGameHudVisibilityProgress = function () {
+		const animation = state.gameHudAnimation
+		if (!animation) return state.gameHudHidden ? 0 : 1
+		const now = typeof performance !== 'undefined' && performance.now ? performance.now() : Date.now()
+		const t = Math.min(1, Math.max(0, (now - animation.startedAt) / animation.duration))
+		const eased = t < .5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2
+		const value = animation.from + (animation.to - animation.from) * eased
+		if (t >= 1) state.gameHudAnimation = null
+		return value
+	}
+
+	const patchGameHudRendering = function () {
+		if (state.gameHudRenderPatched || typeof Game === 'undefined' || !Game.prototype) return
+		state.gameHudRenderPatched = true
+		const patchRender = function (methodName) {
+			api.patch(Game.prototype, methodName, function (original) {
+				return function (...args) {
+					const progress = getGameHudVisibilityProgress()
+					if (progress <= .001) return undefined
+					if (progress >= .999) return original.apply(this, args)
+					this.ctx.save()
+					try {
+						this.ctx.globalAlpha *= progress
+						this.ctx.translate(0, -(1 - progress) * this.screenUnit * 2.4)
+						return original.apply(this, args)
+					} finally {
+						this.ctx.restore()
+					}
+				}
+			})
+		}
+		patchRender('renderResources')
+		patchRender('renderDarkResources')
+	}
+
+	const captureVanillaGameHudState = function (game) {
+		const messenger = game?.messenger
+		const shop = game?.shop
+		const vessel = shop?.vessel
+		return {
+			messengerShown: messenger?.messagesShown === 1,
+			messengerScrollTop: messenger?.element?.scrollTop || 0,
+			shopScrollTop: vessel?.scrollTop || 0,
+			shopMinimized: !!vessel?.classList?.contains('minimized'),
+			shopToggleToggled: !!shop?.shopToggle?.classList?.contains('toggled'),
+			shopSelected: !!shop?.selected,
+			shopSelectedId: Number.isFinite(shop?.selectedId) ? shop.selectedId : 0,
+			mobileShopVisible: !!vessel?.classList?.contains('visible'),
+			mobileToggleActive: !!shop?.mobileToggle?.classList?.contains('active'),
+			hoveredResource: game?.hoveredResource
+		}
+	}
+
+	const closeVanillaGameHudBeforeHide = function (game) {
+		if (!game) return
+		if (game.messenger?.messagesShown === 1) game.messenger.hideMessages?.()
+		game.removeHint?.()
+		game.hoveredResource = false
+		game.hoveredLabel = false
+		const shop = game.shop
+		if (shop?.vessel?.classList?.contains('visible')) shop.vessel.classList.remove('visible')
+		shop?.mobileToggle?.classList?.remove('active')
+	}
+
+	const restoreVanillaGameHudState = function (game, snapshot) {
+		if (!game || !snapshot) return
+		const messenger = game.messenger
+		const shop = game.shop
+		const vessel = shop?.vessel
+		if (vessel) {
+			vessel.classList.toggle('minimized', !!snapshot.shopMinimized)
+			vessel.classList.toggle('visible', !!snapshot.mobileShopVisible)
+			vessel.scrollTop = snapshot.shopScrollTop || 0
+		}
+		shop?.shopToggle?.classList?.toggle('toggled', !!snapshot.shopToggleToggled)
+		shop?.mobileToggle?.classList?.toggle('active', !!snapshot.mobileToggleActive)
+		if (shop?.items?.length) {
+			for (const item of shop.items) item?.html?.classList?.remove('selected')
+			shop.selectedId = Math.min(Math.max(0, snapshot.shopSelectedId || 0), shop.items.length - 1)
+			shop.selected = !!snapshot.shopSelected
+			if (shop.selected) shop.items[shop.selectedId]?.html?.classList?.add('selected')
+		}
+		if (messenger) {
+			if (snapshot.messengerShown) messenger.showMessages?.()
+			else messenger.hideMessages?.()
+		}
+		if (snapshot.hoveredResource !== undefined) game.hoveredResource = snapshot.hoveredResource
+		const restoreScroll = function () {
+			if (vessel) vessel.scrollTop = snapshot.shopScrollTop || 0
+			if (messenger?.element) messenger.element.scrollTop = snapshot.messengerScrollTop || 0
+		}
+		requestAnimationFrame(restoreScroll)
+		setTimeout(restoreScroll, 140)
+	}
+
+	const getGameHudEntryElements = function (entry) {
+		const out = []
+		const add = function (value) {
+			if (!value) return
+			if (typeof value === 'string') {
+				document.querySelectorAll(value).forEach(function (el) { out.push(el) })
+				return
+			}
+			if (value instanceof Element) {
+				out.push(value)
+				return
+			}
+			if (typeof value[Symbol.iterator] === 'function') {
+				for (const item of value) add(item)
+			}
+		}
+		try {
+			add(entry.element)
+			add(entry.elements)
+			if (entry.selector) add(entry.selector)
+			if (typeof entry.getElement === 'function') add(entry.getElement())
+			if (typeof entry.getElements === 'function') add(entry.getElements())
+		} catch (error) {
+			warn('HUD element lookup from ' + entry.modId + ' failed', error)
+		}
+		return Array.from(new Set(out)).filter(function (el) { return el && el.nodeType === 1 })
+	}
+
+	const clearGameHudElementClasses = function (element) {
+		element.classList.remove('modloader-game-hud-item', 'modloader-game-hud-item-hidden', 'modloader-game-hud-side-left', 'modloader-game-hud-side-right', 'modloader-game-hud-side-top', 'modloader-game-hud-side-bottom')
+	}
+
+	const syncGameHudEntry = function (entry) {
+		const elements = getGameHudEntryElements(entry)
+		for (const previous of entry.lastElements || []) {
+			if (elements.indexOf(previous) === -1) clearGameHudElementClasses(previous)
+		}
+		entry.lastElements = elements
+		if (entry.managed === false) return
+		for (const element of elements) {
+			element.classList.add('modloader-game-hud-item', 'modloader-game-hud-side-' + entry.side)
+			element.classList.toggle('modloader-game-hud-item-hidden', !!state.gameHudHidden)
+		}
+	}
+
+	const syncGameHudEntries = function () {
+		for (const key in state.gameHudItems) syncGameHudEntry(state.gameHudItems[key])
+	}
+
+	const createGameHudEntryContext = function (entry, game) {
+		return { id: entry.id, key: entry.key, modId: entry.modId, hidden: !!state.gameHudHidden, game, state: entry.savedState, elements: getGameHudEntryElements(entry) }
+	}
+
+	const callGameHudEntry = function (entry, name, game, extra) {
+		const fn = entry[name]
+		if (typeof fn !== 'function') return undefined
+		try {
+			return fn(Object.assign(createGameHudEntryContext(entry, game), extra || {}))
+		} catch (error) {
+			warn('HUD ' + name + ' from ' + entry.modId + ' failed', error)
+			return undefined
+		}
+	}
+
+	const captureGameHudEntries = function (game) {
+		for (const key in state.gameHudItems) {
+			const entry = state.gameHudItems[key]
+			const ctx = createGameHudEntryContext(entry, game)
+			try {
+				if (typeof entry.capture === 'function') entry.savedState = entry.capture(ctx)
+				else if (typeof entry.getState === 'function') entry.savedState = entry.getState(ctx)
+			} catch (error) {
+				warn('HUD state capture from ' + entry.modId + ' failed', error)
+			}
+			callGameHudEntry(entry, 'beforeHide', game)
+			callGameHudEntry(entry, 'onHide', game)
+		}
+	}
+
+	const restoreGameHudEntries = function (game) {
+		for (const key in state.gameHudItems) {
+			const entry = state.gameHudItems[key]
+			callGameHudEntry(entry, 'beforeShow', game)
+			try {
+				const ctx = createGameHudEntryContext(entry, game)
+				if (typeof entry.restore === 'function') entry.restore(entry.savedState, ctx)
+				else if (typeof entry.restoreState === 'function') entry.restoreState(entry.savedState, ctx)
+			} catch (error) {
+				warn('HUD state restore from ' + entry.modId + ' failed', error)
+			}
+			callGameHudEntry(entry, 'onShow', game)
+		}
+	}
+
+	const setGameHudAnimation = function (hidden) {
+		const now = typeof performance !== 'undefined' && performance.now ? performance.now() : Date.now()
+		state.gameHudAnimation = {
+			from: getGameHudVisibilityProgress(),
+			to: hidden ? 0 : 1,
+			startedAt: now,
+			duration: GAME_HUD_ANIMATION_MS
+		}
+	}
+
+	const setGameHudHidden = function (hidden, options = {}) {
+		hidden = !!hidden
+		installGameHud(options.game)
+		if (state.gameHudHidden === hidden && !options.force) return state.gameHudHidden
+		const game = getGameHudGame(options.game)
+		setGameHudAnimation(hidden)
+		if (hidden) {
+			state.gameHudSnapshot = captureVanillaGameHudState(game)
+			captureGameHudEntries(game)
+			closeVanillaGameHudBeforeHide(game)
+		} else {
+			restoreVanillaGameHudState(game, state.gameHudSnapshot)
+			restoreGameHudEntries(game)
+		}
+		state.gameHudHidden = hidden
+		applyGameHudBodyClass()
+		syncGameHudEntries()
+		window.dispatchEvent(new CustomEvent('modloader:game-hud', { detail: { hidden, game } }))
+		return state.gameHudHidden
+	}
+
+	const toggleGameHudHidden = function (options = {}) {
+		return setGameHudHidden(!state.gameHudHidden, options)
+	}
+
+	const registerGameHudItem = function (modId, options) {
+		options = options || {}
+		const id = options.id || options.name || 'hud'
+		const key = gameHudKey(modId, id)
+		if (!options.element && !options.elements && !options.selector && !options.getElement && !options.getElements && !options.capture && !options.getState && !options.restore && !options.restoreState) {
+			warn('Ignoring HUD registration from ' + (modId || 'anonymous') + ' without an element or callback.')
+			return function () {}
+		}
+		if (state.gameHudItems[key]?.lastElements) {
+			for (const element of state.gameHudItems[key].lastElements) clearGameHudElementClasses(element)
+		}
+		const entry = {
+			id,
+			key,
+			modId: modId || 'anonymous',
+			element: options.element,
+			elements: options.elements,
+			selector: options.selector,
+			getElement: options.getElement,
+			getElements: options.getElements,
+			side: normalizeGameHudSide(options.side || options.edge || options.anchor),
+			managed: options.managed !== false,
+			capture: options.capture,
+			getState: options.getState,
+			restore: options.restore,
+			restoreState: options.restoreState,
+			beforeHide: options.beforeHide,
+			onHide: options.onHide,
+			beforeShow: options.beforeShow,
+			onShow: options.onShow,
+			savedState: undefined,
+			lastElements: []
+		}
+		state.gameHudItems[key] = entry
+		syncGameHudEntry(entry)
+		return function () { unregisterGameHudItem(modId, id, options.element) }
+	}
+
+	const unregisterGameHudItem = function (modId, id, element) {
+		const key = gameHudKey(modId, id)
+		const entry = state.gameHudItems[key]
+		if (!entry || (element && entry.element && entry.element !== element)) return
+		for (const item of entry.lastElements || []) clearGameHudElementClasses(item)
+		delete state.gameHudItems[key]
+	}
+
+	const createUiHudApi = function (modId) {
+		return {
+			register(options) { return registerGameHudItem(modId, options) },
+			unregister(id) { return unregisterGameHudItem(modId, id) },
+			hide(options) { return setGameHudHidden(true, options) },
+			show(options) { return setGameHudHidden(false, options) },
+			toggle(options) { return toggleGameHudHidden(options) },
+			isHidden() { return !!state.gameHudHidden },
+			refresh() { syncGameHudEntries() }
+		}
+	}
+
+	const installGameHud = function (game) {
+		if (game) state.game = game
+		if (!document.body) return
+		ensureGameHudStyle()
+		applyGameHudBodyClass()
+		if (!state.gameHudInstalled) {
+			state.gameHudInstalled = true
+			document.addEventListener('keydown', handleGameHudHotkey, true)
+		}
+		patchGameHudRendering()
+		syncGameHudEntries()
 	}
 
 	const uiPages = []
@@ -854,6 +1262,9 @@
 			unregisterButton(id) { return unregisterUiButton(modId, id) },
 			refreshCornerButtons: syncUiDocks,
 			refreshButtons: syncUiDocks,
+			registerHud(options) { return registerGameHudItem(modId, options) },
+			registerGameHud(options) { return registerGameHudItem(modId, options) },
+			hud: createUiHudApi(modId),
 			pages: createUiPagesApi(modId)
 		}
 	}
@@ -5418,11 +5829,14 @@
 				await api.loadEntries()
 				if (uiPages.length) ensureUiPagesInstalled()
 				installLanguageBridge()
+				installGameHud(context)
 			}
 			if (name === 'afterGameInit') {
+				installGameHud(context)
 				requestAnimationFrame(refreshOpenPanel)
 				requestAnimationFrame(restorePanelAfterLoad)
 				requestAnimationFrame(syncUiDocks)
+				requestAnimationFrame(syncGameHudEntries)
 			}
 
 			const hooks = state.hooks[name] || []
@@ -5539,6 +5953,10 @@
 		showStatus,
 		renderPanel,
 		togglePanel,
+		hideGameHud(options) { return setGameHudHidden(true, options) },
+		showGameHud(options) { return setGameHudHidden(false, options) },
+		toggleGameHud(options) { return toggleGameHudHidden(options) },
+		isGameHudHidden() { return !!state.gameHudHidden },
 		getConfigValue,
 		setConfigValue,
 

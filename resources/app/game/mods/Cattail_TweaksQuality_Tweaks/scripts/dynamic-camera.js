@@ -8,8 +8,6 @@
 	const yawConfigKey = 'cameraYaw'
 	const legacyPitchConfigKey = 'defaultPitch'
 	const legacyYawConfigKey = 'defaultYaw'
-	const oldDefaultPitch = 0.87
-	const oldDefaultYaw = 45
 
 	let previewEnabled = null
 
@@ -39,7 +37,7 @@
 			})
 			api.on('afterGameInit', function (payload, game) {
 				activeGame = game || activeGame
-				ensureState(activeGame, api)
+				resetStartupCameraState(activeGame, api)
 			})
 		}
 	})
@@ -302,26 +300,26 @@
 		return game.__cattailDynamicCameraState
 	}
 
+	function resetStartupCameraState(game, api) {
+		if (!game) return
+		game.__cattailDynamicCameraState = createDefaultState(api)
+	}
+
 	function readSavedState(api) {
-		const defaults = createDefaultState(api)
-		try {
-			const parsed = JSON.parse(localStorage.getItem(stateKey) || localStorage.getItem(legacyStateKey) || 'null')
-			if (parsed && typeof parsed === 'object') {
-				if (!hasStoredConfig(pitchConfigKey)) defaults.pitch = clamp(Number(parsed.pitch), minPitch, maxPitch)
-				if (!hasStoredConfig(yawConfigKey)) defaults.yaw = normalizeRadians(Number(parsed.yaw) || 0)
-			}
-		} catch (error) {}
-		return defaults
+		return createDefaultState(api)
 	}
 
 	function createDefaultState(api) {
-		return {
-			pitch: readPitchConfig(api),
-			yaw: readYawConfig(api),
+		const state = {
+			pitch: vanillaPitch,
+			yaw: 0,
 			lastFrameTime: 0,
 			lastSavedAt: 0,
 			lastInput: 0
 		}
+		const saved = readSavedCameraSnapshot(api)
+		if (isValidCameraSnapshot(saved) && !isVanillaCameraState(saved)) state.restoreState = saved
+		return state
 	}
 
 	function toggleCameraReset(game, api) {
@@ -542,21 +540,40 @@
 		}
 	}
 
-	function readPitchConfig(api) {
-		return clamp(readNumberConfigWithFallback(api, pitchConfigKey, legacyPitchConfigKey, vanillaPitch), minPitch, maxPitch)
+	function readSavedCameraSnapshot(api) {
+		const pitch = readSavedCameraNumberConfig(pitchConfigKey, legacyPitchConfigKey, NaN)
+		const yawDegrees = readSavedCameraNumberConfig(yawConfigKey, legacyYawConfigKey, NaN)
+		if (Number.isFinite(pitch) || Number.isFinite(yawDegrees)) {
+			return {
+				pitch: clamp(Number.isFinite(pitch) ? pitch : vanillaPitch, minPitch, maxPitch),
+				yaw: normalizeRadians((Number.isFinite(yawDegrees) ? yawDegrees : 0) * Math.PI / 180)
+			}
+		}
+		return readStoredCameraState(stateKey) || readStoredCameraState(legacyStateKey)
 	}
 
-	function readYawConfig(api) {
-		return normalizeRadians(readNumberConfigWithFallback(api, yawConfigKey, legacyYawConfigKey, 0) * Math.PI / 180)
-	}
-
-	function readNumberConfigWithFallback(api, key, legacyKey, fallback) {
+	function readSavedCameraNumberConfig(key, legacyKey, fallback) {
 		if (hasStoredConfig(key)) return readStoredConfigNumber(MOD_ID, key, fallback)
 		if (hasStoredConfig(legacyKey)) return readStoredConfigNumber(MOD_ID, legacyKey, fallback)
 		if (hasLegacyStoredConfig(key)) return readStoredConfigNumber(LEGACY_MOD_ID, key, fallback)
 		if (hasLegacyStoredConfig(legacyKey)) return readStoredConfigNumber(LEGACY_MOD_ID, legacyKey, fallback)
-		const value = Number(api?.config?.get(key, fallback))
-		return Number.isFinite(value) ? value : fallback
+		return fallback
+	}
+
+	function readStoredCameraState(key) {
+		try {
+			const parsed = JSON.parse(localStorage.getItem(key) || 'null')
+			if (!parsed || typeof parsed !== 'object') return null
+			const pitch = Number(parsed.pitch)
+			const yaw = Number(parsed.yaw)
+			if (!Number.isFinite(pitch) || !Number.isFinite(yaw)) return null
+			return {
+				pitch: clamp(pitch, minPitch, maxPitch),
+				yaw: normalizeRadians(yaw)
+			}
+		} catch (error) {
+			return null
+		}
 	}
 
 	function migrateLegacyDynamicCameraConfig(api) {
@@ -568,7 +585,6 @@
 				const legacyState = localStorage.getItem(legacyStateKey)
 				if (legacyState !== null) localStorage.setItem(stateKey, legacyState)
 			}
-			migrateOldDynamicCameraDefaults()
 		} catch (error) {}
 	}
 
@@ -583,26 +599,6 @@
 		}
 	}
 
-	function migrateOldDynamicCameraDefaults() {
-		const pitchKey = configStorageKey(MOD_ID, pitchConfigKey)
-		const yawKey = configStorageKey(MOD_ID, yawConfigKey)
-		const pitch = readStoredConfigRawNumber(pitchKey)
-		const yaw = readStoredConfigRawNumber(yawKey)
-		if (isNearNumber(pitch, oldDefaultPitch) && isNearNumber(yaw, oldDefaultYaw)) {
-			localStorage.setItem(pitchKey, JSON.stringify(vanillaPitch))
-			localStorage.setItem(yawKey, JSON.stringify(0))
-		}
-		try {
-			const parsed = JSON.parse(localStorage.getItem(stateKey) || 'null')
-			if (parsed && isNearNumber(Number(parsed.pitch), oldDefaultPitch) && isNearNumber(Number(parsed.yaw), oldDefaultYaw)) {
-				localStorage.setItem(stateKey, JSON.stringify({ pitch: vanillaPitch, yaw: 0 }))
-			}
-		} catch (error) {}
-	}
-
-	function isNearNumber(value, target) {
-		return Number.isFinite(value) && Math.abs(value - target) <= 0.0001
-	}
 
 	function hasStoredConfig(key) {
 		try {
@@ -630,16 +626,6 @@
 		}
 	}
 
-	function readStoredConfigRawNumber(key) {
-		try {
-			const raw = localStorage.getItem(key)
-			if (raw === null) return NaN
-			const value = Number(JSON.parse(raw))
-			return Number.isFinite(value) ? value : NaN
-		} catch (error) {
-			return NaN
-		}
-	}
 
 	function configStorageKey(modId, key) {
 		return 'modloader:' + modId + ':config:' + key

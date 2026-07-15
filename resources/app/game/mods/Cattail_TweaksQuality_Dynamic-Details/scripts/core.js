@@ -110,6 +110,7 @@ ModLoader.register({
 		const rates = new WeakMap()
 		const events = new WeakMap()
 		let lastGame = null
+		let coordinateTeleportPanel = null
 		let zPressed = false
 		let hintOpacity = 1
 		let hintInfoOpaque = false
@@ -145,7 +146,9 @@ ModLoader.register({
 			if (namespace.coordinateOverlayInstalled) return
 			if (typeof Game === 'undefined') return
 			namespace.coordinateOverlayInstalled = true
+			installStyles()
 			installCoordinateToggle()
+			installCoordinateTeleportPanel()
 			patchTransientCubeHints()
 		}
 
@@ -448,7 +451,7 @@ ModLoader.register({
 
 		function isCoordinateToggleEvent(event, game) {
 			const key = String(event?.key || '').toLowerCase()
-			const altC = !!(event?.altKey && (key === 'c' || event?.code === 'KeyC' || event?.keyCode === 67))
+			const altC = !!(event?.altKey && !event?.shiftKey && (key === 'c' || event?.code === 'KeyC' || event?.keyCode === 67))
 			return altC
 		}
 		function isCoordinateToggleActive(game) {
@@ -459,6 +462,156 @@ ModLoader.register({
 			if (game) game[coordinateToggleKey] = !!active
 		}
 
+		function installCoordinateTeleportPanel() {
+			if (window._cattailDynamicCoordinateTeleportInstalled) return
+			window._cattailDynamicCoordinateTeleportInstalled = true
+			addEventListener('keydown', function (event) {
+				const game = lastGame
+				if (isCoordinateTeleportPanelEvent(event)) {
+					if (event.key === 'Escape') {
+						hideCoordinateTeleportPanel()
+						event.preventDefault()
+					} else if (event.key === 'Enter') {
+						teleportCoordinatePanelTarget(game)
+						event.preventDefault()
+					}
+					event.stopImmediatePropagation()
+					return
+				}
+				if (!game || !isCoordinateTeleportToggleEvent(event, game) || event.repeat) return
+				showCoordinateTeleportPanel(game)
+				event.preventDefault()
+				event.stopImmediatePropagation()
+			}, true)
+			addEventListener('mousedown', function (event) {
+				if (!coordinateTeleportPanel?.element || !coordinateTeleportPanel.visible) return
+				if (coordinateTeleportPanel.element.contains(event.target)) return
+				hideCoordinateTeleportPanel()
+			}, true)
+		}
+
+		function isCoordinateTeleportToggleEvent(event, game) {
+			const key = String(event?.key || '').toLowerCase()
+			return !!(
+				event?.altKey &&
+				event?.shiftKey &&
+				!event?.ctrlKey &&
+				(key === 'c' || event?.code === 'KeyC' || event?.keyCode === 67) &&
+				isCoordinateEmptyCellContext(game)
+			)
+		}
+
+		function isCoordinateTeleportPanelEvent(event) {
+			return !!(coordinateTeleportPanel?.element && event?.target && coordinateTeleportPanel.element.contains(event.target))
+		}
+
+		function showCoordinateTeleportPanel(game) {
+			if (!game || !Array.isArray(game.hoveredCell)) return
+			const panel = getCoordinateTeleportPanel()
+			panel.u.value = String(game.hoveredCell[0])
+			panel.v.value = String(game.hoveredCell[1])
+			panel.game = game
+			panel.visible = true
+			panel.element.classList.add('visible')
+			positionCoordinateTeleportPanel(game, panel)
+			requestAnimationFrame(() => {
+				positionCoordinateTeleportPanel(game, panel)
+				panel.u.focus()
+				panel.u.select()
+			})
+		}
+
+		function hideCoordinateTeleportPanel() {
+			if (!coordinateTeleportPanel) return
+			coordinateTeleportPanel.visible = false
+			coordinateTeleportPanel.element.classList.remove('visible')
+		}
+
+		function getCoordinateTeleportPanel() {
+			if (coordinateTeleportPanel?.element) return coordinateTeleportPanel
+			const element = document.createElement('div')
+			element.className = 'cattail-coordinate-teleport'
+
+			const u = document.createElement('input')
+			u.type = 'number'
+			u.step = '1'
+			u.inputMode = 'numeric'
+			u.placeholder = 'u'
+			u.setAttribute('aria-label', 'u')
+
+			const v = document.createElement('input')
+			v.type = 'number'
+			v.step = '1'
+			v.inputMode = 'numeric'
+			v.placeholder = 'v'
+			v.setAttribute('aria-label', 'v')
+
+			const button = document.createElement('button')
+			button.type = 'button'
+			button.textContent = String.fromCharCode(8593)
+			button.setAttribute('aria-label', 'teleport')
+
+			element.append(u, v, button)
+			element.addEventListener('mousedown', function (event) { event.stopPropagation() })
+			element.addEventListener('mouseup', function (event) { event.stopPropagation() })
+			element.addEventListener('click', function (event) { event.stopPropagation() })
+			button.addEventListener('click', function (event) {
+				teleportCoordinatePanelTarget(coordinateTeleportPanel?.game || lastGame)
+				event.preventDefault()
+				event.stopPropagation()
+			})
+
+			document.body.append(element)
+			coordinateTeleportPanel = { element, u, v, button, visible: false, game: null }
+			return coordinateTeleportPanel
+		}
+
+		function positionCoordinateTeleportPanel(game, panel = coordinateTeleportPanel) {
+			if (!game || !panel?.element) return
+			const canvasRect = game.canvas?.getBoundingClientRect?.()
+			const baseX = (canvasRect?.left || 0) + (game.mouse?.offsetxy?.[0] || 0)
+			const baseY = (canvasRect?.top || 0) + (game.mouse?.offsetxy?.[1] || 0)
+			panel.element.style.left = baseX + 'px'
+			panel.element.style.top = baseY + 'px'
+			const rect = panel.element.getBoundingClientRect?.()
+			if (!rect) return
+			const margin = 8
+			const wantedX = Math.min(Math.max(baseX + 24, margin), Math.max(margin, innerWidth - rect.width - margin))
+			const wantedY = Math.min(Math.max(baseY - rect.height * 0.5, margin), Math.max(margin, innerHeight - rect.height - margin))
+			panel.element.style.left = wantedX + 'px'
+			panel.element.style.top = wantedY + 'px'
+		}
+
+		function teleportCoordinatePanelTarget(game) {
+			const panel = coordinateTeleportPanel
+			if (!game || !panel) return
+			const u = parseCoordinateTeleportValue(panel.u.value)
+			const v = parseCoordinateTeleportValue(panel.v.value)
+			if (!Number.isFinite(u) || !Number.isFinite(v)) return
+			teleportToCoordinate(game, [u, v])
+			hideCoordinateTeleportPanel()
+		}
+
+		function parseCoordinateTeleportValue(value) {
+			const number = Number(String(value).trim())
+			return Number.isFinite(number) ? Math.round(number) : NaN
+		}
+
+		function teleportToCoordinate(game, position) {
+			if (!game || !Array.isArray(position) || !Array.isArray(game.translation) || typeof game.uvToXY !== 'function') return
+			const projected = game.uvToXY(position)
+			const zoom = Number(game.zoom) || 1
+			if (!Array.isArray(projected)) return
+			const ratio = Number(game.pixelRatio) || 1
+			const mouse = Array.isArray(game.mouse?.offsetxy) ? game.mouse.offsetxy : [0, 0]
+			const desired = [
+				(Number(mouse[0]) || 0) * ratio - (Number(game.w2) || (Number(game.w) || 0) / 2),
+				(Number(mouse[1]) || 0) * ratio - (Number(game.h2) || (Number(game.h) || 0) / 2)
+			]
+			game.translation[0] += (projected[0] - desired[0]) / zoom
+			game.translation[1] += (projected[1] - desired[1]) / zoom
+			game.updateMouseData?.()
+		}
 		function installDirectionPointerToggle() {
 			if (window._cattailDynamicDirectionPointerToggleInstalled) return
 			window._cattailDynamicDirectionPointerToggleInstalled = true
@@ -4908,6 +5061,65 @@ ModLoader.register({
 			const style = document.createElement('style')
 			style.id = 'cattail-dynamic-details-style'
 			style.textContent = `
+.cattail-coordinate-teleport {
+	position: absolute;
+	z-index: 10000;
+	display: none;
+	grid-template-columns: 48px 48px 26px;
+	align-items: center;
+	cursor: default;
+	gap: 6px;
+	padding: 6px;
+	background: #fff;
+	box-shadow: 0px 8px 36px #0002;
+	border-radius: 4px;
+	line-height: 0;
+	pointer-events: auto;
+	user-select: none;
+}
+.cattail-coordinate-teleport.visible {
+	display: grid;
+}
+.cattail-coordinate-teleport input {
+	box-sizing: border-box;
+	width: 48px;
+	height: 24px;
+	padding: 0 4px;
+	border: 1px solid #dde;
+	border-radius: 3px;
+	background: #f8f8fb;
+	color: #667;
+	font: 500 12px Montserrat, Arial, sans-serif;
+	text-align: center;
+	outline: none;
+}
+.cattail-coordinate-teleport input:focus {
+	border-color: #bbc;
+	background: #fff;
+}
+.cattail-coordinate-teleport input::-webkit-outer-spin-button,
+.cattail-coordinate-teleport input::-webkit-inner-spin-button {
+	-webkit-appearance: none;
+	margin: 0;
+}
+.cattail-coordinate-teleport button {
+	box-sizing: border-box;
+	width: 26px;
+	height: 24px;
+	padding: 0;
+	border: 1px solid #dde;
+	border-radius: 3px;
+	background: #eee;
+	color: #778;
+	font: 600 15px/22px Montserrat, Arial, sans-serif;
+	text-align: center;
+	outline: none;
+}
+.cattail-coordinate-teleport button:hover,
+.cattail-coordinate-teleport button:focus {
+	background: #e5e5ee;
+	color: #556;
+}
 .hintBubble {
 	opacity: var(--cattail-dynamic-hint-opacity, 1);
 }

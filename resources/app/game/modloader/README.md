@@ -70,6 +70,35 @@ labels follow the current game language where ModLoader translations exist.
 The lower-left status line also shows the loader version, enabled mod count,
 and `Ctrl+M` reminder.
 
+## Game HUD API
+
+Press `H` in game to hide or restore the game HUD. ModLoader handles vanilla
+shop, chat, hints, resource icons, and registered game-HUD mod elements.
+
+Mods can register their own HUD elements:
+
+```js
+const releaseHud = api.ui.hud.register({
+  id: 'my-widget',
+  element: widget,
+  side: 'right',
+  capture() {
+    return { scrollTop: widget.scrollTop }
+  },
+  restore(saved) {
+    if (saved) widget.scrollTop = saved.scrollTop || 0
+  }
+})
+```
+
+`side` can be `left`, `right`, `top`, or `bottom`. ModLoader will animate the
+element off that edge while the HUD is hidden. Use `managed: false` when a mod
+wants to handle its own animation and only needs the hide/show callbacks.
+
+Game-corner buttons registered with `api.ui.registerCornerButton()` are treated
+as game HUD by default when they use a `game-*` dock. Pass `gameHud: false` to
+opt out, or `hudSide` to choose a different hide edge.
+
 ## Translation Catalog
 
 Open `Ctrl+M` -> Menu Settings -> `translations` to create or open
