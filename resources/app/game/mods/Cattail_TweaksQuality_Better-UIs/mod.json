@@ -15,6 +15,7 @@
     "scripts/shop-categories.js",
     "scripts/save-slots.js",
     "scripts/language-menu.js",
+    "scripts/page-shell.js",
     "scripts/settings-page.js"
   ],
   "conflicts": [
