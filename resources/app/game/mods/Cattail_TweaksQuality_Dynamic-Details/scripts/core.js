@@ -4,6 +4,8 @@ ModLoader.register({
 		const detailKey = '_cattailDynamicDetails'
 		const cubeHintKey = '_cattailDynamicCubeHint'
 		const cubeProbeKey = '_cattailDynamicCubeProbe'
+		const scanProbeKey = '_cattailDynamicScanProbe'
+		const scanHintKey = '_cattailDynamicScanHint'
 		const cubeMemoryKey = '_cattailDynamicCubeMemory'
 		const detailToggleKey = '_cattailDynamicDetailsToggle'
 		const coordinateToggleKey = '_cattailDynamicCoordinateToggle'
@@ -379,6 +381,10 @@ ModLoader.register({
 			return !!(isBuildingDetailsFeatureEnabled() && (isDetailToggleActive(game) || (game?.altActive && game?.shiftPressed)))
 		}
 
+		function isScannedVoidCellDetailActive(game) {
+			return !!(isBuildingDetailsFeatureEnabled() && (isDetailToggleActive(game) || game?.altActive))
+		}
+
 		function installDetailToggle() {
 			if (window._cattailDynamicDetailsToggleInstalled) return
 			window._cattailDynamicDetailsToggleInstalled = true
@@ -424,7 +430,7 @@ ModLoader.register({
 		}
 
 		function isBuildingDetailContext(game) {
-			return !!(isBuildingDetailsFeatureEnabled() && (game?.hoveredEntity || shouldUseTransientCubeHint(game)))
+			return !!(isBuildingDetailsFeatureEnabled() && (game?.hoveredEntity || shouldUseTransientCubeHint(game) || isScannedVoidCellContext(game)))
 		}
 
 		function installCoordinateToggle() {
@@ -736,6 +742,7 @@ ModLoader.register({
 					const previousShift = this.shiftPressed
 					const previousHovered = this.hoveredEntity
 					let probe = null
+					let scanProbe = null
 
 					if (locked) {
 						this.altActive = true
@@ -748,8 +755,13 @@ ModLoader.register({
 							probe = getTransientCubeProbe(this)
 							if (probe) this.hoveredEntity = probe
 						}
+						if (!probe && shouldUseScannedVoidCellHint(this)) {
+							scanProbe = getScannedVoidCellProbe(this)
+							if (scanProbe) this.hoveredEntity = scanProbe
+						}
 						result = original.apply(this, args)
 					} finally {
+						if (scanProbe && this.hoveredEntity === scanProbe) this.hoveredEntity = previousHovered
 						if (probe && this.hoveredEntity === probe) this.hoveredEntity = previousHovered
 						if (locked) {
 							this.altActive = previousAlt
@@ -1030,6 +1042,22 @@ ModLoader.register({
 				!game.entityAtCoordinates?.(game.hoveredCell)
 			)
 		}
+		function isScannedVoidCellContext(game) {
+			return !!(
+				game &&
+				game.plane === 1 &&
+				!game.itemInHand &&
+				!game.hoveredEntity &&
+				Array.isArray(game.hoveredCell) &&
+				!game.entityAtCoordinates?.(game.hoveredCell) &&
+				findScannedVoidCell(game, game.hoveredCell)
+			)
+		}
+
+		function shouldUseScannedVoidCellHint(game) {
+			return !!(isScannedVoidCellDetailActive(game) && isScannedVoidCellContext(game))
+		}
+
 		function shouldUseTransientCubeHint(game) {
 			return !!(
 				isBuildingDetailsFeatureEnabled() &&
@@ -1076,6 +1104,66 @@ ModLoader.register({
 			probe.consumers = []
 			probe.destabilizers = []
 			return probe
+		}
+
+		function getScannedVoidCellProbe(game) {
+			const position = game?.hoveredCell
+			const scanCell = findScannedVoidCell(game, position)
+			if (!scanCell) return null
+
+			let probe = game[scanProbeKey]
+			if (!probe) {
+				probe = {
+					name: 'scan',
+					isScannedVoidCellProbe: true,
+					canHit() { return false },
+					canDarkHit() { return false },
+					getHint() { return false },
+					getDarkHint() { return getScannedVoidCellHint(this.master, this.position, this.scanCell) }
+				}
+				game[scanProbeKey] = probe
+			}
+
+			probe.master = game
+			probe.position = position.slice()
+			probe.scanCell = scanCell
+			return probe
+		}
+
+		function findScannedVoidCell(game, position) {
+			if (!game || !Array.isArray(position)) return null
+			const effects = Array.isArray(game.vfx) ? game.vfx : []
+			for (let i = effects.length - 1; i >= 0; i--) {
+				const effect = effects[i]
+				if (!effect || effect.terminate || !Array.isArray(effect.cells)) continue
+				const isScanner = effect.constructor?.name === 'ScannerMap' || (Array.isArray(effect.source) && Number.isFinite(effect.maxEndTime))
+				if (!isScanner) continue
+				for (const cell of effect.cells) {
+					if (cell?.p?.[0] === position[0] && cell?.p?.[1] === position[1]) return cell
+				}
+			}
+			return null
+		}
+
+		function getScannedVoidCellHint(game, position, scanCell) {
+			if (!game || !Array.isArray(position) || !scanCell) return false
+			const values = Array.isArray(scanCell.values) ? scanCell.values : game.getResourceNodeValues?.(position[0], position[1])
+			if (!Array.isArray(values) || !values.length) return false
+			const signature = position[0] + ',' + position[1] + '|' + values.map((entry) => entry?.rid + ':' + round(Number(entry?.v) || 0)).join(',')
+			const cached = game[scanHintKey]
+			if (cached?.signature === signature) return cached.hint
+
+			const hint = new Cloud(game)
+			hint.setDarkMode?.()
+			const probs = []
+			for (const entry of values) {
+				const rid = Number(entry?.rid)
+				if (!Number.isInteger(rid)) continue
+				probs[rid] = (Number(entry?.v) || 0) * 2
+			}
+			hint.addResourcePercentageList(probs)
+			game[scanHintKey] = { signature, hint }
+			return hint
 		}
 
 		function findCubeGeneratingPump(game, position) {
