@@ -12,6 +12,7 @@ ModLoader.register({
 		const dynamicSourceLineChartModeStorageKey = 'cattailDynamicResourceSourceLineChartMode'
 		const dynamicSourceLineChartConfigStorageKey = 'modloader:Cattail_TweaksQuality_Dynamic-Details:config:enableResourceSourceLineChart'
 		const dynamicSourceDetailsConfigStorageKey = 'modloader:Cattail_TweaksQuality_Dynamic-Details:config:enableResourceSourceDetails'
+		const dynamicSourceLineChartWheelCooldownMs = 180
 		const dynamicSourceToggleStorageKey = 'cattailDynamicResourceSourceToggle'
 		const dynamicSourceLastResourceStorageKey = 'cattailDynamicResourceSourceLastResource'
 		const rowHeight = 44
@@ -46,7 +47,8 @@ ModLoader.register({
 			hoverClearTimer: null,
 			lastSignature: '',
 			assetCache: new Map(),
-			missingBridgeAlerted: false
+			missingBridgeAlerted: false,
+			lineChartLastWheel: 0
 		}
 
 		api.on('afterVanillaScripts', function () {
@@ -384,18 +386,24 @@ ModLoader.register({
 			}).filter(function (bucket) { return Number.isFinite(bucket.duration) && Number.isFinite(bucket.value) })
 			if (mapped.length < 2) return null
 			const average = game?.analytics?.average?.[resourceId]
+			const latest = Math.max(0, Number(game?.resources?.[resourceId]) || 0)
 			return {
 				type: 'line',
 				buckets: mapped,
-				latest: Math.max(0, Number(game?.resources?.[resourceId]) || 0),
+				latest,
+				latestText: formatInfoNumber(game, latest),
 				average: Array.isArray(average) ? [Number(average[0]) || 0, Number(average[1]) || 0] : null,
 				gainColor: '#6ea56e',
 				consumeColor: '#C38C75'
 			}
 		}
 
+		function isDynamicLineChartFeatureEnabled(game) {
+			return !!(isDynamicDetailsEnabled() && game?.entitiesInGame?.mega1b && readStoredBooleanDefaultTrue(dynamicSourceDetailsConfigStorageKey) && readStoredBooleanDefaultTrue(dynamicSourceLineChartConfigStorageKey))
+		}
+
 		function isDynamicLineChartActive(game) {
-			return !!(isDynamicDetailsEnabled() && game?.entitiesInGame?.mega1b && readStoredBooleanDefaultTrue(dynamicSourceDetailsConfigStorageKey) && readStoredBooleanDefaultTrue(dynamicSourceLineChartConfigStorageKey) && readStoredBooleanDefaultTrue(dynamicSourceLineChartModeStorageKey))
+			return !!(isDynamicLineChartFeatureEnabled(game) && readStoredBooleanDefaultTrue(dynamicSourceLineChartModeStorageKey))
 		}
 
 		function readStoredBooleanDefaultTrue(key) {
@@ -594,6 +602,9 @@ ModLoader.register({
 								state.lastSignature = ''
 								updatePopup(state.game, true)
 							},
+							lineChartWheel(event) {
+								if (state.active) handleLineChartWheel(event.payload)
+							},
 
 
 							key(event) {
@@ -675,6 +686,38 @@ ModLoader.register({
 			} catch (error) {}
 		}
 
+		function handleLineChartWheel(payload) {
+			const game = state.game
+			const resourceId = Number(payload?.resource)
+			const delta = Number(payload?.deltaY) || Number(payload?.deltaX) || 0
+			if (!game || !Number.isInteger(resourceId) || !delta || !isDynamicLineChartFeatureEnabled(game)) return
+			if (getVisibleResourceIds(game).indexOf(resourceId) === -1) return
+			const now = performance.now()
+			if (now - state.lineChartLastWheel < dynamicSourceLineChartWheelCooldownMs) return
+			state.lineChartLastWheel = now
+			clearHoverClearTimer()
+			state.hoveredResource = resourceId
+			rememberWatcherResource(game, resourceId)
+			game.hoveredResource = resourceId
+			const previous = readStoredBooleanDefaultTrue(dynamicSourceLineChartModeStorageKey)
+			if (!dispatchDynamicLineChartWheel(delta, previous)) saveDynamicLineChartMode(!previous)
+			state.lastSignature = ''
+			updatePopup(game, true)
+		}
+
+		function dispatchDynamicLineChartWheel(delta, previous) {
+			try {
+				const event = new WheelEvent('wheel', { deltaY: delta || 1, bubbles: true, cancelable: true })
+				window.dispatchEvent(event)
+			} catch (error) {}
+			return readStoredBooleanDefaultTrue(dynamicSourceLineChartModeStorageKey) !== previous
+		}
+
+		function saveDynamicLineChartMode(active) {
+			try {
+				localStorage.setItem(dynamicSourceLineChartModeStorageKey, active ? '1' : '0')
+			} catch (error) {}
+		}
 		function buildMontserratFontCss() {
 			const regular = getAssetDataUrl('font/Montserrat-Regular.woff2', 'font/woff2')
 			const semibold = getAssetDataUrl('font/Montserrat-SemiBold.woff2', 'font/woff2')
@@ -748,6 +791,7 @@ function getLastPointerClient(){const sx=Number(lastPointer.screenX);const sy=Nu
 function setHoveredIcon(value,force){const next=Number.isInteger(value)?value:null;if(Number.isInteger(next))lastHoveredIconId=next;if(next===hoveredIconId&&!force)return;hoveredIconId=next;send({type:'hover',payload:{current:next,last:lastHoveredIconId}})}
 function updateHoveredIcon(event){lastPointer={inside:true,x:event.clientX,y:event.clientY,screenX:event.screenX,screenY:event.screenY};const point=getLastPointerClient();setHoveredIcon(getIconIdFromPoint(point.x,point.y))}
 function syncHoveredIconFromPoint(){if(!lastPointer.inside||!Number.isInteger(hoveredIconId))return;const point=getLastPointerClient();if(getIconIdFromPoint(point.x,point.y)!==hoveredIconId)setHoveredIcon(null,true)}
+function onIconWheel(event){const id=getIconIdFromPoint(event.clientX,event.clientY);if(!Number.isInteger(id))return;event.preventDefault();event.stopPropagation();setHoveredIcon(id);send({type:'lineChartWheel',payload:{resource:id,deltaX:event.deltaX||0,deltaY:event.deltaY||0}})}
 function rowHtml(row,hovered){const active=hovered===row.id&&row.info;const offset=-(Number(row.id)||0)*36;const pop=Math.max(0,Number(row.pop)||0);const scale=Number((1+pop*.35).toFixed(3));return '<div class="row '+(active?'hovered':'')+'" data-id="'+row.id+'" title="'+escapeHtml(row.name)+'"><span class="info">'+(active?safeInfoHtml(row.info):'')+'</span><span class="icon" style="background-position:'+offset+'px 0;transform:scale('+scale+')"></span><span class="amount">'+escapeHtml(row.amount)+'</span></div>'}
 function infoHtml(info){let html='<span class="infoPanel"><span class="rateStack"><span class="ratePill name" style="--line-color:'+normalizeColor(info.color)+'">'+escapeHtml(info.name)+'</span>';if(info.gainText)html+='<span class="ratePill rate" style="--line-color:#6ea56e">'+escapeHtml(info.gainText)+'</span>';if(info.consumeText)html+='<span class="ratePill rate" style="--line-color:#C38C75">'+escapeHtml(info.consumeText)+'</span>';html+='</span>';if(info.graph)html+='<canvas class="graphCanvas"></canvas>';if(info.sourceSummary)html+=sourcePanelHtml(info.sourceSummary);return html+'</span>'}
 function safeInfoHtml(info){try{return infoHtml(info)}catch(error){console.error('[Resource Watcher popup] info render failed',error);return ''}}
@@ -758,8 +802,8 @@ function drawGraphs(){if(!latestState)return;const row=list.querySelector('.row.
 function drawGraph(canvas,graph){if(graph&&graph.type==='line')return drawLineGraph(canvas,graph);return drawBarGraph(canvas,graph)}
 function prepareGraphCanvas(canvas,cssW,cssH){const ratio=Math.max(1,(window.devicePixelRatio||1)*getScale());canvas.width=Math.round(cssW*ratio);canvas.height=Math.round(cssH*ratio);const ctx=canvas.getContext('2d');ctx.setTransform(ratio,0,0,ratio,0,0);ctx.clearRect(0,0,cssW,cssH);roundRect(ctx,0,0,cssW,cssH,5);ctx.fillStyle='rgba(255,255,255,.96)';ctx.fill();return ctx}
 function drawBarGraph(canvas,graph){const cssW=360,cssH=150;const ctx=prepareGraphCanvas(canvas,cssW,cssH);const data=graph.data||[];const labelW=78;const shortW=cssW-labelW-16;const h=cssH/2;const dx=Math.max(1,Math.floor(shortW/Math.max(1,data.length+1)));const graphW=dx*(data.length+1);let max=0;for(const p of data){max=Math.max(max,Number(p[0])||0,Math.abs(Number(p[1])||0))}const frameMs=Math.max(1,(Number(graph.measuringFrame)||1)-(Number(graph.frameTimer)||0));const lastPlus=(Number(graph.frame&&graph.frame[0])||0)/frameMs*1000;const lastMinus=Math.abs((Number(graph.frame&&graph.frame[1])||0)/frameMs*1000);max=Math.max(max,lastPlus,lastMinus);if(max<=0)max=1;const order=String(Math.floor(max)).length;const delta=Math.pow(10,Math.max(0,order-1));max=delta*(Math.floor(max/delta)+1);for(let j=0;j<data.length;j++)drawGraphBar(ctx,j*dx,h,dx,data[j][0],data[j][1],max,graph.gainColor,graph.consumeColor);drawGraphBar(ctx,data.length*dx,h,dx,lastPlus,-lastMinus,max,graph.gainColor,graph.consumeColor);ctx.font='10px Montserrat,Arial,sans-serif';ctx.textBaseline='middle';ctx.textAlign='left';ctx.fillStyle='#111';const firstDigit=Number(String(max)[0])||1;const sparse=firstDigit<2||firstDigit>5;for(let v=delta-max;v<max;v+=delta){const digit=Number(String(Math.abs(v))[0])||0;if(sparse&&(digit%2))continue;const y=h-(v/max)*h;ctx.globalAlpha=.12;ctx.fillRect(0,y,graphW,1);ctx.globalAlpha=1;ctx.fillText(formatGraphNumber(v)+'\u2009/\u2009s',graphW+8,y)}}
-function drawLineGraph(canvas,graph){const cssW=360,cssH=150;const buckets=Array.isArray(graph.buckets)?graph.buckets:[];const ctx=prepareGraphCanvas(canvas,cssW,cssH);if(!buckets.length)return;const padding=16;const halfHeight=cssH/2;const fontSize=Math.max(7,halfHeight*.12);const plotLeft=Math.max(5,padding*.35);const plotRight=cssW-padding*3.1;const plotTop=Math.max(5,padding*.28);const plotBottom=cssH-padding*1.35;const plotWidth=Math.max(1,plotRight-plotLeft);const plotHeight=Math.max(1,plotBottom-plotTop);const totalDuration=Math.max(.001,buckets.reduce(function(total,bucket){return total+(Number(bucket.duration)||0)},0));const scale=getLineGraphScale(graph,buckets);ctx.font=fontSize+'px Montserrat,Arial,sans-serif';drawLineGraphGrid(ctx,plotLeft,plotRight,plotTop,plotBottom,plotWidth,plotHeight,scale,totalDuration);drawLineGraphPath(ctx,buckets,graph,scale,totalDuration,plotLeft,plotBottom,plotWidth,plotHeight)}
-function drawLineGraphGrid(ctx,plotLeft,plotRight,plotTop,plotBottom,plotWidth,plotHeight,scale,totalDuration){ctx.fillStyle='#000';ctx.globalAlpha=.16;ctx.fillRect(plotLeft,plotBottom,plotWidth,1);ctx.fillRect(plotRight,plotTop,1,plotHeight);const firstOffset=Math.ceil((scale.min-scale.baseline)/scale.delta)*scale.delta;const lastOffset=Math.floor((scale.max-scale.baseline)/scale.delta)*scale.delta;const tickCount=Math.max(0,Math.floor((lastOffset-firstOffset)/scale.delta)+1);const skip=Math.max(1,Math.ceil(tickCount/7));let tickIndex=0;for(let offset=firstOffset;offset<=lastOffset;offset+=scale.delta){const shouldDraw=Math.abs(offset)<.5||tickIndex%skip===0;tickIndex++;if(!shouldDraw)continue;const value=scale.baseline+offset;const py=plotBottom-Math.max(0,Math.min(1,(value-scale.min)/scale.span))*plotHeight;ctx.globalAlpha=Math.abs(offset)<.5 ? .16 : .1;ctx.fillRect(plotLeft,py,plotWidth,1);ctx.globalAlpha=1;ctx.textAlign='left';ctx.textBaseline='middle';ctx.fillText(formatLineGraphDelta(offset,scale.labelUnit,scale.baseline),plotRight+4,py)}for(const age of getLineGraphTimeTicks(totalDuration)){const px=getLineGraphTimeXFromAge(age,totalDuration,plotLeft,plotWidth);ctx.globalAlpha=age>0&&age<totalDuration ? .1 : .16;ctx.fillRect(px,plotTop,1,plotHeight);ctx.globalAlpha=1;ctx.textAlign='center';ctx.textBaseline='top';ctx.fillText(formatLineGraphDuration(age),px,plotBottom+3)}ctx.globalAlpha=1}
+function drawLineGraph(canvas,graph){const cssW=360,cssH=150;const buckets=Array.isArray(graph.buckets)?graph.buckets:[];const ctx=prepareGraphCanvas(canvas,cssW,cssH);if(!buckets.length)return;const padding=16;const halfHeight=cssH/2;const fontSize=Math.max(7,halfHeight*.12);const plotLeft=Math.max(5,padding*.35);const plotRight=cssW-padding*3.1;const plotTop=Math.max(5,padding*.28);const plotBottom=cssH-padding*1.35;const plotWidth=Math.max(1,plotRight-plotLeft);const plotHeight=Math.max(1,plotBottom-plotTop);const totalDuration=Math.max(.001,buckets.reduce(function(total,bucket){return total+(Number(bucket.duration)||0)},0));const scale=getLineGraphScale(graph,buckets);ctx.font=fontSize+'px Montserrat,Arial,sans-serif';drawLineGraphGrid(ctx,plotLeft,plotRight,plotTop,plotBottom,plotWidth,plotHeight,scale,totalDuration,graph);drawLineGraphPath(ctx,buckets,graph,scale,totalDuration,plotLeft,plotBottom,plotWidth,plotHeight)}
+function drawLineGraphGrid(ctx,plotLeft,plotRight,plotTop,plotBottom,plotWidth,plotHeight,scale,totalDuration,graph){ctx.fillStyle='#000';ctx.globalAlpha=.16;ctx.fillRect(plotLeft,plotBottom,plotWidth,1);ctx.fillRect(plotRight,plotTop,1,plotHeight);const firstOffset=Math.ceil((scale.min-scale.baseline)/scale.delta)*scale.delta;const lastOffset=Math.floor((scale.max-scale.baseline)/scale.delta)*scale.delta;const tickCount=Math.max(0,Math.floor((lastOffset-firstOffset)/scale.delta)+1);const skip=Math.max(1,Math.ceil(tickCount/7));let tickIndex=0;for(let offset=firstOffset;offset<=lastOffset;offset+=scale.delta){const shouldDraw=Math.abs(offset)<.5||tickIndex%skip===0;tickIndex++;if(!shouldDraw)continue;const value=scale.baseline+offset;const py=plotBottom-Math.max(0,Math.min(1,(value-scale.min)/scale.span))*plotHeight;ctx.globalAlpha=Math.abs(offset)<.5 ? .16 : .1;ctx.fillRect(plotLeft,py,plotWidth,1);ctx.globalAlpha=1;ctx.textAlign='left';ctx.textBaseline='middle';ctx.fillText(formatLineGraphDelta(offset,scale.labelUnit,scale.baseline,graph),plotRight+4,py)}for(const age of getLineGraphTimeTicks(totalDuration)){const px=getLineGraphTimeXFromAge(age,totalDuration,plotLeft,plotWidth);ctx.globalAlpha=age>0&&age<totalDuration ? .1 : .16;ctx.fillRect(px,plotTop,1,plotHeight);ctx.globalAlpha=1;ctx.textAlign='center';ctx.textBaseline='top';ctx.fillText(formatLineGraphDuration(age),px,plotBottom+3)}ctx.globalAlpha=1}
 function drawLineGraphPath(ctx,buckets,graph,scale,totalDuration,plotLeft,plotBottom,plotWidth,plotHeight){if(!buckets.length||!scale||scale.span<=0)return;const points=[];let elapsed=0;for(const bucket of buckets){const duration=Math.max(.001,Number(bucket.duration)||1);const value=Math.max(0,Number(bucket.value)||0);const px=getLineGraphTimeXFromElapsed(elapsed+duration/2,totalDuration,plotLeft,plotWidth);const py=plotBottom-Math.max(0,Math.min(1,(value-scale.min)/scale.span))*plotHeight;points.push({x:px,y:py,value});elapsed+=duration}if(points.length<2)return;ctx.save();ctx.lineWidth=1.35;ctx.lineJoin='round';ctx.lineCap='round';for(let i=1;i<points.length;i++){const previous=points[i-1];const current=points[i];ctx.strokeStyle=current.value>=previous.value?(graph.gainColor||'#6ea56e'):(graph.consumeColor||'#C38C75');ctx.beginPath();ctx.moveTo(previous.x,previous.y);ctx.lineTo(current.x,current.y);ctx.stroke()}ctx.restore()}
 function getLineGraphTimeTicks(totalDuration){return [totalDuration,totalDuration*2/3,totalDuration/3,totalDuration/6,0]}
 function getLineGraphTimeXFromAge(age,totalDuration,plotLeft,plotWidth){return getLineGraphTimeXFromElapsed(totalDuration-age,totalDuration,plotLeft,plotWidth)}
@@ -771,9 +815,11 @@ function getLineGraphRecentRange(buckets,fallbackValue){const recentWindowSecond
 function getLineGraphRoundedSpan(span){const safe=Math.max(1,Number(span)||0);const order=Math.max(1,String(Math.floor(safe)).length);const delta=Math.pow(10,order-1);return {max:delta*(Math.floor(safe/delta)+1),delta}}
 function getLineGraphRateMagnitude(graph,buckets){const average=graph&&graph.average;let speed=0;if(Array.isArray(average)){speed=Math.max(speed,Math.abs(Number(average[0])||0),Math.abs(Number(average[1])||0));if(speed>0)return speed}let previous=null;for(const bucket of buckets){const duration=Math.max(.001,Number(bucket&&bucket.duration)||1);const value=Math.max(0,Number(bucket&&bucket.value)||0);if(previous&&duration<=1&&previous.duration<=1){const seconds=Math.max(.001,duration);speed=Math.max(speed,Math.abs(value-previous.value)/seconds)}previous={value,duration}}return speed}
 function getLineGraphLabelUnit(value){const amount=Math.abs(Number(value)||0);if(amount>=1e15)return {value:1e15,suffix:'q'};if(amount>=1e12)return {value:1e12,suffix:'t'};if(amount>=1e9)return {value:1e9,suffix:'b'};if(amount>=1e6)return {value:1e6,suffix:'m'};if(amount>=1e3)return {value:1e3,suffix:'k'};return {value:1,suffix:''}}
-function formatLineGraphAmount(value,unit){if(unit&&unit.value>1)return formatLineGraphAmountInUnit(value,unit);const abs=Math.abs(Number(value)||0);if(abs>=1000000)return Math.round(value/1000000)+'m';if(abs>=1000)return Math.round(value/1000)+'k';return String(Math.round(value))}
-function formatLineGraphAmountInUnit(value,unit){const scaled=Math.abs(Number(value)||0)/unit.value;const rounded=scaled>=100?Math.round(scaled):scaled>=10?Math.round(scaled*10)/10:Math.round(scaled*100)/100;return String(rounded).replace(/\.0+$/,'').replace(/(\.\d*[1-9])0+$/,'$1')+unit.suffix}
-function formatLineGraphDelta(value,unit,baseline){if(Math.abs(value)<.5)return formatLineGraphAmount(Math.max(0,Number(baseline)||0));const sign=value>0?'+':'-';return sign+formatLineGraphAmount(Math.abs(value),unit)}
+function formatLineGraphAmount(value,unit){const amount=Math.abs(Number(value)||0);if(unit&&unit.value>1){const text=formatLineGraphAmountInUnit(amount,unit);if(amount===0||!isZeroUnitLabel(text))return text}return formatLineGraphReadable(amount)}
+function formatLineGraphAmountInUnit(value,unit){const scaled=Math.abs(Number(value)||0)/unit.value;const rounded=scaled>=100?Math.round(scaled):scaled>=10?Math.round(scaled*10)/10:Math.round(scaled*100)/100;const text=String(rounded).replace(/\.0+$/,'').replace(/(\.\d*[1-9])0+$/,'$1');return (/[0-9]/.test(text)?text:'0')+unit.suffix}
+function isZeroUnitLabel(value){return /^0(?:\.0+)?[a-z]?$/.test(String(value||''))}
+function formatLineGraphReadable(value){const amount=Math.abs(Number(value)||0);const unit=getLineGraphLabelUnit(amount);if(unit.value>1)return formatLineGraphAmountInUnit(amount,unit);return String(Math.round(amount))}
+function formatLineGraphDelta(value,unit,baseline,graph){if(Math.abs(value)<.5)return graph&&graph.latestText?String(graph.latestText):formatLineGraphReadable(Math.max(0,Number(baseline)||0));const sign=value>0?'+':'-';return sign+formatLineGraphAmount(Math.abs(value),unit)}
 function formatLineGraphDuration(seconds){const value=Math.max(0,Number(seconds)||0);if(value<=0)return '0ms';if(value<1)return Math.max(1,Math.round(value*1000))+'ms';if(value<60)return Math.round(value)+'s';if(value<3600)return Math.round(value/60)+'m';const hours=value/3600;return (hours>=10?Math.round(hours):Math.round(hours*10)/10)+'h'}
 function drawGraphBar(ctx,x,mid,dx,gain,consume,max,gainColor,consumeColor){const plus=Math.max(0,Number(gain)||0);const minus=Math.max(0,Math.abs(Number(consume)||0));const hp=Math.floor(plus/max*mid);const hm=Math.floor(minus/max*mid);ctx.globalAlpha=.42;ctx.fillStyle=consumeColor||'#C38C75';ctx.fillRect(x,mid,dx,hm);ctx.fillStyle=gainColor||'#6ea56e';ctx.fillRect(x,mid-hp,dx,hp);ctx.globalAlpha=1;ctx.fillStyle=consumeColor||'#C38C75';ctx.fillRect(x,mid+hm,Math.max(1,dx-1),1);ctx.fillStyle=gainColor||'#6ea56e';ctx.fillRect(x,mid-hp,Math.max(1,dx-1),1)}
 function roundRect(ctx,x,y,w,h,r){if(ctx.roundRect){ctx.beginPath();ctx.roundRect(x,y,w,h,r);ctx.closePath();return}ctx.beginPath();ctx.moveTo(x+r,y);ctx.lineTo(x+w-r,y);ctx.quadraticCurveTo(x+w,y,x+w,y+r);ctx.lineTo(x+w,y+h-r);ctx.quadraticCurveTo(x+w,y+h,x+w-r,y+h);ctx.lineTo(x+r,y+h);ctx.quadraticCurveTo(x,y+h,x,y+h-r);ctx.lineTo(x,y+r);ctx.quadraticCurveTo(x,y,x+r,y);ctx.closePath()}
@@ -785,7 +831,7 @@ function escapeAttr(value){return escapeHtml(value)}
 function px(name,value){document.documentElement.style.setProperty(name,(value||0)+'px')}
 function placeInfoPanel(){const panel=list.querySelector('.row.hovered .infoPanel');if(!panel)return;const row=panel.closest('.row');panel.style.transform='none';const scale=getScale();const surfaceRect=surface.getBoundingClientRect();const rowRect=row.getBoundingClientRect();const panelRect=panel.getBoundingClientRect();let top=rowRect.top+rowRect.height/2-panelRect.height/2;top=Math.max(surfaceRect.top+30*scale,Math.min(top,surfaceRect.bottom-panelRect.height-4*scale));panel.style.top=((top-rowRect.top)/scale)+'px';drawGraphs()}
 window.cattailResourceWatcherSetState=function(state){latestState=state||{};try{applyScale(latestState.scale||1);px('--base-width',latestState.baseWidth||latestState.width||206);px('--base-height',latestState.baseHeight||latestState.height||118);px('--popup-top-reserve',latestState.popupTopReserve||86);px('--list-width',latestState.listWidth||206);px('--info-width',latestState.infoWidth||0);px('--icon-width',latestState.iconWidth||42);px('--amount-width',latestState.amountWidth||154);px('--column-gap',latestState.columnGap||10);px('--row-height',latestState.rowHeight||44);px('--row-gap',latestState.rowGap||4);const activeResource=Number.isInteger(latestState.activeResource)?latestState.activeResource:latestState.hoveredResource;list.innerHTML=(latestState.rows||[]).map(function(row){return rowHtml(row,activeResource)}).join('')||'<div class="row"><span class="info"></span><span class="icon"></span><span class="amount">0</span></div>';requestAnimationFrame(function(){syncHoveredIconFromPoint();applyWindowShape();placeInfoPanel()})}catch(error){console.error('[Resource Watcher popup] state render failed',error);try{list.innerHTML=(latestState.rows||[]).map(function(row){const offset=-(Number(row.id)||0)*36;return '<div class="row" data-id="'+row.id+'"><span class="info"></span><span class="icon" style="background-position:'+offset+'px 0"></span><span class="amount">'+escapeHtml(row.amount)+'</span></div>'}).join('')}catch(fallbackError){}}};ipcRenderer.on('modloader:window:update',function(event,state){window.cattailResourceWatcherSetState(state)});ipcRenderer.on('modloader:window:geometry',function(event,geometry){if(geometry&&geometry.side){applySide(geometry.side);applyWindowShape()}});
-document.addEventListener('pointermove',updateHoveredIcon,true);document.addEventListener('pointerover',updateHoveredIcon,true);root.addEventListener('pointerleave',function(){lastPointer.inside=false;setHoveredIcon(null,true)},true);back.addEventListener('click',function(event){event.preventDefault();event.stopPropagation();send({type:'back'})},true);resize.addEventListener('pointerdown',startResize,true);resize.addEventListener('pointermove',moveResize,true);resize.addEventListener('pointerup',endResize,true);resize.addEventListener('pointercancel',endResize,true);move.addEventListener('pointerdown',startMove,true);move.addEventListener('pointermove',moveWindow,true);move.addEventListener('pointerup',endMove,true);move.addEventListener('pointercancel',endMove,true);document.addEventListener('keydown',function(event){if(event.key==='Escape')send({type:'back'})},true);
+document.addEventListener('pointermove',updateHoveredIcon,true);document.addEventListener('pointerover',updateHoveredIcon,true);document.addEventListener('wheel',onIconWheel,{capture:true,passive:false});root.addEventListener('pointerleave',function(){lastPointer.inside=false;setHoveredIcon(null,true)},true);back.addEventListener('click',function(event){event.preventDefault();event.stopPropagation();send({type:'back'})},true);resize.addEventListener('pointerdown',startResize,true);resize.addEventListener('pointermove',moveResize,true);resize.addEventListener('pointerup',endResize,true);resize.addEventListener('pointercancel',endResize,true);move.addEventListener('pointerdown',startMove,true);move.addEventListener('pointermove',moveWindow,true);move.addEventListener('pointerup',endMove,true);move.addEventListener('pointercancel',endMove,true);document.addEventListener('keydown',function(event){if(event.key==='Escape')send({type:'back'})},true);
 </script></body></html>`
 		}
 		function safeCall(fn, fallback) {

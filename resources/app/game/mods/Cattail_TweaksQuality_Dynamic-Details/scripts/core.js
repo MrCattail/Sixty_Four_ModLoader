@@ -9,6 +9,7 @@ ModLoader.register({
 		const cubeMemoryKey = '_cattailDynamicCubeMemory'
 		const detailToggleKey = '_cattailDynamicDetailsToggle'
 		const coordinateToggleKey = '_cattailDynamicCoordinateToggle'
+		const directionPointerToggleKey = '_cattailDynamicDirectionPointerToggle'
 		const widthStateKey = '_cattailDynamicWidthState'
 		const cubeMemoryTtl = 15000
 		const stableWidthTtl = 10000
@@ -152,7 +153,7 @@ ModLoader.register({
 			if (namespace.directionPointersInstalled) return
 			if (typeof Game === 'undefined') return
 			namespace.directionPointersInstalled = true
-			installCoordinateToggle()
+			installDirectionPointerToggle()
 			patchTransientCubeHints()
 		}
 
@@ -448,13 +449,7 @@ ModLoader.register({
 		function isCoordinateToggleEvent(event, game) {
 			const key = String(event?.key || '').toLowerCase()
 			const altC = !!(event?.altKey && (key === 'c' || event?.code === 'KeyC' || event?.keyCode === 67))
-			const altCtrl = !!(
-				event?.altKey &&
-				event?.ctrlKey &&
-				(event.keyCode === 17 || event.keyCode === 18 || key === 'control' || key === 'alt') &&
-				isCoordinateEmptyCellContext(game)
-			)
-			return altC || altCtrl
+			return altC
 		}
 		function isCoordinateToggleActive(game) {
 			return !!game?.[coordinateToggleKey]
@@ -462,6 +457,36 @@ ModLoader.register({
 
 		function setCoordinateToggle(game, active) {
 			if (game) game[coordinateToggleKey] = !!active
+		}
+
+		function installDirectionPointerToggle() {
+			if (window._cattailDynamicDirectionPointerToggleInstalled) return
+			window._cattailDynamicDirectionPointerToggleInstalled = true
+			addEventListener('keydown', function (event) {
+				const game = lastGame
+				if (!game || !isDirectionPointerToggleEvent(event, game) || event.repeat) return
+				setDirectionPointerToggle(game, !isDirectionPointerToggleActive(game))
+				event.preventDefault()
+				event.stopImmediatePropagation()
+			}, true)
+		}
+
+		function isDirectionPointerToggleEvent(event, game) {
+			const key = String(event?.key || '').toLowerCase()
+			return !!(
+				event?.altKey &&
+				event?.ctrlKey &&
+				(event.keyCode === 17 || event.keyCode === 18 || key === 'control' || key === 'alt') &&
+				isCoordinateEmptyCellContext(game)
+			)
+		}
+
+		function isDirectionPointerToggleActive(game) {
+			return !!game?.[directionPointerToggleKey]
+		}
+
+		function setDirectionPointerToggle(game, active) {
+			if (game) game[directionPointerToggleKey] = !!active
 		}
 
 		function setDetailToggle(game, active) {
@@ -917,8 +942,7 @@ ModLoader.register({
 			return !!(
 				isDirectionPointersFeatureEnabled() &&
 				isCoordinateEmptyCellContext(game) &&
-				game.altActive &&
-				game.shiftPressed
+				((game.altActive && game.shiftPressed) || isDirectionPointerToggleActive(game))
 			)
 		}
 

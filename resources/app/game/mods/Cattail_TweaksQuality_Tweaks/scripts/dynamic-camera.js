@@ -8,6 +8,8 @@
 	const yawConfigKey = 'cameraYaw'
 	const legacyPitchConfigKey = 'defaultPitch'
 	const legacyYawConfigKey = 'defaultYaw'
+	const oldDefaultPitch = 0.87
+	const oldDefaultYaw = 45
 
 	let previewEnabled = null
 
@@ -566,6 +568,7 @@
 				const legacyState = localStorage.getItem(legacyStateKey)
 				if (legacyState !== null) localStorage.setItem(stateKey, legacyState)
 			}
+			migrateOldDynamicCameraDefaults()
 		} catch (error) {}
 	}
 
@@ -578,6 +581,27 @@
 				return
 			}
 		}
+	}
+
+	function migrateOldDynamicCameraDefaults() {
+		const pitchKey = configStorageKey(MOD_ID, pitchConfigKey)
+		const yawKey = configStorageKey(MOD_ID, yawConfigKey)
+		const pitch = readStoredConfigRawNumber(pitchKey)
+		const yaw = readStoredConfigRawNumber(yawKey)
+		if (isNearNumber(pitch, oldDefaultPitch) && isNearNumber(yaw, oldDefaultYaw)) {
+			localStorage.setItem(pitchKey, JSON.stringify(vanillaPitch))
+			localStorage.setItem(yawKey, JSON.stringify(0))
+		}
+		try {
+			const parsed = JSON.parse(localStorage.getItem(stateKey) || 'null')
+			if (parsed && isNearNumber(Number(parsed.pitch), oldDefaultPitch) && isNearNumber(Number(parsed.yaw), oldDefaultYaw)) {
+				localStorage.setItem(stateKey, JSON.stringify({ pitch: vanillaPitch, yaw: 0 }))
+			}
+		} catch (error) {}
+	}
+
+	function isNearNumber(value, target) {
+		return Number.isFinite(value) && Math.abs(value - target) <= 0.0001
 	}
 
 	function hasStoredConfig(key) {
@@ -603,6 +627,17 @@
 			return Number.isFinite(value) ? value : fallback
 		} catch (error) {
 			return fallback
+		}
+	}
+
+	function readStoredConfigRawNumber(key) {
+		try {
+			const raw = localStorage.getItem(key)
+			if (raw === null) return NaN
+			const value = Number(JSON.parse(raw))
+			return Number.isFinite(value) ? value : NaN
+		} catch (error) {
+			return NaN
 		}
 	}
 
