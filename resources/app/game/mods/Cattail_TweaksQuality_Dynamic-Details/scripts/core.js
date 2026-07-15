@@ -53,14 +53,14 @@ ModLoader.register({
 		const resourceSourceChartGainColor = '#6ea56e'
 		const resourceSourceChartConsumeColor = '#C38C75'
 		const resourceSourceLineChartStages = [
-			{ from: 1, count: 30, to: 10 },
-			{ from: 10, count: 6, to: 30 },
-			{ from: 30, count: 20, to: 60 },
-			{ from: 60, count: 30, to: 600 },
-			{ from: 600, count: 6, to: 1800 },
-			{ from: 1800, count: 4, to: 3600 }
+			{ from: 1, count: 60, to: 10 },
+			{ from: 10, count: 12, to: 30 },
+			{ from: 30, count: 40, to: 60 },
+			{ from: 60, count: 60, to: 600 },
+			{ from: 600, count: 12, to: 1800 },
+			{ from: 1800, count: 8, to: 3600 }
 		]
-		const resourceSourceLineChartMaxBuckets = 96
+		const resourceSourceLineChartMaxBuckets = 256
 		const resourceSourceLineChartWheelCooldownMs = 180
 		const resourceSourceProfilerStorageKey = 'cattailDynamicResourceSourceProfiler'
 		const resourceSourceProfilerSlowMs = 8
@@ -3676,7 +3676,7 @@ ModLoader.register({
 			const plotBottom = y + height - padding * 1.35
 			const plotWidth = Math.max(pixelRatio, plotRight - plotLeft)
 			const plotHeight = Math.max(pixelRatio, plotBottom - plotTop)
-			const totalDuration = Math.max(1, buckets.reduce((total, bucket) => total + (Number(bucket.duration) || 0), 0))
+			const totalDuration = Math.max(0.001, buckets.reduce((total, bucket) => total + (Number(bucket.duration) || 0), 0))
 			const scale = getResourceSourceLineChartScale(game, buckets, resourceId)
 
 			ctx.save()
@@ -3721,8 +3721,8 @@ ModLoader.register({
 				ctx.fillText(formatResourceSourceLineChartDelta(game, offset, scale.labelUnit, scale.baseline), plotRight + pixelRatio * 4, py)
 			}
 
-			for (const age of [totalDuration, totalDuration / 2, 0]) {
-				const px = plotRight - age / totalDuration * plotWidth
+			for (const age of getResourceSourceLineChartTimeTicks(totalDuration)) {
+				const px = getResourceSourceLineChartTimeXFromAge(age, totalDuration, plotLeft, plotWidth)
 				ctx.globalAlpha = age > 0 && age < totalDuration ? 0.1 : 0.16
 				ctx.fillRect(px, plotTop, pixelRatio, plotHeight)
 				ctx.globalAlpha = 1
@@ -3740,7 +3740,7 @@ ModLoader.register({
 			for (const bucket of buckets) {
 				const duration = Math.max(0.001, Number(bucket.duration) || 1)
 				const value = Math.max(0, Number(bucket?.values?.[resourceId]) || 0)
-				const px = plotLeft + Math.max(0, Math.min(1, (elapsed + duration / 2) / totalDuration)) * plotWidth
+				const px = getResourceSourceLineChartTimeXFromElapsed(elapsed + duration / 2, totalDuration, plotLeft, plotWidth)
 				const py = plotBottom - Math.max(0, Math.min(1, (value - scale.min) / scale.span)) * plotHeight
 				points.push({ x: px, y: py, value })
 				elapsed += duration
@@ -3760,6 +3760,26 @@ ModLoader.register({
 				ctx.stroke()
 			}
 			ctx.restore()
+		}
+
+		function getResourceSourceLineChartTimeTicks(totalDuration) {
+			return [totalDuration, totalDuration * 2 / 3, totalDuration / 3, totalDuration / 6, 0]
+		}
+
+		function getResourceSourceLineChartTimeXFromAge(age, totalDuration, plotLeft, plotWidth) {
+			return getResourceSourceLineChartTimeXFromElapsed(totalDuration - age, totalDuration, plotLeft, plotWidth)
+		}
+
+		function getResourceSourceLineChartTimeXFromElapsed(elapsed, totalDuration, plotLeft, plotWidth) {
+			const ratio = getResourceSourceLineChartTimeRatio(elapsed, totalDuration)
+			return plotLeft + ratio * plotWidth
+		}
+
+		function getResourceSourceLineChartTimeRatio(elapsed, totalDuration) {
+			const total = Math.max(0.001, Number(totalDuration) || 0)
+			const normalized = Math.max(0, Math.min(1, (Number(elapsed) || 0) / total))
+			if (normalized <= 2 / 3) return normalized / 2
+			return 2 * normalized - 1
 		}
 
 		function getResourceSourceLineChartScale(game, buckets, resourceId) {
