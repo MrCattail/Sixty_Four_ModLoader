@@ -1,0 +1,83 @@
+{
+  "id": "SixtyFour_WorldEditer",
+  "uniqueId": "SixtyFour_WorldEditer",
+  "name": "SixtyFour WorldEditer",
+  "version": "0.1.0",
+  "loaderVersion": ">=0.1.0",
+  "languageSupport": {
+    "gameLanguage": true
+  },
+  "entry": "scripts/main.js",
+  "description": "Adds an in-game world editing mode for selection, area statistics, copying, blueprint previews, paste validation, and blueprint library storage without modifying vanilla scripts.",
+  "config": {
+    "enabled": {
+      "type": "boolean",
+      "label": {
+        "en": "Enable WorldEditer",
+        "sch": "启用 WorldEditer",
+        "modsch": "启用 WorldEditer",
+        "tch": "啟用 WorldEditer"
+      },
+      "default": true,
+      "description": {
+        "en": "Press V in game to enter or leave the editor.",
+        "sch": "游戏中按 V 进入或退出编辑模式。",
+        "modsch": "游戏中按 V 进入或退出编辑模式。",
+        "tch": "遊戲中按 V 進入或退出編輯模式。"
+      },
+      "reloadPolicy": "hot"
+    },
+    "showStatsCards": {
+      "type": "boolean",
+      "label": {
+        "en": "Area statistic cards",
+        "sch": "区域统计卡片",
+        "modsch": "区域统计卡片",
+        "tch": "區域統計卡片"
+      },
+      "default": true,
+      "description": {
+        "en": "Show selection size, building counts, and estimated resource flow cards.",
+        "sch": "显示选区尺寸、建筑数量和估算资源流。",
+        "modsch": "显示选区尺寸、建筑数量和估算资源流。",
+        "tch": "顯示選區尺寸、建築數量和估算資源流。"
+      },
+      "reloadPolicy": "hot"
+    },
+    "allowOverwriteMode": {
+      "type": "boolean",
+      "label": {
+        "en": "Allow overwrite paste mode",
+        "sch": "允许覆盖粘贴模式",
+        "modsch": "允许覆盖粘贴模式",
+        "tch": "允許覆蓋貼上模式"
+      },
+      "default": false,
+      "description": {
+        "en": "When enabled, the mouse wheel can switch paste preview into destructive overwrite mode.",
+        "sch": "启用后，蓝图预览时可用鼠标滚轮切换到会拆除目标建筑的覆盖模式。",
+        "modsch": "启用后，蓝图预览时可用鼠标滚轮切换到会拆除目标建筑的覆盖模式。",
+        "tch": "啟用後，藍圖預覽時可用滑鼠滾輪切換到會拆除目標建築的覆蓋模式。"
+      },
+      "reloadPolicy": "hot"
+    }
+  },
+  "translations": {
+    "en": {
+      "name": "SixtyFour WorldEditer",
+      "description": "Adds an in-game world editing mode for selection, area statistics, copying, blueprint previews, paste validation, and blueprint library storage without modifying vanilla scripts."
+    },
+    "sch": {
+      "name": "SixtyFour WorldEditer",
+      "description": "新增地图编辑模式，可框选区域、查看统计、复制建筑、预览蓝图、检查粘贴冲突，并保存蓝图；不修改原版脚本。"
+    },
+    "modsch": {
+      "name": "SixtyFour WorldEditer",
+      "description": "新增地图编辑模式，可框选区域、查看统计、复制建筑、预览蓝图、检查粘贴冲突，并保存蓝图；不修改原版脚本。"
+    },
+    "tch": {
+      "name": "SixtyFour WorldEditer",
+      "description": "新增地圖編輯模式，可框選區域、查看統計、複製建築、預覽藍圖、檢查貼上衝突，並儲存藍圖；不修改原版腳本。"
+    }
+  }
+}
