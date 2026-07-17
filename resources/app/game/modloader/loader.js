@@ -799,9 +799,16 @@
 		}
 	}
 
+	const markBuiltInRenderLayerDemands = function (game) {
+		if (!isRenderApiEnabled() || !game) return
+		if (game.touchMode === 1 || game.touchMode === 2) markRenderLayerDemanded('screen-effects')
+		if (game.photofobia && game.flashlight && !game.plane) markRenderLayerDemanded('reduced-flashes')
+	}
+
 	const beginRenderFrame = function (game) {
 		if (game) state.game = game
 		if (!isRenderApiEnabled()) return
+		markBuiltInRenderLayerDemands(game)
 		const manager = ensureRenderLayerManager(game)
 		if (!manager) return
 		state.renderFrame += 1
