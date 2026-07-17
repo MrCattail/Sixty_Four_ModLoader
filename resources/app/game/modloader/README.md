@@ -136,6 +136,8 @@ Built-in layer ids are `background`, `buildings`, `effects`, `interaction`,
 `ui`, `screen-effects`, `cursor`, `reduced-flashes`, and `top-effects`.
 Custom layers can be registered with `api.render.registerLayer(id, { order, zIndex, clearEachFrame })`.
 Use `api.render.layers.get(id)` to access a layer canvas/context directly.
+Use `api.render.demandedLayers()` or `api.render.layers.demands()` to inspect which layer ids have been requested, and `api.render.isLayerDemanded(id)` / `api.render.layers.isDemanded(id)` to check one layer without creating it.
+Use `api.render.routedMethods()` / `api.render.methodRoutes()` to inspect which vanilla render methods currently route because the Render API is enabled and their target layer is demanded. Pass `{ all: true }` to include inactive routes; entries include `method`, `layer`, `demanded`, and `routed`. Use `api.render.isMethodRouted(methodName)` and `api.render.getMethodLayer(methodName)` for single-method checks.
 The ModLoader menu settings page includes a Render API switch. Turning it off
 returns vanilla draw calls to the main canvas and skips registered render-layer
 callbacks until it is turned on again.

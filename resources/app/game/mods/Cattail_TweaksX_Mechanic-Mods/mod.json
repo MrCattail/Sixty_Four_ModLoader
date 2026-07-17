@@ -27,6 +27,7 @@
     "scripts/scan-reality-surges.js",
     "scripts/scan-reality-slider.js",
     "scripts/hollow-vent-reality.js",
+    "scripts/hollow-time-flow.js",
     "scripts/flat-build-costs.js",
     "scripts/super-silo.js"
   ],
@@ -149,6 +150,47 @@
       "reloadPolicy": "hot",
       "section": "hollowVentReality"
     },
+    "hollowTimeFlowMode": {
+      "type": "slider",
+      "valueType": "integer",
+      "integer": true,
+      "label": "Hollow Stone time flow",
+      "default": 0,
+      "min": -1,
+      "max": 2,
+      "step": 1,
+      "valueLabels": {
+        "0": "Normal",
+        "1": "Acceleration",
+        "2": "Random",
+        "-1": "Slowdown"
+      },
+      "description": "Continuously choose the Hollow Stone time distortion mode: slowdown, normal, acceleration, or random vanilla multiplier.",
+      "reloadPolicy": "hot",
+      "section": "hollowTimeFlow",
+      "sectionLabel": {
+        "en": "Hollow Stone time flow",
+        "ru": "Ход времени Hollow Stone",
+        "de": "Zeitfluss des Hohlsteins",
+        "ptbr": "Fluxo de tempo da Pedra Oca",
+        "it": "Flusso temporale della Pietra Cava",
+        "es": "Flujo temporal de la Piedra hueca",
+        "fr": "Flux temporel de la pierre creuse",
+        "nl": "Tijdstroom van de holle steen",
+        "cz": "Tok času Dutého kamene",
+        "pl": "Przepływ czasu Pustego Kamienia",
+        "jp": "ホロウストーンの時間の流れ",
+        "kr": "공허석 시간 흐름",
+        "sch": "空心石时间流向",
+        "tch": "空心石時間流向",
+        "thai": "การไหลของเวลาหินกลวง",
+        "hu": "Üreges kő időáramlása",
+        "lv": "Dobā akmens laika plūsma",
+        "ro": "Fluxul timpului pentru piatra goală",
+        "no": "Tidsflyt for hul stein",
+        "modsch": "空心石时间流向"
+      }
+    },
     "enableFlatBuildCosts": {
       "type": "boolean",
       "label": "Disable build cost scaling",
@@ -215,6 +257,16 @@
         "enableFlatBuildCosts": {
           "label": "Disable build cost scaling",
           "description": "Keep every building at its base construction cost instead of scaling by existing building count."
+        },
+        "hollowTimeFlowMode": {
+          "label": "Hollow Stone time flow",
+          "description": "Continuously choose the Hollow Stone time distortion mode: slowdown, normal, acceleration, or random vanilla multiplier.",
+          "valueLabels": {
+            "0": "Normal",
+            "1": "Acceleration",
+            "2": "Random",
+            "-1": "Slowdown"
+          }
         }
       }
     },
@@ -273,6 +325,16 @@
         "enableFlatBuildCosts": {
           "label": "Отключить рост цены строительства",
           "description": "Каждое здание сохраняет базовую цену строительства и не дорожает от количества уже построенных."
+        },
+        "hollowTimeFlowMode": {
+          "label": "Ход времени Hollow Stone",
+          "description": "Постоянно выбирает режим искажения времени Hollow Stone: замедление, обычный режим, ускорение или случайный оригинальный множитель.",
+          "valueLabels": {
+            "0": "Нормально",
+            "1": "Ускорение",
+            "2": "Случайно",
+            "-1": "Замедление"
+          }
         }
       }
     },
@@ -331,6 +393,16 @@
         "enableFlatBuildCosts": {
           "label": "Baukosten-Skalierung aus",
           "description": "Jedes Gebäude behält seine Grundbaukosten, statt mit der vorhandenen Anzahl teurer zu werden."
+        },
+        "hollowTimeFlowMode": {
+          "label": "Zeitfluss des Hohlsteins",
+          "description": "Wählt dauerhaft den Zeitverzerrungsmodus des Hohlsteins: Verlangsamung, normal, Beschleunigung oder zufälliger Vanilla-Multiplikator.",
+          "valueLabels": {
+            "0": "Normal",
+            "1": "Beschleunigung",
+            "2": "Zufällig",
+            "-1": "Verlangsamung"
+          }
         }
       }
     },
@@ -389,6 +461,16 @@
         "enableFlatBuildCosts": {
           "label": "Desativar escala de custo de construção",
           "description": "Cada construção mantém o custo base, sem aumentar conforme a quantidade já construída."
+        },
+        "hollowTimeFlowMode": {
+          "label": "Fluxo de tempo da Pedra Oca",
+          "description": "Escolhe continuamente o modo de distorção temporal da Pedra Oca: desaceleração, normal, aceleração ou multiplicador aleatório original.",
+          "valueLabels": {
+            "0": "Normal",
+            "1": "Aceleração",
+            "2": "Aleatório",
+            "-1": "Desaceleração"
+          }
         }
       }
     },
@@ -447,6 +529,16 @@
         "enableFlatBuildCosts": {
           "label": "Disattiva scala costi costruzione",
           "description": "Ogni edificio mantiene il costo base invece di aumentare in base a quelli già costruiti."
+        },
+        "hollowTimeFlowMode": {
+          "label": "Flusso temporale della Pietra Cava",
+          "description": "Sceglie continuamente la modalità di distorsione temporale della Pietra Cava: rallentamento, normale, accelerazione o moltiplicatore casuale originale.",
+          "valueLabels": {
+            "0": "Normale",
+            "1": "Accelerazione",
+            "2": "Casuale",
+            "-1": "Rallentamento"
+          }
         }
       }
     },
@@ -505,6 +597,16 @@
         "enableFlatBuildCosts": {
           "label": "Desactivar escala de coste de construcción",
           "description": "Cada edificio mantiene su coste base y no aumenta según la cantidad ya construida."
+        },
+        "hollowTimeFlowMode": {
+          "label": "Flujo temporal de la Piedra hueca",
+          "description": "Elige continuamente el modo de distorsión temporal de la Piedra hueca: desaceleración, normal, aceleración o multiplicador aleatorio original.",
+          "valueLabels": {
+            "0": "Normal",
+            "1": "Aceleración",
+            "2": "Aleatorio",
+            "-1": "Desaceleración"
+          }
         }
       }
     },
@@ -563,6 +665,16 @@
         "enableFlatBuildCosts": {
           "label": "Désactiver l’échelle du coût de construction",
           "description": "Chaque bâtiment garde son coût de base au lieu d’augmenter avec le nombre déjà construit."
+        },
+        "hollowTimeFlowMode": {
+          "label": "Flux temporel de la pierre creuse",
+          "description": "Choisit en continu le mode de distorsion temporelle de la pierre creuse : ralentissement, normal, accélération ou multiplicateur aléatoire d’origine.",
+          "valueLabels": {
+            "0": "Normal",
+            "1": "Accélération",
+            "2": "Aléatoire",
+            "-1": "Ralentissement"
+          }
         }
       }
     },
@@ -621,6 +733,16 @@
         "enableFlatBuildCosts": {
           "label": "Bouwkostenschaal uit",
           "description": "Elk gebouw behoudt zijn basisbouwkosten in plaats van duurder te worden door het aantal bestaande gebouwen."
+        },
+        "hollowTimeFlowMode": {
+          "label": "Tijdstroom van de holle steen",
+          "description": "Kiest voortdurend de tijdvervormingsmodus van de holle steen: vertraging, normaal, versnelling of een willekeurige originele vermenigvuldiger.",
+          "valueLabels": {
+            "0": "Normaal",
+            "1": "Versnelling",
+            "2": "Willekeurig",
+            "-1": "Vertraging"
+          }
         }
       }
     },
@@ -679,6 +801,16 @@
         "enableFlatBuildCosts": {
           "label": "Vypnout škálování stavební ceny",
           "description": "Každá stavba si ponechá základní cenu a nezdražuje podle počtu již postavených kusů."
+        },
+        "hollowTimeFlowMode": {
+          "label": "Tok času Dutého kamene",
+          "description": "Průběžně vybírá režim časového zkreslení Dutého kamene: zpomalení, normální stav, zrychlení nebo náhodný původní násobitel.",
+          "valueLabels": {
+            "0": "Normálně",
+            "1": "Zrychlení",
+            "2": "Náhodně",
+            "-1": "Zpomalení"
+          }
         }
       }
     },
@@ -737,6 +869,16 @@
         "enableFlatBuildCosts": {
           "label": "Wyłącz skalowanie kosztu budowy",
           "description": "Każdy budynek zachowuje bazowy koszt budowy zamiast drożeć wraz z liczbą już zbudowanych."
+        },
+        "hollowTimeFlowMode": {
+          "label": "Przepływ czasu Pustego Kamienia",
+          "description": "Stale wybiera tryb zniekształcenia czasu Pustego Kamienia: spowolnienie, normalnie, przyspieszenie albo losowy oryginalny mnożnik.",
+          "valueLabels": {
+            "0": "Normalnie",
+            "1": "Przyspieszenie",
+            "2": "Losowo",
+            "-1": "Spowolnienie"
+          }
         }
       }
     },
@@ -795,6 +937,16 @@
         "enableFlatBuildCosts": {
           "label": "建設コスト倍率を無効化",
           "description": "各建物の建設コストを基礎価格のままにし、建設済み数で上昇しないようにします。"
+        },
+        "hollowTimeFlowMode": {
+          "label": "ホロウストーンの時間の流れ",
+          "description": "ホロウストーンの時間歪曲モードを継続的に選びます：減速、通常、加速、またはバニラのランダム倍率。",
+          "valueLabels": {
+            "0": "通常",
+            "1": "時間加速",
+            "2": "ランダム",
+            "-1": "時間減速"
+          }
         }
       }
     },
@@ -853,6 +1005,16 @@
         "enableFlatBuildCosts": {
           "label": "건설 비용 배율 끄기",
           "description": "모든 건물이 기존 건설 수에 따라 비싸지지 않고 기본 건설 비용을 유지합니다."
+        },
+        "hollowTimeFlowMode": {
+          "label": "공허석 시간 흐름",
+          "description": "공허석 시간 왜곡 모드를 계속 선택합니다: 시간 감속, 정상, 시간 가속 또는 원본 무작위 배율.",
+          "valueLabels": {
+            "0": "정상",
+            "1": "시간 가속",
+            "2": "무작위",
+            "-1": "시간 감속"
+          }
         }
       }
     },
@@ -911,6 +1073,16 @@
         "enableFlatBuildCosts": {
           "label": "关闭建造耗材倍率",
           "description": "每个建筑始终按基础耗材价格建造，不再随已建数量提高。"
+        },
+        "hollowTimeFlowMode": {
+          "label": "空心石时间流向",
+          "description": "持续选择空心石时间扭曲模式：时间减速、正常、时间加速或随机原版倍率。",
+          "valueLabels": {
+            "0": "正常",
+            "1": "时间加速",
+            "2": "随机",
+            "-1": "时间减速"
+          }
         }
       }
     },
@@ -969,6 +1141,16 @@
         "enableFlatBuildCosts": {
           "label": "關閉建造耗材倍率",
           "description": "每個建築始終按基礎耗材價格建造，不再隨已建數量提高。"
+        },
+        "hollowTimeFlowMode": {
+          "label": "空心石時間流向",
+          "description": "持續選擇空心石時間扭曲模式：時間減速、正常、時間加速或隨機原版倍率。",
+          "valueLabels": {
+            "0": "正常",
+            "1": "時間加速",
+            "2": "隨機",
+            "-1": "時間減速"
+          }
         }
       }
     },
@@ -1027,6 +1209,16 @@
         "enableFlatBuildCosts": {
           "label": "ปิดการเพิ่มต้นทุนก่อสร้าง",
           "description": "สิ่งปลูกสร้างทุกชนิดใช้ต้นทุนพื้นฐานเสมอ ไม่เพิ่มตามจำนวนที่สร้างไว้แล้ว"
+        },
+        "hollowTimeFlowMode": {
+          "label": "การไหลของเวลาหินกลวง",
+          "description": "เลือกโหมดบิดเบือนเวลาของหินกลวงอย่างต่อเนื่อง: ช้าลง, ปกติ, เร่งเวลา หรือสุ่มตัวคูณแบบเดิม",
+          "valueLabels": {
+            "0": "ปกติ",
+            "1": "เร่งเวลา",
+            "2": "สุ่ม",
+            "-1": "ช้าลง"
+          }
         }
       }
     },
@@ -1085,6 +1277,16 @@
         "enableFlatBuildCosts": {
           "label": "Építési költség skálázása ki",
           "description": "Minden épület megtartja az alap építési költségét, és nem drágul a már megépített darabszám alapján."
+        },
+        "hollowTimeFlowMode": {
+          "label": "Üreges kő időáramlása",
+          "description": "Folyamatosan kiválasztja az Üreges kő időtorzítási módját: lassítás, normál, gyorsítás vagy véletlen eredeti szorzó.",
+          "valueLabels": {
+            "0": "Normál",
+            "1": "Gyorsítás",
+            "2": "Véletlen",
+            "-1": "Lassítás"
+          }
         }
       }
     },
@@ -1143,6 +1345,16 @@
         "enableFlatBuildCosts": {
           "label": "Izslēgt būves izmaksu mērogošanu",
           "description": "Katra būve saglabā pamata būvniecības izmaksas, nevis kļūst dārgāka pēc jau uzbūvētā skaita."
+        },
+        "hollowTimeFlowMode": {
+          "label": "Dobā akmens laika plūsma",
+          "description": "Nepārtraukti izvēlas Dobā akmens laika kropļojuma režīmu: palēninājums, normāli, paātrinājums vai nejaušs oriģinālais reizinātājs.",
+          "valueLabels": {
+            "0": "Normāli",
+            "1": "Paātrinājums",
+            "2": "Nejauši",
+            "-1": "Palēninājums"
+          }
         }
       }
     },
@@ -1201,6 +1413,16 @@
         "enableFlatBuildCosts": {
           "label": "Dezactivează scalarea costului de construire",
           "description": "Fiecare clădire păstrează costul de bază, fără să crească după numărul deja construit."
+        },
+        "hollowTimeFlowMode": {
+          "label": "Fluxul timpului pentru piatra goală",
+          "description": "Alege continuu modul de distorsiune temporală al pietrei goale: încetinire, normal, accelerare sau multiplicator original aleatoriu.",
+          "valueLabels": {
+            "0": "Normal",
+            "1": "Accelerare",
+            "2": "Aleatoriu",
+            "-1": "Încetinire"
+          }
         }
       }
     },
@@ -1259,6 +1481,16 @@
         "enableFlatBuildCosts": {
           "label": "Slå av byggkostnadsskalering",
           "description": "Hver bygning beholder grunnkostnaden i stedet for å bli dyrere ut fra antallet som allerede er bygget."
+        },
+        "hollowTimeFlowMode": {
+          "label": "Tidsflyt for hul stein",
+          "description": "Velger kontinuerlig tidsforvrengningsmodus for hul stein: bremsing, normal, akselerasjon eller tilfeldig original multiplikator.",
+          "valueLabels": {
+            "0": "Normal",
+            "1": "Akselerasjon",
+            "2": "Tilfeldig",
+            "-1": "Bremsing"
+          }
         }
       }
     },
@@ -1317,6 +1549,16 @@
         "enableFlatBuildCosts": {
           "label": "关闭建造耗材倍率",
           "description": "每个建筑始终按基础耗材价格建造，不再随已建数量提高。"
+        },
+        "hollowTimeFlowMode": {
+          "label": "空心石时间流向",
+          "description": "持续选择空心石时间扭曲模式：时间减速、正常、时间加速或随机原版倍率。",
+          "valueLabels": {
+            "0": "正常",
+            "1": "时间加速",
+            "2": "随机",
+            "-1": "时间减速"
+          }
         }
       }
     }

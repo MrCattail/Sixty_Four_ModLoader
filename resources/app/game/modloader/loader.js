@@ -465,6 +465,34 @@
 		return state.renderLayerDemands[normalizeRenderLayerId(id)] === true
 	}
 
+	const listRenderLayerDemands = function () {
+		return Object.keys(state.renderLayerDemands).filter(function (id) {
+			return state.renderLayerDemands[id] === true
+		}).sort()
+	}
+
+	const getRenderMethodLayer = function (methodName) {
+		return RENDER_METHOD_LAYERS[String(methodName || '')] || null
+	}
+
+	const isRenderMethodRouted = function (methodName) {
+		const layerId = getRenderMethodLayer(methodName)
+		return !!(isRenderApiEnabled() && layerId && hasRenderLayerDemand(layerId))
+	}
+
+	const listRenderMethodRoutes = function (options = {}) {
+		options = options || {}
+		const includeInactive = options.all === true || options.includeInactive === true
+		const enabled = isRenderApiEnabled()
+		return Object.keys(RENDER_METHOD_LAYERS).sort().map(function (methodName) {
+			const layerId = RENDER_METHOD_LAYERS[methodName]
+			const demanded = hasRenderLayerDemand(layerId)
+			const routed = enabled && demanded
+			if (!includeInactive && !routed) return null
+			return { method: methodName, layer: layerId, demanded, routed }
+		}).filter(Boolean)
+	}
+
 	const getRenderGame = function (game) {
 		return game || state.game || uiPagesCurrentGame || window.game || null
 	}
@@ -977,6 +1005,12 @@
 			getLayer(id, game, options) { return getPublicRenderLayer(id, game, options) },
 			layer(id, game, options) { return getPublicRenderLayer(id, game, options) },
 			context(id, game, options) { return getPublicRenderLayer(id, game, options)?.ctx || null },
+			demandedLayers: listRenderLayerDemands,
+			isLayerDemanded(id) { return hasRenderLayerDemand(id) },
+			routedMethods: listRenderMethodRoutes,
+			methodRoutes: listRenderMethodRoutes,
+			getMethodLayer(methodName) { return getRenderMethodLayer(methodName) },
+			isMethodRouted(methodName) { return isRenderMethodRouted(methodName) },
 			withLayer(id, fn, options = {}) {
 				const layerId = markRenderLayerDemanded(id)
 				const game = getRenderGame(options.game)
@@ -1003,6 +1037,9 @@
 				if (layer) layer.dirty = true
 			},
 			layers: {
+				demands: listRenderLayerDemands,
+				demanded: listRenderLayerDemands,
+				isDemanded(id) { return hasRenderLayerDemand(id) },
 				list(game) {
 					if (!isRenderApiEnabled()) return []
 					const manager = ensureRenderLayerManager(game)
