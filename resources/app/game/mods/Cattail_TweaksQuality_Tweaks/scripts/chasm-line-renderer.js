@@ -8,7 +8,11 @@
 	const ignoreDistanceConfigKey = 'enableChasmLineDistanceOverride'
 	const modeCanvas = 0
 	const modeWebgl = 1
+	const renderLayerId = 'chasm-lines'
+	const renderCallbackId = 'chasm-line-renderer-lines'
+	const uiDemandCallbackId = 'chasm-line-renderer-ui-demand'
 	const curveSegments = 64
+	let renderApiRegistered = false
 
 	ModLoader.register({
 		id: MOD_ID,
@@ -22,6 +26,7 @@
 	function installChasmLineRenderer(api) {
 		if (window[installedKey] || typeof Game === 'undefined') return
 		window[installedKey] = true
+		registerChasmLineRenderApi(api)
 		api.patch(Game.prototype, 'renderChasm', function (original) {
 			return function (...args) {
 				const ignoreDistance = shouldIgnoreChasmLineDistance(this, api)
@@ -30,6 +35,7 @@
 				if (!rendererEnabled && !ignoreDistance) return original.apply(this, args)
 				const segments = collectChasmLineSegments(this, { ignoreDistance })
 				if (!segments) return original.apply(this, args)
+				if (shouldUseChasmLineRenderApi(api, this) && shouldReplaceChasmLines(rendererEnabled, ignoreDistance, mode)) return
 				if (rendererEnabled && mode === modeWebgl && renderChasmLineSegmentsWebgl(this, segments)) return
 				if (ignoreDistance) {
 					drawChasmLineSegmentsCanvas(this, segments)
@@ -38,6 +44,43 @@
 				return original.apply(this, args)
 			}
 		})
+	}
+
+	function registerChasmLineRenderApi(api) {
+		if (renderApiRegistered || !api?.render || typeof api.render.onLayer !== 'function') return
+		if (typeof api.render.registerLayer === 'function') {
+			api.render.registerLayer(renderLayerId, { order: 44, zIndex: 44, clearEachFrame: true })
+		}
+		api.render.onLayer('ui', function () {}, { id: uiDemandCallbackId, order: -1000, copyTransform: false, copyState: false })
+		api.render.onLayer(renderLayerId, function ({ game, ctx }) {
+			renderChasmLinesForRenderApi(api, game, ctx)
+		}, { id: renderCallbackId, order: 20, copyTransform: false, copyState: false })
+		renderApiRegistered = true
+	}
+
+	function shouldUseChasmLineRenderApi(api, game) {
+		return !!(
+			game &&
+			renderApiRegistered &&
+			api?.render &&
+			(typeof api.render.isEnabled !== 'function' || api.render.isEnabled() !== false)
+		)
+	}
+
+	function renderChasmLinesForRenderApi(api, game, ctx) {
+		if (!game || !ctx || game.plane) return
+		const ignoreDistance = shouldIgnoreChasmLineDistance(game, api)
+		const rendererEnabled = isChasmLineRendererEnabled(api)
+		const mode = normalizeChasmLineMode(api.config.get(modeConfigKey, modeWebgl))
+		if (!shouldReplaceChasmLines(rendererEnabled, ignoreDistance, mode)) return
+		const segments = collectChasmLineSegments(game, { ignoreDistance })
+		if (!segments) return
+		if (rendererEnabled && mode === modeWebgl && renderChasmLineSegmentsWebgl(game, segments, ctx)) return
+		if (ignoreDistance || rendererEnabled) drawChasmLineSegmentsCanvas(game, segments, ctx)
+	}
+
+	function shouldReplaceChasmLines(rendererEnabled, ignoreDistance, mode) {
+		return !!(ignoreDistance || (rendererEnabled && mode === modeWebgl))
 	}
 
 	function isChasmLineRendererEnabled(api) {
@@ -91,8 +134,7 @@
 		return segments
 	}
 
-	function drawChasmLineSegmentsCanvas(game, segments) {
-		const ctx = game?.ctx
+	function drawChasmLineSegmentsCanvas(game, segments, ctx = game?.ctx) {
 		if (!ctx) return false
 		ctx.save()
 		for (let i = 0; i < segments.length; i++) {
@@ -123,8 +165,8 @@
 		]
 	}
 
-	function renderChasmLineSegmentsWebgl(game, segments) {
-		if (game?.[rendererFailedKey]) return false
+	function renderChasmLineSegmentsWebgl(game, segments, ctx = game?.ctx) {
+		if (!ctx || game?.[rendererFailedKey]) return false
 		const renderer = getChasmLineRenderer(game)
 		if (!renderer) return false
 		try {
@@ -145,7 +187,7 @@
 				bindChasmLineAttributes(gl, renderer.program, renderer.buffer)
 				gl.drawArraysInstanced(gl.TRIANGLES, 0, curveSegments * 6, segments.length)
 			}
-			game.ctx.drawImage(renderer.canvas, 0, 0)
+			ctx.drawImage(renderer.canvas, 0, 0)
 			return true
 		} catch (error) {
 			destroyChasmLineRenderer(game)

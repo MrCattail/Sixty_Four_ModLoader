@@ -6,7 +6,10 @@ ModLoader.register({
 		const MAX_UNDO = 32
 		const renderLayerId = 'interaction'
 		const renderCallbackId = 'worldediter-overlay'
+		const cursorLayerId = 'cursor'
+		const cursorCallbackId = 'worldediter-cursor'
 		let renderApiOverlayRegistered = false
+		let renderApiCursorRegistered = false
 		const state = {
 			api,
 			game: null,
@@ -32,6 +35,7 @@ ModLoader.register({
 
 		api.on('afterVanillaScripts', function () {
 			registerRenderApiOverlay()
+			registerRenderApiCursor()
 			if (typeof Game === 'undefined' || !Game.prototype) return
 			api.patch(Game.prototype, 'processMousemove2', function (original) {
 				return function (xy, dxy, click) {
@@ -81,7 +85,7 @@ ModLoader.register({
 			api.patch(Game.prototype, 'renderCursor', function (original) {
 				return function () {
 					if (!isActiveForGame(this)) return original.apply(this, arguments)
-					renderEditorCursor(this)
+					if (!shouldUseRenderApiCursor()) renderEditorCursor(this)
 				}
 			})
 			api.patch(Game.prototype, 'renderHoveredCell', function (original) {
@@ -112,6 +116,21 @@ ModLoader.register({
 
 		function shouldUseRenderApiOverlay() {
 			if (!renderApiOverlayRegistered || !api.render) return false
+			if (typeof api.render.isEnabled === 'function') return api.render.isEnabled() !== false
+			return true
+		}
+
+		function registerRenderApiCursor() {
+			if (!api.render || typeof api.render.onLayer !== 'function') return
+			api.render.onLayer(cursorLayerId, function ({ game, ctx }) {
+				if (!isActiveForGame(game)) return
+				renderEditorCursor(game, ctx)
+			}, { id: cursorCallbackId, order: 40, copyTransform: false, copyState: false })
+			renderApiCursorRegistered = true
+		}
+
+		function shouldUseRenderApiCursor() {
+			if (!renderApiCursorRegistered || !api.render) return false
 			if (typeof api.render.isEnabled === 'function') return api.render.isEnabled() !== false
 			return true
 		}
@@ -1037,8 +1056,8 @@ ModLoader.register({
 			} catch (error) {}
 		}
 
-		function renderEditorCursor(game) {
-			const ctx = game.ctx
+		function renderEditorCursor(game, ctx = game?.ctx) {
+			if (!ctx) return
 			const mouse = game.mouse?.offsetxy || [state.mouse.x, state.mouse.y]
 			const cell = game.hoveredCell || [0, 0]
 			const target = game.uvToXYUntranslated(cell)

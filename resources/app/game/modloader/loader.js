@@ -425,6 +425,7 @@
 		ui: { id: 'ui', order: 50, zIndex: 50, clearEachFrame: true },
 		'screen-effects': { id: 'screen-effects', order: 55, zIndex: 55, clearEachFrame: true },
 		cursor: { id: 'cursor', order: 60, zIndex: 60, clearEachFrame: true },
+		'reduced-flashes': { id: 'reduced-flashes', order: 65, zIndex: 65, clearEachFrame: true },
 		'top-effects': { id: 'top-effects', order: 70, zIndex: 70, clearEachFrame: true }
 	}
 
@@ -506,6 +507,15 @@
 		manager.container.insertBefore(canvas, before)
 	}
 
+	const applyRenderLayerDefinition = function (manager, layer) {
+		if (!manager || !layer || layer.isMain) return
+		const def = getRenderLayerDef(layer.id)
+		layer.order = def.order
+		layer.zIndex = def.zIndex
+		layer.clearEachFrame = def.clearEachFrame
+		if (layer.canvas) insertRenderLayerCanvas(manager, layer)
+	}
+
 	const syncRenderLayerCanvas = function (manager, layer) {
 		if (!manager?.sourceCanvas || !layer?.canvas || layer.isMain) return false
 		const source = manager.sourceCanvas
@@ -544,7 +554,10 @@
 			return { id: 'main', order: 20, zIndex: 20, canvas: manager.sourceCanvas, ctx: manager.game?.ctx, isMain: true, clearEachFrame: false }
 		}
 		if (options && Object.keys(options).length) registerRenderLayerDefinition(normalized, options)
-		if (manager.layers[normalized]) return manager.layers[normalized]
+		if (manager.layers[normalized]) {
+			applyRenderLayerDefinition(manager, manager.layers[normalized])
+			return manager.layers[normalized]
+		}
 		const def = getRenderLayerDef(normalized)
 		const canvas = document.createElement('canvas')
 		canvas.className = 'modloader-render-layer modloader-render-layer-' + normalized
@@ -683,7 +696,9 @@
 		if (options.clearEachFrame !== undefined || options.clear !== undefined || current.clearEachFrame !== undefined) next.clearEachFrame = options.clearEachFrame ?? options.clear ?? current.clearEachFrame
 		else delete next.clearEachFrame
 		state.renderLayerDefinitions[normalized] = next
-		if (state.renderLayerManager) ensureRenderLayer(state.renderLayerManager, normalized)
+		const manager = state.renderLayerManager
+		if (manager?.layers?.[normalized]) applyRenderLayerDefinition(manager, manager.layers[normalized])
+		else if (manager) ensureRenderLayer(manager, normalized)
 		return state.renderLayerDefinitions[normalized]
 	}
 
@@ -816,8 +831,35 @@
 		}, { copyTransform: false, copyState: false })
 	}
 
+	const shouldRouteReducedFlashesOverlay = function (game) {
+		return !!(isRenderApiEnabled() && game?.photofobia && game.flashlight && !game.plane && game.canvas && game.ctx)
+	}
+
+	const renderReducedFlashesOverlay = function (game) {
+		if (!shouldRouteReducedFlashesOverlay(game)) return
+		withRenderLayer(game, 'reduced-flashes', function (ctx) {
+			const width = Number(game.w) || 0
+			const height = Number(game.h) || 0
+			if (!width || !height) return
+			const centerX = Number(game.w2) || width / 2
+			const centerY = Number(game.h2) || height / 2
+			const fill = ctx.createRadialGradient(centerX, centerY, height / 4, centerX, centerY, centerX)
+			fill.addColorStop(0, '#1120')
+			fill.addColorStop(1, '#1129')
+			ctx.save()
+			try {
+				ctx.setTransform(1, 0, 0, 1, 0, 0)
+				ctx.fillStyle = fill
+				ctx.fillRect(0, 0, width, height)
+			} finally {
+				ctx.restore()
+			}
+		}, { copyTransform: false, copyState: false })
+	}
+
 	const renderBuiltInFrameOverlays = function (game) {
 		renderTouchModeOverlay(game)
+		renderReducedFlashesOverlay(game)
 	}
 
 	const endRenderFrame = function (game) {
@@ -849,9 +891,13 @@
 			api.patch(Game.prototype, 'renderloop', function (original) {
 				return function (...args) {
 					beginRenderFrame(this)
+					const routeReducedFlashesOverlay = shouldRouteReducedFlashesOverlay(this) && !!ensureRenderLayerManager(this)
+					const previousPhotofobia = this.photofobia
+					if (routeReducedFlashesOverlay) this.photofobia = false
 					try {
 						return original.apply(this, args)
 					} finally {
+						if (routeReducedFlashesOverlay) this.photofobia = previousPhotofobia
 						endRenderFrame(this)
 					}
 				}

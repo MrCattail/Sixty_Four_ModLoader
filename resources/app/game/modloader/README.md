@@ -133,8 +133,8 @@ api.render.withLayer('ui', (ctx, game) => {
 ```
 
 Built-in layer ids are `background`, `buildings`, `effects`, `interaction`,
-`ui`, `screen-effects`, `cursor`, and `top-effects`. Custom layers can be
-registered with `api.render.registerLayer(id, { order, zIndex, clearEachFrame })`.
+`ui`, `screen-effects`, `cursor`, `reduced-flashes`, and `top-effects`.
+Custom layers can be registered with `api.render.registerLayer(id, { order, zIndex, clearEachFrame })`.
 Use `api.render.layers.get(id)` to access a layer canvas/context directly.
 The ModLoader menu settings page includes a Render API switch. Turning it off
 returns vanilla draw calls to the main canvas and skips registered render-layer

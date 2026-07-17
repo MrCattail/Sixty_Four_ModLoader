@@ -22,6 +22,7 @@
     "scripts/explainer-fix.js",
     "scripts/ending-skip.js",
     "scripts/accessibility-buttons.js",
+    "scripts/reduced-flashes-layering.js",
     "scripts/chasm-line-renderer.js",
     "scripts/floor-grid-lines.js",
     "scripts/play-time-counter.js",
@@ -60,6 +61,30 @@
       "default": true,
       "description": "Show the bottom accessibility control bar and reality-floor color palette.",
       "section": "accessibilityButtons"
+    },
+    "enableResourceLayersAboveReducedFlashes": {
+      "type": "boolean",
+      "label": {
+        "en": "Resources/lines above reduced flashes",
+        "sch": "资源和绘线显示在变暗遮罩上方",
+        "modsch": "资源和绘线显示在变暗遮罩上方",
+        "tch": "資源和繪線顯示在變暗遮罩上方"
+      },
+      "default": false,
+      "description": {
+        "en": "When the Render API is on, draw resource UI and resource/chasm lines above the reduced-flashes dark overlay. Off keeps the vanilla order where the overlay darkens them.",
+        "sch": "渲染 API 开启时，让资源 UI、资源来源绘线和逆裂缝绘线显示在 reduced flashes 的变暗遮罩上方。关闭时保持原版顺序，由遮罩压暗它们。",
+        "modsch": "渲染 API 开启时，让资源 UI、资源来源绘线和逆裂缝绘线显示在 reduced flashes 的变暗遮罩上方。关闭时保持原版顺序，由遮罩压暗它们。",
+        "tch": "渲染 API 開啟時，讓資源 UI、資源來源繪線和逆裂縫繪線顯示在 reduced flashes 的變暗遮罩上方。關閉時保持原版順序，由遮罩壓暗它們。"
+      },
+      "reloadPolicy": "hot",
+      "section": "reducedFlashesLayering",
+      "sectionLabel": {
+        "en": "Reduced flashes layering",
+        "sch": "变暗遮罩层级",
+        "modsch": "变暗遮罩层级",
+        "tch": "變暗遮罩層級"
+      }
     },
     "enableStabilizerSurgeFlashReduction": {
       "type": "boolean",
@@ -655,7 +680,7 @@
       "section": "viewDistance"
     }
   },
-  "description": "Combines view distance limits, dynamic camera projection, ending skip, accessibility buttons, stabilizer surge flash reduction, gradient mine flash suppression, startup loading screen skip, void return fade skip, resource glow colors, chasm line rendering, floor grid outlines, play-time counter, Shift/Ctrl zoom shortcut control, and explainer fixes into one multi-entry quality mod.",
+  "description": "Combines view distance limits, dynamic camera projection, ending skip, accessibility buttons, reduced-flashes layer preference, stabilizer surge flash reduction, gradient mine flash suppression, startup loading screen skip, void return fade skip, resource glow colors, chasm line rendering, floor grid outlines, play-time counter, Shift/Ctrl zoom shortcut control, and explainer fixes into one multi-entry quality mod.",
   "reloadOnConfigChange": true,
   "translations": {
     "sch": {

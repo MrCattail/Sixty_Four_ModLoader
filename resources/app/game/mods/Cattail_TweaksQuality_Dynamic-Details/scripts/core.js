@@ -10,6 +10,8 @@ ModLoader.register({
 		const detailToggleKey = '_cattailDynamicDetailsToggle'
 		const coordinateToggleKey = '_cattailDynamicCoordinateToggle'
 		const directionPointerToggleKey = '_cattailDynamicDirectionPointerToggle'
+		const coordinateRenderLayerId = 'cursor'
+		const coordinateRenderCallbackId = 'dynamic-details-coordinate-overlay'
 		const widthStateKey = '_cattailDynamicWidthState'
 		const cubeMemoryTtl = 15000
 		const stableWidthTtl = 10000
@@ -32,6 +34,11 @@ ModLoader.register({
 		const resourceSourceLineChartStateKey = '_cattailDynamicResourceSourceLineChart'
 		const resourceSourceLineRendererCanvas = 0
 		const resourceSourceLineRendererWebgl = 1
+		const resourceSourceRenderLayerId = 'resource-links'
+		const resourceSourceRenderCallbackId = 'dynamic-details-resource-source-links'
+		const resourceSourceUiDemandCallbackId = 'dynamic-details-resource-source-ui-demand'
+		const resourceSourceGpuLineDefaultOrder = 1
+		const resourceSourceGpuLineStackOrder = 45
 		const resourceSourceWarmupKey = '_cattailDynamicResourceSourceWarmup'
 		const resourceSourceSuppressTransferKey = '_cattailDynamicResourceSourceSuppressTransfer'
 		const resourceSourceActiveCubeKey = '_cattailDynamicResourceSourceActiveCube'
@@ -114,6 +121,8 @@ ModLoader.register({
 		let zPressed = false
 		let hintOpacity = 1
 		let hintInfoOpaque = false
+		let coordinateRenderApiRegistered = false
+		let resourceSourceRenderApiRegistered = false
 		let resourceSourceProfilerEnabled = false
 
 		const namespace = window.CattailDynamicDetails = window.CattailDynamicDetails || {}
@@ -139,6 +148,7 @@ ModLoader.register({
 			installDetailToggle()
 			installOpacityControls()
 			patchTransientCubeHints()
+			registerResourceSourceRenderApiLayers()
 			installResourceSourceTracking()
 		}
 
@@ -149,6 +159,7 @@ ModLoader.register({
 			installStyles()
 			installCoordinateToggle()
 			installCoordinateTeleportPanel()
+			registerCoordinateRenderApiOverlay()
 			patchTransientCubeHints()
 		}
 
@@ -157,6 +168,7 @@ ModLoader.register({
 			if (typeof Game === 'undefined') return
 			namespace.directionPointersInstalled = true
 			installDirectionPointerToggle()
+			registerCoordinateRenderApiOverlay()
 			patchTransientCubeHints()
 		}
 
@@ -909,8 +921,42 @@ ModLoader.register({
 			return Math.max(opacityMin, Math.min(opacityMax, Math.round(Number(value) * 100) / 100))
 		}
 
+		function registerCoordinateRenderApiOverlay() {
+			if (coordinateRenderApiRegistered || !api.render || typeof api.render.onLayer !== 'function') return
+			api.render.onLayer(coordinateRenderLayerId, function ({ game, ctx }) {
+				renderCoordinateOverlay(game, ctx)
+			}, { id: coordinateRenderCallbackId, order: 20, copyTransform: false, copyState: false })
+			coordinateRenderApiRegistered = true
+		}
+
+		function shouldUseCoordinateRenderApiOverlay() {
+			if (!coordinateRenderApiRegistered || !api.render) return false
+			if (typeof api.render.isEnabled === 'function') return api.render.isEnabled() !== false
+			return true
+		}
+
+		function registerResourceSourceRenderApiLayers() {
+			if (resourceSourceRenderApiRegistered || !api.render || typeof api.render.onLayer !== 'function') return
+			if (typeof api.render.registerLayer === 'function') {
+				api.render.registerLayer(resourceSourceRenderLayerId, { order: 45, zIndex: 45, clearEachFrame: true })
+			}
+			api.render.onLayer('ui', function () {}, { id: resourceSourceUiDemandCallbackId, order: -1000, copyTransform: false, copyState: false })
+			api.render.onLayer(resourceSourceRenderLayerId, function ({ game, ctx }) {
+				if (!shouldUseResourceSourceRenderApiLinks(game)) return
+				renderResourceSourceLinks(game, ctx)
+			}, { id: resourceSourceRenderCallbackId, order: 20, copyTransform: false, copyState: false })
+			resourceSourceRenderApiRegistered = true
+		}
+
+		function shouldUseResourceSourceRenderApiLinks(game) {
+			if (!game || !resourceSourceRenderApiRegistered || !api.render || !isResourceSourceFeatureEnabled()) return false
+			if (typeof api.render.isEnabled === 'function') return api.render.isEnabled() !== false
+			return true
+		}
+
 		function patchTransientCubeHints() {
-			if (typeof Game === 'undefined' || window._cattailDynamicCursorOverlayInstalled) return
+			if (typeof Game === 'undefined') return
+			if (window._cattailDynamicCursorOverlayInstalled) return
 			window._cattailDynamicCursorOverlayInstalled = true
 			api.patch(Game.prototype, 'renderCursor', function (original) {
 				return function (...args) {
@@ -946,20 +992,20 @@ ModLoader.register({
 							this.shiftPressed = previousShift
 						}
 					}
-					renderCoordinateOverlay(this)
+					if (!shouldUseCoordinateRenderApiOverlay()) renderCoordinateOverlay(this)
 					return result
 				}
 			})
 		}
 
-		function renderCoordinateOverlay(game) {
+		function renderCoordinateOverlay(game, ctx = game?.ctx) {
 			if (!shouldShowCoordinateOverlay(game)) {
-				renderCoordinateDirectionIndicators(game)
+				renderCoordinateDirectionIndicators(game, ctx)
 				return
 			}
+			if (!ctx) return
 			const cell = game.hoveredCell
 			const text = 'X: ' + cell[0] + ' Y: ' + cell[1]
-			const ctx = game.ctx
 			const pixelRatio = game.pixelRatio || 1
 			const unit = game.screenUnit || game.unit || 1
 			const fontSize = Math.max(9 * pixelRatio, unit * 0.105)
@@ -1004,7 +1050,7 @@ ModLoader.register({
 				ctx.fillText(text, point.x, point.y)
 			}
 			ctx.restore()
-			renderCoordinateDirectionIndicators(game)
+			renderCoordinateDirectionIndicators(game, ctx)
 		}
 
 		function getCoordinateOverlayPosition(game, width, height, gap, margin, hintRect = getCurrentHintCanvasRect(game)) {
@@ -1045,12 +1091,11 @@ ModLoader.register({
 			ctx.fill()
 		}
 
-		function renderCoordinateDirectionIndicators(game) {
+		function renderCoordinateDirectionIndicators(game, ctx = game?.ctx) {
 			if (!shouldShowCoordinateDirectionIndicators(game)) return
 			const targets = collectCoordinateDirectionTargets(game)
 			if (!targets.length) return
-
-			const ctx = game.ctx
+			if (!ctx) return
 			const pixelRatio = game.pixelRatio || 1
 			const unit = game.screenUnit || game.unit || 1
 			const iconSize = Math.max(21 * pixelRatio, Math.min(34 * pixelRatio, unit * 0.26))
@@ -2530,6 +2575,16 @@ ModLoader.register({
 			patchGeneralDecayResourceSourceAttribution()
 			patchResourceSourceProducerContexts()
 
+			if (typeof Splash !== 'undefined' && Splash.prototype && !Splash.prototype._cattailDynamicResourceSourceShowPatched) {
+				Splash.prototype._cattailDynamicResourceSourceShowPatched = true
+				api.patch(Splash.prototype, 'show', function (original) {
+					return function (...args) {
+						clearResourceSourceGpuLines(this.master)
+						return original.apply(this, args)
+					}
+				})
+			}
+
 			api.patch(Game.prototype, 'switchPlane', function (original) {
 				return function (...args) {
 					clearResourceSourceGpuLines(this)
@@ -2636,7 +2691,7 @@ ModLoader.register({
 					try {
 						profileResourceSource(
 							'resource.links.total',
-							() => renderResourceSourceLinks(this),
+							() => { if (!shouldUseResourceSourceRenderApiLinks(this)) renderResourceSourceLinks(this) },
 							() => getResourceSourceProfileDetail(this, getResourceSourceFocusResourceId(this))
 						)
 						const result = profileResourceSource(
@@ -3430,7 +3485,7 @@ ModLoader.register({
 			if (deadline && typeof deadline.timeRemaining === 'function') return deadline.timeRemaining() > 3
 			return performance.now() - start < 6
 		}
-		function renderResourceSourceLinks(game) {
+		function renderResourceSourceLinks(game, ctx = game?.ctx) {
 			if (isResourceSourceEndingActive(game)) {
 				clearResourceSourceGpuLines(game)
 				return
@@ -3460,9 +3515,10 @@ ModLoader.register({
 			}
 
 			clearResourceSourceGpuLines(game)
+			if (!ctx) return
 			profileResourceSource(
 				'resource.links.canvas.render',
-				() => drawResourceSourceLinkSegments(game, segments),
+				() => drawResourceSourceLinkSegments(game, segments, ctx),
 				() => getResourceSourceProfileDetail(game, resourceId, { segments: segments.length })
 			)
 		}
@@ -3493,12 +3549,13 @@ ModLoader.register({
 			}
 		}
 
-		function drawResourceSourceLinkSegments(game, segments) {
-			for (const segment of segments) drawResourceSourceLink(game, segment.source, segment.target, segment.color)
+		function drawResourceSourceLinkSegments(game, segments, ctx = game?.ctx) {
+			if (!ctx) return
+			for (const segment of segments) drawResourceSourceLink(game, segment.source, segment.target, segment.color, ctx)
 		}
 
-		function drawResourceSourceLink(game, source, target, color) {
-			const ctx = game.ctx
+		function drawResourceSourceLink(game, source, target, color, ctx = game?.ctx) {
+			if (!ctx) return
 			const bend = Math.max(game.unit || 1, Math.abs(target[1] - source[1]) * 0.28)
 			ctx.save()
 			ctx.globalAlpha = 0.72
@@ -3573,9 +3630,11 @@ ModLoader.register({
 			if (game[resourceSourceGpuRendererKey]?.gl) return game[resourceSourceGpuRendererKey]
 			const canvas = document.createElement('canvas')
 			canvas.className = 'cattail-resource-source-gpu-lines'
+			const renderOrder = getResourceSourceGpuLineRenderOrder(game)
+			canvas.dataset.modloaderRenderOrder = String(renderOrder)
 			canvas.style.position = 'fixed'
 			canvas.style.pointerEvents = 'none'
-			canvas.style.zIndex = '1'
+			canvas.style.zIndex = String(renderOrder)
 			canvas.style.display = 'none'
 			const gl = profileResourceSource('resource.links.webgl.context', () => canvas.getContext('webgl2', { alpha: true, premultipliedAlpha: false, antialias: true }), () => getResourceSourceProfileDetail(game, getResourceSourceFocusResourceId(game)))
 			if (!gl) {
@@ -3612,11 +3671,18 @@ ModLoader.register({
 			const rect = game.canvas.getBoundingClientRect()
 			if (renderer.canvas.width !== game.w) renderer.canvas.width = game.w
 			if (renderer.canvas.height !== game.h) renderer.canvas.height = game.h
+			const renderOrder = getResourceSourceGpuLineRenderOrder(game)
+			renderer.canvas.dataset.modloaderRenderOrder = String(renderOrder)
 			renderer.canvas.style.display = 'block'
+			renderer.canvas.style.zIndex = String(renderOrder)
 			renderer.canvas.style.left = rect.left + 'px'
 			renderer.canvas.style.top = rect.top + 'px'
 			renderer.canvas.style.width = rect.width + 'px'
 			renderer.canvas.style.height = rect.height + 'px'
+		}
+
+		function getResourceSourceGpuLineRenderOrder(game) {
+			return game?.canvas?.parentNode?.id === 'modloader-render-stack' ? resourceSourceGpuLineStackOrder : resourceSourceGpuLineDefaultOrder
 		}
 
 		function clearResourceSourceGpuLines(game) {
@@ -3629,7 +3695,7 @@ ModLoader.register({
 		}
 
 		function isResourceSourceEndingActive(game) {
-			return !!(game && (game.credits || game.pinhole || game.entitiesInGame?.pinhole > 0))
+			return !!(game && (game.splash?.isShown || game.credits || game.pinhole || game.entitiesInGame?.pinhole > 0))
 		}
 
 		function bindResourceSourceGpuLineAttributes(gl, program, buffer) {
