@@ -99,6 +99,47 @@ Game-corner buttons registered with `api.ui.registerCornerButton()` are treated
 as game HUD by default when they use a `game-*` dock. Pass `gameHud: false` to
 opt out, or `hudSide` to choose a different hide edge.
 
+## Render Layers API
+
+ModLoader creates a stacked canvas renderer around the vanilla game canvas. The
+vanilla canvas remains the main world canvas, and layer canvases are created
+lazily. When a mod registers or accesses a layer, matching safe vanilla draw
+calls can be routed to that layer so ordering stays stable. Unused layers keep
+their vanilla draw calls on the main canvas to avoid extra compositor cost.
+Background and building layers exist for future world-splitting work, but the
+current vanilla world is still drawn on the main canvas.
+
+Mods can draw into a layer every frame:
+
+```js
+const stop = api.render.onLayer('interaction', ({ game, ctx }) => {
+  if (!game.hoveredCell) return
+  ctx.save()
+  ctx.fillStyle = 'rgba(64, 255, 160, .25)'
+  ctx.fillRect(20, 20, 80, 80)
+  ctx.restore()
+})
+```
+
+For one-off drawing or advanced wrappers, temporarily switch `game.ctx` with
+`withLayer()`:
+
+```js
+api.render.withLayer('ui', (ctx, game) => {
+  ctx.font = game.smallFont
+  ctx.fillStyle = '#fff'
+  ctx.fillText('mod overlay', game.screenUnit, game.screenUnit * 2)
+})
+```
+
+Built-in layer ids are `background`, `buildings`, `effects`, `interaction`,
+`ui`, `screen-effects`, `cursor`, and `top-effects`. Custom layers can be
+registered with `api.render.registerLayer(id, { order, zIndex, clearEachFrame })`.
+Use `api.render.layers.get(id)` to access a layer canvas/context directly.
+The ModLoader menu settings page includes a Render API switch. Turning it off
+returns vanilla draw calls to the main canvas and skips registered render-layer
+callbacks until it is turned on again.
+
 ## Translation Catalog
 
 Open `Ctrl+M` -> Menu Settings -> `translations` to create or open

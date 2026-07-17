@@ -40,7 +40,7 @@
 		panelPreferredHideEdge: null,
 		panelModOrder: [],
 		panelConfigSectionOrder: {},
-		panelSettings: { theme: 'dark', hideMode: 'auto', autoHideSeconds: 3, hideMenuDetails: false, hideModFileDetails: false, sortConfigSections: true },
+		panelSettings: { theme: 'dark', hideMode: 'auto', autoHideSeconds: 3, hideMenuDetails: false, hideModFileDetails: false, sortConfigSections: true, renderApiEnabled: true },
 		panelSettingsOpen: false,
 		panelStateLoaded: false,
 		panelAutoHideTimer: null,
@@ -51,7 +51,16 @@
 		gameHudItems: {},
 		gameHudInstalled: false,
 		gameHudRenderPatched: false,
-		gameHudAnimation: null
+		gameHudAnimation: null,
+		vanillaGameHudHidden: false,
+		vanillaGameHudSyncInstalled: false,
+		renderLayerManager: null,
+		renderLayerDefinitions: {},
+		renderCallbacks: {},
+		renderLayerDemands: {},
+		renderCallbackSerial: 1,
+		renderFrame: 0,
+		renderInstalled: false
 	}
 
 	const addIssue = function (level, code, message, details) {
@@ -281,6 +290,7 @@
 			.modloader-ui-dock-game-top-right { right: calc(var(--unit) * .5); top: calc(var(--unit) * 3.35); flex-direction: column; }
 			.modloader-ui-dock-splash-bottom-right { right: 72px; bottom: 15px; flex-direction: row-reverse; }
 			.modloader-ui-dock-splash-top-right { right: 72px; top: 15px; flex-direction: row-reverse; }
+			.modloader-ui-dock-vanilla-hidden { display: none !important; }
 			.mobile .modloader-ui-hide-mobile { display: none !important; }
 		`
 		document.head.appendChild(style)
@@ -307,6 +317,38 @@
 		return `${modId || 'anonymous'}:${id || 'button'}`
 	}
 
+	const isVanillaGameHudHidden = function (game = state.game) {
+		const shopToggle = game?.shop?.shopToggle
+		let vanillaHidden = false
+		try {
+			vanillaHidden = !!shopToggle && getComputedStyle(shopToggle).display === 'none'
+		} catch (error) {}
+		return !!(game?.pinhole || game?.credits || vanillaHidden)
+	}
+
+	const applyVanillaGameHudVisibilityToDock = function (dockName, dock = state.uiDocks[dockName]) {
+		if (!dock) return
+		const hidden = isGameHudDock(dockName) && state.vanillaGameHudHidden
+		dock.classList.toggle('modloader-ui-dock-vanilla-hidden', hidden)
+		dock.setAttribute('aria-hidden', hidden ? 'true' : 'false')
+	}
+
+	const applyVanillaGameHudVisibilityToDocks = function () {
+		for (const dockName in state.uiDocks) applyVanillaGameHudVisibilityToDock(dockName)
+	}
+
+	const syncVanillaGameHudVisibility = function (game = state.game) {
+		if (game) state.game = game
+		const hidden = isVanillaGameHudHidden(game)
+		const changed = state.vanillaGameHudHidden !== hidden
+		state.vanillaGameHudHidden = hidden
+		applyVanillaGameHudVisibilityToDocks()
+		if (changed && typeof window !== 'undefined') {
+			window.dispatchEvent(new CustomEvent('modloader:vanilla-game-hud', { detail: { hidden, game } }))
+		}
+		return hidden
+	}
+
 	const syncUiDock = function (dockName) {
 		const dock = ensureUiDock(dockName)
 		if (!dock) return
@@ -321,6 +363,7 @@
 			if (entry.element.parentNode !== dock) dock.appendChild(entry.element)
 		}
 		dock.classList.toggle('modloader-ui-dock-empty', entries.length === 0)
+		applyVanillaGameHudVisibilityToDock(dockName, dock)
 	}
 
 	const syncUiDocks = function () {
@@ -371,6 +414,531 @@
 		}
 		syncUiDock(dock)
 		return function () { unregisterUiButton(modId, id, options.element) }
+	}
+
+
+	const RENDER_LAYER_DEFS = {
+		background: { id: 'background', order: 0, zIndex: 0, clearEachFrame: true },
+		buildings: { id: 'buildings', order: 10, zIndex: 10, clearEachFrame: true },
+		effects: { id: 'effects', order: 30, zIndex: 30, clearEachFrame: true },
+		interaction: { id: 'interaction', order: 40, zIndex: 40, clearEachFrame: true },
+		ui: { id: 'ui', order: 50, zIndex: 50, clearEachFrame: true },
+		'screen-effects': { id: 'screen-effects', order: 55, zIndex: 55, clearEachFrame: true },
+		cursor: { id: 'cursor', order: 60, zIndex: 60, clearEachFrame: true },
+		'top-effects': { id: 'top-effects', order: 70, zIndex: 70, clearEachFrame: true }
+	}
+
+	const RENDER_METHOD_LAYERS = {
+		renderVFX: 'effects',
+		renderAvailability: 'interaction',
+		renderSOI: 'interaction',
+		renderHoveredCell: 'interaction',
+		renderAffected: 'interaction',
+		renderResources: 'ui',
+		renderDarkResources: 'ui',
+		renderHollowEvents: 'screen-effects',
+		renderDarkHollowEvents: 'screen-effects',
+		renderSlowdown: 'screen-effects',
+		renderCursor: 'cursor'
+	}
+
+	const RENDER_CONTEXT_PROPS = [
+		'globalAlpha', 'globalCompositeOperation', 'imageSmoothingEnabled',
+		'fillStyle', 'strokeStyle', 'font', 'textAlign', 'textBaseline', 'direction',
+		'lineWidth', 'lineCap', 'lineJoin', 'miterLimit', 'shadowBlur', 'shadowColor',
+		'shadowOffsetX', 'shadowOffsetY', 'filter'
+	]
+
+	const normalizeRenderLayerId = function (id) {
+		return String(id || 'ui').trim().toLowerCase().replace(/[^a-z0-9_.:-]/g, '-') || 'ui'
+	}
+
+	const markRenderLayerDemanded = function (id) {
+		const normalized = normalizeRenderLayerId(id)
+		state.renderLayerDemands[normalized] = true
+		return normalized
+	}
+
+	const hasRenderLayerDemand = function (id) {
+		return state.renderLayerDemands[normalizeRenderLayerId(id)] === true
+	}
+
+	const getRenderGame = function (game) {
+		return game || state.game || uiPagesCurrentGame || window.game || null
+	}
+
+	const getRenderLayerDef = function (id) {
+		const normalized = normalizeRenderLayerId(id)
+		return Object.assign({ id: normalized, order: 45, zIndex: 45, clearEachFrame: true }, RENDER_LAYER_DEFS[normalized] || {}, state.renderLayerDefinitions[normalized] || {})
+	}
+
+	const isRenderApiEnabled = function () {
+		loadPanelState()
+		return state.panelSettings.renderApiEnabled !== false
+	}
+
+	const ensureRenderLayerStyle = function () {
+		if (document.getElementById('modloader-render-layer-style')) return
+		const style = document.createElement('style')
+		style.id = 'modloader-render-layer-style'
+		style.textContent = [
+			'#modloader-render-stack { position: fixed; inset: 0; z-index: 0; width: 100%; height: 100%; overflow: hidden; pointer-events: none; }',
+			'#modloader-render-stack > canvas { position: absolute; left: 0; top: 0; width: 100%; height: 100%; margin: 0; padding: 0; border: 0; user-select: none; }',
+			'#modloader-render-stack > .modloader-render-main-canvas { pointer-events: auto; cursor: none; }',
+			'#modloader-render-stack > .modloader-render-layer { pointer-events: none; }'
+		].join('\n')
+		document.head.appendChild(style)
+	}
+
+	const insertRenderLayerCanvas = function (manager, layer) {
+		const canvas = layer.canvas
+		canvas.dataset.modloaderRenderOrder = String(layer.order)
+		canvas.style.zIndex = String(layer.zIndex)
+		const children = Array.from(manager.container.children)
+		let before = null
+		for (const child of children) {
+			const order = Number(child.dataset?.modloaderRenderOrder)
+			if (Number.isFinite(order) && order > layer.order) {
+				before = child
+				break
+			}
+		}
+		manager.container.insertBefore(canvas, before)
+	}
+
+	const syncRenderLayerCanvas = function (manager, layer) {
+		if (!manager?.sourceCanvas || !layer?.canvas || layer.isMain) return false
+		const source = manager.sourceCanvas
+		const game = manager.game
+		const ratio = Math.max(1, Number(game?.pixelRatio) || Number(window.devicePixelRatio) || 1)
+		let width = Number(game?.w) || source.width || 0
+		let height = Number(game?.h) || source.height || 0
+		if (!width || !height) {
+			const rect = source.getBoundingClientRect()
+			width = width || rect.width * ratio || window.innerWidth * ratio
+			height = height || rect.height * ratio || window.innerHeight * ratio
+		}
+		width = Math.max(1, Math.round(width))
+		height = Math.max(1, Math.round(height))
+		if (layer.canvas.width !== width) layer.canvas.width = width
+		if (layer.canvas.height !== height) layer.canvas.height = height
+		return true
+	}
+
+	const syncRenderLayers = function (manager) {
+		if (!manager?.sourceCanvas) return false
+		const source = manager.sourceCanvas
+		if (!source.isConnected) return false
+		if (manager.container && source.parentNode !== manager.container) {
+			manager.container.appendChild(source)
+		}
+		for (const id in manager.layers) syncRenderLayerCanvas(manager, manager.layers[id])
+		applyRenderLayerVisibility(manager)
+		return true
+	}
+
+	const ensureRenderLayer = function (manager, id, options = {}) {
+		if (!manager) return null
+		const normalized = normalizeRenderLayerId(id)
+		if (normalized === 'main' || normalized === 'world' || normalized === 'vanilla') {
+			return { id: 'main', order: 20, zIndex: 20, canvas: manager.sourceCanvas, ctx: manager.game?.ctx, isMain: true, clearEachFrame: false }
+		}
+		if (options && Object.keys(options).length) registerRenderLayerDefinition(normalized, options)
+		if (manager.layers[normalized]) return manager.layers[normalized]
+		const def = getRenderLayerDef(normalized)
+		const canvas = document.createElement('canvas')
+		canvas.className = 'modloader-render-layer modloader-render-layer-' + normalized
+		canvas.dataset.modloaderLayer = normalized
+		canvas.setAttribute('aria-hidden', 'true')
+		canvas.style.zIndex = String(def.zIndex)
+		const ctx = canvas.getContext('2d')
+		const layer = Object.assign({}, def, { canvas, ctx, visible: true })
+		manager.layers[normalized] = layer
+		insertRenderLayerCanvas(manager, layer)
+		syncRenderLayerCanvas(manager, layer)
+		applyRenderLayerVisibility(manager)
+		return layer
+	}
+
+	const ensureRenderLayerManager = function (game) {
+		game = getRenderGame(game)
+		if (!game?.canvas || !document.body) return null
+		if (game.__modloaderRenderLayerManager?.sourceCanvas === game.canvas) {
+			state.renderLayerManager = game.__modloaderRenderLayerManager
+			state.renderLayerManager.game = game
+			return state.renderLayerManager
+		}
+		ensureRenderLayerStyle()
+		const source = game.canvas
+		let container = source.parentNode?.id === 'modloader-render-stack' ? source.parentNode : null
+		if (!container) {
+			container = document.createElement('div')
+			container.id = 'modloader-render-stack'
+			container.setAttribute('aria-hidden', 'true')
+			const parent = source.parentNode || document.body
+			parent.insertBefore(container, source)
+			container.appendChild(source)
+		}
+		source.classList.add('modloader-render-main-canvas')
+		source.dataset.modloaderRenderOrder = '20'
+		source.style.zIndex = '20'
+		const manager = { game, sourceCanvas: source, container, layers: {} }
+		game.__modloaderRenderLayerManager = manager
+		state.renderLayerManager = manager
+		syncRenderLayers(manager)
+		window.dispatchEvent(new CustomEvent('modloader:render-layers-ready', { detail: { game, manager } }))
+		return manager
+	}
+
+	const clearRenderLayer = function (layer) {
+		if (!layer?.ctx || !layer?.canvas || layer.isMain) return
+		const ctx = layer.ctx
+		ctx.save()
+		try {
+			ctx.setTransform(1, 0, 0, 1, 0, 0)
+			ctx.clearRect(0, 0, layer.canvas.width, layer.canvas.height)
+		} finally {
+			ctx.restore()
+		}
+	}
+
+	const clearRenderLayers = function (manager) {
+		if (!manager) return
+		for (const id in manager.layers) {
+			const layer = manager.layers[id]
+			if (layer.clearEachFrame !== false) clearRenderLayer(layer)
+		}
+	}
+
+	const applyRenderLayerVisibility = function (manager) {
+		if (!manager) return
+		const enabled = isRenderApiEnabled()
+		for (const id in manager.layers) {
+			const layer = manager.layers[id]
+			if (layer?.canvas) layer.canvas.style.display = enabled && layer.visible !== false ? '' : 'none'
+		}
+	}
+
+	const setRenderApiEnabled = function (enabled) {
+		state.panelSettings.renderApiEnabled = enabled !== false
+		const manager = state.renderLayerManager
+		if (manager) {
+			if (!isRenderApiEnabled()) clearRenderLayers(manager)
+			applyRenderLayerVisibility(manager)
+		}
+		if (isRenderApiEnabled()) installRenderApi(getRenderGame())
+		return isRenderApiEnabled()
+	}
+
+	const copyRenderContextState = function (from, to, options = {}) {
+		if (!from || !to) return
+		try {
+			if (options.copyTransform !== false && typeof from.getTransform === 'function' && typeof to.setTransform === 'function') to.setTransform(from.getTransform())
+			else if (typeof to.setTransform === 'function') to.setTransform(1, 0, 0, 1, 0, 0)
+		} catch (error) {}
+		if (options.copyState === false) return
+		for (const prop of RENDER_CONTEXT_PROPS) {
+			try { to[prop] = from[prop] } catch (error) {}
+		}
+		try {
+			if (typeof from.getLineDash === 'function' && typeof to.setLineDash === 'function') to.setLineDash(from.getLineDash())
+		} catch (error) {}
+		try { to.lineDashOffset = from.lineDashOffset } catch (error) {}
+	}
+
+	const withRenderLayer = function (game, layerId, fn, options = {}) {
+		game = getRenderGame(game)
+		if (!game || typeof fn !== 'function') return undefined
+		if (!isRenderApiEnabled()) return options.allowWhenDisabled ? fn(game.ctx, game, null) : undefined
+		const manager = ensureRenderLayerManager(game)
+		if (!manager) return fn(game.ctx, game, null)
+		const layer = ensureRenderLayer(manager, layerId, options.layerOptions)
+		if (!layer?.ctx || layer.isMain) return fn(game.ctx, game, layer)
+		if (layer.visible === false) return undefined
+		syncRenderLayerCanvas(manager, layer)
+		const previousCtx = game.ctx
+		const nextCtx = layer.ctx
+		if (previousCtx === nextCtx) return fn(nextCtx, game, layer)
+		nextCtx.save()
+		try {
+			copyRenderContextState(previousCtx, nextCtx, options)
+			game.ctx = nextCtx
+			return fn(nextCtx, game, layer)
+		} finally {
+			game.ctx = previousCtx
+			nextCtx.restore()
+		}
+	}
+
+	const registerRenderLayerDefinition = function (id, options = {}) {
+		const normalized = normalizeRenderLayerId(id)
+		const current = state.renderLayerDefinitions[normalized] || {}
+		const order = Number(options.order ?? options.zIndex ?? current.order)
+		const zIndex = Number(options.zIndex ?? options.order ?? current.zIndex)
+		const next = Object.assign({}, current, options, { id: normalized })
+		if (Number.isFinite(order)) next.order = order
+		else delete next.order
+		if (Number.isFinite(zIndex)) next.zIndex = zIndex
+		else delete next.zIndex
+		if (options.clearEachFrame !== undefined || options.clear !== undefined || current.clearEachFrame !== undefined) next.clearEachFrame = options.clearEachFrame ?? options.clear ?? current.clearEachFrame
+		else delete next.clearEachFrame
+		state.renderLayerDefinitions[normalized] = next
+		if (state.renderLayerManager) ensureRenderLayer(state.renderLayerManager, normalized)
+		return state.renderLayerDefinitions[normalized]
+	}
+
+	const publicRenderLayer = function (layer) {
+		if (!layer) return null
+		return {
+			id: layer.id,
+			name: layer.id,
+			canvas: layer.canvas,
+			ctx: layer.ctx,
+			context: layer.ctx,
+			isMain: !!layer.isMain,
+			get visible() { return layer.visible !== false },
+			set visible(value) {
+				layer.visible = value !== false
+				if (layer.canvas) layer.canvas.style.display = layer.visible === false ? 'none' : ''
+			},
+			clear() { clearRenderLayer(layer) },
+			sync(game) {
+				const manager = ensureRenderLayerManager(game)
+				if (manager) syncRenderLayerCanvas(manager, layer)
+				return this
+			}
+		}
+	}
+
+	const getPublicRenderLayer = function (id, game, options) {
+		const layerId = markRenderLayerDemanded(id)
+		if (!isRenderApiEnabled()) return null
+		const manager = ensureRenderLayerManager(game)
+		return publicRenderLayer(manager ? ensureRenderLayer(manager, layerId, options) : null)
+	}
+
+	const renderCallbackKey = function (modId, id) {
+		return (modId || 'anonymous') + ':' + (id || ('render-' + state.renderCallbackSerial++))
+	}
+
+	const createRenderCallbackContext = function (entry, game, layer) {
+		return {
+			id: entry.id,
+			modId: entry.modId,
+			layer: layer.id,
+			layerId: layer.id,
+			game,
+			ctx: layer.ctx,
+			context: layer.ctx,
+			canvas: layer.canvas,
+			width: layer.canvas?.width || 0,
+			height: layer.canvas?.height || 0,
+			pixelRatio: Number(game?.pixelRatio) || Number(window.devicePixelRatio) || 1,
+			frame: state.renderFrame
+		}
+	}
+
+	const registerRenderCallback = function (modId, layerId, fn, options = {}) {
+		if (typeof layerId === 'object' && !fn) {
+			options = layerId || {}
+			layerId = options.layer || options.layerId || options.name || 'ui'
+			fn = options.render || options.fn || options.callback
+		}
+		if (typeof fn !== 'function') {
+			warn('Ignoring render callback from ' + (modId || 'anonymous') + ' without a function.')
+			return function () {}
+		}
+		const id = String(options.id || options.name || '') || undefined
+		const key = renderCallbackKey(modId, id)
+		const normalizedLayerId = markRenderLayerDemanded(layerId)
+		state.renderCallbacks[key] = {
+			id: id || key,
+			key,
+			modId: modId || 'anonymous',
+			layerId: normalizedLayerId,
+			fn,
+			order: Number.isFinite(Number(options.order)) ? Number(options.order) : 100,
+			enabled: options.enabled !== false,
+			copyState: options.copyState,
+			copyTransform: options.copyTransform
+		}
+		return function () { delete state.renderCallbacks[key] }
+	}
+
+	const runRenderCallbacks = function (game) {
+		const entries = Object.keys(state.renderCallbacks).map(function (key) { return state.renderCallbacks[key] }).filter(function (entry) { return entry && entry.enabled !== false })
+		entries.sort(function (a, b) {
+			const ao = getRenderLayerDef(a.layerId).order
+			const bo = getRenderLayerDef(b.layerId).order
+			return (ao - bo) || (a.order - b.order) || String(a.key).localeCompare(String(b.key))
+		})
+		for (const entry of entries) {
+			try {
+				withRenderLayer(game, entry.layerId, function (ctx, activeGame, layer) {
+					entry.fn(createRenderCallbackContext(entry, activeGame, layer))
+				}, { copyState: entry.copyState, copyTransform: entry.copyTransform })
+			} catch (error) {
+				warn('Render callback from ' + entry.modId + ' failed', error)
+			}
+		}
+	}
+
+	const beginRenderFrame = function (game) {
+		if (game) state.game = game
+		if (!isRenderApiEnabled()) return
+		const manager = ensureRenderLayerManager(game)
+		if (!manager) return
+		state.renderFrame += 1
+		syncRenderLayers(manager)
+		clearRenderLayers(manager)
+	}
+
+	const renderTouchModeOverlay = function (game) {
+		if (!game || (game.touchMode !== 1 && game.touchMode !== 2)) return
+		withRenderLayer(game, 'screen-effects', function (ctx) {
+			const fill = ctx.createLinearGradient(0, 0, 0, game.h)
+			if (game.touchMode === 1) {
+				fill.addColorStop(0, '#FF241CFF')
+				fill.addColorStop(1, '#FFB97F00')
+			} else {
+				fill.addColorStop(0, '#30F1FFFF')
+				fill.addColorStop(1, '#CEFFB400')
+			}
+			ctx.save()
+			try {
+				ctx.setTransform(1, 0, 0, 1, 0, 0)
+				ctx.globalCompositeOperation = 'multiply'
+				ctx.fillStyle = fill
+				ctx.fillRect(0, 0, game.w, game.h)
+			} finally {
+				ctx.restore()
+			}
+		}, { copyTransform: false, copyState: false })
+	}
+
+	const renderBuiltInFrameOverlays = function (game) {
+		renderTouchModeOverlay(game)
+	}
+
+	const endRenderFrame = function (game) {
+		if (!isRenderApiEnabled()) return
+		const manager = ensureRenderLayerManager(game)
+		if (!manager) return
+		runRenderCallbacks(game)
+		renderBuiltInFrameOverlays(game)
+		window.dispatchEvent(new CustomEvent('modloader:render-frame', { detail: { game, frame: state.renderFrame, manager } }))
+	}
+
+	const patchRenderLayerMethod = function (methodName, layerId) {
+		if (typeof Game === 'undefined' || !Game.prototype || typeof Game.prototype[methodName] !== 'function') return
+		api.patch(Game.prototype, methodName, function (original) {
+			return function (...args) {
+				if (!isRenderApiEnabled() || !hasRenderLayerDemand(layerId)) return original.apply(this, args)
+				return withRenderLayer(this, layerId, function () {
+					return original.apply(this, args)
+				}.bind(this))
+			}
+		})
+	}
+
+	const installRenderApi = function (game) {
+		if (game) state.game = game
+		if (typeof Game === 'undefined' || !Game.prototype) return
+		if (!state.renderInstalled) {
+			state.renderInstalled = true
+			api.patch(Game.prototype, 'renderloop', function (original) {
+				return function (...args) {
+					beginRenderFrame(this)
+					try {
+						return original.apply(this, args)
+					} finally {
+						endRenderFrame(this)
+					}
+				}
+			})
+			api.patch(Game.prototype, 'initScreenSize', function (original) {
+				return function (...args) {
+					const result = original.apply(this, args)
+					if (isRenderApiEnabled()) {
+						const manager = ensureRenderLayerManager(this)
+						if (manager) syncRenderLayers(manager)
+					}
+					return result
+				}
+			})
+			api.patch(Game.prototype, 'initScreenSizeMobile', function (original) {
+				return function (...args) {
+					const result = original.apply(this, args)
+					if (isRenderApiEnabled()) {
+						const manager = ensureRenderLayerManager(this)
+						if (manager) syncRenderLayers(manager)
+					}
+					return result
+				}
+			})
+			for (const methodName in RENDER_METHOD_LAYERS) patchRenderLayerMethod(methodName, RENDER_METHOD_LAYERS[methodName])
+		}
+		if (isRenderApiEnabled() && game?.canvas) ensureRenderLayerManager(game)
+	}
+
+	const createRenderApi = function (modId) {
+		return {
+			install(game) {
+				installRenderApi(game)
+				return state.renderLayerManager
+			},
+			isEnabled: isRenderApiEnabled,
+			setEnabled(value) { return setRenderApiEnabled(value) },
+			isAvailable(game) { return isRenderApiEnabled() && !!ensureRenderLayerManager(game) },
+			getLayer(id, game, options) { return getPublicRenderLayer(id, game, options) },
+			layer(id, game, options) { return getPublicRenderLayer(id, game, options) },
+			context(id, game, options) { return getPublicRenderLayer(id, game, options)?.ctx || null },
+			withLayer(id, fn, options = {}) {
+				const layerId = markRenderLayerDemanded(id)
+				const game = getRenderGame(options.game)
+				return withRenderLayer(game, layerId, function (ctx, activeGame, layer) {
+					return fn(ctx, activeGame, publicRenderLayer(layer))
+				}, options)
+			},
+			onLayer(id, fn, options) { return registerRenderCallback(modId, id, fn, options || {}) },
+			on(id, fn, options) { return registerRenderCallback(modId, id, fn, options || {}) },
+			register(options) { return registerRenderCallback(modId, options || {}) },
+			registerLayer(id, options) { return registerRenderLayerDefinition(id, options || {}) },
+			clear(id, game) {
+				const layer = getPublicRenderLayer(id, game)
+				if (layer) layer.clear()
+			},
+			sync(game) {
+				if (!isRenderApiEnabled()) return null
+				const manager = ensureRenderLayerManager(game)
+				if (manager) syncRenderLayers(manager)
+				return manager
+			},
+			markDirty(id) {
+				const layer = state.renderLayerManager?.layers?.[normalizeRenderLayerId(id)]
+				if (layer) layer.dirty = true
+			},
+			layers: {
+				list(game) {
+					if (!isRenderApiEnabled()) return []
+					const manager = ensureRenderLayerManager(game)
+					if (!manager) return []
+					return Object.keys(manager.layers).map(function (id) { return publicRenderLayer(manager.layers[id]) })
+				},
+				get(id, game, options) { return getPublicRenderLayer(id, game, options) },
+				ensure(id, options, game) { return getPublicRenderLayer(id, game, options) },
+				clear(id, game) {
+					const layer = getPublicRenderLayer(id, game)
+					if (layer) layer.clear()
+				},
+				with(id, fn, options = {}) {
+					const layerId = markRenderLayerDemanded(id)
+					return withRenderLayer(getRenderGame(options.game), layerId, function (ctx, activeGame, layer) {
+						return fn(ctx, activeGame, publicRenderLayer(layer))
+					}, options)
+				}
+			}
+		}
 	}
 
 
@@ -750,6 +1318,36 @@
 			isHidden() { return !!state.gameHudHidden },
 			refresh() { syncGameHudEntries() }
 		}
+	}
+
+	const patchVanillaGameHudSyncMethod = function (target, methodName, gameFromThis) {
+		if (!target || typeof target[methodName] !== 'function') return
+		api.patch(target, methodName, function (original) {
+			return function (...args) {
+				const result = original.apply(this, args)
+				syncVanillaGameHudVisibility(gameFromThis ? gameFromThis(this) : this)
+				return result
+			}
+		})
+	}
+
+	const installVanillaGameHudSync = function (game) {
+		if (game) state.game = game
+		if (!state.vanillaGameHudSyncInstalled) {
+			state.vanillaGameHudSyncInstalled = true
+			if (typeof Shop !== 'undefined' && Shop.prototype) {
+				patchVanillaGameHudSyncMethod(Shop.prototype, 'init', function (shop) { return shop.master })
+				patchVanillaGameHudSyncMethod(Shop.prototype, 'check', function (shop) { return shop.master })
+			}
+			if (typeof Pinhole !== 'undefined' && Pinhole.prototype) {
+				patchVanillaGameHudSyncMethod(Pinhole.prototype, 'init', function (pinhole) { return pinhole.master })
+			}
+			if (typeof Game !== 'undefined' && Game.prototype) {
+				patchVanillaGameHudSyncMethod(Game.prototype, 'watchCredits')
+				patchVanillaGameHudSyncMethod(Game.prototype, 'closeCredits')
+			}
+		}
+		syncVanillaGameHudVisibility(game)
 	}
 
 	const installGameHud = function (game) {
@@ -1262,6 +1860,8 @@
 			unregisterButton(id) { return unregisterUiButton(modId, id) },
 			refreshCornerButtons: syncUiDocks,
 			refreshButtons: syncUiDocks,
+			isVanillaGameHudHidden(game) { return isVanillaGameHudHidden(game) },
+			refreshVanillaGameHud(game) { return syncVanillaGameHudVisibility(game) },
 			registerHud(options) { return registerGameHudItem(modId, options) },
 			registerGameHud(options) { return registerGameHudItem(modId, options) },
 			hud: createUiHudApi(modId),
@@ -1283,10 +1883,10 @@
 	}
 	const PANEL_TEXT = {
 		en: {
-			close: 'Close', hideToEdge: 'Hide to edge', showFromEdge: 'Show ModLoader menu', menuSettings: 'Menu Settings', themeMode: 'Theme', darkMode: 'Dark', lightMode: 'Light', hideMode: 'Auto-hide mode', autoHide: 'Auto-hide', manualHide: 'Manual', sortMod: 'Sort mod', sortConfigSection: 'Sort section', configSectionSorting: 'Config section sorting', configSectionSortingOn: 'On', configSectionSortingOff: 'Off', autoHideDelay: 'Auto-hide delay', secondsSuffix: 's', hideMenuDetails: 'Hide menu details', hideModFileDetails: 'Hide mod file details', show: 'Show', hide: 'Hide', installedMods: 'Installed mods', enabledEntries: 'Enabled entries', loadedMods: 'Loaded mods', issues: 'Issues', dataPatches: 'Data patches', wordPatches: 'Word patches', registeredLanguages: 'Registered languages', orphanEntities: 'Orphan entities', modManager: 'Mod Manager', selectAll: 'all', toggleNote: 'Toggle mods or edit config below.', changesRequireReload: 'Changes require reload.', configSaveNote: 'Config saved to localStorage; some mods need reload.', saveReload: 'Save & Reload', saveConfig: 'Save Config', insert: 'insert', folder: 'folder', deleteMod: 'Delete mod', config: 'Config', recentLog: 'Recent Log', noLogEntries: 'No log entries.', noModsFound: 'No mods with mod.json were found.', fileAccessUnavailable: 'File access is unavailable.', fileAccessLoadedOnly: 'File access is unavailable, so only loaded mods can be shown.', reloadHot: 'hot capable, reload now', reloadRestart: 'restart required', reloadRequired: 'reload required', idPrefix: 'id: {value}', uniquePrefix: 'unique: {value}', depsPrefix: 'deps: {value}', conflictsPrefix: 'conflicts: {value}', missingDependencies: 'Missing dependencies: {value}', conflictsEnabled: 'Conflicts enabled: {value}', savedReloading: 'Saved. Reloading...', saveFailed: 'Save failed: {value}', configSaved: 'Config saved.', noChanges: 'No changes to save.', changesCanceled: 'Canceled unsaved changes.', openFolderFailed: 'Could not open folder: {value}', deleteTitle: 'Delete Mod?', deleteMessage: 'Delete {name} from the mods folder? This cannot be undone.', deleteConfirm: 'Delete', cancel: 'Cancel', replaceTitle: 'Replace Mod?', replaceMessage: 'mods already contains {name}. Replace it with the imported mod?', replaceConfirm: 'Replace', deletedMod: 'Deleted {name}. Reload to unload already running code.', deleteFailed: 'Delete failed: {value}', importHint: 'Drop a file here or paste', importDetail: 'Drag a mod zip here, or copy a zip file and press paste. ModLoader will unpack it into the mods folder automatically.', importWaiting: 'Waiting for a zip file...', importNoZip: 'Drop or paste a .zip file.', importNoPath: 'Could not read the file path from the dropped file.', importing: 'Importing {name}...', importedMod: 'Imported {name}. Enable it and Save & Reload when ready.', importFailed: 'Import failed: {value}', importModeOff: 'Back to mod list', invalidZip: 'Only .zip mod packages can be imported.', zipNoMod: 'The zip does not contain a mod.json.', zipMultipleMods: 'The zip contains multiple mod folders; import one mod at a time.', zipExtractFailed: 'Could not extract zip: {value}', folderOpened: 'Opened mods folder.', replaceRenamedUniqueTitle: 'Update Renamed Mod?', replaceRenamedUniqueMessage: 'The new file has the same mod unique code as an installed mod. It is probably an update and rename.\n{oldName} -> {newName}\nReplace the old file?', replaceRenamedPreviousTitle: 'Mod Rename Detected', replaceRenamedPreviousMessage: 'This new file appears to be a rename of an installed file.\n{oldName} -> {newName}\nReplace the old file?', replaceOld: 'Replace', keepImported: 'Do not replace (add new file)', uniqueCodeEditTitle: 'Recommend changing mod unique code', uniqueCodeEditMessage: 'These two mods will share the same mod unique code. Change the imported mod unique code before adding it?', uniqueCodeLabel: 'Mod unique code', uniqueCodeConfirm: 'Confirm', uniqueCodeSkip: 'No', manifestReadFailed: 'Could not read mod.json: {value}', translationFile: 'translations', translationFileTitle: 'Open translation file', translationFileSynced: 'Translation file synced: {path}', translationFileFailed: 'Translation file failed: {value}'
+			close: 'Close', hideToEdge: 'Hide to edge', showFromEdge: 'Show ModLoader menu', menuSettings: 'Menu Settings', themeMode: 'Theme', darkMode: 'Dark', lightMode: 'Light', hideMode: 'Auto-hide mode', autoHide: 'Auto-hide', manualHide: 'Manual', sortMod: 'Sort mod', sortConfigSection: 'Sort section', configSectionSorting: 'Config section sorting', configSectionSortingOn: 'On', configSectionSortingOff: 'Off', renderApi: 'Render API', renderApiOn: 'On', renderApiOff: 'Off', autoHideDelay: 'Auto-hide delay', secondsSuffix: 's', hideMenuDetails: 'Hide menu details', hideModFileDetails: 'Hide mod file details', show: 'Show', hide: 'Hide', installedMods: 'Installed mods', enabledEntries: 'Enabled entries', loadedMods: 'Loaded mods', issues: 'Issues', dataPatches: 'Data patches', wordPatches: 'Word patches', registeredLanguages: 'Registered languages', orphanEntities: 'Orphan entities', modManager: 'Mod Manager', selectAll: 'all', toggleNote: 'Toggle mods or edit config below.', changesRequireReload: 'Changes require reload.', configSaveNote: 'Config saved to localStorage; some mods need reload.', saveReload: 'Save & Reload', saveConfig: 'Save Config', insert: 'insert', folder: 'folder', deleteMod: 'Delete mod', config: 'Config', recentLog: 'Recent Log', noLogEntries: 'No log entries.', noModsFound: 'No mods with mod.json were found.', fileAccessUnavailable: 'File access is unavailable.', fileAccessLoadedOnly: 'File access is unavailable, so only loaded mods can be shown.', reloadHot: 'hot capable, reload now', reloadRestart: 'restart required', reloadRequired: 'reload required', idPrefix: 'id: {value}', uniquePrefix: 'unique: {value}', depsPrefix: 'deps: {value}', conflictsPrefix: 'conflicts: {value}', missingDependencies: 'Missing dependencies: {value}', conflictsEnabled: 'Conflicts enabled: {value}', savedReloading: 'Saved. Reloading...', saveFailed: 'Save failed: {value}', configSaved: 'Config saved.', noChanges: 'No changes to save.', changesCanceled: 'Canceled unsaved changes.', openFolderFailed: 'Could not open folder: {value}', deleteTitle: 'Delete Mod?', deleteMessage: 'Delete {name} from the mods folder? This cannot be undone.', deleteConfirm: 'Delete', cancel: 'Cancel', replaceTitle: 'Replace Mod?', replaceMessage: 'mods already contains {name}. Replace it with the imported mod?', replaceConfirm: 'Replace', deletedMod: 'Deleted {name}. Reload to unload already running code.', deleteFailed: 'Delete failed: {value}', importHint: 'Drop a file here or paste', importDetail: 'Drag a mod zip here, or copy a zip file and press paste. ModLoader will unpack it into the mods folder automatically.', importWaiting: 'Waiting for a zip file...', importNoZip: 'Drop or paste a .zip file.', importNoPath: 'Could not read the file path from the dropped file.', importing: 'Importing {name}...', importedMod: 'Imported {name}. Enable it and Save & Reload when ready.', importFailed: 'Import failed: {value}', importModeOff: 'Back to mod list', invalidZip: 'Only .zip mod packages can be imported.', zipNoMod: 'The zip does not contain a mod.json.', zipMultipleMods: 'The zip contains multiple mod folders; import one mod at a time.', zipExtractFailed: 'Could not extract zip: {value}', folderOpened: 'Opened mods folder.', replaceRenamedUniqueTitle: 'Update Renamed Mod?', replaceRenamedUniqueMessage: 'The new file has the same mod unique code as an installed mod. It is probably an update and rename.\n{oldName} -> {newName}\nReplace the old file?', replaceRenamedPreviousTitle: 'Mod Rename Detected', replaceRenamedPreviousMessage: 'This new file appears to be a rename of an installed file.\n{oldName} -> {newName}\nReplace the old file?', replaceOld: 'Replace', keepImported: 'Do not replace (add new file)', uniqueCodeEditTitle: 'Recommend changing mod unique code', uniqueCodeEditMessage: 'These two mods will share the same mod unique code. Change the imported mod unique code before adding it?', uniqueCodeLabel: 'Mod unique code', uniqueCodeConfirm: 'Confirm', uniqueCodeSkip: 'No', manifestReadFailed: 'Could not read mod.json: {value}', translationFile: 'translations', translationFileTitle: 'Open translation file', translationFileSynced: 'Translation file synced: {path}', translationFileFailed: 'Translation file failed: {value}'
 		},
 		sch: {
-			close: '\u5173\u95ed', hideToEdge: '\u9690\u85cf\u5230\u8fb9\u7f18', showFromEdge: '\u663e\u793a ModLoader \u83dc\u5355', menuSettings: 'Mod \u83dc\u5355\u8bbe\u7f6e', themeMode: '\u4eae\u8272 / \u6697\u8272\u6a21\u5f0f', darkMode: '\u6697\u8272', lightMode: '\u4eae\u8272', hideMode: '\u81ea\u52a8\u9690\u85cf\u6a21\u5f0f', autoHide: '\u81ea\u52a8\u9690\u85cf', manualHide: '\u624b\u52a8\u9690\u85cf', sortMod: '\u6392\u5e8f mod', sortConfigSection: '\u6392\u5e8f\u5b50\u529f\u80fd', configSectionSorting: '\u5b50\u529f\u80fd\u624b\u52a8\u6392\u5e8f', configSectionSortingOn: '\u5f00\u542f', configSectionSortingOff: '\u5173\u95ed', autoHideDelay: '\u81ea\u52a8\u9690\u85cf\u79d2\u6570', secondsSuffix: '\u79d2', hideMenuDetails: '\u9690\u85cf\u83dc\u5355\u8be6\u60c5', hideModFileDetails: '\u9690\u85cf mod \u6587\u4ef6\u8be6\u60c5', show: '\u663e\u793a', hide: '\u9690\u85cf', installedMods: '\u5df2\u5b89\u88c5 mod', enabledEntries: '\u542f\u7528\u6761\u76ee', loadedMods: '\u5df2\u52a0\u8f7d mod', issues: '\u95ee\u9898', dataPatches: '\u6570\u636e\u8865\u4e01', wordPatches: '\u6587\u672c\u8865\u4e01', registeredLanguages: '\u5df2\u6ce8\u518c\u8bed\u8a00', orphanEntities: '\u5b64\u7acb\u5b9e\u4f53', modManager: 'Mod \u7ba1\u7406', selectAll: '\u5168\u9009', toggleNote: '\u5728\u4e0b\u65b9\u5f00\u5173 mod \u6216\u7f16\u8f91\u914d\u7f6e\u3002', changesRequireReload: '\u6539\u52a8\u9700\u8981 reload\u3002', configSaveNote: '\u914d\u7f6e\u5df2\u4fdd\u5b58\u5230 localStorage\uff1b\u90e8\u5206 mod \u9700\u8981 reload \u751f\u6548\u3002', saveReload: '\u4fdd\u5b58\u5e76 Reload', saveConfig: '\u4fdd\u5b58\u914d\u7f6e', insert: '\u5bfc\u5165', folder: '\u6587\u4ef6\u5939', deleteMod: '\u5220\u9664 mod', config: '\u914d\u7f6e', recentLog: '\u6700\u8fd1\u65e5\u5fd7', noLogEntries: '\u6682\u65e0\u65e5\u5fd7\u3002', noModsFound: '\u6ca1\u6709\u627e\u5230\u5e26 mod.json \u7684 mod\u3002', fileAccessUnavailable: '\u6587\u4ef6\u8bbf\u95ee\u4e0d\u53ef\u7528\u3002', fileAccessLoadedOnly: '\u6587\u4ef6\u8bbf\u95ee\u4e0d\u53ef\u7528\uff0c\u6240\u4ee5\u53ea\u80fd\u663e\u793a\u5df2\u52a0\u8f7d\u7684 mod\u3002', reloadHot: '\u652f\u6301\u70ed\u5f00\u5173\uff0c\u5f53\u524d\u4ecd\u5efa\u8bae reload', reloadRestart: '\u9700\u8981\u91cd\u542f', reloadRequired: '\u9700\u8981 reload', idPrefix: 'id\uff1a{value}', uniquePrefix: '\u552f\u4e00\u7801\uff1a{value}', depsPrefix: '\u4f9d\u8d56\uff1a{value}', conflictsPrefix: '\u51b2\u7a81\uff1a{value}', missingDependencies: '\u7f3a\u5c11\u4f9d\u8d56\uff1a{value}', conflictsEnabled: '\u5df2\u542f\u7528\u51b2\u7a81\uff1a{value}', savedReloading: '\u5df2\u4fdd\u5b58\uff0c\u6b63\u5728 reload...', saveFailed: '\u4fdd\u5b58\u5931\u8d25\uff1a{value}', configSaved: '\u914d\u7f6e\u5df2\u4fdd\u5b58\u3002', noChanges: '\u6ca1\u6709\u9700\u8981\u4fdd\u5b58\u7684\u6539\u52a8\u3002', changesCanceled: '\u5df2\u53d6\u6d88\u672a\u4fdd\u5b58\u7684\u6539\u52a8\u3002', openFolderFailed: '\u65e0\u6cd5\u6253\u5f00\u6587\u4ef6\u5939\uff1a{value}', deleteTitle: '\u5220\u9664 Mod\uff1f', deleteMessage: '\u4ece mods \u6587\u4ef6\u5939\u5220\u9664 {name}\uff1f\u8fd9\u4e2a\u64cd\u4f5c\u4e0d\u80fd\u64a4\u9500\u3002', deleteConfirm: '\u5220\u9664', cancel: '\u53d6\u6d88', replaceTitle: '\u66ff\u6362 Mod\uff1f', replaceMessage: 'mods \u91cc\u5df2\u7ecf\u6709 {name}\u3002\u662f\u5426\u7528\u5bfc\u5165\u7684 mod \u66ff\u6362\u5b83\uff1f', replaceConfirm: '\u66ff\u6362', deletedMod: '\u5df2\u5220\u9664 {name}\u3002\u5df2\u7ecf\u8fd0\u884c\u7684\u4ee3\u7801\u9700\u8981 reload \u624d\u4f1a\u5378\u8f7d\u3002', deleteFailed: '\u5220\u9664\u5931\u8d25\uff1a{value}', importHint: '\u628a\u6587\u4ef6\u62d6\u5230\u8fd9\u91cc\u6216\u590d\u5236', importDetail: '\u53ef\u4ee5\u628a mod zip \u5305\u76f4\u63a5\u62d6\u5165\uff0c\u6216\u8005\u590d\u5236 zip \u5305\u540e\u5728\u8fd9\u91cc\u6309\u7c98\u8d34\u5feb\u6377\u952e\uff0cModLoader \u4f1a\u81ea\u52a8\u89e3\u5305\u5230 mods \u6587\u4ef6\u5939\u3002', importWaiting: '\u7b49\u5f85 zip \u6587\u4ef6...', importNoZip: '\u8bf7\u62d6\u5165\u6216\u7c98\u8d34 .zip \u6587\u4ef6\u3002', importNoPath: '\u65e0\u6cd5\u8bfb\u53d6\u8be5\u6587\u4ef6\u8def\u5f84\u3002', importing: '\u6b63\u5728\u5bfc\u5165 {name}...', importedMod: '\u5df2\u5bfc\u5165 {name}\u3002\u9700\u8981\u65f6\u52fe\u9009\u5b83\u5e76\u4fdd\u5b58 reload\u3002', importFailed: '\u5bfc\u5165\u5931\u8d25\uff1a{value}', importModeOff: '\u8fd4\u56de mod \u5217\u8868', invalidZip: '\u53ea\u80fd\u5bfc\u5165 .zip mod \u5305\u3002', zipNoMod: '\u8fd9\u4e2a zip \u5185\u6ca1\u6709 mod.json\u3002', zipMultipleMods: '\u8fd9\u4e2a zip \u5305\u542b\u591a\u4e2a mod \u6587\u4ef6\u5939\uff1b\u8bf7\u4e00\u6b21\u5bfc\u5165\u4e00\u4e2a mod\u3002', zipExtractFailed: '\u65e0\u6cd5\u89e3\u538b zip\uff1a{value}', folderOpened: '\u5df2\u6253\u5f00 mods \u6587\u4ef6\u5939\u3002', replaceRenamedUniqueTitle: '\u53d1\u73b0\u540c\u552f\u4e00\u7801 Mod', replaceRenamedUniqueMessage: '\u65b0\u6587\u4ef6\u8ddf\u5df2\u6709\u6587\u4ef6\u6709\u76f8\u540c\u7684 mod \u552f\u4e00\u7801\uff0c\u5b83\u5f88\u53ef\u80fd\u662f\u65e7\u6587\u4ef6\u7684\u66f4\u65b0\u548c\u6539\u540d\u3002\n{oldName} \u2192 {newName}\n\u662f\u5426\u8986\u76d6\u65e7\u6587\u4ef6\uff1f', replaceRenamedPreviousTitle: '\u53d1\u73b0 Mod \u6539\u540d', replaceRenamedPreviousMessage: '\u8fd9\u4e2a\u65b0\u6587\u4ef6\u662f\u5df2\u6709\u6587\u4ef6\u7684\u6539\u540d\u3002\n{oldName} \u2192 {newName}\n\u662f\u5426\u8986\u76d6\u65e7\u6587\u4ef6\uff1f', replaceOld: '\u8986\u76d6', keepImported: '\u4e0d\u8986\u76d6\uff08\u52a0\u5165\u65b0\u6587\u4ef6\uff09', uniqueCodeEditTitle: '\u63a8\u8350\u4fee\u6539 mod \u552f\u4e00\u7801', uniqueCodeEditMessage: '\u8fd9\u4e24\u4e2a mod \u4f1a\u5171\u7528\u540c\u4e00\u4e2a mod \u552f\u4e00\u7801\u3002\u662f\u5426\u5728\u52a0\u5165\u65b0\u6587\u4ef6\u524d\u4fee\u6539\u5bfc\u5165 mod \u7684\u552f\u4e00\u7801\uff1f', uniqueCodeLabel: 'mod \u552f\u4e00\u7801', uniqueCodeConfirm: '\u786e\u8ba4\u4fee\u6539', uniqueCodeSkip: '\u5426\uff08\u4e0d\u4fee\u6539\uff09', manifestReadFailed: '\u65e0\u6cd5\u8bfb\u53d6 mod.json\uff1a{value}', translationFile: '\u7ffb\u8bd1', translationFileTitle: '\u6253\u5f00\u7ffb\u8bd1\u6587\u4ef6', translationFileSynced: '\u7ffb\u8bd1\u6587\u4ef6\u5df2\u540c\u6b65\uff1a{path}', translationFileFailed: '\u7ffb\u8bd1\u6587\u4ef6\u5931\u8d25\uff1a{value}'
+			close: '\u5173\u95ed', hideToEdge: '\u9690\u85cf\u5230\u8fb9\u7f18', showFromEdge: '\u663e\u793a ModLoader \u83dc\u5355', menuSettings: 'Mod \u83dc\u5355\u8bbe\u7f6e', themeMode: '\u4eae\u8272 / \u6697\u8272\u6a21\u5f0f', darkMode: '\u6697\u8272', lightMode: '\u4eae\u8272', hideMode: '\u81ea\u52a8\u9690\u85cf\u6a21\u5f0f', autoHide: '\u81ea\u52a8\u9690\u85cf', manualHide: '\u624b\u52a8\u9690\u85cf', sortMod: '\u6392\u5e8f mod', sortConfigSection: '\u6392\u5e8f\u5b50\u529f\u80fd', configSectionSorting: '\u5b50\u529f\u80fd\u624b\u52a8\u6392\u5e8f', configSectionSortingOn: '\u5f00\u542f', configSectionSortingOff: '\u5173\u95ed', renderApi: '\u6e32\u67d3 API', renderApiOn: '\u5f00\u542f', renderApiOff: '\u5173\u95ed', autoHideDelay: '\u81ea\u52a8\u9690\u85cf\u79d2\u6570', secondsSuffix: '\u79d2', hideMenuDetails: '\u9690\u85cf\u83dc\u5355\u8be6\u60c5', hideModFileDetails: '\u9690\u85cf mod \u6587\u4ef6\u8be6\u60c5', show: '\u663e\u793a', hide: '\u9690\u85cf', installedMods: '\u5df2\u5b89\u88c5 mod', enabledEntries: '\u542f\u7528\u6761\u76ee', loadedMods: '\u5df2\u52a0\u8f7d mod', issues: '\u95ee\u9898', dataPatches: '\u6570\u636e\u8865\u4e01', wordPatches: '\u6587\u672c\u8865\u4e01', registeredLanguages: '\u5df2\u6ce8\u518c\u8bed\u8a00', orphanEntities: '\u5b64\u7acb\u5b9e\u4f53', modManager: 'Mod \u7ba1\u7406', selectAll: '\u5168\u9009', toggleNote: '\u5728\u4e0b\u65b9\u5f00\u5173 mod \u6216\u7f16\u8f91\u914d\u7f6e\u3002', changesRequireReload: '\u6539\u52a8\u9700\u8981 reload\u3002', configSaveNote: '\u914d\u7f6e\u5df2\u4fdd\u5b58\u5230 localStorage\uff1b\u90e8\u5206 mod \u9700\u8981 reload \u751f\u6548\u3002', saveReload: '\u4fdd\u5b58\u5e76 Reload', saveConfig: '\u4fdd\u5b58\u914d\u7f6e', insert: '\u5bfc\u5165', folder: '\u6587\u4ef6\u5939', deleteMod: '\u5220\u9664 mod', config: '\u914d\u7f6e', recentLog: '\u6700\u8fd1\u65e5\u5fd7', noLogEntries: '\u6682\u65e0\u65e5\u5fd7\u3002', noModsFound: '\u6ca1\u6709\u627e\u5230\u5e26 mod.json \u7684 mod\u3002', fileAccessUnavailable: '\u6587\u4ef6\u8bbf\u95ee\u4e0d\u53ef\u7528\u3002', fileAccessLoadedOnly: '\u6587\u4ef6\u8bbf\u95ee\u4e0d\u53ef\u7528\uff0c\u6240\u4ee5\u53ea\u80fd\u663e\u793a\u5df2\u52a0\u8f7d\u7684 mod\u3002', reloadHot: '\u652f\u6301\u70ed\u5f00\u5173\uff0c\u5f53\u524d\u4ecd\u5efa\u8bae reload', reloadRestart: '\u9700\u8981\u91cd\u542f', reloadRequired: '\u9700\u8981 reload', idPrefix: 'id\uff1a{value}', uniquePrefix: '\u552f\u4e00\u7801\uff1a{value}', depsPrefix: '\u4f9d\u8d56\uff1a{value}', conflictsPrefix: '\u51b2\u7a81\uff1a{value}', missingDependencies: '\u7f3a\u5c11\u4f9d\u8d56\uff1a{value}', conflictsEnabled: '\u5df2\u542f\u7528\u51b2\u7a81\uff1a{value}', savedReloading: '\u5df2\u4fdd\u5b58\uff0c\u6b63\u5728 reload...', saveFailed: '\u4fdd\u5b58\u5931\u8d25\uff1a{value}', configSaved: '\u914d\u7f6e\u5df2\u4fdd\u5b58\u3002', noChanges: '\u6ca1\u6709\u9700\u8981\u4fdd\u5b58\u7684\u6539\u52a8\u3002', changesCanceled: '\u5df2\u53d6\u6d88\u672a\u4fdd\u5b58\u7684\u6539\u52a8\u3002', openFolderFailed: '\u65e0\u6cd5\u6253\u5f00\u6587\u4ef6\u5939\uff1a{value}', deleteTitle: '\u5220\u9664 Mod\uff1f', deleteMessage: '\u4ece mods \u6587\u4ef6\u5939\u5220\u9664 {name}\uff1f\u8fd9\u4e2a\u64cd\u4f5c\u4e0d\u80fd\u64a4\u9500\u3002', deleteConfirm: '\u5220\u9664', cancel: '\u53d6\u6d88', replaceTitle: '\u66ff\u6362 Mod\uff1f', replaceMessage: 'mods \u91cc\u5df2\u7ecf\u6709 {name}\u3002\u662f\u5426\u7528\u5bfc\u5165\u7684 mod \u66ff\u6362\u5b83\uff1f', replaceConfirm: '\u66ff\u6362', deletedMod: '\u5df2\u5220\u9664 {name}\u3002\u5df2\u7ecf\u8fd0\u884c\u7684\u4ee3\u7801\u9700\u8981 reload \u624d\u4f1a\u5378\u8f7d\u3002', deleteFailed: '\u5220\u9664\u5931\u8d25\uff1a{value}', importHint: '\u628a\u6587\u4ef6\u62d6\u5230\u8fd9\u91cc\u6216\u590d\u5236', importDetail: '\u53ef\u4ee5\u628a mod zip \u5305\u76f4\u63a5\u62d6\u5165\uff0c\u6216\u8005\u590d\u5236 zip \u5305\u540e\u5728\u8fd9\u91cc\u6309\u7c98\u8d34\u5feb\u6377\u952e\uff0cModLoader \u4f1a\u81ea\u52a8\u89e3\u5305\u5230 mods \u6587\u4ef6\u5939\u3002', importWaiting: '\u7b49\u5f85 zip \u6587\u4ef6...', importNoZip: '\u8bf7\u62d6\u5165\u6216\u7c98\u8d34 .zip \u6587\u4ef6\u3002', importNoPath: '\u65e0\u6cd5\u8bfb\u53d6\u8be5\u6587\u4ef6\u8def\u5f84\u3002', importing: '\u6b63\u5728\u5bfc\u5165 {name}...', importedMod: '\u5df2\u5bfc\u5165 {name}\u3002\u9700\u8981\u65f6\u52fe\u9009\u5b83\u5e76\u4fdd\u5b58 reload\u3002', importFailed: '\u5bfc\u5165\u5931\u8d25\uff1a{value}', importModeOff: '\u8fd4\u56de mod \u5217\u8868', invalidZip: '\u53ea\u80fd\u5bfc\u5165 .zip mod \u5305\u3002', zipNoMod: '\u8fd9\u4e2a zip \u5185\u6ca1\u6709 mod.json\u3002', zipMultipleMods: '\u8fd9\u4e2a zip \u5305\u542b\u591a\u4e2a mod \u6587\u4ef6\u5939\uff1b\u8bf7\u4e00\u6b21\u5bfc\u5165\u4e00\u4e2a mod\u3002', zipExtractFailed: '\u65e0\u6cd5\u89e3\u538b zip\uff1a{value}', folderOpened: '\u5df2\u6253\u5f00 mods \u6587\u4ef6\u5939\u3002', replaceRenamedUniqueTitle: '\u53d1\u73b0\u540c\u552f\u4e00\u7801 Mod', replaceRenamedUniqueMessage: '\u65b0\u6587\u4ef6\u8ddf\u5df2\u6709\u6587\u4ef6\u6709\u76f8\u540c\u7684 mod \u552f\u4e00\u7801\uff0c\u5b83\u5f88\u53ef\u80fd\u662f\u65e7\u6587\u4ef6\u7684\u66f4\u65b0\u548c\u6539\u540d\u3002\n{oldName} \u2192 {newName}\n\u662f\u5426\u8986\u76d6\u65e7\u6587\u4ef6\uff1f', replaceRenamedPreviousTitle: '\u53d1\u73b0 Mod \u6539\u540d', replaceRenamedPreviousMessage: '\u8fd9\u4e2a\u65b0\u6587\u4ef6\u662f\u5df2\u6709\u6587\u4ef6\u7684\u6539\u540d\u3002\n{oldName} \u2192 {newName}\n\u662f\u5426\u8986\u76d6\u65e7\u6587\u4ef6\uff1f', replaceOld: '\u8986\u76d6', keepImported: '\u4e0d\u8986\u76d6\uff08\u52a0\u5165\u65b0\u6587\u4ef6\uff09', uniqueCodeEditTitle: '\u63a8\u8350\u4fee\u6539 mod \u552f\u4e00\u7801', uniqueCodeEditMessage: '\u8fd9\u4e24\u4e2a mod \u4f1a\u5171\u7528\u540c\u4e00\u4e2a mod \u552f\u4e00\u7801\u3002\u662f\u5426\u5728\u52a0\u5165\u65b0\u6587\u4ef6\u524d\u4fee\u6539\u5bfc\u5165 mod \u7684\u552f\u4e00\u7801\uff1f', uniqueCodeLabel: 'mod \u552f\u4e00\u7801', uniqueCodeConfirm: '\u786e\u8ba4\u4fee\u6539', uniqueCodeSkip: '\u5426\uff08\u4e0d\u4fee\u6539\uff09', manifestReadFailed: '\u65e0\u6cd5\u8bfb\u53d6 mod.json\uff1a{value}', translationFile: '\u7ffb\u8bd1', translationFileTitle: '\u6253\u5f00\u7ffb\u8bd1\u6587\u4ef6', translationFileSynced: '\u7ffb\u8bd1\u6587\u4ef6\u5df2\u540c\u6b65\uff1a{path}', translationFileFailed: '\u7ffb\u8bd1\u6587\u4ef6\u5931\u8d25\uff1a{value}'
 		}
 	}
 	PANEL_TEXT.modsch = PANEL_TEXT.sch
@@ -3688,6 +4288,7 @@
 				state.panelSettings.hideMenuDetails = stored.settings.hideMenuDetails === true
 				state.panelSettings.hideModFileDetails = stored.settings.hideModFileDetails === true
 				state.panelSettings.sortConfigSections = stored.settings.sortConfigSections !== false
+				state.panelSettings.renderApiEnabled = stored.settings.renderApiEnabled !== false
 			}
 			if (isValidPanelEdge(stored.hiddenSide)) state.panelHiddenSide = stored.hiddenSide
 			else if (activeTab) state.panelHiddenSide = activeTab.edge
@@ -4271,6 +4872,10 @@
 			{ value: true, label: t('configSectionSortingOn') },
 			{ value: false, label: t('configSectionSortingOff') }
 		], state.panelSettings.sortConfigSections !== false, function (value) { state.panelSettings.sortConfigSections = value !== false })
+		addSettingsRow(t('renderApi'), [
+			{ value: true, label: t('renderApiOn') },
+			{ value: false, label: t('renderApiOff') }
+		], isRenderApiEnabled(), function (value) { setRenderApiEnabled(value !== false) })
 		addSettingsButtonRow(t('translationFile'), t('translationFile'), t('translationFileTitle'))
 		panel.appendChild(settingsPage)
 
@@ -5767,6 +6372,7 @@
 		state,
 		windows: createWindowApi('ModLoader'),
 		ui: createUiApi('ModLoader'),
+		render: createRenderApi('ModLoader'),
 
 		async boot() {
 			if (state.booted) return state
@@ -5830,13 +6436,16 @@
 				if (uiPages.length) ensureUiPagesInstalled()
 				installLanguageBridge()
 				installGameHud(context)
+				installVanillaGameHudSync(context)
 			}
 			if (name === 'afterGameInit') {
 				installGameHud(context)
+				installVanillaGameHudSync(context)
 				requestAnimationFrame(refreshOpenPanel)
 				requestAnimationFrame(restorePanelAfterLoad)
 				requestAnimationFrame(syncUiDocks)
 				requestAnimationFrame(syncGameHudEntries)
+				requestAnimationFrame(function () { syncVanillaGameHudVisibility(context) })
 			}
 
 			const hooks = state.hooks[name] || []
@@ -5849,6 +6458,7 @@
 					warn(`Hook ${name} from ${hook.modId} failed`, error)
 				}
 			}
+			if (name === 'afterVanillaScripts' || name === 'afterGameInit') installRenderApi(context)
 			return current
 		},
 
@@ -5877,6 +6487,7 @@
 				patch(target, methodName, wrapper) { return api.patch(target, methodName, wrapper, modId) },
 				windows: createWindowApi(modId),
 				ui: createUiApi(modId),
+				render: createRenderApi(modId),
 				asset(path) { return api.asset(modId, path) },
 				replaceAsset(from, to) { return api.replaceAsset(from, api.asset(modId, to), modId) },
 				registerSound(name, src, options) { return api.registerSound(name, api.asset(modId, src), options, modId) },

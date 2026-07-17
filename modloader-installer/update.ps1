@@ -84,15 +84,90 @@ function Get-LoaderVersionFromText {
 	return ''
 }
 
-function Get-InstalledModLoaderVersion {
+function ConvertTo-UtcDateTime {
+	param($Value)
+
+	if (-not $Value) { return $null }
+	try {
+		if ($Value -is [datetime]) {
+			return $Value.ToUniversalTime()
+		}
+		return ([datetimeoffset]::Parse([string]$Value, [System.Globalization.CultureInfo]::InvariantCulture, [System.Globalization.DateTimeStyles]::AssumeUniversal)).UtcDateTime
+	} catch {
+		try {
+			return ([datetime]::Parse([string]$Value, [System.Globalization.CultureInfo]::InvariantCulture, [System.Globalization.DateTimeStyles]::AssumeUniversal)).ToUniversalTime()
+		} catch {
+			return $null
+		}
+	}
+}
+
+function Get-ManifestBuildTimeUtc {
+	param($Manifest)
+
+	if (-not $Manifest) { return $null }
+	foreach ($name in @('builtAtUtc', 'buildTimeUtc', 'packageBuiltAtUtc', 'createdAtUtc')) {
+		if ($Manifest.PSObject.Properties[$name]) {
+			$time = ConvertTo-UtcDateTime -Value $Manifest.$name
+			if ($time) { return $time }
+		}
+	}
+	return $null
+}
+
+function Get-BuildTimeSortKey {
+	param($Value)
+
+	$time = ConvertTo-UtcDateTime -Value $Value
+	if (-not $time) { return [int64]0 }
+	return [int64]$time.Ticks
+}
+
+function Format-BuildTime {
+	param($Value)
+
+	$time = ConvertTo-UtcDateTime -Value $Value
+	if (-not $time) { return 'unknown' }
+	return $time.ToString('u')
+}
+
+function Get-InstalledModLoaderInfo {
 	param([string]$Root)
 
+	$version = ''
+	$buildTimeUtc = $null
 	$loaderPath = Join-Path $Root 'resources\app\game\modloader\loader.js'
-	if (-not (Test-Path -LiteralPath $loaderPath)) {
-		return '0.0.0'
+	$manifestPath = Join-Path $Root 'modloader-installer\modloader-package.json'
+
+	if (Test-Path -LiteralPath $manifestPath) {
+		try {
+			$manifest = Get-Content -LiteralPath $manifestPath -Raw -Encoding UTF8 | ConvertFrom-Json
+			if (-not $manifest.id -or $manifest.id -eq 'sixtyfour-modloader') {
+				$version = [string]$manifest.version
+				$buildTimeUtc = Get-ManifestBuildTimeUtc -Manifest $manifest
+			}
+		} catch {
+			$version = ''
+			$buildTimeUtc = $null
+		}
 	}
 
-	return Get-LoaderVersionFromText -Text (Get-Content -LiteralPath $loaderPath -Raw -Encoding UTF8)
+	if (Test-Path -LiteralPath $loaderPath) {
+		if (-not $version) {
+			$version = Get-LoaderVersionFromText -Text (Get-Content -LiteralPath $loaderPath -Raw -Encoding UTF8)
+		}
+		if (-not $buildTimeUtc) {
+			$buildTimeUtc = (Get-Item -LiteralPath $loaderPath).LastWriteTimeUtc
+		}
+	}
+
+	if (-not $version) { $version = '0.0.0' }
+	return [pscustomobject]@{
+		Version = $version
+		VersionKey = Get-VersionSortKey -Version $version
+		BuildTimeUtc = $buildTimeUtc
+		BuildTimeKey = Get-BuildTimeSortKey -Value $buildTimeUtc
+	}
 }
 
 function Get-VersionParts {
@@ -177,6 +252,7 @@ function Get-PackageInfoFromZip {
 			}
 
 			$version = ''
+			$buildTimeUtc = $null
 			$manifestKey = ($root + 'modloader-installer/modloader-package.json').ToLowerInvariant()
 			if ($entriesByPath.ContainsKey($manifestKey)) {
 				try {
@@ -185,8 +261,10 @@ function Get-PackageInfoFromZip {
 						continue
 					}
 					$version = [string]$manifest.version
+					$buildTimeUtc = Get-ManifestBuildTimeUtc -Manifest $manifest
 				} catch {
 					$version = ''
+					$buildTimeUtc = $null
 				}
 			}
 			if (-not $version) {
@@ -196,10 +274,16 @@ function Get-PackageInfoFromZip {
 				continue
 			}
 
+			if (-not $buildTimeUtc) {
+				$buildTimeUtc = $file.LastWriteTimeUtc
+			}
+
 			$packages += [pscustomobject]@{
 				Path = $file.FullName
 				Version = $version
 				VersionKey = Get-VersionSortKey -Version $version
+				BuildTimeUtc = $buildTimeUtc
+				BuildTimeKey = Get-BuildTimeSortKey -Value $buildTimeUtc
 				LastWriteTimeUtc = $file.LastWriteTimeUtc
 				PackageRoot = $root.TrimEnd('/')
 			}
@@ -209,16 +293,36 @@ function Get-PackageInfoFromZip {
 			return $null
 		}
 
-		return $packages | Sort-Object @{ Expression = 'VersionKey'; Descending = $true }, @{ Expression = 'LastWriteTimeUtc'; Descending = $true } | Select-Object -First 1
+		return $packages | Sort-Object @{ Expression = 'VersionKey'; Descending = $true }, @{ Expression = 'BuildTimeKey'; Descending = $true }, @{ Expression = 'LastWriteTimeUtc'; Descending = $true } | Select-Object -First 1
 	} finally {
 		$zip.Dispose()
 	}
 }
 
+function Compare-PackageInfoToInstalled {
+	param(
+		$Package,
+		$Installed
+	)
+
+	$versionCompare = Compare-VersionText -Left $Package.Version -Right $Installed.Version
+	if ($versionCompare -ne 0) { return $versionCompare }
+
+	$packageBuild = ConvertTo-UtcDateTime -Value $Package.BuildTimeUtc
+	$installedBuild = ConvertTo-UtcDateTime -Value $Installed.BuildTimeUtc
+	if ($packageBuild -and $installedBuild) {
+		if ($packageBuild -gt $installedBuild) { return 1 }
+		if ($packageBuild -lt $installedBuild) { return -1 }
+		return 0
+	}
+	if ($packageBuild -and -not $installedBuild) { return 1 }
+	return 0
+}
+
 function Find-PackageZip {
 	param(
 		[string]$ExplicitZipPath,
-		[string]$CurrentVersion
+		$CurrentInfo
 	)
 
 	if ($ExplicitZipPath) {
@@ -227,8 +331,8 @@ function Find-PackageZip {
 		if (-not $info) {
 			throw 'The selected zip is not a Sixty Four ModLoader package.'
 		}
-		if ((Compare-VersionText -Left $info.Version -Right $CurrentVersion) -le 0) {
-			throw "The selected package version ($($info.Version)) is not newer than the installed ModLoader version ($CurrentVersion)."
+		if ((Compare-PackageInfoToInstalled -Package $info -Installed $CurrentInfo) -le 0) {
+			throw "The selected package ($($info.Version), built $(Format-BuildTime $info.BuildTimeUtc)) is not newer than the installed ModLoader ($($CurrentInfo.Version), built $(Format-BuildTime $CurrentInfo.BuildTimeUtc))."
 		}
 		return $info
 	}
@@ -250,12 +354,12 @@ function Find-PackageZip {
 		}
 	}
 
-	$newerPackages = @($packages | Where-Object { (Compare-VersionText -Left $_.Version -Right $CurrentVersion) -gt 0 })
+	$newerPackages = @($packages | Where-Object { (Compare-PackageInfoToInstalled -Package $_ -Installed $CurrentInfo) -gt 0 })
 	if (-not $newerPackages) {
-		throw "Could not find a newer Sixty Four ModLoader package in modloader-installer. Installed version: $CurrentVersion"
+		throw "Could not find a newer Sixty Four ModLoader package in modloader-installer. Installed version: $($CurrentInfo.Version); installed build: $(Format-BuildTime $CurrentInfo.BuildTimeUtc)"
 	}
 
-	return $newerPackages | Sort-Object @{ Expression = 'VersionKey'; Descending = $true }, @{ Expression = 'LastWriteTimeUtc'; Descending = $true } | Select-Object -First 1
+	return $newerPackages | Sort-Object @{ Expression = 'VersionKey'; Descending = $true }, @{ Expression = 'BuildTimeKey'; Descending = $true }, @{ Expression = 'LastWriteTimeUtc'; Descending = $true } | Select-Object -First 1
 }
 
 function Find-PackageRoot {
@@ -352,8 +456,8 @@ if ($DeletePackage -and $KeepPackage) {
 }
 
 $targetRoot = Resolve-GameRoot -Path $GameRoot
-$currentVersion = Get-InstalledModLoaderVersion -Root $targetRoot
-$package = Find-PackageZip -ExplicitZipPath $ZipPath -CurrentVersion $currentVersion
+$currentInfo = Get-InstalledModLoaderInfo -Root $targetRoot
+$package = Find-PackageZip -ExplicitZipPath $ZipPath -CurrentInfo $currentInfo
 $zip = $package.Path
 $stamp = Get-Date -Format 'yyyyMMdd-HHmmss'
 $tempRoot = Join-Path ([System.IO.Path]::GetTempPath()) "SixtyFour-ModLoader-Update-$stamp"
@@ -365,8 +469,10 @@ try {
 	New-DirectoryIfMissing -Path $tempRoot
 
 	Write-Host "Using package: $zip"
-	Write-Host "Installed ModLoader version: $currentVersion"
+	Write-Host "Installed ModLoader version: $($currentInfo.Version)"
+	Write-Host "Installed ModLoader build: $(Format-BuildTime $currentInfo.BuildTimeUtc)"
 	Write-Host "Package ModLoader version: $($package.Version)"
+	Write-Host "Package ModLoader build: $(Format-BuildTime $package.BuildTimeUtc)"
 	Write-Host "Extracting package..."
 	Expand-Archive -LiteralPath $zip -DestinationPath $tempRoot -Force
 	$packageRoot = Find-PackageRoot -ExtractRoot $tempRoot

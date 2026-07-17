@@ -55,12 +55,14 @@ ModLoader.register({
 			if (typeof Game === 'undefined' || !Game.prototype) return
 			installStyles()
 			installGlobalBridge()
+			installControllerVisibilitySync()
 		})
 
 		api.on('afterGameInit', function (payload, game) {
 			installStyles()
 			state.game = game
 			ensureController(game)
+			syncControllerVisibility(game)
 		})
 
 		function installGlobalBridge() {
@@ -77,11 +79,41 @@ ModLoader.register({
 			})
 		}
 
+		function installControllerVisibilitySync() {
+			if (window.__cattailResourceWatcherVisibilitySyncInstalled) return
+			window.__cattailResourceWatcherVisibilitySyncInstalled = true
+			window.addEventListener('modloader:vanilla-game-hud', function (event) {
+				syncControllerVisibility(event.detail?.game || state.game)
+			})
+		}
+
+		function syncControllerVisibility(game, controller = state.controller || game?.[watcherKey]) {
+			const toggle = controller?.toggle || game?.[watcherKey]?.toggle
+			if (!toggle) return
+			const hidden = isControllerHidden(game)
+			toggle.style.display = ''
+			toggle.disabled = hidden
+			toggle.setAttribute('aria-hidden', hidden ? 'true' : 'false')
+			if (hidden && state.active) exitWatcher()
+		}
+
+		function isControllerHidden(game) {
+			const loaderHidden = api.ui?.isVanillaGameHudHidden?.(game)
+			if (typeof loaderHidden === 'boolean') return loaderHidden
+			const shopToggle = game?.shop?.shopToggle
+			let vanillaHidden = false
+			try {
+				vanillaHidden = !!shopToggle && getComputedStyle(shopToggle).display === 'none'
+			} catch (error) {}
+			return !!(game?.pinhole || game?.credits || vanillaHidden)
+		}
+
 		function ensureController(game) {
 			if (!document.body) return null
 			const current = game?.[watcherKey]
 			if (current?.toggle?.isConnected) {
 				state.controller = current
+				syncControllerVisibility(game, current)
 				return current
 			}
 
@@ -101,6 +133,7 @@ ModLoader.register({
 			bindController(game, controller)
 			game[watcherKey] = controller
 			state.controller = controller
+			syncControllerVisibility(game, controller)
 			return controller
 		}
 
@@ -112,12 +145,12 @@ ModLoader.register({
 			controller.toggle.addEventListener('mousedown', stop, true)
 			controller.toggle.addEventListener('click', function (event) {
 				stop(event)
-				enterWatcher(game)
+				if (!isControllerHidden(game)) enterWatcher(game)
 			}, true)
 		}
 
 		function enterWatcher(game) {
-			if (!game || state.active) return
+			if (!game || state.active || isControllerHidden(game)) return
 			state.game = game
 			state.active = true
 			state.hoveredResource = null
@@ -389,6 +422,7 @@ ModLoader.register({
 			const latest = Math.max(0, Number(game?.resources?.[resourceId]) || 0)
 			return {
 				type: 'line',
+				resourceId,
 				buckets: mapped,
 				latest,
 				latestText: formatInfoNumber(game, latest),
@@ -605,6 +639,9 @@ ModLoader.register({
 							lineChartWheel(event) {
 								if (state.active) handleLineChartWheel(event.payload)
 							},
+							lineGraphDebug(event) {
+								if (state.active) logLineGraphDebug(event.payload)
+							},
 
 
 							key(event) {
@@ -643,6 +680,16 @@ ModLoader.register({
 				}
 			}
 		}
+		function logLineGraphDebug(payload) {
+			try {
+				const data = payload && typeof payload === 'object' ? payload : { message: String(payload) }
+				const reason = data.reason || data.phase || 'debug'
+				console.info('[Resource Watcher][LineGraph] ' + reason + ' ' + JSON.stringify(data))
+			} catch (error) {
+				console.info('[Resource Watcher][LineGraph] debug', payload)
+			}
+		}
+
 		function getSizeSignature(size) {
 			return Math.round(size?.width || 0) + 'x' + Math.round(size?.height || 0)
 		}
@@ -765,7 +812,7 @@ html[data-side="left"] .infoPanel{left:0;right:auto;align-items:flex-start;text-
 .icon{display:block;justify-self:center;width:36px;height:40px;background-image:url('${resourceSpriteUrl}');background-size:360px 40px;background-repeat:no-repeat;background-position:0 0;filter:drop-shadow(0 1px 2px rgba(255,255,255,.92)) drop-shadow(0 0 3px rgba(255,255,255,.72));transform-origin:center center;transition:transform .04s linear;}
 .amount{display:block;min-width:0;overflow:hidden;text-overflow:ellipsis;text-align:left;color:#111;font:600 24px/1.05 Montserrat,Arial,sans-serif;text-rendering:geometricPrecision;text-shadow:0 1px 2px rgba(255,255,255,.92),0 -1px 2px rgba(255,255,255,.82),1px 0 2px rgba(255,255,255,.82),-1px 0 2px rgba(255,255,255,.82);}
 </style></head><body><div id="root"><div id="surface"><button id="move" type="button" tabindex="-1" aria-label="move"><svg viewBox="0 0 18 18" aria-hidden="true"><path d="M9 2v14"></path><path d="M6 5l3-3 3 3"></path><path d="M6 13l3 3 3-3"></path><path d="M2 9h14"></path><path d="M5 6L2 9l3 3"></path><path d="M13 6l3 3-3 3"></path></svg></button><button id="resize" type="button" tabindex="-1" aria-label="resize"><svg viewBox="0 0 18 18" aria-hidden="true"><path d="M7 3H3v4"></path><path d="M3 3l5 5"></path><path d="M11 15h4v-4"></path><path d="M15 15l-5-5"></path></svg></button><button id="back" type="button" tabindex="-1">back</button><div id="list"></div></div></div><script>
-const {ipcRenderer}=require('electron');const root=document.getElementById('root');const surface=document.getElementById('surface');const list=document.getElementById('list');const back=document.getElementById('back');const resize=document.getElementById('resize');const move=document.getElementById('move');let latestState=null;let resizeDrag=null;let moveDrag=null;
+const {ipcRenderer}=require('electron');const root=document.getElementById('root');const surface=document.getElementById('surface');const list=document.getElementById('list');const back=document.getElementById('back');const resize=document.getElementById('resize');const move=document.getElementById('move');let latestState=null;let resizeDrag=null;let moveDrag=null;const lineGraphDebugBuild='format-v2';let lineGraphDebugLastScaleKey='';let lineGraphDebugLastScaleAt=0;const lineGraphDebugLastAnomalyAt={};
 function send(message){try{ipcRenderer.send('modloader:window:message',{type:message&&message.type||'message',payload:message&&message.payload})}catch(error){}}
 function normalizeScale(value){const number=Number(value);return Math.max(.5,Math.min(3,Number.isFinite(number)&&number>0?number:1))}
 function normalizeSide(value){return value==='left'?'left':'right'}
@@ -802,8 +849,8 @@ function drawGraphs(){if(!latestState)return;const row=list.querySelector('.row.
 function drawGraph(canvas,graph){if(graph&&graph.type==='line')return drawLineGraph(canvas,graph);return drawBarGraph(canvas,graph)}
 function prepareGraphCanvas(canvas,cssW,cssH){const ratio=Math.max(1,(window.devicePixelRatio||1)*getScale());canvas.width=Math.round(cssW*ratio);canvas.height=Math.round(cssH*ratio);const ctx=canvas.getContext('2d');ctx.setTransform(ratio,0,0,ratio,0,0);ctx.clearRect(0,0,cssW,cssH);roundRect(ctx,0,0,cssW,cssH,5);ctx.fillStyle='rgba(255,255,255,.96)';ctx.fill();return ctx}
 function drawBarGraph(canvas,graph){const cssW=360,cssH=150;const ctx=prepareGraphCanvas(canvas,cssW,cssH);const data=graph.data||[];const labelW=78;const shortW=cssW-labelW-16;const h=cssH/2;const dx=Math.max(1,Math.floor(shortW/Math.max(1,data.length+1)));const graphW=dx*(data.length+1);let max=0;for(const p of data){max=Math.max(max,Number(p[0])||0,Math.abs(Number(p[1])||0))}const frameMs=Math.max(1,(Number(graph.measuringFrame)||1)-(Number(graph.frameTimer)||0));const lastPlus=(Number(graph.frame&&graph.frame[0])||0)/frameMs*1000;const lastMinus=Math.abs((Number(graph.frame&&graph.frame[1])||0)/frameMs*1000);max=Math.max(max,lastPlus,lastMinus);if(max<=0)max=1;const order=String(Math.floor(max)).length;const delta=Math.pow(10,Math.max(0,order-1));max=delta*(Math.floor(max/delta)+1);for(let j=0;j<data.length;j++)drawGraphBar(ctx,j*dx,h,dx,data[j][0],data[j][1],max,graph.gainColor,graph.consumeColor);drawGraphBar(ctx,data.length*dx,h,dx,lastPlus,-lastMinus,max,graph.gainColor,graph.consumeColor);ctx.font='10px Montserrat,Arial,sans-serif';ctx.textBaseline='middle';ctx.textAlign='left';ctx.fillStyle='#111';const firstDigit=Number(String(max)[0])||1;const sparse=firstDigit<2||firstDigit>5;for(let v=delta-max;v<max;v+=delta){const digit=Number(String(Math.abs(v))[0])||0;if(sparse&&(digit%2))continue;const y=h-(v/max)*h;ctx.globalAlpha=.12;ctx.fillRect(0,y,graphW,1);ctx.globalAlpha=1;ctx.fillText(formatGraphNumber(v)+'\u2009/\u2009s',graphW+8,y)}}
-function drawLineGraph(canvas,graph){const cssW=360,cssH=150;const buckets=Array.isArray(graph.buckets)?graph.buckets:[];const ctx=prepareGraphCanvas(canvas,cssW,cssH);if(!buckets.length)return;const padding=16;const halfHeight=cssH/2;const fontSize=Math.max(7,halfHeight*.12);const plotLeft=Math.max(5,padding*.35);const plotRight=cssW-padding*3.1;const plotTop=Math.max(5,padding*.28);const plotBottom=cssH-padding*1.35;const plotWidth=Math.max(1,plotRight-plotLeft);const plotHeight=Math.max(1,plotBottom-plotTop);const totalDuration=Math.max(.001,buckets.reduce(function(total,bucket){return total+(Number(bucket.duration)||0)},0));const scale=getLineGraphScale(graph,buckets);ctx.font=fontSize+'px Montserrat,Arial,sans-serif';drawLineGraphGrid(ctx,plotLeft,plotRight,plotTop,plotBottom,plotWidth,plotHeight,scale,totalDuration,graph);drawLineGraphPath(ctx,buckets,graph,scale,totalDuration,plotLeft,plotBottom,plotWidth,plotHeight)}
-function drawLineGraphGrid(ctx,plotLeft,plotRight,plotTop,plotBottom,plotWidth,plotHeight,scale,totalDuration,graph){ctx.fillStyle='#000';ctx.globalAlpha=.16;ctx.fillRect(plotLeft,plotBottom,plotWidth,1);ctx.fillRect(plotRight,plotTop,1,plotHeight);const firstOffset=Math.ceil((scale.min-scale.baseline)/scale.delta)*scale.delta;const lastOffset=Math.floor((scale.max-scale.baseline)/scale.delta)*scale.delta;const tickCount=Math.max(0,Math.floor((lastOffset-firstOffset)/scale.delta)+1);const skip=Math.max(1,Math.ceil(tickCount/7));let tickIndex=0;for(let offset=firstOffset;offset<=lastOffset;offset+=scale.delta){const shouldDraw=Math.abs(offset)<.5||tickIndex%skip===0;tickIndex++;if(!shouldDraw)continue;const value=scale.baseline+offset;const py=plotBottom-Math.max(0,Math.min(1,(value-scale.min)/scale.span))*plotHeight;ctx.globalAlpha=Math.abs(offset)<.5 ? .16 : .1;ctx.fillRect(plotLeft,py,plotWidth,1);ctx.globalAlpha=1;ctx.textAlign='left';ctx.textBaseline='middle';ctx.fillText(formatLineGraphDelta(offset,scale.labelUnit,scale.baseline,graph),plotRight+4,py)}for(const age of getLineGraphTimeTicks(totalDuration)){const px=getLineGraphTimeXFromAge(age,totalDuration,plotLeft,plotWidth);ctx.globalAlpha=age>0&&age<totalDuration ? .1 : .16;ctx.fillRect(px,plotTop,1,plotHeight);ctx.globalAlpha=1;ctx.textAlign='center';ctx.textBaseline='top';ctx.fillText(formatLineGraphDuration(age),px,plotBottom+3)}ctx.globalAlpha=1}
+function drawLineGraph(canvas,graph){const cssW=360,cssH=150;const buckets=Array.isArray(graph.buckets)?graph.buckets:[];const ctx=prepareGraphCanvas(canvas,cssW,cssH);if(!buckets.length)return;const padding=16;const halfHeight=cssH/2;const fontSize=Math.max(7,halfHeight*.12);const plotLeft=Math.max(5,padding*.35);const plotRight=cssW-padding*3.1;const plotTop=Math.max(5,padding*.28);const plotBottom=cssH-padding*1.35;const plotWidth=Math.max(1,plotRight-plotLeft);const plotHeight=Math.max(1,plotBottom-plotTop);const totalDuration=Math.max(.001,buckets.reduce(function(total,bucket){return total+(Number(bucket.duration)||0)},0));const scale=getLineGraphScale(graph,buckets);debugLineGraphScale(graph,scale,totalDuration,buckets);ctx.font=fontSize+'px Montserrat,Arial,sans-serif';drawLineGraphGrid(ctx,plotLeft,plotRight,plotTop,plotBottom,plotWidth,plotHeight,scale,totalDuration,graph);drawLineGraphPath(ctx,buckets,graph,scale,totalDuration,plotLeft,plotBottom,plotWidth,plotHeight)}
+function drawLineGraphGrid(ctx,plotLeft,plotRight,plotTop,plotBottom,plotWidth,plotHeight,scale,totalDuration,graph){ctx.fillStyle='#000';ctx.globalAlpha=.16;ctx.fillRect(plotLeft,plotBottom,plotWidth,1);ctx.fillRect(plotRight,plotTop,1,plotHeight);const firstOffset=Math.ceil((scale.min-scale.baseline)/scale.delta)*scale.delta;const lastOffset=Math.floor((scale.max-scale.baseline)/scale.delta)*scale.delta;const tickCount=Math.max(0,Math.floor((lastOffset-firstOffset)/scale.delta)+1);const skip=Math.max(1,Math.ceil(tickCount/7));let tickIndex=0;for(let offset=firstOffset;offset<=lastOffset;offset+=scale.delta){const shouldDraw=Math.abs(offset)<.5||tickIndex%skip===0;tickIndex++;if(!shouldDraw)continue;const value=scale.baseline+offset;const py=plotBottom-Math.max(0,Math.min(1,(value-scale.min)/scale.span))*plotHeight;ctx.globalAlpha=Math.abs(offset)<.5 ? .16 : .1;ctx.fillRect(plotLeft,py,plotWidth,1);ctx.globalAlpha=1;ctx.textAlign='left';ctx.textBaseline='middle';const rawLabel=formatLineGraphDelta(offset,scale.labelUnit,scale.baseline,graph);const label=normalizeLineGraphLabel(rawLabel,offset);debugLineGraphTick(graph,scale,offset,value,rawLabel,label);ctx.fillText(label,plotRight+4,py)}for(const age of getLineGraphTimeTicks(totalDuration)){const px=getLineGraphTimeXFromAge(age,totalDuration,plotLeft,plotWidth);ctx.globalAlpha=age>0&&age<totalDuration ? .1 : .16;ctx.fillRect(px,plotTop,1,plotHeight);ctx.globalAlpha=1;ctx.textAlign='center';ctx.textBaseline='top';ctx.fillText(formatLineGraphDuration(age),px,plotBottom+3)}ctx.globalAlpha=1}
 function drawLineGraphPath(ctx,buckets,graph,scale,totalDuration,plotLeft,plotBottom,plotWidth,plotHeight){if(!buckets.length||!scale||scale.span<=0)return;const points=[];let elapsed=0;for(const bucket of buckets){const duration=Math.max(.001,Number(bucket.duration)||1);const value=Math.max(0,Number(bucket.value)||0);const px=getLineGraphTimeXFromElapsed(elapsed+duration/2,totalDuration,plotLeft,plotWidth);const py=plotBottom-Math.max(0,Math.min(1,(value-scale.min)/scale.span))*plotHeight;points.push({x:px,y:py,value});elapsed+=duration}if(points.length<2)return;ctx.save();ctx.lineWidth=1.35;ctx.lineJoin='round';ctx.lineCap='round';for(let i=1;i<points.length;i++){const previous=points[i-1];const current=points[i];ctx.strokeStyle=current.value>=previous.value?(graph.gainColor||'#6ea56e'):(graph.consumeColor||'#C38C75');ctx.beginPath();ctx.moveTo(previous.x,previous.y);ctx.lineTo(current.x,current.y);ctx.stroke()}ctx.restore()}
 function getLineGraphTimeTicks(totalDuration){return [totalDuration,totalDuration*2/3,totalDuration/3,totalDuration/6,0]}
 function getLineGraphTimeXFromAge(age,totalDuration,plotLeft,plotWidth){return getLineGraphTimeXFromElapsed(totalDuration-age,totalDuration,plotLeft,plotWidth)}
@@ -815,11 +862,19 @@ function getLineGraphRecentRange(buckets,fallbackValue){const recentWindowSecond
 function getLineGraphRoundedSpan(span){const safe=Math.max(1,Number(span)||0);const order=Math.max(1,String(Math.floor(safe)).length);const delta=Math.pow(10,order-1);return {max:delta*(Math.floor(safe/delta)+1),delta}}
 function getLineGraphRateMagnitude(graph,buckets){const average=graph&&graph.average;let speed=0;if(Array.isArray(average)){speed=Math.max(speed,Math.abs(Number(average[0])||0),Math.abs(Number(average[1])||0));if(speed>0)return speed}let previous=null;for(const bucket of buckets){const duration=Math.max(.001,Number(bucket&&bucket.duration)||1);const value=Math.max(0,Number(bucket&&bucket.value)||0);if(previous&&duration<=1&&previous.duration<=1){const seconds=Math.max(.001,duration);speed=Math.max(speed,Math.abs(value-previous.value)/seconds)}previous={value,duration}}return speed}
 function getLineGraphLabelUnit(value){const amount=Math.abs(Number(value)||0);if(amount>=1e15)return {value:1e15,suffix:'q'};if(amount>=1e12)return {value:1e12,suffix:'t'};if(amount>=1e9)return {value:1e9,suffix:'b'};if(amount>=1e6)return {value:1e6,suffix:'m'};if(amount>=1e3)return {value:1e3,suffix:'k'};return {value:1,suffix:''}}
-function formatLineGraphAmount(value,unit){const amount=Math.abs(Number(value)||0);if(unit&&unit.value>1){const text=formatLineGraphAmountInUnit(amount,unit);if(amount===0||!isZeroUnitLabel(text))return text}return formatLineGraphReadable(amount)}
-function formatLineGraphAmountInUnit(value,unit){const scaled=Math.abs(Number(value)||0)/unit.value;const rounded=scaled>=100?Math.round(scaled):scaled>=10?Math.round(scaled*10)/10:Math.round(scaled*100)/100;const text=String(rounded).replace(/\.0+$/,'').replace(/(\.\d*[1-9])0+$/,'$1');return (/[0-9]/.test(text)?text:'0')+unit.suffix}
+function formatLineGraphAmount(value,unit){const amount=Math.abs(Number(value)||0);if(unit&&unit.value>1&&amount>=unit.value)return formatLineGraphAmountInUnit(amount,unit);return formatLineGraphReadable(amount)}
+function formatLineGraphAmountInUnit(value,unit){const divisor=Math.abs(Number(unit&&unit.value)||1);const scaled=Math.abs(Number(value)||0)/divisor;const rounded=scaled>=100?Math.round(scaled):scaled>=10?Math.round(scaled*10)/10:Math.round(scaled*100)/100;return trimLineGraphAmountText(rounded)+(unit&&unit.suffix||'')}
+function trimLineGraphAmountText(value){const number=Number(value);if(!Number.isFinite(number))return '0';let text=String(number);if(text.indexOf('.')===-1)return text;while(text.endsWith('0'))text=text.slice(0,-1);if(text.endsWith('.'))text=text.slice(0,-1);return text||'0'}
 function isZeroUnitLabel(value){return /^0(?:\.0+)?[a-z]?$/.test(String(value||''))}
 function formatLineGraphReadable(value){const amount=Math.abs(Number(value)||0);const unit=getLineGraphLabelUnit(amount);if(unit.value>1)return formatLineGraphAmountInUnit(amount,unit);return String(Math.round(amount))}
 function formatLineGraphDelta(value,unit,baseline,graph){if(Math.abs(value)<.5)return graph&&graph.latestText?String(graph.latestText):formatLineGraphReadable(Math.max(0,Number(baseline)||0));const sign=value>0?'+':'-';return sign+formatLineGraphAmount(Math.abs(value),unit)}
+function normalizeLineGraphLabel(label,value){const text=String(label==null?'':label);const match=text.trim().match(/^([+\-\u2212])\s*0(?:[.,]0+)?[kmbtq]$/i);if(!match)return text;const sign=match[1]==='+'?'+':'-';return sign+formatLineGraphReadable(Math.abs(Number(value)||0))}
+function debugLineGraphScale(graph,scale,totalDuration,buckets){const now=Date.now();const resourceId=Number.isInteger(graph&&graph.resourceId)?graph.resourceId:null;const key=[resourceId,scale&&scale.baseline,scale&&scale.delta,scale&&scale.labelUnit&&scale.labelUnit.suffix,buckets.length].join('|');if(key===lineGraphDebugLastScaleKey&&now-lineGraphDebugLastScaleAt<1500)return;lineGraphDebugLastScaleKey=key;lineGraphDebugLastScaleAt=now;sendLineGraphDebug({phase:'scale',debugBuild:lineGraphDebugBuild,resourceId,bucketCount:buckets.length,totalDuration:roundLineGraphDebugNumber(totalDuration),latest:roundLineGraphDebugNumber(graph&&graph.latest),latestText:graph&&graph.latestText,average:graph&&graph.average,min:roundLineGraphDebugNumber(scale&&scale.min),max:roundLineGraphDebugNumber(scale&&scale.max),span:roundLineGraphDebugNumber(scale&&scale.span),delta:roundLineGraphDebugNumber(scale&&scale.delta),baseline:roundLineGraphDebugNumber(scale&&scale.baseline),labelUnit:lineGraphDebugUnit(scale&&scale.labelUnit)})}
+function debugLineGraphTick(graph,scale,offset,value,rawLabel,label){const rawZero=isLineGraphZeroUnitDebugLabel(rawLabel);const finalZero=isLineGraphZeroUnitDebugLabel(label);if(!rawZero&&!finalZero)return;const now=Date.now();const resourceId=Number.isInteger(graph&&graph.resourceId)?graph.resourceId:null;const key=[resourceId,offset,rawLabel,label].join('|');if(now-(lineGraphDebugLastAnomalyAt[key]||0)<1000)return;lineGraphDebugLastAnomalyAt[key]=now;sendLineGraphDebug({reason:finalZero?'final-zero-unit':'raw-zero-unit',debugBuild:lineGraphDebugBuild,resourceId,offset:roundLineGraphDebugNumber(offset),absOffset:roundLineGraphDebugNumber(Math.abs(Number(offset)||0)),value:roundLineGraphDebugNumber(value),rawLabel:String(rawLabel),finalLabel:String(label),formatAmount:formatLineGraphAmount(Math.abs(Number(offset)||0),scale&&scale.labelUnit),readableAmount:formatLineGraphReadable(Math.abs(Number(offset)||0)),baseline:roundLineGraphDebugNumber(scale&&scale.baseline),min:roundLineGraphDebugNumber(scale&&scale.min),max:roundLineGraphDebugNumber(scale&&scale.max),delta:roundLineGraphDebugNumber(scale&&scale.delta),labelUnit:lineGraphDebugUnit(scale&&scale.labelUnit),latestText:graph&&graph.latestText,average:graph&&graph.average})}
+function isLineGraphZeroUnitDebugLabel(label){return /^([+\-\u2212])\s*0(?:[.,]0+)?[kmbtq]$/i.test(String(label==null?'':label).trim())}
+function sendLineGraphDebug(payload){try{send({type:'lineGraphDebug',payload})}catch(error){}}
+function roundLineGraphDebugNumber(value){const number=Number(value);if(!Number.isFinite(number))return null;if(Math.abs(number)>=1000)return Number(number.toFixed(2));return Number(number.toFixed(6))}
+function lineGraphDebugUnit(unit){return unit?{value:unit.value,suffix:unit.suffix}:null}
 function formatLineGraphDuration(seconds){const value=Math.max(0,Number(seconds)||0);if(value<=0)return '0ms';if(value<1)return Math.max(1,Math.round(value*1000))+'ms';if(value<60)return Math.round(value)+'s';if(value<3600)return Math.round(value/60)+'m';const hours=value/3600;return (hours>=10?Math.round(hours):Math.round(hours*10)/10)+'h'}
 function drawGraphBar(ctx,x,mid,dx,gain,consume,max,gainColor,consumeColor){const plus=Math.max(0,Number(gain)||0);const minus=Math.max(0,Math.abs(Number(consume)||0));const hp=Math.floor(plus/max*mid);const hm=Math.floor(minus/max*mid);ctx.globalAlpha=.42;ctx.fillStyle=consumeColor||'#C38C75';ctx.fillRect(x,mid,dx,hm);ctx.fillStyle=gainColor||'#6ea56e';ctx.fillRect(x,mid-hp,dx,hp);ctx.globalAlpha=1;ctx.fillStyle=consumeColor||'#C38C75';ctx.fillRect(x,mid+hm,Math.max(1,dx-1),1);ctx.fillStyle=gainColor||'#6ea56e';ctx.fillRect(x,mid-hp,Math.max(1,dx-1),1)}
 function roundRect(ctx,x,y,w,h,r){if(ctx.roundRect){ctx.beginPath();ctx.roundRect(x,y,w,h,r);ctx.closePath();return}ctx.beginPath();ctx.moveTo(x+r,y);ctx.lineTo(x+w-r,y);ctx.quadraticCurveTo(x+w,y,x+w,y+r);ctx.lineTo(x+w,y+h-r);ctx.quadraticCurveTo(x+w,y+h,x+w-r,y+h);ctx.lineTo(x+r,y+h);ctx.quadraticCurveTo(x,y+h,x,y+h-r);ctx.lineTo(x,y+r);ctx.quadraticCurveTo(x,y,x+r,y);ctx.closePath()}

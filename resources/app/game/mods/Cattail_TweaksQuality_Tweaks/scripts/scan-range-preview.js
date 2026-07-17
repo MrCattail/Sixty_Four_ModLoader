@@ -1,8 +1,9 @@
 (function () {
 	const MOD_ID = 'Cattail_TweaksQuality_Tweaks'
 	const installedKey = '__cattailScanRangePreviewInstalled'
-	const overlayKey = '__cattailScanRangePreviewOverlay'
 	const configKey = 'enableScanRangePreview'
+	const renderLayerId = 'interaction'
+	const renderCallbackId = 'scan-range-preview'
 	const scanEntityName = 'scan'
 	const vanillaScanRadius = 16
 	const minScanDiameter = 8
@@ -12,6 +13,7 @@
 
 	let previewEnabled = null
 	let cachedPreviewShape = null
+	let renderCallbackRegistered = false
 
 	ModLoader.register({
 		id: MOD_ID,
@@ -36,21 +38,12 @@
 		if (window[installedKey] || typeof Game === 'undefined') return
 		window[installedKey] = true
 
-		api.patch(Game.prototype, 'renderloop', function (original) {
-			return function (...args) {
-				const result = original.apply(this, args)
-				if (!shouldRenderScanRangePreview(this, api)) clearScanRangeOverlay(this)
-				return result
-			}
-		})
+		registerScanRangeRenderCallback(api)
 
 		api.patch(Game.prototype, 'renderAvailability', function (original) {
 			return function (...args) {
-				if (!shouldRenderScanRangePreview(this, api)) {
-					clearScanRangeOverlay(this)
-					return original.apply(this, args)
-				}
-				renderScanRangePreview(this)
+				if (shouldUseRenderLayerPreview(this, api)) return
+				return original.apply(this, args)
 			}
 		})
 
@@ -60,6 +53,24 @@
 				return original.apply(this, args)
 			}
 		})
+	}
+
+	function registerScanRangeRenderCallback(api) {
+		if (!api?.render || typeof api.render.onLayer !== 'function') return
+		api.render.onLayer(renderLayerId, function ({ game, ctx, canvas, width, height }) {
+			renderScanRangePreview(game, ctx, { canvas, width, height }, api)
+		}, { id: renderCallbackId, order: 20, copyTransform: false, copyState: false })
+		renderCallbackRegistered = true
+	}
+
+	function shouldUseRenderLayerPreview(game, api) {
+		return shouldRenderScanRangePreview(game, api) && isRenderLayerPreviewAvailable(api)
+	}
+
+	function isRenderLayerPreviewAvailable(api) {
+		if (!renderCallbackRegistered || !api?.render) return false
+		if (typeof api.render.isEnabled === 'function') return api.render.isEnabled() !== false
+		return true
 	}
 
 	function shouldRenderScanRangePreview(game, api) {
@@ -81,119 +92,32 @@
 	}
 
 	function shouldSkipGenericScanSoi(game, api, target) {
-		return shouldRenderScanRangePreview(game, api) && Array.isArray(target) && sameCell(target, game.hoveredCell)
+		return shouldUseRenderLayerPreview(game, api) && Array.isArray(target) && sameCell(target, game.hoveredCell)
 	}
 
 	function sameCell(a, b) {
 		return Array.isArray(a) && Array.isArray(b) && a[0] === b[0] && a[1] === b[1]
 	}
 
-	function renderScanRangePreview(game) {
-		if (typeof document === 'undefined' || typeof game.uvToXY !== 'function') return
-		const overlay = ensureScanRangeOverlay(game)
-		if (!overlay || !syncOverlayCanvas(game, overlay)) {
-			clearScanRangeOverlay(game)
-			return
-		}
+	function renderScanRangePreview(game, ctx, layer, api) {
+		if (!ctx || !shouldRenderScanRangePreview(game, api) || typeof game.uvToXY !== 'function') return
+		const state = getPreviewState(game, layer)
+		if (!state) return
 
-		const state = getPreviewState(game, overlay)
-		if (!state) {
-			clearScanRangeOverlay(game)
-			return
-		}
-
-		overlay.canvas.style.display = 'block'
-		if (overlay.lastKey === state.key) return
-		overlay.lastKey = state.key
-
-		const ctx = overlay.ctx
-		ctx.clearRect(0, 0, overlay.canvas.width, overlay.canvas.height)
 		ctx.save()
-		ctx.translate(state.x, state.y)
-		ctx.fillStyle = state.fillColor
-		fillShape(ctx, state.shape.rangePath, state.shape.rangeCells)
-		ctx.fillStyle = state.centerColor
-		fillShape(ctx, state.shape.centerPath, state.shape.centerCell ? [state.shape.centerCell] : null)
-		ctx.restore()
-	}
-
-	function ensureScanRangeOverlay(game) {
-		if (!game || !game.canvas) return null
-		const existing = game[overlayKey]
-		if (existing && existing.canvas && existing.canvas.isConnected) return existing
-
-		const canvas = document.createElement('canvas')
-		canvas.className = 'cattail-scan-range-overlay'
-		canvas.setAttribute('aria-hidden', 'true')
-		canvas.style.position = 'fixed'
-		canvas.style.left = '0px'
-		canvas.style.top = '0px'
-		canvas.style.width = '0px'
-		canvas.style.height = '0px'
-		canvas.style.margin = '0'
-		canvas.style.padding = '0'
-		canvas.style.border = '0'
-		canvas.style.pointerEvents = 'none'
-		canvas.style.display = 'none'
-
-		const parent = game.canvas.parentNode || document.body
-		if (game.canvas.parentNode) parent.insertBefore(canvas, game.canvas.nextSibling)
-		else parent.appendChild(canvas)
-
-		const overlay = {
-			canvas,
-			ctx: canvas.getContext('2d'),
-			lastKey: ''
+		try {
+			ctx.setTransform(1, 0, 0, 1, 0, 0)
+			ctx.translate(state.x, state.y)
+			ctx.fillStyle = state.fillColor
+			fillShape(ctx, state.shape.rangePath, state.shape.rangeCells)
+			ctx.fillStyle = state.centerColor
+			fillShape(ctx, state.shape.centerPath, state.shape.centerCell ? [state.shape.centerCell] : null)
+		} finally {
+			ctx.restore()
 		}
-		game[overlayKey] = overlay
-		return overlay.ctx ? overlay : null
 	}
 
-	function syncOverlayCanvas(game, overlay) {
-		const source = game.canvas
-		if (!source || !source.isConnected) return false
-		const rect = source.getBoundingClientRect()
-		if (!rect.width || !rect.height) return false
-
-		const style = overlay.canvas.style
-		const left = rect.left + 'px'
-		const top = rect.top + 'px'
-		const widthCss = rect.width + 'px'
-		const heightCss = rect.height + 'px'
-		if (style.left !== left) style.left = left
-		if (style.top !== top) style.top = top
-		if (style.width !== widthCss) style.width = widthCss
-		if (style.height !== heightCss) style.height = heightCss
-
-		const backingWidth = getBackingWidth(game, rect)
-		const backingHeight = getBackingHeight(game, rect)
-		if (overlay.canvas.width !== backingWidth) {
-			overlay.canvas.width = backingWidth
-			overlay.lastKey = ''
-		}
-		if (overlay.canvas.height !== backingHeight) {
-			overlay.canvas.height = backingHeight
-			overlay.lastKey = ''
-		}
-		return true
-	}
-
-	function getBackingWidth(game, rect) {
-		const ratio = getPixelRatio(game)
-		return Math.max(1, Math.round(Number(game.w) || game.canvas.width || rect.width * ratio))
-	}
-
-	function getBackingHeight(game, rect) {
-		const ratio = getPixelRatio(game)
-		return Math.max(1, Math.round(Number(game.h) || game.canvas.height || rect.height * ratio))
-	}
-
-	function getPixelRatio(game) {
-		const ratio = Number(game.pixelRatio) || Number(window.devicePixelRatio) || 1
-		return Number.isFinite(ratio) && ratio > 0 ? ratio : 1
-	}
-
-	function getPreviewState(game, overlay) {
+	function getPreviewState(game, layer) {
 		const projection = getProjection(game)
 		if (!projection) return null
 		const scanRadius = getScanRadius()
@@ -203,31 +127,14 @@
 		const originXY = game.uvToXY(game.hoveredCell)
 		if (!Array.isArray(originXY)) return null
 
-		const x = (Number(game.w2) || overlay.canvas.width / 2) + originXY[0]
-		const y = (Number(game.h2) || overlay.canvas.height / 2) + originXY[1]
+		const width = Number(layer?.width || layer?.canvas?.width || game.w) || 0
+		const height = Number(layer?.height || layer?.canvas?.height || game.h) || 0
+		const x = (Number(game.w2) || width / 2) + originXY[0]
+		const y = (Number(game.h2) || height / 2) + originXY[1]
 		const canPlace = !!game.canPlace
 		const fillColor = getFillColor(game, canPlace)
 		const centerColor = getCenterColor(game, canPlace)
-		const key = [
-			shape.key,
-			formatProjectionNumber(x),
-			formatProjectionNumber(y),
-			canPlace ? '1' : '0',
-			game.plane ? '1' : '0',
-			overlay.canvas.width,
-			overlay.canvas.height
-		].join('|')
-
-		return { key, shape, x, y, fillColor, centerColor }
-	}
-
-	function clearScanRangeOverlay(game) {
-		const overlay = game && game[overlayKey]
-		if (!overlay || !overlay.ctx || !overlay.canvas) return
-		if (overlay.canvas.style.display !== 'none') overlay.canvas.style.display = 'none'
-		if (overlay.lastKey === '') return
-		overlay.ctx.clearRect(0, 0, overlay.canvas.width, overlay.canvas.height)
-		overlay.lastKey = ''
+		return { shape, x, y, fillColor, centerColor }
 	}
 
 	function getCachedPreviewShape(scanRadius, projection) {

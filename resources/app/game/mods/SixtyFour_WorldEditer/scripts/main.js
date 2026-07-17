@@ -4,6 +4,9 @@ ModLoader.register({
 		const MOD_ID = api.id
 		const BLUEPRINT_STORAGE_KEY = 'modloader:' + MOD_ID + ':blueprints'
 		const MAX_UNDO = 32
+		const renderLayerId = 'interaction'
+		const renderCallbackId = 'worldediter-overlay'
+		let renderApiOverlayRegistered = false
 		const state = {
 			api,
 			game: null,
@@ -28,6 +31,7 @@ ModLoader.register({
 		}
 
 		api.on('afterVanillaScripts', function () {
+			registerRenderApiOverlay()
 			if (typeof Game === 'undefined' || !Game.prototype) return
 			api.patch(Game.prototype, 'processMousemove2', function (original) {
 				return function (xy, dxy, click) {
@@ -80,10 +84,10 @@ ModLoader.register({
 					renderEditorCursor(this)
 				}
 			})
-			api.patch(Game.prototype, 'render', function (original) {
+			api.patch(Game.prototype, 'renderHoveredCell', function (original) {
 				return function () {
 					const result = original.apply(this, arguments)
-					if (isActiveForGame(this)) renderEditorOverlay(this)
+					if (isActiveForGame(this) && !shouldUseRenderApiOverlay()) renderEditorOverlay(this)
 					return result
 				}
 			})
@@ -96,6 +100,21 @@ ModLoader.register({
 			installInputCapture(game)
 			updateDom()
 		})
+
+		function registerRenderApiOverlay() {
+			if (!api.render || typeof api.render.onLayer !== 'function') return
+			api.render.onLayer(renderLayerId, function ({ game, ctx }) {
+				if (!isActiveForGame(game)) return
+				renderEditorOverlay(game, ctx, { translateToMap: true })
+			}, { id: renderCallbackId, order: 35, copyTransform: false, copyState: false })
+			renderApiOverlayRegistered = true
+		}
+
+		function shouldUseRenderApiOverlay() {
+			if (!renderApiOverlayRegistered || !api.render) return false
+			if (typeof api.render.isEnabled === 'function') return api.render.isEnabled() !== false
+			return true
+		}
 
 		function enabled() {
 			return api.config.get('enabled', true) !== false
@@ -964,13 +983,19 @@ ModLoader.register({
 			return value
 		}
 
-		function renderEditorOverlay(game) {
-			const ctx = game.ctx
+		function renderEditorOverlay(game, ctx = game.ctx, options = {}) {
 			if (!ctx) return
 			ctx.save()
-			drawSelections(game, ctx)
-			drawPastePreview(game, ctx)
-			ctx.restore()
+			try {
+				if (options.translateToMap) {
+					ctx.setTransform(1, 0, 0, 1, 0, 0)
+					ctx.translate(Number(game.w2) || 0, Number(game.h2) || 0)
+				}
+				drawSelections(game, ctx)
+				drawPastePreview(game, ctx)
+			} finally {
+				ctx.restore()
+			}
 			renderCards(game)
 		}
 
@@ -1004,7 +1029,6 @@ ModLoader.register({
 				if (entry.save.par) for (const key in entry.save.par) entity[key] = clone(entry.save.par[key])
 				entity.position = entry.position.slice()
 				ctx.save()
-				ctx.translate(game.w2, game.h2)
 				ctx.globalAlpha = .58
 				const c = entry.status === 'empty' ? '#63d88a88' : entry.status === 'same' ? '#ffd45f99' : '#ec554d99'
 				if (typeof entity.renderColored === 'function') entity.renderColored(0, entry.position, c)
@@ -1058,7 +1082,7 @@ ModLoader.register({
 
 		function drawCell(game, ctx, cell, fill, stroke) {
 			if (!cell) return
-			const p = game.uvToXYUntranslated(cell)
+			const p = game.uvToXY(cell)
 			const dx = .866 * game.unit
 			const dy = .5 * game.unit
 			ctx.save()
@@ -1082,10 +1106,10 @@ ModLoader.register({
 
 		function drawRectOutline(game, ctx, rect, color) {
 			const corners = [
-				game.uvToXYUntranslated([rect.minX, rect.minY]),
-				game.uvToXYUntranslated([rect.maxX, rect.minY]),
-				game.uvToXYUntranslated([rect.maxX, rect.maxY]),
-				game.uvToXYUntranslated([rect.minX, rect.maxY])
+				game.uvToXY([rect.minX, rect.minY]),
+				game.uvToXY([rect.maxX, rect.minY]),
+				game.uvToXY([rect.maxX, rect.maxY]),
+				game.uvToXY([rect.minX, rect.maxY])
 			]
 			ctx.save()
 			ctx.strokeStyle = color
@@ -1110,7 +1134,7 @@ ModLoader.register({
 			ctx.strokeStyle = 'rgba(45,52,64,.82)'
 			ctx.lineWidth = Math.max(1, game.pixelRatio)
 			for (const point of points) {
-				const xy = game.uvToXYUntranslated(point)
+				const xy = game.uvToXY(point)
 				const r = Math.max(3, game.screenUnit * .055)
 				ctx.beginPath()
 				ctx.arc(xy[0], xy[1], r, 0, Math.PI * 2)

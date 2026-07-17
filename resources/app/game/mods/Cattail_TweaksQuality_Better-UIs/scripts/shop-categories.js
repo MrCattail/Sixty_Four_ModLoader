@@ -579,8 +579,9 @@ ModLoader.register({
 		function syncToggleVisibility(shop) {
 			const toggle = shop?.[toggleKey]
 			if (!toggle) return
-			const vanillaHidden = shop.shopToggle && getComputedStyle(shop.shopToggle).display === 'none'
-			toggle.style.display = (shop.master?.pinhole || vanillaHidden) ? 'none' : 'block'
+			toggle.style.display = ''
+			const hidden = !!api.ui?.isVanillaGameHudHidden?.(shop?.master)
+			toggle.setAttribute('aria-hidden', hidden ? 'true' : 'false')
 		}
 
 		function localizedToggleText(shop) {

@@ -89,10 +89,12 @@ if ($CleanEnabled) {
 }
 
 $loaderVersion = Get-LoaderVersionFromText -Text (Get-Content -LiteralPath (Join-Path $stagingRoot 'resources\app\game\modloader\loader.js') -Raw -Encoding UTF8)
+$builtAtUtc = (Get-Date).ToUniversalTime().ToString('o')
 $packageManifest = [ordered]@{
 	id = 'sixtyfour-modloader'
 	name = "Cattail's ModLoader"
 	version = $loaderVersion
+	builtAtUtc = $builtAtUtc
 	packageFormat = 1
 }
 $packageManifest | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath (Join-Path $stagingRoot 'modloader-installer\modloader-package.json') -Encoding ASCII
@@ -123,6 +125,8 @@ To update an existing install without manually extracting over the game folder:
 1. Put any newer ModLoader zip in `modloader-installer`; the file name does not matter.
 2. Double-click `modloader-installer\update.cmd`.
 3. The updater scans all zip files there and uses the newest ModLoader package.
+   A package is newer when its version is higher, or when the version is the same
+   but its package build time is newer.
 4. Choose whether the package mods should replace the current mods folder.
 5. After a successful update, choose whether to delete the zip package that was used.
 

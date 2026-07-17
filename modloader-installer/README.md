@@ -32,7 +32,9 @@ For installed players:
 1. Put any newer ModLoader zip in `modloader-installer`. The file name does not matter.
 2. Double-click `update.cmd`.
 3. The updater scans all zip files there, ignores non-ModLoader or older packages,
-   and uses the newest ModLoader package it can find.
+   and uses the newest ModLoader package it can find. A package is newer when its
+   version is higher, or when the version is the same but its package build time
+   is newer.
 4. Choose whether the package `mods` folder should replace the current `mods`
    folder.
 5. After a successful update, choose whether to delete the zip package that was
