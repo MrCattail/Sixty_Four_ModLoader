@@ -2691,7 +2691,7 @@ ModLoader.register({
 					try {
 						profileResourceSource(
 							'resource.links.total',
-							() => { if (!shouldUseResourceSourceRenderApiLinks(this)) renderResourceSourceLinks(this) },
+							() => { if (!shouldUseResourceSourceRenderApiLinks(this)) renderResourceSourceLinks(this, this.ctx, { compositeGpuToCanvas: true }) },
 							() => getResourceSourceProfileDetail(this, getResourceSourceFocusResourceId(this))
 						)
 						const result = profileResourceSource(
@@ -3485,7 +3485,7 @@ ModLoader.register({
 			if (deadline && typeof deadline.timeRemaining === 'function') return deadline.timeRemaining() > 3
 			return performance.now() - start < 6
 		}
-		function renderResourceSourceLinks(game, ctx = game?.ctx) {
+		function renderResourceSourceLinks(game, ctx = game?.ctx, options = {}) {
 			if (isResourceSourceEndingActive(game)) {
 				clearResourceSourceGpuLines(game)
 				return
@@ -3505,10 +3505,11 @@ ModLoader.register({
 				() => collectResourceSourceLinkSegmentsForResource(game, resourceId),
 				() => getResourceSourceProfileDetail(game, resourceId)
 			)
+			const compositeGpuToCanvas = options.compositeGpuToCanvas === true && !!ctx
 			if (isResourceSourceGpuLineModeActive(game)) {
 				profileResourceSource(
 					'resource.links.webgl.render',
-					() => renderResourceSourceGpuLines(game, segments),
+					() => renderResourceSourceGpuLines(game, segments, compositeGpuToCanvas ? { compositeCtx: ctx } : null),
 					() => getResourceSourceProfileDetail(game, resourceId, { segments: segments.length })
 				)
 				return
@@ -3573,18 +3574,22 @@ ModLoader.register({
 			ctx.restore()
 		}
 
-		function renderResourceSourceGpuLines(game, segments) {
+		function renderResourceSourceGpuLines(game, segments, options = null) {
+			const compositeCtx = options?.compositeCtx || null
 			const renderer = profileResourceSource('resource.links.webgl.renderer', () => getResourceSourceGpuRenderer(game), () => ({ segments: segments.length }))
 			if (!renderer) {
-				drawResourceSourceLinkSegments(game, segments)
+				drawResourceSourceLinkSegments(game, segments, compositeCtx || game?.ctx)
 				return
 			}
-			syncResourceSourceGpuCanvas(renderer, game)
+			syncResourceSourceGpuCanvas(renderer, game, { visible: !compositeCtx })
 			const gl = renderer.gl
 			gl.viewport(0, 0, renderer.canvas.width, renderer.canvas.height)
 			gl.clearColor(0, 0, 0, 0)
 			gl.clear(gl.COLOR_BUFFER_BIT)
-			if (!segments.length) return
+			if (!segments.length) {
+				if (compositeCtx) renderer.canvas.style.display = 'none'
+				return
+			}
 
 			const lineData = profileResourceSource('resource.links.webgl.data', () => buildResourceSourceGpuLineData(game, segments), () => ({ segments: segments.length }))
 			gl.bindBuffer(gl.ARRAY_BUFFER, renderer.lineBuffer)
@@ -3603,6 +3608,7 @@ ModLoader.register({
 			gl.uniform1f(renderer.pointUniforms.size, Math.max(4, (game.unit || 1) * 0.09))
 			bindResourceSourceGpuPointAttributes(gl, renderer.pointProgram, renderer.lineBuffer)
 			gl.drawArraysInstanced(gl.POINTS, 0, 1, segments.length)
+			if (compositeCtx) compositeResourceSourceGpuCanvas(renderer, compositeCtx)
 		}
 
 		function buildResourceSourceGpuLineData(game, segments) {
@@ -3667,18 +3673,30 @@ ModLoader.register({
 			}
 		}
 
-		function syncResourceSourceGpuCanvas(renderer, game) {
-			const rect = game.canvas.getBoundingClientRect()
+		function syncResourceSourceGpuCanvas(renderer, game, options = {}) {
+			const visible = options.visible !== false
 			if (renderer.canvas.width !== game.w) renderer.canvas.width = game.w
 			if (renderer.canvas.height !== game.h) renderer.canvas.height = game.h
 			const renderOrder = getResourceSourceGpuLineRenderOrder(game)
 			renderer.canvas.dataset.modloaderRenderOrder = String(renderOrder)
-			renderer.canvas.style.display = 'block'
+			renderer.canvas.style.display = visible ? 'block' : 'none'
 			renderer.canvas.style.zIndex = String(renderOrder)
+			if (!visible) return
+			const rect = game.canvas.getBoundingClientRect()
 			renderer.canvas.style.left = rect.left + 'px'
 			renderer.canvas.style.top = rect.top + 'px'
 			renderer.canvas.style.width = rect.width + 'px'
 			renderer.canvas.style.height = rect.height + 'px'
+		}
+
+		function compositeResourceSourceGpuCanvas(renderer, ctx) {
+			if (!renderer?.canvas || !ctx) return
+			if (renderer.gl?.flush) renderer.gl.flush()
+			ctx.save()
+			ctx.globalAlpha = 1
+			ctx.drawImage(renderer.canvas, 0, 0)
+			ctx.restore()
+			renderer.canvas.style.display = 'none'
 		}
 
 		function getResourceSourceGpuLineRenderOrder(game) {

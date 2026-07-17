@@ -60,7 +60,8 @@
 		renderLayerDemands: {},
 		renderCallbackSerial: 1,
 		renderFrame: 0,
-		renderInstalled: false
+		renderInstalled: false,
+		renderTouchModeOverlayStyle: 'gradient'
 	}
 
 	const addIssue = function (level, code, message, details) {
@@ -808,9 +809,29 @@
 		clearRenderLayers(manager)
 	}
 
+	const detectTouchModeOverlayStyle = function (renderloop) {
+		const source = typeof renderloop === 'function' ? Function.prototype.toString.call(renderloop) : ''
+		if (/createLinearGradient\s*\(\s*0\s*,\s*0\s*,\s*0\s*,\s*this\.h\s*\)/.test(source)) return 'gradient'
+		if (/strokeRect\s*\(\s*0\s*,\s*0\s*,\s*this\.w\s*,\s*this\.h\s*\)/.test(source)) return 'border'
+		return 'gradient'
+	}
+
 	const renderTouchModeOverlay = function (game) {
 		if (!game || (game.touchMode !== 1 && game.touchMode !== 2)) return
 		withRenderLayer(game, 'screen-effects', function (ctx) {
+			if (state.renderTouchModeOverlayStyle === 'border') {
+				const weight = (Number(game.unit) || 0) / 8
+				ctx.save()
+				try {
+					ctx.setTransform(1, 0, 0, 1, 0, 0)
+					ctx.strokeStyle = ctx.fillStyle = game.touchMode === 1 ? '#FB1A38' : '#5E78E2'
+					ctx.lineWidth = weight * 2
+					ctx.strokeRect(0, 0, game.w, game.h)
+				} finally {
+					ctx.restore()
+				}
+				return
+			}
 			const fill = ctx.createLinearGradient(0, 0, 0, game.h)
 			if (game.touchMode === 1) {
 				fill.addColorStop(0, '#FF241CFF')
@@ -829,6 +850,10 @@
 				ctx.restore()
 			}
 		}, { copyTransform: false, copyState: false })
+	}
+
+	const shouldRouteTouchModeOverlay = function (game) {
+		return !!(isRenderApiEnabled() && (game?.touchMode === 1 || game?.touchMode === 2) && game.canvas && game.ctx)
 	}
 
 	const shouldRouteReducedFlashesOverlay = function (game) {
@@ -888,15 +913,21 @@
 		if (typeof Game === 'undefined' || !Game.prototype) return
 		if (!state.renderInstalled) {
 			state.renderInstalled = true
+			state.renderTouchModeOverlayStyle = detectTouchModeOverlayStyle(Game.prototype.renderloop)
 			api.patch(Game.prototype, 'renderloop', function (original) {
 				return function (...args) {
 					beginRenderFrame(this)
-					const routeReducedFlashesOverlay = shouldRouteReducedFlashesOverlay(this) && !!ensureRenderLayerManager(this)
+					const renderLayerManager = isRenderApiEnabled() ? ensureRenderLayerManager(this) : null
+					const routeTouchModeOverlay = shouldRouteTouchModeOverlay(this) && !!renderLayerManager
+					const routeReducedFlashesOverlay = shouldRouteReducedFlashesOverlay(this) && !!renderLayerManager
+					const previousTouchMode = this.touchMode
 					const previousPhotofobia = this.photofobia
+					if (routeTouchModeOverlay) this.touchMode = 0
 					if (routeReducedFlashesOverlay) this.photofobia = false
 					try {
 						return original.apply(this, args)
 					} finally {
+						if (routeTouchModeOverlay) this.touchMode = previousTouchMode
 						if (routeReducedFlashesOverlay) this.photofobia = previousPhotofobia
 						endRenderFrame(this)
 					}
