@@ -51,10 +51,28 @@
 		if (typeof api.render.registerLayer === 'function') {
 			api.render.registerLayer(renderLayerId, { order: 44, zIndex: 44, clearEachFrame: true })
 		}
-		api.render.onLayer('ui', function () {}, { id: uiDemandCallbackId, order: -1000, copyTransform: false, copyState: false })
+		if (typeof api.render.demandLayer === 'function') {
+			api.render.demandLayer('ui', {
+				id: uiDemandCallbackId,
+				enabled({ game }) { return shouldDemandChasmLineRenderApi(api, game) }
+			})
+		} else {
+			api.render.onLayer('ui', function () {}, {
+				id: uiDemandCallbackId,
+				order: -1000,
+				copyTransform: false,
+				copyState: false,
+				enabled({ game }) { return shouldDemandChasmLineRenderApi(api, game) }
+			})
+		}
 		api.render.onLayer(renderLayerId, function ({ game, ctx }) {
 			renderChasmLinesForRenderApi(api, game, ctx)
-		}, { id: renderCallbackId, order: 20, copyTransform: false, copyState: false })
+		}, {
+			id: renderCallbackId,
+			order: 20,
+			space: 'screen',
+			enabled({ game }) { return shouldDemandChasmLineRenderApi(api, game) }
+		})
 		renderApiRegistered = true
 	}
 
@@ -65,6 +83,14 @@
 			api?.render &&
 			(typeof api.render.isEnabled !== 'function' || api.render.isEnabled() !== false)
 		)
+	}
+
+	function shouldDemandChasmLineRenderApi(api, game) {
+		if (!shouldUseChasmLineRenderApi(api, game) || game.plane || !game.chasm) return false
+		const ignoreDistance = shouldIgnoreChasmLineDistance(game, api)
+		const rendererEnabled = isChasmLineRendererEnabled(api)
+		const mode = normalizeChasmLineMode(api.config.get(modeConfigKey, modeWebgl))
+		return shouldReplaceChasmLines(rendererEnabled, ignoreDistance, mode)
 	}
 
 	function renderChasmLinesForRenderApi(api, game, ctx) {

@@ -5,19 +5,24 @@
 	const defaultOrder = 65
 	const raisedResourceOrder = 43
 	const apiOffFrameKey = '__cattailReducedFlashesLayeringApiOffFrame'
+	const uiDemandCallbackId = 'reduced-flashes-layering-ui-demand'
 	let lastApplied = null
 	let apiOffLayeringInstalled = false
+	let uiDemandRegistered = false
 
 	ModLoader.register({
 		id: MOD_ID,
 		init(api) {
+			registerRaisedResourceUiDemand(api)
 			applyReducedFlashesLayering(api, true)
 			installApiOffReducedFlashesLayering(api)
 			api.on('afterVanillaScripts', function () {
+				registerRaisedResourceUiDemand(api)
 				applyReducedFlashesLayering(api, true)
 				installApiOffReducedFlashesLayering(api)
 			})
 			api.on('afterGameInit', function () {
+				registerRaisedResourceUiDemand(api)
 				applyReducedFlashesLayering(api, true)
 				installApiOffReducedFlashesLayering(api)
 			})
@@ -29,6 +34,25 @@
 			})
 		}
 	})
+
+	function registerRaisedResourceUiDemand(api) {
+		if (uiDemandRegistered || !api?.render) return
+		if (typeof api.render.demandLayer === 'function') {
+			api.render.demandLayer('ui', {
+				id: uiDemandCallbackId,
+				enabled({ game }) { return shouldDemandRaisedResourceUiLayer(api, game) }
+			})
+		} else if (typeof api.render.onLayer === 'function') {
+			api.render.onLayer('ui', function () {}, {
+				id: uiDemandCallbackId,
+				order: -1000,
+				copyTransform: false,
+				copyState: false,
+				enabled({ game }) { return shouldDemandRaisedResourceUiLayer(api, game) }
+			})
+		} else return
+		uiDemandRegistered = true
+	}
 
 	function applyReducedFlashesLayering(api, force = false) {
 		if (!api?.render || typeof api.render.registerLayer !== 'function') return
@@ -78,6 +102,16 @@
 			!game.plane &&
 			game.canvas &&
 			game.ctx
+		)
+	}
+
+	function shouldDemandRaisedResourceUiLayer(api, game) {
+		return !!(
+			api?.config?.get(configKey, false) === true &&
+			isRenderApiEnabled(api) &&
+			game?.photofobia &&
+			game.flashlight &&
+			!game.plane
 		)
 	}
 

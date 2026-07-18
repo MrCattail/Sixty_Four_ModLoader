@@ -110,7 +110,12 @@ ModLoader.register({
 			api.render.onLayer(renderLayerId, function ({ game, ctx }) {
 				if (!isActiveForGame(game)) return
 				renderEditorOverlay(game, ctx, { translateToMap: true })
-			}, { id: renderCallbackId, order: 35, copyTransform: false, copyState: false })
+			}, {
+				id: renderCallbackId,
+				order: 35,
+				space: 'screen',
+				enabled({ game }) { return isActiveForGame(game) }
+			})
 			renderApiOverlayRegistered = true
 		}
 
@@ -125,7 +130,12 @@ ModLoader.register({
 			api.render.onLayer(cursorLayerId, function ({ game, ctx }) {
 				if (!isActiveForGame(game)) return
 				renderEditorCursor(game, ctx)
-			}, { id: cursorCallbackId, order: 40, copyTransform: false, copyState: false })
+			}, {
+				id: cursorCallbackId,
+				order: 40,
+				space: 'screen',
+				enabled({ game }) { return isActiveForGame(game) }
+			})
 			renderApiCursorRegistered = true
 		}
 

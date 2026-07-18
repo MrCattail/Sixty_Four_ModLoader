@@ -134,11 +134,16 @@ api.render.withLayer('ui', (ctx, game) => {
 
 Built-in layer ids are `background`, `buildings`, `effects`, `interaction`,
 `ui`, `screen-effects`, `cursor`, `reduced-flashes`, and `top-effects`.
-Custom layers can be registered with `api.render.registerLayer(id, { order, zIndex, clearEachFrame })`.
+Custom layers can be registered with `api.render.registerLayer(id, { order, zIndex, clearEachFrame })`; this defines or updates the layer but does not create or demand a canvas by itself.
+Render callbacks accept `enabled: false` or an `enabled(ctx)` predicate; disabled callbacks are skipped before their layer is touched for that frame. Prefer `enabled(ctx)` for hot toggles or overlays that are only visible in specific game states. Pass `space: 'screen'` when a callback draws screen-space UI or full-screen overlays; this defaults `copyTransform` and `copyState` to `false` for that callback.
+Use `api.render.demandLayer(id, { enabled })` or `api.render.layers.demand(id, { enabled })` when a mod only needs a layer or routed vanilla method to be active for the frame and does not need to draw its own callback.
 Use `api.render.layers.get(id)` to access a layer canvas/context directly.
-Use `api.render.demandedLayers()` or `api.render.layers.demands()` to inspect which layer ids have been requested, and `api.render.isLayerDemanded(id)` / `api.render.layers.isDemanded(id)` to check one layer without creating it.
-Use `api.render.routedMethods()` / `api.render.methodRoutes()` to inspect which vanilla render methods currently route because the Render API is enabled and their target layer is demanded. Pass `{ all: true }` to include inactive routes; entries include `method`, `layer`, `demanded`, and `routed`. Use `api.render.isMethodRouted(methodName)` and `api.render.getMethodLayer(methodName)` for single-method checks.
-The `Ctrl+M` ModLoader panel shows the same Render API switch state, demanded layer ids, and active method routes in its summary block.
+Use `api.render.demandedLayers()` or `api.render.layers.demands()` to inspect which layer ids are active for the current frame, and `api.render.isLayerDemanded(id)` / `api.render.layers.isDemanded(id)` to check one active layer without creating it. Direct `getLayer()` / `withLayer()` access keeps a persistent demand; `onLayer()` callbacks and `demandLayer()` entries only demand their layer while enabled. Only active layer canvases are shown, synced, and cleared during the normal frame path.
+Use `api.render.definedLayers()`, `api.render.createdLayers()`, `api.render.callbacks()`, `api.render.layerDemanders()`, and `api.render.summary()` for read-only diagnostics that do not create canvases or demand layers.
+Use `api.render.onReady(fn)`, `api.render.onFrameStart(fn)`, and `api.render.onFrame(fn)` for render lifecycle notifications; callbacks receive a lightweight context and return cleanup functions. The grouped aliases `api.render.events.ready(fn)`, `api.render.events.frameStart(fn)`, and `api.render.events.frame(fn)` are also available.
+Use `api.render.routeMethod(methodName, layerId)` or `api.render.routes.register(methodName, layerId)` to add a routed `Game.prototype` render method; routing still only happens when the API is enabled and the target layer is demanded for that frame.
+Use `api.render.routedMethods()` / `api.render.methodRoutes()` to inspect which vanilla render methods currently route because the Render API is enabled and their target layer is demanded. Pass `{ all: true }` to include inactive routes; entries include `method`, `layer`, `demanded`, `routed`, `builtIn`, `custom`, and `patched`. Use `api.render.isMethodRouted(methodName)` and `api.render.getMethodLayer(methodName)` for single-method checks.
+The `Ctrl+M` ModLoader panel shows the same Render API switch state, demanded layer ids, created layer ids, callback active/total counts, and active method routes in its summary block.
 The ModLoader menu settings page includes a Render API switch. Turning it off
 returns vanilla draw calls to the main canvas and skips registered render-layer
 callbacks until it is turned on again.

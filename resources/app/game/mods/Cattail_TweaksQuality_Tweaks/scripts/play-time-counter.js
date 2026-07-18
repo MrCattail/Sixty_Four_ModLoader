@@ -2,9 +2,13 @@
 	const MOD_ID = 'Cattail_TweaksQuality_Tweaks'
 	const LEGACY_MOD_ID = 'Cattail_TweaksQuality_Dynamic-Details'
 	const installedKey = '__cattailPlayTimeCounterInstalled'
+	const renderLayerId = 'top-effects'
+	const renderCallbackId = 'tweaks-play-time-counter'
 	const defaultPosition = 'bottom-right'
 	const topPosition = 'top-center'
 	const leftPosition = 'bottom-left'
+
+	let renderApiRegistered = false
 
 	ModLoader.register({
 		id: MOD_ID,
@@ -20,18 +24,35 @@
 	function installPlayTimeCounter(api) {
 		if (typeof Game === 'undefined' || window[installedKey]) return
 		window[installedKey] = true
+		registerPlayTimeCounterRenderApi(api)
 		api.patch(Game.prototype, 'renderloop', function (original) {
 			return function (...args) {
 				const result = original.apply(this, args)
-				renderPlayTimeCounter(this, api)
+				if (!shouldUsePlayTimeCounterRenderApi(api)) renderPlayTimeCounter(this, api)
 				return result
 			}
 		})
 	}
 
-	function renderPlayTimeCounter(game, api) {
-		if (!shouldShowPlayTimeCounter(game, api)) return
-		const ctx = game.ctx
+	function registerPlayTimeCounterRenderApi(api) {
+		if (renderApiRegistered || !api.render || typeof api.render.onLayer !== 'function') return
+		api.render.onLayer(renderLayerId, function ({ game, ctx }) {
+			renderPlayTimeCounter(game, api, ctx)
+		}, {
+			id: renderCallbackId,
+			order: 30,
+			space: 'screen',
+			enabled({ game }) { return shouldUsePlayTimeCounterRenderApi(api) && isPlayTimeCounterReady(game, api) }
+		})
+		renderApiRegistered = true
+	}
+
+	function shouldUsePlayTimeCounterRenderApi(api) {
+		return !!(renderApiRegistered && api.render && (typeof api.render.isEnabled !== 'function' || api.render.isEnabled() !== false))
+	}
+
+	function renderPlayTimeCounter(game, api, ctx = game?.ctx) {
+		if (!shouldShowPlayTimeCounter(game, api, ctx)) return
 		const text = formatPlayTimeCounter(game.stats.totalPlayAndIdleTime)
 		const pixelRatio = game.pixelRatio || 1
 		const unit = game.screenUnit || game.unit || 1
@@ -53,12 +74,15 @@
 		ctx.restore()
 	}
 
-	function shouldShowPlayTimeCounter(game, api) {
+	function shouldShowPlayTimeCounter(game, api, ctx = game?.ctx) {
+		return !!(isPlayTimeCounterReady(game, api) && ctx)
+	}
+
+	function isPlayTimeCounterReady(game, api) {
 		return !!(
 			api.config.get('enablePlayTimeCounter', true) !== false &&
 			game &&
 			!game.halt &&
-			game.ctx &&
 			game.stats &&
 			Number.isFinite(Number(game.stats.totalPlayAndIdleTime)) &&
 			Number.isFinite(Number(game.w)) &&

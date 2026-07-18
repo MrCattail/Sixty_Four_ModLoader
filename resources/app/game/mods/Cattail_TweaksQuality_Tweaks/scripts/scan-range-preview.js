@@ -59,7 +59,12 @@
 		if (!api?.render || typeof api.render.onLayer !== 'function') return
 		api.render.onLayer(renderLayerId, function ({ game, ctx, canvas, width, height }) {
 			renderScanRangePreview(game, ctx, { canvas, width, height }, api)
-		}, { id: renderCallbackId, order: 20, copyTransform: false, copyState: false })
+		}, {
+			id: renderCallbackId,
+			order: 20,
+			space: 'screen',
+			enabled({ game }) { return shouldUseRenderLayerPreview(game, api) }
+		})
 		renderCallbackRegistered = true
 	}
 

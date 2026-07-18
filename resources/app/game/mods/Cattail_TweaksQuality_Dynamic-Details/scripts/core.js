@@ -925,7 +925,12 @@ ModLoader.register({
 			if (coordinateRenderApiRegistered || !api.render || typeof api.render.onLayer !== 'function') return
 			api.render.onLayer(coordinateRenderLayerId, function ({ game, ctx }) {
 				renderCoordinateOverlay(game, ctx)
-			}, { id: coordinateRenderCallbackId, order: 20, copyTransform: false, copyState: false })
+			}, {
+				id: coordinateRenderCallbackId,
+				order: 20,
+				space: 'screen',
+				enabled({ game }) { return shouldDemandCoordinateRenderApiOverlay(game) }
+			})
 			coordinateRenderApiRegistered = true
 		}
 
@@ -940,18 +945,52 @@ ModLoader.register({
 			if (typeof api.render.registerLayer === 'function') {
 				api.render.registerLayer(resourceSourceRenderLayerId, { order: 45, zIndex: 45, clearEachFrame: true })
 			}
-			api.render.onLayer('ui', function () {}, { id: resourceSourceUiDemandCallbackId, order: -1000, copyTransform: false, copyState: false })
+			if (typeof api.render.demandLayer === 'function') {
+				api.render.demandLayer('ui', {
+					id: resourceSourceUiDemandCallbackId,
+					enabled({ game }) { return shouldDemandResourceSourceRenderApiLinks(game) }
+				})
+			} else {
+				api.render.onLayer('ui', function () {}, {
+					id: resourceSourceUiDemandCallbackId,
+					order: -1000,
+					copyTransform: false,
+					copyState: false,
+					enabled({ game }) { return shouldDemandResourceSourceRenderApiLinks(game) }
+				})
+			}
 			api.render.onLayer(resourceSourceRenderLayerId, function ({ game, ctx }) {
-				if (!shouldUseResourceSourceRenderApiLinks(game)) return
+				if (!shouldUseResourceSourceRenderApiLinks(game)) {
+					clearResourceSourceGpuLines(game)
+					return
+				}
 				renderResourceSourceLinks(game, ctx)
-			}, { id: resourceSourceRenderCallbackId, order: 20, copyTransform: false, copyState: false })
+			}, {
+				id: resourceSourceRenderCallbackId,
+				order: 20,
+				space: 'screen',
+				enabled({ game }) { return shouldDemandResourceSourceRenderApiLinks(game) }
+			})
 			resourceSourceRenderApiRegistered = true
 		}
 
 		function shouldUseResourceSourceRenderApiLinks(game) {
 			if (!game || !resourceSourceRenderApiRegistered || !api.render || !isResourceSourceFeatureEnabled()) return false
+			if (isResourceSourceOverlayInactive(game)) return false
 			if (typeof api.render.isEnabled === 'function') return api.render.isEnabled() !== false
 			return true
+		}
+
+		function shouldDemandResourceSourceRenderApiLinks(game) {
+			return !!(
+				shouldUseResourceSourceRenderApiLinks(game) &&
+				(isResourceSourceLinkActive(game) || isResourceSourceGpuLineCanvasVisible(game))
+			)
+		}
+
+		function isResourceSourceGpuLineCanvasVisible(game) {
+			const canvas = game?.[resourceSourceGpuRendererKey]?.canvas
+			return !!(canvas && canvas.style.display !== 'none')
 		}
 
 		function patchTransientCubeHints() {
@@ -1142,6 +1181,10 @@ ModLoader.register({
 				isCoordinateEmptyCellContext(game) &&
 				((game.altActive && game.shiftPressed) || isDirectionPointerToggleActive(game))
 			)
+		}
+
+		function shouldDemandCoordinateRenderApiOverlay(game) {
+			return !!(shouldShowCoordinateOverlay(game) || shouldShowCoordinateDirectionIndicators(game))
 		}
 
 		function collectCoordinateDirectionTargets(game) {
@@ -2588,7 +2631,9 @@ ModLoader.register({
 			api.patch(Game.prototype, 'switchPlane', function (original) {
 				return function (...args) {
 					clearResourceSourceGpuLines(this)
-					return original.apply(this, args)
+					const result = original.apply(this, args)
+					clearResourceSourceGpuLines(this)
+					return result
 				}
 			})
 
@@ -2675,11 +2720,7 @@ ModLoader.register({
 				return function (...args) {
 					profileResourceSource('resource.warmup.schedule', () => scheduleResourceSourceWarmup(this), () => getResourceSourceProfileDetail(this, getResourceSourceFocusResourceId(this)))
 					profileResourceSource('resource.events.trim.render', () => trimResourceSourceEvents(getResourceSourceState(this), performance.now()), () => getResourceSourceProfileDetail(this, getResourceSourceFocusResourceId(this)))
-					if (isResourceSourceEndingActive(this)) {
-						clearResourceSourceGpuLines(this)
-						return original.apply(this, args)
-					}
-					if (this.plane) {
+					if (isResourceSourceOverlayInactive(this)) {
 						clearResourceSourceGpuLines(this)
 						return original.apply(this, args)
 					}
@@ -2713,6 +2754,13 @@ ModLoader.register({
 					} finally {
 						if (useVirtualHover) this.hoveredResource = previousHoveredResource
 					}
+				}
+			})
+
+			api.patch(Game.prototype, 'renderDarkResources', function (original) {
+				return function (...args) {
+					clearResourceSourceGpuLines(this)
+					return original.apply(this, args)
 				}
 			})
 		}
@@ -3486,7 +3534,7 @@ ModLoader.register({
 			return performance.now() - start < 6
 		}
 		function renderResourceSourceLinks(game, ctx = game?.ctx, options = {}) {
-			if (isResourceSourceEndingActive(game)) {
+			if (isResourceSourceOverlayInactive(game)) {
 				clearResourceSourceGpuLines(game)
 				return
 			}
@@ -3714,6 +3762,10 @@ ModLoader.register({
 
 		function isResourceSourceEndingActive(game) {
 			return !!(game && (game.splash?.isShown || game.credits || game.pinhole || game.entitiesInGame?.pinhole > 0))
+		}
+
+		function isResourceSourceOverlayInactive(game) {
+			return !!(isResourceSourceEndingActive(game) || game?.plane)
 		}
 
 		function bindResourceSourceGpuLineAttributes(gl, program, buffer) {
