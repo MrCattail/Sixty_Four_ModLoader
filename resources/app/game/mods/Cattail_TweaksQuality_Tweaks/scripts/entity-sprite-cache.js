@@ -83,14 +83,6 @@
 				}
 			})
 		}
-		if (typeof Doublechannel2 !== 'undefined') {
-			api.patch(Doublechannel2.prototype, 'render', function (original) {
-				return function (dt, vposition) {
-					if (drawCachedAnimatedSpriteEntity(this, api, dt, vposition)) return
-					return runOriginalWithFallback(this, original, arguments, 'doublechannel2')
-				}
-			})
-		}
 		if (typeof Destabilizer2a !== 'undefined') {
 			api.patch(Destabilizer2a.prototype, 'render', function (original) {
 				return function (dt, vposition) {
