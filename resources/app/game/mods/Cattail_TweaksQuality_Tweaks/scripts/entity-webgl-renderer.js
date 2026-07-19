@@ -1951,7 +1951,8 @@
 		style.width = rect.width + 'px'
 		style.height = rect.height + 'px'
 		style.pointerEvents = 'none'
-		style.zIndex = '2147483646'
+		const targetZIndex = typeof getComputedStyle === 'function' ? getComputedStyle(target).zIndex : target?.style?.zIndex
+		style.zIndex = targetZIndex && targetZIndex !== 'auto' ? targetZIndex : ''
 		style.opacity = String(replayOpacity)
 		style.background = 'transparent'
 		if (!renderer.canvas.isConnected) document.body.appendChild(renderer.canvas)
