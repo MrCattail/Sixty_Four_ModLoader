@@ -10,6 +10,24 @@
 	const replayBatchQuadLimit = 4096
 	const defaultStaticAtlasPageSize = 2048
 	const staticAtlasPadding = 1
+	const defaultDynamicAtlasPageSize = 2048
+	const defaultDynamicAtlasMaxPages = 8
+	const dynamicAtlasPadding = 1
+	const dynamicEntryIdleFrameLimit = 240
+	const dynamicEntrySweepInterval = 60
+	const maxSourceDiagnosticEntries = 2000
+	const dynamicSourceMutationMethods = [
+		'clearRect',
+		'drawImage',
+		'fill',
+		'fillRect',
+		'fillText',
+		'putImageData',
+		'reset',
+		'stroke',
+		'strokeRect',
+		'strokeText'
+	]
 	const sourceIds = new WeakMap()
 	const targetIds = new WeakMap()
 	const sourceTotals = new Map()
@@ -35,6 +53,10 @@
 	let replayFrameId = 0
 	let replayStaticAtlasEnabled = true
 	let replayStaticAtlasPageSize = defaultStaticAtlasPageSize
+	let replayDynamicAtlasEnabled = true
+	let replayDynamicTrackingEnabled = true
+	let replayDynamicAtlasPageSize = defaultDynamicAtlasPageSize
+	let replayDynamicAtlasMaxPages = defaultDynamicAtlasMaxPages
 
 	const stats = {
 		frames: 0,
@@ -69,6 +91,8 @@
 		staticUploads: 0,
 		dynamicUploads: 0,
 		atlasUploads: 0,
+		dynamicAtlasUploads: 0,
+		dynamicUploadSkips: 0,
 		barriers: 0,
 		segments: 0,
 		skippedCommands: 0,
@@ -161,6 +185,7 @@
 				runtimeEnabled = true
 				replayEnabled = options.replay === true
 				applyRuntimeOptions(options)
+				if (!replayEnabled) destroyReplayRenderer()
 				if (options.clear !== false) resetStats()
 				return this.stats()
 			},
@@ -173,19 +198,19 @@
 			},
 			disableReplay() {
 				replayEnabled = false
-				hideReplayCanvas()
+				destroyReplayRenderer()
 				return this.stats()
 			},
 			disable() {
 				runtimeEnabled = false
 				replayEnabled = false
-				hideReplayCanvas()
+				destroyReplayRenderer()
 				return this.stats()
 			},
 			useConfig() {
 				runtimeEnabled = null
 				replayEnabled = false
-				hideReplayCanvas()
+				destroyReplayRenderer()
 				return this.stats()
 			},
 			showReplay(options = {}) {
@@ -201,6 +226,12 @@
 			},
 			replayCanvas() {
 				return replayRenderer?.canvas || null
+			},
+			markSourceDirty(source) {
+				return markReplaySourceDirty(source)
+			},
+			replaySources(options = {}) {
+				return getReplaySourceStats(options.limit || options.top || 40)
 			},
 			destroyReplay() {
 				replayEnabled = false
@@ -226,7 +257,8 @@
 					topSources: listMap(sourceTotals, 'source', 20),
 					topUnsupported: listMap(unsupportedTotals, 'reason', 20),
 					topOperations: listMap(operationTotals, 'operation', 20),
-					topTargets: listMap(targetTotals, 'target', 20)
+					topTargets: listMap(targetTotals, 'target', 20),
+					replaySources: getReplaySourceStats(40)
 				}
 			},
 			snapshot() {
@@ -245,12 +277,33 @@
 		sampleLimit = normalizeLimit(options.samples || options.sampleLimit, sampleLimit, maxSampleLimit)
 		const previousAtlasEnabled = replayStaticAtlasEnabled
 		const previousAtlasPageSize = replayStaticAtlasPageSize
+		const previousDynamicAtlasEnabled = replayDynamicAtlasEnabled
+		const previousDynamicTrackingEnabled = replayDynamicTrackingEnabled
+		const previousDynamicAtlasPageSize = replayDynamicAtlasPageSize
+		const previousDynamicAtlasMaxPages = replayDynamicAtlasMaxPages
 		if (Object.prototype.hasOwnProperty.call(options, 'staticAtlas')) replayStaticAtlasEnabled = options.staticAtlas !== false
 		if (Object.prototype.hasOwnProperty.call(options, 'atlas')) replayStaticAtlasEnabled = options.atlas !== false
 		if (Object.prototype.hasOwnProperty.call(options, 'atlasSize') || Object.prototype.hasOwnProperty.call(options, 'staticAtlasSize')) {
 			replayStaticAtlasPageSize = normalizeAtlasPageSize(options.atlasSize || options.staticAtlasSize)
 		}
-		if (replayRenderer && (previousAtlasEnabled !== replayStaticAtlasEnabled || previousAtlasPageSize !== replayStaticAtlasPageSize)) destroyReplayRenderer()
+		if (Object.prototype.hasOwnProperty.call(options, 'dynamicAtlas')) replayDynamicAtlasEnabled = options.dynamicAtlas !== false
+		if (Object.prototype.hasOwnProperty.call(options, 'dynamicPages')) replayDynamicAtlasEnabled = options.dynamicPages !== false
+		if (Object.prototype.hasOwnProperty.call(options, 'dynamicTracking')) replayDynamicTrackingEnabled = options.dynamicTracking !== false
+		if (Object.prototype.hasOwnProperty.call(options, 'trackDynamicSources')) replayDynamicTrackingEnabled = options.trackDynamicSources !== false
+		if (Object.prototype.hasOwnProperty.call(options, 'dynamicAtlasSize') || Object.prototype.hasOwnProperty.call(options, 'dynamicPageSize')) {
+			replayDynamicAtlasPageSize = normalizeAtlasPageSize(options.dynamicAtlasSize || options.dynamicPageSize)
+		}
+		if (Object.prototype.hasOwnProperty.call(options, 'dynamicAtlasMaxPages')) {
+			replayDynamicAtlasMaxPages = normalizeDynamicAtlasMaxPages(options.dynamicAtlasMaxPages)
+		}
+		if (replayRenderer && (
+			previousAtlasEnabled !== replayStaticAtlasEnabled ||
+			previousAtlasPageSize !== replayStaticAtlasPageSize ||
+			previousDynamicAtlasEnabled !== replayDynamicAtlasEnabled ||
+			previousDynamicTrackingEnabled !== replayDynamicTrackingEnabled ||
+			previousDynamicAtlasPageSize !== replayDynamicAtlasPageSize ||
+			previousDynamicAtlasMaxPages !== replayDynamicAtlasMaxPages
+		)) destroyReplayRenderer()
 	}
 
 	function createFrame(game) {
@@ -771,6 +824,7 @@
 		stats.lastRecordingMs = frame.recordingMs
 		stats.maxRecordingMs = Math.max(stats.maxRecordingMs, frame.recordingMs)
 		mergeMap(sourceTotals, frame.sourceCounts)
+		trimMapOldest(sourceTotals, maxSourceDiagnosticEntries)
 		mergeMap(unsupportedTotals, frame.unsupportedCounts)
 		mergeMap(operationTotals, frame.operationCounts)
 		mergeMap(targetTotals, frame.targetCounts)
@@ -801,6 +855,8 @@
 			staticUploads: 0,
 			dynamicUploads: 0,
 			atlasUploads: 0,
+			dynamicAtlasUploads: 0,
+			dynamicUploadSkips: 0,
 			barriers: 0,
 			segments: 0,
 			skippedCommands: 0,
@@ -816,7 +872,7 @@
 			const renderer = getReplayRenderer(frame.replayTarget)
 			syncReplayRenderer(renderer, frame.replayTarget)
 			if (renderer.contextLost) throw new Error('webgl-context-lost')
-			prepareReplayStaticAtlas(renderer, frame)
+			prepareReplayTextureEntries(renderer, frame)
 			report.canvasSize = { width: renderer.canvas.width, height: renderer.canvas.height }
 			beginReplayFrame(renderer)
 			let segmentOpen = false
@@ -842,6 +898,7 @@
 			}
 			flushReplayBatch(renderer, report)
 			renderer.gl.flush()
+			sweepReplayDynamicEntries(renderer)
 			syncReplayCanvasVisibility(renderer)
 		} catch (error) {
 			report.errors++
@@ -863,6 +920,8 @@
 		replayStats.staticUploads += report.staticUploads
 		replayStats.dynamicUploads += report.dynamicUploads
 		replayStats.atlasUploads += report.atlasUploads
+		replayStats.dynamicAtlasUploads += report.dynamicAtlasUploads
+		replayStats.dynamicUploadSkips += report.dynamicUploadSkips
 		replayStats.barriers += report.barriers
 		replayStats.segments += report.segments
 		replayStats.skippedCommands += report.skippedCommands
@@ -881,6 +940,8 @@
 			textureBinds: report.textureBinds,
 			textureUploads: report.textureUploads,
 			atlasUploads: report.atlasUploads,
+			dynamicAtlasUploads: report.dynamicAtlasUploads,
+			dynamicUploadSkips: report.dynamicUploadSkips,
 			barriers: report.barriers,
 			segments: report.segments,
 			skippedCommands: report.skippedCommands,
@@ -992,6 +1053,7 @@
 			resolutionLocation,
 			textureLocation,
 			textureEntries: new WeakMap(),
+			textureEntryList: [],
 			whiteEntry: null,
 			ownedTextures: new Set(),
 			staticAtlasEnabled: replayStaticAtlasEnabled && typeof gl.texSubImage2D === 'function',
@@ -1000,6 +1062,20 @@
 			staticAtlasPages: [],
 			staticAtlasEntries: 0,
 			staticAtlasFallbackEntries: 0,
+			dynamicAtlasEnabled: replayDynamicAtlasEnabled && typeof gl.texSubImage2D === 'function',
+			dynamicTrackingEnabled: replayDynamicTrackingEnabled,
+			dynamicAtlasPageSize: resolveReplayDynamicAtlasPageSize(gl),
+			dynamicAtlasPadding,
+			dynamicAtlasMaxPages: replayDynamicAtlasMaxPages,
+			dynamicAtlasPages: [],
+			dynamicAtlasEntries: 0,
+			dynamicAtlasFallbackEntries: 0,
+			dynamicAtlasReallocations: 0,
+			dynamicEntryEvictions: 0,
+			dynamicSlotReuses: 0,
+			dynamicEntries: new Set(),
+			dynamicSourceTrackerMap: new WeakMap(),
+			dynamicSourceTrackers: new Set(),
 			boundTexture: null,
 			batchEntry: null,
 			batchSmoothing: null,
@@ -1065,15 +1141,26 @@
 		return Math.max(1, size)
 	}
 
-	function prepareReplayStaticAtlas(renderer, frame) {
-		if (!renderer?.staticAtlasEnabled || !frame?.replayCommands || !frame.sourceRefs) return
+	function resolveReplayDynamicAtlasPageSize(gl) {
+		let size = normalizeAtlasPageSize(replayDynamicAtlasPageSize)
+		try {
+			const maximum = Number(gl?.getParameter?.(gl.MAX_TEXTURE_SIZE))
+			if (Number.isFinite(maximum) && maximum > 0) size = Math.min(size, Math.floor(maximum))
+		} catch (error) {}
+		return Math.max(1, size)
+	}
+
+	function prepareReplayTextureEntries(renderer, frame) {
+		if (!renderer || !frame?.replayCommands || !frame.sourceRefs) return
 		const seen = new Set()
 		for (const command of frame.replayCommands) {
 			if (!command?.supported || command.type !== 'drawImage') continue
 			const source = frame.sourceRefs.get(command.sourceKey)
-			if (!source || seen.has(source) || isDynamicReplaySource(source)) continue
+			if (!source || seen.has(source)) continue
 			seen.add(source)
-			getReplayTextureEntry(renderer, source)
+			const entry = getReplayTextureEntry(renderer, source)
+			const size = getSourceSize(source)
+			if (entry && size) ensureReplayTextureSize(renderer, entry, size)
 		}
 	}
 
@@ -1104,6 +1191,7 @@
 			lastUploadFrame: -1,
 			white,
 			atlas: true,
+			atlasKind: 'static',
 			atlasPage: region.page,
 			x: region.x,
 			y: region.y
@@ -1124,6 +1212,7 @@
 	function tryAllocateReplayAtlasRegion(page, width, height, padding) {
 		const outerWidth = width + padding * 2
 		const outerHeight = height + padding * 2
+		if (outerWidth > page.width - padding * 2 || outerHeight > page.height - padding * 2) return null
 		let x = page.cursorX
 		let y = page.cursorY
 		if (x + outerWidth > page.width - padding) {
@@ -1138,7 +1227,12 @@
 		page.rowHeight = Math.max(page.rowHeight, outerHeight)
 		page.usedPixels += outerWidth * outerHeight
 		page.entries++
-		return { page, x: x + padding, y: y + padding }
+		return {
+			page,
+			x: x + padding,
+			y: y + padding,
+			allocation: { x, y, width: outerWidth, height: outerHeight }
+		}
 	}
 
 	function createReplayAtlasPage(renderer) {
@@ -1162,7 +1256,9 @@
 			rowHeight: 0,
 			usedPixels: 0,
 			entries: 0,
-			atlasPage: true
+			atlasPage: true,
+			atlasKind: 'static',
+			index: renderer.staticAtlasPages.length
 		}
 		renderer.staticAtlasPages.push(page)
 		return page
@@ -1175,6 +1271,316 @@
 			renderer.ownedTextures?.delete(page.texture)
 		}
 		renderer.staticAtlasPages.length = 0
+	}
+
+	function createReplayDynamicAtlasEntry(renderer, source, size, tracker) {
+		const width = Math.max(1, Math.floor(Number(size?.[0]) || 0))
+		const height = Math.max(1, Math.floor(Number(size?.[1]) || 0))
+		const region = allocateReplayDynamicAtlasRegion(renderer, width, height)
+		if (!region) return null
+		renderer.dynamicAtlasEntries++
+		return {
+			source,
+			width,
+			height,
+			dynamic: true,
+			uploaded: false,
+			smoothing: null,
+			lastUploadFrame: -1,
+			lastSkipFrame: -1,
+			lastSourceVersion: -1,
+			white: false,
+			atlas: true,
+			atlasKind: 'dynamic',
+			dynamicAtlas: true,
+			atlasPage: region.page,
+			allocation: region.allocation,
+			x: region.x,
+			y: region.y,
+			tracker
+		}
+	}
+
+	function allocateReplayDynamicAtlasRegion(renderer, width, height) {
+		for (const page of renderer.dynamicAtlasPages) {
+			const reused = tryReuseReplayDynamicAtlasRegion(page, width, height, renderer.dynamicAtlasPadding)
+			if (reused) {
+				renderer.dynamicSlotReuses++
+				return reused
+			}
+			const region = tryAllocateReplayAtlasRegion(page, width, height, renderer.dynamicAtlasPadding)
+			if (region) return region
+		}
+		if (width + renderer.dynamicAtlasPadding * 2 > renderer.dynamicAtlasPageSize ||
+			height + renderer.dynamicAtlasPadding * 2 > renderer.dynamicAtlasPageSize ||
+			renderer.dynamicAtlasPages.length >= renderer.dynamicAtlasMaxPages) return null
+		const page = createReplayDynamicAtlasPage(renderer)
+		return tryAllocateReplayAtlasRegion(page, width, height, renderer.dynamicAtlasPadding)
+	}
+
+	function tryReuseReplayDynamicAtlasRegion(page, width, height, padding) {
+		const outerWidth = width + padding * 2
+		const outerHeight = height + padding * 2
+		let bestIndex = -1
+		let bestArea = Infinity
+		for (let i = 0; i < page.freeRegions.length; i++) {
+			const region = page.freeRegions[i]
+			if (region.width < outerWidth || region.height < outerHeight) continue
+			const area = region.width * region.height
+			if (area < bestArea) {
+				bestArea = area
+				bestIndex = i
+			}
+		}
+		if (bestIndex < 0) return null
+		const allocation = page.freeRegions.splice(bestIndex, 1)[0]
+		page.usedPixels += allocation.width * allocation.height
+		page.entries++
+		return {
+			page,
+			x: allocation.x + padding,
+			y: allocation.y + padding,
+			allocation
+		}
+	}
+
+	function createReplayDynamicAtlasPage(renderer) {
+		const gl = renderer.gl
+		const texture = gl.createTexture()
+		if (!texture) throw new Error('webgl-dynamic-atlas-texture-create-failed')
+		renderer.ownedTextures.add(texture)
+		gl.bindTexture(gl.TEXTURE_2D, texture)
+		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE)
+		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE)
+		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST)
+		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST)
+		gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, renderer.dynamicAtlasPageSize, renderer.dynamicAtlasPageSize, 0, gl.RGBA, gl.UNSIGNED_BYTE, null)
+		const page = {
+			texture,
+			width: renderer.dynamicAtlasPageSize,
+			height: renderer.dynamicAtlasPageSize,
+			smoothing: false,
+			cursorX: renderer.dynamicAtlasPadding,
+			cursorY: renderer.dynamicAtlasPadding,
+			rowHeight: 0,
+			usedPixels: 0,
+			entries: 0,
+			freeRegions: [],
+			atlasPage: true,
+			atlasKind: 'dynamic',
+			index: renderer.dynamicAtlasPages.length
+		}
+		renderer.dynamicAtlasPages.push(page)
+		return page
+	}
+
+	function ensureReplayTextureSize(renderer, entry, size) {
+		if (!entry?.dynamicAtlas || (entry.width === size[0] && entry.height === size[1])) return true
+		releaseReplayDynamicAtlasSlot(entry)
+		const region = allocateReplayDynamicAtlasRegion(renderer, size[0], size[1])
+		if (!region) return convertReplayDynamicAtlasEntryToTexture(renderer, entry)
+		entry.width = size[0]
+		entry.height = size[1]
+		entry.sourceKey = getSourceKey(entry.source)
+		entry.atlasPage = region.page
+		entry.allocation = region.allocation
+		entry.x = region.x
+		entry.y = region.y
+		entry.uploaded = false
+		entry.lastUploadFrame = -1
+		entry.lastSourceVersion = -1
+		renderer.dynamicAtlasReallocations++
+		return true
+	}
+
+	function releaseReplayDynamicAtlasSlot(entry) {
+		const page = entry?.atlasPage
+		const allocation = entry?.allocation
+		if (!page || !allocation || !Array.isArray(page.freeRegions)) return
+		page.freeRegions.push(allocation)
+		page.usedPixels = Math.max(0, page.usedPixels - allocation.width * allocation.height)
+		page.entries = Math.max(0, page.entries - 1)
+		entry.atlasPage = null
+		entry.allocation = null
+	}
+
+	function convertReplayDynamicAtlasEntryToTexture(renderer, entry) {
+		const texture = renderer.gl.createTexture()
+		if (!texture) return false
+		renderer.ownedTextures.add(texture)
+		if (entry.dynamicAtlas) {
+			releaseReplayDynamicAtlasSlot(entry)
+			renderer.dynamicAtlasEntries = Math.max(0, renderer.dynamicAtlasEntries - 1)
+		}
+		entry.texture = texture
+		entry.atlas = false
+		entry.atlasKind = ''
+		entry.dynamicAtlas = false
+		entry.atlasPage = null
+		entry.allocation = null
+		entry.atlasFallback = entry.atlasFallback || 'dynamic-resize'
+		entry.uploaded = false
+		entry.width = 0
+		entry.height = 0
+		entry.lastUploadFrame = -1
+		entry.lastSourceVersion = -1
+		renderer.dynamicAtlasFallbackEntries++
+		return true
+	}
+
+	function installReplayDynamicSourceTracker(renderer, source) {
+		if (!renderer || !source || typeof source !== 'object') return null
+		const existing = renderer.dynamicSourceTrackerMap.get(source)
+		if (existing) return existing
+		if (!getSourceKind(source).includes('canvas') || typeof source.getContext !== 'function') return null
+		let context = null
+		try { context = source.getContext('2d') } catch (error) {}
+		if (!context) return null
+		const tracker = {
+			source,
+			context,
+			version: 0,
+			mutations: 0,
+			active: true,
+			reliable: false,
+			originals: new Map(),
+			propertyRestorers: []
+		}
+		for (const methodName of dynamicSourceMutationMethods) {
+			const original = context?.[methodName]
+			if (typeof original !== 'function') continue
+			const wrapper = function () {
+				const result = original.apply(this, arguments)
+				recordReplayDynamicMutation(tracker)
+				return result
+			}
+			try { context[methodName] = wrapper } catch (error) { continue }
+			if (context[methodName] !== wrapper) continue
+			tracker.originals.set(methodName, { original, wrapper })
+		}
+		let trackedDimensions = 0
+		for (const propertyName of ['width', 'height']) {
+			if (installReplayCanvasPropertyTracker(tracker, propertyName)) trackedDimensions++
+		}
+		tracker.reliable = tracker.originals.size > 0 && trackedDimensions === 2
+		renderer.dynamicSourceTrackerMap.set(source, tracker)
+		renderer.dynamicSourceTrackers.add(tracker)
+		return tracker
+	}
+
+	function installReplayCanvasPropertyTracker(tracker, propertyName) {
+		const source = tracker.source
+		const found = findReplayPropertyDescriptor(source, propertyName)
+		const descriptor = found?.descriptor
+		if (typeof descriptor?.get !== 'function' || typeof descriptor?.set !== 'function') return false
+		const ownDescriptor = Object.getOwnPropertyDescriptor(source, propertyName)
+		try {
+			Object.defineProperty(source, propertyName, {
+				configurable: true,
+				enumerable: descriptor.enumerable === true,
+				get() {
+					return descriptor.get.call(this)
+				},
+				set(value) {
+					descriptor.set.call(this, value)
+					recordReplayDynamicMutation(tracker)
+				}
+			})
+		} catch (error) {
+			return false
+		}
+		tracker.propertyRestorers.push(function () {
+			try {
+				if (ownDescriptor) Object.defineProperty(source, propertyName, ownDescriptor)
+				else delete source[propertyName]
+			} catch (error) {}
+		})
+		return true
+	}
+
+	function findReplayPropertyDescriptor(value, propertyName) {
+		let current = value
+		while (current) {
+			const descriptor = Object.getOwnPropertyDescriptor(current, propertyName)
+			if (descriptor) return { owner: current, descriptor }
+			current = Object.getPrototypeOf(current)
+		}
+		return null
+	}
+
+	function recordReplayDynamicMutation(tracker) {
+		if (!tracker?.active) return
+		tracker.version++
+		tracker.mutations++
+	}
+
+	function markReplaySourceDirty(source) {
+		const entry = replayRenderer?.textureEntries?.get(source)
+		if (!entry?.dynamic) return false
+		if (!entry.tracker) {
+			entry.tracker = {
+				source,
+				version: 0,
+				mutations: 0,
+				active: true,
+				reliable: true,
+				manual: true,
+				originals: new Map(),
+				propertyRestorers: []
+			}
+			replayRenderer.dynamicSourceTrackerMap.set(source, entry.tracker)
+			replayRenderer.dynamicSourceTrackers.add(entry.tracker)
+		}
+		entry.tracker.reliable = true
+		recordReplayDynamicMutation(entry.tracker)
+		return true
+	}
+
+	function sweepReplayDynamicEntries(renderer) {
+		if (!renderer?.dynamicEntries || replayFrameId % dynamicEntrySweepInterval !== 0) return
+		let evicted = false
+		for (const entry of Array.from(renderer.dynamicEntries)) {
+			if (replayFrameId - entry.lastUsedFrame <= dynamicEntryIdleFrameLimit) continue
+			evictReplayDynamicEntry(renderer, entry)
+			evicted = true
+		}
+		if (evicted) renderer.textureEntryList = renderer.textureEntryList.filter(function (entry) { return !entry.evicted })
+	}
+
+	function evictReplayDynamicEntry(renderer, entry) {
+		if (!entry || entry.evicted) return
+		entry.evicted = true
+		renderer.textureEntries.delete(entry.source)
+		renderer.dynamicEntries.delete(entry)
+		if (entry.dynamicAtlas) {
+			releaseReplayDynamicAtlasSlot(entry)
+			renderer.dynamicAtlasEntries = Math.max(0, renderer.dynamicAtlasEntries - 1)
+		} else if (entry.texture && renderer.ownedTextures.has(entry.texture)) {
+			try { renderer.gl.deleteTexture(entry.texture) } catch (error) {}
+			renderer.ownedTextures.delete(entry.texture)
+		}
+		if (entry.atlasFallback) renderer.dynamicAtlasFallbackEntries = Math.max(0, renderer.dynamicAtlasFallbackEntries - 1)
+		if (entry.tracker) restoreReplayDynamicSourceTracker(renderer, entry.tracker)
+		entry.source = null
+		entry.tracker = null
+		renderer.dynamicEntryEvictions++
+	}
+
+	function restoreReplayDynamicSourceTracker(renderer, tracker) {
+		if (!tracker) return
+		tracker.active = false
+		for (const [methodName, record] of tracker.originals || []) {
+			try {
+				if (tracker.context?.[methodName] === record.wrapper) tracker.context[methodName] = record.original
+			} catch (error) {}
+		}
+		for (let i = tracker.propertyRestorers.length - 1; i >= 0; i--) tracker.propertyRestorers[i]()
+		if (tracker.source) renderer?.dynamicSourceTrackerMap?.delete(tracker.source)
+		renderer?.dynamicSourceTrackers?.delete(tracker)
+	}
+
+	function restoreReplayDynamicSourceTrackers(renderer) {
+		for (const tracker of Array.from(renderer?.dynamicSourceTrackers || [])) restoreReplayDynamicSourceTracker(renderer, tracker)
 	}
 
 	function createReplayWhiteTexture(renderer) {
@@ -1245,11 +1651,21 @@
 		const sourceRect = clipped.source
 		const smoothing = command.smoothing !== false
 		const entry = getReplayTextureEntry(renderer, source)
+		if (!entry || !ensureReplayTextureSize(renderer, entry, size)) return false
 		const uvs = getReplayTextureUvs(entry, sourceRect, size, smoothing)
 		if (!uvs) return false
 		const alpha = Number(command.alpha)
 		const color = [1, 1, 1, Number.isFinite(alpha) ? alpha : 1]
-		return appendReplayQuad(renderer, entry, smoothing, positions, uvs, color, report)
+		const appended = appendReplayQuad(renderer, entry, smoothing, positions, uvs, color, report)
+		if (appended) {
+			entry.draws++
+			entry.lastUsedFrame = replayFrameId
+			if (entry.lastDrawFrame !== replayFrameId) {
+				entry.frames++
+				entry.lastDrawFrame = replayFrameId
+			}
+		}
+		return appended
 	}
 
 	function appendReplayPolygon(renderer, command, report) {
@@ -1353,13 +1769,19 @@
 		if (entry) return entry
 		const dynamic = isDynamicReplaySource(source)
 		const size = getSourceSize(source)
+		const tracker = dynamic && renderer.dynamicTrackingEnabled ? installReplayDynamicSourceTracker(renderer, source) : null
+		let atlasFallback = ''
+		if (renderer.dynamicAtlasEnabled && dynamic && size) {
+			entry = createReplayDynamicAtlasEntry(renderer, source, size, tracker)
+			if (entry) return registerReplayTextureEntry(renderer, source, entry)
+			renderer.dynamicAtlasFallbackEntries++
+			atlasFallback = 'dynamic'
+		}
 		if (renderer.staticAtlasEnabled && !dynamic && size) {
 			entry = createReplayStaticAtlasEntry(renderer, source, size)
-			if (entry) {
-				renderer.textureEntries.set(source, entry)
-				return entry
-			}
+			if (entry) return registerReplayTextureEntry(renderer, source, entry)
 			renderer.staticAtlasFallbackEntries++
+			atlasFallback = 'static'
 		}
 		const texture = renderer.gl.createTexture()
 		if (!texture) return null
@@ -1373,10 +1795,30 @@
 			uploaded: false,
 			smoothing: null,
 			lastUploadFrame: -1,
+			lastSkipFrame: -1,
+			lastSourceVersion: -1,
 			white: false,
-			atlas: false
+			atlas: false,
+			atlasKind: '',
+			dynamicAtlas: false,
+			atlasFallback,
+			tracker
 		}
+		return registerReplayTextureEntry(renderer, source, entry)
+	}
+
+	function registerReplayTextureEntry(renderer, source, entry) {
+		entry.sourceKey = getSourceKey(source)
+		entry.sourceKind = getSourceKind(source)
+		entry.draws = 0
+		entry.frames = 0
+		entry.uploads = 0
+		entry.lastUsedFrame = replayFrameId
+		entry.uploadSkips = 0
+		entry.lastDrawFrame = -1
 		renderer.textureEntries.set(source, entry)
+		renderer.textureEntryList.push(entry)
+		if (entry.dynamic) renderer.dynamicEntries.add(entry)
 		return entry
 	}
 
@@ -1414,6 +1856,15 @@
 
 	function prepareReplayTexture(renderer, entry, smoothing, report) {
 		const gl = renderer.gl
+		let source = null
+		let size = null
+		if (!entry.white) {
+			source = entry.source
+			if (!source) return false
+			size = getSourceSize(source)
+			if (!size) return false
+			if (entry.atlas && (entry.width !== size[0] || entry.height !== size[1])) return false
+		}
 		const resource = entry.atlasPage || entry
 		if (renderer.boundTexture !== resource.texture) {
 			gl.bindTexture(gl.TEXTURE_2D, resource.texture)
@@ -1421,12 +1872,13 @@
 			report.textureBinds++
 		}
 		if (!entry.white) {
-			const source = entry.source
-			if (!source) return false
-			const size = getSourceSize(source)
-			if (!size) return false
-			if (entry.atlas && (entry.width !== size[0] || entry.height !== size[1])) return false
-			const needsUpload = !entry.uploaded || entry.width !== size[0] || entry.height !== size[1] || (entry.dynamic && entry.lastUploadFrame !== replayFrameId)
+			const trackedVersion = entry.tracker?.reliable ? entry.tracker.version : null
+			const dynamicDirty = entry.dynamic && (
+				trackedVersion === null
+					? entry.lastUploadFrame !== replayFrameId
+					: entry.lastSourceVersion !== trackedVersion
+			)
+			const needsUpload = !entry.uploaded || entry.width !== size[0] || entry.height !== size[1] || dynamicDirty
 			if (needsUpload) {
 				try {
 					gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true)
@@ -1434,6 +1886,7 @@
 					if (entry.atlas) {
 						gl.texSubImage2D(gl.TEXTURE_2D, 0, entry.x, entry.y, gl.RGBA, gl.UNSIGNED_BYTE, source)
 						report.atlasUploads++
+						if (entry.dynamicAtlas) report.dynamicAtlasUploads++
 					} else {
 						gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, source)
 						gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE)
@@ -1441,8 +1894,12 @@
 					}
 					entry.width = size[0]
 					entry.height = size[1]
+					if (entry.dynamic) entry.sourceKey = getSourceKey(entry.source)
 					entry.uploaded = true
 					entry.lastUploadFrame = replayFrameId
+					entry.lastSkipFrame = replayFrameId
+					entry.lastSourceVersion = entry.tracker?.version ?? -1
+					entry.uploads++
 					report.textureUploads++
 					if (entry.dynamic) report.dynamicUploads++
 					else report.staticUploads++
@@ -1450,6 +1907,10 @@
 					report.uploadErrors++
 					return false
 				}
+			} else if (entry.dynamic && trackedVersion !== null && entry.lastSkipFrame !== replayFrameId) {
+				entry.lastSkipFrame = replayFrameId
+				entry.uploadSkips++
+				report.dynamicUploadSkips++
 			}
 		}
 		if (resource.smoothing !== smoothing) {
@@ -1505,6 +1966,7 @@
 		const renderer = replayRenderer
 		if (!renderer) return
 		try { renderer.canvas.remove() } catch (error) {}
+		restoreReplayDynamicSourceTrackers(renderer)
 		try {
 			const gl = renderer.gl
 			if (!renderer.contextLost) {
@@ -1534,6 +1996,8 @@
 			staticUploads: replayStats.staticUploads,
 			dynamicUploads: replayStats.dynamicUploads,
 			atlasUploads: replayStats.atlasUploads,
+			dynamicAtlasUploads: replayStats.dynamicAtlasUploads,
+			dynamicUploadSkips: replayStats.dynamicUploadSkips,
 			barriers: replayStats.barriers,
 			segments: replayStats.segments,
 			skippedCommands: replayStats.skippedCommands,
@@ -1549,6 +2013,8 @@
 			avgTextureBindsPerFrame: roundNumber(getReplaySampleAverage('textureBinds'), 3),
 			avgTextureUploadsPerFrame: roundNumber(getReplaySampleAverage('textureUploads'), 3),
 			avgAtlasUploadsPerFrame: roundNumber(getReplaySampleAverage('atlasUploads'), 3),
+			avgDynamicAtlasUploadsPerFrame: roundNumber(getReplaySampleAverage('dynamicAtlasUploads'), 3),
+			avgDynamicUploadSkipsPerFrame: roundNumber(getReplaySampleAverage('dynamicUploadSkips'), 3),
 			avgBarriersPerFrame: roundNumber(getReplaySampleAverage('barriers'), 3),
 			avgSegmentsPerFrame: roundNumber(getReplaySampleAverage('segments'), 3),
 			avgSkippedCommandsPerFrame: roundNumber(getReplaySampleAverage('skippedCommands'), 3),
@@ -1557,7 +2023,9 @@
 			maxReplayMs: roundMs(replayStats.maxReplayMs),
 			lastError: replayStats.lastError,
 			lastCanvasSize: Object.assign({}, replayStats.lastCanvasSize),
-			staticAtlas: getReplayAtlasStats()
+			staticAtlas: getReplayAtlasStats(),
+			dynamicAtlas: getReplayDynamicAtlasStats(),
+			sources: getReplaySourceStats(40)
 		}
 	}
 
@@ -1583,6 +2051,80 @@
 		}
 	}
 
+	function getReplayDynamicAtlasStats() {
+		const renderer = replayRenderer
+		const pages = renderer?.dynamicAtlasPages || []
+		const trackers = Array.from(renderer?.dynamicSourceTrackers || [])
+		let usedPixels = 0
+		let mutations = 0
+		let reliableTrackers = 0
+		let freeSlots = 0
+		for (const page of pages) {
+			usedPixels += Number(page.usedPixels) || 0
+			freeSlots += page.freeRegions?.length || 0
+		}
+		for (const tracker of trackers) {
+			mutations += Number(tracker.mutations) || 0
+			if (tracker.reliable) reliableTrackers++
+		}
+		const pageSize = renderer?.dynamicAtlasPageSize || normalizeAtlasPageSize(replayDynamicAtlasPageSize)
+		const capacityPixels = pages.length * pageSize * pageSize
+		return {
+			configuredEnabled: replayDynamicAtlasEnabled,
+			enabled: renderer ? renderer.dynamicAtlasEnabled : replayDynamicAtlasEnabled,
+			trackingConfigured: replayDynamicTrackingEnabled,
+			trackingEnabled: renderer ? renderer.dynamicTrackingEnabled : replayDynamicTrackingEnabled,
+			pageSize,
+			padding: renderer?.dynamicAtlasPadding ?? dynamicAtlasPadding,
+			maxPages: renderer?.dynamicAtlasMaxPages || replayDynamicAtlasMaxPages,
+			pages: pages.length,
+			entries: renderer?.dynamicAtlasEntries || 0,
+			fallbackEntries: renderer?.dynamicAtlasFallbackEntries || 0,
+			reallocations: renderer?.dynamicAtlasReallocations || 0,
+			activeEntries: renderer?.dynamicEntries?.size || 0,
+			evictions: renderer?.dynamicEntryEvictions || 0,
+			slotReuses: renderer?.dynamicSlotReuses || 0,
+			freeSlots,
+			idleFrameLimit: dynamicEntryIdleFrameLimit,
+			sweepInterval: dynamicEntrySweepInterval,
+			trackers: trackers.length,
+			reliableTrackers,
+			mutations,
+			uploads: replayStats.dynamicAtlasUploads,
+			uploadSkips: replayStats.dynamicUploadSkips,
+			usedPixels,
+			capacityPixels,
+			utilization: capacityPixels ? roundNumber(usedPixels / capacityPixels, 4) : 0
+		}
+	}
+
+	function getReplaySourceStats(limit = 40) {
+		const entries = replayRenderer?.textureEntryList || []
+		return entries.map(function (entry) {
+			return {
+				source: entry.sourceKey || 'unknown-source',
+				kind: entry.sourceKind || 'unknown',
+				width: Number(entry.width) || 0,
+				height: Number(entry.height) || 0,
+				dynamic: entry.dynamic === true,
+				atlas: entry.atlasKind || 'none',
+				page: entry.atlasPage?.index ?? null,
+				fallback: entry.atlasFallback || '',
+				tracked: !!entry.tracker,
+				reliable: entry.tracker?.reliable === true,
+				mutations: Number(entry.tracker?.mutations) || 0,
+				draws: Number(entry.draws) || 0,
+				frames: Number(entry.frames) || 0,
+				uploads: Number(entry.uploads) || 0,
+				uploadSkips: Number(entry.uploadSkips) || 0
+			}
+		}).sort(function (a, b) {
+			return (b.draws - a.draws) ||
+				(b.uploads - a.uploads) ||
+				String(a.source).localeCompare(String(b.source))
+		}).slice(0, normalizeLimit(limit, 40, 200))
+	}
+
 	function getReplaySampleAverage(key) {
 		if (!replaySamples.length) return 0
 		let total = 0
@@ -1591,7 +2133,7 @@
 	}
 
 	function resetReplayStats() {
-		for (const key of ['frames', 'commands', 'quads', 'drawCalls', 'textureBinds', 'textureUploads', 'staticUploads', 'dynamicUploads', 'atlasUploads', 'barriers', 'segments', 'skippedCommands', 'skippedTargets', 'uploadErrors', 'errors', 'contextLosses', 'resizes', 'rendererCreates', 'replayMs', 'lastReplayMs', 'maxReplayMs']) replayStats[key] = 0
+		for (const key of ['frames', 'commands', 'quads', 'drawCalls', 'textureBinds', 'textureUploads', 'staticUploads', 'dynamicUploads', 'atlasUploads', 'dynamicAtlasUploads', 'dynamicUploadSkips', 'barriers', 'segments', 'skippedCommands', 'skippedTargets', 'uploadErrors', 'errors', 'contextLosses', 'resizes', 'rendererCreates', 'replayMs', 'lastReplayMs', 'maxReplayMs']) replayStats[key] = 0
 		replayStats.lastError = ''
 		replayStats.lastCanvasSize = { width: 0, height: 0 }
 		replaySamples.length = 0
@@ -1607,6 +2149,7 @@
 			previewLimit,
 			sampleLimit,
 			sampleCount: samples.length,
+			sourceDiagnosticEntries: sourceTotals.size,
 			frames: stats.frames,
 			drawImages: stats.drawImages,
 			supportedDrawImages: stats.supportedDrawImages,
@@ -1698,6 +2241,14 @@
 		for (const [key, value] of source) incrementMap(target, key, value)
 	}
 
+	function trimMapOldest(map, maximum) {
+		while (map.size > maximum) {
+			const oldest = map.keys().next()
+			if (oldest.done) break
+			map.delete(oldest.value)
+		}
+	}
+
 	function listMap(map, keyName, limit) {
 		return Array.from(map.entries())
 			.map(function (entry) { return { [keyName]: entry[0], calls: entry[1] } })
@@ -1718,6 +2269,12 @@
 		const number = Number(value)
 		if (!Number.isFinite(number)) return defaultStaticAtlasPageSize
 		return Math.max(256, Math.min(8192, Math.floor(number)))
+	}
+
+	function normalizeDynamicAtlasMaxPages(value) {
+		const number = Number(value)
+		if (!Number.isFinite(number)) return defaultDynamicAtlasMaxPages
+		return Math.max(1, Math.min(32, Math.floor(number)))
 	}
 
 	function normalizeLimit(value, fallback, maximum) {
