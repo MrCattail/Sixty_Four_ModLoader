@@ -7,10 +7,13 @@
 	const defaultRealityColor = '#1D232B'
 	const defaultVoidColor = '#FFFFFF'
 	const maxGridLines = 1200
+	const renderLayerId = 'background'
+	const renderCallbackId = 'tweaks-floor-grid-lines'
 
 	let previewEnabled = null
 	let previewRealityColor = null
 	let previewVoidColor = null
+	let renderApiRegistered = false
 
 	ModLoader.register({
 		id: MOD_ID,
@@ -37,18 +40,42 @@
 	function installFloorGridLines(api) {
 		if (window[installedKey] || typeof Game === 'undefined') return
 		window[installedKey] = true
+		registerFloorGridLinesRenderApi(api)
 		api.patch(Game.prototype, 'renderConductors', function (original) {
 			return function (...args) {
-				renderFloorGridLines(this, api)
+				if (!shouldUseFloorGridLinesRenderApi(api, this)) renderFloorGridLines(this, api)
 				return original.apply(this, args)
 			}
 		})
 	}
 
-	function renderFloorGridLines(game, api) {
+	function registerFloorGridLinesRenderApi(api) {
+		if (renderApiRegistered || !api?.render || typeof api.render.onLayer !== 'function') return
+		api.render.onLayer(renderLayerId, function ({ game, ctx }) {
+			renderFloorGridLines(game, api, ctx, { screenSpace: true })
+		}, {
+			id: renderCallbackId,
+			order: 10,
+			space: 'screen',
+			enabled({ game }) { return shouldUseFloorGridLinesRenderApi(api, game) }
+		})
+		renderApiRegistered = true
+	}
+
+	function shouldUseFloorGridLinesRenderApi(api, game) {
+		return !!(
+			renderApiRegistered &&
+			api?.render &&
+			(typeof api.render.isEnabled !== 'function' || api.render.isEnabled() !== false) &&
+			shouldShowFloorGridLines(game, api)
+		)
+	}
+
+	function renderFloorGridLines(game, api, ctx = game?.ctx, options = {}) {
 		if (!shouldShowFloorGridLines(game, api)) return
-		const ctx = game.ctx
-		if (!ctx || typeof game.xyToUV !== 'function' || typeof game.uvToXY !== 'function') return
+		if (!ctx || typeof game.xyToUV !== 'function') return
+		const toXY = options.screenSpace === true ? game.uvToXYUntranslated : game.uvToXY
+		if (typeof toXY !== 'function') return
 		const bounds = getVisibleUvBounds(game)
 		if (!bounds) return
 		const step = getGridStep(bounds)
@@ -61,13 +88,13 @@
 		ctx.lineCap = 'butt'
 		ctx.lineJoin = 'miter'
 		for (let y = bounds.y0; y <= bounds.y1; y += step) {
-			const xy0 = game.uvToXY([bounds.x0, y])
-			const xy1 = game.uvToXY([bounds.x1, y])
+			const xy0 = toXY.call(game, [bounds.x0, y])
+			const xy1 = toXY.call(game, [bounds.x1, y])
 			drawGridLine(ctx, xy0, xy1)
 		}
 		for (let x = bounds.x0; x <= bounds.x1; x += step) {
-			const xy0 = game.uvToXY([x, bounds.y0])
-			const xy1 = game.uvToXY([x, bounds.y1])
+			const xy0 = toXY.call(game, [x, bounds.y0])
+			const xy1 = toXY.call(game, [x, bounds.y1])
 			drawGridLine(ctx, xy0, xy1)
 		}
 		ctx.restore()

@@ -3,6 +3,8 @@ ModLoader.register({
 	init(api) {
 		let previewEnabled = null
 		let previewColors = null
+		let defaultGlowColors = null
+		const rgbaStopsCache = new Map()
 
 		const shareText = {
 	"en": {
@@ -511,6 +513,7 @@ ModLoader.register({
 		function renderResourcesWithColoredGlow(game, original, args) {
 			const ctx = game?.ctx
 			if (!ctx || typeof ctx.arc !== 'function' || typeof ctx.fill !== 'function') return original.apply(game, args)
+			const glowOverrides = getResourceGlowOverrides()
 
 			const originalTranslate = ctx.translate
 			const originalArc = ctx.arc
@@ -538,7 +541,7 @@ ModLoader.register({
 					const resourceId = pendingGlowResource
 					pendingGlowResource = null
 					const previousFillStyle = this.fillStyle
-					this.fillStyle = createResourceGlow(game, resourceId)
+					this.fillStyle = createResourceGlow(game, resourceId, glowOverrides)
 					try {
 						return originalFill.apply(this, arguments)
 					} finally {
@@ -582,20 +585,35 @@ ModLoader.register({
 			return Math.abs(Number(x) || 0) <= tolerance && Math.abs(Number(y) || 0) <= tolerance && Math.abs(Number(radius) - expectedRadius) <= tolerance
 		}
 
-		function createResourceGlow(game, resourceId) {
+		function createResourceGlow(game, resourceId, glowOverrides) {
 			const radius = (game?.screenUnit || 1) * .4
-			const color = getResourceGlowColor(game, resourceId)
+			const color = getResourceGlowColor(game, resourceId, glowOverrides)
+			const stops = getResourceGlowStops(color)
 			const glow = game.ctx.createRadialGradient(0, 0, 0, 0, 0, radius)
-			glow.addColorStop(.46, hexToRgba(color, .95))
-			glow.addColorStop(.74, hexToRgba(color, .42))
-			glow.addColorStop(1, hexToRgba(color, 0))
+			glow.addColorStop(.46, stops[0])
+			glow.addColorStop(.74, stops[1])
+			glow.addColorStop(1, stops[2])
 			return glow
 		}
 
-		function getResourceGlowColor(game, resourceId) {
-			const overrides = mergeObjects(getResourceGlowDefaultColors(), previewColors === null ? readObject(api.config.get('resourceGlowColors', {})) : previewColors)
+		function getResourceGlowOverrides() {
+			return mergeObjects(getResourceGlowDefaultColors(), previewColors === null ? readObject(api.config.get('resourceGlowColors', {})) : previewColors)
+		}
+
+		function getResourceGlowColor(game, resourceId, glowOverrides) {
+			const overrides = readObject(glowOverrides)
 			const override = overrides[resourceId] ?? overrides[String(resourceId)] ?? overrides['r' + resourceId]
 			return normalizeHexColor(override) || getDefaultResourceColor(game, resourceId) || '#FFFFFF'
+		}
+
+		function getResourceGlowStops(color) {
+			const normalized = normalizeHexColor(color) || '#FFFFFF'
+			const cached = rgbaStopsCache.get(normalized)
+			if (cached) return cached
+			const stops = [hexToRgba(normalized, .95), hexToRgba(normalized, .42), hexToRgba(normalized, 0)]
+			if (rgbaStopsCache.size > 128) rgbaStopsCache.clear()
+			rgbaStopsCache.set(normalized, stops)
+			return stops
 		}
 
 		function getDefaultResourceColor(game, resourceId) {
@@ -608,9 +626,11 @@ ModLoader.register({
 		}
 
 		function getResourceGlowDefaultColors() {
+			if (defaultGlowColors) return defaultGlowColors
 			const schema = typeof api.config.schema === 'function' ? api.config.schema() : []
 			const item = Array.isArray(schema) ? schema.find(function (entry) { return entry?.key === 'resourceGlowColors' }) : null
-			return readObject(item?.default)
+			defaultGlowColors = readObject(item?.default)
+			return defaultGlowColors
 		}
 
 		function mergeObjects(base, override) {

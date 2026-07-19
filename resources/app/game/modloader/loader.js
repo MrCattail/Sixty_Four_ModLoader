@@ -63,11 +63,25 @@
 		renderLayerDemands: {},
 		renderActiveLayerDemands: {},
 		renderLastActiveLayerDemands: {},
+		renderLayerDirtyMarks: {},
+		renderLayerFrameState: {},
 		renderCallbackSerial: 1,
 		renderLayerDemandSerial: 1,
 		renderFrame: 0,
 		renderInstalled: false,
-		renderTouchModeOverlayStyle: 'gradient'
+		renderTouchModeOverlayStyle: 'gradient',
+		renderTimingEnabled: false,
+		renderTimingEntitiesEnabled: false,
+		renderTimingVfxEnabled: false,
+		renderTimingSampleLimit: 240,
+		renderTimingFrame: 0,
+		renderTimingRecords: {},
+		renderTimingEntityRecords: {},
+		renderTimingContextStack: [],
+		renderTimingEntityDepth: 0,
+		renderTimingEntityDetailMethods: [],
+		renderTimingPatchedEntityMethods: [],
+		renderTimingEntityPrototypeMarks: null
 	}
 
 	const addIssue = function (level, code, message, details) {
@@ -436,12 +450,19 @@
 		'top-effects': { id: 'top-effects', order: 70, zIndex: 70, clearEachFrame: true }
 	}
 
+	const MAIN_RENDER_LAYER_ORDER = 20
+	const MAIN_RENDER_LAYER_Z_INDEX = 20
+
 	const RENDER_METHOD_LAYERS = {
+		renderConductors: 'buildings',
+		renderChasmVFX: 'buildings',
+		renderEntities: 'buildings',
 		renderVFX: 'effects',
 		renderAvailability: 'interaction',
 		renderSOI: 'interaction',
 		renderHoveredCell: 'interaction',
 		renderAffected: 'interaction',
+		renderGrid: 'interaction',
 		renderResources: 'ui',
 		renderDarkResources: 'ui',
 		renderHollowEvents: 'screen-effects',
@@ -486,9 +507,13 @@
 		return resolved
 	}
 
-	const markRenderLayerDemanded = function (id) {
+	const shouldPersistRenderLayerDemand = function (options = {}) {
+		return !(options.persistent === false || options.persist === false)
+	}
+
+	const markRenderLayerDemanded = function (id, options = {}) {
 		const normalized = normalizeRenderLayerId(id)
-		state.renderLayerDemands[normalized] = true
+		if (shouldPersistRenderLayerDemand(options)) state.renderLayerDemands[normalized] = true
 		state.renderActiveLayerDemands[normalized] = true
 		return normalized
 	}
@@ -497,6 +522,22 @@
 		const normalized = normalizeRenderLayerId(id)
 		state.renderActiveLayerDemands[normalized] = true
 		return normalized
+	}
+
+	const shouldReleaseCurrentRenderLayerDemand = function (options = {}) {
+		return options.currentFrame === true || options.current === true || options.active === true || options.now === true
+	}
+
+	const releaseRenderLayerDemand = function (id, options = {}) {
+		const normalized = normalizeRenderLayerId(id)
+		const hadPersistentDemand = state.renderLayerDemands[normalized] === true
+		const hadActiveDemand = state.renderActiveLayerDemands[normalized] === true
+		const releaseCurrentFrame = shouldReleaseCurrentRenderLayerDemand(options)
+		delete state.renderLayerDemands[normalized]
+		if (releaseCurrentFrame) delete state.renderActiveLayerDemands[normalized]
+		const manager = getExistingRenderLayerManager(options.game)
+		if (manager) applyRenderLayerVisibility(manager)
+		return hadPersistentDemand || (releaseCurrentFrame && hadActiveDemand)
 	}
 
 	const resetActiveRenderLayerDemands = function () {
@@ -553,6 +594,392 @@
 		}).filter(Boolean)
 	}
 
+	const getRenderTimingNow = function () {
+		return typeof performance !== 'undefined' && typeof performance.now === 'function' ? performance.now() : Date.now()
+	}
+
+	const roundRenderTimingMs = function (value) {
+		return Math.round((Number(value) || 0) * 1000) / 1000
+	}
+
+	const normalizeRenderTimingSampleLimit = function (value) {
+		const parsed = Number(value)
+		if (!Number.isFinite(parsed)) return state.renderTimingSampleLimit
+		return Math.max(1, Math.min(2000, Math.floor(parsed)))
+	}
+
+	const normalizeRenderTimingEntityDetailMethods = function (value) {
+		const source = Array.isArray(value) ? value : (value === undefined || value === null || value === false ? [] : [value])
+		const methods = []
+		const seen = {}
+		for (const entry of source) {
+			const methodName = String(entry || '').trim()
+			if (!methodName || methodName === 'render' || methodName === 'darkrender') continue
+			if (!/^[A-Za-z_$][A-Za-z0-9_$]*$/.test(methodName) || seen[methodName]) continue
+			seen[methodName] = true
+			methods.push(methodName)
+			if (methods.length >= 16) break
+		}
+		return methods
+	}
+
+	const sameRenderTimingEntityDetailMethods = function (a, b) {
+		const left = Array.isArray(a) ? a : []
+		const right = Array.isArray(b) ? b : []
+		return left.length === right.length && left.every(function (methodName, index) { return methodName === right[index] })
+	}
+
+	const isRenderTimingEntityDetailMethod = function (methodName) {
+		return state.renderTimingEntityDetailMethods.indexOf(String(methodName || '')) >= 0
+	}
+
+	const getRenderTimingFrame = function () {
+		return Number(state.renderTimingFrame) || Number(state.renderFrame) || 0
+	}
+
+	const getCurrentRenderTimingContext = function () {
+		const stack = state.renderTimingContextStack || []
+		return stack.length ? stack[stack.length - 1] : null
+	}
+
+	const getRenderTimingRecord = function (name) {
+		const method = String(name || 'unknown')
+		if (!state.renderTimingRecords[method]) {
+			state.renderTimingRecords[method] = { method, calls: 0, totalMs: 0, samples: [], lastMs: 0, lastFrame: 0 }
+		}
+		return state.renderTimingRecords[method]
+	}
+
+	const pushRenderTimingSample = function (record, elapsedMs) {
+		const elapsed = Math.max(0, Number(elapsedMs) || 0)
+		record.calls += 1
+		record.totalMs += elapsed
+		record.samples.push(elapsed)
+		record.lastMs = elapsed
+		record.lastFrame = getRenderTimingFrame()
+		const limit = normalizeRenderTimingSampleLimit(state.renderTimingSampleLimit)
+		while (record.samples.length > limit) {
+			record.totalMs -= record.samples.shift() || 0
+		}
+		return record
+	}
+
+	const recordRenderTiming = function (name, elapsedMs) {
+		if (!state.renderTimingEnabled) return null
+		return pushRenderTimingSample(getRenderTimingRecord(name), elapsedMs)
+	}
+
+	const measureRenderTiming = function (name, fn) {
+		if (!state.renderTimingEnabled) return fn()
+		const method = String(name || 'unknown')
+		if (method === 'renderloop') state.renderTimingFrame += 1
+		const startedAt = getRenderTimingNow()
+		state.renderTimingContextStack.push(method)
+		try {
+			return fn()
+		} finally {
+			state.renderTimingContextStack.pop()
+			recordRenderTiming(method, getRenderTimingNow() - startedAt)
+		}
+	}
+
+	const describeRenderTimingRecord = function (record) {
+		const samples = record?.samples || []
+		let min = Infinity
+		let max = 0
+		for (const value of samples) {
+			if (value < min) min = value
+			if (value > max) max = value
+		}
+		const sampleCount = samples.length
+		const totalMs = Number(record?.totalMs) || 0
+		return {
+			method: record?.method || 'unknown',
+			calls: Number(record?.calls) || 0,
+			sampleCount,
+			avgMs: sampleCount ? roundRenderTimingMs(totalMs / sampleCount) : 0,
+			lastMs: roundRenderTimingMs(record?.lastMs || 0),
+			maxMs: sampleCount ? roundRenderTimingMs(max) : 0,
+			minMs: sampleCount ? roundRenderTimingMs(min) : 0,
+			totalMs: roundRenderTimingMs(totalMs),
+			lastFrame: Number(record?.lastFrame) || 0
+		}
+	}
+
+	const listRenderTimingMethods = function (options = {}) {
+		const entries = Object.keys(state.renderTimingRecords).map(function (name) {
+			return describeRenderTimingRecord(state.renderTimingRecords[name])
+		})
+		const sort = options.sort || 'avg'
+		entries.sort(function (a, b) {
+			if (sort === 'name') return String(a.method).localeCompare(String(b.method))
+			if (sort === 'last') return (b.lastMs - a.lastMs) || String(a.method).localeCompare(String(b.method))
+			if (sort === 'total') return (b.totalMs - a.totalMs) || String(a.method).localeCompare(String(b.method))
+			return (b.avgMs - a.avgMs) || String(a.method).localeCompare(String(b.method))
+		})
+		return entries
+	}
+
+	const getRenderTimingEntityRecord = function (entityName, constructorName, renderMethod, context) {
+		const entity = String(entityName || constructorName || 'unknown')
+		const ctor = String(constructorName || entity || 'unknown')
+		const method = String(renderMethod || 'render')
+		const parent = String(context || 'renderEntities')
+		const key = parent + ':' + method + ':' + entity
+		if (!state.renderTimingEntityRecords[key]) {
+			state.renderTimingEntityRecords[key] = { key, entity, constructor: ctor, context: parent, renderMethod: method, calls: 0, totalMs: 0, allTotalMs: 0, samples: [], lastMs: 0, lastFrame: 0 }
+		}
+		return state.renderTimingEntityRecords[key]
+	}
+
+	const getRenderTimingEntityName = function (entity) {
+		if (!entity) return 'unknown'
+		return String(entity.name || entity.id || entity.constructor?.name || 'unknown')
+	}
+
+	const getRenderTimingConstructorName = function (entity) {
+		return String(entity?.constructor?.name || getRenderTimingEntityName(entity))
+	}
+
+	const isRenderTimingEntityContext = function (context) {
+		return context === 'renderEntities' || context === 'renderConductors'
+	}
+
+	const isRenderTimingVfxContext = function (context) {
+		return context === 'renderVFX' || context === 'renderChasmVFX'
+	}
+
+	const shouldRecordRenderEntityTiming = function (context) {
+		if (!state.renderTimingEnabled) return false
+		if (state.renderTimingEntitiesEnabled && isRenderTimingEntityContext(context)) return true
+		return !!(state.renderTimingVfxEnabled && isRenderTimingVfxContext(context))
+	}
+
+	const recordRenderEntityTiming = function (entity, renderMethod, context, elapsedMs) {
+		if (!shouldRecordRenderEntityTiming(context)) return null
+		const elapsed = Math.max(0, Number(elapsedMs) || 0)
+		const record = getRenderTimingEntityRecord(getRenderTimingEntityName(entity), getRenderTimingConstructorName(entity), renderMethod, context)
+		record.allTotalMs += elapsed
+		return pushRenderTimingSample(record, elapsed)
+	}
+
+	const describeRenderTimingEntityRecord = function (record) {
+		const samples = record?.samples || []
+		let min = Infinity
+		let max = 0
+		for (const value of samples) {
+			if (value < min) min = value
+			if (value > max) max = value
+		}
+		const sampleCount = samples.length
+		const totalMs = Number(record?.totalMs) || 0
+		const frameCount = Math.max(1, getRenderTimingFrame())
+		return {
+			entity: record?.entity || 'unknown',
+			constructor: record?.constructor || 'unknown',
+			context: record?.context || 'renderEntities',
+			renderMethod: record?.renderMethod || 'render',
+			calls: Number(record?.calls) || 0,
+			callsPerFrame: roundRenderTimingMs((Number(record?.calls) || 0) / frameCount),
+			sampleCount,
+			avgMs: sampleCount ? roundRenderTimingMs(totalMs / sampleCount) : 0,
+			avgPerFrameMs: roundRenderTimingMs((Number(record?.allTotalMs) || 0) / frameCount),
+			lastMs: roundRenderTimingMs(record?.lastMs || 0),
+			maxMs: sampleCount ? roundRenderTimingMs(max) : 0,
+			minMs: sampleCount ? roundRenderTimingMs(min) : 0,
+			totalMs: roundRenderTimingMs(totalMs),
+			allTotalMs: roundRenderTimingMs(record?.allTotalMs || 0),
+			lastFrame: Number(record?.lastFrame) || 0
+		}
+	}
+
+	const listRenderTimingEntities = function (options = {}) {
+		const entries = Object.keys(state.renderTimingEntityRecords).map(function (key) {
+			return describeRenderTimingEntityRecord(state.renderTimingEntityRecords[key])
+		}).filter(function (entry) {
+			if (options.context && entry.context !== options.context) return false
+			if (!options.context && options.includeVfx !== true && !isRenderTimingEntityContext(entry.context)) return false
+			if (options.renderMethod && entry.renderMethod !== options.renderMethod) return false
+			return true
+		})
+		const sort = options.sort || 'frame'
+		entries.sort(function (a, b) {
+			if (sort === 'name' || sort === 'entity') return String(a.entity).localeCompare(String(b.entity)) || String(a.context).localeCompare(String(b.context))
+			if (sort === 'avg') return (b.avgMs - a.avgMs) || String(a.entity).localeCompare(String(b.entity))
+			if (sort === 'last') return (b.lastMs - a.lastMs) || String(a.entity).localeCompare(String(b.entity))
+			if (sort === 'calls') return (b.callsPerFrame - a.callsPerFrame) || String(a.entity).localeCompare(String(b.entity))
+			if (sort === 'total') return (b.allTotalMs - a.allTotalMs) || String(a.entity).localeCompare(String(b.entity))
+			return (b.avgPerFrameMs - a.avgPerFrameMs) || String(a.entity).localeCompare(String(b.entity))
+		})
+		return entries
+	}
+
+	const listRenderTimingVfx = function (options = {}) {
+		return listRenderTimingEntities(Object.assign({}, options, { includeVfx: true })).filter(function (entry) {
+			return isRenderTimingVfxContext(entry.context)
+		}).map(function (entry) {
+			const row = { effect: entry.entity }
+			for (const key of Object.keys(entry)) if (key !== 'entity') row[key] = entry[key]
+			return row
+		})
+	}
+
+	const getRenderTimingSummary = function (options = {}) {
+		const methods = listRenderTimingMethods(options)
+		const entities = listRenderTimingEntities(options)
+		const vfx = listRenderTimingVfx(options)
+		const renderloop = methods.find(function (entry) { return entry.method === 'renderloop' }) || null
+		return {
+			enabled: !!state.renderTimingEnabled,
+			entitiesEnabled: !!state.renderTimingEntitiesEnabled,
+			vfxEnabled: !!state.renderTimingVfxEnabled,
+			entityDetailMethods: state.renderTimingEntityDetailMethods.slice(),
+			frame: getRenderTimingFrame(),
+			sampleLimit: normalizeRenderTimingSampleLimit(state.renderTimingSampleLimit),
+			renderloop,
+			topMethods: methods.filter(function (entry) { return entry.method !== 'renderloop' }).slice(0, Number(options.top || 8) || 8),
+			topEntities: entities.slice(0, Number(options.topEntities || options.top || 8) || 8),
+			topVfx: vfx.slice(0, Number(options.topVfx || options.top || 8) || 8),
+			methods,
+			entities,
+			vfx
+		}
+	}
+
+	const clearRenderTiming = function () {
+		state.renderTimingRecords = {}
+		state.renderTimingEntityRecords = {}
+		state.renderTimingFrame = 0
+		return getRenderTimingSummary()
+	}
+
+	const resetRenderTimingEntityPrototypeMarks = function () {
+		state.renderTimingEntityPrototypeMarks = typeof WeakSet !== 'undefined' ? new WeakSet() : []
+	}
+
+	const hasRenderTimingEntityPrototypeMark = function (proto) {
+		if (!state.renderTimingEntityPrototypeMarks) resetRenderTimingEntityPrototypeMarks()
+		if (typeof WeakSet !== 'undefined' && state.renderTimingEntityPrototypeMarks instanceof WeakSet) return state.renderTimingEntityPrototypeMarks.has(proto)
+		return state.renderTimingEntityPrototypeMarks.indexOf(proto) >= 0
+	}
+
+	const markRenderTimingEntityPrototype = function (proto) {
+		if (!state.renderTimingEntityPrototypeMarks) resetRenderTimingEntityPrototypeMarks()
+		if (typeof WeakSet !== 'undefined' && state.renderTimingEntityPrototypeMarks instanceof WeakSet) state.renderTimingEntityPrototypeMarks.add(proto)
+		else if (state.renderTimingEntityPrototypeMarks.indexOf(proto) < 0) state.renderTimingEntityPrototypeMarks.push(proto)
+	}
+
+	const restoreRenderEntityTimingPatches = function () {
+		for (const patch of state.renderTimingPatchedEntityMethods.slice().reverse()) {
+			try {
+				if (patch.owner && patch.owner[patch.methodName] === patch.wrapper) {
+					Object.defineProperty(patch.owner, patch.methodName, patch.descriptor)
+				}
+			} catch (error) {
+				warn('Failed to restore render timing entity patch', patch.methodName, error)
+			}
+		}
+		state.renderTimingPatchedEntityMethods = []
+		resetRenderTimingEntityPrototypeMarks()
+	}
+
+	const hasRenderEntityTimingPatch = function (owner, methodName) {
+		return state.renderTimingPatchedEntityMethods.some(function (patch) { return patch.owner === owner && patch.methodName === methodName })
+	}
+
+	const patchRenderEntityTimingMethod = function (owner, methodName) {
+		if (!owner || hasRenderEntityTimingPatch(owner, methodName)) return false
+		const descriptor = Object.getOwnPropertyDescriptor(owner, methodName)
+		const original = descriptor?.value
+		if (!descriptor || typeof original !== 'function') return false
+		if (original.__modloaderRenderTimingWrapper === true) return false
+		const wrapper = function (...args) {
+			const context = getCurrentRenderTimingContext()
+			const detailMethod = isRenderTimingEntityDetailMethod(methodName)
+			if (!shouldRecordRenderEntityTiming(context) || (state.renderTimingEntityDepth > 0 && !detailMethod)) return original.apply(this, args)
+			const startedAt = getRenderTimingNow()
+			state.renderTimingEntityDepth += 1
+			try {
+				return original.apply(this, args)
+			} finally {
+				state.renderTimingEntityDepth -= 1
+				recordRenderEntityTiming(this, methodName, context, getRenderTimingNow() - startedAt)
+			}
+		}
+		try {
+			Object.defineProperty(wrapper, '__modloaderRenderTimingWrapper', { value: true })
+			Object.defineProperty(wrapper, '__modloaderRenderTimingOriginal', { value: original })
+			const nextDescriptor = Object.assign({}, descriptor, { value: wrapper })
+			Object.defineProperty(owner, methodName, nextDescriptor)
+			state.renderTimingPatchedEntityMethods.push({ owner, methodName, original, wrapper, descriptor })
+			return true
+		} catch (error) {
+			warn('Failed to install render timing entity patch', methodName, error)
+			return false
+		}
+	}
+
+	const installRenderEntityTimingForEntity = function (entity) {
+		if (!entity) return
+		let proto = Object.getPrototypeOf(entity)
+		while (proto && proto !== Object.prototype) {
+			if (!hasRenderTimingEntityPrototypeMark(proto)) {
+				patchRenderEntityTimingMethod(proto, 'render')
+				patchRenderEntityTimingMethod(proto, 'darkrender')
+				for (const methodName of state.renderTimingEntityDetailMethods) patchRenderEntityTimingMethod(proto, methodName)
+				markRenderTimingEntityPrototype(proto)
+			}
+			proto = Object.getPrototypeOf(proto)
+		}
+	}
+
+	const installRenderEntityTiming = function (game) {
+		if (!state.renderTimingEnabled || !game) return
+		if (state.renderTimingEntitiesEnabled) {
+			for (const entity of game.stuff || []) installRenderEntityTimingForEntity(entity)
+			for (const entity of game.conductors || []) installRenderEntityTimingForEntity(entity)
+		}
+		if (state.renderTimingVfxEnabled) {
+			for (const effect of game.vfx || []) installRenderEntityTimingForEntity(effect)
+			for (const effect of game.chasmVfx || []) installRenderEntityTimingForEntity(effect)
+		}
+	}
+
+	const setRenderTimingEnabled = function (enabled = true, options = {}) {
+		if (typeof enabled === 'object') {
+			options = enabled || {}
+			enabled = options.enabled !== false
+		}
+		options = options || {}
+		if (Object.prototype.hasOwnProperty.call(options, 'samples') || Object.prototype.hasOwnProperty.call(options, 'sampleLimit')) {
+			state.renderTimingSampleLimit = normalizeRenderTimingSampleLimit(options.samples || options.sampleLimit)
+		}
+		const detailMethodKeys = ['entityDetailMethods', 'detailMethods', 'entitySubMethods']
+		for (const key of detailMethodKeys) {
+			if (!Object.prototype.hasOwnProperty.call(options, key)) continue
+			const nextMethods = normalizeRenderTimingEntityDetailMethods(options[key])
+			if (!sameRenderTimingEntityDetailMethods(state.renderTimingEntityDetailMethods, nextMethods)) {
+				restoreRenderEntityTimingPatches()
+				state.renderTimingEntityDetailMethods = nextMethods
+			}
+			break
+		}
+		state.renderTimingEnabled = enabled !== false
+		state.renderTimingEntitiesEnabled = state.renderTimingEnabled && options.entities !== false && options.entity !== false
+		state.renderTimingVfxEnabled = state.renderTimingEnabled && (options.vfx === true || options.effects === true || options.visualEffects === true)
+		if (options.clear === true) clearRenderTiming()
+		if (state.renderTimingEnabled) installRenderEntityTiming(getRenderGame(options.game))
+		else restoreRenderEntityTimingPatches()
+		return getRenderTimingSummary()
+	}
+
+	const enableRenderTiming = function (options = {}) {
+		return setRenderTimingEnabled(true, Object.assign({ clear: true }, options || {}))
+	}
+
+	const disableRenderTiming = function (options = {}) {
+		return setRenderTimingEnabled(false, options || {})
+	}
 	const getRenderGame = function (game) {
 		return game || state.game || uiPagesCurrentGame || window.game || null
 	}
@@ -562,10 +989,97 @@
 		return Object.assign({ id: normalized, order: 45, zIndex: 45, clearEachFrame: true }, RENDER_LAYER_DEFS[normalized] || {}, state.renderLayerDefinitions[normalized] || {})
 	}
 
+	const getRenderLayerZIndex = function (def) {
+		const zIndex = Number(def?.zIndex)
+		if (Number.isFinite(zIndex)) return zIndex
+		const order = Number(def?.order)
+		return Number.isFinite(order) ? order : 45
+	}
+
+	const isRenderLayerBelowMain = function (idOrDef) {
+		const def = typeof idOrDef === 'string' ? getRenderLayerDef(idOrDef) : (idOrDef || {})
+		return getRenderLayerZIndex(def) < MAIN_RENDER_LAYER_Z_INDEX
+	}
+
+	const listDemandedRenderLayersBelowMain = function (options = {}) {
+		if (!isRenderApiEnabled()) return []
+		const includeBackground = options.includeBackground === true
+		return Object.keys(state.renderActiveLayerDemands).filter(function (id) {
+			return state.renderActiveLayerDemands[id] === true && (includeBackground || id !== 'background') && isRenderLayerBelowMain(id)
+		}).sort()
+	}
+
+	const markBackgroundDemandForUnderMainLayers = function () {
+		if (hasRenderLayerDemand('background')) return false
+		if (!listDemandedRenderLayersBelowMain().length) return false
+		markActiveRenderLayerDemanded('background')
+		return true
+	}
+
 	const getExistingRenderLayerManager = function (game) {
 		game = getRenderGame(game)
-		if (game?.__modloaderRenderLayerManager?.sourceCanvas === game.canvas) return game.__modloaderRenderLayerManager
+		if (game && game.__modloaderRenderLayerManager?.sourceCanvas === game.canvas) return game.__modloaderRenderLayerManager
 		return state.renderLayerManager || null
+	}
+
+	const isRenderLayerCached = function (defOrId) {
+		const def = typeof defOrId === 'string' ? getRenderLayerDef(defOrId) : (defOrId || {})
+		return def.cache === true || def.cached === true || def.redrawWhenDirty === true || def.redrawOnDirty === true
+	}
+
+	const getRenderLayerDirtyGame = function (gameOrOptions) {
+		if (gameOrOptions && !gameOrOptions.canvas && !gameOrOptions.ctx && Object.prototype.hasOwnProperty.call(gameOrOptions, 'game')) return gameOrOptions.game
+		return gameOrOptions
+	}
+
+	const setRenderLayerDirtyState = function (layer, dirty = true) {
+		if (!layer || layer.isMain) return false
+		const value = dirty !== false
+		layer.dirty = value
+		state.renderLayerDirtyMarks[layer.id] = value
+		if (value) layer.lastDirtyFrame = state.renderFrame
+		else layer.lastDrawFrame = state.renderFrame
+		return true
+	}
+
+	const markRenderLayerDirty = function (id, dirty = true, gameOrOptions) {
+		const normalized = normalizeRenderLayerId(id)
+		const value = dirty !== false
+		state.renderLayerDirtyMarks[normalized] = value
+		const manager = getExistingRenderLayerManager(getRenderLayerDirtyGame(gameOrOptions))
+		const layer = manager?.layers?.[normalized]
+		if (layer) setRenderLayerDirtyState(layer, value)
+		return !!layer || value
+	}
+
+	const isRenderLayerDirty = function (id, gameOrOptions) {
+		const normalized = normalizeRenderLayerId(id)
+		const manager = getExistingRenderLayerManager(getRenderLayerDirtyGame(gameOrOptions))
+		const layer = manager?.layers?.[normalized]
+		if (layer) return isRenderLayerCached(layer) ? layer.dirty !== false : !!layer.dirty
+		if (Object.prototype.hasOwnProperty.call(state.renderLayerDirtyMarks, normalized)) return state.renderLayerDirtyMarks[normalized] !== false
+		return isRenderLayerCached(normalized)
+	}
+
+	const getRenderLayerFrameState = function (layerId, manager) {
+		const normalized = normalizeRenderLayerId(layerId)
+		const existing = state.renderLayerFrameState[normalized]
+		if (existing?.frame === state.renderFrame) return existing
+		const cached = isRenderLayerCached(normalized)
+		const dirty = isRenderLayerDirty(normalized, manager?.game)
+		const frameState = { id: normalized, frame: state.renderFrame, cached, dirty, shouldDraw: !cached || dirty, drew: false, failed: false }
+		state.renderLayerFrameState[normalized] = frameState
+		return frameState
+	}
+
+	const finishCachedRenderLayerFrame = function (manager) {
+		if (!manager) return
+		for (const id in state.renderLayerFrameState) {
+			const frameState = state.renderLayerFrameState[id]
+			if (frameState?.frame !== state.renderFrame || !frameState.cached || !frameState.drew || frameState.failed) continue
+			const layer = manager.layers?.[id]
+			if (layer) setRenderLayerDirtyState(layer, false)
+		}
 	}
 
 	const describeRenderLayer = function (id, manager) {
@@ -573,24 +1087,42 @@
 		const def = getRenderLayerDef(normalized)
 		const layer = manager?.layers?.[normalized] || null
 		const canvas = layer?.canvas || null
+		const cached = isRenderLayerCached(def)
 		return {
 			id: normalized,
 			order: Number(def.order) || 0,
 			zIndex: Number(def.zIndex) || Number(def.order) || 0,
 			clearEachFrame: def.clearEachFrame !== false,
+			cached,
+			cache: cached,
+			belowMain: isRenderLayerBelowMain(def),
+			requiresBackgroundFill: normalized !== 'background' && isRenderLayerBelowMain(def),
 			builtIn: !!RENDER_LAYER_DEFS[normalized],
 			custom: !!state.renderLayerDefinitions[normalized],
 			active: hasRenderLayerDemand(normalized),
 			persistentDemand: state.renderLayerDemands[normalized] === true,
 			created: !!layer,
+			dirty: isRenderLayerDirty(normalized, manager?.game),
+			lastDirtyFrame: Number(layer?.lastDirtyFrame) || 0,
+			lastDrawFrame: Number(layer?.lastDrawFrame) || 0,
 			visible: !!(isRenderApiEnabled() && layer?.visible !== false && canvas && canvas.style.display !== 'none'),
 			width: Number(canvas?.width) || 0,
 			height: Number(canvas?.height) || 0
 		}
 	}
 
+	const getRenderDiagnosticGame = function (gameOrOptions) {
+		if (gameOrOptions && !gameOrOptions.canvas && !gameOrOptions.ctx && Object.prototype.hasOwnProperty.call(gameOrOptions, 'game')) return gameOrOptions.game
+		return gameOrOptions
+	}
+
+	const describeRenderLayerInfo = function (id, gameOrOptions) {
+		const manager = getExistingRenderLayerManager(getRenderDiagnosticGame(gameOrOptions))
+		return describeRenderLayer(id, manager)
+	}
+
 	const listRenderLayerDefinitions = function (options = {}) {
-		const manager = getExistingRenderLayerManager(options.game)
+		const manager = getExistingRenderLayerManager(getRenderDiagnosticGame(options))
 		const ids = new Set(Object.keys(RENDER_LAYER_DEFS))
 		for (const id of Object.keys(state.renderLayerDefinitions)) ids.add(id)
 		for (const id of Object.keys(state.renderLayerDemands)) ids.add(id)
@@ -691,6 +1223,8 @@
 		layer.order = def.order
 		layer.zIndex = def.zIndex
 		layer.clearEachFrame = def.clearEachFrame
+		layer.cached = isRenderLayerCached(def)
+		layer.cache = layer.cached
 		if (layer.canvas) insertRenderLayerCanvas(manager, layer)
 	}
 
@@ -708,8 +1242,16 @@
 		}
 		width = Math.max(1, Math.round(width))
 		height = Math.max(1, Math.round(height))
-		if (layer.canvas.width !== width) layer.canvas.width = width
-		if (layer.canvas.height !== height) layer.canvas.height = height
+		let resized = false
+		if (layer.canvas.width !== width) {
+			layer.canvas.width = width
+			resized = true
+		}
+		if (layer.canvas.height !== height) {
+			layer.canvas.height = height
+			resized = true
+		}
+		if (resized) setRenderLayerDirtyState(layer, true)
 		return true
 	}
 
@@ -732,7 +1274,7 @@
 		if (!manager) return null
 		const normalized = normalizeRenderLayerId(id)
 		if (normalized === 'main' || normalized === 'world' || normalized === 'vanilla') {
-			return { id: 'main', order: 20, zIndex: 20, canvas: manager.sourceCanvas, ctx: manager.game?.ctx, isMain: true, clearEachFrame: false }
+			return { id: 'main', order: MAIN_RENDER_LAYER_ORDER, zIndex: MAIN_RENDER_LAYER_Z_INDEX, canvas: manager.sourceCanvas, ctx: manager.game?.ctx, isMain: true, clearEachFrame: false }
 		}
 		if (options && Object.keys(options).length) registerRenderLayerDefinition(normalized, options)
 		if (manager.layers[normalized]) {
@@ -746,7 +1288,9 @@
 		canvas.setAttribute('aria-hidden', 'true')
 		canvas.style.zIndex = String(def.zIndex)
 		const ctx = canvas.getContext('2d')
-		const layer = Object.assign({}, def, { canvas, ctx, visible: true })
+		const cached = isRenderLayerCached(def)
+		const pendingDirty = state.renderLayerDirtyMarks[normalized]
+		const layer = Object.assign({}, def, { canvas, ctx, visible: true, cached, cache: cached, dirty: pendingDirty !== false, lastDirtyFrame: state.renderFrame, lastDrawFrame: 0 })
 		manager.layers[normalized] = layer
 		insertRenderLayerCanvas(manager, layer)
 		syncRenderLayerCanvas(manager, layer)
@@ -774,8 +1318,8 @@
 			container.appendChild(source)
 		}
 		source.classList.add('modloader-render-main-canvas')
-		source.dataset.modloaderRenderOrder = '20'
-		source.style.zIndex = '20'
+		source.dataset.modloaderRenderOrder = String(MAIN_RENDER_LAYER_ORDER)
+		source.style.zIndex = String(MAIN_RENDER_LAYER_Z_INDEX)
 		const manager = { game, sourceCanvas: source, container, layers: {} }
 		game.__modloaderRenderLayerManager = manager
 		state.renderLayerManager = manager
@@ -784,7 +1328,7 @@
 		return manager
 	}
 
-	const clearRenderLayer = function (layer) {
+	const clearRenderLayer = function (layer, options = {}) {
 		if (!layer?.ctx || !layer?.canvas || layer.isMain) return
 		const ctx = layer.ctx
 		ctx.save()
@@ -794,6 +1338,7 @@
 		} finally {
 			ctx.restore()
 		}
+		if (options.markDirty === true || (options.markDirty !== false && isRenderLayerCached(layer))) setRenderLayerDirtyState(layer, true)
 	}
 
 	const clearRenderLayers = function (manager, options = {}) {
@@ -831,6 +1376,7 @@
 			if (!isRenderApiEnabled()) {
 				state.renderActiveLayerDemands = {}
 				state.renderLastActiveLayerDemands = {}
+				if (manager.container) manager.container.style.backgroundColor = ''
 				clearRenderLayers(manager)
 			}
 			applyRenderLayerVisibility(manager)
@@ -882,21 +1428,51 @@
 	}
 
 	const registerRenderLayerDefinition = function (id, options = {}) {
+		options = options || {}
 		const normalized = normalizeRenderLayerId(id)
 		const current = state.renderLayerDefinitions[normalized] || {}
 		const order = Number(options.order ?? options.zIndex ?? current.order)
 		const zIndex = Number(options.zIndex ?? options.order ?? current.zIndex)
 		const next = Object.assign({}, current, options, { id: normalized })
+		const cacheOption = options.cache ?? options.cached ?? options.redrawWhenDirty ?? options.redrawOnDirty ?? current.cache ?? current.cached ?? current.redrawWhenDirty ?? current.redrawOnDirty
+		if (cacheOption !== undefined) {
+			const cached = cacheOption === true
+			next.cache = cached
+			next.cached = cached
+			next.redrawWhenDirty = cached
+		}
 		if (Number.isFinite(order)) next.order = order
 		else delete next.order
 		if (Number.isFinite(zIndex)) next.zIndex = zIndex
 		else delete next.zIndex
-		if (options.clearEachFrame !== undefined || options.clear !== undefined || current.clearEachFrame !== undefined) next.clearEachFrame = options.clearEachFrame ?? options.clear ?? current.clearEachFrame
+		if (options.clearEachFrame !== undefined || options.clear !== undefined) next.clearEachFrame = options.clearEachFrame ?? options.clear
+		else if (isRenderLayerCached(next)) next.clearEachFrame = false
+		else if (current.clearEachFrame !== undefined) next.clearEachFrame = current.clearEachFrame
 		else delete next.clearEachFrame
 		state.renderLayerDefinitions[normalized] = next
 		const manager = state.renderLayerManager
-		if (manager?.layers?.[normalized]) applyRenderLayerDefinition(manager, manager.layers[normalized])
+		if (manager?.layers?.[normalized]) {
+			applyRenderLayerDefinition(manager, manager.layers[normalized])
+			setRenderLayerDirtyState(manager.layers[normalized], true)
+		}
 		return state.renderLayerDefinitions[normalized]
+	}
+
+	const registerScopedRenderLayerDefinition = function (modId, id, options = {}) {
+		const normalized = normalizeRenderLayerId(id)
+		const hadDefinition = Object.prototype.hasOwnProperty.call(state.renderLayerDefinitions, normalized)
+		const previousDefinition = hadDefinition ? Object.assign({}, state.renderLayerDefinitions[normalized]) : null
+		const registeredDefinition = registerRenderLayerDefinition(normalized, options || {})
+		return function () {
+			if (state.renderLayerDefinitions[normalized] !== registeredDefinition) return
+			if (hadDefinition) state.renderLayerDefinitions[normalized] = previousDefinition
+			else delete state.renderLayerDefinitions[normalized]
+			const manager = state.renderLayerManager
+			if (manager?.layers?.[normalized]) {
+				applyRenderLayerDefinition(manager, manager.layers[normalized])
+				setRenderLayerDirtyState(manager.layers[normalized], true)
+			}
+		}
 	}
 
 	const publicRenderLayer = function (layer) {
@@ -914,7 +1490,14 @@
 				const manager = getExistingRenderLayerManager()
 				if (manager) applyRenderLayerVisibility(manager)
 			},
-			clear() { clearRenderLayer(layer) },
+			get cached() { return isRenderLayerCached(getRenderLayerDef(layer.id)) },
+			get cache() { return isRenderLayerCached(getRenderLayerDef(layer.id)) },
+			get dirty() { return isRenderLayerDirty(layer.id) },
+			set dirty(value) { markRenderLayerDirty(layer.id, value !== false) },
+			markDirty() { markRenderLayerDirty(layer.id, true); return this },
+			markClean() { markRenderLayerDirty(layer.id, false); return this },
+			isDirty() { return isRenderLayerDirty(layer.id) },
+			clear() { clearRenderLayer(layer); return this },
 			sync(game) {
 				const manager = ensureRenderLayerManager(game)
 				if (manager) syncRenderLayerCanvas(manager, layer)
@@ -924,7 +1507,7 @@
 	}
 
 	const getPublicRenderLayer = function (id, game, options) {
-		const layerId = markRenderLayerDemanded(id)
+		const layerId = markRenderLayerDemanded(id, options || {})
 		if (!isRenderApiEnabled()) return null
 		const manager = ensureRenderLayerManager(game)
 		return publicRenderLayer(manager ? ensureRenderLayer(manager, layerId, options) : null)
@@ -939,6 +1522,7 @@
 	}
 
 	const createRenderCallbackContext = function (entry, game, layer) {
+		const frameState = state.renderLayerFrameState[entry.layerId] || getRenderLayerFrameState(entry.layerId, getExistingRenderLayerManager(game))
 		return {
 			id: entry.id,
 			modId: entry.modId,
@@ -952,11 +1536,16 @@
 			width: layer.canvas?.width || 0,
 			height: layer.canvas?.height || 0,
 			pixelRatio: Number(game?.pixelRatio) || Number(window.devicePixelRatio) || 1,
-			frame: state.renderFrame
+			frame: state.renderFrame,
+			cached: !!frameState.cached,
+			cache: !!frameState.cached,
+			dirty: !!frameState.dirty,
+			redraw: !!frameState.shouldDraw
 		}
 	}
 
 	const createRenderCallbackEnabledContext = function (entry, game) {
+		const cached = isRenderLayerCached(entry.layerId)
 		return {
 			id: entry.id,
 			modId: entry.modId,
@@ -965,7 +1554,10 @@
 			space: entry.space || 'world',
 			game,
 			pixelRatio: Number(game?.pixelRatio) || Number(window.devicePixelRatio) || 1,
-			frame: state.renderFrame
+			frame: state.renderFrame,
+			cached,
+			cache: cached,
+			dirty: isRenderLayerDirty(entry.layerId, game)
 		}
 	}
 
@@ -1133,7 +1725,8 @@
 			callbacks: callbacks.length,
 			activeCallbacks: callbacks.filter(function (entry) { return entry.active }).map(function (entry) { return entry.key }),
 			layerDemanders: layerDemanders.length,
-			activeLayerDemanders: layerDemanders.filter(function (entry) { return entry.active }).map(function (entry) { return entry.key })
+			activeLayerDemanders: layerDemanders.filter(function (entry) { return entry.active }).map(function (entry) { return entry.key }),
+			timing: getRenderTimingSummary()
 		}
 	}
 
@@ -1144,17 +1737,24 @@
 
 	const runRenderCallbacks = function (game) {
 		const entries = listEnabledRenderCallbacks(game)
+		const manager = ensureRenderLayerManager(game)
 		entries.sort(function (a, b) {
 			const ao = getRenderLayerDef(a.layerId).order
 			const bo = getRenderLayerDef(b.layerId).order
 			return (ao - bo) || (a.order - b.order) || String(a.key).localeCompare(String(b.key))
 		})
 		for (const entry of entries) {
+			const frameState = getRenderLayerFrameState(entry.layerId, manager)
+			if (!frameState.shouldDraw) continue
 			try {
 				withRenderLayer(game, entry.layerId, function (ctx, activeGame, layer) {
-					entry.fn(createRenderCallbackContext(entry, activeGame, layer))
+					measureRenderTiming('callback:' + entry.layerId + ':' + entry.id, function () {
+						entry.fn(createRenderCallbackContext(entry, activeGame, layer))
+					})
 				}, { space: entry.space, copyState: entry.copyState, copyTransform: entry.copyTransform })
+				frameState.drew = true
 			} catch (error) {
+				frameState.failed = true
 				warn('Render callback from ' + entry.modId + ' failed', error)
 			}
 		}
@@ -1168,11 +1768,14 @@
 
 	const beginRenderFrame = function (game) {
 		if (game) state.game = game
+		installRenderEntityTiming(game)
+		state.renderLayerFrameState = {}
 		const previousDemands = copyRenderLayerDemandMap(state.renderLastActiveLayerDemands)
 		resetActiveRenderLayerDemands()
 		if (!isRenderApiEnabled()) {
 			state.renderActiveLayerDemands = {}
 			state.renderLastActiveLayerDemands = {}
+			state.renderLayerFrameState = {}
 			const manager = state.renderLayerManager
 			if (manager) applyRenderLayerVisibility(manager)
 			return
@@ -1180,12 +1783,14 @@
 		state.renderFrame += 1
 		markBuiltInRenderLayerDemands(game)
 		markRenderCallbackLayerDemands(game)
+		markBackgroundDemandForUnderMainLayers()
 		const manager = ensureRenderLayerManager(game)
 		if (!manager) {
 			state.renderLastActiveLayerDemands = copyRenderLayerDemandMap(state.renderActiveLayerDemands)
 			return
 		}
 		clearInactiveRenderLayers(manager, previousDemands)
+		applyRenderStackBackground(manager, game)
 		syncRenderLayers(manager, { activeOnly: true })
 		clearRenderLayers(manager, { activeOnly: true })
 		state.renderLastActiveLayerDemands = copyRenderLayerDemandMap(state.renderActiveLayerDemands)
@@ -1243,6 +1848,107 @@
 		return !!(isRenderApiEnabled() && game?.photofobia && game.flashlight && !game.plane && game.canvas && game.ctx)
 	}
 
+	const isFullFrameBackgroundFill = function (game, args) {
+		const x = Number(args?.[0])
+		const y = Number(args?.[1])
+		const width = Number(args?.[2])
+		const height = Number(args?.[3])
+		const gameWidth = Number(game?.w) || 0
+		const gameHeight = Number(game?.h) || 0
+		return Number.isFinite(x) && Number.isFinite(y) && Number.isFinite(width) && Number.isFinite(height) && gameWidth > 0 && gameHeight > 0 && Math.abs(x) < 0.001 && Math.abs(y) < 0.001 && Math.abs(width - gameWidth) < 0.001 && Math.abs(height - gameHeight) < 0.001
+	}
+
+	const shouldRouteFrameBackgroundFill = function (game) {
+		return !!(isRenderApiEnabled() && game?.canvas && game.ctx && hasRenderLayerDemand('background'))
+	}
+
+	const getFrameBackgroundFillColor = function (game, ctx) {
+		const fill = ctx?.fillStyle
+		if (typeof fill === 'string' && fill) return fill
+		return game?.plane === 1 ? '#000' : '#fff'
+	}
+
+	const getFrameBackgroundFillSignature = function (game, color, args) {
+		return [String(color || ''), Number(args?.[2]) || Number(game?.w) || 0, Number(args?.[3]) || Number(game?.h) || 0, Number(game?.plane) || 0].join('|')
+	}
+
+	const applyRenderStackBackground = function (manager, game, color) {
+		if (!manager?.container) return
+		if (isRenderApiEnabled() && hasRenderLayerDemand('background')) manager.container.style.backgroundColor = color || (game?.plane === 1 ? '#000' : '#fff')
+		else manager.container.style.backgroundColor = ''
+	}
+
+	const clearMainRenderCanvas = function (ctx, width, height, originalClearRect) {
+		if (!ctx || typeof originalClearRect !== 'function') return
+		ctx.save()
+		try {
+			if (typeof ctx.setTransform === 'function') ctx.setTransform(1, 0, 0, 1, 0, 0)
+			originalClearRect.call(ctx, 0, 0, width, height)
+		} finally {
+			ctx.restore()
+		}
+	}
+
+	const routeFrameBackgroundFill = function (game, ctx, args, originalClearRect) {
+		const manager = ensureRenderLayerManager(game)
+		const layer = manager ? ensureRenderLayer(manager, 'background') : null
+		if (!layer?.ctx || layer.isMain) return false
+		syncRenderLayerCanvas(manager, layer)
+		const backgroundColor = getFrameBackgroundFillColor(game, ctx)
+		applyRenderStackBackground(manager, game, backgroundColor)
+		const frameState = getRenderLayerFrameState('background', manager)
+		const signature = getFrameBackgroundFillSignature(game, backgroundColor, args)
+		if (layer.frameBackgroundFillSignature !== signature) {
+			layer.frameBackgroundFillSignature = signature
+			setRenderLayerDirtyState(layer, true)
+			frameState.dirty = true
+			frameState.shouldDraw = true
+		}
+		clearMainRenderCanvas(ctx, Number(game?.w) || Number(args?.[2]) || 0, Number(game?.h) || Number(args?.[3]) || 0, originalClearRect)
+		if (!frameState.shouldDraw) return true
+		const layerCtx = layer.ctx
+		layerCtx.save()
+		try {
+			if (typeof layerCtx.setTransform === 'function') layerCtx.setTransform(1, 0, 0, 1, 0, 0)
+			layerCtx.globalAlpha = 1
+			layerCtx.globalCompositeOperation = 'source-over'
+			layerCtx.fillStyle = backgroundColor
+			layerCtx.fillRect(Number(args[0]) || 0, Number(args[1]) || 0, Number(args[2]) || 0, Number(args[3]) || 0)
+			frameState.drew = true
+		} catch (error) {
+			frameState.failed = true
+			throw error
+		} finally {
+			layerCtx.restore()
+		}
+		return true
+	}
+
+	const beginFrameBackgroundFillRoute = function (game) {
+		const ctx = game?.ctx
+		if (!ctx || typeof ctx.fillRect !== 'function' || typeof ctx.clearRect !== 'function') return null
+		const originalFillRect = ctx.fillRect
+		const originalClearRect = ctx.clearRect
+		let routed = false
+		const patchedFillRect = function (...args) {
+			if (!routed && isFullFrameBackgroundFill(game, args)) {
+				routed = true
+				if (routeFrameBackgroundFill(game, ctx, args, originalClearRect)) return undefined
+			}
+			return originalFillRect.apply(this, args)
+		}
+		try {
+			ctx.fillRect = patchedFillRect
+		} catch (error) {
+			return null
+		}
+		return function () {
+			try {
+				if (ctx.fillRect === patchedFillRect) ctx.fillRect = originalFillRect
+			} catch (error) {}
+		}
+	}
+
 	const renderReducedFlashesOverlay = function (game) {
 		if (!shouldRouteReducedFlashesOverlay(game)) return
 		withRenderLayer(game, 'reduced-flashes', function (ctx) {
@@ -1274,8 +1980,9 @@
 		if (!isRenderApiEnabled()) return
 		const manager = ensureRenderLayerManager(game)
 		if (!manager) return
-		runRenderCallbacks(game)
-		renderBuiltInFrameOverlays(game)
+		measureRenderTiming('renderCallbacks', function () { runRenderCallbacks(game) })
+		measureRenderTiming('renderBuiltInOverlays', function () { renderBuiltInFrameOverlays(game) })
+		finishCachedRenderLayerFrame(manager)
 		emitRenderEvent('frame', game, manager, 'modloader:render-frame')
 	}
 
@@ -1306,6 +2013,68 @@
 		}
 	}
 
+	const createRenderScope = function (modId) {
+		const cleanupFns = []
+		let disposed = false
+		const addCleanup = function (cleanup) {
+			if (typeof cleanup !== 'function') return cleanup
+			if (disposed) {
+				try { cleanup() } catch (error) { warn('Render scope cleanup failed for ' + (modId || 'anonymous'), error) }
+				return cleanup
+			}
+			cleanupFns.push(cleanup)
+			return cleanup
+		}
+		const dispose = function () {
+			if (disposed) return false
+			disposed = true
+			while (cleanupFns.length) {
+				try { cleanupFns.pop()() }
+				catch (error) { warn('Render scope cleanup failed for ' + (modId || 'anonymous'), error) }
+			}
+			return true
+		}
+		return {
+			get disposed() { return disposed },
+			add: addCleanup,
+			dispose,
+			cleanup: dispose,
+			stop: dispose,
+			onReady(fn) { return addCleanup(addRenderEventListener('ready', fn, modId)) },
+			onFrameStart(fn) { return addCleanup(addRenderEventListener('frameStart', fn, modId)) },
+			onBeforeFrame(fn) { return addCleanup(addRenderEventListener('frameStart', fn, modId)) },
+			onFrame(fn) { return addCleanup(addRenderEventListener('frame', fn, modId)) },
+			onAfterFrame(fn) { return addCleanup(addRenderEventListener('frame', fn, modId)) },
+			onLayer(id, fn, options) { return addCleanup(registerRenderCallback(modId, id, fn, options || {})) },
+			on(id, fn, options) { return addCleanup(registerRenderCallback(modId, id, fn, options || {})) },
+			register(options) { return addCleanup(registerRenderCallback(modId, options || {})) },
+			registerLayer(id, options) { return addCleanup(registerScopedRenderLayerDefinition(modId, id, options || {})) },
+			defineLayer(id, options) { return addCleanup(registerScopedRenderLayerDefinition(modId, id, options || {})) },
+			demandLayer(id, options) { return addCleanup(registerRenderLayerDemand(modId, id, options || {})) },
+			demand(id, options) { return addCleanup(registerRenderLayerDemand(modId, id, options || {})) },
+			requireLayer(id, options) { return addCleanup(registerRenderLayerDemand(modId, id, options || {})) },
+			routeMethod(methodName, layerId, options) { return addCleanup(registerRenderMethodRoute(modId, methodName, layerId, options || {})) },
+			registerMethodRoute(methodName, layerId, options) { return addCleanup(registerRenderMethodRoute(modId, methodName, layerId, options || {})) },
+			events: {
+				ready(fn) { return addCleanup(addRenderEventListener('ready', fn, modId)) },
+				frameStart(fn) { return addCleanup(addRenderEventListener('frameStart', fn, modId)) },
+				beforeFrame(fn) { return addCleanup(addRenderEventListener('frameStart', fn, modId)) },
+				frame(fn) { return addCleanup(addRenderEventListener('frame', fn, modId)) },
+				afterFrame(fn) { return addCleanup(addRenderEventListener('frame', fn, modId)) }
+			},
+			layers: {
+				register(id, options) { return addCleanup(registerScopedRenderLayerDefinition(modId, id, options || {})) },
+				define(id, options) { return addCleanup(registerScopedRenderLayerDefinition(modId, id, options || {})) },
+				demand(id, options) { return addCleanup(registerRenderLayerDemand(modId, id, options || {})) },
+				require(id, options) { return addCleanup(registerRenderLayerDemand(modId, id, options || {})) }
+			},
+			routes: {
+				register(methodName, layerId, options) { return addCleanup(registerRenderMethodRoute(modId, methodName, layerId, options || {})) },
+				route(methodName, layerId, options) { return addCleanup(registerRenderMethodRoute(modId, methodName, layerId, options || {})) }
+			}
+		}
+	}
+
 	const patchRenderLayerMethod = function (methodName) {
 		methodName = normalizeRenderMethodName(methodName)
 		if (!methodName || state.renderPatchedMethods[methodName] === true) return false
@@ -1313,11 +2082,24 @@
 		state.renderPatchedMethods[methodName] = true
 		api.patch(Game.prototype, methodName, function (original) {
 			return function (...args) {
-				const layerId = getRenderMethodLayer(methodName)
-				if (!isRenderApiEnabled() || !layerId || !hasRenderLayerDemand(layerId)) return original.apply(this, args)
-				return withRenderLayer(this, layerId, function () {
-					return original.apply(this, args)
-				}.bind(this))
+				const game = this
+				return measureRenderTiming(methodName, function () {
+					const layerId = getRenderMethodLayer(methodName)
+					if (!isRenderApiEnabled() || !layerId || !hasRenderLayerDemand(layerId)) return original.apply(game, args)
+					const manager = ensureRenderLayerManager(game)
+					const frameState = getRenderLayerFrameState(layerId, manager)
+					if (!frameState.shouldDraw) return undefined
+					try {
+						const result = withRenderLayer(game, layerId, function () {
+							return original.apply(game, args)
+						})
+						frameState.drew = true
+						return result
+					} catch (error) {
+						frameState.failed = true
+						throw error
+					}
+				})
 			}
 		})
 		return true
@@ -1331,21 +2113,26 @@
 			state.renderTouchModeOverlayStyle = detectTouchModeOverlayStyle(Game.prototype.renderloop)
 			api.patch(Game.prototype, 'renderloop', function (original) {
 				return function (...args) {
-					beginRenderFrame(this)
-					const renderLayerManager = isRenderApiEnabled() ? ensureRenderLayerManager(this) : null
-					const routeTouchModeOverlay = shouldRouteTouchModeOverlay(this) && !!renderLayerManager
-					const routeReducedFlashesOverlay = shouldRouteReducedFlashesOverlay(this) && !!renderLayerManager
-					const previousTouchMode = this.touchMode
-					const previousPhotofobia = this.photofobia
-					if (routeTouchModeOverlay) this.touchMode = 0
-					if (routeReducedFlashesOverlay) this.photofobia = false
-					try {
-						return original.apply(this, args)
-					} finally {
-						if (routeTouchModeOverlay) this.touchMode = previousTouchMode
-						if (routeReducedFlashesOverlay) this.photofobia = previousPhotofobia
-						endRenderFrame(this)
-					}
+					const game = this
+					return measureRenderTiming('renderloop', function () {
+						beginRenderFrame(game)
+						const renderLayerManager = isRenderApiEnabled() ? ensureRenderLayerManager(game) : null
+						const routeTouchModeOverlay = shouldRouteTouchModeOverlay(game) && !!renderLayerManager
+						const routeReducedFlashesOverlay = shouldRouteReducedFlashesOverlay(game) && !!renderLayerManager
+						const restoreFrameBackgroundFillRoute = shouldRouteFrameBackgroundFill(game) && !!renderLayerManager ? beginFrameBackgroundFillRoute(game) : null
+						const previousTouchMode = game.touchMode
+						const previousPhotofobia = game.photofobia
+						if (routeTouchModeOverlay) game.touchMode = 0
+						if (routeReducedFlashesOverlay) game.photofobia = false
+						try {
+							return original.apply(game, args)
+						} finally {
+							if (restoreFrameBackgroundFillRoute) restoreFrameBackgroundFillRoute()
+							if (routeTouchModeOverlay) game.touchMode = previousTouchMode
+							if (routeReducedFlashesOverlay) game.photofobia = previousPhotofobia
+							endRenderFrame(game)
+						}
+					})
 				}
 			})
 			api.patch(Game.prototype, 'initScreenSize', function (original) {
@@ -1381,17 +2168,43 @@
 			},
 			isEnabled: isRenderApiEnabled,
 			setEnabled(value) { return setRenderApiEnabled(value) },
+			createScope() { return createRenderScope(modId) },
+			scope() { return createRenderScope(modId) },
 			isAvailable(game) { return isRenderApiEnabled() && !!ensureRenderLayerManager(game) },
 			getLayer(id, game, options) { return getPublicRenderLayer(id, game, options) },
 			layer(id, game, options) { return getPublicRenderLayer(id, game, options) },
 			context(id, game, options) { return getPublicRenderLayer(id, game, options)?.ctx || null },
 			demandedLayers: listRenderLayerDemands,
 			isLayerDemanded(id) { return hasRenderLayerDemand(id) },
+			describeLayer: describeRenderLayerInfo,
+			layerInfo: describeRenderLayerInfo,
+			getLayerInfo: describeRenderLayerInfo,
 			layerDemanders: listRenderLayerDemandCallbacks,
 			definedLayers: listRenderLayerDefinitions,
 			createdLayers(game) { return listCreatedRenderLayers(game) },
 			callbacks: listRenderCallbacks,
 			summary(game) { return getRenderDiagnosticsSummary(game) },
+			enableTiming(options) { return enableRenderTiming(options || {}) },
+			disableTiming(options) { return disableRenderTiming(options || {}) },
+			clearTiming: clearRenderTiming,
+			renderTimings: listRenderTimingMethods,
+			timing: {
+				isEnabled() { return !!state.renderTimingEnabled },
+				areEntitiesEnabled() { return !!state.renderTimingEntitiesEnabled },
+				areVfxEnabled() { return !!state.renderTimingVfxEnabled },
+				detailMethods() { return state.renderTimingEntityDetailMethods.slice() },
+				enable(options) { return enableRenderTiming(options || {}) },
+				disable(options) { return disableRenderTiming(options || {}) },
+				setEnabled(value, options) { return setRenderTimingEnabled(value, options || {}) },
+				clear: clearRenderTiming,
+				summary: getRenderTimingSummary,
+				methods: listRenderTimingMethods,
+				entities: listRenderTimingEntities,
+				entityMethods: listRenderTimingEntities,
+				vfx: listRenderTimingVfx,
+				effects: listRenderTimingVfx,
+				list: listRenderTimingMethods
+			},
 			onReady(fn) { return addRenderEventListener('ready', fn, modId) },
 			onFrameStart(fn) { return addRenderEventListener('frameStart', fn, modId) },
 			onBeforeFrame(fn) { return addRenderEventListener('frameStart', fn, modId) },
@@ -1400,6 +2213,9 @@
 			demandLayer(id, options) { return registerRenderLayerDemand(modId, id, options || {}) },
 			demand(id, options) { return registerRenderLayerDemand(modId, id, options || {}) },
 			requireLayer(id, options) { return registerRenderLayerDemand(modId, id, options || {}) },
+			releaseLayer(id, options) { return releaseRenderLayerDemand(id, options || {}) },
+			releaseDemand(id, options) { return releaseRenderLayerDemand(id, options || {}) },
+			releaseLayerDemand(id, options) { return releaseRenderLayerDemand(id, options || {}) },
 			routeMethod(methodName, layerId, options) { return registerRenderMethodRoute(modId, methodName, layerId, options || {}) },
 			registerMethodRoute(methodName, layerId, options) { return registerRenderMethodRoute(modId, methodName, layerId, options || {}) },
 			routedMethods: listRenderMethodRoutes,
@@ -1407,7 +2223,7 @@
 			getMethodLayer(methodName) { return getRenderMethodLayer(methodName) },
 			isMethodRouted(methodName) { return isRenderMethodRouted(methodName) },
 			withLayer(id, fn, options = {}) {
-				const layerId = markRenderLayerDemanded(id)
+				const layerId = markRenderLayerDemanded(id, options)
 				const game = getRenderGame(options.game)
 				return withRenderLayer(game, layerId, function (ctx, activeGame, layer) {
 					return fn(ctx, activeGame, publicRenderLayer(layer))
@@ -1417,6 +2233,7 @@
 			on(id, fn, options) { return registerRenderCallback(modId, id, fn, options || {}) },
 			register(options) { return registerRenderCallback(modId, options || {}) },
 			registerLayer(id, options) { return registerRenderLayerDefinition(id, options || {}) },
+			defineLayer(id, options) { return registerRenderLayerDefinition(id, options || {}) },
 			clear(id, game) {
 				const layer = getPublicRenderLayer(id, game)
 				if (layer) layer.clear()
@@ -1427,19 +2244,27 @@
 				if (manager) syncRenderLayers(manager)
 				return manager
 			},
-			markDirty(id) {
-				const layer = state.renderLayerManager?.layers?.[normalizeRenderLayerId(id)]
-				if (layer) layer.dirty = true
-			},
+			markDirty(id, game) { return markRenderLayerDirty(id, true, game) },
+			markClean(id, game) { return markRenderLayerDirty(id, false, game) },
+			isDirty(id, game) { return isRenderLayerDirty(id, game) },
 			layers: {
 				demands: listRenderLayerDemands,
 				demanded: listRenderLayerDemands,
 				defined: listRenderLayerDefinitions,
+				describe: describeRenderLayerInfo,
+				info: describeRenderLayerInfo,
 				created(game) { return listCreatedRenderLayers(game) },
 				demanders: listRenderLayerDemandCallbacks,
 				isDemanded(id) { return hasRenderLayerDemand(id) },
+				isDirty(id, game) { return isRenderLayerDirty(id, game) },
+				markDirty(id, game) { return markRenderLayerDirty(id, true, game) },
+				markClean(id, game) { return markRenderLayerDirty(id, false, game) },
+				register(id, options) { return registerRenderLayerDefinition(id, options || {}) },
+				define(id, options) { return registerRenderLayerDefinition(id, options || {}) },
 				demand(id, options) { return registerRenderLayerDemand(modId, id, options || {}) },
 				require(id, options) { return registerRenderLayerDemand(modId, id, options || {}) },
+				release(id, options) { return releaseRenderLayerDemand(id, options || {}) },
+				releaseDemand(id, options) { return releaseRenderLayerDemand(id, options || {}) },
 				list(game) {
 					if (!isRenderApiEnabled()) return []
 					const manager = ensureRenderLayerManager(game)
@@ -1453,7 +2278,7 @@
 					if (layer) layer.clear()
 				},
 				with(id, fn, options = {}) {
-					const layerId = markRenderLayerDemanded(id)
+					const layerId = markRenderLayerDemanded(id, options)
 					return withRenderLayer(getRenderGame(options.game), layerId, function (ctx, activeGame, layer) {
 						return fn(ctx, activeGame, publicRenderLayer(layer))
 					}, options)
@@ -2418,10 +3243,10 @@
 	}
 	const PANEL_TEXT = {
 		en: {
-			close: 'Close', hideToEdge: 'Hide to edge', showFromEdge: 'Show ModLoader menu', menuSettings: 'Menu Settings', themeMode: 'Theme', darkMode: 'Dark', lightMode: 'Light', hideMode: 'Auto-hide mode', autoHide: 'Auto-hide', manualHide: 'Manual', sortMod: 'Sort mod', sortConfigSection: 'Sort section', configSectionSorting: 'Config section sorting', configSectionSortingOn: 'On', configSectionSortingOff: 'Off', renderApi: 'Render API', renderApiOn: 'On', renderApiOff: 'Off', renderApiLayerDemands: 'Layer demands', renderApiCreatedLayers: 'Created layers', renderApiCallbacks: 'Callbacks active/total', renderApiMethodRoutes: 'Method routes', autoHideDelay: 'Auto-hide delay', secondsSuffix: 's', hideMenuDetails: 'Hide menu details', hideModFileDetails: 'Hide mod file details', show: 'Show', hide: 'Hide', installedMods: 'Installed mods', enabledEntries: 'Enabled entries', loadedMods: 'Loaded mods', issues: 'Issues', dataPatches: 'Data patches', wordPatches: 'Word patches', registeredLanguages: 'Registered languages', orphanEntities: 'Orphan entities', modManager: 'Mod Manager', selectAll: 'all', toggleNote: 'Toggle mods or edit config below.', changesRequireReload: 'Changes require reload.', configSaveNote: 'Config saved to localStorage; some mods need reload.', saveReload: 'Save & Reload', saveConfig: 'Save Config', insert: 'insert', folder: 'folder', deleteMod: 'Delete mod', config: 'Config', recentLog: 'Recent Log', noLogEntries: 'No log entries.', noModsFound: 'No mods with mod.json were found.', fileAccessUnavailable: 'File access is unavailable.', fileAccessLoadedOnly: 'File access is unavailable, so only loaded mods can be shown.', reloadHot: 'hot capable, reload now', reloadRestart: 'restart required', reloadRequired: 'reload required', idPrefix: 'id: {value}', uniquePrefix: 'unique: {value}', depsPrefix: 'deps: {value}', conflictsPrefix: 'conflicts: {value}', missingDependencies: 'Missing dependencies: {value}', conflictsEnabled: 'Conflicts enabled: {value}', savedReloading: 'Saved. Reloading...', saveFailed: 'Save failed: {value}', configSaved: 'Config saved.', noChanges: 'No changes to save.', changesCanceled: 'Canceled unsaved changes.', openFolderFailed: 'Could not open folder: {value}', deleteTitle: 'Delete Mod?', deleteMessage: 'Delete {name} from the mods folder? This cannot be undone.', deleteConfirm: 'Delete', cancel: 'Cancel', replaceTitle: 'Replace Mod?', replaceMessage: 'mods already contains {name}. Replace it with the imported mod?', replaceConfirm: 'Replace', deletedMod: 'Deleted {name}. Reload to unload already running code.', deleteFailed: 'Delete failed: {value}', importHint: 'Drop a file here or paste', importDetail: 'Drag a mod zip here, or copy a zip file and press paste. ModLoader will unpack it into the mods folder automatically.', importWaiting: 'Waiting for a zip file...', importNoZip: 'Drop or paste a .zip file.', importNoPath: 'Could not read the file path from the dropped file.', importing: 'Importing {name}...', importedMod: 'Imported {name}. Enable it and Save & Reload when ready.', importFailed: 'Import failed: {value}', importModeOff: 'Back to mod list', invalidZip: 'Only .zip mod packages can be imported.', zipNoMod: 'The zip does not contain a mod.json.', zipMultipleMods: 'The zip contains multiple mod folders; import one mod at a time.', zipExtractFailed: 'Could not extract zip: {value}', folderOpened: 'Opened mods folder.', replaceRenamedUniqueTitle: 'Update Renamed Mod?', replaceRenamedUniqueMessage: 'The new file has the same mod unique code as an installed mod. It is probably an update and rename.\n{oldName} -> {newName}\nReplace the old file?', replaceRenamedPreviousTitle: 'Mod Rename Detected', replaceRenamedPreviousMessage: 'This new file appears to be a rename of an installed file.\n{oldName} -> {newName}\nReplace the old file?', replaceOld: 'Replace', keepImported: 'Do not replace (add new file)', uniqueCodeEditTitle: 'Recommend changing mod unique code', uniqueCodeEditMessage: 'These two mods will share the same mod unique code. Change the imported mod unique code before adding it?', uniqueCodeLabel: 'Mod unique code', uniqueCodeConfirm: 'Confirm', uniqueCodeSkip: 'No', manifestReadFailed: 'Could not read mod.json: {value}', translationFile: 'translations', translationFileTitle: 'Open translation file', translationFileSynced: 'Translation file synced: {path}', translationFileFailed: 'Translation file failed: {value}'
+			close: 'Close', hideToEdge: 'Hide to edge', showFromEdge: 'Show ModLoader menu', menuSettings: 'Menu Settings', themeMode: 'Theme', darkMode: 'Dark', lightMode: 'Light', hideMode: 'Auto-hide mode', autoHide: 'Auto-hide', manualHide: 'Manual', sortMod: 'Sort mod', sortConfigSection: 'Sort section', configSectionSorting: 'Config section sorting', configSectionSortingOn: 'On', configSectionSortingOff: 'Off', renderApi: 'Render API', renderApiOn: 'On', renderApiOff: 'Off', renderApiLayerDemands: 'Layer demands', renderApiCreatedLayers: 'Created layers', renderApiCallbacks: 'Callbacks active/total', renderApiLayerDemanders: 'Demanders active/total', renderApiMethodRoutes: 'Method routes', renderApiTiming: 'Timing', autoHideDelay: 'Auto-hide delay', secondsSuffix: 's', hideMenuDetails: 'Hide menu details', hideModFileDetails: 'Hide mod file details', show: 'Show', hide: 'Hide', installedMods: 'Installed mods', enabledEntries: 'Enabled entries', loadedMods: 'Loaded mods', issues: 'Issues', dataPatches: 'Data patches', wordPatches: 'Word patches', registeredLanguages: 'Registered languages', orphanEntities: 'Orphan entities', modManager: 'Mod Manager', selectAll: 'all', toggleNote: 'Toggle mods or edit config below.', changesRequireReload: 'Changes require reload.', configSaveNote: 'Config saved to localStorage; some mods need reload.', saveReload: 'Save & Reload', saveConfig: 'Save Config', insert: 'insert', folder: 'folder', deleteMod: 'Delete mod', config: 'Config', recentLog: 'Recent Log', noLogEntries: 'No log entries.', noModsFound: 'No mods with mod.json were found.', fileAccessUnavailable: 'File access is unavailable.', fileAccessLoadedOnly: 'File access is unavailable, so only loaded mods can be shown.', reloadHot: 'hot capable, reload now', reloadRestart: 'restart required', reloadRequired: 'reload required', idPrefix: 'id: {value}', uniquePrefix: 'unique: {value}', depsPrefix: 'deps: {value}', conflictsPrefix: 'conflicts: {value}', missingDependencies: 'Missing dependencies: {value}', conflictsEnabled: 'Conflicts enabled: {value}', savedReloading: 'Saved. Reloading...', saveFailed: 'Save failed: {value}', configSaved: 'Config saved.', noChanges: 'No changes to save.', changesCanceled: 'Canceled unsaved changes.', openFolderFailed: 'Could not open folder: {value}', deleteTitle: 'Delete Mod?', deleteMessage: 'Delete {name} from the mods folder? This cannot be undone.', deleteConfirm: 'Delete', cancel: 'Cancel', replaceTitle: 'Replace Mod?', replaceMessage: 'mods already contains {name}. Replace it with the imported mod?', replaceConfirm: 'Replace', deletedMod: 'Deleted {name}. Reload to unload already running code.', deleteFailed: 'Delete failed: {value}', importHint: 'Drop a file here or paste', importDetail: 'Drag a mod zip here, or copy a zip file and press paste. ModLoader will unpack it into the mods folder automatically.', importWaiting: 'Waiting for a zip file...', importNoZip: 'Drop or paste a .zip file.', importNoPath: 'Could not read the file path from the dropped file.', importing: 'Importing {name}...', importedMod: 'Imported {name}. Enable it and Save & Reload when ready.', importFailed: 'Import failed: {value}', importModeOff: 'Back to mod list', invalidZip: 'Only .zip mod packages can be imported.', zipNoMod: 'The zip does not contain a mod.json.', zipMultipleMods: 'The zip contains multiple mod folders; import one mod at a time.', zipExtractFailed: 'Could not extract zip: {value}', folderOpened: 'Opened mods folder.', replaceRenamedUniqueTitle: 'Update Renamed Mod?', replaceRenamedUniqueMessage: 'The new file has the same mod unique code as an installed mod. It is probably an update and rename.\n{oldName} -> {newName}\nReplace the old file?', replaceRenamedPreviousTitle: 'Mod Rename Detected', replaceRenamedPreviousMessage: 'This new file appears to be a rename of an installed file.\n{oldName} -> {newName}\nReplace the old file?', replaceOld: 'Replace', keepImported: 'Do not replace (add new file)', uniqueCodeEditTitle: 'Recommend changing mod unique code', uniqueCodeEditMessage: 'These two mods will share the same mod unique code. Change the imported mod unique code before adding it?', uniqueCodeLabel: 'Mod unique code', uniqueCodeConfirm: 'Confirm', uniqueCodeSkip: 'No', manifestReadFailed: 'Could not read mod.json: {value}', translationFile: 'translations', translationFileTitle: 'Open translation file', translationFileSynced: 'Translation file synced: {path}', translationFileFailed: 'Translation file failed: {value}'
 		},
 		sch: {
-			close: '\u5173\u95ed', hideToEdge: '\u9690\u85cf\u5230\u8fb9\u7f18', showFromEdge: '\u663e\u793a ModLoader \u83dc\u5355', menuSettings: 'Mod \u83dc\u5355\u8bbe\u7f6e', themeMode: '\u4eae\u8272 / \u6697\u8272\u6a21\u5f0f', darkMode: '\u6697\u8272', lightMode: '\u4eae\u8272', hideMode: '\u81ea\u52a8\u9690\u85cf\u6a21\u5f0f', autoHide: '\u81ea\u52a8\u9690\u85cf', manualHide: '\u624b\u52a8\u9690\u85cf', sortMod: '\u6392\u5e8f mod', sortConfigSection: '\u6392\u5e8f\u5b50\u529f\u80fd', configSectionSorting: '\u5b50\u529f\u80fd\u624b\u52a8\u6392\u5e8f', configSectionSortingOn: '\u5f00\u542f', configSectionSortingOff: '\u5173\u95ed', renderApi: '\u6e32\u67d3 API', renderApiOn: '\u5f00\u542f', renderApiOff: '\u5173\u95ed', renderApiLayerDemands: '\u5df2\u9700\u6c42\u56fe\u5c42', renderApiCreatedLayers: '\u5df2\u521b\u5efa\u56fe\u5c42', renderApiCallbacks: '\u56de\u8c03 \u6d3b\u8dc3/\u603b\u6570', renderApiMethodRoutes: '\u5df2\u8def\u7531\u65b9\u6cd5', autoHideDelay: '\u81ea\u52a8\u9690\u85cf\u79d2\u6570', secondsSuffix: '\u79d2', hideMenuDetails: '\u9690\u85cf\u83dc\u5355\u8be6\u60c5', hideModFileDetails: '\u9690\u85cf mod \u6587\u4ef6\u8be6\u60c5', show: '\u663e\u793a', hide: '\u9690\u85cf', installedMods: '\u5df2\u5b89\u88c5 mod', enabledEntries: '\u542f\u7528\u6761\u76ee', loadedMods: '\u5df2\u52a0\u8f7d mod', issues: '\u95ee\u9898', dataPatches: '\u6570\u636e\u8865\u4e01', wordPatches: '\u6587\u672c\u8865\u4e01', registeredLanguages: '\u5df2\u6ce8\u518c\u8bed\u8a00', orphanEntities: '\u5b64\u7acb\u5b9e\u4f53', modManager: 'Mod \u7ba1\u7406', selectAll: '\u5168\u9009', toggleNote: '\u5728\u4e0b\u65b9\u5f00\u5173 mod \u6216\u7f16\u8f91\u914d\u7f6e\u3002', changesRequireReload: '\u6539\u52a8\u9700\u8981 reload\u3002', configSaveNote: '\u914d\u7f6e\u5df2\u4fdd\u5b58\u5230 localStorage\uff1b\u90e8\u5206 mod \u9700\u8981 reload \u751f\u6548\u3002', saveReload: '\u4fdd\u5b58\u5e76 Reload', saveConfig: '\u4fdd\u5b58\u914d\u7f6e', insert: '\u5bfc\u5165', folder: '\u6587\u4ef6\u5939', deleteMod: '\u5220\u9664 mod', config: '\u914d\u7f6e', recentLog: '\u6700\u8fd1\u65e5\u5fd7', noLogEntries: '\u6682\u65e0\u65e5\u5fd7\u3002', noModsFound: '\u6ca1\u6709\u627e\u5230\u5e26 mod.json \u7684 mod\u3002', fileAccessUnavailable: '\u6587\u4ef6\u8bbf\u95ee\u4e0d\u53ef\u7528\u3002', fileAccessLoadedOnly: '\u6587\u4ef6\u8bbf\u95ee\u4e0d\u53ef\u7528\uff0c\u6240\u4ee5\u53ea\u80fd\u663e\u793a\u5df2\u52a0\u8f7d\u7684 mod\u3002', reloadHot: '\u652f\u6301\u70ed\u5f00\u5173\uff0c\u5f53\u524d\u4ecd\u5efa\u8bae reload', reloadRestart: '\u9700\u8981\u91cd\u542f', reloadRequired: '\u9700\u8981 reload', idPrefix: 'id\uff1a{value}', uniquePrefix: '\u552f\u4e00\u7801\uff1a{value}', depsPrefix: '\u4f9d\u8d56\uff1a{value}', conflictsPrefix: '\u51b2\u7a81\uff1a{value}', missingDependencies: '\u7f3a\u5c11\u4f9d\u8d56\uff1a{value}', conflictsEnabled: '\u5df2\u542f\u7528\u51b2\u7a81\uff1a{value}', savedReloading: '\u5df2\u4fdd\u5b58\uff0c\u6b63\u5728 reload...', saveFailed: '\u4fdd\u5b58\u5931\u8d25\uff1a{value}', configSaved: '\u914d\u7f6e\u5df2\u4fdd\u5b58\u3002', noChanges: '\u6ca1\u6709\u9700\u8981\u4fdd\u5b58\u7684\u6539\u52a8\u3002', changesCanceled: '\u5df2\u53d6\u6d88\u672a\u4fdd\u5b58\u7684\u6539\u52a8\u3002', openFolderFailed: '\u65e0\u6cd5\u6253\u5f00\u6587\u4ef6\u5939\uff1a{value}', deleteTitle: '\u5220\u9664 Mod\uff1f', deleteMessage: '\u4ece mods \u6587\u4ef6\u5939\u5220\u9664 {name}\uff1f\u8fd9\u4e2a\u64cd\u4f5c\u4e0d\u80fd\u64a4\u9500\u3002', deleteConfirm: '\u5220\u9664', cancel: '\u53d6\u6d88', replaceTitle: '\u66ff\u6362 Mod\uff1f', replaceMessage: 'mods \u91cc\u5df2\u7ecf\u6709 {name}\u3002\u662f\u5426\u7528\u5bfc\u5165\u7684 mod \u66ff\u6362\u5b83\uff1f', replaceConfirm: '\u66ff\u6362', deletedMod: '\u5df2\u5220\u9664 {name}\u3002\u5df2\u7ecf\u8fd0\u884c\u7684\u4ee3\u7801\u9700\u8981 reload \u624d\u4f1a\u5378\u8f7d\u3002', deleteFailed: '\u5220\u9664\u5931\u8d25\uff1a{value}', importHint: '\u628a\u6587\u4ef6\u62d6\u5230\u8fd9\u91cc\u6216\u590d\u5236', importDetail: '\u53ef\u4ee5\u628a mod zip \u5305\u76f4\u63a5\u62d6\u5165\uff0c\u6216\u8005\u590d\u5236 zip \u5305\u540e\u5728\u8fd9\u91cc\u6309\u7c98\u8d34\u5feb\u6377\u952e\uff0cModLoader \u4f1a\u81ea\u52a8\u89e3\u5305\u5230 mods \u6587\u4ef6\u5939\u3002', importWaiting: '\u7b49\u5f85 zip \u6587\u4ef6...', importNoZip: '\u8bf7\u62d6\u5165\u6216\u7c98\u8d34 .zip \u6587\u4ef6\u3002', importNoPath: '\u65e0\u6cd5\u8bfb\u53d6\u8be5\u6587\u4ef6\u8def\u5f84\u3002', importing: '\u6b63\u5728\u5bfc\u5165 {name}...', importedMod: '\u5df2\u5bfc\u5165 {name}\u3002\u9700\u8981\u65f6\u52fe\u9009\u5b83\u5e76\u4fdd\u5b58 reload\u3002', importFailed: '\u5bfc\u5165\u5931\u8d25\uff1a{value}', importModeOff: '\u8fd4\u56de mod \u5217\u8868', invalidZip: '\u53ea\u80fd\u5bfc\u5165 .zip mod \u5305\u3002', zipNoMod: '\u8fd9\u4e2a zip \u5185\u6ca1\u6709 mod.json\u3002', zipMultipleMods: '\u8fd9\u4e2a zip \u5305\u542b\u591a\u4e2a mod \u6587\u4ef6\u5939\uff1b\u8bf7\u4e00\u6b21\u5bfc\u5165\u4e00\u4e2a mod\u3002', zipExtractFailed: '\u65e0\u6cd5\u89e3\u538b zip\uff1a{value}', folderOpened: '\u5df2\u6253\u5f00 mods \u6587\u4ef6\u5939\u3002', replaceRenamedUniqueTitle: '\u53d1\u73b0\u540c\u552f\u4e00\u7801 Mod', replaceRenamedUniqueMessage: '\u65b0\u6587\u4ef6\u8ddf\u5df2\u6709\u6587\u4ef6\u6709\u76f8\u540c\u7684 mod \u552f\u4e00\u7801\uff0c\u5b83\u5f88\u53ef\u80fd\u662f\u65e7\u6587\u4ef6\u7684\u66f4\u65b0\u548c\u6539\u540d\u3002\n{oldName} \u2192 {newName}\n\u662f\u5426\u8986\u76d6\u65e7\u6587\u4ef6\uff1f', replaceRenamedPreviousTitle: '\u53d1\u73b0 Mod \u6539\u540d', replaceRenamedPreviousMessage: '\u8fd9\u4e2a\u65b0\u6587\u4ef6\u662f\u5df2\u6709\u6587\u4ef6\u7684\u6539\u540d\u3002\n{oldName} \u2192 {newName}\n\u662f\u5426\u8986\u76d6\u65e7\u6587\u4ef6\uff1f', replaceOld: '\u8986\u76d6', keepImported: '\u4e0d\u8986\u76d6\uff08\u52a0\u5165\u65b0\u6587\u4ef6\uff09', uniqueCodeEditTitle: '\u63a8\u8350\u4fee\u6539 mod \u552f\u4e00\u7801', uniqueCodeEditMessage: '\u8fd9\u4e24\u4e2a mod \u4f1a\u5171\u7528\u540c\u4e00\u4e2a mod \u552f\u4e00\u7801\u3002\u662f\u5426\u5728\u52a0\u5165\u65b0\u6587\u4ef6\u524d\u4fee\u6539\u5bfc\u5165 mod \u7684\u552f\u4e00\u7801\uff1f', uniqueCodeLabel: 'mod \u552f\u4e00\u7801', uniqueCodeConfirm: '\u786e\u8ba4\u4fee\u6539', uniqueCodeSkip: '\u5426\uff08\u4e0d\u4fee\u6539\uff09', manifestReadFailed: '\u65e0\u6cd5\u8bfb\u53d6 mod.json\uff1a{value}', translationFile: '\u7ffb\u8bd1', translationFileTitle: '\u6253\u5f00\u7ffb\u8bd1\u6587\u4ef6', translationFileSynced: '\u7ffb\u8bd1\u6587\u4ef6\u5df2\u540c\u6b65\uff1a{path}', translationFileFailed: '\u7ffb\u8bd1\u6587\u4ef6\u5931\u8d25\uff1a{value}'
+			close: '\u5173\u95ed', hideToEdge: '\u9690\u85cf\u5230\u8fb9\u7f18', showFromEdge: '\u663e\u793a ModLoader \u83dc\u5355', menuSettings: 'Mod \u83dc\u5355\u8bbe\u7f6e', themeMode: '\u4eae\u8272 / \u6697\u8272\u6a21\u5f0f', darkMode: '\u6697\u8272', lightMode: '\u4eae\u8272', hideMode: '\u81ea\u52a8\u9690\u85cf\u6a21\u5f0f', autoHide: '\u81ea\u52a8\u9690\u85cf', manualHide: '\u624b\u52a8\u9690\u85cf', sortMod: '\u6392\u5e8f mod', sortConfigSection: '\u6392\u5e8f\u5b50\u529f\u80fd', configSectionSorting: '\u5b50\u529f\u80fd\u624b\u52a8\u6392\u5e8f', configSectionSortingOn: '\u5f00\u542f', configSectionSortingOff: '\u5173\u95ed', renderApi: '\u6e32\u67d3 API', renderApiOn: '\u5f00\u542f', renderApiOff: '\u5173\u95ed', renderApiLayerDemands: '\u5df2\u9700\u6c42\u56fe\u5c42', renderApiCreatedLayers: '\u5df2\u521b\u5efa\u56fe\u5c42', renderApiCallbacks: '\u56de\u8c03 \u6d3b\u8dc3/\u603b\u6570', renderApiLayerDemanders: '\u9700\u6c42\u5668 \u6d3b\u8dc3/\u603b\u6570', renderApiMethodRoutes: '\u5df2\u8def\u7531\u65b9\u6cd5', renderApiTiming: '\u8017\u65f6', autoHideDelay: '\u81ea\u52a8\u9690\u85cf\u79d2\u6570', secondsSuffix: '\u79d2', hideMenuDetails: '\u9690\u85cf\u83dc\u5355\u8be6\u60c5', hideModFileDetails: '\u9690\u85cf mod \u6587\u4ef6\u8be6\u60c5', show: '\u663e\u793a', hide: '\u9690\u85cf', installedMods: '\u5df2\u5b89\u88c5 mod', enabledEntries: '\u542f\u7528\u6761\u76ee', loadedMods: '\u5df2\u52a0\u8f7d mod', issues: '\u95ee\u9898', dataPatches: '\u6570\u636e\u8865\u4e01', wordPatches: '\u6587\u672c\u8865\u4e01', registeredLanguages: '\u5df2\u6ce8\u518c\u8bed\u8a00', orphanEntities: '\u5b64\u7acb\u5b9e\u4f53', modManager: 'Mod \u7ba1\u7406', selectAll: '\u5168\u9009', toggleNote: '\u5728\u4e0b\u65b9\u5f00\u5173 mod \u6216\u7f16\u8f91\u914d\u7f6e\u3002', changesRequireReload: '\u6539\u52a8\u9700\u8981 reload\u3002', configSaveNote: '\u914d\u7f6e\u5df2\u4fdd\u5b58\u5230 localStorage\uff1b\u90e8\u5206 mod \u9700\u8981 reload \u751f\u6548\u3002', saveReload: '\u4fdd\u5b58\u5e76 Reload', saveConfig: '\u4fdd\u5b58\u914d\u7f6e', insert: '\u5bfc\u5165', folder: '\u6587\u4ef6\u5939', deleteMod: '\u5220\u9664 mod', config: '\u914d\u7f6e', recentLog: '\u6700\u8fd1\u65e5\u5fd7', noLogEntries: '\u6682\u65e0\u65e5\u5fd7\u3002', noModsFound: '\u6ca1\u6709\u627e\u5230\u5e26 mod.json \u7684 mod\u3002', fileAccessUnavailable: '\u6587\u4ef6\u8bbf\u95ee\u4e0d\u53ef\u7528\u3002', fileAccessLoadedOnly: '\u6587\u4ef6\u8bbf\u95ee\u4e0d\u53ef\u7528\uff0c\u6240\u4ee5\u53ea\u80fd\u663e\u793a\u5df2\u52a0\u8f7d\u7684 mod\u3002', reloadHot: '\u652f\u6301\u70ed\u5f00\u5173\uff0c\u5f53\u524d\u4ecd\u5efa\u8bae reload', reloadRestart: '\u9700\u8981\u91cd\u542f', reloadRequired: '\u9700\u8981 reload', idPrefix: 'id\uff1a{value}', uniquePrefix: '\u552f\u4e00\u7801\uff1a{value}', depsPrefix: '\u4f9d\u8d56\uff1a{value}', conflictsPrefix: '\u51b2\u7a81\uff1a{value}', missingDependencies: '\u7f3a\u5c11\u4f9d\u8d56\uff1a{value}', conflictsEnabled: '\u5df2\u542f\u7528\u51b2\u7a81\uff1a{value}', savedReloading: '\u5df2\u4fdd\u5b58\uff0c\u6b63\u5728 reload...', saveFailed: '\u4fdd\u5b58\u5931\u8d25\uff1a{value}', configSaved: '\u914d\u7f6e\u5df2\u4fdd\u5b58\u3002', noChanges: '\u6ca1\u6709\u9700\u8981\u4fdd\u5b58\u7684\u6539\u52a8\u3002', changesCanceled: '\u5df2\u53d6\u6d88\u672a\u4fdd\u5b58\u7684\u6539\u52a8\u3002', openFolderFailed: '\u65e0\u6cd5\u6253\u5f00\u6587\u4ef6\u5939\uff1a{value}', deleteTitle: '\u5220\u9664 Mod\uff1f', deleteMessage: '\u4ece mods \u6587\u4ef6\u5939\u5220\u9664 {name}\uff1f\u8fd9\u4e2a\u64cd\u4f5c\u4e0d\u80fd\u64a4\u9500\u3002', deleteConfirm: '\u5220\u9664', cancel: '\u53d6\u6d88', replaceTitle: '\u66ff\u6362 Mod\uff1f', replaceMessage: 'mods \u91cc\u5df2\u7ecf\u6709 {name}\u3002\u662f\u5426\u7528\u5bfc\u5165\u7684 mod \u66ff\u6362\u5b83\uff1f', replaceConfirm: '\u66ff\u6362', deletedMod: '\u5df2\u5220\u9664 {name}\u3002\u5df2\u7ecf\u8fd0\u884c\u7684\u4ee3\u7801\u9700\u8981 reload \u624d\u4f1a\u5378\u8f7d\u3002', deleteFailed: '\u5220\u9664\u5931\u8d25\uff1a{value}', importHint: '\u628a\u6587\u4ef6\u62d6\u5230\u8fd9\u91cc\u6216\u590d\u5236', importDetail: '\u53ef\u4ee5\u628a mod zip \u5305\u76f4\u63a5\u62d6\u5165\uff0c\u6216\u8005\u590d\u5236 zip \u5305\u540e\u5728\u8fd9\u91cc\u6309\u7c98\u8d34\u5feb\u6377\u952e\uff0cModLoader \u4f1a\u81ea\u52a8\u89e3\u5305\u5230 mods \u6587\u4ef6\u5939\u3002', importWaiting: '\u7b49\u5f85 zip \u6587\u4ef6...', importNoZip: '\u8bf7\u62d6\u5165\u6216\u7c98\u8d34 .zip \u6587\u4ef6\u3002', importNoPath: '\u65e0\u6cd5\u8bfb\u53d6\u8be5\u6587\u4ef6\u8def\u5f84\u3002', importing: '\u6b63\u5728\u5bfc\u5165 {name}...', importedMod: '\u5df2\u5bfc\u5165 {name}\u3002\u9700\u8981\u65f6\u52fe\u9009\u5b83\u5e76\u4fdd\u5b58 reload\u3002', importFailed: '\u5bfc\u5165\u5931\u8d25\uff1a{value}', importModeOff: '\u8fd4\u56de mod \u5217\u8868', invalidZip: '\u53ea\u80fd\u5bfc\u5165 .zip mod \u5305\u3002', zipNoMod: '\u8fd9\u4e2a zip \u5185\u6ca1\u6709 mod.json\u3002', zipMultipleMods: '\u8fd9\u4e2a zip \u5305\u542b\u591a\u4e2a mod \u6587\u4ef6\u5939\uff1b\u8bf7\u4e00\u6b21\u5bfc\u5165\u4e00\u4e2a mod\u3002', zipExtractFailed: '\u65e0\u6cd5\u89e3\u538b zip\uff1a{value}', folderOpened: '\u5df2\u6253\u5f00 mods \u6587\u4ef6\u5939\u3002', replaceRenamedUniqueTitle: '\u53d1\u73b0\u540c\u552f\u4e00\u7801 Mod', replaceRenamedUniqueMessage: '\u65b0\u6587\u4ef6\u8ddf\u5df2\u6709\u6587\u4ef6\u6709\u76f8\u540c\u7684 mod \u552f\u4e00\u7801\uff0c\u5b83\u5f88\u53ef\u80fd\u662f\u65e7\u6587\u4ef6\u7684\u66f4\u65b0\u548c\u6539\u540d\u3002\n{oldName} \u2192 {newName}\n\u662f\u5426\u8986\u76d6\u65e7\u6587\u4ef6\uff1f', replaceRenamedPreviousTitle: '\u53d1\u73b0 Mod \u6539\u540d', replaceRenamedPreviousMessage: '\u8fd9\u4e2a\u65b0\u6587\u4ef6\u662f\u5df2\u6709\u6587\u4ef6\u7684\u6539\u540d\u3002\n{oldName} \u2192 {newName}\n\u662f\u5426\u8986\u76d6\u65e7\u6587\u4ef6\uff1f', replaceOld: '\u8986\u76d6', keepImported: '\u4e0d\u8986\u76d6\uff08\u52a0\u5165\u65b0\u6587\u4ef6\uff09', uniqueCodeEditTitle: '\u63a8\u8350\u4fee\u6539 mod \u552f\u4e00\u7801', uniqueCodeEditMessage: '\u8fd9\u4e24\u4e2a mod \u4f1a\u5171\u7528\u540c\u4e00\u4e2a mod \u552f\u4e00\u7801\u3002\u662f\u5426\u5728\u52a0\u5165\u65b0\u6587\u4ef6\u524d\u4fee\u6539\u5bfc\u5165 mod \u7684\u552f\u4e00\u7801\uff1f', uniqueCodeLabel: 'mod \u552f\u4e00\u7801', uniqueCodeConfirm: '\u786e\u8ba4\u4fee\u6539', uniqueCodeSkip: '\u5426\uff08\u4e0d\u4fee\u6539\uff09', manifestReadFailed: '\u65e0\u6cd5\u8bfb\u53d6 mod.json\uff1a{value}', translationFile: '\u7ffb\u8bd1', translationFileTitle: '\u6253\u5f00\u7ffb\u8bd1\u6587\u4ef6', translationFileSynced: '\u7ffb\u8bd1\u6587\u4ef6\u5df2\u540c\u6b65\uff1a{path}', translationFileFailed: '\u7ffb\u8bd1\u6587\u4ef6\u5931\u8d25\uff1a{value}'
 		}
 	}
 	PANEL_TEXT.modsch = PANEL_TEXT.sch
@@ -5439,13 +6264,21 @@
 			const renderApiRoutes = listRenderMethodRoutes()
 			const renderApiCreatedLayers = listCreatedRenderLayers().map(function (layer) { return layer.id })
 			const renderApiCallbacks = listRenderCallbacks()
+			const renderApiLayerDemanders = listRenderLayerDemandCallbacks()
 			const demandRow = panelRow(t('renderApiLayerDemands'), renderApiDemands.join(', ') || '-')
 			const createdLayersRow = panelRow(t('renderApiCreatedLayers'), renderApiCreatedLayers.join(', ') || '-')
 			const callbacksRow = panelRow(t('renderApiCallbacks'), renderApiCallbacks.filter(function (entry) { return entry.active }).length + ' / ' + renderApiCallbacks.length)
+			const demandersRow = panelRow(t('renderApiLayerDemanders'), renderApiLayerDemanders.filter(function (entry) { return entry.active }).length + ' / ' + renderApiLayerDemanders.length)
 			const routesRow = panelRow(t('renderApiMethodRoutes'), renderApiRoutes.map(function (route) { return route.method + ' -> ' + route.layer }).join(', ') || '-')
+			const renderApiTiming = getRenderTimingSummary()
+			const renderApiTimingParts = []
+			if (renderApiTiming.renderloop) renderApiTimingParts.push('renderloop ' + renderApiTiming.renderloop.avgMs + 'ms')
+			for (const entry of renderApiTiming.topMethods.slice(0, 3)) renderApiTimingParts.push(entry.method + ' ' + entry.avgMs + 'ms')
+			const timingRow = panelRow(t('renderApiTiming'), renderApiTiming.enabled ? (renderApiTimingParts.join(', ') || '-') : t('renderApiOff'))
 			demandRow.classList.add('modloader-panel-row-wide')
 			createdLayersRow.classList.add('modloader-panel-row-wide')
 			routesRow.classList.add('modloader-panel-row-wide')
+			timingRow.classList.add('modloader-panel-row-wide')
 			summary.appendChild(panelRow(t('installedMods'), String(mods.length)))
 			summary.appendChild(panelRow(t('enabledEntries'), String(state.enabledEntries.length)))
 			summary.appendChild(panelRow(t('loadedMods'), String(state.mods.length)))
@@ -5458,7 +6291,9 @@
 			summary.appendChild(demandRow)
 			summary.appendChild(createdLayersRow)
 			summary.appendChild(callbacksRow)
+			summary.appendChild(demandersRow)
 			summary.appendChild(routesRow)
+			summary.appendChild(timingRow)
 			panel.appendChild(summary)
 		}
 

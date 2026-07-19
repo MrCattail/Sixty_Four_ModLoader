@@ -39,6 +39,7 @@ ModLoader.register({
 		const resourceSourceUiDemandCallbackId = 'dynamic-details-resource-source-ui-demand'
 		const resourceSourceGpuLineDefaultOrder = 1
 		const resourceSourceGpuLineStackOrder = 45
+		const resourceSourceGpuCanvasLayoutSyncIntervalMs = 250
 		const resourceSourceWarmupKey = '_cattailDynamicResourceSourceWarmup'
 		const resourceSourceSuppressTransferKey = '_cattailDynamicResourceSourceSuppressTransfer'
 		const resourceSourceActiveCubeKey = '_cattailDynamicResourceSourceActiveCube'
@@ -81,8 +82,10 @@ ModLoader.register({
 		const resourceSourceLongTaskMinMs = 50
 		const resourceSourceProfilerSampleLimit = 12
 		const resourceSourceProfilerTraceLimit = 48
+		const resourceSourceProfilerMethodDefaultSampleLimit = 240
 		const resourceSourceImageCache = new Map()
 		const resourceSourceProfilerStats = new Map()
+		const resourceSourceProfilerMethodRecords = new Map()
 		const resourceSourceProfilerSamples = []
 		const resourceSourceProfilerTrace = []
 		const resourceSourceProfilerActiveStack = []
@@ -124,6 +127,8 @@ ModLoader.register({
 		let coordinateRenderApiRegistered = false
 		let resourceSourceRenderApiRegistered = false
 		let resourceSourceProfilerEnabled = false
+		let resourceSourceProfilerMethodSampleLimit = resourceSourceProfilerMethodDefaultSampleLimit
+		let resourceSourceProfilerRenderCycles = 0
 
 		const namespace = window.CattailDynamicDetails = window.CattailDynamicDetails || {}
 
@@ -2718,6 +2723,7 @@ ModLoader.register({
 
 			api.patch(Game.prototype, 'renderResources', function (original) {
 				return function (...args) {
+					if (resourceSourceProfilerEnabled) resourceSourceProfilerRenderCycles++
 					profileResourceSource('resource.warmup.schedule', () => scheduleResourceSourceWarmup(this), () => getResourceSourceProfileDetail(this, getResourceSourceFocusResourceId(this)))
 					profileResourceSource('resource.events.trim.render', () => trimResourceSourceEvents(getResourceSourceState(this), performance.now()), () => getResourceSourceProfileDetail(this, getResourceSourceFocusResourceId(this)))
 					if (isResourceSourceOverlayInactive(this)) {
@@ -2811,9 +2817,24 @@ ModLoader.register({
 			startResourceSourceLongTaskObserver()
 			if (resourceSourceProfilerEnabled) console.info('[Cattail Dynamic Details] Resource source profiler enabled. Press F8 to toggle.')
 			window.cattailResourceSourceProfiler = {
-				enable() { setResourceSourceProfilerEnabled(true) },
-				disable() { setResourceSourceProfilerEnabled(false) },
-				isEnabled() { return resourceSourceProfilerEnabled }
+				enable(options = {}) {
+					resourceSourceProfilerMethodSampleLimit = normalizeResourceSourceProfilerSampleLimit(options.samples || options.sampleLimit || resourceSourceProfilerMethodSampleLimit)
+					clearResourceSourceProfilerTables()
+					setResourceSourceProfilerEnabled(true)
+					return getResourceSourceProfilerSummary()
+				},
+				disable() {
+					setResourceSourceProfilerEnabled(false)
+					return getResourceSourceProfilerSummary()
+				},
+				clear() {
+					clearResourceSourceProfilerTables()
+					return getResourceSourceProfilerSummary()
+				},
+				isEnabled() { return resourceSourceProfilerEnabled },
+				summary() { return getResourceSourceProfilerSummary() },
+				renderApi(game = lastGame) { return getResourceSourceRenderApiStatus(game) },
+				methods(options = {}) { return listResourceSourceProfilerMethods(options) }
 			}
 			addEventListener('keydown', function (event) {
 				if (!isResourceSourceProfilerToggleEvent(event) || event.repeat) return
@@ -3000,9 +3021,145 @@ ModLoader.register({
 			} finally {
 				const duration = performance.now() - start
 				resourceSourceProfilerActiveStack.length = stackIndex
+				recordResourceSourceProfileMethod(label, duration)
 				rememberResourceSourceProfileTrace(label, 'end', { duration: Math.round(duration * 100) / 100 })
 				logResourceSourceProfile(label, duration, detail)
 			}
+		}
+
+		function recordResourceSourceProfileMethod(label, duration) {
+			const key = String(label || 'unknown')
+			let record = resourceSourceProfilerMethodRecords.get(key)
+			if (!record) {
+				record = { method: key, calls: 0, totalMs: 0, samples: [], lastMs: 0 }
+				resourceSourceProfilerMethodRecords.set(key, record)
+			}
+			const elapsed = Math.max(0, Number(duration) || 0)
+			record.calls++
+			record.totalMs += elapsed
+			record.samples.push(elapsed)
+			record.lastMs = elapsed
+			while (record.samples.length > resourceSourceProfilerMethodSampleLimit) record.totalMs -= record.samples.shift() || 0
+		}
+
+		function listResourceSourceProfilerMethods(options = {}) {
+			const rows = Array.from(resourceSourceProfilerMethodRecords.values()).map(describeResourceSourceProfilerMethod)
+			const sort = options.sort || 'perRender'
+			rows.sort(function (a, b) {
+				if (sort === 'avg') return (b.avgMs - a.avgMs) || String(a.method).localeCompare(String(b.method))
+				if (sort === 'total') return (b.totalMs - a.totalMs) || String(a.method).localeCompare(String(b.method))
+				if (sort === 'calls') return (b.calls - a.calls) || String(a.method).localeCompare(String(b.method))
+				return (b.avgPerRenderMs - a.avgPerRenderMs) || String(a.method).localeCompare(String(b.method))
+			})
+			return rows
+		}
+
+		function describeResourceSourceProfilerMethod(record) {
+			const samples = record.samples || []
+			let min = Infinity
+			let max = 0
+			for (const value of samples) {
+				if (value < min) min = value
+				if (value > max) max = value
+			}
+			const sampleCount = samples.length
+			const avgMs = sampleCount ? record.totalMs / sampleCount : 0
+			const callsPerRender = record.calls / Math.max(1, resourceSourceProfilerRenderCycles)
+			return {
+				method: record.method,
+				calls: record.calls,
+				callsPerRender: roundResourceSourceProfilerNumber(callsPerRender, 3),
+				sampleCount,
+				avgMs: roundResourceSourceProfilerMs(avgMs),
+				avgPerRenderMs: roundResourceSourceProfilerMs(avgMs * callsPerRender),
+				lastMs: roundResourceSourceProfilerMs(record.lastMs || 0),
+				maxMs: sampleCount ? roundResourceSourceProfilerMs(max) : 0,
+				minMs: sampleCount ? roundResourceSourceProfilerMs(min) : 0,
+				totalMs: roundResourceSourceProfilerMs(record.totalMs || 0)
+			}
+		}
+
+		function getResourceSourceProfilerSummary() {
+			return {
+				enabled: resourceSourceProfilerEnabled,
+				sampleLimit: resourceSourceProfilerMethodSampleLimit,
+				renderCycles: resourceSourceProfilerRenderCycles,
+				top: listResourceSourceProfilerMethods().slice(0, 8),
+				renderApi: getResourceSourceRenderApiStatus(lastGame),
+				lastSamples: resourceSourceProfilerSamples.slice(-resourceSourceProfilerSampleLimit),
+				lastTrace: resourceSourceProfilerTrace.slice(-16)
+			}
+		}
+
+		function clearResourceSourceProfilerTables() {
+			resourceSourceProfilerMethodRecords.clear()
+			resourceSourceProfilerStats.clear()
+			resourceSourceProfilerSamples.length = 0
+			resourceSourceProfilerTrace.length = 0
+			resourceSourceProfilerActiveStack.length = 0
+			resourceSourceProfilerRenderCycles = 0
+		}
+		function getResourceSourceRenderApiStatus(game = lastGame) {
+			const apiAvailable = !!(api.render && typeof api.render === 'object')
+			const apiEnabled = apiAvailable && (typeof api.render.isEnabled !== 'function' || api.render.isEnabled() !== false)
+			let featureEnabled = false
+			let overlayInactive = false
+			let shouldUse = false
+			let shouldDemand = false
+			let linkActive = false
+			let lineLocked = false
+			let toggleActive = false
+			let gpuCanvasVisible = false
+			let focusResource = null
+			let selectedResource = null
+			let lineResource = null
+			try { featureEnabled = isResourceSourceFeatureEnabled() } catch (error) {}
+			try { overlayInactive = isResourceSourceOverlayInactive(game) } catch (error) {}
+			try { shouldUse = shouldUseResourceSourceRenderApiLinks(game) } catch (error) {}
+			try { shouldDemand = shouldDemandResourceSourceRenderApiLinks(game) } catch (error) {}
+			try { linkActive = isResourceSourceLinkActive(game) } catch (error) {}
+			try { lineLocked = isResourceSourceLineLockActive(game) } catch (error) {}
+			try { toggleActive = isResourceSourceToggleActive(game) } catch (error) {}
+			try { gpuCanvasVisible = isResourceSourceGpuLineCanvasVisible(game) } catch (error) {}
+			try { focusResource = getResourceSourceFocusResourceId(game) } catch (error) {}
+			try { selectedResource = getResourceSourceSelectedResourceId(game) } catch (error) {}
+			try { lineResource = getResourceSourceLineResourceId(game) } catch (error) {}
+			return {
+				apiAvailable,
+				apiEnabled,
+				registered: !!resourceSourceRenderApiRegistered,
+				featureEnabled,
+				overlayInactive,
+				shouldUse,
+				shouldDemand,
+				linkActive,
+				lineLocked,
+				toggleActive,
+				gpuCanvasVisible,
+				hoveredResource: Number.isInteger(game?.hoveredResource) ? game.hoveredResource : null,
+				lastResource: Number.isInteger(game?.[resourceSourceLastResourceKey]) ? game[resourceSourceLastResourceKey] : null,
+				lineResource: Number.isInteger(lineResource) ? lineResource : null,
+				selectedResource: Number.isInteger(selectedResource) ? selectedResource : null,
+				focusResource: Number.isInteger(focusResource) ? focusResource : null,
+				layer: api.render?.describeLayer?.(resourceSourceRenderLayerId)
+			}
+		}
+
+		function normalizeResourceSourceProfilerSampleLimit(value) {
+			const parsed = Number(value)
+			if (!Number.isFinite(parsed)) return resourceSourceProfilerMethodDefaultSampleLimit
+			return Math.max(1, Math.min(5000, Math.floor(parsed)))
+		}
+
+		function roundResourceSourceProfilerMs(value) {
+			return Math.round((Number(value) || 0) * 1000) / 1000
+		}
+
+		function roundResourceSourceProfilerNumber(value, digits) {
+			const number = Number(value)
+			if (!Number.isFinite(number)) return 0
+			const scale = Math.pow(10, digits)
+			return Math.round(number * scale) / scale
 		}
 
 		function logResourceSourceProfile(label, duration, detail) {
@@ -3555,9 +3712,18 @@ ModLoader.register({
 			)
 			const compositeGpuToCanvas = options.compositeGpuToCanvas === true && !!ctx
 			if (isResourceSourceGpuLineModeActive(game)) {
+				if (compositeGpuToCanvas) {
+					clearResourceSourceGpuLines(game)
+					profileResourceSource(
+						'resource.links.canvas.webglFallback',
+						() => drawResourceSourceLinkSegments(game, segments, ctx),
+						() => getResourceSourceProfileDetail(game, resourceId, { segments: segments.length })
+					)
+					return
+				}
 				profileResourceSource(
 					'resource.links.webgl.render',
-					() => renderResourceSourceGpuLines(game, segments, compositeGpuToCanvas ? { compositeCtx: ctx } : null),
+					() => renderResourceSourceGpuLines(game, segments, null),
 					() => getResourceSourceProfileDetail(game, resourceId, { segments: segments.length })
 				)
 				return
@@ -3629,15 +3795,23 @@ ModLoader.register({
 				drawResourceSourceLinkSegments(game, segments, compositeCtx || game?.ctx)
 				return
 			}
-			syncResourceSourceGpuCanvas(renderer, game, { visible: !compositeCtx })
+			profileResourceSource('resource.links.webgl.sync', () => syncResourceSourceGpuCanvas(renderer, game, { visible: !compositeCtx }), () => ({ segments: segments.length }))
+			if (!segments.length) {
+				clearResourceSourceGpuRenderer(renderer)
+				renderer.canvas.style.display = 'none'
+				return
+			}
+
+			const signature = profileResourceSource('resource.links.webgl.signature', () => getResourceSourceGpuRenderSignature(game, renderer, segments), () => ({ segments: segments.length }))
+			if (renderer._cattailResourceSourceGpuSignature === signature && renderer._cattailResourceSourceGpuHasContent) {
+				if (compositeCtx) profileResourceSource('resource.links.webgl.composite', () => compositeResourceSourceGpuCanvas(renderer, compositeCtx), () => ({ segments: segments.length, cached: true }))
+				return
+			}
+
 			const gl = renderer.gl
 			gl.viewport(0, 0, renderer.canvas.width, renderer.canvas.height)
 			gl.clearColor(0, 0, 0, 0)
 			gl.clear(gl.COLOR_BUFFER_BIT)
-			if (!segments.length) {
-				if (compositeCtx) renderer.canvas.style.display = 'none'
-				return
-			}
 
 			const lineData = profileResourceSource('resource.links.webgl.data', () => buildResourceSourceGpuLineData(game, segments), () => ({ segments: segments.length }))
 			gl.bindBuffer(gl.ARRAY_BUFFER, renderer.lineBuffer)
@@ -3656,7 +3830,63 @@ ModLoader.register({
 			gl.uniform1f(renderer.pointUniforms.size, Math.max(4, (game.unit || 1) * 0.09))
 			bindResourceSourceGpuPointAttributes(gl, renderer.pointProgram, renderer.lineBuffer)
 			gl.drawArraysInstanced(gl.POINTS, 0, 1, segments.length)
-			if (compositeCtx) compositeResourceSourceGpuCanvas(renderer, compositeCtx)
+			renderer._cattailResourceSourceGpuSignature = signature
+			renderer._cattailResourceSourceGpuHasContent = true
+			renderer._cattailResourceSourceGpuNeedsFlush = true
+			renderer._cattailResourceSourceGpuCompositeBounds = getResourceSourceGpuCompositeBounds(game, renderer, segments)
+			renderer._cattailResourceSourceGpuCompositeCacheReady = false
+			if (compositeCtx) profileResourceSource('resource.links.webgl.composite', () => compositeResourceSourceGpuCanvas(renderer, compositeCtx), () => ({ segments: segments.length, cached: false }))
+		}
+
+		function getResourceSourceGpuRenderSignature(game, renderer, segments) {
+			const parts = [renderer.canvas.width, renderer.canvas.height, roundResourceSourceGpuSignatureNumber(game?.unit || 1), segments.length]
+			for (const segment of segments) {
+				parts.push(
+					roundResourceSourceGpuSignatureNumber(segment.source?.[0]),
+					roundResourceSourceGpuSignatureNumber(segment.source?.[1]),
+					roundResourceSourceGpuSignatureNumber(segment.target?.[0]),
+					roundResourceSourceGpuSignatureNumber(segment.target?.[1]),
+					String(segment.color || '')
+				)
+			}
+			return parts.join('|')
+		}
+
+		function roundResourceSourceGpuSignatureNumber(value) {
+			return Math.round((Number(value) || 0) * 100) / 100
+		}
+		function getResourceSourceGpuCompositeBounds(game, renderer, segments) {
+			if (!renderer?.canvas || !Array.isArray(segments) || !segments.length) return null
+			const unit = Number(game?.unit) || 1
+			const pad = Math.ceil(Math.max(8, unit * 0.18))
+			let minX = Infinity
+			let minY = Infinity
+			let maxX = -Infinity
+			let maxY = -Infinity
+			for (const segment of segments) {
+				const source = segment?.source
+				const target = segment?.target
+				if (!Array.isArray(source) || !Array.isArray(target)) continue
+				const sx = Number(source[0]) || 0
+				const sy = Number(source[1]) || 0
+				const tx = Number(target[0]) || 0
+				const ty = Number(target[1]) || 0
+				const bend = Math.max(unit, Math.abs(ty - sy) * 0.28)
+				minX = Math.min(minX, sx, tx)
+				maxX = Math.max(maxX, sx, tx)
+				minY = Math.min(minY, sy, sy - bend, ty, ty + bend)
+				maxY = Math.max(maxY, sy, sy - bend, ty, ty + bend)
+			}
+			if (!Number.isFinite(minX) || !Number.isFinite(minY) || !Number.isFinite(maxX) || !Number.isFinite(maxY)) return null
+			const canvasWidth = renderer.canvas.width || 0
+			const canvasHeight = renderer.canvas.height || 0
+			const x = Math.max(0, Math.floor(minX - pad))
+			const y = Math.max(0, Math.floor(minY - pad))
+			const right = Math.min(canvasWidth, Math.ceil(maxX + pad))
+			const bottom = Math.min(canvasHeight, Math.ceil(maxY + pad))
+			const width = Math.max(0, right - x)
+			const height = Math.max(0, bottom - y)
+			return width > 0 && height > 0 ? { x, y, width, height } : null
 		}
 
 		function buildResourceSourceGpuLineData(game, segments) {
@@ -3723,28 +3953,90 @@ ModLoader.register({
 
 		function syncResourceSourceGpuCanvas(renderer, game, options = {}) {
 			const visible = options.visible !== false
-			if (renderer.canvas.width !== game.w) renderer.canvas.width = game.w
-			if (renderer.canvas.height !== game.h) renderer.canvas.height = game.h
+			const canvas = renderer.canvas
+			let layoutDirty = options.forceLayout === true
+			const width = Math.max(0, Number(game?.w) || 0)
+			const height = Math.max(0, Number(game?.h) || 0)
+			if (canvas.width !== width) {
+				canvas.width = width
+				layoutDirty = true
+			}
+			if (canvas.height !== height) {
+				canvas.height = height
+				layoutDirty = true
+			}
 			const renderOrder = getResourceSourceGpuLineRenderOrder(game)
-			renderer.canvas.dataset.modloaderRenderOrder = String(renderOrder)
-			renderer.canvas.style.display = visible ? 'block' : 'none'
-			renderer.canvas.style.zIndex = String(renderOrder)
+			if (renderer._cattailResourceSourceGpuRenderOrder !== renderOrder) {
+				canvas.dataset.modloaderRenderOrder = String(renderOrder)
+				canvas.style.zIndex = String(renderOrder)
+				renderer._cattailResourceSourceGpuRenderOrder = renderOrder
+				layoutDirty = true
+			}
+			const display = visible ? 'block' : 'none'
+			if (canvas.style.display !== display) {
+				canvas.style.display = display
+				layoutDirty = true
+			}
 			if (!visible) return
+
+			const viewportWidth = typeof window !== 'undefined' ? window.innerWidth : 0
+			const viewportHeight = typeof window !== 'undefined' ? window.innerHeight : 0
+			if (renderer._cattailResourceSourceGpuViewportWidth !== viewportWidth || renderer._cattailResourceSourceGpuViewportHeight !== viewportHeight) {
+				renderer._cattailResourceSourceGpuViewportWidth = viewportWidth
+				renderer._cattailResourceSourceGpuViewportHeight = viewportHeight
+				layoutDirty = true
+			}
+			const now = performance.now()
+			if (!layoutDirty && renderer._cattailResourceSourceGpuNextLayoutSyncAt > now) return
 			const rect = game.canvas.getBoundingClientRect()
-			renderer.canvas.style.left = rect.left + 'px'
-			renderer.canvas.style.top = rect.top + 'px'
-			renderer.canvas.style.width = rect.width + 'px'
-			renderer.canvas.style.height = rect.height + 'px'
+			setResourceSourceGpuCanvasStyleIfChanged(canvas, 'left', rect.left + 'px')
+			setResourceSourceGpuCanvasStyleIfChanged(canvas, 'top', rect.top + 'px')
+			setResourceSourceGpuCanvasStyleIfChanged(canvas, 'width', rect.width + 'px')
+			setResourceSourceGpuCanvasStyleIfChanged(canvas, 'height', rect.height + 'px')
+			renderer._cattailResourceSourceGpuNextLayoutSyncAt = now + resourceSourceGpuCanvasLayoutSyncIntervalMs
+		}
+
+		function setResourceSourceGpuCanvasStyleIfChanged(canvas, name, value) {
+			if (canvas.style[name] !== value) canvas.style[name] = value
 		}
 
 		function compositeResourceSourceGpuCanvas(renderer, ctx) {
 			if (!renderer?.canvas || !ctx) return
-			if (renderer.gl?.flush) renderer.gl.flush()
-			ctx.save()
-			ctx.globalAlpha = 1
-			ctx.drawImage(renderer.canvas, 0, 0)
-			ctx.restore()
+			const cached = !renderer._cattailResourceSourceGpuNeedsFlush
+			if (renderer._cattailResourceSourceGpuNeedsFlush && renderer.gl?.flush) {
+				profileResourceSource('resource.links.webgl.flush', () => renderer.gl.flush(), () => ({ cached: false }))
+			}
+			renderer._cattailResourceSourceGpuNeedsFlush = false
+			const cache = profileResourceSource('resource.links.webgl.composite.cache', () => getResourceSourceGpuCompositeCache(renderer), () => ({ cached }))
+			profileResourceSource('resource.links.webgl.composite.drawImage', () => {
+				ctx.save()
+				ctx.globalAlpha = 1
+				if (cache?.canvas && cache.bounds) {
+					ctx.drawImage(cache.canvas, cache.bounds.x, cache.bounds.y)
+				} else {
+					ctx.drawImage(renderer.canvas, 0, 0)
+				}
+				ctx.restore()
+			}, () => ({ cached, cropped: !!cache?.canvas }))
 			renderer.canvas.style.display = 'none'
+		}
+
+		function getResourceSourceGpuCompositeCache(renderer) {
+			const bounds = renderer?._cattailResourceSourceGpuCompositeBounds
+			if (!renderer?.canvas || !bounds || bounds.width <= 0 || bounds.height <= 0) return null
+			if (renderer._cattailResourceSourceGpuCompositeCacheReady && renderer._cattailResourceSourceGpuCompositeCanvas) {
+				return { canvas: renderer._cattailResourceSourceGpuCompositeCanvas, bounds }
+			}
+			const canvas = renderer._cattailResourceSourceGpuCompositeCanvas || document.createElement('canvas')
+			if (canvas.width !== bounds.width) canvas.width = bounds.width
+			if (canvas.height !== bounds.height) canvas.height = bounds.height
+			const ctx = canvas.getContext('2d')
+			if (!ctx) return null
+			ctx.clearRect(0, 0, bounds.width, bounds.height)
+			ctx.drawImage(renderer.canvas, bounds.x, bounds.y, bounds.width, bounds.height, 0, 0, bounds.width, bounds.height)
+			renderer._cattailResourceSourceGpuCompositeCanvas = canvas
+			renderer._cattailResourceSourceGpuCompositeCacheReady = true
+			return { canvas, bounds }
 		}
 
 		function getResourceSourceGpuLineRenderOrder(game) {
@@ -3754,10 +4046,20 @@ ModLoader.register({
 		function clearResourceSourceGpuLines(game) {
 			const renderer = game?.[resourceSourceGpuRendererKey]
 			if (!renderer?.gl) return
+			if (renderer._cattailResourceSourceGpuHasContent || renderer.canvas.style.display !== 'none') clearResourceSourceGpuRenderer(renderer)
+			renderer.canvas.style.display = 'none'
+		}
+
+		function clearResourceSourceGpuRenderer(renderer) {
+			if (!renderer?.gl) return
 			renderer.gl.viewport(0, 0, renderer.canvas.width, renderer.canvas.height)
 			renderer.gl.clearColor(0, 0, 0, 0)
 			renderer.gl.clear(renderer.gl.COLOR_BUFFER_BIT)
-			renderer.canvas.style.display = 'none'
+			renderer._cattailResourceSourceGpuSignature = ''
+			renderer._cattailResourceSourceGpuHasContent = false
+			renderer._cattailResourceSourceGpuNeedsFlush = false
+			renderer._cattailResourceSourceGpuCompositeBounds = null
+			renderer._cattailResourceSourceGpuCompositeCacheReady = false
 		}
 
 		function isResourceSourceEndingActive(game) {
@@ -4595,7 +4897,7 @@ ModLoader.register({
 
 		function getResourceSourceShopImage(game, name) {
 			const entityData = game?.codex?.entities?.[name]
-			const src = entityData?.shopImage || ('img/shop/' + name + '.jpg')
+			const src = getResourceSourceShopImageSrc(entityData, name)
 			const resolved = window.ModLoader?.resolveAsset(src) || src
 			let img = resourceSourceImageCache.get(resolved)
 			if (!img) {
@@ -4613,6 +4915,12 @@ ModLoader.register({
 			}
 			markResourceSourceImageLoaded(img)
 			return img
+		}
+
+		function getResourceSourceShopImageSrc(entityData, name) {
+			if (entityData?.shopImage) return entityData.shopImage
+			if (name === 'cookie') return 'img/cookie.png'
+			return 'img/shop/' + name + '.jpg'
 		}
 
 		function markResourceSourceImageLoaded(img) {
