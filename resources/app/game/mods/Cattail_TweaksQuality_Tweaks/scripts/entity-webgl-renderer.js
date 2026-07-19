@@ -8,6 +8,8 @@
 	const maxPreviewLimit = 500
 	const maxSampleLimit = 5000
 	const replayBatchQuadLimit = 4096
+	const defaultStaticAtlasPageSize = 2048
+	const staticAtlasPadding = 1
 	const sourceIds = new WeakMap()
 	const targetIds = new WeakMap()
 	const sourceTotals = new Map()
@@ -31,6 +33,8 @@
 	let replayOpacity = 0.55
 	let replayRenderer = null
 	let replayFrameId = 0
+	let replayStaticAtlasEnabled = true
+	let replayStaticAtlasPageSize = defaultStaticAtlasPageSize
 
 	const stats = {
 		frames: 0,
@@ -64,6 +68,7 @@
 		textureUploads: 0,
 		staticUploads: 0,
 		dynamicUploads: 0,
+		atlasUploads: 0,
 		barriers: 0,
 		segments: 0,
 		skippedCommands: 0,
@@ -238,6 +243,14 @@
 	function applyRuntimeOptions(options) {
 		previewLimit = normalizeLimit(options.preview || options.previewLimit, previewLimit, maxPreviewLimit)
 		sampleLimit = normalizeLimit(options.samples || options.sampleLimit, sampleLimit, maxSampleLimit)
+		const previousAtlasEnabled = replayStaticAtlasEnabled
+		const previousAtlasPageSize = replayStaticAtlasPageSize
+		if (Object.prototype.hasOwnProperty.call(options, 'staticAtlas')) replayStaticAtlasEnabled = options.staticAtlas !== false
+		if (Object.prototype.hasOwnProperty.call(options, 'atlas')) replayStaticAtlasEnabled = options.atlas !== false
+		if (Object.prototype.hasOwnProperty.call(options, 'atlasSize') || Object.prototype.hasOwnProperty.call(options, 'staticAtlasSize')) {
+			replayStaticAtlasPageSize = normalizeAtlasPageSize(options.atlasSize || options.staticAtlasSize)
+		}
+		if (replayRenderer && (previousAtlasEnabled !== replayStaticAtlasEnabled || previousAtlasPageSize !== replayStaticAtlasPageSize)) destroyReplayRenderer()
 	}
 
 	function createFrame(game) {
@@ -787,6 +800,7 @@
 			textureUploads: 0,
 			staticUploads: 0,
 			dynamicUploads: 0,
+			atlasUploads: 0,
 			barriers: 0,
 			segments: 0,
 			skippedCommands: 0,
@@ -802,6 +816,7 @@
 			const renderer = getReplayRenderer(frame.replayTarget)
 			syncReplayRenderer(renderer, frame.replayTarget)
 			if (renderer.contextLost) throw new Error('webgl-context-lost')
+			prepareReplayStaticAtlas(renderer, frame)
 			report.canvasSize = { width: renderer.canvas.width, height: renderer.canvas.height }
 			beginReplayFrame(renderer)
 			let segmentOpen = false
@@ -847,6 +862,7 @@
 		replayStats.textureUploads += report.textureUploads
 		replayStats.staticUploads += report.staticUploads
 		replayStats.dynamicUploads += report.dynamicUploads
+		replayStats.atlasUploads += report.atlasUploads
 		replayStats.barriers += report.barriers
 		replayStats.segments += report.segments
 		replayStats.skippedCommands += report.skippedCommands
@@ -864,6 +880,7 @@
 			drawCalls: report.drawCalls,
 			textureBinds: report.textureBinds,
 			textureUploads: report.textureUploads,
+			atlasUploads: report.atlasUploads,
 			barriers: report.barriers,
 			segments: report.segments,
 			skippedCommands: report.skippedCommands,
@@ -976,13 +993,28 @@
 			textureLocation,
 			textureEntries: new WeakMap(),
 			whiteEntry: null,
+			ownedTextures: new Set(),
+			staticAtlasEnabled: replayStaticAtlasEnabled && typeof gl.texSubImage2D === 'function',
+			staticAtlasPageSize: resolveReplayAtlasPageSize(gl),
+			staticAtlasPadding,
+			staticAtlasPages: [],
+			staticAtlasEntries: 0,
+			staticAtlasFallbackEntries: 0,
 			boundTexture: null,
 			batchEntry: null,
 			batchSmoothing: null,
 			batchQuads: 0,
 			contextLost: false
 		}
-		renderer.whiteEntry = createReplayWhiteTexture(renderer)
+		if (renderer.staticAtlasEnabled) {
+			try {
+				renderer.whiteEntry = createReplayAtlasWhiteEntry(renderer)
+			} catch (error) {
+				destroyReplayAtlasPages(renderer)
+				renderer.staticAtlasEnabled = false
+			}
+		}
+		if (!renderer.whiteEntry) renderer.whiteEntry = createReplayWhiteTexture(renderer)
 		return renderer
 	}
 
@@ -1024,17 +1056,139 @@
 		gl.vertexAttribPointer(location, size, gl.FLOAT, false, stride, offset)
 	}
 
+	function resolveReplayAtlasPageSize(gl) {
+		let size = normalizeAtlasPageSize(replayStaticAtlasPageSize)
+		try {
+			const maximum = Number(gl?.getParameter?.(gl.MAX_TEXTURE_SIZE))
+			if (Number.isFinite(maximum) && maximum > 0) size = Math.min(size, Math.floor(maximum))
+		} catch (error) {}
+		return Math.max(1, size)
+	}
+
+	function prepareReplayStaticAtlas(renderer, frame) {
+		if (!renderer?.staticAtlasEnabled || !frame?.replayCommands || !frame.sourceRefs) return
+		const seen = new Set()
+		for (const command of frame.replayCommands) {
+			if (!command?.supported || command.type !== 'drawImage') continue
+			const source = frame.sourceRefs.get(command.sourceKey)
+			if (!source || seen.has(source) || isDynamicReplaySource(source)) continue
+			seen.add(source)
+			getReplayTextureEntry(renderer, source)
+		}
+	}
+
+	function createReplayAtlasWhiteEntry(renderer) {
+		const entry = createReplayStaticAtlasEntry(renderer, null, [1, 1], true)
+		if (!entry?.atlasPage) throw new Error('webgl-atlas-white-allocation-failed')
+		const gl = renderer.gl
+		gl.bindTexture(gl.TEXTURE_2D, entry.atlasPage.texture)
+		gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false)
+		gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false)
+		gl.texSubImage2D(gl.TEXTURE_2D, 0, entry.x, entry.y, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([255, 255, 255, 255]))
+		entry.uploaded = true
+		return entry
+	}
+
+	function createReplayStaticAtlasEntry(renderer, source, size, white = false) {
+		const width = Math.max(1, Math.floor(Number(size?.[0]) || 0))
+		const height = Math.max(1, Math.floor(Number(size?.[1]) || 0))
+		const region = allocateReplayAtlasRegion(renderer, width, height)
+		if (!region) return null
+		if (!white) renderer.staticAtlasEntries++
+		return {
+			source,
+			width,
+			height,
+			dynamic: false,
+			uploaded: false,
+			lastUploadFrame: -1,
+			white,
+			atlas: true,
+			atlasPage: region.page,
+			x: region.x,
+			y: region.y
+		}
+	}
+
+	function allocateReplayAtlasRegion(renderer, width, height) {
+		for (const page of renderer.staticAtlasPages) {
+			const region = tryAllocateReplayAtlasRegion(page, width, height, renderer.staticAtlasPadding)
+			if (region) return region
+		}
+		if (width + renderer.staticAtlasPadding * 2 > renderer.staticAtlasPageSize ||
+			height + renderer.staticAtlasPadding * 2 > renderer.staticAtlasPageSize) return null
+		const page = createReplayAtlasPage(renderer)
+		return tryAllocateReplayAtlasRegion(page, width, height, renderer.staticAtlasPadding)
+	}
+
+	function tryAllocateReplayAtlasRegion(page, width, height, padding) {
+		const outerWidth = width + padding * 2
+		const outerHeight = height + padding * 2
+		let x = page.cursorX
+		let y = page.cursorY
+		if (x + outerWidth > page.width - padding) {
+			x = padding
+			y += page.rowHeight
+			page.cursorX = x
+			page.cursorY = y
+			page.rowHeight = 0
+		}
+		if (y + outerHeight > page.height - padding) return null
+		page.cursorX = x + outerWidth
+		page.rowHeight = Math.max(page.rowHeight, outerHeight)
+		page.usedPixels += outerWidth * outerHeight
+		page.entries++
+		return { page, x: x + padding, y: y + padding }
+	}
+
+	function createReplayAtlasPage(renderer) {
+		const gl = renderer.gl
+		const texture = gl.createTexture()
+		if (!texture) throw new Error('webgl-atlas-texture-create-failed')
+		renderer.ownedTextures.add(texture)
+		gl.bindTexture(gl.TEXTURE_2D, texture)
+		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE)
+		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE)
+		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST)
+		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST)
+		gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, renderer.staticAtlasPageSize, renderer.staticAtlasPageSize, 0, gl.RGBA, gl.UNSIGNED_BYTE, null)
+		const page = {
+			texture,
+			width: renderer.staticAtlasPageSize,
+			height: renderer.staticAtlasPageSize,
+			smoothing: false,
+			cursorX: renderer.staticAtlasPadding,
+			cursorY: renderer.staticAtlasPadding,
+			rowHeight: 0,
+			usedPixels: 0,
+			entries: 0,
+			atlasPage: true
+		}
+		renderer.staticAtlasPages.push(page)
+		return page
+	}
+
+	function destroyReplayAtlasPages(renderer) {
+		if (!renderer?.staticAtlasPages) return
+		for (const page of renderer.staticAtlasPages) {
+			try { renderer.gl.deleteTexture(page.texture) } catch (error) {}
+			renderer.ownedTextures?.delete(page.texture)
+		}
+		renderer.staticAtlasPages.length = 0
+	}
+
 	function createReplayWhiteTexture(renderer) {
 		const gl = renderer.gl
 		const texture = gl.createTexture()
 		if (!texture) throw new Error('webgl-white-texture-create-failed')
+		renderer.ownedTextures.add(texture)
 		gl.bindTexture(gl.TEXTURE_2D, texture)
 		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE)
 		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE)
 		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST)
 		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST)
 		gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([255, 255, 255, 255]))
-		return { texture, width: 1, height: 1, dynamic: false, uploaded: true, smoothing: false, lastUploadFrame: -1, white: true }
+		return { texture, width: 1, height: 1, dynamic: false, uploaded: true, smoothing: false, lastUploadFrame: -1, white: true, atlas: false }
 	}
 
 	function syncReplayRenderer(renderer, targetCanvas) {
@@ -1089,15 +1243,13 @@
 		]
 		if (!positions.every(Boolean)) return false
 		const sourceRect = clipped.source
-		const u0 = sourceRect[0] / size[0]
-		const v0 = sourceRect[1] / size[1]
-		const u1 = (sourceRect[0] + sourceRect[2]) / size[0]
-		const v1 = (sourceRect[1] + sourceRect[3]) / size[1]
-		const uvs = [[u0, v0], [u1, v0], [u1, v1], [u0, v1]]
+		const smoothing = command.smoothing !== false
 		const entry = getReplayTextureEntry(renderer, source)
+		const uvs = getReplayTextureUvs(entry, sourceRect, size, smoothing)
+		if (!uvs) return false
 		const alpha = Number(command.alpha)
 		const color = [1, 1, 1, Number.isFinite(alpha) ? alpha : 1]
-		return appendReplayQuad(renderer, entry, command.smoothing !== false, positions, uvs, color, report)
+		return appendReplayQuad(renderer, entry, smoothing, positions, uvs, color, report)
 	}
 
 	function appendReplayPolygon(renderer, command, report) {
@@ -1110,8 +1262,38 @@
 		})
 		if (!positions.every(Boolean)) return false
 		const color = parseReplayColor(command.fillStyle, command.alpha)
-		if (!color) return false
-		return appendReplayQuad(renderer, renderer.whiteEntry, false, positions, [[0, 0], [1, 0], [1, 1], [0, 1]], color, report)
+		const uvs = getReplayTextureUvs(renderer.whiteEntry, [0, 0, 1, 1], [1, 1], false)
+		if (!color || !uvs) return false
+		return appendReplayQuad(renderer, renderer.whiteEntry, false, positions, uvs, color, report)
+	}
+
+	function getReplayTextureUvs(entry, sourceRect, size, smoothing) {
+		if (!entry || !Array.isArray(sourceRect) || !Array.isArray(size)) return null
+		if (entry.atlas && entry.atlasPage) {
+			const page = entry.atlasPage
+			if (entry.white) {
+				const u = (entry.x + 0.5) / page.width
+				const v = (entry.y + 0.5) / page.height
+				return [[u, v], [u, v], [u, v], [u, v]]
+			}
+			const sx = Number(sourceRect[0])
+			const sy = Number(sourceRect[1])
+			const sw = Number(sourceRect[2])
+			const sh = Number(sourceRect[3])
+			if (![sx, sy, sw, sh].every(Number.isFinite)) return null
+			const insetX = smoothing ? Math.min(0.5, sw / 2) : 0
+			const insetY = smoothing ? Math.min(0.5, sh / 2) : 0
+			const u0 = (entry.x + sx + insetX) / page.width
+			const v0 = (entry.y + sy + insetY) / page.height
+			const u1 = (entry.x + sx + sw - insetX) / page.width
+			const v1 = (entry.y + sy + sh - insetY) / page.height
+			return [[u0, v0], [u1, v0], [u1, v1], [u0, v1]]
+		}
+		const u0 = sourceRect[0] / size[0]
+		const v0 = sourceRect[1] / size[1]
+		const u1 = (sourceRect[0] + sourceRect[2]) / size[0]
+		const v1 = (sourceRect[1] + sourceRect[3]) / size[1]
+		return [[u0, v0], [u1, v0], [u1, v1], [u0, v1]]
 	}
 
 	function normalizeReplayRects(sourceRect, destinationRect, size) {
@@ -1169,18 +1351,30 @@
 	function getReplayTextureEntry(renderer, source) {
 		let entry = renderer.textureEntries.get(source)
 		if (entry) return entry
+		const dynamic = isDynamicReplaySource(source)
+		const size = getSourceSize(source)
+		if (renderer.staticAtlasEnabled && !dynamic && size) {
+			entry = createReplayStaticAtlasEntry(renderer, source, size)
+			if (entry) {
+				renderer.textureEntries.set(source, entry)
+				return entry
+			}
+			renderer.staticAtlasFallbackEntries++
+		}
 		const texture = renderer.gl.createTexture()
 		if (!texture) return null
+		renderer.ownedTextures.add(texture)
 		entry = {
 			texture,
 			source,
 			width: 0,
 			height: 0,
-			dynamic: isDynamicReplaySource(source),
+			dynamic,
 			uploaded: false,
 			smoothing: null,
 			lastUploadFrame: -1,
-			white: false
+			white: false,
+			atlas: false
 		}
 		renderer.textureEntries.set(source, entry)
 		return entry
@@ -1193,11 +1387,12 @@
 
 	function appendReplayQuad(renderer, entry, smoothing, positions, uvs, color, report) {
 		if (!entry) return false
-		if (renderer.batchQuads && (renderer.batchEntry !== entry || renderer.batchSmoothing !== smoothing)) flushReplayBatch(renderer, report)
+		const batchEntry = entry.atlasPage || entry
+		if (renderer.batchQuads && (renderer.batchEntry !== batchEntry || renderer.batchSmoothing !== smoothing)) flushReplayBatch(renderer, report)
 		if (renderer.batchQuads >= replayBatchQuadLimit) flushReplayBatch(renderer, report)
+		if (!prepareReplayTexture(renderer, entry, smoothing, report)) return false
 		if (!renderer.batchQuads) {
-			if (!prepareReplayTexture(renderer, entry, smoothing, report)) return false
-			renderer.batchEntry = entry
+			renderer.batchEntry = batchEntry
 			renderer.batchSmoothing = smoothing
 		}
 		const base = renderer.batchQuads * 4 * renderer.floatsPerVertex
@@ -1219,9 +1414,10 @@
 
 	function prepareReplayTexture(renderer, entry, smoothing, report) {
 		const gl = renderer.gl
-		if (renderer.boundTexture !== entry.texture) {
-			gl.bindTexture(gl.TEXTURE_2D, entry.texture)
-			renderer.boundTexture = entry.texture
+		const resource = entry.atlasPage || entry
+		if (renderer.boundTexture !== resource.texture) {
+			gl.bindTexture(gl.TEXTURE_2D, resource.texture)
+			renderer.boundTexture = resource.texture
 			report.textureBinds++
 		}
 		if (!entry.white) {
@@ -1229,14 +1425,20 @@
 			if (!source) return false
 			const size = getSourceSize(source)
 			if (!size) return false
+			if (entry.atlas && (entry.width !== size[0] || entry.height !== size[1])) return false
 			const needsUpload = !entry.uploaded || entry.width !== size[0] || entry.height !== size[1] || (entry.dynamic && entry.lastUploadFrame !== replayFrameId)
 			if (needsUpload) {
 				try {
 					gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true)
 					gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false)
-					gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, source)
-					gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE)
-					gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE)
+					if (entry.atlas) {
+						gl.texSubImage2D(gl.TEXTURE_2D, 0, entry.x, entry.y, gl.RGBA, gl.UNSIGNED_BYTE, source)
+						report.atlasUploads++
+					} else {
+						gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, source)
+						gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE)
+						gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE)
+					}
 					entry.width = size[0]
 					entry.height = size[1]
 					entry.uploaded = true
@@ -1250,11 +1452,11 @@
 				}
 			}
 		}
-		if (entry.smoothing !== smoothing) {
+		if (resource.smoothing !== smoothing) {
 			const filter = smoothing ? gl.LINEAR : gl.NEAREST
 			gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, filter)
 			gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, filter)
-			entry.smoothing = smoothing
+			resource.smoothing = smoothing
 		}
 		return true
 	}
@@ -1306,7 +1508,7 @@
 		try {
 			const gl = renderer.gl
 			if (!renderer.contextLost) {
-				gl.deleteTexture(renderer.whiteEntry?.texture)
+				for (const texture of renderer.ownedTextures || []) gl.deleteTexture(texture)
 				gl.deleteBuffer(renderer.vertexBuffer)
 				gl.deleteBuffer(renderer.indexBuffer)
 				gl.deleteVertexArray(renderer.vao)
@@ -1331,6 +1533,7 @@
 			textureUploads: replayStats.textureUploads,
 			staticUploads: replayStats.staticUploads,
 			dynamicUploads: replayStats.dynamicUploads,
+			atlasUploads: replayStats.atlasUploads,
 			barriers: replayStats.barriers,
 			segments: replayStats.segments,
 			skippedCommands: replayStats.skippedCommands,
@@ -1345,6 +1548,7 @@
 			avgDrawCallsPerFrame: roundNumber(getReplaySampleAverage('drawCalls'), 3),
 			avgTextureBindsPerFrame: roundNumber(getReplaySampleAverage('textureBinds'), 3),
 			avgTextureUploadsPerFrame: roundNumber(getReplaySampleAverage('textureUploads'), 3),
+			avgAtlasUploadsPerFrame: roundNumber(getReplaySampleAverage('atlasUploads'), 3),
 			avgBarriersPerFrame: roundNumber(getReplaySampleAverage('barriers'), 3),
 			avgSegmentsPerFrame: roundNumber(getReplaySampleAverage('segments'), 3),
 			avgSkippedCommandsPerFrame: roundNumber(getReplaySampleAverage('skippedCommands'), 3),
@@ -1352,7 +1556,30 @@
 			lastReplayMs: roundMs(replayStats.lastReplayMs),
 			maxReplayMs: roundMs(replayStats.maxReplayMs),
 			lastError: replayStats.lastError,
-			lastCanvasSize: Object.assign({}, replayStats.lastCanvasSize)
+			lastCanvasSize: Object.assign({}, replayStats.lastCanvasSize),
+			staticAtlas: getReplayAtlasStats()
+		}
+	}
+
+	function getReplayAtlasStats() {
+		const renderer = replayRenderer
+		const pages = renderer?.staticAtlasPages || []
+		let usedPixels = 0
+		for (const page of pages) usedPixels += Number(page.usedPixels) || 0
+		const pageSize = renderer?.staticAtlasPageSize || normalizeAtlasPageSize(replayStaticAtlasPageSize)
+		const capacityPixels = pages.length * pageSize * pageSize
+		return {
+			configuredEnabled: replayStaticAtlasEnabled,
+			enabled: renderer ? renderer.staticAtlasEnabled : replayStaticAtlasEnabled,
+			pageSize,
+			padding: renderer?.staticAtlasPadding ?? staticAtlasPadding,
+			pages: pages.length,
+			entries: renderer?.staticAtlasEntries || 0,
+			fallbackEntries: renderer?.staticAtlasFallbackEntries || 0,
+			usedPixels,
+			capacityPixels,
+			utilization: capacityPixels ? roundNumber(usedPixels / capacityPixels, 4) : 0,
+			whiteInAtlas: !!renderer?.whiteEntry?.atlas
 		}
 	}
 
@@ -1364,7 +1591,7 @@
 	}
 
 	function resetReplayStats() {
-		for (const key of ['frames', 'commands', 'quads', 'drawCalls', 'textureBinds', 'textureUploads', 'staticUploads', 'dynamicUploads', 'barriers', 'segments', 'skippedCommands', 'skippedTargets', 'uploadErrors', 'errors', 'contextLosses', 'resizes', 'rendererCreates', 'replayMs', 'lastReplayMs', 'maxReplayMs']) replayStats[key] = 0
+		for (const key of ['frames', 'commands', 'quads', 'drawCalls', 'textureBinds', 'textureUploads', 'staticUploads', 'dynamicUploads', 'atlasUploads', 'barriers', 'segments', 'skippedCommands', 'skippedTargets', 'uploadErrors', 'errors', 'contextLosses', 'resizes', 'rendererCreates', 'replayMs', 'lastReplayMs', 'maxReplayMs']) replayStats[key] = 0
 		replayStats.lastError = ''
 		replayStats.lastCanvasSize = { width: 0, height: 0 }
 		replaySamples.length = 0
@@ -1485,6 +1712,12 @@
 
 	function getCoverage(supported, total) {
 		return total ? roundNumber(supported / total, 4) : 0
+	}
+
+	function normalizeAtlasPageSize(value) {
+		const number = Number(value)
+		if (!Number.isFinite(number)) return defaultStaticAtlasPageSize
+		return Math.max(256, Math.min(8192, Math.floor(number)))
 	}
 
 	function normalizeLimit(value, fallback, maximum) {
