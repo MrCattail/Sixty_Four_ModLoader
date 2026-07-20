@@ -379,6 +379,7 @@
 			pathStrokes: 0,
 			supportedPathStrokes: 0,
 			unsupportedPaints: 0,
+			unsupportedPaintDiagnostics: [],
 			adjacentBatches: 0,
 			atlasBatches: 0,
 			textureSwitches: 0,
@@ -652,8 +653,8 @@
 			recordTimed(frame, function () { recordPathStroke(frame, ctx, meta, args) })
 		}, restorers, frame)
 		for (const methodName of unsupportedPaintMethods) {
-			wrapped += wrapContextMethod(ctx, methodName, function () {
-				recordTimed(frame, function () { recordUnsupportedPaint(frame, ctx, methodName) })
+			wrapped += wrapContextMethod(ctx, methodName, function (args) {
+				recordTimed(frame, function () { recordUnsupportedPaint(frame, ctx, methodName, args) })
 			}, restorers, frame)
 		}
 		wrapped += wrapContextMethod(ctx, 'save', function () {
@@ -772,6 +773,7 @@
 		} else {
 			frame.unsupportedPaints++
 			incrementMap(frame.unsupportedCounts, command.reason || 'canvas-fill')
+			recordUnsupportedPaintDiagnostic(frame, ctx, command, args)
 			recordBarrier(frame)
 		}
 		pushReplayCommand(frame, command)
@@ -790,6 +792,7 @@
 		} else {
 			frame.unsupportedPaints++
 			incrementMap(frame.unsupportedCounts, command.reason || 'canvas-stroke')
+			recordUnsupportedPaintDiagnostic(frame, ctx, command, args)
 			recordBarrier(frame)
 		}
 		pushReplayCommand(frame, command)
@@ -1052,7 +1055,7 @@
 		}
 	}
 
-	function recordUnsupportedPaint(frame, ctx, methodName) {
+	function recordUnsupportedPaint(frame, ctx, methodName, args) {
 		frame.unsupportedPaints++
 		incrementMap(frame.operationCounts, methodName)
 		incrementMap(frame.unsupportedCounts, 'canvas-' + methodName)
@@ -1065,9 +1068,52 @@
 		}
 		incrementMap(frame.targetCounts, command.targetKey)
 		frame.targets.add(command.targetKey)
+		recordUnsupportedPaintDiagnostic(frame, ctx, command, args)
 		recordBarrier(frame)
 		pushReplayCommand(frame, command)
 		pushCommandPreview(frame, command)
+	}
+
+	function recordUnsupportedPaintDiagnostic(frame, ctx, command, args) {
+		if (!frame || !Array.isArray(frame.unsupportedPaintDiagnostics) || frame.unsupportedPaintDiagnostics.length >= 8) return
+		let stack = ''
+		try { stack = String(new Error().stack || '').split('\n').slice(2, 10).join('\n') } catch (error) {}
+		const alpha = Number(ctx?.globalAlpha)
+		frame.unsupportedPaintDiagnostics.push({
+			operation: String(command?.operation || ''),
+			reason: String(command?.reason || ''),
+			targetKey: String(command?.targetKey || getTargetKey(ctx)),
+			fillStyle: describeDiagnosticPaint(ctx?.fillStyle),
+			strokeStyle: describeDiagnosticPaint(ctx?.strokeStyle),
+			alpha: Number.isFinite(alpha) ? roundNumber(alpha, 4) : null,
+			composite: String(ctx?.globalCompositeOperation || ''),
+			filter: String(ctx?.filter || ''),
+			shadowActive: hasActiveShadow(ctx),
+			transform: getTransform(ctx),
+			args: summarizeDiagnosticArgs(args),
+			game: {
+				altActive: activeGame?.altActive === true,
+				plane: Number(activeGame?.plane) || 0,
+				hoveredEntity: String(activeGame?.hoveredEntity?.name || ''),
+				itemInHand: String(activeGame?.itemInHand?.name || '')
+			},
+			stack
+		})
+	}
+
+	function describeDiagnosticPaint(value) {
+		if (typeof value === 'string') return { kind: 'string', value }
+		if (value === null) return { kind: 'null', value: '' }
+		if (value === undefined) return { kind: 'undefined', value: '' }
+		return { kind: String(value?.constructor?.name || typeof value), value: '' }
+	}
+
+	function summarizeDiagnosticArgs(args) {
+		return Array.from(args || []).slice(0, 8).map(function (value) {
+			if (typeof value === 'number') return Number.isFinite(value) ? roundNumber(value, 4) : String(value)
+			if (typeof value === 'string' || typeof value === 'boolean' || value === null) return value
+			return '[' + String(value?.constructor?.name || typeof value) + ']'
+		})
 	}
 
 	function recordStateBarrier(frame, ctx, operation) {
@@ -1239,6 +1285,7 @@
 			pathStrokes: frame.pathStrokes,
 			supportedPathStrokes: frame.supportedPathStrokes,
 			unsupportedPaints: frame.unsupportedPaints,
+			unsupportedPaintDiagnostics: frame.unsupportedPaintDiagnostics.slice(),
 			quadCoverage: getCoverage(frame.supportedDrawImages + frame.supportedPolygonFills + frame.supportedPathStrokes, frame.drawImages + frame.supportedPolygonFills + frame.supportedPathStrokes + frame.unsupportedPaints),
 			adjacentBatches: frame.adjacentBatches,
 			atlasBatches: frame.atlasBatches,
