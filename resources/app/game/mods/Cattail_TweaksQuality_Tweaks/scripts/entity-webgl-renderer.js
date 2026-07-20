@@ -146,7 +146,6 @@
 		'putImageData'
 	]
 	const unsupportedPathMethods = [
-		'arc',
 		'arcTo',
 		'bezierCurveTo',
 		'ellipse',
@@ -647,6 +646,9 @@
 		wrapped += wrapContextMethod(ctx, 'lineTo', function (args) {
 			recordTimed(frame, function () { recordPathPoint(meta, ctx, 'lineTo', args) })
 		}, restorers, frame)
+		wrapped += wrapContextMethod(ctx, 'arc', function (args) {
+			recordTimed(frame, function () { recordPathArc(meta, ctx, args) })
+		}, restorers, frame)
 		wrapped += wrapContextMethod(ctx, 'closePath', function () {
 			recordTimed(frame, function () { recordPathClose(meta) })
 		}, restorers, frame)
@@ -796,8 +798,12 @@
 	}
 
 	function recordPathPoint(meta, ctx, operation, args) {
-		if (!meta.path) meta.path = { subpaths: [], current: null, unsupported: '' }
+		if (!meta.path) meta.path = { subpaths: [], current: null, circle: null, unsupported: '' }
 		if (meta.path.unsupported) return
+		if (meta.path.circle) {
+			meta.path.unsupported = 'path-mixed-circle'
+			return
+		}
 		const point = transformPathPoint(ctx, args?.[0], args?.[1])
 		if (!point) {
 			meta.path.unsupported = 'path-point'
@@ -818,16 +824,54 @@
 		meta.path.current.points.push(point)
 	}
 
+	function recordPathArc(meta, ctx, args) {
+		if (!meta.path) meta.path = { subpaths: [], current: null, circle: null, unsupported: '' }
+		if (meta.path.unsupported) return
+		if (meta.path.current || meta.path.subpaths.length || meta.path.circle) {
+			meta.path.unsupported = 'path-arc-subpaths'
+			return
+		}
+		const values = Array.from(args || []).slice(0, 5).map(Number)
+		const anticlockwise = !!args?.[5]
+		if (values.length !== 5 || !values.every(Number.isFinite) || values[2] <= 0) {
+			meta.path.unsupported = 'path-arc-arguments'
+			return
+		}
+		const sweep = Math.abs(values[4] - values[3])
+		if (sweep < Math.PI * 2 - 0.000001) {
+			meta.path.unsupported = 'path-arc-partial'
+			return
+		}
+		const transform = getTransform(ctx)
+		const scale = getUniformTransformScale(transform)
+		const center = transform && transformReplayPoint(transform, values[0], values[1])
+		const radius = values[2] * scale
+		if (!center || !Number.isFinite(radius) || radius <= 0) {
+			meta.path.unsupported = 'path-arc-transform'
+			return
+		}
+		meta.path.circle = {
+			center: center.map(function (value) { return roundNumber(value, 4) }),
+			radius: roundNumber(radius, 4),
+			anticlockwise,
+			closed: false
+		}
+	}
+
 	function recordPathClose(meta) {
+		if (meta.path?.circle) {
+			meta.path.circle.closed = true
+			return
+		}
 		if (!meta.path?.current) {
-			if (meta.path) meta.path.unsupported = 'path-close-without-subpath'
+			if (meta.path && !meta.path.unsupported) meta.path.unsupported = 'path-close-without-subpath'
 			return
 		}
 		meta.path.current.closed = true
 	}
 
 	function recordUnsupportedPath(meta, operation) {
-		if (!meta.path) meta.path = { subpaths: [], current: null, unsupported: '' }
+		if (!meta.path) meta.path = { subpaths: [], current: null, circle: null, unsupported: '' }
 		if (!meta.path.unsupported) meta.path.unsupported = 'path-' + operation
 	}
 
@@ -839,7 +883,7 @@
 		incrementMap(frame.targetCounts, command.targetKey)
 		if (command.supported) {
 			frame.supportedPolygonFills++
-			recordSupportedCommand(frame, command)
+			if (!command.noop) recordSupportedCommand(frame, command)
 		} else {
 			frame.unsupportedPaints++
 			incrementMap(frame.unsupportedCounts, command.reason || 'canvas-fill')
@@ -945,16 +989,33 @@
 		const path = meta.path
 		const composite = String(ctx?.globalCompositeOperation || 'source-over')
 		const alpha = Number(ctx?.globalAlpha)
-		const fillStyle = typeof ctx?.fillStyle === 'string' ? ctx.fillStyle : ''
+		const fillSource = ctx?.fillStyle
+		const fillStyle = typeof fillSource === 'string' ? fillSource : ''
 		const filter = String(ctx?.filter || 'none')
+		let radial = null
+		let radialRect = null
+		let noop = false
 		let reason = ''
 		if (firstArg && typeof firstArg !== 'string') reason = 'fill-path2d'
 		else if (!path) reason = 'fill-missing-path'
 		else if (path.unsupported) reason = path.unsupported
+		else if (path.circle) {
+			const circle = path.circle
+			const gradient = gradientMetadata.get(fillSource)
+			if (path.subpaths.length) reason = 'path-circle-subpaths'
+			else if (!(radial = describeConcentricRadialGradient(gradient))) reason = 'fill-circle-radial-gradient'
+			else if (!isTransparentGradientEdge(radial)) reason = 'fill-circle-gradient-edge'
+			else {
+				const centerTolerance = Math.max(1, circle.radius, radial.radii[1]) * 0.0001
+				if (Math.hypot(circle.center[0] - radial.center[0], circle.center[1] - radial.center[1]) > centerTolerance) reason = 'fill-circle-gradient-center'
+				else if (circle.radius + centerTolerance < radial.radii[1]) reason = 'fill-circle-gradient-overflow'
+				else radialRect = [circle.center[0] - circle.radius, circle.center[1] - circle.radius, circle.radius * 2, circle.radius * 2].map(function (value) { return roundNumber(value, 4) })
+			}
+		}
 		else if (path.subpaths.length !== 1) reason = 'path-subpaths'
 		else if (!path.subpaths[0]?.closed) reason = 'path-open'
 		else if (path.subpaths[0].points.length < 3) reason = 'path-too-short'
-		else if (!triangulateReplayPolygon(path.subpaths[0].points)) reason = 'path-non-simple'
+		else if (!triangulateReplayPolygon(path.subpaths[0].points) && !(noop = isDegenerateReplayPolygon(path.subpaths[0].points))) reason = 'path-non-simple'
 		else if (!isSolidColor(fillStyle)) reason = 'fill-style'
 		else if (meta.clipActive) reason = 'clip-active'
 		else if (composite !== 'source-over') reason = 'composite-' + composite
@@ -962,13 +1023,17 @@
 		else if (filter && filter !== 'none') reason = 'filter-active'
 		else if (hasActiveShadow(ctx)) reason = 'shadow-active'
 		return {
-			type: 'polygon',
+			type: radialRect ? 'radialGradient' : 'polygon',
 			operation: 'fill',
 			supported: !reason,
+			noop,
 			reason,
 			targetKey,
-			sourceKey: 'solid-white',
-			points: !reason ? path.subpaths[0].points.map(function (point) { return point.slice() }) : null,
+			sourceKey: radialRect ? 'radial-gradient' : 'solid-white',
+			points: !reason && !radialRect && !noop ? path.subpaths[0].points.map(function (point) { return point.slice() }) : null,
+			rect: radialRect,
+			transform: radialRect ? [1, 0, 0, 1, 0, 0] : null,
+			gradient: radialRect ? radial : null,
 			fillStyle,
 			fillRule,
 			alpha: Number.isFinite(alpha) ? roundNumber(alpha, 4) : null,
@@ -976,6 +1041,29 @@
 			filter,
 			smoothing: false
 		}
+	}
+
+	function isTransparentGradientEdge(gradient) {
+		const stops = Array.from(gradient?.stops || [])
+		const edgeColor = stops.length ? parseReplayColor(stops[stops.length - 1]?.color, 1) : null
+		return !!edgeColor && edgeColor[3] <= 0.000001
+	}
+
+	function isDegenerateReplayPolygon(points) {
+		const normalized = normalizeReplayPoints(points)
+		if (!normalized) return false
+		const clean = []
+		for (const point of normalized) {
+			if (!clean.some(function (candidate) { return Math.hypot(point[0] - candidate[0], point[1] - candidate[1]) <= 0.000001 })) clean.push(point)
+		}
+		if (clean.length < 3) return true
+		let maxCross = 0
+		for (let i = 0; i < clean.length - 2; i++) {
+			for (let j = i + 1; j < clean.length - 1; j++) {
+				for (let k = j + 1; k < clean.length; k++) maxCross = Math.max(maxCross, Math.abs(polygonCross(clean[i], clean[j], clean[k])))
+			}
+		}
+		return maxCross <= 0.000001
 	}
 
 	function transformPathPoint(ctx, x, y) {
@@ -2430,6 +2518,7 @@
 	}
 
 	function appendReplayPolygon(renderer, command, report) {
+		if (command.noop) return true
 		if (!Array.isArray(command.points) || command.points.length < 3) return false
 		const positions = normalizeReplayPoints(command.points)
 		if (!positions) return false
