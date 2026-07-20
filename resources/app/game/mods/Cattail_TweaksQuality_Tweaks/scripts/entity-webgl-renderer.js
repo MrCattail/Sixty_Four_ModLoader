@@ -71,14 +71,17 @@
 	let replacementRequested = false
 	let replacementState = 'off'
 	let replacementLastFallback = ''
+	let replacementLastResize = null
 	let replacementCanvas = null
+	let replacementCanvasSize = null
 	let replacementContext = null
 	let replacementRenderScope = null
 	let replacementRenderApi = null
 	const replacementStats = {
 		attemptedFrames: 0,
 		activeFrames: 0,
-		fallbacks: 0
+		fallbacks: 0,
+		resizeTransitions: 0
 	}
 
 	const stats = {
@@ -207,7 +210,7 @@
 					currentFrame = null
 					if (replacementFrame) this.ctx = replacementFrame.mainContext
 					let report = null
-					try { report = finalizeFrame(frame) }
+					try { report = finalizeFrame(frame, replacementFrame?.resized === true) }
 					finally {
 						if (replacementFrame) finalizeReplacementFrame(replacementFrame, frame, report?.replay)
 					}
@@ -421,6 +424,10 @@
 		if (typeof document === 'undefined' || typeof document.createElement !== 'function') throw new Error('document-unavailable')
 		const width = Math.max(1, Math.floor(Number(mainCanvas.width) || 0))
 		const height = Math.max(1, Math.floor(Number(mainCanvas.height) || 0))
+		const previousWidth = replacementCanvasSize?.width || 0
+		const previousHeight = replacementCanvasSize?.height || 0
+		const resized = !!replacementCanvasSize && (previousWidth !== width || previousHeight !== height)
+		replacementCanvasSize = { width, height }
 		if (!replacementCanvas) {
 			replacementCanvas = document.createElement('canvas')
 			replacementCanvas.dataset.cattailEntityWebglReplacement = 'true'
@@ -446,7 +453,16 @@
 		context.setTransform(transform.a, transform.b, transform.c, transform.d, transform.e, transform.f)
 		game.ctx = context
 		replacementStats.attemptedFrames++
-		return { game, mainContext, mainCanvas, context, canvas: replacementCanvas }
+		return {
+			game,
+			mainContext,
+			mainCanvas,
+			context,
+			canvas: replacementCanvas,
+			resized,
+			previousSize: { width: previousWidth, height: previousHeight },
+			canvasSize: { width, height }
+		}
 	}
 
 	function copyReplacementContextState(source, target) {
@@ -461,6 +477,7 @@
 	}
 
 	function finalizeReplacementFrame(session, frame, replayReport) {
+		if (session?.resized) return finalizeReplacementResizeFrame(session)
 		let reason = getReplacementUnsafeReason(session, frame, replayReport)
 		if (!reason) {
 			try {
@@ -482,6 +499,28 @@
 		try { compositeReplacementFrame(session) }
 		catch (error) { fallbackReason += '+composite-' + String(error?.message || error || 'failed') }
 		failReplacement(fallbackReason)
+		return false
+	}
+
+	function finalizeReplacementResizeFrame(session) {
+		let failure = ''
+		try {
+			hideReplayCanvas()
+			if (replayRenderer) syncReplayRenderer(replayRenderer, session.mainCanvas)
+			compositeReplacementFrame(session)
+		} catch (error) {
+			failure = String(error?.message || error || 'failed')
+		}
+		if (failure) {
+			failReplacement('resize-transition-' + failure)
+			return false
+		}
+		replacementState = 'warming'
+		replacementStats.resizeTransitions++
+		replacementLastResize = {
+			from: Object.assign({}, session.previousSize),
+			to: Object.assign({}, session.canvasSize)
+		}
 		return false
 	}
 
@@ -601,6 +640,7 @@
 			}
 		} catch (error) {}
 		replacementCanvas = null
+		replacementCanvasSize = null
 		replacementContext = null
 	}
 
@@ -1529,8 +1569,8 @@
 		frame.commands.push(command)
 	}
 
-	function finalizeFrame(frame) {
-		const replayReport = replayEnabled ? replayRecordedFrame(frame) : null
+	function finalizeFrame(frame, skipReplay = false) {
+		const replayReport = replayEnabled && !skipReplay ? replayRecordedFrame(frame) : null
 		const report = {
 			frame: stats.frames + 1,
 			drawImages: frame.drawImages,
@@ -3119,6 +3159,8 @@
 			attemptedFrames: replacementStats.attemptedFrames,
 			activeFrames: replacementStats.activeFrames,
 			fallbacks: replacementStats.fallbacks,
+			resizeTransitions: replacementStats.resizeTransitions,
+			lastResize: replacementLastResize ? cloneValue(replacementLastResize) : null,
 			lastFallback: replacementLastFallback,
 			layerRoutingReady: !!replacementRenderScope && !!replacementRenderApi,
 			replayOrder: replacementReplayOrder,
@@ -3238,6 +3280,8 @@
 		replacementStats.attemptedFrames = 0
 		replacementStats.activeFrames = 0
 		replacementStats.fallbacks = 0
+		replacementStats.resizeTransitions = 0
+		replacementLastResize = null
 		replacementLastFallback = ''
 	}
 
