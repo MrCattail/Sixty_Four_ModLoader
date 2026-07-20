@@ -2738,7 +2738,7 @@ ModLoader.register({
 					try {
 						profileResourceSource(
 							'resource.links.total',
-							() => { if (!shouldUseResourceSourceRenderApiLinks(this)) renderResourceSourceLinks(this, this.ctx) },
+							() => { if (!shouldUseResourceSourceRenderApiLinks(this)) renderResourceSourceLinks(this, this.ctx, { compositeGpuToCanvas: true }) },
 							() => getResourceSourceProfileDetail(this, getResourceSourceFocusResourceId(this))
 						)
 						const result = profileResourceSource(
@@ -3712,18 +3712,9 @@ ModLoader.register({
 			)
 			const compositeGpuToCanvas = options.compositeGpuToCanvas === true && !!ctx
 			if (isResourceSourceGpuLineModeActive(game)) {
-				if (compositeGpuToCanvas) {
-					clearResourceSourceGpuLines(game)
-					profileResourceSource(
-						'resource.links.canvas.webglFallback',
-						() => drawResourceSourceLinkSegments(game, segments, ctx),
-						() => getResourceSourceProfileDetail(game, resourceId, { segments: segments.length })
-					)
-					return
-				}
 				profileResourceSource(
 					'resource.links.webgl.render',
-					() => renderResourceSourceGpuLines(game, segments, null),
+					() => renderResourceSourceGpuLines(game, segments, compositeGpuToCanvas ? { compositeCtx: ctx } : null),
 					() => getResourceSourceProfileDetail(game, resourceId, { segments: segments.length })
 				)
 				return
