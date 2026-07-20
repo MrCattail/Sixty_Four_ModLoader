@@ -44,6 +44,7 @@
 	const unsupportedTotals = new Map()
 	const operationTotals = new Map()
 	const targetTotals = new Map()
+	const gradientMetadata = new WeakMap()
 	const samples = []
 	const replaySamples = []
 	let sourceId = 0
@@ -89,6 +90,9 @@
 		supportedPolygonFills: 0,
 		pathStrokes: 0,
 		supportedPathStrokes: 0,
+		fillRects: 0,
+		supportedFillRects: 0,
+		radialGradientFillRects: 0,
 		unsupportedPaints: 0,
 		adjacentBatches: 0,
 		atlasBatches: 0,
@@ -117,6 +121,7 @@
 		atlasUploads: 0,
 		dynamicAtlasUploads: 0,
 		dynamicUploadSkips: 0,
+		gradientDraws: 0,
 		barriers: 0,
 		segments: 0,
 		skippedCommands: 0,
@@ -134,7 +139,6 @@
 	}
 
 	const unsupportedPaintMethods = [
-		'fillRect',
 		'strokeRect',
 		'clearRect',
 		'fillText',
@@ -378,6 +382,9 @@
 			supportedPolygonFills: 0,
 			pathStrokes: 0,
 			supportedPathStrokes: 0,
+			fillRects: 0,
+			supportedFillRects: 0,
+			radialGradientFillRects: 0,
 			unsupportedPaints: 0,
 			unsupportedPaintDiagnostics: [],
 			adjacentBatches: 0,
@@ -626,6 +633,8 @@
 	function wrapContext(ctx, frame, restorers) {
 		const meta = { clipActive: false, clipStack: [], path: null }
 		let wrapped = 0
+		wrapped += wrapGradientFactory(ctx, 'createLinearGradient', 'linear', restorers, frame)
+		wrapped += wrapGradientFactory(ctx, 'createRadialGradient', 'radial', restorers, frame)
 		wrapped += wrapContextMethod(ctx, 'drawImage', function (args) {
 			recordTimed(frame, function () { recordDrawImage(frame, ctx, meta, args) })
 		}, restorers, frame)
@@ -651,6 +660,9 @@
 		}, restorers, frame)
 		wrapped += wrapContextMethod(ctx, 'stroke', function (args) {
 			recordTimed(frame, function () { recordPathStroke(frame, ctx, meta, args) })
+		}, restorers, frame)
+		wrapped += wrapContextMethod(ctx, 'fillRect', function (args) {
+			recordTimed(frame, function () { recordFillRect(frame, ctx, meta, args) })
 		}, restorers, frame)
 		for (const methodName of unsupportedPaintMethods) {
 			wrapped += wrapContextMethod(ctx, methodName, function (args) {
@@ -691,6 +703,64 @@
 			if (ctx[methodName] === wrapper) ctx[methodName] = original
 		})
 		return 1
+	}
+
+	function wrapGradientFactory(ctx, methodName, type, restorers, frame) {
+		const original = ctx?.[methodName]
+		if (typeof original !== 'function') return 0
+		const wrapper = function () {
+			const args = Array.from(arguments)
+			const gradient = original.apply(this, arguments)
+			if (currentFrame === frame && gradient && (typeof gradient === 'object' || typeof gradient === 'function')) {
+				const metadata = {
+					type,
+					args: args.map(Number),
+					transform: getTransform(this),
+					stops: [],
+					tracked: false,
+					invalid: false
+				}
+				gradientMetadata.set(gradient, metadata)
+				metadata.tracked = wrapGradientColorStops(gradient, metadata, restorers, frame)
+			}
+			return gradient
+		}
+		try { ctx[methodName] = wrapper } catch (error) {
+			recordFrameError(frame, 'wrap-' + methodName)
+			return 0
+		}
+		if (ctx[methodName] !== wrapper) return 0
+		restorers.push(function () {
+			if (ctx[methodName] === wrapper) ctx[methodName] = original
+		})
+		return 1
+	}
+
+	function wrapGradientColorStops(gradient, metadata, restorers, frame) {
+		const original = gradient?.addColorStop
+		if (typeof original !== 'function') return false
+		const hadOwn = Object.prototype.hasOwnProperty.call(gradient, 'addColorStop')
+		const wrapper = function (offset, color) {
+			const result = original.apply(this, arguments)
+			if (currentFrame === frame) {
+				const normalizedOffset = Number(offset)
+				if (!Number.isFinite(normalizedOffset) || normalizedOffset < 0 || normalizedOffset > 1 || typeof color !== 'string') metadata.invalid = true
+				else metadata.stops.push({ offset: normalizedOffset, color })
+			}
+			return result
+		}
+		try { gradient.addColorStop = wrapper } catch (error) { return false }
+		if (gradient.addColorStop !== wrapper) return false
+		restorers.push(function () {
+			if (gradient.addColorStop !== wrapper) return
+			try {
+				if (hadOwn) gradient.addColorStop = original
+				else delete gradient.addColorStop
+			} catch (error) {
+				try { gradient.addColorStop = original } catch (restoreError) {}
+			}
+		})
+		return true
 	}
 
 	function recordTimed(frame, callback) {
@@ -1055,6 +1125,104 @@
 		}
 	}
 
+	function recordFillRect(frame, ctx, meta, args) {
+		frame.fillRects++
+		incrementMap(frame.operationCounts, 'fillRect')
+		const command = describeFillRect(ctx, meta, args)
+		frame.targets.add(command.targetKey)
+		incrementMap(frame.targetCounts, command.targetKey)
+		if (command.supported) {
+			frame.supportedFillRects++
+			if (command.type === 'radialGradient') frame.radialGradientFillRects++
+			recordSupportedCommand(frame, command)
+		} else {
+			frame.unsupportedPaints++
+			incrementMap(frame.unsupportedCounts, command.reason || 'canvas-fillRect')
+			recordUnsupportedPaintDiagnostic(frame, ctx, command, args)
+			recordBarrier(frame)
+		}
+		pushReplayCommand(frame, command)
+		pushCommandPreview(frame, command)
+	}
+
+	function describeFillRect(ctx, meta, args) {
+		const targetKey = getTargetKey(ctx)
+		const rect = Array.from(args || []).slice(0, 4).map(Number)
+		const transform = getTransform(ctx)
+		const composite = String(ctx?.globalCompositeOperation || 'source-over')
+		const alpha = Number(ctx?.globalAlpha)
+		const filter = String(ctx?.filter || 'none')
+		const gradientSource = ctx?.fillStyle
+		const gradient = gradientMetadata.get(gradientSource)
+		let radial = null
+		let reason = ''
+		if (rect.length !== 4 || !rect.every(Number.isFinite) || rect[2] === 0 || rect[3] === 0) reason = 'fill-rect-arguments'
+		else if (!transform) reason = 'transform'
+		else if (!gradient) reason = typeof gradientSource === 'string' ? 'fill-rect-solid' : 'fill-rect-gradient-untracked'
+		else if (!gradient.tracked || gradient.invalid) reason = 'fill-rect-gradient-untracked'
+		else if (gradient.type !== 'radial') reason = 'fill-rect-gradient-' + String(gradient.type || 'unknown')
+		else if (!(radial = describeConcentricRadialGradient(gradient))) reason = 'fill-rect-radial-gradient'
+		else if (meta.clipActive) reason = 'clip-active'
+		else if (composite !== 'source-over') reason = 'composite-' + composite
+		else if (!Number.isFinite(alpha) || alpha < 0 || alpha > 1) reason = 'global-alpha'
+		else if (filter && filter !== 'none') reason = 'filter-active'
+		else if (hasActiveShadow(ctx)) reason = 'shadow-active'
+		return {
+			type: radial ? 'radialGradient' : 'canvas',
+			operation: 'fillRect',
+			supported: !reason,
+			reason,
+			targetKey,
+			sourceKey: 'radial-gradient',
+			rect: rect.map(function (value) { return roundNumber(value, 4) }),
+			transform,
+			gradient: radial,
+			alpha: Number.isFinite(alpha) ? roundNumber(alpha, 4) : null,
+			composite,
+			filter,
+			smoothing: false
+		}
+	}
+
+	function describeConcentricRadialGradient(metadata) {
+		const args = metadata?.args
+		const transform = metadata?.transform
+		if (!Array.isArray(args) || args.length !== 6 || !args.every(Number.isFinite)) return null
+		if (!Array.isArray(transform) || transform.length !== 6 || !transform.every(Number.isFinite)) return null
+		const scale = getUniformTransformScale(transform)
+		if (!Number.isFinite(scale) || scale <= 0) return null
+		const start = transformReplayPoint(transform, args[0], args[1])
+		const end = transformReplayPoint(transform, args[3], args[4])
+		const innerRadius = args[2] * scale
+		const outerRadius = args[5] * scale
+		if (!start || !end || innerRadius < 0 || outerRadius <= innerRadius) return null
+		if (Math.hypot(start[0] - end[0], start[1] - end[1]) > Math.max(1, outerRadius) * 0.0001) return null
+		const stops = Array.from(metadata.stops || []).map(function (stop) {
+			return { offset: Number(stop?.offset), color: String(stop?.color || '') }
+		}).sort(function (a, b) { return a.offset - b.offset })
+		if (stops.length < 2 || stops.length > 4) return null
+		if (!stops.every(function (stop) { return Number.isFinite(stop.offset) && stop.offset >= 0 && stop.offset <= 1 && !!parseReplayColor(stop.color, 1) })) return null
+		for (let i = 1; i < stops.length; i++) {
+			if (stops[i].offset <= stops[i - 1].offset) return null
+		}
+		return {
+			center: [roundNumber(start[0], 4), roundNumber(start[1], 4)],
+			radii: [roundNumber(innerRadius, 4), roundNumber(outerRadius, 4)],
+			stops: stops.map(function (stop) { return { offset: roundNumber(stop.offset, 5), color: stop.color } })
+		}
+	}
+
+	function getUniformTransformScale(matrix) {
+		if (!Array.isArray(matrix) || matrix.length !== 6) return null
+		const scaleX = Math.hypot(Number(matrix[0]), Number(matrix[1]))
+		const scaleY = Math.hypot(Number(matrix[2]), Number(matrix[3]))
+		const dot = Number(matrix[0]) * Number(matrix[2]) + Number(matrix[1]) * Number(matrix[3])
+		const tolerance = Math.max(scaleX, scaleY, 1) * 0.0001
+		if (!Number.isFinite(scaleX) || !Number.isFinite(scaleY) || scaleX <= 0 || scaleY <= 0) return null
+		if (Math.abs(scaleX - scaleY) > tolerance || Math.abs(dot) > tolerance) return null
+		return (scaleX + scaleY) / 2
+	}
+
 	function recordUnsupportedPaint(frame, ctx, methodName, args) {
 		frame.unsupportedPaints++
 		incrementMap(frame.operationCounts, methodName)
@@ -1284,9 +1452,12 @@
 			supportedPolygonFills: frame.supportedPolygonFills,
 			pathStrokes: frame.pathStrokes,
 			supportedPathStrokes: frame.supportedPathStrokes,
+			fillRects: frame.fillRects,
+			supportedFillRects: frame.supportedFillRects,
+			radialGradientFillRects: frame.radialGradientFillRects,
 			unsupportedPaints: frame.unsupportedPaints,
 			unsupportedPaintDiagnostics: frame.unsupportedPaintDiagnostics.slice(),
-			quadCoverage: getCoverage(frame.supportedDrawImages + frame.supportedPolygonFills + frame.supportedPathStrokes, frame.drawImages + frame.supportedPolygonFills + frame.supportedPathStrokes + frame.unsupportedPaints),
+			quadCoverage: getCoverage(frame.supportedDrawImages + frame.supportedPolygonFills + frame.supportedPathStrokes + frame.supportedFillRects, frame.drawImages + frame.supportedPolygonFills + frame.supportedPathStrokes + frame.supportedFillRects + frame.unsupportedPaints),
 			adjacentBatches: frame.adjacentBatches,
 			atlasBatches: frame.atlasBatches,
 			textureSwitches: frame.textureSwitches,
@@ -1313,6 +1484,9 @@
 		stats.supportedPolygonFills += frame.supportedPolygonFills
 		stats.pathStrokes += frame.pathStrokes
 		stats.supportedPathStrokes += frame.supportedPathStrokes
+		stats.fillRects += frame.fillRects
+		stats.supportedFillRects += frame.supportedFillRects
+		stats.radialGradientFillRects += frame.radialGradientFillRects
 		stats.unsupportedPaints += frame.unsupportedPaints
 		stats.adjacentBatches += frame.adjacentBatches
 		stats.atlasBatches += frame.atlasBatches
@@ -1334,6 +1508,8 @@
 			supportedDrawImages: frame.supportedDrawImages,
 			supportedPolygonFills: frame.supportedPolygonFills,
 			supportedPathStrokes: frame.supportedPathStrokes,
+			supportedFillRects: frame.supportedFillRects,
+			radialGradientFillRects: frame.radialGradientFillRects,
 			unsupportedPaints: frame.unsupportedPaints,
 			adjacentBatches: frame.adjacentBatches,
 			atlasBatches: frame.atlasBatches,
@@ -1360,6 +1536,7 @@
 			atlasUploads: 0,
 			dynamicAtlasUploads: 0,
 			dynamicUploadSkips: 0,
+			gradientDraws: 0,
 			barriers: 0,
 			segments: 0,
 			skippedCommands: 0,
@@ -1394,6 +1571,10 @@
 				if (command.type === 'drawImage') appended = appendReplayDrawImage(renderer, frame, command, report)
 				else if (command.type === 'polygon') appended = appendReplayPolygon(renderer, command, report)
 				else if (command.type === 'stroke') appended = appendReplayStroke(renderer, command, report)
+				else if (command.type === 'radialGradient') {
+					flushReplayBatch(renderer, report)
+					appended = drawReplayRadialGradient(renderer, command, report)
+				}
 				if (!appended) {
 					flushReplayBatch(renderer, report)
 					report.skippedCommands++
@@ -1426,6 +1607,7 @@
 		replayStats.atlasUploads += report.atlasUploads
 		replayStats.dynamicAtlasUploads += report.dynamicAtlasUploads
 		replayStats.dynamicUploadSkips += report.dynamicUploadSkips
+		replayStats.gradientDraws += report.gradientDraws
 		replayStats.barriers += report.barriers
 		replayStats.segments += report.segments
 		replayStats.skippedCommands += report.skippedCommands
@@ -1446,6 +1628,7 @@
 			atlasUploads: report.atlasUploads,
 			dynamicAtlasUploads: report.dynamicAtlasUploads,
 			dynamicUploadSkips: report.dynamicUploadSkips,
+			gradientDraws: report.gradientDraws,
 			barriers: report.barriers,
 			segments: report.segments,
 			skippedCommands: report.skippedCommands,
@@ -1545,6 +1728,7 @@
 		const resolutionLocation = gl.getUniformLocation(program, 'u_resolution')
 		const textureLocation = gl.getUniformLocation(program, 'u_texture')
 		if (resolutionLocation === null || textureLocation === null) throw new Error('webgl-uniform-missing')
+		const gradient = createReplayGradientResources(gl)
 		const renderer = {
 			gl,
 			canvas,
@@ -1557,6 +1741,7 @@
 			floatsPerVertex,
 			resolutionLocation,
 			textureLocation,
+			gradient,
 			textureEntries: new WeakMap(),
 			textureEntryList: [],
 			whiteEntry: null,
@@ -1597,6 +1782,77 @@
 		}
 		if (!renderer.whiteEntry) renderer.whiteEntry = createReplayWhiteTexture(renderer)
 		return renderer
+	}
+
+	function createReplayGradientResources(gl) {
+		const vertexSource = [
+			'#version 300 es',
+			'precision highp float;',
+			'layout(location = 0) in vec2 a_position;',
+			'uniform vec2 u_resolution;',
+			'void main() {',
+			'  vec2 clip = (a_position / u_resolution) * 2.0 - 1.0;',
+			'  gl_Position = vec4(clip.x, -clip.y, 0.0, 1.0);',
+			'}'
+		].join('\n')
+		const fragmentSource = [
+			'#version 300 es',
+			'precision highp float;',
+			'uniform vec2 u_resolution;',
+			'uniform vec2 u_center;',
+			'uniform vec2 u_radii;',
+			'uniform vec4 u_stop_offsets;',
+			'uniform vec4 u_stop_color0;',
+			'uniform vec4 u_stop_color1;',
+			'uniform vec4 u_stop_color2;',
+			'uniform vec4 u_stop_color3;',
+			'uniform int u_stop_count;',
+			'uniform float u_global_alpha;',
+			'out vec4 outColor;',
+			'vec4 premultipliedMix(vec4 a, vec4 b, float amount) {',
+			'  vec4 pa = vec4(a.rgb * a.a, a.a);',
+			'  vec4 pb = vec4(b.rgb * b.a, b.a);',
+			'  vec4 mixed = mix(pa, pb, clamp(amount, 0.0, 1.0));',
+			'  return mixed.a > 0.000001 ? vec4(mixed.rgb / mixed.a, mixed.a) : vec4(0.0);',
+			'}',
+			'vec4 sampleGradient(float amount) {',
+			'  if (u_stop_count <= 1 || amount <= u_stop_offsets.x) return u_stop_color0;',
+			'  if (amount <= u_stop_offsets.y) return premultipliedMix(u_stop_color0, u_stop_color1, (amount - u_stop_offsets.x) / max(0.000001, u_stop_offsets.y - u_stop_offsets.x));',
+			'  if (u_stop_count == 2) return u_stop_color1;',
+			'  if (amount <= u_stop_offsets.z) return premultipliedMix(u_stop_color1, u_stop_color2, (amount - u_stop_offsets.y) / max(0.000001, u_stop_offsets.z - u_stop_offsets.y));',
+			'  if (u_stop_count == 3) return u_stop_color2;',
+			'  if (amount <= u_stop_offsets.w) return premultipliedMix(u_stop_color2, u_stop_color3, (amount - u_stop_offsets.z) / max(0.000001, u_stop_offsets.w - u_stop_offsets.z));',
+			'  return u_stop_color3;',
+			'}',
+			'void main() {',
+			'  vec2 point = vec2(gl_FragCoord.x, u_resolution.y - gl_FragCoord.y);',
+			'  float amount = (distance(point, u_center) - u_radii.x) / max(0.000001, u_radii.y - u_radii.x);',
+			'  vec4 color = sampleGradient(amount);',
+			'  outColor = vec4(color.rgb, color.a * u_global_alpha);',
+			'}'
+		].join('\n')
+		const program = createReplayProgram(gl, vertexSource, fragmentSource)
+		const vao = gl.createVertexArray()
+		const vertexBuffer = gl.createBuffer()
+		if (!vao || !vertexBuffer) throw new Error('webgl-gradient-buffer-create-failed')
+		gl.bindVertexArray(vao)
+		gl.bindBuffer(gl.ARRAY_BUFFER, vertexBuffer)
+		gl.bufferData(gl.ARRAY_BUFFER, 8 * 4, gl.DYNAMIC_DRAW)
+		gl.enableVertexAttribArray(0)
+		gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 2 * 4, 0)
+		const locations = {
+			resolution: gl.getUniformLocation(program, 'u_resolution'),
+			center: gl.getUniformLocation(program, 'u_center'),
+			radii: gl.getUniformLocation(program, 'u_radii'),
+			stopOffsets: gl.getUniformLocation(program, 'u_stop_offsets'),
+			stopColors: [0, 1, 2, 3].map(function (index) { return gl.getUniformLocation(program, 'u_stop_color' + index) }),
+			stopCount: gl.getUniformLocation(program, 'u_stop_count'),
+			globalAlpha: gl.getUniformLocation(program, 'u_global_alpha')
+		}
+		if (locations.resolution === null || locations.center === null || locations.radii === null || locations.stopOffsets === null || locations.stopCount === null || locations.globalAlpha === null || locations.stopColors.some(function (location) { return location === null })) {
+			throw new Error('webgl-gradient-uniform-missing')
+		}
+		return { program, vao, vertexBuffer, locations, vertices: new Float32Array(8) }
 	}
 
 	function createReplayProgram(gl, vertexSource, fragmentSource) {
@@ -2203,6 +2459,74 @@
 		return true
 	}
 
+	function drawReplayRadialGradient(renderer, command, report) {
+		const gradient = command?.gradient
+		const rect = Array.from(command?.rect || []).map(Number)
+		const transform = Array.from(command?.transform || []).map(Number)
+		const center = Array.from(gradient?.center || []).map(Number)
+		const radii = Array.from(gradient?.radii || []).map(Number)
+		const stops = Array.from(gradient?.stops || [])
+		const alpha = Number(command?.alpha)
+		if (rect.length !== 4 || !rect.every(Number.isFinite) || transform.length !== 6 || !transform.every(Number.isFinite)) return false
+		if (center.length !== 2 || !center.every(Number.isFinite) || radii.length !== 2 || !radii.every(Number.isFinite) || radii[0] < 0 || radii[1] <= radii[0]) return false
+		if (stops.length < 2 || stops.length > 4 || !Number.isFinite(alpha) || alpha < 0 || alpha > 1) return false
+		const x0 = rect[0]
+		const y0 = rect[1]
+		const x1 = x0 + rect[2]
+		const y1 = y0 + rect[3]
+		const positions = [
+			transformReplayPoint(transform, x0, y0),
+			transformReplayPoint(transform, x1, y0),
+			transformReplayPoint(transform, x1, y1),
+			transformReplayPoint(transform, x0, y1)
+		]
+		if (!positions.every(Boolean)) return false
+		const offsets = stops.map(function (stop) { return Number(stop?.offset) })
+		const colors = stops.map(function (stop) { return parseReplayColor(stop?.color, 1) })
+		if (!offsets.every(Number.isFinite) || !colors.every(Boolean)) return false
+		while (offsets.length < 4) offsets.push(offsets[offsets.length - 1])
+		while (colors.length < 4) colors.push(colors[colors.length - 1])
+		const resources = renderer.gradient
+		if (!resources?.program || !resources?.vao || !resources?.vertexBuffer) return false
+		for (let i = 0; i < positions.length; i++) {
+			resources.vertices[i * 2] = positions[i][0]
+			resources.vertices[i * 2 + 1] = positions[i][1]
+		}
+		const gl = renderer.gl
+		try {
+			gl.useProgram(resources.program)
+			gl.bindVertexArray(resources.vao)
+			gl.bindBuffer(gl.ARRAY_BUFFER, resources.vertexBuffer)
+			gl.bufferSubData(gl.ARRAY_BUFFER, 0, resources.vertices)
+			gl.uniform2f(resources.locations.resolution, renderer.canvas.width, renderer.canvas.height)
+			gl.uniform2f(resources.locations.center, center[0], center[1])
+			gl.uniform2f(resources.locations.radii, radii[0], radii[1])
+			gl.uniform4f(resources.locations.stopOffsets, offsets[0], offsets[1], offsets[2], offsets[3])
+			for (let i = 0; i < 4; i++) gl.uniform4f(resources.locations.stopColors[i], colors[i][0], colors[i][1], colors[i][2], colors[i][3])
+			gl.uniform1i(resources.locations.stopCount, stops.length)
+			gl.uniform1f(resources.locations.globalAlpha, alpha)
+			gl.drawArrays(gl.TRIANGLE_FAN, 0, 4)
+			report.quads++
+			report.drawCalls++
+			report.gradientDraws++
+			return true
+		} finally {
+			restoreReplayTexturePipeline(renderer)
+		}
+	}
+
+	function restoreReplayTexturePipeline(renderer) {
+		const gl = renderer.gl
+		gl.useProgram(renderer.program)
+		gl.bindVertexArray(renderer.vao)
+		gl.uniform2f(renderer.resolutionLocation, renderer.canvas.width, renderer.canvas.height)
+		gl.activeTexture(gl.TEXTURE0)
+		gl.uniform1i(renderer.textureLocation, 0)
+		renderer.boundTexture = null
+		renderer.batchEntry = null
+		renderer.batchSmoothing = null
+	}
+
 	function buildReplayStrokeGeometry(points, lineWidth, lineCap, miterLimit) {
 		const rawPoints = normalizeReplayPoints(points)
 		if (!rawPoints || rawPoints.length < 2 || !Number.isFinite(lineWidth) || lineWidth <= 0) return null
@@ -2637,6 +2961,9 @@
 				gl.deleteBuffer(renderer.indexBuffer)
 				gl.deleteVertexArray(renderer.vao)
 				gl.deleteProgram(renderer.program)
+				gl.deleteBuffer(renderer.gradient?.vertexBuffer)
+				gl.deleteVertexArray(renderer.gradient?.vao)
+				gl.deleteProgram(renderer.gradient?.program)
 			}
 		} catch (error) {}
 		replayRenderer = null
@@ -2660,6 +2987,7 @@
 			atlasUploads: replayStats.atlasUploads,
 			dynamicAtlasUploads: replayStats.dynamicAtlasUploads,
 			dynamicUploadSkips: replayStats.dynamicUploadSkips,
+			gradientDraws: replayStats.gradientDraws,
 			barriers: replayStats.barriers,
 			segments: replayStats.segments,
 			skippedCommands: replayStats.skippedCommands,
@@ -2677,6 +3005,7 @@
 			avgAtlasUploadsPerFrame: roundNumber(getReplaySampleAverage('atlasUploads'), 3),
 			avgDynamicAtlasUploadsPerFrame: roundNumber(getReplaySampleAverage('dynamicAtlasUploads'), 3),
 			avgDynamicUploadSkipsPerFrame: roundNumber(getReplaySampleAverage('dynamicUploadSkips'), 3),
+			avgGradientDrawsPerFrame: roundNumber(getReplaySampleAverage('gradientDraws'), 3),
 			avgBarriersPerFrame: roundNumber(getReplaySampleAverage('barriers'), 3),
 			avgSegmentsPerFrame: roundNumber(getReplaySampleAverage('segments'), 3),
 			avgSkippedCommandsPerFrame: roundNumber(getReplaySampleAverage('skippedCommands'), 3),
@@ -2812,7 +3141,7 @@
 	}
 
 	function resetReplayStats() {
-		for (const key of ['frames', 'commands', 'quads', 'drawCalls', 'textureBinds', 'textureUploads', 'staticUploads', 'dynamicUploads', 'atlasUploads', 'dynamicAtlasUploads', 'dynamicUploadSkips', 'barriers', 'segments', 'skippedCommands', 'skippedTargets', 'uploadErrors', 'errors', 'contextLosses', 'resizes', 'rendererCreates', 'replayMs', 'lastReplayMs', 'maxReplayMs']) replayStats[key] = 0
+		for (const key of ['frames', 'commands', 'quads', 'drawCalls', 'textureBinds', 'textureUploads', 'staticUploads', 'dynamicUploads', 'atlasUploads', 'dynamicAtlasUploads', 'dynamicUploadSkips', 'gradientDraws', 'barriers', 'segments', 'skippedCommands', 'skippedTargets', 'uploadErrors', 'errors', 'contextLosses', 'resizes', 'rendererCreates', 'replayMs', 'lastReplayMs', 'maxReplayMs']) replayStats[key] = 0
 		replayStats.lastError = ''
 		replayStats.lastCanvasSize = { width: 0, height: 0 }
 		replaySamples.length = 0
@@ -2841,12 +3170,17 @@
 			supportedPolygonFills: stats.supportedPolygonFills,
 			pathStrokes: stats.pathStrokes,
 			supportedPathStrokes: stats.supportedPathStrokes,
+			fillRects: stats.fillRects,
+			supportedFillRects: stats.supportedFillRects,
+			radialGradientFillRects: stats.radialGradientFillRects,
 			unsupportedPaints: stats.unsupportedPaints,
-			quadCoverage: getCoverage(stats.supportedDrawImages + stats.supportedPolygonFills + stats.supportedPathStrokes, stats.drawImages + stats.supportedPolygonFills + stats.supportedPathStrokes + stats.unsupportedPaints),
+			quadCoverage: getCoverage(stats.supportedDrawImages + stats.supportedPolygonFills + stats.supportedPathStrokes + stats.supportedFillRects, stats.drawImages + stats.supportedPolygonFills + stats.supportedPathStrokes + stats.supportedFillRects + stats.unsupportedPaints),
 			avgDrawImagesPerFrame: roundNumber(getSampleAverage('drawImages'), 3),
 			avgSupportedDrawImagesPerFrame: roundNumber(getSampleAverage('supportedDrawImages'), 3),
 			avgSupportedPolygonFillsPerFrame: roundNumber(getSampleAverage('supportedPolygonFills'), 3),
 			avgSupportedPathStrokesPerFrame: roundNumber(getSampleAverage('supportedPathStrokes'), 3),
+			avgSupportedFillRectsPerFrame: roundNumber(getSampleAverage('supportedFillRects'), 3),
+			avgRadialGradientFillRectsPerFrame: roundNumber(getSampleAverage('radialGradientFillRects'), 3),
 			avgAdjacentBatchesPerFrame: roundNumber(getSampleAverage('adjacentBatches'), 3),
 			avgAtlasBatchesPerFrame: roundNumber(getSampleAverage('atlasBatches'), 3),
 			avgTextureSwitchesPerFrame: roundNumber(getSampleAverage('textureSwitches'), 3),
@@ -2881,6 +3215,9 @@
 		stats.supportedPolygonFills = 0
 		stats.pathStrokes = 0
 		stats.supportedPathStrokes = 0
+		stats.fillRects = 0
+		stats.supportedFillRects = 0
+		stats.radialGradientFillRects = 0
 		stats.unsupportedPaints = 0
 		stats.adjacentBatches = 0
 		stats.atlasBatches = 0
