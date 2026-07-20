@@ -8,6 +8,7 @@
 	let previewEnabled = null
 	let configuredEnabled = true
 	let fastPathEnabled = true
+	let directRenderEnabled = true
 	let activeGame = null
 
 	const stats = {
@@ -15,6 +16,9 @@
 		curvesSeen: 0,
 		curvesPrepared: 0,
 		curveFallbacks: 0,
+		directRenderCalls: 0,
+		directRenderFallbacks: 0,
+		directRenderFallbackReasons: {},
 		fallbackReasons: {}
 	}
 
@@ -52,7 +56,17 @@
 		installDebugApi()
 		api.patch(prototype, 'render', function (original) {
 			return function () {
-				if (fastPathEnabled && !this[preparedKey]) prepareExplosionCurves(this)
+				if (fastPathEnabled) {
+					const prepared = this[preparedKey] || prepareExplosionCurves(this)
+					if (directRenderEnabled && prepared.directReady) {
+						const fallbackReason = renderPreparedExplosion(this, prepared)
+						if (!fallbackReason) {
+							stats.directRenderCalls++
+							return
+						}
+						recordDirectRenderFallback(fallbackReason)
+					}
+				}
 				return original.apply(this, arguments)
 			}
 		})
@@ -63,9 +77,15 @@
 			stats() {
 				return Object.assign({}, stats, {
 					enabled: fastPathEnabled,
+					directRenderEnabled,
 					prepareRate: stats.curvesSeen ? roundNumber(stats.curvesPrepared / stats.curvesSeen, 4) : 0,
+					directRenderFallbackReasons: Object.assign({}, stats.directRenderFallbackReasons),
 					fallbackReasons: Object.assign({}, stats.fallbackReasons)
 				})
+			},
+			setDirectRenderEnabled(enabled) {
+				directRenderEnabled = enabled !== false
+				return this.stats()
 			},
 			resetStats() {
 				resetStats()
@@ -79,7 +99,7 @@
 
 	function prepareExplosionCurves(effect) {
 		const paths = effect?.paths
-		const result = { curves: 0, prepared: 0, fallbacks: 0 }
+		const result = { curves: 0, prepared: 0, fallbacks: 0, directReady: false, directCurves: [] }
 		if (!Array.isArray(paths)) {
 			recordFallback('missing-paths')
 			result.fallbacks++
@@ -94,11 +114,14 @@
 			if (reason) {
 				recordFallback(reason)
 				result.fallbacks++
+				result.directCurves.push(null)
 				continue
 			}
 			result.prepared++
+			result.directCurves.push(curve[curveKey])
 			stats.curvesPrepared++
 		}
+		result.directReady = result.curves > 0 && result.fallbacks === 0
 		effect[preparedKey] = result
 		stats.explosionsPrepared++
 		return result
@@ -120,12 +143,52 @@
 		const deltaX = Number(p3[0]) - startX
 		const deltaY = Number(p3[1]) - startY
 		const original = curve.getXY
-		curve[curveKey] = { original }
+		curve[curveKey] = { original, startX, startY, deltaX, deltaY }
 		curve.getXY = function (t) {
 			if (!fastPathEnabled) return original.apply(this, arguments)
 			const remaining = 1 - t
 			const factor = 1 - remaining * remaining * remaining
 			return [startX + deltaX * factor, startY + deltaY * factor]
+		}
+		return ''
+	}
+
+	function renderPreparedExplosion(effect, prepared) {
+		const master = effect?.master
+		if (!master || !effect.visibility) return 'missing-master'
+		if (!effect.visibility[master.plane]) return ''
+		const resources = effect.resources
+		const endTimes = effect.endTimes
+		const curves = prepared.directCurves
+		if (!Array.isArray(resources) || !Array.isArray(endTimes) || !Array.isArray(curves)) return 'missing-render-data'
+		if (resources.length !== endTimes.length || resources.length !== curves.length) return 'render-data-length-mismatch'
+		const ctx = master.ctx
+		const codexResources = master.codex?.resources
+		if (!ctx || !codexResources) return 'missing-render-context'
+
+		const time = effect.time
+		const unit = master.unit
+		for (let j = 0; j < resources.length; j++) {
+			const f = (time / endTimes[j]) ** .6
+			if (!(f <= 1)) continue
+			const from = Math.max(0, f - .05)
+			const to = Math.min(1, f + .05)
+			const curve = curves[j]
+			const triplet = codexResources[resources[j]].triplet
+
+			ctx.strokeStyle = triplet[j % 3]
+			ctx.lineCap = 'round'
+			ctx.lineWidth = (.5 + (1 - f) * .5) * unit * .04
+			ctx.beginPath()
+			let remaining = 1 - from
+			let factor = 1 - remaining * remaining * remaining
+			ctx.moveTo(curve.startX + curve.deltaX * factor, curve.startY + curve.deltaY * factor)
+			for (let sample = from + .02; sample < to; sample += .02) {
+				remaining = 1 - sample
+				factor = 1 - remaining * remaining * remaining
+				ctx.lineTo(curve.startX + curve.deltaX * factor, curve.startY + curve.deltaY * factor)
+			}
+			ctx.stroke()
 		}
 		return ''
 	}
@@ -166,11 +229,19 @@
 		stats.fallbackReasons[reason] = (stats.fallbackReasons[reason] || 0) + 1
 	}
 
+	function recordDirectRenderFallback(reason) {
+		stats.directRenderFallbacks++
+		stats.directRenderFallbackReasons[reason] = (stats.directRenderFallbackReasons[reason] || 0) + 1
+	}
+
 	function resetStats() {
 		stats.explosionsPrepared = 0
 		stats.curvesSeen = 0
 		stats.curvesPrepared = 0
 		stats.curveFallbacks = 0
+		stats.directRenderCalls = 0
+		stats.directRenderFallbacks = 0
+		stats.directRenderFallbackReasons = {}
 		stats.fallbackReasons = {}
 	}
 
