@@ -2738,7 +2738,7 @@ ModLoader.register({
 					try {
 						profileResourceSource(
 							'resource.links.total',
-							() => { if (!shouldUseResourceSourceRenderApiLinks(this)) renderResourceSourceLinks(this, this.ctx, { compositeGpuToCanvas: true }) },
+							() => { if (!shouldUseResourceSourceRenderApiLinks(this)) renderResourceSourceLinks(this, this.ctx) },
 							() => getResourceSourceProfileDetail(this, getResourceSourceFocusResourceId(this))
 						)
 						const result = profileResourceSource(
