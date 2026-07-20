@@ -28,6 +28,13 @@
 		'strokeRect',
 		'strokeText'
 	]
+	const replacementContextStateProperties = [
+		'direction', 'fillStyle', 'filter', 'font', 'fontKerning', 'fontStretch', 'fontVariantCaps',
+		'globalAlpha', 'globalCompositeOperation', 'imageSmoothingEnabled', 'imageSmoothingQuality',
+		'letterSpacing', 'lineCap', 'lineDashOffset', 'lineJoin', 'lineWidth', 'miterLimit',
+		'shadowBlur', 'shadowColor', 'shadowOffsetX', 'shadowOffsetY', 'strokeStyle',
+		'textAlign', 'textBaseline', 'textRendering', 'wordSpacing'
+	]
 	const sourceIds = new WeakMap()
 	const targetIds = new WeakMap()
 	const sourceTotals = new Map()
@@ -57,6 +64,16 @@
 	let replayDynamicTrackingEnabled = true
 	let replayDynamicAtlasPageSize = defaultDynamicAtlasPageSize
 	let replayDynamicAtlasMaxPages = defaultDynamicAtlasMaxPages
+	let replacementRequested = false
+	let replacementState = 'off'
+	let replacementLastFallback = ''
+	let replacementCanvas = null
+	let replacementContext = null
+	const replacementStats = {
+		attemptedFrames: 0,
+		activeFrames: 0,
+		fallbacks: 0
+	}
 
 	const stats = {
 		frames: 0,
@@ -65,6 +82,8 @@
 		unsupportedDrawImages: 0,
 		polygonFills: 0,
 		supportedPolygonFills: 0,
+		pathStrokes: 0,
+		supportedPathStrokes: 0,
 		unsupportedPaints: 0,
 		adjacentBatches: 0,
 		atlasBatches: 0,
@@ -110,7 +129,6 @@
 	}
 
 	const unsupportedPaintMethods = [
-		'stroke',
 		'fillRect',
 		'strokeRect',
 		'clearRect',
@@ -159,13 +177,19 @@
 			return function () {
 				activeGame = this || activeGame
 				if (!isEnabled(api) || currentFrame) return original.apply(this, arguments)
-				const frame = createFrame(this)
+				let replacementFrame = null
+				if (replacementRequested) {
+					try { replacementFrame = beginReplacementFrame(this) }
+					catch (error) { failReplacement('isolation-' + String(error?.message || error || 'unavailable')) }
+				}
+				const frame = createFrame(this, replacementFrame?.context, replacementFrame?.mainCanvas)
 				const restorers = []
 				currentFrame = frame
 				try {
 					wrapTargetContexts(this, frame, restorers)
 					return original.apply(this, arguments)
 				} catch (error) {
+					frame.renderFailed = true
 					recordFallback('render-exception')
 					throw error
 				} finally {
@@ -173,7 +197,12 @@
 						try { restorers[i]() } catch (error) { recordFrameError(frame, 'restore') }
 					}
 					currentFrame = null
-					finalizeFrame(frame)
+					if (replacementFrame) this.ctx = replacementFrame.mainContext
+					let report = null
+					try { report = finalizeFrame(frame) }
+					finally {
+						if (replacementFrame) finalizeReplacementFrame(replacementFrame, frame, report?.replay)
+					}
 				}
 			}
 		})
@@ -182,6 +211,7 @@
 	function installDebugApi(api) {
 		window[apiKey] = {
 			enable(options = {}) {
+				stopReplacement()
 				runtimeEnabled = true
 				replayEnabled = options.replay === true
 				applyRuntimeOptions(options)
@@ -190,38 +220,63 @@
 				return this.stats()
 			},
 			enableReplay(options = {}) {
+				stopReplacement()
 				runtimeEnabled = true
 				replayEnabled = true
 				applyRuntimeOptions(options)
 				if (options.clear !== false) resetStats()
 				return this.stats()
 			},
+			enableReplacement(options = {}) {
+				stopReplacement()
+				runtimeEnabled = true
+				replayEnabled = true
+				replacementRequested = true
+				replacementState = 'warming'
+				replacementLastFallback = ''
+				replayVisible = false
+				replayOpacity = 1
+				applyRuntimeOptions(options)
+				hideReplayCanvas()
+				if (options.clear !== false) resetStats()
+				return this.stats()
+			},
+			disableReplacement() {
+				runtimeEnabled = false
+				stopReplacement()
+				return this.stats()
+			},
 			disableReplay() {
-				replayEnabled = false
-				destroyReplayRenderer()
+				stopReplacement()
 				return this.stats()
 			},
 			disable() {
 				runtimeEnabled = false
-				replayEnabled = false
-				destroyReplayRenderer()
+				stopReplacement()
 				return this.stats()
 			},
 			useConfig() {
 				runtimeEnabled = null
-				replayEnabled = false
-				destroyReplayRenderer()
+				stopReplacement()
 				return this.stats()
 			},
 			showReplay(options = {}) {
-				replayVisible = true
-				const opacity = Number(options.opacity)
-				if (Number.isFinite(opacity)) replayOpacity = Math.max(0, Math.min(1, opacity))
+				if (replacementRequested) {
+					replayVisible = replacementState === 'active'
+					replayOpacity = 1
+				} else {
+					replayVisible = true
+					const opacity = Number(options.opacity)
+					if (Number.isFinite(opacity)) replayOpacity = Math.max(0, Math.min(1, opacity))
+				}
 				syncReplayCanvasVisibility(replayRenderer)
 				return this.stats()
 			},
 			hideReplay() {
-				hideReplayCanvas()
+				if (replacementRequested) {
+					runtimeEnabled = false
+					stopReplacement()
+				} else hideReplayCanvas()
 				return this.stats()
 			},
 			replayCanvas() {
@@ -234,8 +289,7 @@
 				return getReplaySourceStats(options.limit || options.top || 40)
 			},
 			destroyReplay() {
-				replayEnabled = false
-				destroyReplayRenderer()
+				stopReplacement()
 				return this.stats()
 			},
 			clear() {
@@ -306,14 +360,17 @@
 		)) destroyReplayRenderer()
 	}
 
-	function createFrame(game) {
-		const replayTarget = game?.ctx?.canvas || null
+	function createFrame(game, recordingContext, replayTargetCanvas) {
+		const targetContext = recordingContext || game?.ctx || null
+		const replayTarget = replayTargetCanvas || game?.ctx?.canvas || null
 		return {
 			drawImages: 0,
 			supportedDrawImages: 0,
 			unsupportedDrawImages: 0,
 			polygonFills: 0,
 			supportedPolygonFills: 0,
+			pathStrokes: 0,
+			supportedPathStrokes: 0,
 			unsupportedPaints: 0,
 			adjacentBatches: 0,
 			atlasBatches: 0,
@@ -335,10 +392,148 @@
 			commands: [],
 			replayCommands: replayEnabled ? [] : null,
 			replayTarget,
-			replayTargetKey: replayTarget ? getTargetKey(game?.ctx) : '',
+			replayTargetKey: replayTarget && targetContext ? getTargetKey(targetContext) : '',
 			replaySkippedTargets: 0,
 			sourceRefs: replayEnabled ? new Map() : null
 		}
+	}
+
+	function beginReplacementFrame(game) {
+		const mainContext = game?.ctx
+		const mainCanvas = mainContext?.canvas
+		if (!mainContext || !mainCanvas) throw new Error('main-canvas-unavailable')
+		if (typeof document === 'undefined' || typeof document.createElement !== 'function') throw new Error('document-unavailable')
+		const width = Math.max(1, Math.floor(Number(mainCanvas.width) || 0))
+		const height = Math.max(1, Math.floor(Number(mainCanvas.height) || 0))
+		if (!replacementCanvas) {
+			replacementCanvas = document.createElement('canvas')
+			replacementCanvas.dataset.cattailEntityWebglReplacement = 'true'
+			replacementCanvas.setAttribute('aria-hidden', 'true')
+		}
+		if (replacementCanvas.width !== width) replacementCanvas.width = width
+		if (replacementCanvas.height !== height) replacementCanvas.height = height
+		let context = replacementCanvas.getContext('2d')
+		if (!context) throw new Error('isolation-context-unavailable')
+		if (typeof context.reset === 'function') context.reset()
+		else {
+			replacementCanvas.width = width
+			replacementCanvas.height = height
+			context = replacementCanvas.getContext('2d')
+			if (!context) throw new Error('isolation-context-reset-failed')
+		}
+		replacementContext = context
+		context.setTransform(1, 0, 0, 1, 0, 0)
+		context.clearRect(0, 0, width, height)
+		copyReplacementContextState(mainContext, context)
+		const transform = mainContext.getTransform?.()
+		if (!transform) throw new Error('main-transform-unavailable')
+		context.setTransform(transform.a, transform.b, transform.c, transform.d, transform.e, transform.f)
+		game.ctx = context
+		replacementStats.attemptedFrames++
+		return { game, mainContext, mainCanvas, context, canvas: replacementCanvas }
+	}
+
+	function copyReplacementContextState(source, target) {
+		for (const property of replacementContextStateProperties) {
+			try {
+				if (property in source && property in target) target[property] = source[property]
+			} catch (error) {}
+		}
+		try {
+			if (typeof source.getLineDash === 'function' && typeof target.setLineDash === 'function') target.setLineDash(source.getLineDash())
+		} catch (error) {}
+	}
+
+	function finalizeReplacementFrame(session, frame, replayReport) {
+		let reason = getReplacementUnsafeReason(session, frame, replayReport)
+		if (!reason) {
+			try {
+				replayVisible = true
+				replayOpacity = 1
+				syncReplayCanvasVisibility(replayRenderer)
+				if (!replayRenderer?.canvas?.isConnected) reason = 'replay-canvas-detached'
+			} catch (error) {
+				reason = 'replay-visibility-' + String(error?.message || error || 'failed')
+			}
+		}
+		if (!reason) {
+			replacementState = 'active'
+			replacementStats.activeFrames++
+			return true
+		}
+		let fallbackReason = reason
+		try { compositeReplacementFrame(session) }
+		catch (error) { fallbackReason += '+composite-' + String(error?.message || error || 'failed') }
+		failReplacement(fallbackReason)
+		return false
+	}
+
+	function getReplacementUnsafeReason(session, frame, replayReport) {
+		if (!replacementRequested) return 'replacement-disabled'
+		if (frame?.renderFailed) return 'entity-render-failed'
+		if (frame?.recordingErrors) return 'recording-errors'
+		if (frame?.unsupportedDrawImages) return 'unsupported-draw-image'
+		if (frame?.unsupportedPaints) return 'unsupported-paint'
+		if (!replayReport) return 'missing-replay-report'
+		if (replayReport.errors) return replayReport.error || 'replay-error'
+		if (replayReport.uploadErrors) return 'upload-error'
+		if (replayReport.skippedCommands) return 'skipped-command'
+		if (replayReport.skippedTargets) return 'skipped-target'
+		if (!replayRenderer?.gl || replayRenderer.contextLost) return 'webgl-context-unavailable'
+		if (replayReport.canvasSize?.width !== session.mainCanvas.width || replayReport.canvasSize?.height !== session.mainCanvas.height) return 'replay-size-mismatch'
+		return ''
+	}
+
+	function compositeReplacementFrame(session) {
+		const context = session?.mainContext
+		const canvas = session?.canvas
+		if (!context || !canvas) throw new Error('fallback-surface-unavailable')
+		context.save()
+		try {
+			context.setTransform(1, 0, 0, 1, 0, 0)
+			context.globalAlpha = 1
+			context.globalCompositeOperation = 'source-over'
+			context.filter = 'none'
+			context.shadowBlur = 0
+			context.shadowOffsetX = 0
+			context.shadowOffsetY = 0
+			context.drawImage(canvas, 0, 0)
+		} finally {
+			context.restore()
+		}
+	}
+
+	function failReplacement(reason) {
+		replacementRequested = false
+		replacementState = 'fallback'
+		replacementLastFallback = String(reason || 'unknown')
+		replacementStats.fallbacks++
+		runtimeEnabled = false
+		replayEnabled = false
+		hideReplayCanvas()
+		destroyReplayRenderer()
+		destroyReplacementSurface()
+		recordFallback('replacement-' + replacementLastFallback)
+	}
+
+	function stopReplacement() {
+		replacementRequested = false
+		replacementState = 'off'
+		replayEnabled = false
+		hideReplayCanvas()
+		destroyReplayRenderer()
+		destroyReplacementSurface()
+	}
+
+	function destroyReplacementSurface() {
+		try {
+			if (replacementCanvas) {
+				replacementCanvas.width = 1
+				replacementCanvas.height = 1
+			}
+		} catch (error) {}
+		replacementCanvas = null
+		replacementContext = null
 	}
 
 	function wrapTargetContexts(game, frame, restorers) {
@@ -391,6 +586,9 @@
 		}
 		wrapped += wrapContextMethod(ctx, 'fill', function (args) {
 			recordTimed(frame, function () { recordPolygonFill(frame, ctx, meta, args) })
+		}, restorers, frame)
+		wrapped += wrapContextMethod(ctx, 'stroke', function (args) {
+			recordTimed(frame, function () { recordPathStroke(frame, ctx, meta, args) })
 		}, restorers, frame)
 		for (const methodName of unsupportedPaintMethods) {
 			wrapped += wrapContextMethod(ctx, methodName, function () {
@@ -480,7 +678,9 @@
 			return
 		}
 		if (!meta.path.current) {
-			meta.path.unsupported = 'path-line-without-move'
+			const subpath = { points: [point], closed: false }
+			meta.path.subpaths.push(subpath)
+			meta.path.current = subpath
 			return
 		}
 		meta.path.current.points.push(point)
@@ -517,6 +717,93 @@
 		pushCommandPreview(frame, command)
 	}
 
+	function recordPathStroke(frame, ctx, meta, args) {
+		frame.pathStrokes++
+		incrementMap(frame.operationCounts, 'stroke')
+		const command = describePathStroke(ctx, meta, args)
+		frame.targets.add(command.targetKey)
+		incrementMap(frame.targetCounts, command.targetKey)
+		if (command.supported) {
+			frame.supportedPathStrokes++
+			if (!command.noop) recordSupportedCommand(frame, command)
+		} else {
+			frame.unsupportedPaints++
+			incrementMap(frame.unsupportedCounts, command.reason || 'canvas-stroke')
+			recordBarrier(frame)
+		}
+		pushReplayCommand(frame, command)
+		pushCommandPreview(frame, command)
+	}
+
+	function describePathStroke(ctx, meta, args) {
+		const targetKey = getTargetKey(ctx)
+		const firstArg = args?.[0]
+		const path = meta.path
+		const composite = String(ctx?.globalCompositeOperation || 'source-over')
+		const alpha = Number(ctx?.globalAlpha)
+		const strokeStyle = typeof ctx?.strokeStyle === 'string' ? ctx.strokeStyle : ''
+		const filter = String(ctx?.filter || 'none')
+		const lineWidth = Number(ctx?.lineWidth)
+		const lineCap = String(ctx?.lineCap || 'butt')
+		const lineJoin = String(ctx?.lineJoin || 'miter')
+		const miterLimit = Number(ctx?.miterLimit)
+		let dash = null
+		try { dash = typeof ctx?.getLineDash === 'function' ? ctx.getLineDash() : [] } catch (error) {}
+		const scaledLineWidth = getUniformStrokeWidth(ctx, lineWidth)
+		let noop = false
+		let reason = ''
+		if (firstArg) reason = 'stroke-path2d'
+		else if (!path) reason = 'stroke-missing-path'
+		else if (path.unsupported) reason = path.unsupported
+		else if (!path.subpaths.length || path.subpaths.every(function (subpath) { return !subpath?.points || subpath.points.length < 2 })) noop = true
+		else if (path.subpaths.length !== 1) reason = 'stroke-subpaths'
+		else if (path.subpaths[0]?.points.length < 2) reason = 'stroke-too-short'
+		else if (!isSolidColor(strokeStyle)) reason = 'stroke-style'
+		else if (meta.clipActive) reason = 'clip-active'
+		else if (composite !== 'source-over') reason = 'composite-' + composite
+		else if (!Number.isFinite(alpha) || alpha < 0 || alpha > 1) reason = 'global-alpha'
+		else if (filter && filter !== 'none') reason = 'filter-active'
+		else if (hasActiveShadow(ctx)) reason = 'shadow-active'
+		else if (lineCap !== 'butt' && lineCap !== 'square' && lineCap !== 'round') reason = 'stroke-line-cap-' + lineCap
+		else if (lineJoin !== 'miter') reason = 'stroke-line-join-' + lineJoin
+		else if (!Number.isFinite(miterLimit) || miterLimit <= 0) reason = 'stroke-miter-limit'
+		else if (!Array.isArray(dash) || dash.some(function (value) { return Number(value) !== 0 })) reason = 'stroke-dash'
+		else if (Number(ctx?.lineDashOffset) !== 0) reason = 'stroke-dash-offset'
+		else if (!Number.isFinite(scaledLineWidth) || scaledLineWidth <= 0) reason = 'stroke-transform'
+		else if (!buildReplayStrokeGeometry(path.subpaths[0].points, scaledLineWidth, lineCap, miterLimit)) reason = 'stroke-geometry'
+		return {
+			type: 'stroke',
+			operation: 'stroke',
+			supported: !reason,
+			noop,
+			reason,
+			targetKey,
+			sourceKey: 'solid-white',
+			points: path?.subpaths?.[0]?.points ? path.subpaths[0].points.map(function (point) { return point.slice() }) : [],
+			strokeStyle,
+			lineWidth: Number.isFinite(scaledLineWidth) ? scaledLineWidth : null,
+			lineCap,
+			lineJoin,
+			miterLimit: Number.isFinite(miterLimit) ? miterLimit : null,
+			alpha: Number.isFinite(alpha) ? roundNumber(alpha, 4) : null,
+			composite,
+			filter,
+			smoothing: false
+		}
+	}
+
+	function getUniformStrokeWidth(ctx, lineWidth) {
+		const matrix = getTransform(ctx)
+		if (!matrix || !Number.isFinite(lineWidth) || lineWidth <= 0) return null
+		const scaleX = Math.hypot(matrix[0], matrix[1])
+		const scaleY = Math.hypot(matrix[2], matrix[3])
+		const dot = matrix[0] * matrix[2] + matrix[1] * matrix[3]
+		const tolerance = Math.max(scaleX, scaleY, 1) * 0.0001
+		if (!Number.isFinite(scaleX) || !Number.isFinite(scaleY) || scaleX <= 0 || scaleY <= 0) return null
+		if (Math.abs(scaleX - scaleY) > tolerance || Math.abs(dot) > tolerance) return null
+		return roundNumber(lineWidth * (scaleX + scaleY) / 2, 4)
+	}
+
 	function describePolygonFill(ctx, meta, args) {
 		const targetKey = getTargetKey(ctx)
 		const firstArg = args?.[0]
@@ -532,8 +819,8 @@
 		else if (path.unsupported) reason = path.unsupported
 		else if (path.subpaths.length !== 1) reason = 'path-subpaths'
 		else if (!path.subpaths[0]?.closed) reason = 'path-open'
-		else if (path.subpaths[0].points.length !== 4) reason = 'path-not-quad'
-		else if (!isConvexQuad(path.subpaths[0].points)) reason = 'path-nonconvex'
+		else if (path.subpaths[0].points.length < 3) reason = 'path-too-short'
+		else if (!triangulateReplayPolygon(path.subpaths[0].points)) reason = 'path-non-simple'
 		else if (!isSolidColor(fillStyle)) reason = 'fill-style'
 		else if (meta.clipActive) reason = 'clip-active'
 		else if (composite !== 'source-over') reason = 'composite-' + composite
@@ -572,8 +859,8 @@
 		return /^#[0-9a-f]{3,8}$/i.test(String(value || '').trim())
 	}
 
-	function isConvexQuad(points) {
-		if (!Array.isArray(points) || points.length !== 4) return false
+	function isConvexPolygon(points) {
+		if (!Array.isArray(points) || points.length < 3) return false
 		let direction = 0
 		for (let i = 0; i < points.length; i++) {
 			const a = points[i]
@@ -586,6 +873,108 @@
 			else if (direction !== sign) return false
 		}
 		return true
+	}
+
+	function triangulateReplayPolygon(points) {
+		const normalized = normalizeReplayPoints(points)
+		if (!normalized || normalized.length < 3) return null
+		const clean = []
+		for (const point of normalized) {
+			const previous = clean[clean.length - 1]
+			if (!previous || Math.hypot(point[0] - previous[0], point[1] - previous[1]) > 0.000001) clean.push(point)
+		}
+		if (clean.length > 2 && Math.hypot(clean[0][0] - clean[clean.length - 1][0], clean[0][1] - clean[clean.length - 1][1]) <= 0.000001) clean.pop()
+		if (clean.length < 3 || polygonSelfIntersects(clean)) return null
+		const area = polygonSignedArea(clean)
+		if (!Number.isFinite(area) || Math.abs(area) <= 0.000001) return null
+		const orientation = Math.sign(area)
+		const indices = clean.map(function (_, index) { return index })
+		const triangles = []
+		let guard = clean.length * clean.length
+		while (indices.length > 3 && guard-- > 0) {
+			let clipped = false
+			for (let i = 0; i < indices.length; i++) {
+				const previousIndex = indices[(i - 1 + indices.length) % indices.length]
+				const currentIndex = indices[i]
+				const nextIndex = indices[(i + 1) % indices.length]
+				const a = clean[previousIndex]
+				const b = clean[currentIndex]
+				const c = clean[nextIndex]
+				if (polygonCross(a, b, c) * orientation <= 0.000001) continue
+				let containsPoint = false
+				for (const candidateIndex of indices) {
+					if (candidateIndex === previousIndex || candidateIndex === currentIndex || candidateIndex === nextIndex) continue
+					if (pointInTriangle(clean[candidateIndex], a, b, c)) {
+						containsPoint = true
+						break
+					}
+				}
+				if (containsPoint) continue
+				triangles.push([a, b, c])
+				indices.splice(i, 1)
+				clipped = true
+				break
+			}
+			if (!clipped) return null
+		}
+		if (indices.length !== 3) return null
+		triangles.push([clean[indices[0]], clean[indices[1]], clean[indices[2]]])
+		return triangles
+	}
+
+	function polygonSignedArea(points) {
+		let area = 0
+		for (let i = 0; i < points.length; i++) {
+			const a = points[i]
+			const b = points[(i + 1) % points.length]
+			area += a[0] * b[1] - b[0] * a[1]
+		}
+		return area / 2
+	}
+
+	function polygonCross(a, b, c) {
+		return (b[0] - a[0]) * (c[1] - b[1]) - (b[1] - a[1]) * (c[0] - b[0])
+	}
+
+	function pointInTriangle(point, a, b, c) {
+		const c1 = polygonCross(a, b, point)
+		const c2 = polygonCross(b, c, point)
+		const c3 = polygonCross(c, a, point)
+		const hasNegative = c1 < -0.000001 || c2 < -0.000001 || c3 < -0.000001
+		const hasPositive = c1 > 0.000001 || c2 > 0.000001 || c3 > 0.000001
+		return !(hasNegative && hasPositive)
+	}
+
+	function polygonSelfIntersects(points) {
+		for (let i = 0; i < points.length; i++) {
+			const a = points[i]
+			const b = points[(i + 1) % points.length]
+			for (let j = i + 1; j < points.length; j++) {
+				if (j === i || j === i + 1 || (i === 0 && j === points.length - 1)) continue
+				const c = points[j]
+				const d = points[(j + 1) % points.length]
+				if (segmentsIntersect(a, b, c, d)) return true
+			}
+		}
+		return false
+	}
+
+	function segmentsIntersect(a, b, c, d) {
+		const abC = polygonCross(a, b, c)
+		const abD = polygonCross(a, b, d)
+		const cdA = polygonCross(c, d, a)
+		const cdB = polygonCross(c, d, b)
+		if (((abC > 0.000001 && abD < -0.000001) || (abC < -0.000001 && abD > 0.000001)) &&
+			((cdA > 0.000001 && cdB < -0.000001) || (cdA < -0.000001 && cdB > 0.000001))) return true
+		return (Math.abs(abC) <= 0.000001 && pointOnSegment(c, a, b)) ||
+			(Math.abs(abD) <= 0.000001 && pointOnSegment(d, a, b)) ||
+			(Math.abs(cdA) <= 0.000001 && pointOnSegment(a, c, d)) ||
+			(Math.abs(cdB) <= 0.000001 && pointOnSegment(b, c, d))
+	}
+
+	function pointOnSegment(point, a, b) {
+		return point[0] >= Math.min(a[0], b[0]) - 0.000001 && point[0] <= Math.max(a[0], b[0]) + 0.000001 &&
+			point[1] >= Math.min(a[1], b[1]) - 0.000001 && point[1] <= Math.max(a[1], b[1]) + 0.000001
 	}
 
 	function recordSupportedCommand(frame, command) {
@@ -786,8 +1175,10 @@
 			unsupportedDrawImages: frame.unsupportedDrawImages,
 			polygonFills: frame.polygonFills,
 			supportedPolygonFills: frame.supportedPolygonFills,
+			pathStrokes: frame.pathStrokes,
+			supportedPathStrokes: frame.supportedPathStrokes,
 			unsupportedPaints: frame.unsupportedPaints,
-			quadCoverage: getCoverage(frame.supportedDrawImages + frame.supportedPolygonFills, frame.drawImages + frame.supportedPolygonFills + frame.unsupportedPaints),
+			quadCoverage: getCoverage(frame.supportedDrawImages + frame.supportedPolygonFills + frame.supportedPathStrokes, frame.drawImages + frame.supportedPolygonFills + frame.supportedPathStrokes + frame.unsupportedPaints),
 			adjacentBatches: frame.adjacentBatches,
 			atlasBatches: frame.atlasBatches,
 			textureSwitches: frame.textureSwitches,
@@ -812,6 +1203,8 @@
 		stats.unsupportedDrawImages += frame.unsupportedDrawImages
 		stats.polygonFills += frame.polygonFills
 		stats.supportedPolygonFills += frame.supportedPolygonFills
+		stats.pathStrokes += frame.pathStrokes
+		stats.supportedPathStrokes += frame.supportedPathStrokes
 		stats.unsupportedPaints += frame.unsupportedPaints
 		stats.adjacentBatches += frame.adjacentBatches
 		stats.atlasBatches += frame.atlasBatches
@@ -832,6 +1225,7 @@
 			drawImages: frame.drawImages,
 			supportedDrawImages: frame.supportedDrawImages,
 			supportedPolygonFills: frame.supportedPolygonFills,
+			supportedPathStrokes: frame.supportedPathStrokes,
 			unsupportedPaints: frame.unsupportedPaints,
 			adjacentBatches: frame.adjacentBatches,
 			atlasBatches: frame.atlasBatches,
@@ -840,6 +1234,7 @@
 			recordingMs: frame.recordingMs
 		})
 		while (samples.length > sampleLimit) samples.shift()
+		return report
 	}
 
 
@@ -890,6 +1285,7 @@
 				let appended = false
 				if (command.type === 'drawImage') appended = appendReplayDrawImage(renderer, frame, command, report)
 				else if (command.type === 'polygon') appended = appendReplayPolygon(renderer, command, report)
+				else if (command.type === 'stroke') appended = appendReplayStroke(renderer, command, report)
 				if (!appended) {
 					flushReplayBatch(renderer, report)
 					report.skippedCommands++
@@ -971,6 +1367,7 @@
 			try { event.preventDefault() } catch (error) {}
 			renderer.contextLost = true
 			replayStats.contextLosses++
+			if (replacementRequested) failReplacement('webgl-context-lost')
 		}, false)
 		canvas.addEventListener('webglcontextrestored', function () {
 			if (replayRenderer !== renderer) return
@@ -1669,18 +2066,135 @@
 	}
 
 	function appendReplayPolygon(renderer, command, report) {
-		if (!Array.isArray(command.points) || command.points.length !== 4) return false
-		const positions = command.points.map(function (point) {
+		if (!Array.isArray(command.points) || command.points.length < 3) return false
+		const positions = normalizeReplayPoints(command.points)
+		if (!positions) return false
+		const color = parseReplayColor(command.fillStyle, command.alpha)
+		const uvs = getReplayTextureUvs(renderer.whiteEntry, [0, 0, 1, 1], [1, 1], false)
+		if (!color || !uvs) return false
+		if (positions.length === 4 && isConvexPolygon(positions)) return appendReplayQuad(renderer, renderer.whiteEntry, false, positions, uvs, color, report)
+		const triangles = triangulateReplayPolygon(positions)
+		if (!triangles) return false
+		for (const points of triangles) {
+			const triangle = [points[0], points[1], points[2], points[2]]
+			if (!appendReplayQuad(renderer, renderer.whiteEntry, false, triangle, uvs, color, report)) return false
+		}
+		return true
+	}
+
+	function appendReplayStroke(renderer, command, report) {
+		if (command.noop) return true
+		const geometry = buildReplayStrokeGeometry(command.points, Number(command.lineWidth), command.lineCap, Number(command.miterLimit))
+		const color = parseReplayColor(command.strokeStyle, command.alpha)
+		const uvs = getReplayTextureUvs(renderer.whiteEntry, [0, 0, 1, 1], [1, 1], false)
+		if (!geometry || !color || !uvs) return false
+		for (const points of geometry.triangles) {
+			const triangle = [points[0], points[1], points[2], points[2]]
+			if (!appendReplayQuad(renderer, renderer.whiteEntry, false, triangle, uvs, color, report)) return false
+		}
+		return true
+	}
+
+	function buildReplayStrokeGeometry(points, lineWidth, lineCap, miterLimit) {
+		const rawPoints = normalizeReplayPoints(points)
+		if (!rawPoints || rawPoints.length < 2 || !Number.isFinite(lineWidth) || lineWidth <= 0) return null
+		if (!Number.isFinite(miterLimit) || miterLimit <= 0) return null
+		const normalized = []
+		for (const point of rawPoints) {
+			const previous = normalized[normalized.length - 1]
+			if (!previous || Math.hypot(point[0] - previous[0], point[1] - previous[1]) > 0.000001) normalized.push(point)
+		}
+		if (normalized.length < 2) return null
+		const directions = []
+		const normals = []
+		for (let i = 0; i < normalized.length - 1; i++) {
+			const dx = normalized[i + 1][0] - normalized[i][0]
+			const dy = normalized[i + 1][1] - normalized[i][1]
+			const length = Math.hypot(dx, dy)
+			if (!Number.isFinite(length) || length <= 0.000001) return null
+			const direction = [dx / length, dy / length]
+			directions.push(direction)
+			normals.push([-direction[1], direction[0]])
+		}
+		const half = lineWidth / 2
+		const triangles = []
+		for (let i = 0; i < normalized.length - 1; i++) {
+			const direction = directions[i]
+			const normal = normals[i]
+			let start = normalized[i]
+			let end = normalized[i + 1]
+			if (lineCap === 'square' && i === 0) start = [start[0] - direction[0] * half, start[1] - direction[1] * half]
+			if (lineCap === 'square' && i === normalized.length - 2) end = [end[0] + direction[0] * half, end[1] + direction[1] * half]
+			const offset = [normal[0] * half, normal[1] * half]
+			const segmentTriangles = triangulateReplayPolygon([
+				[start[0] + offset[0], start[1] + offset[1]],
+				[end[0] + offset[0], end[1] + offset[1]],
+				[end[0] - offset[0], end[1] - offset[1]],
+				[start[0] - offset[0], start[1] - offset[1]]
+			])
+			if (!segmentTriangles) return null
+			triangles.push(...segmentTriangles)
+		}
+		for (let i = 1; i < normalized.length - 1; i++) {
+			const previousDirection = directions[i - 1]
+			const nextDirection = directions[i]
+			const cross = previousDirection[0] * nextDirection[1] - previousDirection[1] * nextDirection[0]
+			const dot = previousDirection[0] * nextDirection[0] + previousDirection[1] * nextDirection[1]
+			if (Math.abs(cross) <= 0.000001) {
+				if (dot < 0) return null
+				continue
+			}
+			const center = normalized[i]
+			const side = cross > 0 ? -1 : 1
+			const previousOuterNormal = [normals[i - 1][0] * side, normals[i - 1][1] * side]
+			const nextOuterNormal = [normals[i][0] * side, normals[i][1] * side]
+			const previousOuter = [center[0] + previousOuterNormal[0] * half, center[1] + previousOuterNormal[1] * half]
+			const nextOuter = [center[0] + nextOuterNormal[0] * half, center[1] + nextOuterNormal[1] * half]
+			let tip = center.slice()
+			const mx = previousOuterNormal[0] + nextOuterNormal[0]
+			const my = previousOuterNormal[1] + nextOuterNormal[1]
+			const miterLength = Math.hypot(mx, my)
+			if (Number.isFinite(miterLength) && miterLength > 0.000001) {
+				const miter = [mx / miterLength, my / miterLength]
+				const denominator = miter[0] * nextOuterNormal[0] + miter[1] * nextOuterNormal[1]
+				const ratio = Math.abs(1 / denominator)
+				if (Number.isFinite(ratio) && Math.abs(denominator) > 0.000001 && ratio <= miterLimit) {
+					tip = [center[0] + miter[0] * half / denominator, center[1] + miter[1] * half / denominator]
+				}
+			}
+			triangles.push([previousOuter, tip, nextOuter])
+		}
+		if (lineCap === 'round') {
+			triangles.push(...buildRoundCapTriangles(normalized[0], directions[0], half, true))
+			triangles.push(...buildRoundCapTriangles(normalized[normalized.length - 1], directions[directions.length - 1], half, false))
+		}
+		return { triangles }
+	}
+
+	function buildRoundCapTriangles(center, direction, radius, start) {
+		const triangles = []
+		const segments = 12
+		const baseAngle = Math.atan2(direction[1], direction[0])
+		const firstAngle = baseAngle + (start ? -Math.PI / 2 : Math.PI / 2)
+		let previous = [center[0] + Math.cos(firstAngle) * radius, center[1] + Math.sin(firstAngle) * radius]
+		for (let i = 1; i <= segments; i++) {
+			const angle = firstAngle - Math.PI * i / segments
+			const next = [center[0] + Math.cos(angle) * radius, center[1] + Math.sin(angle) * radius]
+			triangles.push([center.slice(), previous, next])
+			previous = next
+		}
+		return triangles
+	}
+
+	function normalizeReplayPoints(points) {
+		if (!Array.isArray(points)) return null
+		const normalized = points.map(function (point) {
 			if (!Array.isArray(point) || point.length < 2) return null
 			const x = Number(point[0])
 			const y = Number(point[1])
 			return Number.isFinite(x) && Number.isFinite(y) ? [x, y] : null
 		})
-		if (!positions.every(Boolean)) return false
-		const color = parseReplayColor(command.fillStyle, command.alpha)
-		const uvs = getReplayTextureUvs(renderer.whiteEntry, [0, 0, 1, 1], [1, 1], false)
-		if (!color || !uvs) return false
-		return appendReplayQuad(renderer, renderer.whiteEntry, false, positions, uvs, color, report)
+		return normalized.every(Boolean) ? normalized : null
 	}
 
 	function getReplayTextureUvs(entry, sourceRect, size, smoothing) {
@@ -1955,7 +2469,12 @@
 		style.zIndex = targetZIndex && targetZIndex !== 'auto' ? targetZIndex : ''
 		style.opacity = String(replayOpacity)
 		style.background = 'transparent'
-		if (!renderer.canvas.isConnected) document.body.appendChild(renderer.canvas)
+		const parent = target?.parentNode
+		if (parent && typeof parent.insertBefore === 'function') {
+			if (renderer.canvas.parentNode !== parent || renderer.canvas.previousSibling !== target) parent.insertBefore(renderer.canvas, target.nextSibling)
+		} else if (!renderer.canvas.isConnected) {
+			document.body.appendChild(renderer.canvas)
+		}
 	}
 
 	function hideReplayCanvas() {
@@ -2023,10 +2542,24 @@
 			lastReplayMs: roundMs(replayStats.lastReplayMs),
 			maxReplayMs: roundMs(replayStats.maxReplayMs),
 			lastError: replayStats.lastError,
+			replacement: getReplacementStats(),
 			lastCanvasSize: Object.assign({}, replayStats.lastCanvasSize),
 			staticAtlas: getReplayAtlasStats(),
 			dynamicAtlas: getReplayDynamicAtlasStats(),
 			sources: getReplaySourceStats(40)
+		}
+	}
+
+	function getReplacementStats() {
+		return {
+			requested: replacementRequested,
+			state: replacementState,
+			active: replacementState === 'active',
+			isolationReady: !!replacementCanvas && !!replacementContext,
+			attemptedFrames: replacementStats.attemptedFrames,
+			activeFrames: replacementStats.activeFrames,
+			fallbacks: replacementStats.fallbacks,
+			lastFallback: replacementLastFallback
 		}
 	}
 
@@ -2139,6 +2672,10 @@
 		replayStats.lastCanvasSize = { width: 0, height: 0 }
 		replaySamples.length = 0
 		lastReplay = null
+		replacementStats.attemptedFrames = 0
+		replacementStats.activeFrames = 0
+		replacementStats.fallbacks = 0
+		replacementLastFallback = ''
 	}
 
 	function getStats(api) {
@@ -2157,11 +2694,14 @@
 			unsupportedDrawImages: stats.unsupportedDrawImages,
 			polygonFills: stats.polygonFills,
 			supportedPolygonFills: stats.supportedPolygonFills,
+			pathStrokes: stats.pathStrokes,
+			supportedPathStrokes: stats.supportedPathStrokes,
 			unsupportedPaints: stats.unsupportedPaints,
-			quadCoverage: getCoverage(stats.supportedDrawImages + stats.supportedPolygonFills, stats.drawImages + stats.supportedPolygonFills + stats.unsupportedPaints),
+			quadCoverage: getCoverage(stats.supportedDrawImages + stats.supportedPolygonFills + stats.supportedPathStrokes, stats.drawImages + stats.supportedPolygonFills + stats.supportedPathStrokes + stats.unsupportedPaints),
 			avgDrawImagesPerFrame: roundNumber(getSampleAverage('drawImages'), 3),
 			avgSupportedDrawImagesPerFrame: roundNumber(getSampleAverage('supportedDrawImages'), 3),
 			avgSupportedPolygonFillsPerFrame: roundNumber(getSampleAverage('supportedPolygonFills'), 3),
+			avgSupportedPathStrokesPerFrame: roundNumber(getSampleAverage('supportedPathStrokes'), 3),
 			avgAdjacentBatchesPerFrame: roundNumber(getSampleAverage('adjacentBatches'), 3),
 			avgAtlasBatchesPerFrame: roundNumber(getSampleAverage('atlasBatches'), 3),
 			avgTextureSwitchesPerFrame: roundNumber(getSampleAverage('textureSwitches'), 3),
@@ -2175,7 +2715,8 @@
 			fallbacks: stats.fallbacks,
 			lastFallback: stats.lastFallback,
 			fallbackReasons: Object.assign({}, stats.fallbackReasons),
-			replay: getReplayStats()
+			replay: getReplayStats(),
+			replacement: getReplacementStats()
 		}
 	}
 
@@ -2193,6 +2734,8 @@
 		stats.unsupportedDrawImages = 0
 		stats.polygonFills = 0
 		stats.supportedPolygonFills = 0
+		stats.pathStrokes = 0
+		stats.supportedPathStrokes = 0
 		stats.unsupportedPaints = 0
 		stats.adjacentBatches = 0
 		stats.atlasBatches = 0
