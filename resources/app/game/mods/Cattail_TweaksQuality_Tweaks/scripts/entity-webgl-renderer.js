@@ -16,6 +16,9 @@
 	const dynamicEntryIdleFrameLimit = 240
 	const dynamicEntrySweepInterval = 60
 	const maxSourceDiagnosticEntries = 2000
+	const replacementReplayOrder = 19
+	const replacementReplayZIndex = 19
+	const replacementSourceLayerId = 'entity-webgl-source'
 	const dynamicSourceMutationMethods = [
 		'clearRect',
 		'drawImage',
@@ -69,6 +72,8 @@
 	let replacementLastFallback = ''
 	let replacementCanvas = null
 	let replacementContext = null
+	let replacementRenderScope = null
+	let replacementRenderApi = null
 	const replacementStats = {
 		attemptedFrames: 0,
 		activeFrames: 0,
@@ -239,6 +244,8 @@
 				applyRuntimeOptions(options)
 				hideReplayCanvas()
 				if (options.clear !== false) resetStats()
+				const layerRoutingError = startReplacementLayerRouting(api)
+				if (layerRoutingError) failReplacement(layerRoutingError)
 				return this.stats()
 			},
 			disableReplacement() {
@@ -399,6 +406,8 @@
 	}
 
 	function beginReplacementFrame(game) {
+		const layerRoutingError = getReplacementLayerRoutingError(game)
+		if (layerRoutingError) throw new Error(layerRoutingError)
 		const mainContext = game?.ctx
 		const mainCanvas = mainContext?.canvas
 		if (!mainContext || !mainCanvas) throw new Error('main-canvas-unavailable')
@@ -451,7 +460,8 @@
 				replayVisible = true
 				replayOpacity = 1
 				syncReplayCanvasVisibility(replayRenderer)
-				if (!replayRenderer?.canvas?.isConnected) reason = 'replay-canvas-detached'
+				if (!isReplacementReplayLayerReady(session?.mainCanvas)) reason = 'replay-layer-unavailable'
+				else if (!replayRenderer?.canvas?.isConnected) reason = 'replay-canvas-detached'
 			} catch (error) {
 				reason = 'replay-visibility-' + String(error?.message || error || 'failed')
 			}
@@ -510,6 +520,7 @@
 		replacementStats.fallbacks++
 		runtimeEnabled = false
 		replayEnabled = false
+		stopReplacementLayerRouting()
 		hideReplayCanvas()
 		destroyReplayRenderer()
 		destroyReplacementSurface()
@@ -520,9 +531,59 @@
 		replacementRequested = false
 		replacementState = 'off'
 		replayEnabled = false
+		stopReplacementLayerRouting()
 		hideReplayCanvas()
 		destroyReplayRenderer()
 		destroyReplacementSurface()
+	}
+
+	function startReplacementLayerRouting(api) {
+		stopReplacementLayerRouting()
+		const renderApi = api?.render || window.ModLoader?.render
+		if (!renderApi || typeof renderApi.createScope !== 'function') return 'render-layer-api-unavailable'
+		if (typeof renderApi.isEnabled !== 'function' || !renderApi.isEnabled()) return 'render-layer-api-disabled'
+		let scope = null
+		try {
+			scope = renderApi.createScope()
+			if (!scope || typeof scope.demandLayer !== 'function' || typeof scope.routeMethod !== 'function') {
+				try { scope?.dispose?.() } catch (disposeError) {}
+				return 'render-layer-scope-unavailable'
+			}
+			scope.demandLayer('buildings', { id: 'entity-webgl-underlay', enabled: function () { return replacementRequested } })
+			scope.routeMethod('renderConductors', 'buildings')
+			scope.routeMethod('renderChasmVFX', 'buildings')
+			scope.routeMethod('renderEntities', replacementSourceLayerId)
+			replacementRenderScope = scope
+			replacementRenderApi = renderApi
+			return ''
+		} catch (error) {
+			try { scope?.dispose?.() } catch (disposeError) {}
+			return 'render-layer-setup-' + String(error?.message || error || 'failed')
+		}
+	}
+
+	function stopReplacementLayerRouting() {
+		const scope = replacementRenderScope
+		replacementRenderScope = null
+		replacementRenderApi = null
+		try { scope?.dispose?.() } catch (error) { recordFallback('render-layer-cleanup') }
+	}
+
+	function getReplacementLayerRoutingError(game) {
+		const renderApi = replacementRenderApi
+		if (!replacementRenderScope || !renderApi) return 'render-layer-scope-unavailable'
+		try {
+			if (typeof renderApi.isEnabled !== 'function' || !renderApi.isEnabled()) return 'render-layer-api-disabled'
+			if (renderApi.getMethodLayer?.('renderConductors') !== 'buildings') return 'render-conductors-route-changed'
+			if (renderApi.getMethodLayer?.('renderChasmVFX') !== 'buildings') return 'render-chasm-vfx-route-changed'
+			if (renderApi.getMethodLayer?.('renderEntities') !== replacementSourceLayerId) return 'render-entities-route-changed'
+			if (!renderApi.isLayerDemanded?.('buildings')) return 'buildings-layer-not-demanded'
+			if (!renderApi.isLayerDemanded?.('background')) return 'background-layer-not-demanded'
+			if (game?.ctx?.canvas?.parentNode?.id !== 'modloader-render-stack') return 'render-stack-unavailable'
+		} catch (error) {
+			return 'render-layer-check-' + String(error?.message || error || 'failed')
+		}
+		return ''
 	}
 
 	function destroyReplacementSurface() {
@@ -2459,22 +2520,56 @@
 		const rect = target?.getBoundingClientRect?.()
 		if (!rect || typeof document === 'undefined' || !document.body) return
 		const style = renderer.canvas.style
+		style.pointerEvents = 'none'
+		style.opacity = String(replayOpacity)
+		style.background = 'transparent'
+		const parent = target?.parentNode
+		if (replacementRequested && parent?.id === 'modloader-render-stack') {
+			style.position = 'absolute'
+			style.left = '0px'
+			style.top = '0px'
+			style.width = '100%'
+			style.height = '100%'
+			style.zIndex = String(replacementReplayZIndex)
+			renderer.canvas.dataset.modloaderRenderOrder = String(replacementReplayOrder)
+			const children = Array.from(parent.children)
+			let before = null
+			for (const child of children) {
+				if (child === renderer.canvas) continue
+				const order = Number(child.dataset?.modloaderRenderOrder)
+				if (Number.isFinite(order) && order > replacementReplayOrder) {
+					before = child
+					break
+				}
+			}
+			if (renderer.canvas.parentNode !== parent || renderer.canvas.nextSibling !== before) parent.insertBefore(renderer.canvas, before)
+			return
+		}
+		delete renderer.canvas.dataset.modloaderRenderOrder
 		style.position = 'fixed'
 		style.left = rect.left + 'px'
 		style.top = rect.top + 'px'
 		style.width = rect.width + 'px'
 		style.height = rect.height + 'px'
-		style.pointerEvents = 'none'
 		const targetZIndex = typeof getComputedStyle === 'function' ? getComputedStyle(target).zIndex : target?.style?.zIndex
 		style.zIndex = targetZIndex && targetZIndex !== 'auto' ? targetZIndex : ''
-		style.opacity = String(replayOpacity)
-		style.background = 'transparent'
-		const parent = target?.parentNode
 		if (parent && typeof parent.insertBefore === 'function') {
 			if (renderer.canvas.parentNode !== parent || renderer.canvas.previousSibling !== target) parent.insertBefore(renderer.canvas, target.nextSibling)
 		} else if (!renderer.canvas.isConnected) {
 			document.body.appendChild(renderer.canvas)
 		}
+	}
+
+	function isReplacementReplayLayerReady(mainCanvas) {
+		const canvas = replayRenderer?.canvas
+		const parent = mainCanvas?.parentNode
+		if (!canvas || !parent || parent.id !== 'modloader-render-stack' || canvas.parentNode !== parent) return false
+		if (Number(canvas.dataset?.modloaderRenderOrder) !== replacementReplayOrder) return false
+		if (Number(canvas.style?.zIndex) !== replacementReplayZIndex) return false
+		const children = Array.from(parent.children)
+		const replayIndex = children.indexOf(canvas)
+		const mainIndex = children.indexOf(mainCanvas)
+		return replayIndex >= 0 && mainIndex >= 0 && replayIndex < mainIndex
 	}
 
 	function hideReplayCanvas() {
@@ -2559,7 +2654,10 @@
 			attemptedFrames: replacementStats.attemptedFrames,
 			activeFrames: replacementStats.activeFrames,
 			fallbacks: replacementStats.fallbacks,
-			lastFallback: replacementLastFallback
+			lastFallback: replacementLastFallback,
+			layerRoutingReady: !!replacementRenderScope && !!replacementRenderApi,
+			replayOrder: replacementReplayOrder,
+			replayZIndex: replacementReplayZIndex
 		}
 	}
 
