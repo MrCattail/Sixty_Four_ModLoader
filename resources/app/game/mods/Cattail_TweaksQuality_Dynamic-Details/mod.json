@@ -166,6 +166,10 @@
         "enableResourceSourceLineChart": {
           "label": "资源折线图",
           "description": "鼠标悬停资源图标时，可将原版柱状图切换为当前资源数量的分级合并折线图。"
+        },
+        "resourceSourceLineRenderer": {
+          "label": "资源来源连线渲染",
+          "description": "选择资源来源连线的渲染方式。游戏中按 O 也会切换这个值。"
         }
       }
     },
@@ -195,6 +199,10 @@
         "enableResourceSourceLineChart": {
           "label": "资源折线图",
           "description": "鼠标悬停资源图标时，可将原版柱状图切换为当前资源数量的分级合并折线图。"
+        },
+        "resourceSourceLineRenderer": {
+          "label": "资源来源连线渲染",
+          "description": "选择资源来源连线的渲染方式。游戏中按 O 也会切换这个值。"
         }
       }
     },
@@ -202,14 +210,23 @@
       "name": "Dynamic Details",
       "config": {
         "cookieDirectionPassword": {
-          "label": "Cookie direction password"
+          "label": "Cookie direction password",
+          "description": "Enter cookie to show the cookie direction indicator before Cookie Clicker is achieved."
         },
         "enableResourceSourceLineChart": {
           "label": "Resource line chart",
           "description": "While hovering resource icons, allow switching the vanilla bar chart to a merged-bucket line chart of the current resource amount."
+        },
+        "resourceSourceLineRenderer": {
+          "label": "Resource source line renderer",
+          "description": "Choose how resource source lines are rendered. Press O in game to switch this value.",
+          "valueLabels": [
+            "Canvas 2D",
+            "WebGL"
+          ]
         }
       },
-      "description": "Adds modular dynamic building detail cards, resource source panels and lines, coordinate hints, direction pointers, and shop build-availability countdowns without modifying vanilla scripts."
+      "description": "Adds Alt+Shift dynamic building detail panels and shop build-availability countdowns without modifying vanilla scripts."
     },
     "ru": {
       "name": "Динамические сведения",

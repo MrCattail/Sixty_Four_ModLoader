@@ -4,8 +4,10 @@
     "kind": "sixty-four.modloader.translations",
     "formatVersion": 1,
     "generator": "Sixty Four ModLoader",
-    "editedAt": "2026-07-21T17:49:22.690Z",
-    "lastAction": "sync"
+    "editedAt": "2026-07-21T23:19:21.347Z",
+    "lastAction": "import",
+    "exportedAt": "2026-07-21T23:18:15.330Z",
+    "sourceName": "Translations-20260721-191815.json"
   },
   "description": "Edit this file to override ModLoader menu text and mod manifest/config translations. The structure is language -> modloader/mods -> text.",
   "languages": {
@@ -116,7 +118,14 @@
         "translationExportOverwriteTitle": "Overwrite translation backup?",
         "translationExportOverwriteMessage": "Target file already exists.\nEdit time: {editedAt}\n{path}\nOverwrite it?",
         "translationOverwriteConfirm": "Overwrite",
-        "translationDialogUnavailable": "File dialog is unavailable."
+        "translationDialogUnavailable": "File dialog is unavailable.",
+        "translationImportWriteModsTitle": "Write translations to mod.json?",
+        "translationImportWriteModsMessage": "The imported file will replace ModLoader translations.json either way. Do you also want to write matching mod translation fields into installed mod.json files? This overwrites existing matching translation fields.",
+        "translationImportWriteModsConfirm": "Write to mod",
+        "translationImportSkipMods": "Do not write",
+        "translationImportWriteModsResult": "Mod write-back: {written} written, {unchanged} already current, {failed} failed.",
+        "translationImportNoMatchingMods": "No installed mod.json matched the imported mod entries.",
+        "translationImportModFailures": "Failures: {failures}"
       },
       "mods": {
         "Cattail_Tweaks_简体中文优化": {
@@ -431,7 +440,14 @@
         "translationExportOverwriteTitle": "覆盖翻译备份？",
         "translationExportOverwriteMessage": "目标文件已存在。\n编辑时间：{editedAt}\n{path}\n是否覆盖？",
         "translationOverwriteConfirm": "覆盖",
-        "translationDialogUnavailable": "文件选择器不可用。"
+        "translationDialogUnavailable": "文件选择器不可用。",
+        "translationImportWriteModsTitle": "写入 mod.json？",
+        "translationImportWriteModsMessage": "无论如何，导入文件都会覆盖 ModLoader 的 translations.json。是否也将匹配的 mod 翻译字段写入已安装的 mod.json？这会覆盖已有的匹配翻译字段。",
+        "translationImportWriteModsConfirm": "写入 mod",
+        "translationImportSkipMods": "不写入 mod",
+        "translationImportWriteModsResult": "mod 写回：已写入 {written}，已是最新 {unchanged}，失败 {failed}。",
+        "translationImportNoMatchingMods": "没有已安装的 mod.json 匹配导入文件中的 mod 条目。",
+        "translationImportModFailures": "失败：{failures}"
       },
       "mods": {
         "Cattail_Tweaks_简体中文优化": {
@@ -742,7 +758,14 @@
         "translationExportOverwriteTitle": "覆盖翻译备份？",
         "translationExportOverwriteMessage": "目标文件已存在。\n编辑时间：{editedAt}\n{path}\n是否覆盖？",
         "translationOverwriteConfirm": "覆盖",
-        "translationDialogUnavailable": "文件选择器不可用。"
+        "translationDialogUnavailable": "文件选择器不可用。",
+        "translationImportWriteModsTitle": "写入 mod.json？",
+        "translationImportWriteModsMessage": "无论如何，导入文件都会覆盖 ModLoader 的 translations.json。是否也将匹配的 mod 翻译字段写入已安装的 mod.json？这会覆盖已有的匹配翻译字段。",
+        "translationImportWriteModsConfirm": "写入 mod",
+        "translationImportSkipMods": "不写入 mod",
+        "translationImportWriteModsResult": "mod 写回：已写入 {written}，已是最新 {unchanged}，失败 {failed}。",
+        "translationImportNoMatchingMods": "没有已安装的 mod.json 匹配导入文件中的 mod 条目。",
+        "translationImportModFailures": "失败：{failures}"
       },
       "mods": {
         "Cattail_Tweaks_简体中文优化": {
@@ -1053,7 +1076,14 @@
         "translationExportOverwriteTitle": "覆蓋翻譯備份？",
         "translationExportOverwriteMessage": "目標檔案已存在。\n編輯時間：{editedAt}\n{path}\n是否覆蓋？",
         "translationOverwriteConfirm": "覆蓋",
-        "translationDialogUnavailable": "檔案選擇器不可用。"
+        "translationDialogUnavailable": "檔案選擇器不可用。",
+        "translationImportWriteModsTitle": "寫入 mod.json？",
+        "translationImportWriteModsMessage": "無論如何，匯入檔案都會覆蓋 ModLoader 的 translations.json。是否也將相符的 mod 翻譯欄位寫入已安裝的 mod.json？這會覆蓋既有的相符翻譯欄位。",
+        "translationImportWriteModsConfirm": "寫入 mod",
+        "translationImportSkipMods": "不寫入 mod",
+        "translationImportWriteModsResult": "mod 寫回：已寫入 {written}，已是最新 {unchanged}，失敗 {failed}。",
+        "translationImportNoMatchingMods": "沒有已安裝的 mod.json 符合匯入檔案中的 mod 條目。",
+        "translationImportModFailures": "失敗：{failures}"
       },
       "mods": {
         "Cattail_Tweaks_简体中文优化": {
@@ -1242,7 +1272,14 @@
         "translationExportOverwriteTitle": "Overwrite translation backup?",
         "translationExportOverwriteMessage": "Target file already exists.\nEdit time: {editedAt}\n{path}\nOverwrite it?",
         "translationOverwriteConfirm": "Overwrite",
-        "translationDialogUnavailable": "File dialog is unavailable."
+        "translationDialogUnavailable": "File dialog is unavailable.",
+        "translationImportWriteModsTitle": "Write translations to mod.json?",
+        "translationImportWriteModsMessage": "The imported file will replace ModLoader translations.json either way. Do you also want to write matching mod translation fields into installed mod.json files? This overwrites existing matching translation fields.",
+        "translationImportWriteModsConfirm": "Write to mod",
+        "translationImportSkipMods": "Do not write",
+        "translationImportWriteModsResult": "Mod write-back: {written} written, {unchanged} already current, {failed} failed.",
+        "translationImportNoMatchingMods": "No installed mod.json matched the imported mod entries.",
+        "translationImportModFailures": "Failures: {failures}"
       },
       "mods": {
         "Cattail_Tweaks_简体中文优化": {
@@ -1431,7 +1468,14 @@
         "translationExportOverwriteTitle": "Uebersetzungsbackup ueberschreiben?",
         "translationExportOverwriteMessage": "Die Zieldatei existiert bereits.\nBearbeitungszeit: {editedAt}\n{path}\nUeberschreiben?",
         "translationOverwriteConfirm": "Ueberschreiben",
-        "translationDialogUnavailable": "Dateiauswahl ist nicht verfuegbar."
+        "translationDialogUnavailable": "Dateiauswahl ist nicht verfuegbar.",
+        "translationImportWriteModsTitle": "Uebersetzungen in mod.json schreiben?",
+        "translationImportWriteModsMessage": "Die importierte Datei ersetzt in jedem Fall ModLoader translations.json. Sollen passende Mod-Uebersetzungsfelder auch in installierte mod.json-Dateien geschrieben werden? Dadurch werden vorhandene passende Uebersetzungsfelder ueberschrieben.",
+        "translationImportWriteModsConfirm": "In mod schreiben",
+        "translationImportSkipMods": "Nicht schreiben",
+        "translationImportWriteModsResult": "Mod-Rueckschreiben: {written} geschrieben, {unchanged} bereits aktuell, {failed} fehlgeschlagen.",
+        "translationImportNoMatchingMods": "Keine installierte mod.json passt zu den importierten Mod-Eintraegen.",
+        "translationImportModFailures": "Fehler: {failures}"
       },
       "mods": {
         "Cattail_Tweaks_简体中文优化": {
@@ -1620,7 +1664,14 @@
         "translationExportOverwriteTitle": "Sobrescrever backup das traducoes?",
         "translationExportOverwriteMessage": "O arquivo de destino ja existe.\nHorario de edicao: {editedAt}\n{path}\nSobrescrever?",
         "translationOverwriteConfirm": "Sobrescrever",
-        "translationDialogUnavailable": "O seletor de arquivos nao esta disponivel."
+        "translationDialogUnavailable": "O seletor de arquivos nao esta disponivel.",
+        "translationImportWriteModsTitle": "Gravar traducoes em mod.json?",
+        "translationImportWriteModsMessage": "O arquivo importado sempre substitui o translations.json do ModLoader. Tambem deseja gravar os campos de traducao de mods correspondentes nos mod.json instalados? Isso sobrescreve campos de traducao correspondentes existentes.",
+        "translationImportWriteModsConfirm": "Gravar no mod",
+        "translationImportSkipMods": "Nao gravar",
+        "translationImportWriteModsResult": "Gravacao em mods: {written} gravados, {unchanged} ja atualizados, {failed} falharam.",
+        "translationImportNoMatchingMods": "Nenhum mod.json instalado corresponde aos mods importados.",
+        "translationImportModFailures": "Falhas: {failures}"
       },
       "mods": {
         "Cattail_Tweaks_简体中文优化": {
@@ -1809,7 +1860,14 @@
         "translationExportOverwriteTitle": "Sovrascrivere il backup traduzioni?",
         "translationExportOverwriteMessage": "Il file di destinazione esiste gia.\nOra di modifica: {editedAt}\n{path}\nSovrascrivere?",
         "translationOverwriteConfirm": "Sovrascrivi",
-        "translationDialogUnavailable": "Selettore file non disponibile."
+        "translationDialogUnavailable": "Selettore file non disponibile.",
+        "translationImportWriteModsTitle": "Scrivere le traduzioni in mod.json?",
+        "translationImportWriteModsMessage": "Il file importato sostituira comunque translations.json di ModLoader. Vuoi anche scrivere i campi di traduzione dei mod corrispondenti nei mod.json installati? Questo sovrascrive i campi di traduzione corrispondenti esistenti.",
+        "translationImportWriteModsConfirm": "Scrivi nel mod",
+        "translationImportSkipMods": "Non scrivere",
+        "translationImportWriteModsResult": "Scrittura nei mod: {written} scritti, {unchanged} gia aggiornati, {failed} non riusciti.",
+        "translationImportNoMatchingMods": "Nessun mod.json installato corrisponde alle voci mod importate.",
+        "translationImportModFailures": "Errori: {failures}"
       },
       "mods": {
         "Cattail_Tweaks_简体中文优化": {
@@ -1998,7 +2056,14 @@
         "translationExportOverwriteTitle": "Sobrescribir copia de traducciones?",
         "translationExportOverwriteMessage": "El archivo de destino ya existe.\nHora de edicion: {editedAt}\n{path}\nSobrescribir?",
         "translationOverwriteConfirm": "Sobrescribir",
-        "translationDialogUnavailable": "El selector de archivos no esta disponible."
+        "translationDialogUnavailable": "El selector de archivos no esta disponible.",
+        "translationImportWriteModsTitle": "Escribir traducciones en mod.json?",
+        "translationImportWriteModsMessage": "El archivo importado reemplazara translations.json de ModLoader de todos modos. Tambien quieres escribir los campos de traduccion de mods coincidentes en los mod.json instalados? Esto sobrescribe los campos de traduccion coincidentes existentes.",
+        "translationImportWriteModsConfirm": "Escribir en mod",
+        "translationImportSkipMods": "No escribir",
+        "translationImportWriteModsResult": "Escritura en mods: {written} escritos, {unchanged} ya actualizados, {failed} fallidos.",
+        "translationImportNoMatchingMods": "Ningun mod.json instalado coincide con las entradas de mod importadas.",
+        "translationImportModFailures": "Fallos: {failures}"
       },
       "mods": {
         "Cattail_Tweaks_简体中文优化": {
@@ -2187,7 +2252,14 @@
         "translationExportOverwriteTitle": "Ecraser la sauvegarde des traductions ?",
         "translationExportOverwriteMessage": "Le fichier cible existe deja.\nHeure de modification : {editedAt}\n{path}\nL ecraser ?",
         "translationOverwriteConfirm": "Ecraser",
-        "translationDialogUnavailable": "Le selecteur de fichiers est indisponible."
+        "translationDialogUnavailable": "Le selecteur de fichiers est indisponible.",
+        "translationImportWriteModsTitle": "Ecrire les traductions dans mod.json ?",
+        "translationImportWriteModsMessage": "Le fichier importe remplace toujours le translations.json de ModLoader. Voulez-vous aussi ecrire les champs de traduction des mods correspondants dans les mod.json installes ? Cela remplace les champs de traduction correspondants existants.",
+        "translationImportWriteModsConfirm": "Ecrire dans le mod",
+        "translationImportSkipMods": "Ne pas ecrire",
+        "translationImportWriteModsResult": "Ecriture dans les mods : {written} ecrits, {unchanged} deja a jour, {failed} echoues.",
+        "translationImportNoMatchingMods": "Aucun mod.json installe ne correspond aux entrees de mod importees.",
+        "translationImportModFailures": "Echecs : {failures}"
       },
       "mods": {
         "Cattail_Tweaks_简体中文优化": {
@@ -2376,7 +2448,14 @@
         "translationExportOverwriteTitle": "Vertalingsbackup overschrijven?",
         "translationExportOverwriteMessage": "Het doelbestand bestaat al.\nBewerkingstijd: {editedAt}\n{path}\nOverschrijven?",
         "translationOverwriteConfirm": "Overschrijven",
-        "translationDialogUnavailable": "Bestandskiezer is niet beschikbaar."
+        "translationDialogUnavailable": "Bestandskiezer is niet beschikbaar.",
+        "translationImportWriteModsTitle": "Vertalingen naar mod.json schrijven?",
+        "translationImportWriteModsMessage": "Het geimporteerde bestand vervangt altijd ModLoader translations.json. Wil je passende mod-vertalingsvelden ook naar geinstalleerde mod.json-bestanden schrijven? Dit overschrijft bestaande passende vertalingsvelden.",
+        "translationImportWriteModsConfirm": "Naar mod schrijven",
+        "translationImportSkipMods": "Niet schrijven",
+        "translationImportWriteModsResult": "Mod-terugschrijven: {written} geschreven, {unchanged} al actueel, {failed} mislukt.",
+        "translationImportNoMatchingMods": "Geen geinstalleerde mod.json komt overeen met de geimporteerde mod-items.",
+        "translationImportModFailures": "Fouten: {failures}"
       },
       "mods": {
         "Cattail_Tweaks_简体中文优化": {
@@ -2565,7 +2644,14 @@
         "translationExportOverwriteTitle": "Prepsat zalohu prekladu?",
         "translationExportOverwriteMessage": "Cilovy soubor jiz existuje.\nCas uprav: {editedAt}\n{path}\nPrepsat?",
         "translationOverwriteConfirm": "Prepsat",
-        "translationDialogUnavailable": "Dialog vyberu souboru neni dostupny."
+        "translationDialogUnavailable": "Dialog vyberu souboru neni dostupny.",
+        "translationImportWriteModsTitle": "Zapsat preklady do mod.json?",
+        "translationImportWriteModsMessage": "Importovany soubor vzdy nahradi ModLoader translations.json. Chcete take zapsat odpovidajici prekladova pole modu do nainstalovanych souboru mod.json? Tim se prepisi existujici odpovidajici prekladova pole.",
+        "translationImportWriteModsConfirm": "Zapsat do modu",
+        "translationImportSkipMods": "Nezapisovat",
+        "translationImportWriteModsResult": "Zapis do modu: {written} zapsano, {unchanged} jiz aktualni, {failed} selhalo.",
+        "translationImportNoMatchingMods": "Zadny nainstalovany mod.json neodpovida importovanym polozkam modu.",
+        "translationImportModFailures": "Selhani: {failures}"
       },
       "mods": {
         "Cattail_Tweaks_简体中文优化": {
@@ -2754,7 +2840,14 @@
         "translationExportOverwriteTitle": "Nadpisac kopie tlumaczen?",
         "translationExportOverwriteMessage": "Plik docelowy juz istnieje.\nCzas edycji: {editedAt}\n{path}\nNadpisac?",
         "translationOverwriteConfirm": "Nadpisz",
-        "translationDialogUnavailable": "Okno wyboru pliku jest niedostepne."
+        "translationDialogUnavailable": "Okno wyboru pliku jest niedostepne.",
+        "translationImportWriteModsTitle": "Zapisac tlumaczenia do mod.json?",
+        "translationImportWriteModsMessage": "Importowany plik zawsze zastapi translations.json ModLoadera. Czy zapisac takze pasujace pola tlumaczen modow do zainstalowanych plikow mod.json? Nadpisze to istniejace pasujace pola tlumaczen.",
+        "translationImportWriteModsConfirm": "Zapisz do moda",
+        "translationImportSkipMods": "Nie zapisuj",
+        "translationImportWriteModsResult": "Zapis do modow: {written} zapisano, {unchanged} juz aktualne, {failed} niepowodzen.",
+        "translationImportNoMatchingMods": "Zaden zainstalowany mod.json nie pasuje do importowanych wpisow modow.",
+        "translationImportModFailures": "Bledy: {failures}"
       },
       "mods": {
         "Cattail_Tweaks_简体中文优化": {
@@ -2943,7 +3036,14 @@
         "translationExportOverwriteTitle": "Overwrite translation backup?",
         "translationExportOverwriteMessage": "Target file already exists.\nEdit time: {editedAt}\n{path}\nOverwrite it?",
         "translationOverwriteConfirm": "Overwrite",
-        "translationDialogUnavailable": "File dialog is unavailable."
+        "translationDialogUnavailable": "File dialog is unavailable.",
+        "translationImportWriteModsTitle": "Write translations to mod.json?",
+        "translationImportWriteModsMessage": "The imported file will replace ModLoader translations.json either way. Do you also want to write matching mod translation fields into installed mod.json files? This overwrites existing matching translation fields.",
+        "translationImportWriteModsConfirm": "Write to mod",
+        "translationImportSkipMods": "Do not write",
+        "translationImportWriteModsResult": "Mod write-back: {written} written, {unchanged} already current, {failed} failed.",
+        "translationImportNoMatchingMods": "No installed mod.json matched the imported mod entries.",
+        "translationImportModFailures": "Failures: {failures}"
       },
       "mods": {
         "Cattail_Tweaks_简体中文优化": {
@@ -3132,7 +3232,14 @@
         "translationExportOverwriteTitle": "Overwrite translation backup?",
         "translationExportOverwriteMessage": "Target file already exists.\nEdit time: {editedAt}\n{path}\nOverwrite it?",
         "translationOverwriteConfirm": "Overwrite",
-        "translationDialogUnavailable": "File dialog is unavailable."
+        "translationDialogUnavailable": "File dialog is unavailable.",
+        "translationImportWriteModsTitle": "Write translations to mod.json?",
+        "translationImportWriteModsMessage": "The imported file will replace ModLoader translations.json either way. Do you also want to write matching mod translation fields into installed mod.json files? This overwrites existing matching translation fields.",
+        "translationImportWriteModsConfirm": "Write to mod",
+        "translationImportSkipMods": "Do not write",
+        "translationImportWriteModsResult": "Mod write-back: {written} written, {unchanged} already current, {failed} failed.",
+        "translationImportNoMatchingMods": "No installed mod.json matched the imported mod entries.",
+        "translationImportModFailures": "Failures: {failures}"
       },
       "mods": {
         "Cattail_Tweaks_简体中文优化": {
@@ -3321,7 +3428,14 @@
         "translationExportOverwriteTitle": "Overwrite translation backup?",
         "translationExportOverwriteMessage": "Target file already exists.\nEdit time: {editedAt}\n{path}\nOverwrite it?",
         "translationOverwriteConfirm": "Overwrite",
-        "translationDialogUnavailable": "File dialog is unavailable."
+        "translationDialogUnavailable": "File dialog is unavailable.",
+        "translationImportWriteModsTitle": "Write translations to mod.json?",
+        "translationImportWriteModsMessage": "The imported file will replace ModLoader translations.json either way. Do you also want to write matching mod translation fields into installed mod.json files? This overwrites existing matching translation fields.",
+        "translationImportWriteModsConfirm": "Write to mod",
+        "translationImportSkipMods": "Do not write",
+        "translationImportWriteModsResult": "Mod write-back: {written} written, {unchanged} already current, {failed} failed.",
+        "translationImportNoMatchingMods": "No installed mod.json matched the imported mod entries.",
+        "translationImportModFailures": "Failures: {failures}"
       },
       "mods": {
         "Cattail_Tweaks_简体中文优化": {
@@ -3510,7 +3624,14 @@
         "translationExportOverwriteTitle": "Felulirod a forditasi mentest?",
         "translationExportOverwriteMessage": "A celfajl mar letezik.\nSzerkesztesi ido: {editedAt}\n{path}\nFelulirod?",
         "translationOverwriteConfirm": "Feluliras",
-        "translationDialogUnavailable": "A fajlvalaszto nem erheto el."
+        "translationDialogUnavailable": "A fajlvalaszto nem erheto el.",
+        "translationImportWriteModsTitle": "Forditasok irasa a mod.json fajlba?",
+        "translationImportWriteModsMessage": "Az importalt fajl mindenkepp felulirja a ModLoader translations.json fajljat. Ird a megfelelo mod forditasi mezoket a telepitett mod.json fajlokba is? Ez felulirja a meglevo megfelelo forditasi mezoket.",
+        "translationImportWriteModsConfirm": "Iras modba",
+        "translationImportSkipMods": "Ne irja",
+        "translationImportWriteModsResult": "Mod visszairas: {written} irva, {unchanged} mar aktualis, {failed} sikertelen.",
+        "translationImportNoMatchingMods": "Nincs telepitett mod.json, amely illeszkedik az importalt mod bejegyzesekhez.",
+        "translationImportModFailures": "Hibak: {failures}"
       },
       "mods": {
         "Cattail_Tweaks_简体中文优化": {
@@ -3699,7 +3820,14 @@
         "translationExportOverwriteTitle": "Overwrite translation backup?",
         "translationExportOverwriteMessage": "Target file already exists.\nEdit time: {editedAt}\n{path}\nOverwrite it?",
         "translationOverwriteConfirm": "Overwrite",
-        "translationDialogUnavailable": "File dialog is unavailable."
+        "translationDialogUnavailable": "File dialog is unavailable.",
+        "translationImportWriteModsTitle": "Write translations to mod.json?",
+        "translationImportWriteModsMessage": "The imported file will replace ModLoader translations.json either way. Do you also want to write matching mod translation fields into installed mod.json files? This overwrites existing matching translation fields.",
+        "translationImportWriteModsConfirm": "Write to mod",
+        "translationImportSkipMods": "Do not write",
+        "translationImportWriteModsResult": "Mod write-back: {written} written, {unchanged} already current, {failed} failed.",
+        "translationImportNoMatchingMods": "No installed mod.json matched the imported mod entries.",
+        "translationImportModFailures": "Failures: {failures}"
       },
       "mods": {
         "Cattail_Tweaks_简体中文优化": {
@@ -3888,7 +4016,14 @@
         "translationExportOverwriteTitle": "Suprascrii copia traducerilor?",
         "translationExportOverwriteMessage": "Fisierul tinta exista deja.\nOra editarii: {editedAt}\n{path}\nSuprascrii?",
         "translationOverwriteConfirm": "Suprascrie",
-        "translationDialogUnavailable": "Selectorul de fisiere nu este disponibil."
+        "translationDialogUnavailable": "Selectorul de fisiere nu este disponibil.",
+        "translationImportWriteModsTitle": "Scrie traducerile in mod.json?",
+        "translationImportWriteModsMessage": "Fisierul importat va inlocui oricum translations.json al ModLoader. Vrei sa scrii si campurile de traducere potrivite in fisierele mod.json instalate? Aceasta suprascrie campurile de traducere potrivite existente.",
+        "translationImportWriteModsConfirm": "Scrie in mod",
+        "translationImportSkipMods": "Nu scrie",
+        "translationImportWriteModsResult": "Scriere in moduri: {written} scrise, {unchanged} deja actuale, {failed} esuate.",
+        "translationImportNoMatchingMods": "Niciun mod.json instalat nu se potriveste cu intrarile de mod importate.",
+        "translationImportModFailures": "Erori: {failures}"
       },
       "mods": {
         "Cattail_Tweaks_简体中文优化": {
@@ -4077,7 +4212,14 @@
         "translationExportOverwriteTitle": "Overskrive oversettelseskopi?",
         "translationExportOverwriteMessage": "Malfilen finnes allerede.\nRedigeringstid: {editedAt}\n{path}\nOverskrive?",
         "translationOverwriteConfirm": "Overskriv",
-        "translationDialogUnavailable": "Filvelgeren er ikke tilgjengelig."
+        "translationDialogUnavailable": "Filvelgeren er ikke tilgjengelig.",
+        "translationImportWriteModsTitle": "Skrive oversettelser til mod.json?",
+        "translationImportWriteModsMessage": "Den importerte filen erstatter alltid ModLoader translations.json. Vil du ogsa skrive samsvarende mod-oversettelsesfelt til installerte mod.json-filer? Dette overskriver eksisterende samsvarende oversettelsesfelt.",
+        "translationImportWriteModsConfirm": "Skriv til mod",
+        "translationImportSkipMods": "Ikke skriv",
+        "translationImportWriteModsResult": "Mod-tilbakeskriving: {written} skrevet, {unchanged} allerede oppdatert, {failed} feilet.",
+        "translationImportNoMatchingMods": "Ingen installert mod.json samsvarer med de importerte mod-oppforingene.",
+        "translationImportModFailures": "Feil: {failures}"
       },
       "mods": {
         "Cattail_Tweaks_简体中文优化": {

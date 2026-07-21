@@ -28,7 +28,8 @@
       "description": "简体中文优化版。"
     },
     "en": {
-      "name": "Simplified Chinese Optimization"
+      "name": "Optimized Simplified Chinese Locale",
+      "description": "Adds the 中文优化版 language extracted from the previous modified words.js."
     },
     "ru": {
       "name": "Оптимизация упрощенного китайского"

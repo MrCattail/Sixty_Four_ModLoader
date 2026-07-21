@@ -23,7 +23,8 @@
       "description": "添加右下角资源监视按钮，可将游戏缩小成置顶资源监视窗口，不修改原版脚本。启用 Dynamic Details 时会联动资源来源数据。"
     },
     "en": {
-      "name": "Resource Watcher"
+      "name": "Resource Watcher",
+      "description": "Adds a bottom-right resource watcher button that shrinks the game into an always-on-top resource monitor without changing vanilla scripts. Integrates with Dynamic Details resource-source data when that mod is enabled."
     },
     "ru": {
       "name": "Монитор ресурсов"

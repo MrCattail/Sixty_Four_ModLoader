@@ -363,7 +363,7 @@
       }
     },
     "modsch": {
-      "name": "自定义背景颜色",
+      "name": "背景颜色自定义",
       "description": "清理现实世界机器贴图，让烘焙的白色底色变透明，并将烘焙地面阴影渲染为中性透明阴影。",
       "config": {
         "globalThresholds": {
@@ -380,12 +380,15 @@
       "name": "Custom Background Color",
       "config": {
         "globalThresholds": {
-          "label": "Global cleanup thresholds"
+          "label": "Global cleanup thresholds",
+          "description": "Global cleanup multipliers. matte/shadow/edge are 0-3. Lower preserves more sprite detail; higher removes more matte, shadow, or edge fringe."
         },
         "spriteThresholds": {
-          "label": "Sprite cleanup thresholds"
+          "label": "Sprite cleanup thresholds",
+          "description": "Per-image cleanup keyed by img/*.png. Supports matte/shadow/edge, enabled:false, matteDistance, matteLuma, matteSaturation, matteSeeds:[[x,y]], and one-based frames:{\"5\":{...}} overrides."
         }
-      }
+      },
+      "description": "Cleans reality-plane machine sprites so their baked white matte becomes transparent and their baked floor shadows render as neutral alpha shadows."
     },
     "ru": {
       "name": "Пользовательский цвет фона",

@@ -23,7 +23,8 @@
       "description": "给聊天气泡添加时间戳，并将时间戳保存到存档。"
     },
     "en": {
-      "name": "Chat Timestamps"
+      "name": "Chat Timestamps",
+      "description": "Adds timestamps to chat bubbles and persists them in saves."
     },
     "ru": {
       "name": "Временные метки чата"

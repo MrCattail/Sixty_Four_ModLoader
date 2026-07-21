@@ -1,0 +1,4399 @@
+{
+  "version": 1,
+  "_meta": {
+    "kind": "sixty-four.modloader.translations",
+    "formatVersion": 1,
+    "generator": "Sixty Four ModLoader",
+    "editedAt": "2026-07-21T22:19:58.002Z",
+    "lastAction": "export",
+    "exportedAt": "2026-07-21T23:18:15.330Z"
+  },
+  "description": "Edit this file to override ModLoader menu text and mod manifest/config translations. The structure is language -> modloader/mods -> text.",
+  "languages": {
+    "en": {
+      "modloader": {
+        "close": "Close",
+        "hideToEdge": "Hide to edge",
+        "showFromEdge": "Show ModLoader menu",
+        "menuSettings": "Menu Settings",
+        "themeMode": "Theme",
+        "darkMode": "Dark",
+        "lightMode": "Light",
+        "hideMode": "Auto-hide mode",
+        "autoHide": "Auto-hide",
+        "manualHide": "Manual",
+        "sortMod": "Sort mod",
+        "autoHideDelay": "Auto-hide delay",
+        "secondsSuffix": "s",
+        "hideMenuDetails": "Hide menu details",
+        "hideModFileDetails": "Hide mod file details",
+        "show": "Show",
+        "hide": "Hide",
+        "installedMods": "Installed mods",
+        "enabledEntries": "Enabled entries",
+        "loadedMods": "Loaded mods",
+        "issues": "Issues",
+        "dataPatches": "Data patches",
+        "wordPatches": "Word patches",
+        "registeredLanguages": "Registered languages",
+        "orphanEntities": "Orphan entities",
+        "modManager": "Mod Manager",
+        "selectAll": "all",
+        "toggleNote": "Toggle mods or edit config below.",
+        "changesRequireReload": "Changes require reload.",
+        "configSaveNote": "Config saved to localStorage; some mods need reload.",
+        "saveReload": "Save & Reload",
+        "saveConfig": "Save Config",
+        "insert": "insert",
+        "folder": "folder",
+        "deleteMod": "Delete mod",
+        "config": "Config",
+        "recentLog": "Recent Log",
+        "noLogEntries": "No log entries.",
+        "noModsFound": "No mods with mod.json were found.",
+        "fileAccessUnavailable": "File access is unavailable.",
+        "fileAccessLoadedOnly": "File access is unavailable, so only loaded mods can be shown.",
+        "reloadHot": "hot capable, reload now",
+        "reloadRestart": "restart required",
+        "reloadRequired": "reload required",
+        "idPrefix": "id: {value}",
+        "uniquePrefix": "unique: {value}",
+        "depsPrefix": "deps: {value}",
+        "conflictsPrefix": "conflicts: {value}",
+        "missingDependencies": "Missing dependencies: {value}",
+        "conflictsEnabled": "Conflicts enabled: {value}",
+        "savedReloading": "Saved. Reloading...",
+        "saveFailed": "Save failed: {value}",
+        "configSaved": "Config saved.",
+        "noChanges": "No changes to save.",
+        "changesCanceled": "Canceled unsaved changes.",
+        "openFolderFailed": "Could not open folder: {value}",
+        "deleteTitle": "Delete Mod?",
+        "deleteMessage": "Delete {name} from the mods folder? This cannot be undone.",
+        "deleteConfirm": "Delete",
+        "cancel": "Cancel",
+        "replaceTitle": "Replace Mod?",
+        "replaceMessage": "mods already contains {name}. Replace it with the imported mod?",
+        "replaceConfirm": "Replace",
+        "deletedMod": "Deleted {name}. Reload to unload already running code.",
+        "deleteFailed": "Delete failed: {value}",
+        "importHint": "Drop a file here or paste",
+        "importDetail": "Drag a mod zip here, or copy a zip file and press paste. ModLoader will unpack it into the mods folder automatically.",
+        "importWaiting": "Waiting for a zip file...",
+        "importNoZip": "Drop or paste a .zip file.",
+        "importNoPath": "Could not read the file path from the dropped file.",
+        "importing": "Importing {name}...",
+        "importedMod": "Imported {name}. Enable it and Save & Reload when ready.",
+        "importFailed": "Import failed: {value}",
+        "importModeOff": "Back to mod list",
+        "invalidZip": "Only .zip mod packages can be imported.",
+        "zipNoMod": "The zip does not contain a mod.json.",
+        "zipMultipleMods": "The zip contains multiple mod folders; import one mod at a time.",
+        "zipExtractFailed": "Could not extract zip: {value}",
+        "folderOpened": "Opened mods folder.",
+        "replaceRenamedUniqueTitle": "Update Renamed Mod?",
+        "replaceRenamedUniqueMessage": "The new file has the same mod unique code as an installed mod. It is probably an update and rename.\n{oldName} -> {newName}\nReplace the old file?",
+        "replaceRenamedPreviousTitle": "Mod Rename Detected",
+        "replaceRenamedPreviousMessage": "This new file appears to be a rename of an installed file.\n{oldName} -> {newName}\nReplace the old file?",
+        "replaceOld": "Replace",
+        "keepImported": "Do not replace (add new file)",
+        "uniqueCodeEditTitle": "Recommend changing mod unique code",
+        "uniqueCodeEditMessage": "These two mods will share the same mod unique code. Change the imported mod unique code before adding it?",
+        "uniqueCodeLabel": "Mod unique code",
+        "uniqueCodeConfirm": "Confirm",
+        "uniqueCodeSkip": "No",
+        "manifestReadFailed": "Could not read mod.json: {value}",
+        "translationFile": "translations",
+        "translationFileTitle": "Open translation file",
+        "translationFileSynced": "Translation file synced: {path}",
+        "translationFileFailed": "Translation file failed: {value}",
+        "translationExport": "Export",
+        "translationExportTitle": "Export translations backup",
+        "translationExported": "Translation backup exported: {path}",
+        "translationImport": "Import",
+        "translationImportTitle": "Import translations file",
+        "translationImported": "Imported translations from {source} and saved to {path}",
+        "translationImportInvalid": "Selected file is not a ModLoader translations file.",
+        "translationExportOverwriteTitle": "Overwrite translation backup?",
+        "translationExportOverwriteMessage": "Target file already exists.\nEdit time: {editedAt}\n{path}\nOverwrite it?",
+        "translationOverwriteConfirm": "Overwrite",
+        "translationDialogUnavailable": "File dialog is unavailable.",
+        "translationImportWriteModsTitle": "Write translations to mod.json?",
+        "translationImportWriteModsMessage": "The imported file will replace ModLoader translations.json either way. Do you also want to write matching mod translation fields into installed mod.json files? This overwrites existing matching translation fields.",
+        "translationImportWriteModsConfirm": "Write to mod",
+        "translationImportSkipMods": "Do not write",
+        "translationImportWriteModsResult": "Mod write-back: {written} written, {unchanged} already current, {failed} failed.",
+        "translationImportNoMatchingMods": "No installed mod.json matched the imported mod entries.",
+        "translationImportModFailures": "Failures: {failures}"
+      },
+      "mods": {
+        "Cattail_Tweaks_简体中文优化": {
+          "name": "Optimized Simplified Chinese Locale",
+          "description": "Adds the 中文优化版 language extracted from the previous modified words.js."
+        },
+        "Cattail_Tweaks_Chat-Timestamps": {
+          "name": "Chat Timestamps",
+          "description": "Adds timestamps to chat bubbles and persists them in saves."
+        },
+        "Cattail_TweaksQuality_Better-UIs": {
+          "name": "Better UIs",
+          "description": "Combines shop categories, save slots, and the language menu into one multi-entry interface quality mod.",
+          "config": {
+            "enableShopCategories": {
+              "label": "Shop categories",
+              "description": "Show the optional categorized compact building shop view."
+            },
+            "enableSaveSlots": {
+              "label": "Save slots",
+              "description": "Show the in-game save-slot page with import and export actions."
+            },
+            "enableLanguageMenu": {
+              "label": "Language menu",
+              "description": "Use the scrollable language selection page on the splash menu."
+            }
+          }
+        },
+        "Cattail_TweaksQuality_Custom-Background-Color": {
+          "name": "Custom Background Color",
+          "description": "Cleans reality-plane machine sprites so their baked white matte becomes transparent and their baked floor shadows render as neutral alpha shadows.",
+          "config": {
+            "globalThresholds": {
+              "label": "Global cleanup thresholds",
+              "description": "Global cleanup multipliers. matte/shadow/edge are 0-3. Lower preserves more sprite detail; higher removes more matte, shadow, or edge fringe."
+            },
+            "spriteThresholds": {
+              "label": "Sprite cleanup thresholds",
+              "description": "Per-image cleanup keyed by img/*.png. Supports matte/shadow/edge, enabled:false, matteDistance, matteLuma, matteSaturation, matteSeeds:[[x,y]], and one-based frames:{\"5\":{...}} overrides."
+            }
+          }
+        },
+        "Cattail_TweaksQuality_Dynamic-Details": {
+          "name": "Dynamic Details",
+          "description": "Adds Alt+Shift dynamic building detail panels and shop build-availability countdowns without modifying vanilla scripts.",
+          "config": {
+            "cookieDirectionPassword": {
+              "label": "Cookie direction password",
+              "description": "Enter cookie to show the cookie direction indicator before Cookie Clicker is achieved."
+            },
+            "resourceSourceLineRenderer": {
+              "label": "Resource source line renderer",
+              "description": "Choose how resource source lines are rendered. Press O in game to switch this value.",
+              "valueLabels": [
+                "Canvas 2D",
+                "WebGL"
+              ]
+            }
+          }
+        },
+        "Cattail_TweaksQuality_Resource-Watcher": {
+          "name": "Resource Watcher",
+          "description": "Adds a bottom-right resource watcher button that shrinks the game into an always-on-top resource monitor without changing vanilla scripts. Integrates with Dynamic Details resource-source data when that mod is enabled."
+        },
+        "Cattail_TweaksQuality_Tweaks": {
+          "name": "Tweaks",
+          "description": "Combines view distance limits, ending skip, accessibility buttons, stabilizer surge flash reduction, void return fade skip, resource glow colors, chasm line rendering, floor grid outlines, play-time counter, and explainer fixes into one multi-entry quality mod.",
+          "config": {
+            "enableEndingSkip": {
+              "label": "Ending skip",
+              "description": "Show a skip button during the pinhole ending and credits sequence."
+            },
+            "enableAccessibilityButtons": {
+              "label": "Accessibility buttons",
+              "description": "Show the bottom accessibility control bar and reality-floor color palette."
+            },
+            "enableStabilizerSurgeFlashReduction": {
+              "label": "Stabilizer surge flash reduction",
+              "description": "After the void altar exists, hide full-screen flashes caused by stabilizer-triggered surge effects."
+            },
+            "enableResourceGlowColors": {
+              "label": "Resource glow colors",
+              "description": "Color resource icon glows by resource, with optional per-resource overrides."
+            },
+            "enablePlayTimeCounter": {
+              "label": "Play time counter",
+              "description": "Show the active run play-time counter on the game canvas."
+            },
+            "playTimeCounterPosition": {
+              "label": "Play time counter position",
+              "description": "Slide between bottom-left, top-center, and bottom-right.",
+              "valueLabels": {
+                "0": "bottom-left",
+                "1": "top-center",
+                "2": "bottom-right"
+              }
+            },
+            "resourceGlowColors": {
+              "label": "Resource glow palette",
+              "description": "Per-resource glow color overrides. Empty rows use each resource's native color."
+            },
+            "enableViewDistance": {
+              "label": "View distance limits",
+              "description": "Use expanded camera zoom limits."
+            },
+            "farthestZoom": {
+              "label": "Farthest zoom",
+              "description": "Lower values show more of the world. Vanilla far limit is 0.3."
+            },
+            "closestZoom": {
+              "label": "Closest zoom",
+              "description": "Higher values zoom closer to the world. Vanilla near limit is 2."
+            },
+            "fallbackZoom": {
+              "label": "Fallback zoom",
+              "description": "Used when the saved zoom value is missing or invalid."
+            },
+            "enableChasmLineRenderer": {
+              "label": "Chasm line renderer",
+              "description": "Allow this mod to replace the chasm-to-resource lines with the selected renderer."
+            },
+            "chasmLineRendererMode": {
+              "label": "Chasm line rendering mode",
+              "description": "Canvas 2D uses the original game drawing. WebGL renders the same chasm-to-resource curves through a GPU-backed canvas.",
+              "valueLabels": {
+                "0": "Canvas 2D",
+                "1": "WebGL"
+              }
+            },
+            "enableChasmLineDistanceOverride": {
+              "label": "Chasm lines ignore distance",
+              "description": "Keep rendering chasm-to-resource lines even when the chasm is outside the normal visible range."
+            },
+            "enableFloorGridLines": {
+              "label": "Floor grid outlines",
+              "description": "Draw thin outlines around the in-game floor cells."
+            },
+            "floorGridLineRealityColor": {
+              "label": "Reality floor grid outline color",
+              "description": "Leave empty to use the default dark gray outline in reality."
+            },
+            "floorGridLineVoidColor": {
+              "label": "Void floor grid outline color",
+              "description": "Leave empty to use the default white outline in the void."
+            },
+            "enableVoidReturnFadeSkip": {
+              "label": "Skip void return fade",
+              "description": "When returning from the void to reality, remove the long white recovery fade and show the clear view immediately."
+            },
+            "enableExplainerFix": {
+              "label": "Explainer fix",
+              "description": "Refresh pulsing explainer hints after language changes and use readable light text in the void."
+            }
+          }
+        },
+        "Cattail_TweaksX_Reality-Pack": {
+          "name": "Reality Pack",
+          "description": "Combines Auto Reality Collect, Scan Reality Surges, and Super Silo into one TweaksX mod.",
+          "config": {
+            "surgeCount": {
+              "label": "Surge count",
+              "description": "Number of random surges to create when a supercritical kernel lands."
+            },
+            "surgeRadius": {
+              "label": "Spawn radius",
+              "description": "Circular radius, in cells, used to search for empty reality-plane spawn spots."
+            },
+            "fillAmount": {
+              "label": "Long fill amount",
+              "description": "Fill value assigned to activated silos."
+            },
+            "enableRealityAutoCollect": {
+              "label": "Reality auto collect",
+              "description": "Automatically collect ready Reality / soul power in the void world."
+            },
+            "enableScanRealitySurges": {
+              "label": "Scan reality surges",
+              "description": "Create random reality-plane surges when a supercritical kernel lands."
+            },
+            "enableSuperSilo": {
+              "label": "Super Silo",
+              "description": "Keep activated silos filled with the configured long fill amount."
+            },
+            "enableScanRealitySlider": {
+              "label": "Supercritical kernel slider",
+              "description": "Show the supercritical kernel range and Reality infusion slider on its shop card."
+            },
+            "enableHollowVentReality": {
+              "label": "Hollow vent Reality source",
+              "description": "Let hollow vents grow Reality symbols that are automatically harvested through the void altar."
+            },
+            "ventRealityInterval": {
+              "label": "Vent production time",
+              "description": "Seconds each hollow vent takes to grow a Reality symbol."
+            },
+            "ventRealityAmount": {
+              "label": "Small vent Reality",
+              "description": "Reality gained from each small hollow vent symbol."
+            },
+            "ventRealityLargeMultiplier": {
+              "label": "Large vent multiplier",
+              "description": "Multiplier applied to the large hollow vent Reality output."
+            }
+          }
+        }
+      }
+    },
+    "sch": {
+      "modloader": {
+        "close": "关闭",
+        "hideToEdge": "隐藏到边缘",
+        "showFromEdge": "显示 ModLoader 菜单",
+        "menuSettings": "Mod 菜单设置",
+        "themeMode": "亮色 / 暗色模式",
+        "darkMode": "暗色",
+        "lightMode": "亮色",
+        "hideMode": "自动隐藏模式",
+        "autoHide": "自动隐藏",
+        "manualHide": "手动隐藏",
+        "sortMod": "排序 mod",
+        "autoHideDelay": "自动隐藏秒数",
+        "secondsSuffix": "秒",
+        "hideMenuDetails": "隐藏菜单详情",
+        "hideModFileDetails": "隐藏 mod 文件详情",
+        "show": "显示",
+        "hide": "隐藏",
+        "installedMods": "已安装 mod",
+        "enabledEntries": "启用条目",
+        "loadedMods": "已加载 mod",
+        "issues": "问题",
+        "dataPatches": "数据补丁",
+        "wordPatches": "文本补丁",
+        "registeredLanguages": "已注册语言",
+        "orphanEntities": "孤立实体",
+        "modManager": "Mod 管理",
+        "selectAll": "全选",
+        "toggleNote": "在下方开关 mod 或编辑配置。",
+        "changesRequireReload": "改动需要 reload。",
+        "configSaveNote": "配置已保存到 localStorage；部分 mod 需要 reload 生效。",
+        "saveReload": "保存并 Reload",
+        "saveConfig": "保存配置",
+        "insert": "导入",
+        "folder": "文件夹",
+        "deleteMod": "删除 mod",
+        "config": "配置",
+        "recentLog": "最近日志",
+        "noLogEntries": "暂无日志。",
+        "noModsFound": "没有找到带 mod.json 的 mod。",
+        "fileAccessUnavailable": "文件访问不可用。",
+        "fileAccessLoadedOnly": "文件访问不可用，所以只能显示已加载的 mod。",
+        "reloadHot": "支持热开关，当前仍建议 reload",
+        "reloadRestart": "需要重启",
+        "reloadRequired": "需要 reload",
+        "idPrefix": "id：{value}",
+        "uniquePrefix": "唯一码：{value}",
+        "depsPrefix": "依赖：{value}",
+        "conflictsPrefix": "冲突：{value}",
+        "missingDependencies": "缺少依赖：{value}",
+        "conflictsEnabled": "已启用冲突：{value}",
+        "savedReloading": "已保存，正在 reload...",
+        "saveFailed": "保存失败：{value}",
+        "configSaved": "配置已保存。",
+        "noChanges": "没有需要保存的改动。",
+        "changesCanceled": "已取消未保存的改动。",
+        "openFolderFailed": "无法打开文件夹：{value}",
+        "deleteTitle": "删除 Mod？",
+        "deleteMessage": "从 mods 文件夹删除 {name}？这个操作不能撤销。",
+        "deleteConfirm": "删除",
+        "cancel": "取消",
+        "replaceTitle": "替换 Mod？",
+        "replaceMessage": "mods 里已经有 {name}。是否用导入的 mod 替换它？",
+        "replaceConfirm": "替换",
+        "deletedMod": "已删除 {name}。已经运行的代码需要 reload 才会卸载。",
+        "deleteFailed": "删除失败：{value}",
+        "importHint": "把文件拖到这里或复制",
+        "importDetail": "可以把 mod zip 包直接拖入，或者复制 zip 包后在这里按粘贴快捷键，ModLoader 会自动解包到 mods 文件夹。",
+        "importWaiting": "等待 zip 文件...",
+        "importNoZip": "请拖入或粘贴 .zip 文件。",
+        "importNoPath": "无法读取该文件路径。",
+        "importing": "正在导入 {name}...",
+        "importedMod": "已导入 {name}。需要时勾选它并保存 reload。",
+        "importFailed": "导入失败：{value}",
+        "importModeOff": "返回 mod 列表",
+        "invalidZip": "只能导入 .zip mod 包。",
+        "zipNoMod": "这个 zip 内没有 mod.json。",
+        "zipMultipleMods": "这个 zip 包含多个 mod 文件夹；请一次导入一个 mod。",
+        "zipExtractFailed": "无法解压 zip：{value}",
+        "folderOpened": "已打开 mods 文件夹。",
+        "replaceRenamedUniqueTitle": "发现同唯一码 Mod",
+        "replaceRenamedUniqueMessage": "新文件跟已有文件有相同的 mod 唯一码，它很可能是旧文件的更新和改名。\n{oldName} → {newName}\n是否覆盖旧文件？",
+        "replaceRenamedPreviousTitle": "发现 Mod 改名",
+        "replaceRenamedPreviousMessage": "这个新文件是已有文件的改名。\n{oldName} → {newName}\n是否覆盖旧文件？",
+        "replaceOld": "覆盖",
+        "keepImported": "不覆盖（加入新文件）",
+        "uniqueCodeEditTitle": "推荐修改 mod 唯一码",
+        "uniqueCodeEditMessage": "这两个 mod 会共用同一个 mod 唯一码。是否在加入新文件前修改导入 mod 的唯一码？",
+        "uniqueCodeLabel": "mod 唯一码",
+        "uniqueCodeConfirm": "确认修改",
+        "uniqueCodeSkip": "否（不修改）",
+        "manifestReadFailed": "无法读取 mod.json：{value}",
+        "translationFile": "翻译",
+        "translationFileTitle": "打开翻译文件",
+        "translationFileSynced": "翻译文件已同步：{path}",
+        "translationFileFailed": "翻译文件失败：{value}",
+        "translationExport": "导出",
+        "translationExportTitle": "导出翻译备份",
+        "translationExported": "翻译备份已导出：{path}",
+        "translationImport": "导入",
+        "translationImportTitle": "导入翻译文件",
+        "translationImported": "已从 {source} 导入翻译，并保存到 {path}",
+        "translationImportInvalid": "选择的文件不是 ModLoader 翻译文件。",
+        "translationExportOverwriteTitle": "覆盖翻译备份？",
+        "translationExportOverwriteMessage": "目标文件已存在。\n编辑时间：{editedAt}\n{path}\n是否覆盖？",
+        "translationOverwriteConfirm": "覆盖",
+        "translationDialogUnavailable": "文件选择器不可用。",
+        "translationImportWriteModsTitle": "写入 mod.json？",
+        "translationImportWriteModsMessage": "无论如何，导入文件都会覆盖 ModLoader 的 translations.json。是否也将匹配的 mod 翻译字段写入已安装的 mod.json？这会覆盖已有的匹配翻译字段。",
+        "translationImportWriteModsConfirm": "写入 mod",
+        "translationImportSkipMods": "不写入 mod",
+        "translationImportWriteModsResult": "mod 写回：已写入 {written}，已是最新 {unchanged}，失败 {failed}。",
+        "translationImportNoMatchingMods": "没有已安装的 mod.json 匹配导入文件中的 mod 条目。",
+        "translationImportModFailures": "失败：{failures}"
+      },
+      "mods": {
+        "Cattail_Tweaks_简体中文优化": {
+          "name": "简体中文优化",
+          "description": "简体中文优化版。"
+        },
+        "Cattail_Tweaks_Chat-Timestamps": {
+          "name": "聊天时间戳",
+          "description": "给聊天气泡添加时间戳，并将时间戳保存到存档。"
+        },
+        "Cattail_TweaksQuality_Better-UIs": {
+          "name": "更好的UI界面",
+          "description": "将商店分类、存档栏和语言菜单整合为一个界面优化 mod。",
+          "config": {
+            "enableShopCategories": {
+              "label": "商店分类",
+              "description": "可将建筑建造卡的视图切换至可按照分类进行收缩/展开。"
+            },
+            "enableSaveSlots": {
+              "label": "存档栏",
+              "description": "新增游戏内存档页，并提供导入和导出功能。"
+            },
+            "enableLanguageMenu": {
+              "label": "语言菜单",
+              "description": "语言切换功能新增滚动列表。"
+            }
+          }
+        },
+        "Cattail_TweaksQuality_Custom-Background-Color": {
+          "name": "自定义背景颜色",
+          "description": "清理现实世界机器贴图，让烘焙的白色底色变透明，并将烘焙地面阴影渲染为中性透明阴影。",
+          "config": {
+            "globalThresholds": {
+              "label": "全局清理阈值",
+              "description": "全局清理倍率。matte/shadow/edge 范围为 0-3。数值越低保留越多贴图细节，越高会移除更多底色、阴影或边缘杂色。"
+            },
+            "spriteThresholds": {
+              "label": "贴图清理阈值",
+              "description": "按 img/*.png 设置单张图片清理参数。支持 matte/shadow/edge、enabled:false、matteDistance、matteLuma、matteSaturation、matteSeeds:[[x,y]]，以及从 1 开始的 frames:{\"5\":{...}} 帧覆盖。"
+            }
+          }
+        },
+        "Cattail_TweaksQuality_Dynamic-Details": {
+          "name": "动态详情",
+          "description": "添加 Alt+Shift 动态建筑详情面板和商店建造可用倒计时，不修改原版脚本。",
+          "config": {
+            "cookieDirectionPassword": {
+              "label": "饼干方向密码",
+              "description": "输入 cookie 可在达成 Cookie Clicker 前显示饼干方向指示。"
+            },
+            "resourceSourceLineRenderer": {
+              "label": "资源来源连线渲染",
+              "description": "选择资源来源连线的渲染方式。游戏中按 O 也会切换这个值。"
+            }
+          }
+        },
+        "Cattail_TweaksQuality_Resource-Watcher": {
+          "name": "资源监视器",
+          "description": "添加右下角资源监视按钮，可将游戏缩小成置顶资源监视窗口，不修改原版脚本。启用 Dynamic Details 时会联动资源来源数据。"
+        },
+        "Cattail_TweaksQuality_Tweaks": {
+          "name": "优化和修复",
+          "description": "优化和修复游戏中的部分内容。",
+          "config": {
+            "enableEndingSkip": {
+              "label": "结局跳过",
+              "description": "新增在结局和致谢名单的跳过功能。"
+            },
+            "enableAccessibilityButtons": {
+              "label": "游戏内设置按钮",
+              "description": "鼠标移动到底部中间时会弹出设置按钮。"
+            },
+            "enableStabilizerSurgeFlashReduction": {
+              "label": "禁用稳定器触发浪涌时的闪烁",
+              "description": "在建造虚空祭坛之后，也禁用稳定器激活浪涌效果时产生的全频闪烁。"
+            },
+            "enableResourceGlowColors": {
+              "label": "资源发光颜色",
+              "description": "新增默认根据资源的颜色改变对应资源发光颜色，并支持自定义。"
+            },
+            "enablePlayTimeCounter": {
+              "label": "游戏时长显示",
+              "description": "在游戏里显示当前存档的游玩时长。"
+            },
+            "playTimeCounterPosition": {
+              "label": "游戏时长位置",
+              "description": "滑动选择右下角、顶部居中或左下角。",
+              "valueLabels": {
+                "0": "左下角",
+                "1": "顶部居中",
+                "2": "右下角"
+              }
+            },
+            "resourceGlowColors": {
+              "label": "资源发光颜色自定义",
+              "description": "可自定义设置每种资源的发光颜色。"
+            },
+            "enableViewDistance": {
+              "label": "禁用视野距离限制",
+              "description": "可修改原版游戏的视角的远近限制。"
+            },
+            "farthestZoom": {
+              "label": "最远视角距离",
+              "description": "数值越低，可看到的世界范围越大。原版最远限制为 0.3。"
+            },
+            "closestZoom": {
+              "label": "最近视角距离",
+              "description": "数值越高，镜头可以拉得越近。原版最近限制为 2。"
+            },
+            "fallbackZoom": {
+              "label": "默认缩放",
+              "description": "当保存的缩放值缺失或无效时使用。"
+            },
+            "enableChasmLineRenderer": {
+              "label": "逆裂缝绘线渲染模式切换",
+              "description": "新增并可切换WebGL逆裂缝绘线的渲染方式，以提升性能。"
+            },
+            "chasmLineRendererMode": {
+              "label": "渲染模式",
+              "description": "原版渲染方式为Canvas 2D。可切换至WebGL渲染模式，用GPU进行渲染以提升性能。",
+              "valueLabels": {
+                "0": "Canvas 2D",
+                "1": "WebGL"
+              }
+            },
+            "enableChasmLineDistanceOverride": {
+              "label": "无视距离渲染逆裂缝绘线",
+              "description": "无论距离多远，逆裂缝的绘线都会保持渲染。"
+            },
+            "enableFloorGridLines": {
+              "label": "地板方格边框显示",
+              "description": "新增地板方格边框，方便数格子。"
+            },
+            "floorGridLineRealityColor": {
+              "label": "现实维度地板方格边框颜色",
+              "description": "留空时现实世界使用默认深灰色边框。"
+            },
+            "floorGridLineVoidColor": {
+              "label": "虚空维度地板方格边框颜色",
+              "description": "留空时虚空世界使用默认白色边框。"
+            },
+            "enableVoidReturnFadeSkip": {
+              "label": "禁用回到现实白屏淡出效果",
+              "description": "从虚空维度返回现实维度时，移除长时间的白色淡出效果，直接显示清晰画面。"
+            },
+            "enableExplainerFix": {
+              "label": "提示句修复",
+              "description": "修复提示语在切换语言后不刷新，并让虚空世界里的提示文字变成亮色以便看清。"
+            }
+          }
+        },
+        "Cattail_TweaksX_Reality-Pack": {
+          "name": "机制修改",
+          "description": "修改游戏的机制，可能会影响游戏平衡",
+          "config": {
+            "surgeCount": {
+              "label": "浪涌数量",
+              "description": "可修改内核振动现实结构后浪涌生成范围内的浪涌数量。"
+            },
+            "surgeRadius": {
+              "label": "浪涌生成半径",
+              "description": "可修改内核振动现实结构后浪涌的生成范围。"
+            },
+            "fillAmount": {
+              "label": "筒仓填充值",
+              "description": "可修改超级筒仓的填充值"
+            },
+            "enableRealityAutoCollect": {
+              "label": "现实自动收集",
+              "description": "自动收集在虚空维度中完全发亮的符号。"
+            },
+            "enableScanRealitySurges": {
+              "label": "强力超临界内核",
+              "description": "超临界内核得到加强。在震荡现实结构时，会在现实对应位置震出一些浪涌。"
+            },
+            "enableSuperSilo": {
+              "label": "超级筒仓",
+              "description": "让已激活的筒仓保持配置的超长填充值。"
+            },
+            "enableScanRealitySlider": {
+              "label": "可控超临界内核",
+              "description": "可以注入现实来提升超临界内核的威力。"
+            },
+            "enableHollowVentReality": {
+              "label": "虚空维度裂缝现实渗入",
+              "description": "空心石在虚空维度的穿孔裂缝会持续渗入现实。"
+            },
+            "ventRealityInterval": {
+              "label": "现实渗入时间",
+              "description": "每个现实渗入所需的秒数。"
+            },
+            "ventRealityAmount": {
+              "label": "现实渗入数量",
+              "description": "每个空心石渗入的现实的数量。"
+            },
+            "ventRealityLargeMultiplier": {
+              "label": "大空心石现实渗入倍率",
+              "description": "大空心石渗入的现实的数量倍率。"
+            }
+          }
+        }
+      }
+    },
+    "modsch": {
+      "modloader": {
+        "close": "关闭",
+        "hideToEdge": "隐藏到边缘",
+        "showFromEdge": "显示 ModLoader 菜单",
+        "menuSettings": "Mod 菜单设置",
+        "themeMode": "亮色 / 暗色模式",
+        "darkMode": "暗色",
+        "lightMode": "亮色",
+        "hideMode": "自动隐藏模式",
+        "autoHide": "自动隐藏",
+        "manualHide": "手动隐藏",
+        "sortMod": "排序 mod",
+        "autoHideDelay": "自动隐藏秒数",
+        "secondsSuffix": "秒",
+        "hideMenuDetails": "隐藏菜单详情",
+        "hideModFileDetails": "隐藏 mod 文件详情",
+        "show": "显示",
+        "hide": "隐藏",
+        "installedMods": "已安装 mod",
+        "enabledEntries": "启用条目",
+        "loadedMods": "已加载 mod",
+        "issues": "问题",
+        "dataPatches": "数据补丁",
+        "wordPatches": "文本补丁",
+        "registeredLanguages": "已注册语言",
+        "orphanEntities": "孤立实体",
+        "modManager": "Mod 管理",
+        "selectAll": "全选",
+        "toggleNote": "在下方开关 mod 或编辑配置。",
+        "changesRequireReload": "改动需要 reload。",
+        "configSaveNote": "配置已保存到 localStorage；部分 mod 需要 reload 生效。",
+        "saveReload": "保存并 Reload",
+        "saveConfig": "保存配置",
+        "insert": "导入",
+        "folder": "文件夹",
+        "deleteMod": "删除 mod",
+        "config": "配置",
+        "recentLog": "最近日志",
+        "noLogEntries": "暂无日志。",
+        "noModsFound": "没有找到带 mod.json 的 mod。",
+        "fileAccessUnavailable": "文件访问不可用。",
+        "fileAccessLoadedOnly": "文件访问不可用，所以只能显示已加载的 mod。",
+        "reloadHot": "支持热开关，当前仍建议 reload",
+        "reloadRestart": "需要重启",
+        "reloadRequired": "需要 reload",
+        "idPrefix": "id：{value}",
+        "uniquePrefix": "唯一码：{value}",
+        "depsPrefix": "依赖：{value}",
+        "conflictsPrefix": "冲突：{value}",
+        "missingDependencies": "缺少依赖：{value}",
+        "conflictsEnabled": "已启用冲突：{value}",
+        "savedReloading": "已保存，正在 reload...",
+        "saveFailed": "保存失败：{value}",
+        "configSaved": "配置已保存。",
+        "noChanges": "没有需要保存的改动。",
+        "changesCanceled": "已取消未保存的改动。",
+        "openFolderFailed": "无法打开文件夹：{value}",
+        "deleteTitle": "删除 Mod？",
+        "deleteMessage": "从 mods 文件夹删除 {name}？这个操作不能撤销。",
+        "deleteConfirm": "删除",
+        "cancel": "取消",
+        "replaceTitle": "替换 Mod？",
+        "replaceMessage": "mods 里已经有 {name}。是否用导入的 mod 替换它？",
+        "replaceConfirm": "替换",
+        "deletedMod": "已删除 {name}。已经运行的代码需要 reload 才会卸载。",
+        "deleteFailed": "删除失败：{value}",
+        "importHint": "把文件拖到这里或复制",
+        "importDetail": "可以把 mod zip 包直接拖入，或者复制 zip 包后在这里按粘贴快捷键，ModLoader 会自动解包到 mods 文件夹。",
+        "importWaiting": "等待 zip 文件...",
+        "importNoZip": "请拖入或粘贴 .zip 文件。",
+        "importNoPath": "无法读取该文件路径。",
+        "importing": "正在导入 {name}...",
+        "importedMod": "已导入 {name}。需要时勾选它并保存 reload。",
+        "importFailed": "导入失败：{value}",
+        "importModeOff": "返回 mod 列表",
+        "invalidZip": "只能导入 .zip mod 包。",
+        "zipNoMod": "这个 zip 内没有 mod.json。",
+        "zipMultipleMods": "这个 zip 包含多个 mod 文件夹；请一次导入一个 mod。",
+        "zipExtractFailed": "无法解压 zip：{value}",
+        "folderOpened": "已打开 mods 文件夹。",
+        "replaceRenamedUniqueTitle": "发现同唯一码 Mod",
+        "replaceRenamedUniqueMessage": "新文件跟已有文件有相同的 mod 唯一码，它很可能是旧文件的更新和改名。\n{oldName} → {newName}\n是否覆盖旧文件？",
+        "replaceRenamedPreviousTitle": "发现 Mod 改名",
+        "replaceRenamedPreviousMessage": "这个新文件是已有文件的改名。\n{oldName} → {newName}\n是否覆盖旧文件？",
+        "replaceOld": "覆盖",
+        "keepImported": "不覆盖（加入新文件）",
+        "uniqueCodeEditTitle": "推荐修改 mod 唯一码",
+        "uniqueCodeEditMessage": "这两个 mod 会共用同一个 mod 唯一码。是否在加入新文件前修改导入 mod 的唯一码？",
+        "uniqueCodeLabel": "mod 唯一码",
+        "uniqueCodeConfirm": "确认修改",
+        "uniqueCodeSkip": "否（不修改）",
+        "manifestReadFailed": "无法读取 mod.json：{value}",
+        "translationFile": "翻译",
+        "translationFileTitle": "打开翻译文件",
+        "translationFileSynced": "翻译文件已同步：{path}",
+        "translationFileFailed": "翻译文件失败：{value}",
+        "translationExport": "导出",
+        "translationExportTitle": "导出翻译备份",
+        "translationExported": "翻译备份已导出：{path}",
+        "translationImport": "导入",
+        "translationImportTitle": "导入翻译文件",
+        "translationImported": "已从 {source} 导入翻译，并保存到 {path}",
+        "translationImportInvalid": "选择的文件不是 ModLoader 翻译文件。",
+        "translationExportOverwriteTitle": "覆盖翻译备份？",
+        "translationExportOverwriteMessage": "目标文件已存在。\n编辑时间：{editedAt}\n{path}\n是否覆盖？",
+        "translationOverwriteConfirm": "覆盖",
+        "translationDialogUnavailable": "文件选择器不可用。",
+        "translationImportWriteModsTitle": "写入 mod.json？",
+        "translationImportWriteModsMessage": "无论如何，导入文件都会覆盖 ModLoader 的 translations.json。是否也将匹配的 mod 翻译字段写入已安装的 mod.json？这会覆盖已有的匹配翻译字段。",
+        "translationImportWriteModsConfirm": "写入 mod",
+        "translationImportSkipMods": "不写入 mod",
+        "translationImportWriteModsResult": "mod 写回：已写入 {written}，已是最新 {unchanged}，失败 {failed}。",
+        "translationImportNoMatchingMods": "没有已安装的 mod.json 匹配导入文件中的 mod 条目。",
+        "translationImportModFailures": "失败：{failures}"
+      },
+      "mods": {
+        "Cattail_Tweaks_简体中文优化": {
+          "name": "简体中文优化",
+          "description": "简体中文优化版。"
+        },
+        "Cattail_Tweaks_Chat-Timestamps": {
+          "name": "聊天时间戳",
+          "description": "给聊天气泡添加时间戳，并将时间戳保存到存档。"
+        },
+        "Cattail_TweaksQuality_Better-UIs": {
+          "name": "更好的UI界面",
+          "description": "将商店分类、存档栏和语言菜单整合为一个界面优化 mod。",
+          "config": {
+            "enableShopCategories": {
+              "label": "建筑分类",
+              "description": "可将建筑建造卡的视图切换至可按照分类进行收缩/展开。"
+            },
+            "enableSaveSlots": {
+              "label": "存档栏",
+              "description": "新增游戏内存档页，并提供导入和导出功能。"
+            },
+            "enableLanguageMenu": {
+              "label": "语言菜单",
+              "description": "语言切换功能新增滚动列表。"
+            }
+          }
+        },
+        "Cattail_TweaksQuality_Custom-Background-Color": {
+          "name": "背景颜色自定义",
+          "description": "清理现实世界机器贴图，让烘焙的白色底色变透明，并将烘焙地面阴影渲染为中性透明阴影。",
+          "config": {
+            "globalThresholds": {
+              "label": "全局清理阈值",
+              "description": "全局清理倍率。matte/shadow/edge 范围为 0-3。数值越低保留越多贴图细节，越高会移除更多底色、阴影或边缘杂色。"
+            },
+            "spriteThresholds": {
+              "label": "贴图清理阈值",
+              "description": "按 img/*.png 设置单张图片清理参数。支持 matte/shadow/edge、enabled:false、matteDistance、matteLuma、matteSaturation、matteSeeds:[[x,y]]，以及从 1 开始的 frames:{\"5\":{...}} 帧覆盖。"
+            }
+          }
+        },
+        "Cattail_TweaksQuality_Dynamic-Details": {
+          "name": "动态详情",
+          "description": "添加 Alt+Shift 动态建筑详情面板和商店建造可用倒计时，不修改原版脚本。",
+          "config": {
+            "cookieDirectionPassword": {
+              "label": "饼干方向密码",
+              "description": "输入 cookie 可在达成 Cookie Clicker 前显示饼干方向指示。"
+            },
+            "resourceSourceLineRenderer": {
+              "label": "资源来源连线渲染",
+              "description": "选择资源来源连线的渲染方式。游戏中按 O 也会切换这个值。"
+            }
+          }
+        },
+        "Cattail_TweaksQuality_Resource-Watcher": {
+          "name": "资源监视器",
+          "description": "添加右下角资源监视按钮，可将游戏缩小成置顶资源监视窗口，不修改原版脚本。启用 Dynamic Details 时会联动资源来源数据。"
+        },
+        "Cattail_TweaksQuality_Tweaks": {
+          "name": "优化和修复",
+          "description": "优化和修复游戏中的部分内容。",
+          "config": {
+            "enableEndingSkip": {
+              "label": "结局跳过",
+              "description": "新增在结局和致谢名单的跳过功能。"
+            },
+            "enableAccessibilityButtons": {
+              "label": "辅助按钮",
+              "description": "鼠标移动到底部中间时会弹出设置按钮。"
+            },
+            "enableStabilizerSurgeFlashReduction": {
+              "label": "禁用稳定器触发浪涌时的闪烁",
+              "description": "在建造虚空祭坛之后，也禁用稳定器激活浪涌效果时产生的全频闪烁。"
+            },
+            "enableResourceGlowColors": {
+              "label": "资源发光颜色",
+              "description": "新增默认根据资源的颜色改变对应资源发光颜色，并支持自定义。"
+            },
+            "enablePlayTimeCounter": {
+              "label": "游戏时长显示",
+              "description": "在游戏里显示当前存档的游玩时长。"
+            },
+            "playTimeCounterPosition": {
+              "label": "游戏时长位置",
+              "description": "滑动选择右下角、顶部居中或左下角。",
+              "valueLabels": {
+                "0": "左下角",
+                "1": "顶部居中",
+                "2": "右下角"
+              }
+            },
+            "resourceGlowColors": {
+              "label": "资源发光颜色调色板",
+              "description": "可自定义设置每周资源的发光颜色。"
+            },
+            "enableViewDistance": {
+              "label": "禁用视野距离限制",
+              "description": "可修改原版游戏的视角的远近限制。"
+            },
+            "farthestZoom": {
+              "label": "最远视角距离",
+              "description": "数值越低，可看到的世界范围越大。原版最远限制为 0.3。"
+            },
+            "closestZoom": {
+              "label": "最近视角距离",
+              "description": "数值越高，镜头可以拉得越近。原版最近限制为 2。"
+            },
+            "fallbackZoom": {
+              "label": "默认缩放",
+              "description": "当保存的缩放值缺失或无效时使用。"
+            },
+            "enableChasmLineRenderer": {
+              "label": "逆裂缝绘线渲染模式切换",
+              "description": "新增并可切换WebGL逆裂缝绘线的渲染方式，以提升性能。"
+            },
+            "chasmLineRendererMode": {
+              "label": "渲染模式",
+              "description": "原版渲染方式为Canvas 2D。可切换至WebGL渲染模式，用GPU进行渲染以提升性能。",
+              "valueLabels": {
+                "0": "Canvas 2D",
+                "1": "WebGL"
+              }
+            },
+            "enableChasmLineDistanceOverride": {
+              "label": "无视距离渲染逆裂缝绘线",
+              "description": "无论距离多远，逆裂缝的绘线都会保持渲染。"
+            },
+            "enableFloorGridLines": {
+              "label": "显示地板方格边框",
+              "description": "新增地板方格边框，方便数格子。"
+            },
+            "floorGridLineRealityColor": {
+              "label": "现实维度地板方格边框颜色",
+              "description": "留空时现实世界使用默认深灰色边框。"
+            },
+            "floorGridLineVoidColor": {
+              "label": "虚空维度地板方格边框颜色",
+              "description": "留空时虚空世界使用默认白色边框。"
+            },
+            "enableVoidReturnFadeSkip": {
+              "label": "禁用回到现实白屏淡出效果",
+              "description": "从虚空维度返回现实维度时，移除长时间的白色淡出效果，直接显示清晰画面。"
+            },
+            "enableExplainerFix": {
+              "label": "提示句修复",
+              "description": "修复提示语在切换语言后不刷新，并让虚空世界里的提示文字变成亮色以便看清。"
+            }
+          }
+        },
+        "Cattail_TweaksX_Reality-Pack": {
+          "name": "机制修改",
+          "description": "修改游戏的机制，可能会影响游戏平衡。",
+          "config": {
+            "surgeCount": {
+              "label": "浪涌数量",
+              "description": "可修改内核振动现实结构后浪涌生成范围内的浪涌数量。"
+            },
+            "surgeRadius": {
+              "label": "浪涌生成半径",
+              "description": "可修改内核振动现实结构后浪涌的生成范围。"
+            },
+            "fillAmount": {
+              "label": "筒仓填充值",
+              "description": "可修改超级筒仓的填充值"
+            },
+            "enableRealityAutoCollect": {
+              "label": "现实自动收集",
+              "description": "自动收集在虚空维度中完全发亮的符号。"
+            },
+            "enableScanRealitySurges": {
+              "label": "强力超临界内核",
+              "description": "超临界内核得到加强。在震荡现实结构时，会在现实对应位置震出一些浪涌。"
+            },
+            "enableSuperSilo": {
+              "label": "超级筒仓",
+              "description": "让已激活的筒仓保持配置的超长填充值。"
+            },
+            "enableScanRealitySlider": {
+              "label": "可控超临界内核",
+              "description": "可以注入现实来提升超临界内核的威力。"
+            },
+            "enableHollowVentReality": {
+              "label": "虚空维度裂缝现实渗入",
+              "description": "空心石在虚空维度的穿孔裂缝会持续渗入现实。"
+            },
+            "ventRealityInterval": {
+              "label": "现实渗入时间",
+              "description": "每个现实渗入所需的秒数。"
+            },
+            "ventRealityAmount": {
+              "label": "现实渗入数量",
+              "description": "每个空心石渗入的现实的数量。"
+            },
+            "ventRealityLargeMultiplier": {
+              "label": "大空心石现实渗入倍率",
+              "description": "大空心石渗入的现实的数量倍率。"
+            }
+          }
+        }
+      }
+    },
+    "tch": {
+      "modloader": {
+        "close": "关闭",
+        "hideToEdge": "隐藏到边缘",
+        "showFromEdge": "显示 ModLoader 菜单",
+        "menuSettings": "Mod 菜单设置",
+        "themeMode": "亮色 / 暗色模式",
+        "darkMode": "暗色",
+        "lightMode": "亮色",
+        "hideMode": "自动隐藏模式",
+        "autoHide": "自动隐藏",
+        "manualHide": "手动隐藏",
+        "sortMod": "排序 mod",
+        "autoHideDelay": "自动隐藏秒数",
+        "secondsSuffix": "秒",
+        "hideMenuDetails": "隐藏菜单详情",
+        "hideModFileDetails": "隐藏 mod 文件详情",
+        "show": "显示",
+        "hide": "隐藏",
+        "installedMods": "已安装 mod",
+        "enabledEntries": "启用条目",
+        "loadedMods": "已加载 mod",
+        "issues": "问题",
+        "dataPatches": "数据补丁",
+        "wordPatches": "文本补丁",
+        "registeredLanguages": "已注册语言",
+        "orphanEntities": "孤立实体",
+        "modManager": "Mod 管理",
+        "selectAll": "全选",
+        "toggleNote": "在下方开关 mod 或编辑配置。",
+        "changesRequireReload": "改动需要 reload。",
+        "configSaveNote": "配置已保存到 localStorage；部分 mod 需要 reload 生效。",
+        "saveReload": "保存并 Reload",
+        "saveConfig": "保存配置",
+        "insert": "导入",
+        "folder": "文件夹",
+        "deleteMod": "删除 mod",
+        "config": "配置",
+        "recentLog": "最近日志",
+        "noLogEntries": "暂无日志。",
+        "noModsFound": "没有找到带 mod.json 的 mod。",
+        "fileAccessUnavailable": "文件访问不可用。",
+        "fileAccessLoadedOnly": "文件访问不可用，所以只能显示已加载的 mod。",
+        "reloadHot": "支持热开关，当前仍建议 reload",
+        "reloadRestart": "需要重启",
+        "reloadRequired": "需要 reload",
+        "idPrefix": "id：{value}",
+        "uniquePrefix": "唯一码：{value}",
+        "depsPrefix": "依赖：{value}",
+        "conflictsPrefix": "冲突：{value}",
+        "missingDependencies": "缺少依赖：{value}",
+        "conflictsEnabled": "已启用冲突：{value}",
+        "savedReloading": "已保存，正在 reload...",
+        "saveFailed": "保存失败：{value}",
+        "configSaved": "配置已保存。",
+        "noChanges": "没有需要保存的改动。",
+        "changesCanceled": "已取消未保存的改动。",
+        "openFolderFailed": "无法打开文件夹：{value}",
+        "deleteTitle": "删除 Mod？",
+        "deleteMessage": "从 mods 文件夹删除 {name}？这个操作不能撤销。",
+        "deleteConfirm": "删除",
+        "cancel": "取消",
+        "replaceTitle": "替换 Mod？",
+        "replaceMessage": "mods 里已经有 {name}。是否用导入的 mod 替换它？",
+        "replaceConfirm": "替换",
+        "deletedMod": "已删除 {name}。已经运行的代码需要 reload 才会卸载。",
+        "deleteFailed": "删除失败：{value}",
+        "importHint": "把文件拖到这里或复制",
+        "importDetail": "可以把 mod zip 包直接拖入，或者复制 zip 包后在这里按粘贴快捷键，ModLoader 会自动解包到 mods 文件夹。",
+        "importWaiting": "等待 zip 文件...",
+        "importNoZip": "请拖入或粘贴 .zip 文件。",
+        "importNoPath": "无法读取该文件路径。",
+        "importing": "正在导入 {name}...",
+        "importedMod": "已导入 {name}。需要时勾选它并保存 reload。",
+        "importFailed": "导入失败：{value}",
+        "importModeOff": "返回 mod 列表",
+        "invalidZip": "只能导入 .zip mod 包。",
+        "zipNoMod": "这个 zip 内没有 mod.json。",
+        "zipMultipleMods": "这个 zip 包含多个 mod 文件夹；请一次导入一个 mod。",
+        "zipExtractFailed": "无法解压 zip：{value}",
+        "folderOpened": "已打开 mods 文件夹。",
+        "replaceRenamedUniqueTitle": "发现同唯一码 Mod",
+        "replaceRenamedUniqueMessage": "新文件跟已有文件有相同的 mod 唯一码，它很可能是旧文件的更新和改名。\n{oldName} → {newName}\n是否覆盖旧文件？",
+        "replaceRenamedPreviousTitle": "发现 Mod 改名",
+        "replaceRenamedPreviousMessage": "这个新文件是已有文件的改名。\n{oldName} → {newName}\n是否覆盖旧文件？",
+        "replaceOld": "覆盖",
+        "keepImported": "不覆盖（加入新文件）",
+        "uniqueCodeEditTitle": "推荐修改 mod 唯一码",
+        "uniqueCodeEditMessage": "这两个 mod 会共用同一个 mod 唯一码。是否在加入新文件前修改导入 mod 的唯一码？",
+        "uniqueCodeLabel": "mod 唯一码",
+        "uniqueCodeConfirm": "确认修改",
+        "uniqueCodeSkip": "否（不修改）",
+        "manifestReadFailed": "无法读取 mod.json：{value}",
+        "translationFile": "翻译",
+        "translationFileTitle": "打开翻译文件",
+        "translationFileSynced": "翻译文件已同步：{path}",
+        "translationFileFailed": "翻译文件失败：{value}",
+        "translationExport": "匯出",
+        "translationExportTitle": "匯出翻譯備份",
+        "translationExported": "翻譯備份已匯出：{path}",
+        "translationImport": "匯入",
+        "translationImportTitle": "匯入翻譯檔案",
+        "translationImported": "已從 {source} 匯入翻譯，並儲存到 {path}",
+        "translationImportInvalid": "選擇的檔案不是 ModLoader 翻譯檔案。",
+        "translationExportOverwriteTitle": "覆蓋翻譯備份？",
+        "translationExportOverwriteMessage": "目標檔案已存在。\n編輯時間：{editedAt}\n{path}\n是否覆蓋？",
+        "translationOverwriteConfirm": "覆蓋",
+        "translationDialogUnavailable": "檔案選擇器不可用。",
+        "translationImportWriteModsTitle": "寫入 mod.json？",
+        "translationImportWriteModsMessage": "無論如何，匯入檔案都會覆蓋 ModLoader 的 translations.json。是否也將相符的 mod 翻譯欄位寫入已安裝的 mod.json？這會覆蓋既有的相符翻譯欄位。",
+        "translationImportWriteModsConfirm": "寫入 mod",
+        "translationImportSkipMods": "不寫入 mod",
+        "translationImportWriteModsResult": "mod 寫回：已寫入 {written}，已是最新 {unchanged}，失敗 {failed}。",
+        "translationImportNoMatchingMods": "沒有已安裝的 mod.json 符合匯入檔案中的 mod 條目。",
+        "translationImportModFailures": "失敗：{failures}"
+      },
+      "mods": {
+        "Cattail_Tweaks_简体中文优化": {
+          "name": "簡體中文優化"
+        },
+        "Cattail_Tweaks_Chat-Timestamps": {
+          "name": "聊天時間戳"
+        },
+        "Cattail_TweaksQuality_Better-UIs": {
+          "name": "更好的介面",
+          "config": {
+            "enableShopCategories": {
+              "label": "商店分類"
+            },
+            "enableSaveSlots": {
+              "label": "存檔欄"
+            },
+            "enableLanguageMenu": {
+              "label": "語言選單"
+            }
+          }
+        },
+        "Cattail_TweaksQuality_Custom-Background-Color": {
+          "name": "自訂背景顏色",
+          "config": {
+            "globalThresholds": {
+              "label": "全域清理閾值"
+            },
+            "spriteThresholds": {
+              "label": "貼圖清理閾值"
+            }
+          }
+        },
+        "Cattail_TweaksQuality_Dynamic-Details": {
+          "name": "動態詳情",
+          "config": {
+            "cookieDirectionPassword": {
+              "label": "餅乾方向密碼"
+            }
+          }
+        },
+        "Cattail_TweaksQuality_Resource-Watcher": {
+          "name": "資源監視器"
+        },
+        "Cattail_TweaksQuality_Tweaks": {
+          "name": "便利調整",
+          "config": {
+            "enableEndingSkip": {
+              "label": "結局跳過"
+            },
+            "enableAccessibilityButtons": {
+              "label": "輔助按鈕"
+            },
+            "enableStabilizerSurgeFlashReduction": {
+              "label": "穩定器浪湧閃爍削弱"
+            },
+            "enableResourceGlowColors": {
+              "label": "資源光圈顏色"
+            },
+            "enablePlayTimeCounter": {
+              "label": "遊戲時間計數器"
+            },
+            "playTimeCounterPosition": {
+              "label": "遊戲時間計數器位置",
+              "description": "滑動選擇右下角、頂部置中或左下角。",
+              "valueLabels": {
+                "0": "左下角",
+                "1": "頂部置中",
+                "2": "右下角"
+              }
+            },
+            "resourceGlowColors": {
+              "label": "資源光圈調色板"
+            },
+            "enableViewDistance": {
+              "label": "視野距離限制"
+            },
+            "farthestZoom": {
+              "label": "最遠縮放"
+            },
+            "closestZoom": {
+              "label": "最近縮放"
+            },
+            "fallbackZoom": {
+              "label": "預設縮放"
+            },
+            "enableChasmLineRenderer": {
+              "label": "逆裂縫連線渲染",
+              "description": "允許本 mod 用選擇的渲染器替換逆裂縫和資源之間的連線。"
+            },
+            "chasmLineRendererMode": {
+              "label": "逆裂縫連線渲染模式",
+              "description": "Canvas 2D 使用原版繪製。WebGL 使用 GPU 畫布渲染同樣的逆裂縫到資源曲線。",
+              "valueLabels": {
+                "0": "Canvas 2D",
+                "1": "WebGL"
+              }
+            },
+            "enableChasmLineDistanceOverride": {
+              "label": "逆裂縫連線無視距離",
+              "description": "開啟後，視角離逆裂縫較遠時仍繼續渲染逆裂縫與資源之間的連線。"
+            },
+            "enableFloorGridLines": {
+              "label": "顯示地板方格邊框",
+              "description": "在遊戲內地板方格周圍繪製細線邊框。"
+            },
+            "floorGridLineRealityColor": {
+              "label": "現實世界地板方格邊框顏色",
+              "description": "留空時現實世界使用預設深灰色邊框。"
+            },
+            "floorGridLineVoidColor": {
+              "label": "虛空世界地板方格邊框顏色",
+              "description": "留空時虛空世界使用預設白色邊框。"
+            },
+            "enableVoidReturnFadeSkip": {
+              "label": "跳過虛空返回白色恢復效果",
+              "description": "從虛空世界返回現實世界時，移除長時間白色恢復淡出，直接顯示清晰畫面。"
+            },
+            "enableExplainerFix": {
+              "label": "提示修復",
+              "description": "修復提示語在切換語言後不刷新，並讓虛空世界裡的提示文字變成亮色以便看清。"
+            }
+          }
+        },
+        "Cattail_TweaksX_Reality-Pack": {
+          "name": "Reality 整合包",
+          "description": "將自動 Reality 收集、超臨界浪湧和超級 Silo 整合為一個 TweaksX mod。",
+          "config": {
+            "surgeCount": {
+              "label": "浪湧數量",
+              "description": "每次超臨界核心落地時嘗試生成的隨機浪湧數量。"
+            },
+            "surgeRadius": {
+              "label": "生成半徑",
+              "description": "以落點為中心搜尋現實世界空格的圓形半徑（格）。"
+            },
+            "fillAmount": {
+              "label": "超長填充值",
+              "description": "Fill value assigned to activated silos."
+            },
+            "enableRealityAutoCollect": {
+              "label": "自動 Reality 收集",
+              "description": "在虛空世界自動收集已經準備好的 Reality / soul power。"
+            },
+            "enableScanRealitySurges": {
+              "label": "超臨界浪湧",
+              "description": "超臨界內核落地時，在 Reality 平面生成隨機浪湧。"
+            },
+            "enableSuperSilo": {
+              "label": "超級 Silo",
+              "description": "讓已啟動的 Silo 保持設定的超長填充值。"
+            },
+            "enableScanRealitySlider": {
+              "label": "超臨界核心滑桿",
+              "description": "在超臨界核心購買卡片上顯示範圍直徑和 Reality 注入滑桿。"
+            },
+            "enableHollowVentReality": {
+              "label": "空心噴口 Reality 來源",
+              "description": "讓空心石噴口生長 Reality 符號，並透過虛空祭壇自動收割。"
+            },
+            "ventRealityInterval": {
+              "label": "噴口生產時間",
+              "description": "每個空心噴口生長一個 Reality 符號所需的秒數。"
+            },
+            "ventRealityAmount": {
+              "label": "小噴口 Reality",
+              "description": "每個小空心噴口符號提供的 Reality。"
+            },
+            "ventRealityLargeMultiplier": {
+              "label": "大噴口倍率",
+              "description": "套用於大空心噴口 Reality 產出的倍率。"
+            }
+          }
+        }
+      }
+    },
+    "ru": {
+      "modloader": {
+        "translationExport": "Export",
+        "translationExportTitle": "Export translations backup",
+        "translationExported": "Translation backup exported: {path}",
+        "translationImport": "Import",
+        "translationImportTitle": "Import translations file",
+        "translationImported": "Imported translations from {source} and saved to {path}",
+        "translationImportInvalid": "Selected file is not a ModLoader translations file.",
+        "translationExportOverwriteTitle": "Overwrite translation backup?",
+        "translationExportOverwriteMessage": "Target file already exists.\nEdit time: {editedAt}\n{path}\nOverwrite it?",
+        "translationOverwriteConfirm": "Overwrite",
+        "translationDialogUnavailable": "File dialog is unavailable.",
+        "translationImportWriteModsTitle": "Write translations to mod.json?",
+        "translationImportWriteModsMessage": "The imported file will replace ModLoader translations.json either way. Do you also want to write matching mod translation fields into installed mod.json files? This overwrites existing matching translation fields.",
+        "translationImportWriteModsConfirm": "Write to mod",
+        "translationImportSkipMods": "Do not write",
+        "translationImportWriteModsResult": "Mod write-back: {written} written, {unchanged} already current, {failed} failed.",
+        "translationImportNoMatchingMods": "No installed mod.json matched the imported mod entries.",
+        "translationImportModFailures": "Failures: {failures}"
+      },
+      "mods": {
+        "Cattail_Tweaks_简体中文优化": {
+          "name": "Оптимизация упрощенного китайского"
+        },
+        "Cattail_Tweaks_Chat-Timestamps": {
+          "name": "Временные метки чата"
+        },
+        "Cattail_TweaksQuality_Better-UIs": {
+          "name": "Улучшенный интерфейс",
+          "config": {
+            "enableShopCategories": {
+              "label": "Категории магазина"
+            },
+            "enableSaveSlots": {
+              "label": "Ячейки сохранения"
+            },
+            "enableLanguageMenu": {
+              "label": "Меню языка"
+            }
+          }
+        },
+        "Cattail_TweaksQuality_Custom-Background-Color": {
+          "name": "Пользовательский цвет фона",
+          "config": {
+            "globalThresholds": {
+              "label": "Глобальные пороги очистки"
+            },
+            "spriteThresholds": {
+              "label": "Пороги очистки спрайтов"
+            }
+          }
+        },
+        "Cattail_TweaksQuality_Dynamic-Details": {
+          "name": "Динамические сведения",
+          "config": {
+            "cookieDirectionPassword": {
+              "label": "Пароль направления печенья"
+            }
+          }
+        },
+        "Cattail_TweaksQuality_Resource-Watcher": {
+          "name": "Монитор ресурсов"
+        },
+        "Cattail_TweaksQuality_Tweaks": {
+          "name": "Настройки удобства",
+          "config": {
+            "enableEndingSkip": {
+              "label": "Пропуск концовки"
+            },
+            "enableAccessibilityButtons": {
+              "label": "Кнопки доступности"
+            },
+            "enableStabilizerSurgeFlashReduction": {
+              "label": "Снижение вспышек стабилизатора"
+            },
+            "enableResourceGlowColors": {
+              "label": "Цвета свечения ресурсов"
+            },
+            "enablePlayTimeCounter": {
+              "label": "Счетчик времени игры"
+            },
+            "playTimeCounterPosition": {
+              "label": "Позиция счетчика времени",
+              "description": "Slide between bottom-left, top-center, and bottom-right.",
+              "valueLabels": {
+                "0": "Внизу слева",
+                "1": "Вверху по центру",
+                "2": "Внизу справа"
+              }
+            },
+            "resourceGlowColors": {
+              "label": "Палитра свечения ресурсов"
+            },
+            "enableViewDistance": {
+              "label": "Пределы дальности обзора"
+            },
+            "farthestZoom": {
+              "label": "Самое дальнее отдаление"
+            },
+            "closestZoom": {
+              "label": "Самое близкое приближение"
+            },
+            "fallbackZoom": {
+              "label": "Запасной масштаб"
+            },
+            "enableChasmLineRenderer": {
+              "label": "Render lines chasm",
+              "description": "Allow the mod to replace chasm-to-resource lines with the selected renderer."
+            },
+            "chasmLineRendererMode": {
+              "label": "Chasm line render mode",
+              "description": "Canvas 2D uses original drawing. WebGL uses a GPU-backed canvas.",
+              "valueLabels": {
+                "0": "Canvas 2D",
+                "1": "WebGL"
+              }
+            },
+            "enableChasmLineDistanceOverride": {
+              "label": "Linii razloma bez distantsii",
+              "description": "Linii ot razloma k resursam risuyutsya, dazhe kogda razlom vne obychnoy vidimoy zony."
+            },
+            "enableFloorGridLines": {
+              "label": "Kontury kletok pola",
+              "description": "Risuet tonkie kontury vokrug kletok pola v igre."
+            },
+            "floorGridLineRealityColor": {
+              "label": "Tsvet setki pola realnosti",
+              "description": "Pustoe znachenie ispolzuet temno-seryy kontur v realnosti."
+            },
+            "floorGridLineVoidColor": {
+              "label": "Tsvet setki pola pustoty",
+              "description": "Pustoe znachenie ispolzuet belyy kontur v pustote."
+            },
+            "enableVoidReturnFadeSkip": {
+              "label": "Propusk belogo zatuhaniya iz pustoty",
+              "description": "Pri vozvrate iz pustoty v realnost ubiraet dolgoe beloe vosstanovlenie i srazu pokazyvaet chetkiy vid."
+            },
+            "enableExplainerFix": {
+              "label": "Ispravlenie podskazok",
+              "description": "Obnovlyaet pulsiruyushchie podskazki posle smeny yazyka i delaet tekst svetlym v pustote."
+            }
+          }
+        },
+        "Cattail_TweaksX_Reality-Pack": {
+          "name": "Пакет Reality",
+          "description": "Объединяет автосбор Reality, волны от сканирования и супер-силос в один мод TweaksX.",
+          "config": {
+            "surgeCount": {
+              "label": "Количество волн",
+              "description": "Number of random surges to create when a supercritical kernel lands."
+            },
+            "surgeRadius": {
+              "label": "Радиус появления",
+              "description": "Circular radius, in cells, used to search for empty reality-plane spawn spots."
+            },
+            "fillAmount": {
+              "label": "Длинное заполнение",
+              "description": "Fill value assigned to activated silos."
+            },
+            "enableRealityAutoCollect": {
+              "label": "Автосбор Reality",
+              "description": "Автоматически собирает готовую Reality / soul power в пустотном мире."
+            },
+            "enableScanRealitySurges": {
+              "label": "Волны Reality от сканирования",
+              "description": "Создает случайные волны на плоскости Reality при падении сверхкритического ядра."
+            },
+            "enableSuperSilo": {
+              "label": "Супер-силос",
+              "description": "Поддерживает активированные силосы заполненными заданным длинным значением."
+            },
+            "enableScanRealitySlider": {
+              "label": "Ползунок сверхкритического ядра",
+              "description": "Показывает диаметр области и ползунок вливания Reality на карточке покупки сверхкритического ядра."
+            },
+            "enableHollowVentReality": {
+              "label": "Источник Reality из полых вентилей",
+              "description": "Полые вентили выращивают символы Reality, которые автоматически собираются через алтарь пустоты."
+            },
+            "ventRealityInterval": {
+              "label": "Время производства вентиля",
+              "description": "Сколько секунд полый вентиль выращивает символ Reality."
+            },
+            "ventRealityAmount": {
+              "label": "Reality малого вентиля",
+              "description": "Количество Reality от символа малого полого вентиля."
+            },
+            "ventRealityLargeMultiplier": {
+              "label": "Множитель большого вентиля",
+              "description": "Множитель выхода Reality для большого полого вентиля."
+            }
+          }
+        }
+      }
+    },
+    "de": {
+      "modloader": {
+        "translationExport": "Exportieren",
+        "translationExportTitle": "Uebersetzungsbackup exportieren",
+        "translationExported": "Uebersetzungsbackup exportiert: {path}",
+        "translationImport": "Importieren",
+        "translationImportTitle": "Uebersetzungsdatei importieren",
+        "translationImported": "Uebersetzungen aus {source} importiert und in {path} gespeichert",
+        "translationImportInvalid": "Die ausgewaehlte Datei ist keine ModLoader-Uebersetzungsdatei.",
+        "translationExportOverwriteTitle": "Uebersetzungsbackup ueberschreiben?",
+        "translationExportOverwriteMessage": "Die Zieldatei existiert bereits.\nBearbeitungszeit: {editedAt}\n{path}\nUeberschreiben?",
+        "translationOverwriteConfirm": "Ueberschreiben",
+        "translationDialogUnavailable": "Dateiauswahl ist nicht verfuegbar.",
+        "translationImportWriteModsTitle": "Uebersetzungen in mod.json schreiben?",
+        "translationImportWriteModsMessage": "Die importierte Datei ersetzt in jedem Fall ModLoader translations.json. Sollen passende Mod-Uebersetzungsfelder auch in installierte mod.json-Dateien geschrieben werden? Dadurch werden vorhandene passende Uebersetzungsfelder ueberschrieben.",
+        "translationImportWriteModsConfirm": "In mod schreiben",
+        "translationImportSkipMods": "Nicht schreiben",
+        "translationImportWriteModsResult": "Mod-Rueckschreiben: {written} geschrieben, {unchanged} bereits aktuell, {failed} fehlgeschlagen.",
+        "translationImportNoMatchingMods": "Keine installierte mod.json passt zu den importierten Mod-Eintraegen.",
+        "translationImportModFailures": "Fehler: {failures}"
+      },
+      "mods": {
+        "Cattail_Tweaks_简体中文优化": {
+          "name": "Optimiertes vereinfachtes Chinesisch"
+        },
+        "Cattail_Tweaks_Chat-Timestamps": {
+          "name": "Chat-Zeitstempel"
+        },
+        "Cattail_TweaksQuality_Better-UIs": {
+          "name": "Bessere Oberflächen",
+          "config": {
+            "enableShopCategories": {
+              "label": "Shop-Kategorien"
+            },
+            "enableSaveSlots": {
+              "label": "Speicherplätze"
+            },
+            "enableLanguageMenu": {
+              "label": "Sprachmenü"
+            }
+          }
+        },
+        "Cattail_TweaksQuality_Custom-Background-Color": {
+          "name": "Eigene Hintergrundfarbe",
+          "config": {
+            "globalThresholds": {
+              "label": "Globale Bereinigungsschwellen"
+            },
+            "spriteThresholds": {
+              "label": "Sprite-Bereinigungsschwellen"
+            }
+          }
+        },
+        "Cattail_TweaksQuality_Dynamic-Details": {
+          "name": "Dynamische Details",
+          "config": {
+            "cookieDirectionPassword": {
+              "label": "Cookie-Richtungspasswort"
+            }
+          }
+        },
+        "Cattail_TweaksQuality_Resource-Watcher": {
+          "name": "Ressourcenmonitor"
+        },
+        "Cattail_TweaksQuality_Tweaks": {
+          "name": "Komfortanpassungen",
+          "config": {
+            "enableEndingSkip": {
+              "label": "Ende überspringen"
+            },
+            "enableAccessibilityButtons": {
+              "label": "Bedienhilfen-Schaltflächen"
+            },
+            "enableStabilizerSurgeFlashReduction": {
+              "label": "Stabilisator-Blitzreduktion"
+            },
+            "enableResourceGlowColors": {
+              "label": "Ressourcen-Leuchtfarben"
+            },
+            "enablePlayTimeCounter": {
+              "label": "Spielzeitzähler"
+            },
+            "playTimeCounterPosition": {
+              "label": "Position des Spielzeitzählers",
+              "description": "Slide between bottom-left, top-center, and bottom-right.",
+              "valueLabels": {
+                "0": "Unten links",
+                "1": "Oben mittig",
+                "2": "Unten rechts"
+              }
+            },
+            "resourceGlowColors": {
+              "label": "Ressourcen-Leuchtpalette"
+            },
+            "enableViewDistance": {
+              "label": "Sichtweitenlimits"
+            },
+            "farthestZoom": {
+              "label": "Weitester Zoom"
+            },
+            "closestZoom": {
+              "label": "Nächster Zoom"
+            },
+            "fallbackZoom": {
+              "label": "Fallback-Zoom"
+            },
+            "enableChasmLineRenderer": {
+              "label": "Risslinien-Renderer",
+              "description": "Erlaubt dem Mod, die Linien zwischen Riss und Ressourcen mit dem gewaehlten Renderer zu ersetzen."
+            },
+            "chasmLineRendererMode": {
+              "label": "Risslinien-Renderingmodus",
+              "description": "Canvas 2D nutzt die originale Zeichnung. WebGL nutzt eine GPU-Canvas.",
+              "valueLabels": {
+                "0": "Canvas 2D",
+                "1": "WebGL"
+              }
+            },
+            "enableChasmLineDistanceOverride": {
+              "label": "Kluftlinien ohne Distanzlimit",
+              "description": "Zeichnet Linien von Kluft zu Ressourcen weiter, auch wenn die Kluft ausserhalb der normalen Sichtweite liegt."
+            },
+            "enableFloorGridLines": {
+              "label": "Bodenraster-Umrisse",
+              "description": "Zeichnet duenne Umrisse um die Bodenfelder im Spiel."
+            },
+            "floorGridLineRealityColor": {
+              "label": "Bodenrasterfarbe Realitaet",
+              "description": "Leer lassen fuer die dunkelgraue Standardlinie in der Realitaet."
+            },
+            "floorGridLineVoidColor": {
+              "label": "Bodenrasterfarbe Leere",
+              "description": "Leer lassen fuer die weisse Standardlinie in der Leere."
+            },
+            "enableVoidReturnFadeSkip": {
+              "label": "Rueckkehr-Fade aus der Leere ueberspringen",
+              "description": "Beim Zurueckkehren aus der Leere zur Realitaet wird die lange weisse Aufhellung entfernt."
+            },
+            "enableExplainerFix": {
+              "label": "Hinweis-Fix",
+              "description": "Aktualisiert pulsierende Hinweise nach Sprachwechseln und nutzt gut lesbaren hellen Text in der Leere."
+            }
+          }
+        },
+        "Cattail_TweaksX_Reality-Pack": {
+          "name": "Reality-Paket",
+          "description": "Kombiniert Reality-Autosammlung, Scan-Realitätswellen und Super-Silo in einem TweaksX-Mod.",
+          "config": {
+            "surgeCount": {
+              "label": "Wellenanzahl",
+              "description": "Anzahl zufaelliger Wellen beim Einschlag eines superkritischen Kerns."
+            },
+            "surgeRadius": {
+              "label": "Spawnradius",
+              "description": "Kreisradius in Zellen zur Suche nach freien Spawnfeldern."
+            },
+            "fillAmount": {
+              "label": "Lange Füllmenge",
+              "description": "Fill value assigned to activated silos."
+            },
+            "enableRealityAutoCollect": {
+              "label": "Reality automatisch sammeln",
+              "description": "Sammelt bereite Reality / Soul Power in der Leerenwelt automatisch ein."
+            },
+            "enableScanRealitySurges": {
+              "label": "Scan-Realitätswellen",
+              "description": "Erzeugt zufällige Realitätswellen, wenn ein superkritischer Kern landet."
+            },
+            "enableSuperSilo": {
+              "label": "Super-Silo",
+              "description": "Hält aktivierte Silos mit der eingestellten langen Füllmenge gefüllt."
+            },
+            "enableScanRealitySlider": {
+              "label": "Regler für superkritischen Kern",
+              "description": "Zeigt den Reichweitendurchmesser und den Reality-Infusionsregler auf der Kaufkarte des superkritischen Kerns."
+            },
+            "enableHollowVentReality": {
+              "label": "Reality-Quelle aus Hohl-Vents",
+              "description": "Hohl-Vents lassen Reality-Symbole wachsen, die automatisch über den Leerenaltar geerntet werden."
+            },
+            "ventRealityInterval": {
+              "label": "Vent-Produktionszeit",
+              "description": "Sekunden, die ein Hohl-Vent braucht, um ein Reality-Symbol wachsen zu lassen."
+            },
+            "ventRealityAmount": {
+              "label": "Reality kleiner Vents",
+              "description": "Reality-Ertrag jedes Symbols eines kleinen Hohl-Vents."
+            },
+            "ventRealityLargeMultiplier": {
+              "label": "Multiplikator großer Vents",
+              "description": "Multiplikator für den Reality-Ertrag des großen Hohl-Vents."
+            }
+          }
+        }
+      }
+    },
+    "ptbr": {
+      "modloader": {
+        "translationExport": "Exportar",
+        "translationExportTitle": "Exportar backup das traducoes",
+        "translationExported": "Backup das traducoes exportado: {path}",
+        "translationImport": "Importar",
+        "translationImportTitle": "Importar arquivo de traducoes",
+        "translationImported": "Traducoes importadas de {source} e salvas em {path}",
+        "translationImportInvalid": "O arquivo selecionado nao e um arquivo de traducoes do ModLoader.",
+        "translationExportOverwriteTitle": "Sobrescrever backup das traducoes?",
+        "translationExportOverwriteMessage": "O arquivo de destino ja existe.\nHorario de edicao: {editedAt}\n{path}\nSobrescrever?",
+        "translationOverwriteConfirm": "Sobrescrever",
+        "translationDialogUnavailable": "O seletor de arquivos nao esta disponivel.",
+        "translationImportWriteModsTitle": "Gravar traducoes em mod.json?",
+        "translationImportWriteModsMessage": "O arquivo importado sempre substitui o translations.json do ModLoader. Tambem deseja gravar os campos de traducao de mods correspondentes nos mod.json instalados? Isso sobrescreve campos de traducao correspondentes existentes.",
+        "translationImportWriteModsConfirm": "Gravar no mod",
+        "translationImportSkipMods": "Nao gravar",
+        "translationImportWriteModsResult": "Gravacao em mods: {written} gravados, {unchanged} ja atualizados, {failed} falharam.",
+        "translationImportNoMatchingMods": "Nenhum mod.json instalado corresponde aos mods importados.",
+        "translationImportModFailures": "Falhas: {failures}"
+      },
+      "mods": {
+        "Cattail_Tweaks_简体中文优化": {
+          "name": "Otimização de chinês simplificado"
+        },
+        "Cattail_Tweaks_Chat-Timestamps": {
+          "name": "Horários do chat"
+        },
+        "Cattail_TweaksQuality_Better-UIs": {
+          "name": "Interfaces melhores",
+          "config": {
+            "enableShopCategories": {
+              "label": "Categorias da loja"
+            },
+            "enableSaveSlots": {
+              "label": "Espaços de save"
+            },
+            "enableLanguageMenu": {
+              "label": "Menu de idioma"
+            }
+          }
+        },
+        "Cattail_TweaksQuality_Custom-Background-Color": {
+          "name": "Cor de fundo personalizada",
+          "config": {
+            "globalThresholds": {
+              "label": "Limites globais de limpeza"
+            },
+            "spriteThresholds": {
+              "label": "Limites de limpeza dos sprites"
+            }
+          }
+        },
+        "Cattail_TweaksQuality_Dynamic-Details": {
+          "name": "Detalhes dinâmicos",
+          "config": {
+            "cookieDirectionPassword": {
+              "label": "Senha da direção do cookie"
+            }
+          }
+        },
+        "Cattail_TweaksQuality_Resource-Watcher": {
+          "name": "Monitor de recursos"
+        },
+        "Cattail_TweaksQuality_Tweaks": {
+          "name": "Ajustes de qualidade",
+          "config": {
+            "enableEndingSkip": {
+              "label": "Pular final"
+            },
+            "enableAccessibilityButtons": {
+              "label": "Botões de acessibilidade"
+            },
+            "enableStabilizerSurgeFlashReduction": {
+              "label": "Redução de flashes do estabilizador"
+            },
+            "enableResourceGlowColors": {
+              "label": "Cores do brilho dos recursos"
+            },
+            "enablePlayTimeCounter": {
+              "label": "Contador de tempo de jogo"
+            },
+            "playTimeCounterPosition": {
+              "label": "Posição do contador de tempo",
+              "description": "Slide between bottom-left, top-center, and bottom-right.",
+              "valueLabels": {
+                "0": "Inferior esquerdo",
+                "1": "Superior central",
+                "2": "Inferior direito"
+              }
+            },
+            "resourceGlowColors": {
+              "label": "Paleta de brilho dos recursos"
+            },
+            "enableViewDistance": {
+              "label": "Limites de distância de visão"
+            },
+            "farthestZoom": {
+              "label": "Zoom mais distante"
+            },
+            "closestZoom": {
+              "label": "Zoom mais próximo"
+            },
+            "fallbackZoom": {
+              "label": "Zoom reserva"
+            },
+            "enableChasmLineRenderer": {
+              "label": "Renderizador das linhas da fenda",
+              "description": "Permite trocar as linhas entre a fenda e os recursos pelo renderizador escolhido."
+            },
+            "chasmLineRendererMode": {
+              "label": "Modo das linhas da fenda",
+              "description": "Canvas 2D usa o desenho original. WebGL usa uma tela acelerada por GPU.",
+              "valueLabels": {
+                "0": "Canvas 2D",
+                "1": "WebGL"
+              }
+            },
+            "enableChasmLineDistanceOverride": {
+              "label": "Linhas da fenda sem limite",
+              "description": "Mantem as linhas da fenda para os recursos mesmo quando a fenda esta fora do alcance visivel normal."
+            },
+            "enableFloorGridLines": {
+              "label": "Contornos da grade do piso",
+              "description": "Desenha contornos finos nas celulas do piso do jogo."
+            },
+            "floorGridLineRealityColor": {
+              "label": "Cor da grade do piso na realidade",
+              "description": "Vazio usa o contorno cinza escuro padrao na realidade."
+            },
+            "floorGridLineVoidColor": {
+              "label": "Cor da grade do piso no vazio",
+              "description": "Vazio usa o contorno branco padrao no vazio."
+            },
+            "enableVoidReturnFadeSkip": {
+              "label": "Pular fade ao voltar do vazio",
+              "description": "Ao voltar do vazio para a realidade, remove o longo fade branco e mostra a tela nitida imediatamente."
+            },
+            "enableExplainerFix": {
+              "label": "Correcao dos avisos",
+              "description": "Atualiza avisos pulsantes apos mudar o idioma e usa texto claro legivel no vazio."
+            }
+          }
+        },
+        "Cattail_TweaksX_Reality-Pack": {
+          "name": "Pacote Reality",
+          "description": "Combina coleta automática de Reality, surtos de varredura e Super Silo em um mod TweaksX.",
+          "config": {
+            "surgeCount": {
+              "label": "Quantidade de surtos",
+              "description": "Numero de surtos aleatorios criados quando um nucleo supercritico cai."
+            },
+            "surgeRadius": {
+              "label": "Raio de surgimento",
+              "description": "Raio circular, em celulas, usado para procurar espacos vazios."
+            },
+            "fillAmount": {
+              "label": "Valor de enchimento longo",
+              "description": "Fill value assigned to activated silos."
+            },
+            "enableRealityAutoCollect": {
+              "label": "Coleta automática de Reality",
+              "description": "Coleta automaticamente Reality / soul power pronta no mundo vazio."
+            },
+            "enableScanRealitySurges": {
+              "label": "Surtos de Reality por varredura",
+              "description": "Cria surtos aleatórios no plano Reality quando um núcleo supercrítico cai."
+            },
+            "enableSuperSilo": {
+              "label": "Super Silo",
+              "description": "Mantém silos ativados preenchidos com o valor longo configurado."
+            },
+            "enableScanRealitySlider": {
+              "label": "Controle do núcleo supercrítico",
+              "description": "Mostra o diâmetro do alcance e o controle de infusão de Reality no cartão de compra do núcleo supercrítico."
+            },
+            "enableHollowVentReality": {
+              "label": "Fonte de Reality dos vents ocos",
+              "description": "Vents ocos geram símbolos de Reality que são coletados automaticamente pelo altar do vazio."
+            },
+            "ventRealityInterval": {
+              "label": "Tempo de produção do vent",
+              "description": "Segundos para cada vent oco gerar um símbolo de Reality."
+            },
+            "ventRealityAmount": {
+              "label": "Reality do vent pequeno",
+              "description": "Reality obtida de cada símbolo de vent oco pequeno."
+            },
+            "ventRealityLargeMultiplier": {
+              "label": "Multiplicador do vent grande",
+              "description": "Multiplicador aplicado à produção de Reality do vent oco grande."
+            }
+          }
+        }
+      }
+    },
+    "it": {
+      "modloader": {
+        "translationExport": "Esporta",
+        "translationExportTitle": "Esporta backup traduzioni",
+        "translationExported": "Backup traduzioni esportato: {path}",
+        "translationImport": "Importa",
+        "translationImportTitle": "Importa file traduzioni",
+        "translationImported": "Traduzioni importate da {source} e salvate in {path}",
+        "translationImportInvalid": "Il file selezionato non e un file di traduzioni ModLoader.",
+        "translationExportOverwriteTitle": "Sovrascrivere il backup traduzioni?",
+        "translationExportOverwriteMessage": "Il file di destinazione esiste gia.\nOra di modifica: {editedAt}\n{path}\nSovrascrivere?",
+        "translationOverwriteConfirm": "Sovrascrivi",
+        "translationDialogUnavailable": "Selettore file non disponibile.",
+        "translationImportWriteModsTitle": "Scrivere le traduzioni in mod.json?",
+        "translationImportWriteModsMessage": "Il file importato sostituira comunque translations.json di ModLoader. Vuoi anche scrivere i campi di traduzione dei mod corrispondenti nei mod.json installati? Questo sovrascrive i campi di traduzione corrispondenti esistenti.",
+        "translationImportWriteModsConfirm": "Scrivi nel mod",
+        "translationImportSkipMods": "Non scrivere",
+        "translationImportWriteModsResult": "Scrittura nei mod: {written} scritti, {unchanged} gia aggiornati, {failed} non riusciti.",
+        "translationImportNoMatchingMods": "Nessun mod.json installato corrisponde alle voci mod importate.",
+        "translationImportModFailures": "Errori: {failures}"
+      },
+      "mods": {
+        "Cattail_Tweaks_简体中文优化": {
+          "name": "Ottimizzazione cinese semplificato"
+        },
+        "Cattail_Tweaks_Chat-Timestamps": {
+          "name": "Timestamp chat"
+        },
+        "Cattail_TweaksQuality_Better-UIs": {
+          "name": "Interfacce migliori",
+          "config": {
+            "enableShopCategories": {
+              "label": "Categorie negozio"
+            },
+            "enableSaveSlots": {
+              "label": "Slot salvataggio"
+            },
+            "enableLanguageMenu": {
+              "label": "Menu lingua"
+            }
+          }
+        },
+        "Cattail_TweaksQuality_Custom-Background-Color": {
+          "name": "Colore sfondo personalizzato",
+          "config": {
+            "globalThresholds": {
+              "label": "Soglie globali di pulizia"
+            },
+            "spriteThresholds": {
+              "label": "Soglie pulizia sprite"
+            }
+          }
+        },
+        "Cattail_TweaksQuality_Dynamic-Details": {
+          "name": "Dettagli dinamici",
+          "config": {
+            "cookieDirectionPassword": {
+              "label": "Password direzione cookie"
+            }
+          }
+        },
+        "Cattail_TweaksQuality_Resource-Watcher": {
+          "name": "Monitor risorse"
+        },
+        "Cattail_TweaksQuality_Tweaks": {
+          "name": "Migliorie",
+          "config": {
+            "enableEndingSkip": {
+              "label": "Salta finale"
+            },
+            "enableAccessibilityButtons": {
+              "label": "Pulsanti accessibilità"
+            },
+            "enableStabilizerSurgeFlashReduction": {
+              "label": "Riduzione lampeggi stabilizzatore"
+            },
+            "enableResourceGlowColors": {
+              "label": "Colori bagliore risorse"
+            },
+            "enablePlayTimeCounter": {
+              "label": "Contatore tempo di gioco"
+            },
+            "playTimeCounterPosition": {
+              "label": "Posizione contatore tempo",
+              "description": "Slide between bottom-left, top-center, and bottom-right.",
+              "valueLabels": {
+                "0": "In basso a sinistra",
+                "1": "In alto al centro",
+                "2": "In basso a destra"
+              }
+            },
+            "resourceGlowColors": {
+              "label": "Tavolozza bagliore risorse"
+            },
+            "enableViewDistance": {
+              "label": "Limiti distanza visuale"
+            },
+            "farthestZoom": {
+              "label": "Zoom più lontano"
+            },
+            "closestZoom": {
+              "label": "Zoom più vicino"
+            },
+            "fallbackZoom": {
+              "label": "Zoom di riserva"
+            },
+            "enableChasmLineRenderer": {
+              "label": "Renderer linee fenditura",
+              "description": "Permette al mod di sostituire le linee tra fenditura e risorse con il renderer scelto."
+            },
+            "chasmLineRendererMode": {
+              "label": "Modo rendering linee fenditura",
+              "description": "Canvas 2D usa il disegno originale. WebGL usa una canvas GPU.",
+              "valueLabels": {
+                "0": "Canvas 2D",
+                "1": "WebGL"
+              }
+            },
+            "enableChasmLineDistanceOverride": {
+              "label": "Linee frattura senza distanza",
+              "description": "Continua a disegnare le linee dalla frattura alle risorse anche fuori dal normale campo visibile."
+            },
+            "enableFloorGridLines": {
+              "label": "Contorni griglia pavimento",
+              "description": "Disegna contorni sottili attorno alle celle del pavimento."
+            },
+            "floorGridLineRealityColor": {
+              "label": "Colore griglia pavimento realta",
+              "description": "Vuoto usa il contorno grigio scuro predefinito nella realta."
+            },
+            "floorGridLineVoidColor": {
+              "label": "Colore griglia pavimento vuoto",
+              "description": "Vuoto usa il contorno bianco predefinito nel vuoto."
+            },
+            "enableVoidReturnFadeSkip": {
+              "label": "Salta dissolvenza ritorno dal vuoto",
+              "description": "Quando torni dal vuoto alla realta, rimuove la lunga dissolvenza bianca e mostra subito la vista chiara."
+            },
+            "enableExplainerFix": {
+              "label": "Correzione suggerimenti",
+              "description": "Aggiorna i suggerimenti pulsanti dopo il cambio lingua e usa testo chiaro leggibile nel vuoto."
+            }
+          }
+        },
+        "Cattail_TweaksX_Reality-Pack": {
+          "name": "Pacchetto Reality",
+          "description": "Unisce raccolta automatica Reality, impulsi da scansione e Super Silo in un mod TweaksX.",
+          "config": {
+            "surgeCount": {
+              "label": "Numero impulsi",
+              "description": "Numero di impulsi casuali creati quando atterra un nucleo supercritico."
+            },
+            "surgeRadius": {
+              "label": "Raggio generazione",
+              "description": "Raggio circolare, in celle, usato per cercare spazi liberi."
+            },
+            "fillAmount": {
+              "label": "Riempimento lungo",
+              "description": "Fill value assigned to activated silos."
+            },
+            "enableRealityAutoCollect": {
+              "label": "Raccolta automatica Reality",
+              "description": "Raccoglie automaticamente Reality / soul power pronta nel mondo del vuoto."
+            },
+            "enableScanRealitySurges": {
+              "label": "Impulsi Reality da scansione",
+              "description": "Genera impulsi casuali sul piano Reality quando atterra un nucleo supercritico."
+            },
+            "enableSuperSilo": {
+              "label": "Super Silo",
+              "description": "Mantiene i silo attivati pieni con il valore lungo configurato."
+            },
+            "enableScanRealitySlider": {
+              "label": "Cursore nucleo supercritico",
+              "description": "Mostra il diametro del raggio e il cursore di infusione Reality sulla scheda di acquisto del nucleo supercritico."
+            },
+            "enableHollowVentReality": {
+              "label": "Fonte Reality dei venti cavi",
+              "description": "I venti cavi fanno crescere simboli Reality raccolti automaticamente tramite l’altare del vuoto."
+            },
+            "ventRealityInterval": {
+              "label": "Tempo produzione vent",
+              "description": "Secondi necessari a ogni vento cavo per far crescere un simbolo Reality."
+            },
+            "ventRealityAmount": {
+              "label": "Reality vento piccolo",
+              "description": "Reality ottenuta da ogni simbolo di un piccolo vento cavo."
+            },
+            "ventRealityLargeMultiplier": {
+              "label": "Moltiplicatore vento grande",
+              "description": "Moltiplicatore applicato alla produzione Reality del grande vento cavo."
+            }
+          }
+        }
+      }
+    },
+    "es": {
+      "modloader": {
+        "translationExport": "Exportar",
+        "translationExportTitle": "Exportar copia de traducciones",
+        "translationExported": "Copia de traducciones exportada: {path}",
+        "translationImport": "Importar",
+        "translationImportTitle": "Importar archivo de traducciones",
+        "translationImported": "Traducciones importadas desde {source} y guardadas en {path}",
+        "translationImportInvalid": "El archivo seleccionado no es un archivo de traducciones de ModLoader.",
+        "translationExportOverwriteTitle": "Sobrescribir copia de traducciones?",
+        "translationExportOverwriteMessage": "El archivo de destino ya existe.\nHora de edicion: {editedAt}\n{path}\nSobrescribir?",
+        "translationOverwriteConfirm": "Sobrescribir",
+        "translationDialogUnavailable": "El selector de archivos no esta disponible.",
+        "translationImportWriteModsTitle": "Escribir traducciones en mod.json?",
+        "translationImportWriteModsMessage": "El archivo importado reemplazara translations.json de ModLoader de todos modos. Tambien quieres escribir los campos de traduccion de mods coincidentes en los mod.json instalados? Esto sobrescribe los campos de traduccion coincidentes existentes.",
+        "translationImportWriteModsConfirm": "Escribir en mod",
+        "translationImportSkipMods": "No escribir",
+        "translationImportWriteModsResult": "Escritura en mods: {written} escritos, {unchanged} ya actualizados, {failed} fallidos.",
+        "translationImportNoMatchingMods": "Ningun mod.json instalado coincide con las entradas de mod importadas.",
+        "translationImportModFailures": "Fallos: {failures}"
+      },
+      "mods": {
+        "Cattail_Tweaks_简体中文优化": {
+          "name": "Optimización de chino simplificado"
+        },
+        "Cattail_Tweaks_Chat-Timestamps": {
+          "name": "Marcas de tiempo del chat"
+        },
+        "Cattail_TweaksQuality_Better-UIs": {
+          "name": "Interfaces mejoradas",
+          "config": {
+            "enableShopCategories": {
+              "label": "Categorías de tienda"
+            },
+            "enableSaveSlots": {
+              "label": "Ranuras de guardado"
+            },
+            "enableLanguageMenu": {
+              "label": "Menú de idioma"
+            }
+          }
+        },
+        "Cattail_TweaksQuality_Custom-Background-Color": {
+          "name": "Color de fondo personalizado",
+          "config": {
+            "globalThresholds": {
+              "label": "Umbrales globales de limpieza"
+            },
+            "spriteThresholds": {
+              "label": "Umbrales de limpieza de sprites"
+            }
+          }
+        },
+        "Cattail_TweaksQuality_Dynamic-Details": {
+          "name": "Detalles dinámicos",
+          "config": {
+            "cookieDirectionPassword": {
+              "label": "Contraseña de dirección de cookie"
+            }
+          }
+        },
+        "Cattail_TweaksQuality_Resource-Watcher": {
+          "name": "Monitor de recursos"
+        },
+        "Cattail_TweaksQuality_Tweaks": {
+          "name": "Ajustes de calidad",
+          "config": {
+            "enableEndingSkip": {
+              "label": "Saltar final"
+            },
+            "enableAccessibilityButtons": {
+              "label": "Botones de accesibilidad"
+            },
+            "enableStabilizerSurgeFlashReduction": {
+              "label": "Reducción de destellos del estabilizador"
+            },
+            "enableResourceGlowColors": {
+              "label": "Colores de brillo de recursos"
+            },
+            "enablePlayTimeCounter": {
+              "label": "Contador de tiempo de juego"
+            },
+            "playTimeCounterPosition": {
+              "label": "Posición del contador de tiempo",
+              "description": "Slide between bottom-left, top-center, and bottom-right.",
+              "valueLabels": {
+                "0": "Abajo izquierda",
+                "1": "Arriba centro",
+                "2": "Abajo derecha"
+              }
+            },
+            "resourceGlowColors": {
+              "label": "Paleta de brillo de recursos"
+            },
+            "enableViewDistance": {
+              "label": "Límites de distancia de vista"
+            },
+            "farthestZoom": {
+              "label": "Zoom más lejano"
+            },
+            "closestZoom": {
+              "label": "Zoom más cercano"
+            },
+            "fallbackZoom": {
+              "label": "Zoom de reserva"
+            },
+            "enableChasmLineRenderer": {
+              "label": "Renderizador de lineas de grieta",
+              "description": "Permite reemplazar las lineas entre la grieta y los recursos con el renderizador elegido."
+            },
+            "chasmLineRendererMode": {
+              "label": "Modo de lineas de grieta",
+              "description": "Canvas 2D usa el dibujo original. WebGL usa un lienzo con GPU.",
+              "valueLabels": {
+                "0": "Canvas 2D",
+                "1": "WebGL"
+              }
+            },
+            "enableChasmLineDistanceOverride": {
+              "label": "Lineas de grieta sin distancia",
+              "description": "Mantiene las lineas de la grieta a los recursos aunque la grieta este fuera del rango visible normal."
+            },
+            "enableFloorGridLines": {
+              "label": "Bordes de cuadricula del suelo",
+              "description": "Dibuja bordes finos alrededor de las celdas del suelo."
+            },
+            "floorGridLineRealityColor": {
+              "label": "Color de cuadricula en realidad",
+              "description": "Vacio usa el borde gris oscuro predeterminado en realidad."
+            },
+            "floorGridLineVoidColor": {
+              "label": "Color de cuadricula en vacio",
+              "description": "Vacio usa el borde blanco predeterminado en el vacio."
+            },
+            "enableVoidReturnFadeSkip": {
+              "label": "Omitir fundido al volver del vacio",
+              "description": "Al volver del vacio a la realidad, elimina el largo fundido blanco y muestra la vista clara de inmediato."
+            },
+            "enableExplainerFix": {
+              "label": "Correccion de avisos",
+              "description": "Actualiza los avisos pulsantes tras cambiar idioma y usa texto claro legible en el vacio."
+            }
+          }
+        },
+        "Cattail_TweaksX_Reality-Pack": {
+          "name": "Paquete Reality",
+          "description": "Combina recolección automática de Reality, oleadas por escaneo y Súper silo en un mod TweaksX.",
+          "config": {
+            "surgeCount": {
+              "label": "Cantidad de oleadas",
+              "description": "Numero de oleadas aleatorias creadas cuando cae un nucleo supercritico."
+            },
+            "surgeRadius": {
+              "label": "Radio de aparición",
+              "description": "Radio circular, en celdas, usado para buscar espacios vacios."
+            },
+            "fillAmount": {
+              "label": "Valor de llenado largo",
+              "description": "Fill value assigned to activated silos."
+            },
+            "enableRealityAutoCollect": {
+              "label": "Recolección automática de Reality",
+              "description": "Recolecta automáticamente Reality / soul power lista en el mundo del vacío."
+            },
+            "enableScanRealitySurges": {
+              "label": "Oleadas Reality por escaneo",
+              "description": "Genera oleadas aleatorias en el plano Reality cuando cae un núcleo supercrítico."
+            },
+            "enableSuperSilo": {
+              "label": "Súper silo",
+              "description": "Mantiene los silos activados llenos con el valor largo configurado."
+            },
+            "enableScanRealitySlider": {
+              "label": "Control del núcleo supercrítico",
+              "description": "Muestra el diámetro de alcance y el control de inyección de Reality en la tarjeta de compra del núcleo supercrítico."
+            },
+            "enableHollowVentReality": {
+              "label": "Fuente de Reality de vents huecos",
+              "description": "Los vents huecos cultivan símbolos de Reality que se recogen automáticamente mediante el altar del vacío."
+            },
+            "ventRealityInterval": {
+              "label": "Tiempo de producción del vent",
+              "description": "Segundos que tarda cada vent hueco en cultivar un símbolo de Reality."
+            },
+            "ventRealityAmount": {
+              "label": "Reality de vent pequeño",
+              "description": "Reality obtenida de cada símbolo de vent hueco pequeño."
+            },
+            "ventRealityLargeMultiplier": {
+              "label": "Multiplicador de vent grande",
+              "description": "Multiplicador aplicado a la producción de Reality del vent hueco grande."
+            }
+          }
+        }
+      }
+    },
+    "fr": {
+      "modloader": {
+        "translationExport": "Exporter",
+        "translationExportTitle": "Exporter une sauvegarde des traductions",
+        "translationExported": "Sauvegarde des traductions exportee : {path}",
+        "translationImport": "Importer",
+        "translationImportTitle": "Importer un fichier de traductions",
+        "translationImported": "Traductions importees depuis {source} et enregistrees dans {path}",
+        "translationImportInvalid": "Le fichier selectionne n est pas un fichier de traductions ModLoader.",
+        "translationExportOverwriteTitle": "Ecraser la sauvegarde des traductions ?",
+        "translationExportOverwriteMessage": "Le fichier cible existe deja.\nHeure de modification : {editedAt}\n{path}\nL ecraser ?",
+        "translationOverwriteConfirm": "Ecraser",
+        "translationDialogUnavailable": "Le selecteur de fichiers est indisponible.",
+        "translationImportWriteModsTitle": "Ecrire les traductions dans mod.json ?",
+        "translationImportWriteModsMessage": "Le fichier importe remplace toujours le translations.json de ModLoader. Voulez-vous aussi ecrire les champs de traduction des mods correspondants dans les mod.json installes ? Cela remplace les champs de traduction correspondants existants.",
+        "translationImportWriteModsConfirm": "Ecrire dans le mod",
+        "translationImportSkipMods": "Ne pas ecrire",
+        "translationImportWriteModsResult": "Ecriture dans les mods : {written} ecrits, {unchanged} deja a jour, {failed} echoues.",
+        "translationImportNoMatchingMods": "Aucun mod.json installe ne correspond aux entrees de mod importees.",
+        "translationImportModFailures": "Echecs : {failures}"
+      },
+      "mods": {
+        "Cattail_Tweaks_简体中文优化": {
+          "name": "Optimisation chinois simplifié"
+        },
+        "Cattail_Tweaks_Chat-Timestamps": {
+          "name": "Horodatage du chat"
+        },
+        "Cattail_TweaksQuality_Better-UIs": {
+          "name": "Interfaces améliorées",
+          "config": {
+            "enableShopCategories": {
+              "label": "Catégories de boutique"
+            },
+            "enableSaveSlots": {
+              "label": "Emplacements de sauvegarde"
+            },
+            "enableLanguageMenu": {
+              "label": "Menu de langue"
+            }
+          }
+        },
+        "Cattail_TweaksQuality_Custom-Background-Color": {
+          "name": "Couleur de fond personnalisée",
+          "config": {
+            "globalThresholds": {
+              "label": "Seuils globaux de nettoyage"
+            },
+            "spriteThresholds": {
+              "label": "Seuils de nettoyage des sprites"
+            }
+          }
+        },
+        "Cattail_TweaksQuality_Dynamic-Details": {
+          "name": "Détails dynamiques",
+          "config": {
+            "cookieDirectionPassword": {
+              "label": "Mot de passe de direction du cookie"
+            }
+          }
+        },
+        "Cattail_TweaksQuality_Resource-Watcher": {
+          "name": "Moniteur de ressources"
+        },
+        "Cattail_TweaksQuality_Tweaks": {
+          "name": "Ajustements pratiques",
+          "config": {
+            "enableEndingSkip": {
+              "label": "Sauter la fin"
+            },
+            "enableAccessibilityButtons": {
+              "label": "Boutons d’accessibilité"
+            },
+            "enableStabilizerSurgeFlashReduction": {
+              "label": "Réduction des flashs du stabilisateur"
+            },
+            "enableResourceGlowColors": {
+              "label": "Couleurs de halo des ressources"
+            },
+            "enablePlayTimeCounter": {
+              "label": "Compteur de temps de jeu"
+            },
+            "playTimeCounterPosition": {
+              "label": "Position du compteur de temps",
+              "description": "Slide between bottom-left, top-center, and bottom-right.",
+              "valueLabels": {
+                "0": "En bas a gauche",
+                "1": "En haut au centre",
+                "2": "En bas a droite"
+              }
+            },
+            "resourceGlowColors": {
+              "label": "Palette de halo des ressources"
+            },
+            "enableViewDistance": {
+              "label": "Limites de distance de vue"
+            },
+            "farthestZoom": {
+              "label": "Zoom le plus éloigné"
+            },
+            "closestZoom": {
+              "label": "Zoom le plus proche"
+            },
+            "fallbackZoom": {
+              "label": "Zoom de secours"
+            },
+            "enableChasmLineRenderer": {
+              "label": "Rendu des lignes de faille",
+              "description": "Permet de remplacer les lignes entre la faille et les ressources par le rendu choisi."
+            },
+            "chasmLineRendererMode": {
+              "label": "Mode de rendu des lignes de faille",
+              "description": "Canvas 2D utilise le dessin original. WebGL utilise un canvas GPU.",
+              "valueLabels": {
+                "0": "Canvas 2D",
+                "1": "WebGL"
+              }
+            },
+            "enableChasmLineDistanceOverride": {
+              "label": "Lignes de faille sans distance",
+              "description": "Continue a dessiner les lignes faille-ressources meme si la faille est hors de la portee visible normale."
+            },
+            "enableFloorGridLines": {
+              "label": "Contours de grille du sol",
+              "description": "Dessine de fins contours autour des cases du sol."
+            },
+            "floorGridLineRealityColor": {
+              "label": "Couleur de grille en realite",
+              "description": "Vide utilise le contour gris fonce par defaut en realite."
+            },
+            "floorGridLineVoidColor": {
+              "label": "Couleur de grille du vide",
+              "description": "Vide utilise le contour blanc par defaut dans le vide."
+            },
+            "enableVoidReturnFadeSkip": {
+              "label": "Ignorer le fondu de retour du vide",
+              "description": "Au retour du vide vers la realite, supprime le long fondu blanc et affiche tout de suite une vue nette."
+            },
+            "enableExplainerFix": {
+              "label": "Correctif des indices",
+              "description": "Actualise les indices pulses apres les changements de langue et utilise un texte clair lisible dans le vide."
+            }
+          }
+        },
+        "Cattail_TweaksX_Reality-Pack": {
+          "name": "Pack Reality",
+          "description": "Regroupe la collecte auto de Reality, les surges de scan et le Super silo dans un mod TweaksX.",
+          "config": {
+            "surgeCount": {
+              "label": "Nombre de surges",
+              "description": "Nombre de surges aleatoires creees quand un noyau supercritique atterrit."
+            },
+            "surgeRadius": {
+              "label": "Rayon apparition",
+              "description": "Rayon circulaire, en cellules, utilise pour trouver des emplacements libres."
+            },
+            "fillAmount": {
+              "label": "Remplissage long",
+              "description": "Fill value assigned to activated silos."
+            },
+            "enableRealityAutoCollect": {
+              "label": "Collecte auto de Reality",
+              "description": "Collecte automatiquement Reality / soul power prête dans le monde du vide."
+            },
+            "enableScanRealitySurges": {
+              "label": "Surges Reality de scan",
+              "description": "Crée des surges aléatoires dans le plan Reality quand un noyau supercritique atterrit."
+            },
+            "enableSuperSilo": {
+              "label": "Super silo",
+              "description": "Garde les silos activés remplis avec la valeur longue configurée."
+            },
+            "enableScanRealitySlider": {
+              "label": "Curseur du noyau supercritique",
+              "description": "Affiche le diamètre de portée et le curseur d’injection de Reality sur la carte d’achat du noyau supercritique."
+            },
+            "enableHollowVentReality": {
+              "label": "Source Reality des évents creux",
+              "description": "Les évents creux font pousser des symboles Reality automatiquement récoltés par l’autel du vide."
+            },
+            "ventRealityInterval": {
+              "label": "Temps de production de l’évent",
+              "description": "Secondes nécessaires à chaque évent creux pour faire pousser un symbole Reality."
+            },
+            "ventRealityAmount": {
+              "label": "Reality du petit évent",
+              "description": "Reality obtenue pour chaque symbole de petit évent creux."
+            },
+            "ventRealityLargeMultiplier": {
+              "label": "Multiplicateur du grand évent",
+              "description": "Multiplicateur appliqué à la production Reality du grand évent creux."
+            }
+          }
+        }
+      }
+    },
+    "nl": {
+      "modloader": {
+        "translationExport": "Exporteren",
+        "translationExportTitle": "Vertalingsbackup exporteren",
+        "translationExported": "Vertalingsbackup geexporteerd: {path}",
+        "translationImport": "Importeren",
+        "translationImportTitle": "Vertalingsbestand importeren",
+        "translationImported": "Vertalingen geimporteerd uit {source} en opgeslagen in {path}",
+        "translationImportInvalid": "Het geselecteerde bestand is geen ModLoader-vertalingsbestand.",
+        "translationExportOverwriteTitle": "Vertalingsbackup overschrijven?",
+        "translationExportOverwriteMessage": "Het doelbestand bestaat al.\nBewerkingstijd: {editedAt}\n{path}\nOverschrijven?",
+        "translationOverwriteConfirm": "Overschrijven",
+        "translationDialogUnavailable": "Bestandskiezer is niet beschikbaar.",
+        "translationImportWriteModsTitle": "Vertalingen naar mod.json schrijven?",
+        "translationImportWriteModsMessage": "Het geimporteerde bestand vervangt altijd ModLoader translations.json. Wil je passende mod-vertalingsvelden ook naar geinstalleerde mod.json-bestanden schrijven? Dit overschrijft bestaande passende vertalingsvelden.",
+        "translationImportWriteModsConfirm": "Naar mod schrijven",
+        "translationImportSkipMods": "Niet schrijven",
+        "translationImportWriteModsResult": "Mod-terugschrijven: {written} geschreven, {unchanged} al actueel, {failed} mislukt.",
+        "translationImportNoMatchingMods": "Geen geinstalleerde mod.json komt overeen met de geimporteerde mod-items.",
+        "translationImportModFailures": "Fouten: {failures}"
+      },
+      "mods": {
+        "Cattail_Tweaks_简体中文优化": {
+          "name": "Vereenvoudigd Chinees verbeteren"
+        },
+        "Cattail_Tweaks_Chat-Timestamps": {
+          "name": "Chat-tijdstempels"
+        },
+        "Cattail_TweaksQuality_Better-UIs": {
+          "name": "Betere interfaces",
+          "config": {
+            "enableShopCategories": {
+              "label": "Winkelcategorieën"
+            },
+            "enableSaveSlots": {
+              "label": "Opslagsleuven"
+            },
+            "enableLanguageMenu": {
+              "label": "Taalmenu"
+            }
+          }
+        },
+        "Cattail_TweaksQuality_Custom-Background-Color": {
+          "name": "Aangepaste achtergrondkleur",
+          "config": {
+            "globalThresholds": {
+              "label": "Algemene opschoondrempels"
+            },
+            "spriteThresholds": {
+              "label": "Sprite-opschoondrempels"
+            }
+          }
+        },
+        "Cattail_TweaksQuality_Dynamic-Details": {
+          "name": "Dynamische details",
+          "config": {
+            "cookieDirectionPassword": {
+              "label": "Cookie-richtingswachtwoord"
+            }
+          }
+        },
+        "Cattail_TweaksQuality_Resource-Watcher": {
+          "name": "Grondstoffenmonitor"
+        },
+        "Cattail_TweaksQuality_Tweaks": {
+          "name": "Kwaliteitsaanpassingen",
+          "config": {
+            "enableEndingSkip": {
+              "label": "Einde overslaan"
+            },
+            "enableAccessibilityButtons": {
+              "label": "Toegankelijkheidsknoppen"
+            },
+            "enableStabilizerSurgeFlashReduction": {
+              "label": "Flitsreductie stabilisator"
+            },
+            "enableResourceGlowColors": {
+              "label": "Gloedkleuren van grondstoffen"
+            },
+            "enablePlayTimeCounter": {
+              "label": "Speeltijdteller"
+            },
+            "playTimeCounterPosition": {
+              "label": "Positie speeltijdteller",
+              "description": "Slide between bottom-left, top-center, and bottom-right.",
+              "valueLabels": {
+                "0": "Linksonder",
+                "1": "Boven midden",
+                "2": "Rechtsonder"
+              }
+            },
+            "resourceGlowColors": {
+              "label": "Gloedpalet van grondstoffen"
+            },
+            "enableViewDistance": {
+              "label": "Kijkafstandslimieten"
+            },
+            "farthestZoom": {
+              "label": "Verste zoom"
+            },
+            "closestZoom": {
+              "label": "Dichtste zoom"
+            },
+            "fallbackZoom": {
+              "label": "Reservezoom"
+            },
+            "enableChasmLineRenderer": {
+              "label": "Klooflijnen-renderer",
+              "description": "Laat de mod de lijnen tussen kloof en grondstoffen vervangen door de gekozen renderer."
+            },
+            "chasmLineRendererMode": {
+              "label": "Renderstand klooflijnen",
+              "description": "Canvas 2D gebruikt de originele tekening. WebGL gebruikt een GPU-canvas.",
+              "valueLabels": {
+                "0": "Canvas 2D",
+                "1": "WebGL"
+              }
+            },
+            "enableChasmLineDistanceOverride": {
+              "label": "Klooflijnen negeren afstand",
+              "description": "Blijft lijnen van kloof naar grondstoffen tekenen, ook buiten het normale zichtbereik."
+            },
+            "enableFloorGridLines": {
+              "label": "Vloerraster-omtrekken",
+              "description": "Tekent dunne omtrekken rond vloercellen."
+            },
+            "floorGridLineRealityColor": {
+              "label": "Vloerrasterkleur realiteit",
+              "description": "Leeg gebruikt de standaard donkergrijze omtrek in realiteit."
+            },
+            "floorGridLineVoidColor": {
+              "label": "Vloerrasterkleur leegte",
+              "description": "Leeg gebruikt de standaard witte omtrek in de leegte."
+            },
+            "enableVoidReturnFadeSkip": {
+              "label": "Witte fade na leegte overslaan",
+              "description": "Bij terugkeer uit de leegte naar realiteit wordt de lange witte fade verwijderd."
+            },
+            "enableExplainerFix": {
+              "label": "Hint-fix",
+              "description": "Vernieuwt pulserende hints na taalwijzigingen en gebruikt leesbare lichte tekst in de leegte."
+            }
+          }
+        },
+        "Cattail_TweaksX_Reality-Pack": {
+          "name": "Reality-pakket",
+          "description": "Combineert Reality automatisch verzamelen, scan-golven en Super-silo in een TweaksX-mod.",
+          "config": {
+            "surgeCount": {
+              "label": "Aantal golven",
+              "description": "Aantal willekeurige golven dat ontstaat wanneer een superkritische kern landt."
+            },
+            "surgeRadius": {
+              "label": "Verschijnradius",
+              "description": "Cirkelradius in cellen om vrije plekken te zoeken."
+            },
+            "fillAmount": {
+              "label": "Lange vulwaarde",
+              "description": "Fill value assigned to activated silos."
+            },
+            "enableRealityAutoCollect": {
+              "label": "Reality automatisch verzamelen",
+              "description": "Verzamelt automatisch klaarstaande Reality / soul power in de leegtewereld."
+            },
+            "enableScanRealitySurges": {
+              "label": "Reality-golven door scan",
+              "description": "Maakt willekeurige golven in het Reality-vlak wanneer een superkritische kern landt."
+            },
+            "enableSuperSilo": {
+              "label": "Super-silo",
+              "description": "Houdt geactiveerde silo’s gevuld met de ingestelde lange vulwaarde."
+            },
+            "enableScanRealitySlider": {
+              "label": "Schuif voor superkritische kern",
+              "description": "Toont de bereikdiameter en Reality-injectieschuif op de aankoopkaart van de superkritische kern."
+            },
+            "enableHollowVentReality": {
+              "label": "Reality-bron uit holle vents",
+              "description": "Holle vents laten Reality-symbolen groeien die automatisch via het leegte-altaar worden geoogst."
+            },
+            "ventRealityInterval": {
+              "label": "Productietijd vent",
+              "description": "Seconden die elke holle vent nodig heeft om een Reality-symbool te laten groeien."
+            },
+            "ventRealityAmount": {
+              "label": "Reality kleine vent",
+              "description": "Reality uit elk symbool van een kleine holle vent."
+            },
+            "ventRealityLargeMultiplier": {
+              "label": "Vermenigvuldiger grote vent",
+              "description": "Vermenigvuldiger voor de Reality-opbrengst van de grote holle vent."
+            }
+          }
+        }
+      }
+    },
+    "cz": {
+      "modloader": {
+        "translationExport": "Exportovat",
+        "translationExportTitle": "Exportovat zalohu prekladu",
+        "translationExported": "Zaloha prekladu exportovana: {path}",
+        "translationImport": "Importovat",
+        "translationImportTitle": "Importovat soubor prekladu",
+        "translationImported": "Preklady importovany z {source} a ulozeny do {path}",
+        "translationImportInvalid": "Vybrany soubor neni soubor prekladu ModLoaderu.",
+        "translationExportOverwriteTitle": "Prepsat zalohu prekladu?",
+        "translationExportOverwriteMessage": "Cilovy soubor jiz existuje.\nCas uprav: {editedAt}\n{path}\nPrepsat?",
+        "translationOverwriteConfirm": "Prepsat",
+        "translationDialogUnavailable": "Dialog vyberu souboru neni dostupny.",
+        "translationImportWriteModsTitle": "Zapsat preklady do mod.json?",
+        "translationImportWriteModsMessage": "Importovany soubor vzdy nahradi ModLoader translations.json. Chcete take zapsat odpovidajici prekladova pole modu do nainstalovanych souboru mod.json? Tim se prepisi existujici odpovidajici prekladova pole.",
+        "translationImportWriteModsConfirm": "Zapsat do modu",
+        "translationImportSkipMods": "Nezapisovat",
+        "translationImportWriteModsResult": "Zapis do modu: {written} zapsano, {unchanged} jiz aktualni, {failed} selhalo.",
+        "translationImportNoMatchingMods": "Zadny nainstalovany mod.json neodpovida importovanym polozkam modu.",
+        "translationImportModFailures": "Selhani: {failures}"
+      },
+      "mods": {
+        "Cattail_Tweaks_简体中文优化": {
+          "name": "Optimalizace zjednodušené čínštiny"
+        },
+        "Cattail_Tweaks_Chat-Timestamps": {
+          "name": "Časové značky chatu"
+        },
+        "Cattail_TweaksQuality_Better-UIs": {
+          "name": "Lepší rozhraní",
+          "config": {
+            "enableShopCategories": {
+              "label": "Kategorie obchodu"
+            },
+            "enableSaveSlots": {
+              "label": "Pozice uložení"
+            },
+            "enableLanguageMenu": {
+              "label": "Nabídka jazyka"
+            }
+          }
+        },
+        "Cattail_TweaksQuality_Custom-Background-Color": {
+          "name": "Vlastní barva pozadí",
+          "config": {
+            "globalThresholds": {
+              "label": "Globální prahy čištění"
+            },
+            "spriteThresholds": {
+              "label": "Prahy čištění spritů"
+            }
+          }
+        },
+        "Cattail_TweaksQuality_Dynamic-Details": {
+          "name": "Dynamické detaily",
+          "config": {
+            "cookieDirectionPassword": {
+              "label": "Heslo směru sušenky"
+            }
+          }
+        },
+        "Cattail_TweaksQuality_Resource-Watcher": {
+          "name": "Sledování surovin"
+        },
+        "Cattail_TweaksQuality_Tweaks": {
+          "name": "Vylepšení",
+          "config": {
+            "enableEndingSkip": {
+              "label": "Přeskočení konce"
+            },
+            "enableAccessibilityButtons": {
+              "label": "Tlačítka přístupnosti"
+            },
+            "enableStabilizerSurgeFlashReduction": {
+              "label": "Omezení záblesků stabilizátoru"
+            },
+            "enableResourceGlowColors": {
+              "label": "Barvy záře surovin"
+            },
+            "enablePlayTimeCounter": {
+              "label": "Počítadlo herního času"
+            },
+            "playTimeCounterPosition": {
+              "label": "Poloha počítadla času",
+              "description": "Slide between bottom-left, top-center, and bottom-right.",
+              "valueLabels": {
+                "0": "Vlevo dole",
+                "1": "Nahore uprostred",
+                "2": "Vpravo dole"
+              }
+            },
+            "resourceGlowColors": {
+              "label": "Paleta záře surovin"
+            },
+            "enableViewDistance": {
+              "label": "Limity vzdálenosti zobrazení"
+            },
+            "farthestZoom": {
+              "label": "Nejvzdálenější zoom"
+            },
+            "closestZoom": {
+              "label": "Nejbližší zoom"
+            },
+            "fallbackZoom": {
+              "label": "Záložní zoom"
+            },
+            "enableChasmLineRenderer": {
+              "label": "Vykreslovani car prurvy",
+              "description": "Umoznuje modu nahradit cary mezi prurvou a surovinami zvolenym rendererem."
+            },
+            "chasmLineRendererMode": {
+              "label": "Rezim vykreslovani car prurvy",
+              "description": "Canvas 2D pouziva puvodni kresleni. WebGL pouziva GPU canvas.",
+              "valueLabels": {
+                "0": "Canvas 2D",
+                "1": "WebGL"
+              }
+            },
+            "enableChasmLineDistanceOverride": {
+              "label": "Cary prurvy bez vzdalenosti",
+              "description": "Cary mezi prurvou a surovinami se kresli i mimo bezny viditelny dosah."
+            },
+            "enableFloorGridLines": {
+              "label": "Obrysy mrizky podlahy",
+              "description": "Kresli tenke obrysy okolo policek podlahy."
+            },
+            "floorGridLineRealityColor": {
+              "label": "Barva mrizky podlahy reality",
+              "description": "Prazdne pouzije vychozi tmave sedy obrys v realite."
+            },
+            "floorGridLineVoidColor": {
+              "label": "Barva mrizky podlahy prazdnoty",
+              "description": "Prazdne pouzije vychozi bily obrys v prazdnote."
+            },
+            "enableVoidReturnFadeSkip": {
+              "label": "Preskocit bile blednuti z prazdnoty",
+              "description": "Pri navratu z prazdnoty do reality odstrani dlouhe bile dozneni a hned ukaze cisty obraz."
+            },
+            "enableExplainerFix": {
+              "label": "Oprava napoved",
+              "description": "Obnovuje pulzujici napovedy po zmene jazyka a v prazdnote pouziva citelny svetly text."
+            }
+          }
+        },
+        "Cattail_TweaksX_Reality-Pack": {
+          "name": "Balíček Reality",
+          "description": "Spojuje automatický sběr Reality, vlny ze skenu a Super silo do jednoho modu TweaksX.",
+          "config": {
+            "surgeCount": {
+              "label": "Počet vln",
+              "description": "Pocet nahodnych vln pri dopadu superkritickeho jadra."
+            },
+            "surgeRadius": {
+              "label": "Poloměr vzniku",
+              "description": "Kruhovy polomer v bunkach pro hledani volnych mist."
+            },
+            "fillAmount": {
+              "label": "Dlouhé naplnění",
+              "description": "Fill value assigned to activated silos."
+            },
+            "enableRealityAutoCollect": {
+              "label": "Automatický sběr Reality",
+              "description": "Automaticky sbírá připravenou Reality / soul power ve světě prázdnoty."
+            },
+            "enableScanRealitySurges": {
+              "label": "Vlny Reality ze skenu",
+              "description": "Vytvoří náhodné vlny v rovině Reality při dopadu superkritického jádra."
+            },
+            "enableSuperSilo": {
+              "label": "Super silo",
+              "description": "Udržuje aktivovaná sila naplněná nastavenou dlouhou hodnotou."
+            },
+            "enableScanRealitySlider": {
+              "label": "Posuvník superkritického jádra",
+              "description": "Zobrazí průměr dosahu a posuvník vložení Reality na nákupní kartě superkritického jádra."
+            },
+            "enableHollowVentReality": {
+              "label": "Zdroj Reality z dutých průduchů",
+              "description": "Duté průduchy pěstují symboly Reality, které se automaticky sklidí přes oltář prázdnoty."
+            },
+            "ventRealityInterval": {
+              "label": "Doba produkce průduchu",
+              "description": "Kolik sekund potřebuje dutý průduch k vypěstování symbolu Reality."
+            },
+            "ventRealityAmount": {
+              "label": "Reality malého průduchu",
+              "description": "Reality získaná z každého symbolu malého dutého průduchu."
+            },
+            "ventRealityLargeMultiplier": {
+              "label": "Násobitel velkého průduchu",
+              "description": "Násobitel výstupu Reality u velkého dutého průduchu."
+            }
+          }
+        }
+      }
+    },
+    "pl": {
+      "modloader": {
+        "translationExport": "Eksportuj",
+        "translationExportTitle": "Eksportuj kopie tlumaczen",
+        "translationExported": "Kopia tlumaczen wyeksportowana: {path}",
+        "translationImport": "Importuj",
+        "translationImportTitle": "Importuj plik tlumaczen",
+        "translationImported": "Tlumaczenia zaimportowane z {source} i zapisane w {path}",
+        "translationImportInvalid": "Wybrany plik nie jest plikiem tlumaczen ModLoadera.",
+        "translationExportOverwriteTitle": "Nadpisac kopie tlumaczen?",
+        "translationExportOverwriteMessage": "Plik docelowy juz istnieje.\nCzas edycji: {editedAt}\n{path}\nNadpisac?",
+        "translationOverwriteConfirm": "Nadpisz",
+        "translationDialogUnavailable": "Okno wyboru pliku jest niedostepne.",
+        "translationImportWriteModsTitle": "Zapisac tlumaczenia do mod.json?",
+        "translationImportWriteModsMessage": "Importowany plik zawsze zastapi translations.json ModLoadera. Czy zapisac takze pasujace pola tlumaczen modow do zainstalowanych plikow mod.json? Nadpisze to istniejace pasujace pola tlumaczen.",
+        "translationImportWriteModsConfirm": "Zapisz do moda",
+        "translationImportSkipMods": "Nie zapisuj",
+        "translationImportWriteModsResult": "Zapis do modow: {written} zapisano, {unchanged} juz aktualne, {failed} niepowodzen.",
+        "translationImportNoMatchingMods": "Zaden zainstalowany mod.json nie pasuje do importowanych wpisow modow.",
+        "translationImportModFailures": "Bledy: {failures}"
+      },
+      "mods": {
+        "Cattail_Tweaks_简体中文优化": {
+          "name": "Optymalizacja chińskiego uproszczonego"
+        },
+        "Cattail_Tweaks_Chat-Timestamps": {
+          "name": "Znaczniki czasu czatu"
+        },
+        "Cattail_TweaksQuality_Better-UIs": {
+          "name": "Lepsze interfejsy",
+          "config": {
+            "enableShopCategories": {
+              "label": "Kategorie sklepu"
+            },
+            "enableSaveSlots": {
+              "label": "Sloty zapisu"
+            },
+            "enableLanguageMenu": {
+              "label": "Menu języka"
+            }
+          }
+        },
+        "Cattail_TweaksQuality_Custom-Background-Color": {
+          "name": "Niestandardowy kolor tła",
+          "config": {
+            "globalThresholds": {
+              "label": "Globalne progi czyszczenia"
+            },
+            "spriteThresholds": {
+              "label": "Progi czyszczenia sprite’ów"
+            }
+          }
+        },
+        "Cattail_TweaksQuality_Dynamic-Details": {
+          "name": "Dynamiczne szczegóły",
+          "config": {
+            "cookieDirectionPassword": {
+              "label": "Hasło kierunku ciasteczka"
+            }
+          }
+        },
+        "Cattail_TweaksQuality_Resource-Watcher": {
+          "name": "Monitor zasobów"
+        },
+        "Cattail_TweaksQuality_Tweaks": {
+          "name": "Usprawnienia",
+          "config": {
+            "enableEndingSkip": {
+              "label": "Pomijanie zakończenia"
+            },
+            "enableAccessibilityButtons": {
+              "label": "Przyciski dostępności"
+            },
+            "enableStabilizerSurgeFlashReduction": {
+              "label": "Redukcja błysków stabilizatora"
+            },
+            "enableResourceGlowColors": {
+              "label": "Kolory poświaty zasobów"
+            },
+            "enablePlayTimeCounter": {
+              "label": "Licznik czasu gry"
+            },
+            "playTimeCounterPosition": {
+              "label": "Pozycja licznika czasu",
+              "description": "Slide between bottom-left, top-center, and bottom-right.",
+              "valueLabels": {
+                "0": "Lewy dol",
+                "1": "Gora srodek",
+                "2": "Prawy dol"
+              }
+            },
+            "resourceGlowColors": {
+              "label": "Paleta poświaty zasobów"
+            },
+            "enableViewDistance": {
+              "label": "Limity zasięgu widoku"
+            },
+            "farthestZoom": {
+              "label": "Najdalszy zoom"
+            },
+            "closestZoom": {
+              "label": "Najbliższy zoom"
+            },
+            "fallbackZoom": {
+              "label": "Zapasowy zoom"
+            },
+            "enableChasmLineRenderer": {
+              "label": "Renderer linii szczeliny",
+              "description": "Pozwala modowi zastapic linie miedzy szczelina i zasobami wybranym rendererem."
+            },
+            "chasmLineRendererMode": {
+              "label": "Tryb renderowania linii szczeliny",
+              "description": "Canvas 2D uzywa oryginalnego rysowania. WebGL uzywa canvas GPU.",
+              "valueLabels": {
+                "0": "Canvas 2D",
+                "1": "WebGL"
+              }
+            },
+            "enableChasmLineDistanceOverride": {
+              "label": "Linie szczeliny bez dystansu",
+              "description": "Rysuje linie od szczeliny do zasobow nawet poza normalnym zasiegiem widoku."
+            },
+            "enableFloorGridLines": {
+              "label": "Obrysy siatki podlogi",
+              "description": "Rysuje cienkie obrysy wokol pol podlogi."
+            },
+            "floorGridLineRealityColor": {
+              "label": "Kolor siatki podlogi rzeczywistosci",
+              "description": "Puste uzywa domyslnego ciemnoszarego obrysu w rzeczywistosci."
+            },
+            "floorGridLineVoidColor": {
+              "label": "Kolor siatki podlogi pustki",
+              "description": "Puste uzywa domyslnego bialego obrysu w pustce."
+            },
+            "enableVoidReturnFadeSkip": {
+              "label": "Pomin biale zanikanie po pustce",
+              "description": "Po powrocie z pustki do rzeczywistosci usuwa dlugie biale zanikanie i od razu pokazuje czysty obraz."
+            },
+            "enableExplainerFix": {
+              "label": "Poprawka podpowiedzi",
+              "description": "Odswieza pulsujace podpowiedzi po zmianie jezyka i uzywa jasnego tekstu w pustce."
+            }
+          }
+        },
+        "Cattail_TweaksX_Reality-Pack": {
+          "name": "Pakiet Reality",
+          "description": "Łączy automatyczne zbieranie Reality, skoki po skanie i Super silos w jeden mod TweaksX.",
+          "config": {
+            "surgeCount": {
+              "label": "Liczba skoków",
+              "description": "Liczba losowych skokow po upadku superkrytycznego jadra."
+            },
+            "surgeRadius": {
+              "label": "Promień pojawiania",
+              "description": "Okragly promien w komorkach do szukania wolnych miejsc."
+            },
+            "fillAmount": {
+              "label": "Długie napełnienie",
+              "description": "Fill value assigned to activated silos."
+            },
+            "enableRealityAutoCollect": {
+              "label": "Automatyczne zbieranie Reality",
+              "description": "Automatycznie zbiera gotowe Reality / soul power w świecie pustki."
+            },
+            "enableScanRealitySurges": {
+              "label": "Skoki Reality po skanie",
+              "description": "Tworzy losowe skoki na płaszczyźnie Reality po upadku superkrytycznego jądra."
+            },
+            "enableSuperSilo": {
+              "label": "Super silos",
+              "description": "Utrzymuje aktywowane silosy napełnione skonfigurowaną długą wartością."
+            },
+            "enableScanRealitySlider": {
+              "label": "Suwak superkrytycznego jądra",
+              "description": "Pokazuje średnicę zasięgu i suwak wlewu Reality na karcie zakupu superkrytycznego jądra."
+            },
+            "enableHollowVentReality": {
+              "label": "Źródło Reality z pustych ujść",
+              "description": "Puste ujścia hodują symbole Reality automatycznie zbierane przez ołtarz pustki."
+            },
+            "ventRealityInterval": {
+              "label": "Czas produkcji ujścia",
+              "description": "Sekundy potrzebne pustemu ujściu na wyhodowanie symbolu Reality."
+            },
+            "ventRealityAmount": {
+              "label": "Reality małego ujścia",
+              "description": "Reality uzyskiwana z każdego symbolu małego pustego ujścia."
+            },
+            "ventRealityLargeMultiplier": {
+              "label": "Mnożnik dużego ujścia",
+              "description": "Mnożnik produkcji Reality dużego pustego ujścia."
+            }
+          }
+        }
+      }
+    },
+    "jp": {
+      "modloader": {
+        "translationExport": "Export",
+        "translationExportTitle": "Export translations backup",
+        "translationExported": "Translation backup exported: {path}",
+        "translationImport": "Import",
+        "translationImportTitle": "Import translations file",
+        "translationImported": "Imported translations from {source} and saved to {path}",
+        "translationImportInvalid": "Selected file is not a ModLoader translations file.",
+        "translationExportOverwriteTitle": "Overwrite translation backup?",
+        "translationExportOverwriteMessage": "Target file already exists.\nEdit time: {editedAt}\n{path}\nOverwrite it?",
+        "translationOverwriteConfirm": "Overwrite",
+        "translationDialogUnavailable": "File dialog is unavailable.",
+        "translationImportWriteModsTitle": "Write translations to mod.json?",
+        "translationImportWriteModsMessage": "The imported file will replace ModLoader translations.json either way. Do you also want to write matching mod translation fields into installed mod.json files? This overwrites existing matching translation fields.",
+        "translationImportWriteModsConfirm": "Write to mod",
+        "translationImportSkipMods": "Do not write",
+        "translationImportWriteModsResult": "Mod write-back: {written} written, {unchanged} already current, {failed} failed.",
+        "translationImportNoMatchingMods": "No installed mod.json matched the imported mod entries.",
+        "translationImportModFailures": "Failures: {failures}"
+      },
+      "mods": {
+        "Cattail_Tweaks_简体中文优化": {
+          "name": "簡体字中国語最適化"
+        },
+        "Cattail_Tweaks_Chat-Timestamps": {
+          "name": "チャット時刻表示"
+        },
+        "Cattail_TweaksQuality_Better-UIs": {
+          "name": "UI改善",
+          "config": {
+            "enableShopCategories": {
+              "label": "ショップ分類"
+            },
+            "enableSaveSlots": {
+              "label": "セーブスロット"
+            },
+            "enableLanguageMenu": {
+              "label": "言語メニュー"
+            }
+          }
+        },
+        "Cattail_TweaksQuality_Custom-Background-Color": {
+          "name": "カスタム背景色",
+          "config": {
+            "globalThresholds": {
+              "label": "グローバル清掃しきい値"
+            },
+            "spriteThresholds": {
+              "label": "スプライト清掃しきい値"
+            }
+          }
+        },
+        "Cattail_TweaksQuality_Dynamic-Details": {
+          "name": "動的詳細",
+          "config": {
+            "cookieDirectionPassword": {
+              "label": "クッキー方向パスワード"
+            }
+          }
+        },
+        "Cattail_TweaksQuality_Resource-Watcher": {
+          "name": "資源ウォッチャー"
+        },
+        "Cattail_TweaksQuality_Tweaks": {
+          "name": "便利調整",
+          "config": {
+            "enableEndingSkip": {
+              "label": "エンディングスキップ"
+            },
+            "enableAccessibilityButtons": {
+              "label": "アクセシビリティボタン"
+            },
+            "enableStabilizerSurgeFlashReduction": {
+              "label": "安定器サージ点滅軽減"
+            },
+            "enableResourceGlowColors": {
+              "label": "資源の光輪色"
+            },
+            "enablePlayTimeCounter": {
+              "label": "プレイ時間カウンター"
+            },
+            "playTimeCounterPosition": {
+              "label": "プレイ時間カウンター位置",
+              "description": "Slide between bottom-left, top-center, and bottom-right.",
+              "valueLabels": {
+                "0": "左下",
+                "1": "上部中央",
+                "2": "右下"
+              }
+            },
+            "resourceGlowColors": {
+              "label": "資源の光輪パレット"
+            },
+            "enableViewDistance": {
+              "label": "表示距離制限"
+            },
+            "farthestZoom": {
+              "label": "最遠ズーム"
+            },
+            "closestZoom": {
+              "label": "最近ズーム"
+            },
+            "fallbackZoom": {
+              "label": "予備ズーム"
+            },
+            "enableChasmLineRenderer": {
+              "label": "Chasm line renderer",
+              "description": "Chasm to resource lines can use the selected renderer."
+            },
+            "chasmLineRendererMode": {
+              "label": "Chasm line render mode",
+              "description": "Canvas 2D uses original drawing. WebGL uses a GPU-backed canvas.",
+              "valueLabels": {
+                "0": "Canvas 2D",
+                "1": "WebGL"
+              }
+            },
+            "enableChasmLineDistanceOverride": {
+              "label": "Chasm lines ignore distance",
+              "description": "Keep chasm-to-resource lines visible outside the normal range."
+            },
+            "enableFloorGridLines": {
+              "label": "Floor grid outlines",
+              "description": "Draw thin outlines around floor cells."
+            },
+            "floorGridLineRealityColor": {
+              "label": "Reality floor grid outline color",
+              "description": "Empty uses the default dark gray outline in reality."
+            },
+            "floorGridLineVoidColor": {
+              "label": "Void floor grid outline color",
+              "description": "Empty uses the default white outline in the void."
+            },
+            "enableVoidReturnFadeSkip": {
+              "label": "Skip void return fade",
+              "description": "Remove the long white recovery fade when returning from the void to reality."
+            },
+            "enableExplainerFix": {
+              "label": "Explainer fix",
+              "description": "Refresh explainer hints after language changes and use light text in the void."
+            }
+          }
+        },
+        "Cattail_TweaksX_Reality-Pack": {
+          "name": "Realityパック",
+          "description": "Reality自動回収、スキャン発生サージ、スーパーサイロを1つのTweaksX modに統合します。",
+          "config": {
+            "surgeCount": {
+              "label": "サージ数",
+              "description": "超臨界カーネルが着地した時に生成するランダムサージの数。"
+            },
+            "surgeRadius": {
+              "label": "生成半径",
+              "description": "現実面の空きマスを探す円形半径（マス数）。"
+            },
+            "fillAmount": {
+              "label": "長時間補充量",
+              "description": "Fill value assigned to activated silos."
+            },
+            "enableRealityAutoCollect": {
+              "label": "Reality自動回収",
+              "description": "虚空世界で準備済みのReality / soul powerを自動回収します。"
+            },
+            "enableScanRealitySurges": {
+              "label": "スキャンRealityサージ",
+              "description": "超臨界カーネルが着地した時にReality面へランダムなサージを生成します。"
+            },
+            "enableSuperSilo": {
+              "label": "スーパーサイロ",
+              "description": "有効化されたサイロを設定した長時間補充量で維持します。"
+            },
+            "enableScanRealitySlider": {
+              "label": "超臨界コアスライダー",
+              "description": "超臨界コアの購入カードに範囲直径とReality注入スライダーを表示します。"
+            },
+            "enableHollowVentReality": {
+              "label": "空洞ベントのReality源",
+              "description": "空洞ベントがRealityシンボルを育て、虚空祭壇を通して自動収穫します。"
+            },
+            "ventRealityInterval": {
+              "label": "ベント生産時間",
+              "description": "各空洞ベントがRealityシンボルを育てる秒数。"
+            },
+            "ventRealityAmount": {
+              "label": "小ベントReality",
+              "description": "小さな空洞ベントのシンボル1つから得るReality。"
+            },
+            "ventRealityLargeMultiplier": {
+              "label": "大ベント倍率",
+              "description": "大きな空洞ベントのReality出力に適用する倍率。"
+            }
+          }
+        }
+      }
+    },
+    "kr": {
+      "modloader": {
+        "translationExport": "Export",
+        "translationExportTitle": "Export translations backup",
+        "translationExported": "Translation backup exported: {path}",
+        "translationImport": "Import",
+        "translationImportTitle": "Import translations file",
+        "translationImported": "Imported translations from {source} and saved to {path}",
+        "translationImportInvalid": "Selected file is not a ModLoader translations file.",
+        "translationExportOverwriteTitle": "Overwrite translation backup?",
+        "translationExportOverwriteMessage": "Target file already exists.\nEdit time: {editedAt}\n{path}\nOverwrite it?",
+        "translationOverwriteConfirm": "Overwrite",
+        "translationDialogUnavailable": "File dialog is unavailable.",
+        "translationImportWriteModsTitle": "Write translations to mod.json?",
+        "translationImportWriteModsMessage": "The imported file will replace ModLoader translations.json either way. Do you also want to write matching mod translation fields into installed mod.json files? This overwrites existing matching translation fields.",
+        "translationImportWriteModsConfirm": "Write to mod",
+        "translationImportSkipMods": "Do not write",
+        "translationImportWriteModsResult": "Mod write-back: {written} written, {unchanged} already current, {failed} failed.",
+        "translationImportNoMatchingMods": "No installed mod.json matched the imported mod entries.",
+        "translationImportModFailures": "Failures: {failures}"
+      },
+      "mods": {
+        "Cattail_Tweaks_简体中文优化": {
+          "name": "간체 중국어 최적화"
+        },
+        "Cattail_Tweaks_Chat-Timestamps": {
+          "name": "채팅 타임스탬프"
+        },
+        "Cattail_TweaksQuality_Better-UIs": {
+          "name": "개선된 UI",
+          "config": {
+            "enableShopCategories": {
+              "label": "상점 카테고리"
+            },
+            "enableSaveSlots": {
+              "label": "저장 슬롯"
+            },
+            "enableLanguageMenu": {
+              "label": "언어 메뉴"
+            }
+          }
+        },
+        "Cattail_TweaksQuality_Custom-Background-Color": {
+          "name": "사용자 지정 배경색",
+          "config": {
+            "globalThresholds": {
+              "label": "전역 정리 임계값"
+            },
+            "spriteThresholds": {
+              "label": "스프라이트 정리 임계값"
+            }
+          }
+        },
+        "Cattail_TweaksQuality_Dynamic-Details": {
+          "name": "동적 세부 정보",
+          "config": {
+            "cookieDirectionPassword": {
+              "label": "쿠키 방향 암호"
+            }
+          }
+        },
+        "Cattail_TweaksQuality_Resource-Watcher": {
+          "name": "자원 감시기"
+        },
+        "Cattail_TweaksQuality_Tweaks": {
+          "name": "편의성 조정",
+          "config": {
+            "enableEndingSkip": {
+              "label": "엔딩 건너뛰기"
+            },
+            "enableAccessibilityButtons": {
+              "label": "접근성 버튼"
+            },
+            "enableStabilizerSurgeFlashReduction": {
+              "label": "안정기 서지 점멸 감소"
+            },
+            "enableResourceGlowColors": {
+              "label": "자원 발광 색상"
+            },
+            "enablePlayTimeCounter": {
+              "label": "플레이 시간 카운터"
+            },
+            "playTimeCounterPosition": {
+              "label": "플레이 시간 카운터 위치",
+              "description": "Slide between bottom-left, top-center, and bottom-right.",
+              "valueLabels": {
+                "0": "왼쪽 아래",
+                "1": "상단 중앙",
+                "2": "오른쪽 아래"
+              }
+            },
+            "resourceGlowColors": {
+              "label": "자원 발광 팔레트"
+            },
+            "enableViewDistance": {
+              "label": "시야 거리 제한"
+            },
+            "farthestZoom": {
+              "label": "가장 먼 줌"
+            },
+            "closestZoom": {
+              "label": "가장 가까운 줌"
+            },
+            "fallbackZoom": {
+              "label": "대체 줌"
+            },
+            "enableChasmLineRenderer": {
+              "label": "Chasm line renderer",
+              "description": "Chasm to resource lines can use the selected renderer."
+            },
+            "chasmLineRendererMode": {
+              "label": "Chasm line render mode",
+              "description": "Canvas 2D uses original drawing. WebGL uses a GPU-backed canvas.",
+              "valueLabels": {
+                "0": "Canvas 2D",
+                "1": "WebGL"
+              }
+            },
+            "enableChasmLineDistanceOverride": {
+              "label": "Chasm lines ignore distance",
+              "description": "Keep chasm-to-resource lines visible outside the normal range."
+            },
+            "enableFloorGridLines": {
+              "label": "Floor grid outlines",
+              "description": "Draw thin outlines around floor cells."
+            },
+            "floorGridLineRealityColor": {
+              "label": "Reality floor grid outline color",
+              "description": "Empty uses the default dark gray outline in reality."
+            },
+            "floorGridLineVoidColor": {
+              "label": "Void floor grid outline color",
+              "description": "Empty uses the default white outline in the void."
+            },
+            "enableVoidReturnFadeSkip": {
+              "label": "Skip void return fade",
+              "description": "Remove the long white recovery fade when returning from the void to reality."
+            },
+            "enableExplainerFix": {
+              "label": "Explainer fix",
+              "description": "Refresh explainer hints after language changes and use light text in the void."
+            }
+          }
+        },
+        "Cattail_TweaksX_Reality-Pack": {
+          "name": "Reality 팩",
+          "description": "Reality 자동 수집, 스캔 현실 쇄도, 슈퍼 사일로를 하나의 TweaksX 모드로 합칩니다.",
+          "config": {
+            "surgeCount": {
+              "label": "쇄도 수",
+              "description": "초임계 핵이 착지할 때 생성할 무작위 쇄도 수입니다."
+            },
+            "surgeRadius": {
+              "label": "생성 반경",
+              "description": "현실 평면의 빈 칸을 찾는 원형 반경입니다."
+            },
+            "fillAmount": {
+              "label": "긴 충전값",
+              "description": "Fill value assigned to activated silos."
+            },
+            "enableRealityAutoCollect": {
+              "label": "Reality 자동 수집",
+              "description": "공허 세계에서 준비된 Reality / soul power를 자동으로 수집합니다."
+            },
+            "enableScanRealitySurges": {
+              "label": "스캔 Reality 쇄도",
+              "description": "초임계 커널이 착지할 때 Reality 평면에 무작위 쇄도를 생성합니다."
+            },
+            "enableSuperSilo": {
+              "label": "슈퍼 사일로",
+              "description": "활성화된 사일로를 설정된 긴 충전값으로 유지합니다."
+            },
+            "enableScanRealitySlider": {
+              "label": "초임계 핵 슬라이더",
+              "description": "초임계 핵 구매 카드에 범위 지름과 Reality 주입 슬라이더를 표시합니다."
+            },
+            "enableHollowVentReality": {
+              "label": "빈 통풍구 Reality 원천",
+              "description": "빈 통풍구가 Reality 상징을 키우고 공허 제단을 통해 자동 수확합니다."
+            },
+            "ventRealityInterval": {
+              "label": "통풍구 생산 시간",
+              "description": "각 빈 통풍구가 Reality 상징을 키우는 초 단위 시간."
+            },
+            "ventRealityAmount": {
+              "label": "작은 통풍구 Reality",
+              "description": "작은 빈 통풍구 상징 하나에서 얻는 Reality."
+            },
+            "ventRealityLargeMultiplier": {
+              "label": "큰 통풍구 배율",
+              "description": "큰 빈 통풍구의 Reality 생산량에 적용되는 배율."
+            }
+          }
+        }
+      }
+    },
+    "thai": {
+      "modloader": {
+        "translationExport": "Export",
+        "translationExportTitle": "Export translations backup",
+        "translationExported": "Translation backup exported: {path}",
+        "translationImport": "Import",
+        "translationImportTitle": "Import translations file",
+        "translationImported": "Imported translations from {source} and saved to {path}",
+        "translationImportInvalid": "Selected file is not a ModLoader translations file.",
+        "translationExportOverwriteTitle": "Overwrite translation backup?",
+        "translationExportOverwriteMessage": "Target file already exists.\nEdit time: {editedAt}\n{path}\nOverwrite it?",
+        "translationOverwriteConfirm": "Overwrite",
+        "translationDialogUnavailable": "File dialog is unavailable.",
+        "translationImportWriteModsTitle": "Write translations to mod.json?",
+        "translationImportWriteModsMessage": "The imported file will replace ModLoader translations.json either way. Do you also want to write matching mod translation fields into installed mod.json files? This overwrites existing matching translation fields.",
+        "translationImportWriteModsConfirm": "Write to mod",
+        "translationImportSkipMods": "Do not write",
+        "translationImportWriteModsResult": "Mod write-back: {written} written, {unchanged} already current, {failed} failed.",
+        "translationImportNoMatchingMods": "No installed mod.json matched the imported mod entries.",
+        "translationImportModFailures": "Failures: {failures}"
+      },
+      "mods": {
+        "Cattail_Tweaks_简体中文优化": {
+          "name": "ปรับปรุงภาษาจีนตัวย่อ"
+        },
+        "Cattail_Tweaks_Chat-Timestamps": {
+          "name": "เวลาในแชต"
+        },
+        "Cattail_TweaksQuality_Better-UIs": {
+          "name": "UI ที่ดีขึ้น",
+          "config": {
+            "enableShopCategories": {
+              "label": "หมวดหมู่ร้านค้า"
+            },
+            "enableSaveSlots": {
+              "label": "ช่องเซฟ"
+            },
+            "enableLanguageMenu": {
+              "label": "เมนูภาษา"
+            }
+          }
+        },
+        "Cattail_TweaksQuality_Custom-Background-Color": {
+          "name": "สีพื้นหลังแบบกำหนดเอง",
+          "config": {
+            "globalThresholds": {
+              "label": "เกณฑ์ล้างแบบรวม"
+            },
+            "spriteThresholds": {
+              "label": "เกณฑ์ล้างสไปรต์"
+            }
+          }
+        },
+        "Cattail_TweaksQuality_Dynamic-Details": {
+          "name": "รายละเอียดแบบไดนามิก",
+          "config": {
+            "cookieDirectionPassword": {
+              "label": "รหัสทิศทางคุกกี้"
+            }
+          }
+        },
+        "Cattail_TweaksQuality_Resource-Watcher": {
+          "name": "ตัวเฝ้าดูทรัพยากร"
+        },
+        "Cattail_TweaksQuality_Tweaks": {
+          "name": "การปรับแต่งความสะดวก",
+          "config": {
+            "enableEndingSkip": {
+              "label": "ข้ามตอนจบ"
+            },
+            "enableAccessibilityButtons": {
+              "label": "ปุ่มช่วยใช้งาน"
+            },
+            "enableStabilizerSurgeFlashReduction": {
+              "label": "ลดแฟลชจากตัวเสถียร"
+            },
+            "enableResourceGlowColors": {
+              "label": "สีเรืองแสงทรัพยากร"
+            },
+            "enablePlayTimeCounter": {
+              "label": "ตัวนับเวลาเล่น"
+            },
+            "playTimeCounterPosition": {
+              "label": "ตำแหน่งตัวนับเวลาเล่น",
+              "description": "Slide between bottom-left, top-center, and bottom-right.",
+              "valueLabels": {
+                "0": "มุมซ้ายล่าง",
+                "1": "กึ่งกลางด้านบน",
+                "2": "มุมขวาล่าง"
+              }
+            },
+            "resourceGlowColors": {
+              "label": "พาเลตแสงทรัพยากร"
+            },
+            "enableViewDistance": {
+              "label": "ขีดจำกัดระยะมองเห็น"
+            },
+            "farthestZoom": {
+              "label": "ซูมไกลสุด"
+            },
+            "closestZoom": {
+              "label": "ซูมใกล้สุด"
+            },
+            "fallbackZoom": {
+              "label": "ซูมสำรอง"
+            },
+            "enableChasmLineRenderer": {
+              "label": "Chasm line renderer",
+              "description": "Chasm to resource lines can use the selected renderer."
+            },
+            "chasmLineRendererMode": {
+              "label": "Chasm line render mode",
+              "description": "Canvas 2D uses original drawing. WebGL uses a GPU-backed canvas.",
+              "valueLabels": {
+                "0": "Canvas 2D",
+                "1": "WebGL"
+              }
+            },
+            "enableChasmLineDistanceOverride": {
+              "label": "Chasm lines ignore distance",
+              "description": "Keep chasm-to-resource lines visible outside the normal range."
+            },
+            "enableFloorGridLines": {
+              "label": "Floor grid outlines",
+              "description": "Draw thin outlines around floor cells."
+            },
+            "floorGridLineRealityColor": {
+              "label": "Reality floor grid outline color",
+              "description": "Empty uses the default dark gray outline in reality."
+            },
+            "floorGridLineVoidColor": {
+              "label": "Void floor grid outline color",
+              "description": "Empty uses the default white outline in the void."
+            },
+            "enableVoidReturnFadeSkip": {
+              "label": "Skip void return fade",
+              "description": "Remove the long white recovery fade when returning from the void to reality."
+            },
+            "enableExplainerFix": {
+              "label": "Explainer fix",
+              "description": "Refresh explainer hints after language changes and use light text in the void."
+            }
+          }
+        },
+        "Cattail_TweaksX_Reality-Pack": {
+          "name": "แพ็ก Reality",
+          "description": "รวมการเก็บ Reality อัตโนมัติ คลื่นพลังจากการสแกน และไซโลพิเศษไว้ในม็อด TweaksX เดียว",
+          "config": {
+            "surgeCount": {
+              "label": "จำนวนคลื่นพลัง",
+              "description": "Number of random surges to create when a supercritical kernel lands."
+            },
+            "surgeRadius": {
+              "label": "รัศมีเกิด",
+              "description": "Circular radius, in cells, used to search for empty reality-plane spawn spots."
+            },
+            "fillAmount": {
+              "label": "ค่าการเติมยาว",
+              "description": "Fill value assigned to activated silos."
+            },
+            "enableRealityAutoCollect": {
+              "label": "เก็บ Reality อัตโนมัติ",
+              "description": "เก็บ Reality / soul power ที่พร้อมแล้วในโลกวอยด์โดยอัตโนมัติ"
+            },
+            "enableScanRealitySurges": {
+              "label": "คลื่นพลัง Reality จากสแกน",
+              "description": "สร้างคลื่นพลังแบบสุ่มบนระนาบ Reality เมื่อแกนเหนือวิกฤตตกถึงพื้น"
+            },
+            "enableSuperSilo": {
+              "label": "ไซโลพิเศษ",
+              "description": "คงค่าเติมของไซโลที่เปิดใช้แล้วไว้ตามค่าการเติมยาวที่ตั้งไว้"
+            },
+            "enableScanRealitySlider": {
+              "label": "แถบเลื่อนแกนเหนือวิกฤต",
+              "description": "แสดงเส้นผ่านศูนย์กลางระยะและแถบเลื่อนเติม Reality บนการ์ดซื้อแกนเหนือวิกฤต"
+            },
+            "enableHollowVentReality": {
+              "label": "แหล่ง Reality จากช่องกลวง",
+              "description": "ช่องกลวงจะปลูกสัญลักษณ์ Reality และเก็บเกี่ยวอัตโนมัติผ่านแท่นบูชาความว่างเปล่า"
+            },
+            "ventRealityInterval": {
+              "label": "เวลาผลิตของช่อง",
+              "description": "จำนวนวินาทีที่ช่องกลวงใช้ปลูกสัญลักษณ์ Reality หนึ่งอัน"
+            },
+            "ventRealityAmount": {
+              "label": "Reality จากช่องเล็ก",
+              "description": "Reality ที่ได้จากสัญลักษณ์ของช่องกลวงขนาดเล็กแต่ละอัน"
+            },
+            "ventRealityLargeMultiplier": {
+              "label": "ตัวคูณช่องใหญ่",
+              "description": "ตัวคูณผลผลิต Reality ของช่องกลวงขนาดใหญ่"
+            }
+          }
+        }
+      }
+    },
+    "hu": {
+      "modloader": {
+        "translationExport": "Exportalas",
+        "translationExportTitle": "Forditasi mentes exportalasa",
+        "translationExported": "Forditasi mentes exportalva: {path}",
+        "translationImport": "Importalas",
+        "translationImportTitle": "Forditasi fajl importalasa",
+        "translationImported": "Forditasok importalva innen: {source}, mentve ide: {path}",
+        "translationImportInvalid": "A kivalasztott fajl nem ModLoader forditasi fajl.",
+        "translationExportOverwriteTitle": "Felulirod a forditasi mentest?",
+        "translationExportOverwriteMessage": "A celfajl mar letezik.\nSzerkesztesi ido: {editedAt}\n{path}\nFelulirod?",
+        "translationOverwriteConfirm": "Feluliras",
+        "translationDialogUnavailable": "A fajlvalaszto nem erheto el.",
+        "translationImportWriteModsTitle": "Forditasok irasa a mod.json fajlba?",
+        "translationImportWriteModsMessage": "Az importalt fajl mindenkepp felulirja a ModLoader translations.json fajljat. Ird a megfelelo mod forditasi mezoket a telepitett mod.json fajlokba is? Ez felulirja a meglevo megfelelo forditasi mezoket.",
+        "translationImportWriteModsConfirm": "Iras modba",
+        "translationImportSkipMods": "Ne irja",
+        "translationImportWriteModsResult": "Mod visszairas: {written} irva, {unchanged} mar aktualis, {failed} sikertelen.",
+        "translationImportNoMatchingMods": "Nincs telepitett mod.json, amely illeszkedik az importalt mod bejegyzesekhez.",
+        "translationImportModFailures": "Hibak: {failures}"
+      },
+      "mods": {
+        "Cattail_Tweaks_简体中文优化": {
+          "name": "Egyszerűsített kínai optimalizálás"
+        },
+        "Cattail_Tweaks_Chat-Timestamps": {
+          "name": "Chat időbélyegek"
+        },
+        "Cattail_TweaksQuality_Better-UIs": {
+          "name": "Jobb felületek",
+          "config": {
+            "enableShopCategories": {
+              "label": "Bolt kategóriái"
+            },
+            "enableSaveSlots": {
+              "label": "Mentési helyek"
+            },
+            "enableLanguageMenu": {
+              "label": "Nyelv menü"
+            }
+          }
+        },
+        "Cattail_TweaksQuality_Custom-Background-Color": {
+          "name": "Egyéni háttérszín",
+          "config": {
+            "globalThresholds": {
+              "label": "Globális tisztítási küszöbök"
+            },
+            "spriteThresholds": {
+              "label": "Sprite-tisztítási küszöbök"
+            }
+          }
+        },
+        "Cattail_TweaksQuality_Dynamic-Details": {
+          "name": "Dinamikus részletek",
+          "config": {
+            "cookieDirectionPassword": {
+              "label": "Sütiirány jelszó"
+            }
+          }
+        },
+        "Cattail_TweaksQuality_Resource-Watcher": {
+          "name": "Erőforrás-figyelő"
+        },
+        "Cattail_TweaksQuality_Tweaks": {
+          "name": "Kényelmi finomítások",
+          "config": {
+            "enableEndingSkip": {
+              "label": "Befejezés átugrása"
+            },
+            "enableAccessibilityButtons": {
+              "label": "Akadálymentes gombok"
+            },
+            "enableStabilizerSurgeFlashReduction": {
+              "label": "Stabilizátor villanáscsökkentés"
+            },
+            "enableResourceGlowColors": {
+              "label": "Erőforrás-fény színei"
+            },
+            "enablePlayTimeCounter": {
+              "label": "Játékidő-számláló"
+            },
+            "playTimeCounterPosition": {
+              "label": "Játékidő-számláló helye",
+              "description": "Slide between bottom-left, top-center, and bottom-right.",
+              "valueLabels": {
+                "0": "Bal also",
+                "1": "Felul kozepen",
+                "2": "Jobb also"
+              }
+            },
+            "resourceGlowColors": {
+              "label": "Erőforrás-fény paletta"
+            },
+            "enableViewDistance": {
+              "label": "Látótávolság-korlátok"
+            },
+            "farthestZoom": {
+              "label": "Legtávolabbi nagyítás"
+            },
+            "closestZoom": {
+              "label": "Legközelebbi nagyítás"
+            },
+            "fallbackZoom": {
+              "label": "Tartalék nagyítás"
+            },
+            "enableChasmLineRenderer": {
+              "label": "Hasadekvonal-renderelo",
+              "description": "A mod a hasadek es eroforrasok vonalait a valasztott renderelovel rajzolhatja."
+            },
+            "chasmLineRendererMode": {
+              "label": "Hasadekvonal renderelesi mod",
+              "description": "Canvas 2D az eredeti rajzolast hasznalja. WebGL GPU canvast hasznal.",
+              "valueLabels": {
+                "0": "Canvas 2D",
+                "1": "WebGL"
+              }
+            },
+            "enableChasmLineDistanceOverride": {
+              "label": "Hasadekvonalak tavolsag nelkul",
+              "description": "A hasadek es eroforrasok vonalai a normal lathato tartomanyon kivul is latszanak."
+            },
+            "enableFloorGridLines": {
+              "label": "Padloracs korvonalai",
+              "description": "Vekony korvonalakat rajzol a padlocellak kore."
+            },
+            "floorGridLineRealityColor": {
+              "label": "Valosag padloracs szine",
+              "description": "Uresen az alapertelmezett sotetszurke korvonalat hasznalja a valosagban."
+            },
+            "floorGridLineVoidColor": {
+              "label": "Ur padloracs szine",
+              "description": "Uresen az alapertelmezett feher korvonalat hasznalja az urben."
+            },
+            "enableVoidReturnFadeSkip": {
+              "label": "Urbeli visszateres feher fade kihagyasa",
+              "description": "Az urbol a valosagba visszaterve eltavolitja a hosszu feher atmenetet."
+            },
+            "enableExplainerFix": {
+              "label": "Tipp javitas",
+              "description": "Nyelvvaltas utan frissiti a pulzalo tippeket, es az urben vilagos, olvashato szoveget hasznal."
+            }
+          }
+        },
+        "Cattail_TweaksX_Reality-Pack": {
+          "name": "Reality csomag",
+          "description": "Egy TweaksX modba egyesíti a Reality automatikus gyűjtést, a scan hullámokat és a szuper silót.",
+          "config": {
+            "surgeCount": {
+              "label": "Hullámok száma",
+              "description": "A becsapodaskor letrehozott veletlen hullamok szama."
+            },
+            "surgeRadius": {
+              "label": "Megjelenési sugár",
+              "description": "Kor alaku sugar cellakban, ahol ures helyeket keres."
+            },
+            "fillAmount": {
+              "label": "Hosszú feltöltési érték",
+              "description": "Fill value assigned to activated silos."
+            },
+            "enableRealityAutoCollect": {
+              "label": "Reality automatikus gyűjtése",
+              "description": "Automatikusan összegyűjti a kész Reality / soul power értéket az üresség világában."
+            },
+            "enableScanRealitySurges": {
+              "label": "Scan Reality hullámok",
+              "description": "Véletlen Reality-sík hullámokat hoz létre, amikor egy szuperkritikus mag földet ér."
+            },
+            "enableSuperSilo": {
+              "label": "Szuper siló",
+              "description": "Az aktivált silókat a beállított hosszú feltöltési értéken tartja."
+            },
+            "enableScanRealitySlider": {
+              "label": "Szuperkritikus mag csúszka",
+              "description": "Megjeleníti a hatótáv átmérőjét és a Reality-betöltés csúszkáját a szuperkritikus mag vásárlási kártyáján."
+            },
+            "enableHollowVentReality": {
+              "label": "Reality-forrás üreges nyílásokból",
+              "description": "Az üreges nyílások Reality szimbólumokat növesztenek, amelyeket az üresség oltára automatikusan begyűjt."
+            },
+            "ventRealityInterval": {
+              "label": "Nyílás termelési ideje",
+              "description": "Másodperc, amíg egy üreges nyílás Reality szimbólumot növeszt."
+            },
+            "ventRealityAmount": {
+              "label": "Kis nyílás Reality",
+              "description": "Reality mennyiség minden kis üreges nyílás szimbólumából."
+            },
+            "ventRealityLargeMultiplier": {
+              "label": "Nagy nyílás szorzó",
+              "description": "A nagy üreges nyílás Reality termelésére alkalmazott szorzó."
+            }
+          }
+        }
+      }
+    },
+    "lv": {
+      "modloader": {
+        "translationExport": "Export",
+        "translationExportTitle": "Export translations backup",
+        "translationExported": "Translation backup exported: {path}",
+        "translationImport": "Import",
+        "translationImportTitle": "Import translations file",
+        "translationImported": "Imported translations from {source} and saved to {path}",
+        "translationImportInvalid": "Selected file is not a ModLoader translations file.",
+        "translationExportOverwriteTitle": "Overwrite translation backup?",
+        "translationExportOverwriteMessage": "Target file already exists.\nEdit time: {editedAt}\n{path}\nOverwrite it?",
+        "translationOverwriteConfirm": "Overwrite",
+        "translationDialogUnavailable": "File dialog is unavailable.",
+        "translationImportWriteModsTitle": "Write translations to mod.json?",
+        "translationImportWriteModsMessage": "The imported file will replace ModLoader translations.json either way. Do you also want to write matching mod translation fields into installed mod.json files? This overwrites existing matching translation fields.",
+        "translationImportWriteModsConfirm": "Write to mod",
+        "translationImportSkipMods": "Do not write",
+        "translationImportWriteModsResult": "Mod write-back: {written} written, {unchanged} already current, {failed} failed.",
+        "translationImportNoMatchingMods": "No installed mod.json matched the imported mod entries.",
+        "translationImportModFailures": "Failures: {failures}"
+      },
+      "mods": {
+        "Cattail_Tweaks_简体中文优化": {
+          "name": "Vienkāršotās ķīniešu valodas uzlabojums"
+        },
+        "Cattail_Tweaks_Chat-Timestamps": {
+          "name": "Tērzēšanas laika zīmogi"
+        },
+        "Cattail_TweaksQuality_Better-UIs": {
+          "name": "Labākas saskarnes",
+          "config": {
+            "enableShopCategories": {
+              "label": "Veikala kategorijas"
+            },
+            "enableSaveSlots": {
+              "label": "Saglabāšanas vietas"
+            },
+            "enableLanguageMenu": {
+              "label": "Valodas izvēlne"
+            }
+          }
+        },
+        "Cattail_TweaksQuality_Custom-Background-Color": {
+          "name": "Pielāgota fona krāsa",
+          "config": {
+            "globalThresholds": {
+              "label": "Globālie tīrīšanas sliekšņi"
+            },
+            "spriteThresholds": {
+              "label": "Spraitu tīrīšanas sliekšņi"
+            }
+          }
+        },
+        "Cattail_TweaksQuality_Dynamic-Details": {
+          "name": "Dinamiska informācija",
+          "config": {
+            "cookieDirectionPassword": {
+              "label": "Cepuma virziena parole"
+            }
+          }
+        },
+        "Cattail_TweaksQuality_Resource-Watcher": {
+          "name": "Resursu pārraugs"
+        },
+        "Cattail_TweaksQuality_Tweaks": {
+          "name": "Ērtības uzlabojumi",
+          "config": {
+            "enableEndingSkip": {
+              "label": "Beigu izlaišana"
+            },
+            "enableAccessibilityButtons": {
+              "label": "Pieejamības pogas"
+            },
+            "enableStabilizerSurgeFlashReduction": {
+              "label": "Stabilizatora zibšņu mazināšana"
+            },
+            "enableResourceGlowColors": {
+              "label": "Resursu spīduma krāsas"
+            },
+            "enablePlayTimeCounter": {
+              "label": "Spēles laika skaitītājs"
+            },
+            "playTimeCounterPosition": {
+              "label": "Spēles laika skaitītāja vieta",
+              "description": "Slide between bottom-left, top-center, and bottom-right.",
+              "valueLabels": {
+                "0": "Apaksa pa kreisi",
+                "1": "Augsa centra",
+                "2": "Apaksa pa labi"
+              }
+            },
+            "resourceGlowColors": {
+              "label": "Resursu spīduma palete"
+            },
+            "enableViewDistance": {
+              "label": "Skata attāluma limiti"
+            },
+            "farthestZoom": {
+              "label": "Tālākais tālummaiņas līmenis"
+            },
+            "closestZoom": {
+              "label": "Tuvākais tālummaiņas līmenis"
+            },
+            "fallbackZoom": {
+              "label": "Rezerves tālummaiņa"
+            },
+            "enableChasmLineRenderer": {
+              "label": "Plaisas liniju renderetajs",
+              "description": "Mods var aizstat plaisas un resursu linijas ar izveleto renderetaju."
+            },
+            "chasmLineRendererMode": {
+              "label": "Plaisas liniju renderesanas rezims",
+              "description": "Canvas 2D izmanto originalo zimesanu. WebGL izmanto GPU canvas.",
+              "valueLabels": {
+                "0": "Canvas 2D",
+                "1": "WebGL"
+              }
+            },
+            "enableChasmLineDistanceOverride": {
+              "label": "Plaisas linijas bez distances",
+              "description": "Plaisas un resursu linijas paliek redzamas ari arpus parasta redzama attaluma."
+            },
+            "enableFloorGridLines": {
+              "label": "Gridas konturas",
+              "description": "Zime smalkas konturas ap gridas lauciniem."
+            },
+            "floorGridLineRealityColor": {
+              "label": "Realitates gridas konturu krasa",
+              "description": "Tukss izmanto noklusejuma tumsi peleku konturu realitate."
+            },
+            "floorGridLineVoidColor": {
+              "label": "Tuksuma gridas konturu krasa",
+              "description": "Tukss izmanto noklusejuma baltu konturu tuksumaa."
+            },
+            "enableVoidReturnFadeSkip": {
+              "label": "Izlaist balto atgriesanos no tuksuma",
+              "description": "Atgriezoties no tuksuma realitate, nonem ilgo balto parpludumu un uzreiz rada skaidru skatu."
+            },
+            "enableExplainerFix": {
+              "label": "Padomu labojums",
+              "description": "Atsvaidzina pulsojosus padomus pec valodas mainas un tuksumaa izmanto gaisu, salasamu tekstu."
+            }
+          }
+        },
+        "Cattail_TweaksX_Reality-Pack": {
+          "name": "Reality paka",
+          "description": "Apvieno automātisku Reality savākšanu, skenēšanas viļņus un Super Silo vienā TweaksX modā.",
+          "config": {
+            "surgeCount": {
+              "label": "Viļņu skaits",
+              "description": "Nejauso vilnu skaits, kas rodas kodolam piezemejoties."
+            },
+            "surgeRadius": {
+              "label": "Rašanās radiuss",
+              "description": "Aplveida radiuss sunas, kura meklet brivas vietas."
+            },
+            "fillAmount": {
+              "label": "Ilgās uzpildes vērtība",
+              "description": "Fill value assigned to activated silos."
+            },
+            "enableRealityAutoCollect": {
+              "label": "Automātiska Reality savākšana",
+              "description": "Automātiski savāc gatavo Reality / soul power tukšuma pasaulē."
+            },
+            "enableScanRealitySurges": {
+              "label": "Skenēšanas Reality viļņi",
+              "description": "Izveido nejaušus Reality plaknes viļņus, kad superkritiskais kodols piezemējas."
+            },
+            "enableSuperSilo": {
+              "label": "Super Silo",
+              "description": "Uztur aktivizētās tvertnes piepildītas ar iestatīto ilgo uzpildes vērtību."
+            },
+            "enableScanRealitySlider": {
+              "label": "Superkritiskā kodola slīdnis",
+              "description": "Rāda diapazona diametru un Reality ieplūdes slīdni superkritiskā kodola iegādes kartītē."
+            },
+            "enableHollowVentReality": {
+              "label": "Reality avots no dobajām atverēm",
+              "description": "Dobās atveres audzē Reality simbolus, kas automātiski tiek savākti caur tukšuma altāri."
+            },
+            "ventRealityInterval": {
+              "label": "Atveres ražošanas laiks",
+              "description": "Sekundes, kas dobajai atverei vajadzīgas Reality simbola izaudzēšanai."
+            },
+            "ventRealityAmount": {
+              "label": "Mazās atveres Reality",
+              "description": "Reality daudzums no katra mazās dobās atveres simbola."
+            },
+            "ventRealityLargeMultiplier": {
+              "label": "Lielās atveres reizinātājs",
+              "description": "Reizinātājs lielās dobās atveres Reality ieguvei."
+            }
+          }
+        }
+      }
+    },
+    "ro": {
+      "modloader": {
+        "translationExport": "Exporta",
+        "translationExportTitle": "Exporta copia traducerilor",
+        "translationExported": "Copia traducerilor a fost exportata: {path}",
+        "translationImport": "Importa",
+        "translationImportTitle": "Importa fisierul de traduceri",
+        "translationImported": "Traduceri importate din {source} si salvate in {path}",
+        "translationImportInvalid": "Fisierul selectat nu este un fisier de traduceri ModLoader.",
+        "translationExportOverwriteTitle": "Suprascrii copia traducerilor?",
+        "translationExportOverwriteMessage": "Fisierul tinta exista deja.\nOra editarii: {editedAt}\n{path}\nSuprascrii?",
+        "translationOverwriteConfirm": "Suprascrie",
+        "translationDialogUnavailable": "Selectorul de fisiere nu este disponibil.",
+        "translationImportWriteModsTitle": "Scrie traducerile in mod.json?",
+        "translationImportWriteModsMessage": "Fisierul importat va inlocui oricum translations.json al ModLoader. Vrei sa scrii si campurile de traducere potrivite in fisierele mod.json instalate? Aceasta suprascrie campurile de traducere potrivite existente.",
+        "translationImportWriteModsConfirm": "Scrie in mod",
+        "translationImportSkipMods": "Nu scrie",
+        "translationImportWriteModsResult": "Scriere in moduri: {written} scrise, {unchanged} deja actuale, {failed} esuate.",
+        "translationImportNoMatchingMods": "Niciun mod.json instalat nu se potriveste cu intrarile de mod importate.",
+        "translationImportModFailures": "Erori: {failures}"
+      },
+      "mods": {
+        "Cattail_Tweaks_简体中文优化": {
+          "name": "Optimizare chineză simplificată"
+        },
+        "Cattail_Tweaks_Chat-Timestamps": {
+          "name": "Marcaje timp chat"
+        },
+        "Cattail_TweaksQuality_Better-UIs": {
+          "name": "Interfețe mai bune",
+          "config": {
+            "enableShopCategories": {
+              "label": "Categorii magazin"
+            },
+            "enableSaveSlots": {
+              "label": "Sloturi salvare"
+            },
+            "enableLanguageMenu": {
+              "label": "Meniu limbă"
+            }
+          }
+        },
+        "Cattail_TweaksQuality_Custom-Background-Color": {
+          "name": "Culoare fundal personalizată",
+          "config": {
+            "globalThresholds": {
+              "label": "Praguri globale de curățare"
+            },
+            "spriteThresholds": {
+              "label": "Praguri curățare sprite-uri"
+            }
+          }
+        },
+        "Cattail_TweaksQuality_Dynamic-Details": {
+          "name": "Detalii dinamice",
+          "config": {
+            "cookieDirectionPassword": {
+              "label": "Parolă direcție cookie"
+            }
+          }
+        },
+        "Cattail_TweaksQuality_Resource-Watcher": {
+          "name": "Monitor resurse"
+        },
+        "Cattail_TweaksQuality_Tweaks": {
+          "name": "Ajustări utile",
+          "config": {
+            "enableEndingSkip": {
+              "label": "Sari peste final"
+            },
+            "enableAccessibilityButtons": {
+              "label": "Butoane accesibilitate"
+            },
+            "enableStabilizerSurgeFlashReduction": {
+              "label": "Reducere flash stabilizator"
+            },
+            "enableResourceGlowColors": {
+              "label": "Culori halou resurse"
+            },
+            "enablePlayTimeCounter": {
+              "label": "Contor timp de joc"
+            },
+            "playTimeCounterPosition": {
+              "label": "Poziție contor timp",
+              "description": "Slide between bottom-left, top-center, and bottom-right.",
+              "valueLabels": {
+                "0": "Jos stanga",
+                "1": "Sus centru",
+                "2": "Jos dreapta"
+              }
+            },
+            "resourceGlowColors": {
+              "label": "Paletă halou resurse"
+            },
+            "enableViewDistance": {
+              "label": "Limite distanță vizuală"
+            },
+            "farthestZoom": {
+              "label": "Zoom cel mai îndepărtat"
+            },
+            "closestZoom": {
+              "label": "Zoom cel mai apropiat"
+            },
+            "fallbackZoom": {
+              "label": "Zoom de rezervă"
+            },
+            "enableChasmLineRenderer": {
+              "label": "Randare linii fisura",
+              "description": "Permite modului sa inlocuiasca liniile dintre fisura si resurse cu randarea aleasa."
+            },
+            "chasmLineRendererMode": {
+              "label": "Mod randare linii fisura",
+              "description": "Canvas 2D foloseste desenarea originala. WebGL foloseste un canvas GPU.",
+              "valueLabels": {
+                "0": "Canvas 2D",
+                "1": "WebGL"
+              }
+            },
+            "enableChasmLineDistanceOverride": {
+              "label": "Linii fisura fara distanta",
+              "description": "Pastreaza liniile dintre fisura si resurse chiar in afara razei vizibile normale."
+            },
+            "enableFloorGridLines": {
+              "label": "Contururi grila podea",
+              "description": "Deseneaza contururi subtiri in jurul celulelor podelei."
+            },
+            "floorGridLineRealityColor": {
+              "label": "Culoare grila podea realitate",
+              "description": "Gol foloseste conturul implicit gri inchis in realitate."
+            },
+            "floorGridLineVoidColor": {
+              "label": "Culoare grila podea vid",
+              "description": "Gol foloseste conturul implicit alb in vid."
+            },
+            "enableVoidReturnFadeSkip": {
+              "label": "Sari peste fade-ul din vid",
+              "description": "La revenirea din vid in realitate, elimina estomparea alba lunga si arata imediat imaginea clara."
+            },
+            "enableExplainerFix": {
+              "label": "Corectie indicii",
+              "description": "Actualizeaza indiciile pulsante dupa schimbarea limbii si foloseste text luminos in vid."
+            }
+          }
+        },
+        "Cattail_TweaksX_Reality-Pack": {
+          "name": "Pachet Reality",
+          "description": "Combină colectarea automată Reality, valurile de scanare și Super siloz într-un singur mod TweaksX.",
+          "config": {
+            "surgeCount": {
+              "label": "Număr de valuri",
+              "description": "Numarul de valuri aleatorii create cand aterizeaza un nucleu supercritic."
+            },
+            "surgeRadius": {
+              "label": "Raza de apariție",
+              "description": "Raza circulara, in celule, folosita pentru a cauta locuri libere."
+            },
+            "fillAmount": {
+              "label": "Valoare umplere lungă",
+              "description": "Fill value assigned to activated silos."
+            },
+            "enableRealityAutoCollect": {
+              "label": "Colectare automată Reality",
+              "description": "Colectează automat Reality / soul power pregătită în lumea vidului."
+            },
+            "enableScanRealitySurges": {
+              "label": "Valuri Reality la scanare",
+              "description": "Creează valuri aleatorii în planul Reality când aterizează un nucleu supercritic."
+            },
+            "enableSuperSilo": {
+              "label": "Super siloz",
+              "description": "Menține silozurile activate umplute cu valoarea lungă configurată."
+            },
+            "enableScanRealitySlider": {
+              "label": "Glisor nucleu supercritic",
+              "description": "Afișează diametrul razei și glisorul de infuzie Reality pe cardul de cumpărare al nucleului supercritic."
+            },
+            "enableHollowVentReality": {
+              "label": "Sursă Reality din venturi goale",
+              "description": "Venturile goale cresc simboluri Reality colectate automat prin altarul vidului."
+            },
+            "ventRealityInterval": {
+              "label": "Timp producție vent",
+              "description": "Secunde necesare unui vent gol pentru a crește un simbol Reality."
+            },
+            "ventRealityAmount": {
+              "label": "Reality vent mic",
+              "description": "Reality obținută din fiecare simbol al unui vent gol mic."
+            },
+            "ventRealityLargeMultiplier": {
+              "label": "Multiplicator vent mare",
+              "description": "Multiplicator aplicat producției Reality a ventului gol mare."
+            }
+          }
+        }
+      }
+    },
+    "no": {
+      "modloader": {
+        "translationExport": "Eksporter",
+        "translationExportTitle": "Eksporter oversettelseskopi",
+        "translationExported": "Oversettelseskopi eksportert: {path}",
+        "translationImport": "Importer",
+        "translationImportTitle": "Importer oversettelsesfil",
+        "translationImported": "Oversettelser importert fra {source} og lagret i {path}",
+        "translationImportInvalid": "Den valgte filen er ikke en ModLoader-oversettelsesfil.",
+        "translationExportOverwriteTitle": "Overskrive oversettelseskopi?",
+        "translationExportOverwriteMessage": "Malfilen finnes allerede.\nRedigeringstid: {editedAt}\n{path}\nOverskrive?",
+        "translationOverwriteConfirm": "Overskriv",
+        "translationDialogUnavailable": "Filvelgeren er ikke tilgjengelig.",
+        "translationImportWriteModsTitle": "Skrive oversettelser til mod.json?",
+        "translationImportWriteModsMessage": "Den importerte filen erstatter alltid ModLoader translations.json. Vil du ogsa skrive samsvarende mod-oversettelsesfelt til installerte mod.json-filer? Dette overskriver eksisterende samsvarende oversettelsesfelt.",
+        "translationImportWriteModsConfirm": "Skriv til mod",
+        "translationImportSkipMods": "Ikke skriv",
+        "translationImportWriteModsResult": "Mod-tilbakeskriving: {written} skrevet, {unchanged} allerede oppdatert, {failed} feilet.",
+        "translationImportNoMatchingMods": "Ingen installert mod.json samsvarer med de importerte mod-oppforingene.",
+        "translationImportModFailures": "Feil: {failures}"
+      },
+      "mods": {
+        "Cattail_Tweaks_简体中文优化": {
+          "name": "Optimalisering av forenklet kinesisk"
+        },
+        "Cattail_Tweaks_Chat-Timestamps": {
+          "name": "Tidsstempler for chat"
+        },
+        "Cattail_TweaksQuality_Better-UIs": {
+          "name": "Bedre grensesnitt",
+          "config": {
+            "enableShopCategories": {
+              "label": "Butikkategorier"
+            },
+            "enableSaveSlots": {
+              "label": "Lagringsplasser"
+            },
+            "enableLanguageMenu": {
+              "label": "Språkmeny"
+            }
+          }
+        },
+        "Cattail_TweaksQuality_Custom-Background-Color": {
+          "name": "Egendefinert bakgrunnsfarge",
+          "config": {
+            "globalThresholds": {
+              "label": "Globale oppryddingsterskler"
+            },
+            "spriteThresholds": {
+              "label": "Oppryddingsterskler for spriter"
+            }
+          }
+        },
+        "Cattail_TweaksQuality_Dynamic-Details": {
+          "name": "Dynamiske detaljer",
+          "config": {
+            "cookieDirectionPassword": {
+              "label": "Passord for kjeksretning"
+            }
+          }
+        },
+        "Cattail_TweaksQuality_Resource-Watcher": {
+          "name": "Ressursovervåker"
+        },
+        "Cattail_TweaksQuality_Tweaks": {
+          "name": "Praktiske justeringer",
+          "config": {
+            "enableEndingSkip": {
+              "label": "Hopp over slutt"
+            },
+            "enableAccessibilityButtons": {
+              "label": "Tilgjengelighetsknapper"
+            },
+            "enableStabilizerSurgeFlashReduction": {
+              "label": "Reduser stabilisatorblink"
+            },
+            "enableResourceGlowColors": {
+              "label": "Glødefarger for ressurser"
+            },
+            "enablePlayTimeCounter": {
+              "label": "Spilletidteller"
+            },
+            "playTimeCounterPosition": {
+              "label": "Plassering av spilletidteller",
+              "description": "Slide between bottom-left, top-center, and bottom-right.",
+              "valueLabels": {
+                "0": "Nederst til venstre",
+                "1": "Overst i midten",
+                "2": "Nederst til hoyre"
+              }
+            },
+            "resourceGlowColors": {
+              "label": "Glødepalett for ressurser"
+            },
+            "enableViewDistance": {
+              "label": "Grenser for visningsavstand"
+            },
+            "farthestZoom": {
+              "label": "Fjerneste zoom"
+            },
+            "closestZoom": {
+              "label": "Nærmeste zoom"
+            },
+            "fallbackZoom": {
+              "label": "Reservezoom"
+            },
+            "enableChasmLineRenderer": {
+              "label": "Kløftlinje-renderer",
+              "description": "Lar modden erstatte linjene mellom kloften og ressursene med valgt renderer."
+            },
+            "chasmLineRendererMode": {
+              "label": "Renderingsmodus for kloftlinjer",
+              "description": "Canvas 2D bruker original tegning. WebGL bruker et GPU-canvas.",
+              "valueLabels": {
+                "0": "Canvas 2D",
+                "1": "WebGL"
+              }
+            },
+            "enableChasmLineDistanceOverride": {
+              "label": "Kloftlinjer uten avstand",
+              "description": "Tegner linjer fra kloft til ressurser selv utenfor vanlig synlig rekkevidde."
+            },
+            "enableFloorGridLines": {
+              "label": "Omriss for gulvrutenett",
+              "description": "Tegner tynne omriss rundt gulvceller."
+            },
+            "floorGridLineRealityColor": {
+              "label": "Gulvrutenettfarge i virkelighet",
+              "description": "Tomt bruker standard morkegratt omriss i virkeligheten."
+            },
+            "floorGridLineVoidColor": {
+              "label": "Gulvrutenettfarge i tomrom",
+              "description": "Tomt bruker standard hvitt omriss i tomrommet."
+            },
+            "enableVoidReturnFadeSkip": {
+              "label": "Hopp over hvit fade fra tomrom",
+              "description": "Nar du gar fra tomrommet tilbake til virkeligheten, fjernes den lange hvite faden."
+            },
+            "enableExplainerFix": {
+              "label": "Hint-fiks",
+              "description": "Oppdaterer pulserende hint etter sprakbytte og bruker lys, lesbar tekst i tomrommet."
+            }
+          }
+        },
+        "Cattail_TweaksX_Reality-Pack": {
+          "name": "Reality-pakke",
+          "description": "Kombinerer automatisk Reality-innsamling, skanningsbølger og Super-silo i én TweaksX-mod.",
+          "config": {
+            "surgeCount": {
+              "label": "Antall bølger",
+              "description": "Antall tilfeldige bolger som lages naar en superkritisk kjerne lander."
+            },
+            "surgeRadius": {
+              "label": "Oppståelsesradius",
+              "description": "Sirkelradius i celler for aa finne ledige plasser."
+            },
+            "fillAmount": {
+              "label": "Lang fyllverdi",
+              "description": "Fill value assigned to activated silos."
+            },
+            "enableRealityAutoCollect": {
+              "label": "Automatisk Reality-innsamling",
+              "description": "Samler automatisk klar Reality / soul power i tomromsverdenen."
+            },
+            "enableScanRealitySurges": {
+              "label": "Reality-bølger fra skanning",
+              "description": "Lager tilfeldige bølger i Reality-planet når en superkritisk kjerne lander."
+            },
+            "enableSuperSilo": {
+              "label": "Super-silo",
+              "description": "Holder aktiverte siloer fylt med den konfigurerte lange fyllverdien."
+            },
+            "enableScanRealitySlider": {
+              "label": "Skyver for superkritisk kjerne",
+              "description": "Viser rekkeviddediameteren og Reality-infusjonsskyveren på kjøpskortet for den superkritiske kjernen."
+            },
+            "enableHollowVentReality": {
+              "label": "Reality-kilde fra hule ventiler",
+              "description": "Hule ventiler dyrker Reality-symboler som automatisk høstes gjennom tomhetsalteret."
+            },
+            "ventRealityInterval": {
+              "label": "Produksjonstid for ventil",
+              "description": "Sekunder hver hul ventil bruker på å dyrke et Reality-symbol."
+            },
+            "ventRealityAmount": {
+              "label": "Reality fra liten ventil",
+              "description": "Reality fra hvert symbol i en liten hul ventil."
+            },
+            "ventRealityLargeMultiplier": {
+              "label": "Multiplikator for stor ventil",
+              "description": "Multiplikator brukt på Reality-produksjonen til den store hule ventilen."
+            }
+          }
+        }
+      }
+    }
+  }
+}

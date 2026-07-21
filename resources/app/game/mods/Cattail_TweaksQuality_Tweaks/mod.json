@@ -511,9 +511,9 @@
       "type": "boolean",
       "label": {
         "en": "Cube resource render cache",
-        "sch": "\u7a33\u5b9a Cube \u8d44\u6e90\u6e32\u67d3\u7f13\u5b58",
-        "modsch": "\u7a33\u5b9a Cube \u8d44\u6e90\u6e32\u67d3\u7f13\u5b58",
-        "tch": "\u7a69\u5b9a Cube \u8cc7\u6e90\u6e32\u67d3\u7de9\u5b58",
+        "sch": "稳定 Cube 资源渲染缓存",
+        "modsch": "稳定 Cube 资源渲染缓存",
+        "tch": "穩定 Cube 資源渲染緩存",
         "ru": "Cube resource render cache",
         "de": "Cube resource render cache",
         "ptbr": "Cube resource render cache",
@@ -534,9 +534,9 @@
       "default": true,
       "description": {
         "en": "Cache the resource sprites inside stable Cubes as one offscreen image. Turn this off if Cube resources look stale or misaligned.",
-        "sch": "\u5c06\u7a33\u5b9a Cube \u91cc\u7684\u8d44\u6e90 sprite \u5408\u6210\u4e3a\u4e00\u5f20\u79bb\u5c4f\u56fe\u50cf\u3002\u5982\u679c Cube \u8d44\u6e90\u770b\u8d77\u6765\u672a\u5237\u65b0\u6216\u9519\u4f4d\uff0c\u8bf7\u5173\u95ed\u6b64\u9879\u3002",
-        "modsch": "\u5c06\u7a33\u5b9a Cube \u91cc\u7684\u8d44\u6e90 sprite \u5408\u6210\u4e3a\u4e00\u5f20\u79bb\u5c4f\u56fe\u50cf\u3002\u5982\u679c Cube \u8d44\u6e90\u770b\u8d77\u6765\u672a\u5237\u65b0\u6216\u9519\u4f4d\uff0c\u8bf7\u5173\u95ed\u6b64\u9879\u3002",
-        "tch": "\u5c07\u7a69\u5b9a Cube \u88e1\u7684\u8cc7\u6e90 sprite \u5408\u6210\u70ba\u4e00\u5f35\u96e2\u5c4f\u5716\u50cf\u3002\u5982\u679c Cube \u8cc7\u6e90\u770b\u8d77\u4f86\u672a\u66f4\u65b0\u6216\u932f\u4f4d\uff0c\u8acb\u95dc\u9589\u6b64\u9805\u3002",
+        "sch": "将稳定 Cube 里的资源 sprite 合成为一张离屏图像。如果 Cube 资源看起来未刷新或错位，请关闭此项。",
+        "modsch": "将稳定 Cube 里的资源 sprite 合成为一张离屏图像。如果 Cube 资源看起来未刷新或错位，请关闭此项。",
+        "tch": "將穩定 Cube 裡的資源 sprite 合成為一張離屏圖像。如果 Cube 資源看起來未更新或錯位，請關閉此項。",
         "ru": "Cache the resource sprites inside stable Cubes as one offscreen image. Turn this off if Cube resources look stale or misaligned.",
         "de": "Cache the resource sprites inside stable Cubes as one offscreen image. Turn this off if Cube resources look stale or misaligned.",
         "ptbr": "Cache the resource sprites inside stable Cubes as one offscreen image. Turn this off if Cube resources look stale or misaligned.",
@@ -558,9 +558,9 @@
       "section": "renderPerformance",
       "sectionLabel": {
         "en": "Render performance",
-        "sch": "\u6e32\u67d3\u6027\u80fd",
-        "modsch": "\u6e32\u67d3\u6027\u80fd",
-        "tch": "\u6e32\u67d3\u6548\u80fd",
+        "sch": "渲染性能",
+        "modsch": "渲染性能",
+        "tch": "渲染效能",
         "ru": "Render performance",
         "de": "Render performance",
         "ptbr": "Render performance",
@@ -583,9 +583,9 @@
       "type": "boolean",
       "label": {
         "en": "Damaged Cube resource cache",
-        "sch": "\u53d7\u635f Cube \u8d44\u6e90\u7f13\u5b58",
-        "modsch": "\u53d7\u635f Cube \u8d44\u6e90\u7f13\u5b58",
-        "tch": "\u53d7\u640d Cube \u8cc7\u6e90\u7de9\u5b58",
+        "sch": "受损 Cube 资源缓存",
+        "modsch": "受损 Cube 资源缓存",
+        "tch": "受損 Cube 資源緩存",
         "ru": "Damaged Cube resource cache",
         "de": "Damaged Cube resource cache",
         "ptbr": "Damaged Cube resource cache",
@@ -606,9 +606,9 @@
       "default": true,
       "description": {
         "en": "Also cache damaged Cubes by keeping their resource offsets and approximating per-resource shake as a whole cached-image jitter. Turn this off to preserve exact vanilla damaged-Cube shake.",
-        "sch": "\u540c\u65f6\u7f13\u5b58\u53d7\u635f Cube\uff1a\u4fdd\u7559\u8d44\u6e90\u504f\u79fb\uff0c\u5e76\u5c06\u9010\u8d44\u6e90\u6296\u52a8\u8fd1\u4f3c\u4e3a\u6574\u5f20\u7f13\u5b58\u56fe\u7684\u8f7b\u5fae\u6296\u52a8\u3002\u82e5\u8981\u4fdd\u7559\u539f\u7248\u53d7\u635f Cube \u7684\u7cbe\u786e\u6296\u52a8\uff0c\u8bf7\u5173\u95ed\u6b64\u9879\u3002",
-        "modsch": "\u540c\u65f6\u7f13\u5b58\u53d7\u635f Cube\uff1a\u4fdd\u7559\u8d44\u6e90\u504f\u79fb\uff0c\u5e76\u5c06\u9010\u8d44\u6e90\u6296\u52a8\u8fd1\u4f3c\u4e3a\u6574\u5f20\u7f13\u5b58\u56fe\u7684\u8f7b\u5fae\u6296\u52a8\u3002\u82e5\u8981\u4fdd\u7559\u539f\u7248\u53d7\u635f Cube \u7684\u7cbe\u786e\u6296\u52a8\uff0c\u8bf7\u5173\u95ed\u6b64\u9879\u3002",
-        "tch": "\u540c\u6642\u7de9\u5b58\u53d7\u640d Cube\uff1a\u4fdd\u7559\u8cc7\u6e90\u504f\u79fb\uff0c\u4e26\u5c07\u9010\u8cc7\u6e90\u6296\u52d5\u8fd1\u4f3c\u70ba\u6574\u5f35\u7de9\u5b58\u5716\u7684\u8f15\u5fae\u6296\u52d5\u3002\u82e5\u8981\u4fdd\u7559\u539f\u7248\u53d7\u640d Cube \u7684\u7cbe\u78ba\u6296\u52d5\uff0c\u8acb\u95dc\u9589\u6b64\u9805\u3002",
+        "sch": "同时缓存受损 Cube：保留资源偏移，并将逐资源抖动近似为整张缓存图的轻微抖动。若要保留原版受损 Cube 的精确抖动，请关闭此项。",
+        "modsch": "同时缓存受损 Cube：保留资源偏移，并将逐资源抖动近似为整张缓存图的轻微抖动。若要保留原版受损 Cube 的精确抖动，请关闭此项。",
+        "tch": "同時緩存受損 Cube：保留資源偏移，並將逐資源抖動近似為整張緩存圖的輕微抖動。若要保留原版受損 Cube 的精確抖動，請關閉此項。",
         "ru": "Also cache damaged Cubes by keeping their resource offsets and approximating per-resource shake as a whole cached-image jitter. Turn this off to preserve exact vanilla damaged-Cube shake.",
         "de": "Also cache damaged Cubes by keeping their resource offsets and approximating per-resource shake as a whole cached-image jitter. Turn this off to preserve exact vanilla damaged-Cube shake.",
         "ptbr": "Also cache damaged Cubes by keeping their resource offsets and approximating per-resource shake as a whole cached-image jitter. Turn this off to preserve exact vanilla damaged-Cube shake.",
@@ -633,9 +633,9 @@
       "type": "boolean",
       "label": {
         "en": "Entity sprite render cache",
-        "sch": "\u5b9e\u4f53 sprite \u6e32\u67d3\u7f13\u5b58",
-        "modsch": "\u5b9e\u4f53 sprite \u6e32\u67d3\u7f13\u5b58",
-        "tch": "\u5be6\u9ad4 sprite \u6e32\u67d3\u7de9\u5b58",
+        "sch": "实体 sprite 渲染缓存",
+        "modsch": "实体 sprite 渲染缓存",
+        "tch": "實體 sprite 渲染緩存",
         "ru": "Entity sprite render cache",
         "de": "Entity sprite render cache",
         "ptbr": "Entity sprite render cache",
@@ -656,9 +656,9 @@
       "default": true,
       "description": {
         "en": "Cache pre-scaled sprite frames for selected high-cost entities such as Silo2, Double Channel, and Recycler Mk II. Turn this off if those buildings look stale or misaligned.",
-        "sch": "\u4e3a Silo2\u3001Double Channel \u548c Recycler Mk II \u7b49\u9ad8\u6210\u672c\u5b9e\u4f53\u7f13\u5b58\u9884\u7f29\u653e sprite \u5e27\u3002\u5982\u679c\u8fd9\u4e9b\u5efa\u7b51\u770b\u8d77\u6765\u672a\u5237\u65b0\u6216\u9519\u4f4d\uff0c\u8bf7\u5173\u95ed\u6b64\u9879\u3002",
-        "modsch": "\u4e3a Silo2\u3001Double Channel \u548c Recycler Mk II \u7b49\u9ad8\u6210\u672c\u5b9e\u4f53\u7f13\u5b58\u9884\u7f29\u653e sprite \u5e27\u3002\u5982\u679c\u8fd9\u4e9b\u5efa\u7b51\u770b\u8d77\u6765\u672a\u5237\u65b0\u6216\u9519\u4f4d\uff0c\u8bf7\u5173\u95ed\u6b64\u9879\u3002",
-        "tch": "\u70ba Silo2\u3001Double Channel \u548c Recycler Mk II \u7b49\u9ad8\u6210\u672c\u5be6\u9ad4\u7de9\u5b58\u9810\u7e2e\u653e sprite \u5e40\u3002\u5982\u679c\u9019\u4e9b\u5efa\u7bc9\u770b\u8d77\u4f86\u672a\u66f4\u65b0\u6216\u932f\u4f4d\uff0c\u8acb\u95dc\u9589\u6b64\u9805\u3002",
+        "sch": "为 Silo2、Double Channel 和 Recycler Mk II 等高成本实体缓存预缩放 sprite 帧。如果这些建筑看起来未刷新或错位，请关闭此项。",
+        "modsch": "为 Silo2、Double Channel 和 Recycler Mk II 等高成本实体缓存预缩放 sprite 帧。如果这些建筑看起来未刷新或错位，请关闭此项。",
+        "tch": "為 Silo2、Double Channel 和 Recycler Mk II 等高成本實體緩存預縮放 sprite 幀。如果這些建築看起來未更新或錯位，請關閉此項。",
         "ru": "Cache pre-scaled sprite frames for selected high-cost entities such as Silo2, Double Channel, and Recycler Mk II. Turn this off if those buildings look stale or misaligned.",
         "de": "Cache pre-scaled sprite frames for selected high-cost entities such as Silo2, Double Channel, and Recycler Mk II. Turn this off if those buildings look stale or misaligned.",
         "ptbr": "Cache pre-scaled sprite frames for selected high-cost entities such as Silo2, Double Channel, and Recycler Mk II. Turn this off if those buildings look stale or misaligned.",
@@ -783,9 +783,9 @@
       "type": "boolean",
       "label": {
         "en": "Resource icon render cache",
-        "sch": "\u8d44\u6e90\u56fe\u6807\u6e32\u67d3\u7f13\u5b58",
-        "modsch": "\u8d44\u6e90\u56fe\u6807\u6e32\u67d3\u7f13\u5b58",
-        "tch": "\u8cc7\u6e90\u5716\u793a\u6e32\u67d3\u7de9\u5b58",
+        "sch": "资源图标渲染缓存",
+        "modsch": "资源图标渲染缓存",
+        "tch": "資源圖示渲染緩存",
         "ru": "Resource icon render cache",
         "de": "Resource icon render cache",
         "ptbr": "Resource icon render cache",
@@ -806,9 +806,9 @@
       "default": true,
       "description": {
         "en": "Cache pre-scaled resource icons used by the resource HUD and flying resource transfers. Turn this off if resource icons look stale or misaligned while zooming.",
-        "sch": "\u7f13\u5b58\u8d44\u6e90 HUD \u548c\u98de\u884c\u8d44\u6e90\u8f6c\u79fb\u4f7f\u7528\u7684\u9884\u7f29\u653e\u8d44\u6e90\u56fe\u6807\u3002\u5982\u679c\u7f29\u653e\u65f6\u8d44\u6e90\u56fe\u6807\u672a\u5237\u65b0\u6216\u9519\u4f4d\uff0c\u8bf7\u5173\u95ed\u6b64\u9879\u3002",
-        "modsch": "\u7f13\u5b58\u8d44\u6e90 HUD \u548c\u98de\u884c\u8d44\u6e90\u8f6c\u79fb\u4f7f\u7528\u7684\u9884\u7f29\u653e\u8d44\u6e90\u56fe\u6807\u3002\u5982\u679c\u7f29\u653e\u65f6\u8d44\u6e90\u56fe\u6807\u672a\u5237\u65b0\u6216\u9519\u4f4d\uff0c\u8bf7\u5173\u95ed\u6b64\u9879\u3002",
-        "tch": "\u7de9\u5b58\u8cc7\u6e90 HUD \u548c\u98db\u884c\u8cc7\u6e90\u8f49\u79fb\u4f7f\u7528\u7684\u9810\u7e2e\u653e\u8cc7\u6e90\u5716\u793a\u3002\u5982\u679c\u7e2e\u653e\u6642\u8cc7\u6e90\u5716\u793a\u672a\u66f4\u65b0\u6216\u932f\u4f4d\uff0c\u8acb\u95dc\u9589\u6b64\u9805\u3002",
+        "sch": "缓存资源 HUD 和飞行资源转移使用的预缩放资源图标。如果缩放时资源图标未刷新或错位，请关闭此项。",
+        "modsch": "缓存资源 HUD 和飞行资源转移使用的预缩放资源图标。如果缩放时资源图标未刷新或错位，请关闭此项。",
+        "tch": "緩存資源 HUD 和飛行資源轉移使用的預縮放資源圖示。如果縮放時資源圖示未更新或錯位，請關閉此項。",
         "ru": "Cache pre-scaled resource icons used by the resource HUD and flying resource transfers. Turn this off if resource icons look stale or misaligned while zooming.",
         "de": "Cache pre-scaled resource icons used by the resource HUD and flying resource transfers. Turn this off if resource icons look stale or misaligned while zooming.",
         "ptbr": "Cache pre-scaled resource icons used by the resource HUD and flying resource transfers. Turn this off if resource icons look stale or misaligned while zooming.",
@@ -1122,7 +1122,7 @@
           "description": "新增在结局和致谢名单的跳过功能。"
         },
         "enableAccessibilityButtons": {
-          "label": "辅助按钮",
+          "label": "游戏内设置按钮",
           "description": "鼠标移动到底部中间时会弹出设置按钮。"
         },
         "enableStabilizerSurgeFlashReduction": {
@@ -1139,11 +1139,16 @@
         },
         "playTimeCounterPosition": {
           "label": "游戏时长位置",
-          "description": "滑动选择右下角、顶部居中或左下角。"
+          "description": "滑动选择右下角、顶部居中或左下角。",
+          "valueLabels": {
+            "0": "左下角",
+            "1": "顶部居中",
+            "2": "右下角"
+          }
         },
         "resourceGlowColors": {
-          "label": "资源发光颜色调色板",
-          "description": "可自定义设置每周资源的发光颜色。"
+          "label": "资源发光颜色自定义",
+          "description": "可自定义设置每种资源的发光颜色。"
         },
         "enableViewDistance": {
           "label": "禁用视野距离限制",
@@ -1167,7 +1172,11 @@
         },
         "chasmLineRendererMode": {
           "label": "渲染模式",
-          "description": "原版渲染方式为Canvas 2D。可切换至WebGL渲染模式，用GPU进行渲染以提升性能。"
+          "description": "原版渲染方式为Canvas 2D。可切换至WebGL渲染模式，用GPU进行渲染以提升性能。",
+          "valueLabels": {
+            "0": "Canvas 2D",
+            "1": "WebGL"
+          }
         },
         "enableChasmLineDistanceOverride": {
           "label": "无视距离渲染逆裂缝绘线",
@@ -1190,7 +1199,7 @@
           "description": "从虚空维度返回现实维度时，移除长时间的白色淡出效果，直接显示清晰画面。"
         },
         "enableExplainerFix": {
-          "label": "提示修复",
+          "label": "提示句修复",
           "description": "修复提示语在切换语言后不刷新，并让虚空世界里的提示文字变成亮色以便看清。"
         },
         "disableShiftCtrlZoomShortcut": {
@@ -1245,7 +1254,12 @@
         },
         "playTimeCounterPosition": {
           "label": "游戏时长位置",
-          "description": "滑动选择右下角、顶部居中或左下角。"
+          "description": "滑动选择右下角、顶部居中或左下角。",
+          "valueLabels": {
+            "0": "左下角",
+            "1": "顶部居中",
+            "2": "右下角"
+          }
         },
         "resourceGlowColors": {
           "label": "资源发光颜色调色板",
@@ -1273,7 +1287,11 @@
         },
         "chasmLineRendererMode": {
           "label": "渲染模式",
-          "description": "原版渲染方式为Canvas 2D。可切换至WebGL渲染模式，用GPU进行渲染以提升性能。"
+          "description": "原版渲染方式为Canvas 2D。可切换至WebGL渲染模式，用GPU进行渲染以提升性能。",
+          "valueLabels": {
+            "0": "Canvas 2D",
+            "1": "WebGL"
+          }
         },
         "enableChasmLineDistanceOverride": {
           "label": "无视距离渲染逆裂缝绘线",
@@ -1296,7 +1314,7 @@
           "description": "从虚空维度返回现实维度时，移除长时间的白色淡出效果，直接显示清晰画面。"
         },
         "enableExplainerFix": {
-          "label": "提示修复",
+          "label": "提示句修复",
           "description": "修复提示语在切换语言后不刷新，并让虚空世界里的提示文字变成亮色以便看清。"
         },
         "disableShiftCtrlZoomShortcut": {
@@ -1329,38 +1347,53 @@
       "name": "Tweaks",
       "config": {
         "enableEndingSkip": {
-          "label": "Ending skip"
+          "label": "Ending skip",
+          "description": "Show a skip button during the pinhole ending and credits sequence."
         },
         "enableAccessibilityButtons": {
-          "label": "Accessibility buttons"
+          "label": "Accessibility buttons",
+          "description": "Show the bottom accessibility control bar and reality-floor color palette."
         },
         "enableStabilizerSurgeFlashReduction": {
-          "label": "Stabilizer surge flash reduction"
+          "label": "Stabilizer surge flash reduction",
+          "description": "After the void altar exists, hide full-screen flashes caused by stabilizer-triggered surge effects."
         },
         "enableResourceGlowColors": {
-          "label": "Resource glow colors"
+          "label": "Resource glow colors",
+          "description": "Color resource icon glows by resource, with optional per-resource overrides."
         },
         "enablePlayTimeCounter": {
-          "label": "Play time counter"
+          "label": "Play time counter",
+          "description": "Show the active run play-time counter on the game canvas."
         },
         "playTimeCounterPosition": {
           "label": "Play time counter position",
-          "description": "Slide between bottom-left, top-center, and bottom-right."
+          "description": "Slide between bottom-left, top-center, and bottom-right.",
+          "valueLabels": {
+            "0": "bottom-left",
+            "1": "top-center",
+            "2": "bottom-right"
+          }
         },
         "resourceGlowColors": {
-          "label": "Resource glow palette"
+          "label": "Resource glow palette",
+          "description": "Per-resource glow color overrides. Empty rows use each resource's native color."
         },
         "enableViewDistance": {
-          "label": "View distance limits"
+          "label": "View distance limits",
+          "description": "Use expanded camera zoom limits."
         },
         "farthestZoom": {
-          "label": "Farthest zoom"
+          "label": "Farthest zoom",
+          "description": "Lower values show more of the world. Vanilla far limit is 0.3."
         },
         "closestZoom": {
-          "label": "Closest zoom"
+          "label": "Closest zoom",
+          "description": "Higher values zoom closer to the world. Vanilla near limit is 2."
         },
         "fallbackZoom": {
-          "label": "Fallback zoom"
+          "label": "Fallback zoom",
+          "description": "Used when the saved zoom value is missing or invalid."
         },
         "enableChasmLineRenderer": {
           "label": "Chasm line renderer",
@@ -1368,7 +1401,11 @@
         },
         "chasmLineRendererMode": {
           "label": "Chasm line rendering mode",
-          "description": "Canvas 2D uses the original game drawing. WebGL renders the same chasm-to-resource curves through a GPU-backed canvas."
+          "description": "Canvas 2D uses the original game drawing. WebGL renders the same chasm-to-resource curves through a GPU-backed canvas.",
+          "valueLabels": {
+            "0": "Canvas 2D",
+            "1": "WebGL"
+          }
         },
         "enableChasmLineDistanceOverride": {
           "label": "Chasm lines ignore distance",
@@ -1418,7 +1455,8 @@
           "label": "Disable offline earnings simulation",
           "description": "Skip the offline earnings simulation when loading a save. Time spent away will grant no offline resources or other simulated progress."
         }
-      }
+      },
+      "description": "Combines view distance limits, ending skip, accessibility buttons, stabilizer surge flash reduction, void return fade skip, resource glow colors, chasm line rendering, floor grid outlines, play-time counter, and explainer fixes into one multi-entry quality mod."
     },
     "ru": {
       "name": "Настройки удобства",
@@ -1440,7 +1478,12 @@
         },
         "playTimeCounterPosition": {
           "label": "Позиция счетчика времени",
-          "description": "Slide between bottom-left, top-center, and bottom-right."
+          "description": "Slide between bottom-left, top-center, and bottom-right.",
+          "valueLabels": {
+            "0": "Внизу слева",
+            "1": "Вверху по центру",
+            "2": "Внизу справа"
+          }
         },
         "resourceGlowColors": {
           "label": "Палитра свечения ресурсов"
@@ -1463,7 +1506,11 @@
         },
         "chasmLineRendererMode": {
           "label": "Chasm line render mode",
-          "description": "Canvas 2D uses original drawing. WebGL uses a GPU-backed canvas."
+          "description": "Canvas 2D uses original drawing. WebGL uses a GPU-backed canvas.",
+          "valueLabels": {
+            "0": "Canvas 2D",
+            "1": "WebGL"
+          }
         },
         "enableChasmLineDistanceOverride": {
           "label": "Linii razloma bez distantsii",
@@ -1535,7 +1582,12 @@
         },
         "playTimeCounterPosition": {
           "label": "Position des Spielzeitzählers",
-          "description": "Slide between bottom-left, top-center, and bottom-right."
+          "description": "Slide between bottom-left, top-center, and bottom-right.",
+          "valueLabels": {
+            "0": "Unten links",
+            "1": "Oben mittig",
+            "2": "Unten rechts"
+          }
         },
         "resourceGlowColors": {
           "label": "Ressourcen-Leuchtpalette"
@@ -1558,7 +1610,11 @@
         },
         "chasmLineRendererMode": {
           "label": "Risslinien-Renderingmodus",
-          "description": "Canvas 2D nutzt die originale Zeichnung. WebGL nutzt eine GPU-Canvas."
+          "description": "Canvas 2D nutzt die originale Zeichnung. WebGL nutzt eine GPU-Canvas.",
+          "valueLabels": {
+            "0": "Canvas 2D",
+            "1": "WebGL"
+          }
         },
         "enableChasmLineDistanceOverride": {
           "label": "Kluftlinien ohne Distanzlimit",
@@ -1630,7 +1686,12 @@
         },
         "playTimeCounterPosition": {
           "label": "Posição do contador de tempo",
-          "description": "Slide between bottom-left, top-center, and bottom-right."
+          "description": "Slide between bottom-left, top-center, and bottom-right.",
+          "valueLabels": {
+            "0": "Inferior esquerdo",
+            "1": "Superior central",
+            "2": "Inferior direito"
+          }
         },
         "resourceGlowColors": {
           "label": "Paleta de brilho dos recursos"
@@ -1653,7 +1714,11 @@
         },
         "chasmLineRendererMode": {
           "label": "Modo das linhas da fenda",
-          "description": "Canvas 2D usa o desenho original. WebGL usa uma tela acelerada por GPU."
+          "description": "Canvas 2D usa o desenho original. WebGL usa uma tela acelerada por GPU.",
+          "valueLabels": {
+            "0": "Canvas 2D",
+            "1": "WebGL"
+          }
         },
         "enableChasmLineDistanceOverride": {
           "label": "Linhas da fenda sem limite",
@@ -1725,7 +1790,12 @@
         },
         "playTimeCounterPosition": {
           "label": "Posizione contatore tempo",
-          "description": "Slide between bottom-left, top-center, and bottom-right."
+          "description": "Slide between bottom-left, top-center, and bottom-right.",
+          "valueLabels": {
+            "0": "In basso a sinistra",
+            "1": "In alto al centro",
+            "2": "In basso a destra"
+          }
         },
         "resourceGlowColors": {
           "label": "Tavolozza bagliore risorse"
@@ -1748,7 +1818,11 @@
         },
         "chasmLineRendererMode": {
           "label": "Modo rendering linee fenditura",
-          "description": "Canvas 2D usa il disegno originale. WebGL usa una canvas GPU."
+          "description": "Canvas 2D usa il disegno originale. WebGL usa una canvas GPU.",
+          "valueLabels": {
+            "0": "Canvas 2D",
+            "1": "WebGL"
+          }
         },
         "enableChasmLineDistanceOverride": {
           "label": "Linee frattura senza distanza",
@@ -1820,7 +1894,12 @@
         },
         "playTimeCounterPosition": {
           "label": "Posición del contador de tiempo",
-          "description": "Slide between bottom-left, top-center, and bottom-right."
+          "description": "Slide between bottom-left, top-center, and bottom-right.",
+          "valueLabels": {
+            "0": "Abajo izquierda",
+            "1": "Arriba centro",
+            "2": "Abajo derecha"
+          }
         },
         "resourceGlowColors": {
           "label": "Paleta de brillo de recursos"
@@ -1843,7 +1922,11 @@
         },
         "chasmLineRendererMode": {
           "label": "Modo de lineas de grieta",
-          "description": "Canvas 2D usa el dibujo original. WebGL usa un lienzo con GPU."
+          "description": "Canvas 2D usa el dibujo original. WebGL usa un lienzo con GPU.",
+          "valueLabels": {
+            "0": "Canvas 2D",
+            "1": "WebGL"
+          }
         },
         "enableChasmLineDistanceOverride": {
           "label": "Lineas de grieta sin distancia",
@@ -1915,7 +1998,12 @@
         },
         "playTimeCounterPosition": {
           "label": "Position du compteur de temps",
-          "description": "Slide between bottom-left, top-center, and bottom-right."
+          "description": "Slide between bottom-left, top-center, and bottom-right.",
+          "valueLabels": {
+            "0": "En bas a gauche",
+            "1": "En haut au centre",
+            "2": "En bas a droite"
+          }
         },
         "resourceGlowColors": {
           "label": "Palette de halo des ressources"
@@ -1938,7 +2026,11 @@
         },
         "chasmLineRendererMode": {
           "label": "Mode de rendu des lignes de faille",
-          "description": "Canvas 2D utilise le dessin original. WebGL utilise un canvas GPU."
+          "description": "Canvas 2D utilise le dessin original. WebGL utilise un canvas GPU.",
+          "valueLabels": {
+            "0": "Canvas 2D",
+            "1": "WebGL"
+          }
         },
         "enableChasmLineDistanceOverride": {
           "label": "Lignes de faille sans distance",
@@ -2010,7 +2102,12 @@
         },
         "playTimeCounterPosition": {
           "label": "Positie speeltijdteller",
-          "description": "Slide between bottom-left, top-center, and bottom-right."
+          "description": "Slide between bottom-left, top-center, and bottom-right.",
+          "valueLabels": {
+            "0": "Linksonder",
+            "1": "Boven midden",
+            "2": "Rechtsonder"
+          }
         },
         "resourceGlowColors": {
           "label": "Gloedpalet van grondstoffen"
@@ -2033,7 +2130,11 @@
         },
         "chasmLineRendererMode": {
           "label": "Renderstand klooflijnen",
-          "description": "Canvas 2D gebruikt de originele tekening. WebGL gebruikt een GPU-canvas."
+          "description": "Canvas 2D gebruikt de originele tekening. WebGL gebruikt een GPU-canvas.",
+          "valueLabels": {
+            "0": "Canvas 2D",
+            "1": "WebGL"
+          }
         },
         "enableChasmLineDistanceOverride": {
           "label": "Klooflijnen negeren afstand",
@@ -2105,7 +2206,12 @@
         },
         "playTimeCounterPosition": {
           "label": "Poloha počítadla času",
-          "description": "Slide between bottom-left, top-center, and bottom-right."
+          "description": "Slide between bottom-left, top-center, and bottom-right.",
+          "valueLabels": {
+            "0": "Vlevo dole",
+            "1": "Nahore uprostred",
+            "2": "Vpravo dole"
+          }
         },
         "resourceGlowColors": {
           "label": "Paleta záře surovin"
@@ -2128,7 +2234,11 @@
         },
         "chasmLineRendererMode": {
           "label": "Rezim vykreslovani car prurvy",
-          "description": "Canvas 2D pouziva puvodni kresleni. WebGL pouziva GPU canvas."
+          "description": "Canvas 2D pouziva puvodni kresleni. WebGL pouziva GPU canvas.",
+          "valueLabels": {
+            "0": "Canvas 2D",
+            "1": "WebGL"
+          }
         },
         "enableChasmLineDistanceOverride": {
           "label": "Cary prurvy bez vzdalenosti",
@@ -2200,7 +2310,12 @@
         },
         "playTimeCounterPosition": {
           "label": "Pozycja licznika czasu",
-          "description": "Slide between bottom-left, top-center, and bottom-right."
+          "description": "Slide between bottom-left, top-center, and bottom-right.",
+          "valueLabels": {
+            "0": "Lewy dol",
+            "1": "Gora srodek",
+            "2": "Prawy dol"
+          }
         },
         "resourceGlowColors": {
           "label": "Paleta poświaty zasobów"
@@ -2223,7 +2338,11 @@
         },
         "chasmLineRendererMode": {
           "label": "Tryb renderowania linii szczeliny",
-          "description": "Canvas 2D uzywa oryginalnego rysowania. WebGL uzywa canvas GPU."
+          "description": "Canvas 2D uzywa oryginalnego rysowania. WebGL uzywa canvas GPU.",
+          "valueLabels": {
+            "0": "Canvas 2D",
+            "1": "WebGL"
+          }
         },
         "enableChasmLineDistanceOverride": {
           "label": "Linie szczeliny bez dystansu",
@@ -2295,7 +2414,12 @@
         },
         "playTimeCounterPosition": {
           "label": "プレイ時間カウンター位置",
-          "description": "Slide between bottom-left, top-center, and bottom-right."
+          "description": "Slide between bottom-left, top-center, and bottom-right.",
+          "valueLabels": {
+            "0": "左下",
+            "1": "上部中央",
+            "2": "右下"
+          }
         },
         "resourceGlowColors": {
           "label": "資源の光輪パレット"
@@ -2318,7 +2442,11 @@
         },
         "chasmLineRendererMode": {
           "label": "Chasm line render mode",
-          "description": "Canvas 2D uses original drawing. WebGL uses a GPU-backed canvas."
+          "description": "Canvas 2D uses original drawing. WebGL uses a GPU-backed canvas.",
+          "valueLabels": {
+            "0": "Canvas 2D",
+            "1": "WebGL"
+          }
         },
         "enableChasmLineDistanceOverride": {
           "label": "Chasm lines ignore distance",
@@ -2390,7 +2518,12 @@
         },
         "playTimeCounterPosition": {
           "label": "플레이 시간 카운터 위치",
-          "description": "Slide between bottom-left, top-center, and bottom-right."
+          "description": "Slide between bottom-left, top-center, and bottom-right.",
+          "valueLabels": {
+            "0": "왼쪽 아래",
+            "1": "상단 중앙",
+            "2": "오른쪽 아래"
+          }
         },
         "resourceGlowColors": {
           "label": "자원 발광 팔레트"
@@ -2413,7 +2546,11 @@
         },
         "chasmLineRendererMode": {
           "label": "Chasm line render mode",
-          "description": "Canvas 2D uses original drawing. WebGL uses a GPU-backed canvas."
+          "description": "Canvas 2D uses original drawing. WebGL uses a GPU-backed canvas.",
+          "valueLabels": {
+            "0": "Canvas 2D",
+            "1": "WebGL"
+          }
         },
         "enableChasmLineDistanceOverride": {
           "label": "Chasm lines ignore distance",
@@ -2485,7 +2622,12 @@
         },
         "playTimeCounterPosition": {
           "label": "遊戲時間計數器位置",
-          "description": "滑動選擇右下角、頂部置中或左下角。"
+          "description": "滑動選擇右下角、頂部置中或左下角。",
+          "valueLabels": {
+            "0": "左下角",
+            "1": "頂部置中",
+            "2": "右下角"
+          }
         },
         "resourceGlowColors": {
           "label": "資源光圈調色板"
@@ -2508,7 +2650,11 @@
         },
         "chasmLineRendererMode": {
           "label": "逆裂縫連線渲染模式",
-          "description": "Canvas 2D 使用原版繪製。WebGL 使用 GPU 畫布渲染同樣的逆裂縫到資源曲線。"
+          "description": "Canvas 2D 使用原版繪製。WebGL 使用 GPU 畫布渲染同樣的逆裂縫到資源曲線。",
+          "valueLabels": {
+            "0": "Canvas 2D",
+            "1": "WebGL"
+          }
         },
         "enableChasmLineDistanceOverride": {
           "label": "逆裂縫連線無視距離",
@@ -2580,7 +2726,12 @@
         },
         "playTimeCounterPosition": {
           "label": "ตำแหน่งตัวนับเวลาเล่น",
-          "description": "Slide between bottom-left, top-center, and bottom-right."
+          "description": "Slide between bottom-left, top-center, and bottom-right.",
+          "valueLabels": {
+            "0": "มุมซ้ายล่าง",
+            "1": "กึ่งกลางด้านบน",
+            "2": "มุมขวาล่าง"
+          }
         },
         "resourceGlowColors": {
           "label": "พาเลตแสงทรัพยากร"
@@ -2603,7 +2754,11 @@
         },
         "chasmLineRendererMode": {
           "label": "Chasm line render mode",
-          "description": "Canvas 2D uses original drawing. WebGL uses a GPU-backed canvas."
+          "description": "Canvas 2D uses original drawing. WebGL uses a GPU-backed canvas.",
+          "valueLabels": {
+            "0": "Canvas 2D",
+            "1": "WebGL"
+          }
         },
         "enableChasmLineDistanceOverride": {
           "label": "Chasm lines ignore distance",
@@ -2675,7 +2830,12 @@
         },
         "playTimeCounterPosition": {
           "label": "Játékidő-számláló helye",
-          "description": "Slide between bottom-left, top-center, and bottom-right."
+          "description": "Slide between bottom-left, top-center, and bottom-right.",
+          "valueLabels": {
+            "0": "Bal also",
+            "1": "Felul kozepen",
+            "2": "Jobb also"
+          }
         },
         "resourceGlowColors": {
           "label": "Erőforrás-fény paletta"
@@ -2698,7 +2858,11 @@
         },
         "chasmLineRendererMode": {
           "label": "Hasadekvonal renderelesi mod",
-          "description": "Canvas 2D az eredeti rajzolast hasznalja. WebGL GPU canvast hasznal."
+          "description": "Canvas 2D az eredeti rajzolast hasznalja. WebGL GPU canvast hasznal.",
+          "valueLabels": {
+            "0": "Canvas 2D",
+            "1": "WebGL"
+          }
         },
         "enableChasmLineDistanceOverride": {
           "label": "Hasadekvonalak tavolsag nelkul",
@@ -2770,7 +2934,12 @@
         },
         "playTimeCounterPosition": {
           "label": "Spēles laika skaitītāja vieta",
-          "description": "Slide between bottom-left, top-center, and bottom-right."
+          "description": "Slide between bottom-left, top-center, and bottom-right.",
+          "valueLabels": {
+            "0": "Apaksa pa kreisi",
+            "1": "Augsa centra",
+            "2": "Apaksa pa labi"
+          }
         },
         "resourceGlowColors": {
           "label": "Resursu spīduma palete"
@@ -2793,7 +2962,11 @@
         },
         "chasmLineRendererMode": {
           "label": "Plaisas liniju renderesanas rezims",
-          "description": "Canvas 2D izmanto originalo zimesanu. WebGL izmanto GPU canvas."
+          "description": "Canvas 2D izmanto originalo zimesanu. WebGL izmanto GPU canvas.",
+          "valueLabels": {
+            "0": "Canvas 2D",
+            "1": "WebGL"
+          }
         },
         "enableChasmLineDistanceOverride": {
           "label": "Plaisas linijas bez distances",
@@ -2865,7 +3038,12 @@
         },
         "playTimeCounterPosition": {
           "label": "Poziție contor timp",
-          "description": "Slide between bottom-left, top-center, and bottom-right."
+          "description": "Slide between bottom-left, top-center, and bottom-right.",
+          "valueLabels": {
+            "0": "Jos stanga",
+            "1": "Sus centru",
+            "2": "Jos dreapta"
+          }
         },
         "resourceGlowColors": {
           "label": "Paletă halou resurse"
@@ -2888,7 +3066,11 @@
         },
         "chasmLineRendererMode": {
           "label": "Mod randare linii fisura",
-          "description": "Canvas 2D foloseste desenarea originala. WebGL foloseste un canvas GPU."
+          "description": "Canvas 2D foloseste desenarea originala. WebGL foloseste un canvas GPU.",
+          "valueLabels": {
+            "0": "Canvas 2D",
+            "1": "WebGL"
+          }
         },
         "enableChasmLineDistanceOverride": {
           "label": "Linii fisura fara distanta",
@@ -2960,7 +3142,12 @@
         },
         "playTimeCounterPosition": {
           "label": "Plassering av spilletidteller",
-          "description": "Slide between bottom-left, top-center, and bottom-right."
+          "description": "Slide between bottom-left, top-center, and bottom-right.",
+          "valueLabels": {
+            "0": "Nederst til venstre",
+            "1": "Overst i midten",
+            "2": "Nederst til hoyre"
+          }
         },
         "resourceGlowColors": {
           "label": "Glødepalett for ressurser"
@@ -2983,7 +3170,11 @@
         },
         "chasmLineRendererMode": {
           "label": "Renderingsmodus for kloftlinjer",
-          "description": "Canvas 2D bruker original tegning. WebGL bruker et GPU-canvas."
+          "description": "Canvas 2D bruker original tegning. WebGL bruker et GPU-canvas.",
+          "valueLabels": {
+            "0": "Canvas 2D",
+            "1": "WebGL"
+          }
         },
         "enableChasmLineDistanceOverride": {
           "label": "Kloftlinjer uten avstand",

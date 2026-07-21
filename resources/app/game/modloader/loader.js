@@ -3450,6 +3450,15 @@
 			close: '\u5173\u95ed', hideToEdge: '\u9690\u85cf\u5230\u8fb9\u7f18', showFromEdge: '\u663e\u793a ModLoader \u83dc\u5355', menuSettings: 'Mod \u83dc\u5355\u8bbe\u7f6e', themeMode: '\u4eae\u8272 / \u6697\u8272\u6a21\u5f0f', darkMode: '\u6697\u8272', lightMode: '\u4eae\u8272', hideMode: '\u81ea\u52a8\u9690\u85cf\u6a21\u5f0f', autoHide: '\u81ea\u52a8\u9690\u85cf', manualHide: '\u624b\u52a8\u9690\u85cf', sortMod: '\u6392\u5e8f mod', sortConfigSection: '\u6392\u5e8f\u5b50\u529f\u80fd', configSectionSorting: '\u5b50\u529f\u80fd\u624b\u52a8\u6392\u5e8f', configSectionSortingOn: '\u5f00\u542f', configSectionSortingOff: '\u5173\u95ed', renderApi: '\u6e32\u67d3 API', renderApiOn: '\u5f00\u542f', renderApiOff: '\u5173\u95ed', renderApiLayerDemands: '\u5df2\u9700\u6c42\u56fe\u5c42', renderApiCreatedLayers: '\u5df2\u521b\u5efa\u56fe\u5c42', renderApiCallbacks: '\u56de\u8c03 \u6d3b\u8dc3/\u603b\u6570', renderApiLayerDemanders: '\u9700\u6c42\u5668 \u6d3b\u8dc3/\u603b\u6570', renderApiMethodRoutes: '\u5df2\u8def\u7531\u65b9\u6cd5', renderApiTiming: '\u8017\u65f6', autoHideDelay: '\u81ea\u52a8\u9690\u85cf\u79d2\u6570', secondsSuffix: '\u79d2', hideMenuDetails: '\u9690\u85cf\u83dc\u5355\u8be6\u60c5', hideModFileDetails: '\u9690\u85cf mod \u6587\u4ef6\u8be6\u60c5', show: '\u663e\u793a', hide: '\u9690\u85cf', installedMods: '\u5df2\u5b89\u88c5 mod', enabledEntries: '\u542f\u7528\u6761\u76ee', loadedMods: '\u5df2\u52a0\u8f7d mod', issues: '\u95ee\u9898', dataPatches: '\u6570\u636e\u8865\u4e01', wordPatches: '\u6587\u672c\u8865\u4e01', registeredLanguages: '\u5df2\u6ce8\u518c\u8bed\u8a00', orphanEntities: '\u5b64\u7acb\u5b9e\u4f53', modManager: 'Mod \u7ba1\u7406', selectAll: '\u5168\u9009', toggleNote: '\u5728\u4e0b\u65b9\u5f00\u5173 mod \u6216\u7f16\u8f91\u914d\u7f6e\u3002', changesRequireReload: '\u6539\u52a8\u9700\u8981 reload\u3002', configSaveNote: '\u914d\u7f6e\u5df2\u4fdd\u5b58\u5230 localStorage\uff1b\u90e8\u5206 mod \u9700\u8981 reload \u751f\u6548\u3002', saveReload: '\u4fdd\u5b58\u5e76 Reload', saveConfig: '\u4fdd\u5b58\u914d\u7f6e', insert: '\u5bfc\u5165', folder: '\u6587\u4ef6\u5939', deleteMod: '\u5220\u9664 mod', config: '\u914d\u7f6e', recentLog: '\u6700\u8fd1\u65e5\u5fd7', noLogEntries: '\u6682\u65e0\u65e5\u5fd7\u3002', noModsFound: '\u6ca1\u6709\u627e\u5230\u5e26 mod.json \u7684 mod\u3002', fileAccessUnavailable: '\u6587\u4ef6\u8bbf\u95ee\u4e0d\u53ef\u7528\u3002', fileAccessLoadedOnly: '\u6587\u4ef6\u8bbf\u95ee\u4e0d\u53ef\u7528\uff0c\u6240\u4ee5\u53ea\u80fd\u663e\u793a\u5df2\u52a0\u8f7d\u7684 mod\u3002', reloadHot: '\u652f\u6301\u70ed\u5f00\u5173\uff0c\u5f53\u524d\u4ecd\u5efa\u8bae reload', reloadRestart: '\u9700\u8981\u91cd\u542f', reloadRequired: '\u9700\u8981 reload', idPrefix: 'id\uff1a{value}', uniquePrefix: '\u552f\u4e00\u7801\uff1a{value}', depsPrefix: '\u4f9d\u8d56\uff1a{value}', conflictsPrefix: '\u51b2\u7a81\uff1a{value}', missingDependencies: '\u7f3a\u5c11\u4f9d\u8d56\uff1a{value}', conflictsEnabled: '\u5df2\u542f\u7528\u51b2\u7a81\uff1a{value}', savedReloading: '\u5df2\u4fdd\u5b58\uff0c\u6b63\u5728 reload...', saveFailed: '\u4fdd\u5b58\u5931\u8d25\uff1a{value}', configSaved: '\u914d\u7f6e\u5df2\u4fdd\u5b58\u3002', noChanges: '\u6ca1\u6709\u9700\u8981\u4fdd\u5b58\u7684\u6539\u52a8\u3002', changesCanceled: '\u5df2\u53d6\u6d88\u672a\u4fdd\u5b58\u7684\u6539\u52a8\u3002', openFolderFailed: '\u65e0\u6cd5\u6253\u5f00\u6587\u4ef6\u5939\uff1a{value}', deleteTitle: '\u5220\u9664 Mod\uff1f', deleteMessage: '\u4ece mods \u6587\u4ef6\u5939\u5220\u9664 {name}\uff1f\u8fd9\u4e2a\u64cd\u4f5c\u4e0d\u80fd\u64a4\u9500\u3002', deleteConfirm: '\u5220\u9664', cancel: '\u53d6\u6d88', replaceTitle: '\u66ff\u6362 Mod\uff1f', replaceMessage: 'mods \u91cc\u5df2\u7ecf\u6709 {name}\u3002\u662f\u5426\u7528\u5bfc\u5165\u7684 mod \u66ff\u6362\u5b83\uff1f', replaceConfirm: '\u66ff\u6362', deletedMod: '\u5df2\u5220\u9664 {name}\u3002\u5df2\u7ecf\u8fd0\u884c\u7684\u4ee3\u7801\u9700\u8981 reload \u624d\u4f1a\u5378\u8f7d\u3002', deleteFailed: '\u5220\u9664\u5931\u8d25\uff1a{value}', importHint: '\u628a\u6587\u4ef6\u62d6\u5230\u8fd9\u91cc\u6216\u590d\u5236', importDetail: '\u53ef\u4ee5\u628a mod zip \u5305\u76f4\u63a5\u62d6\u5165\uff0c\u6216\u8005\u590d\u5236 zip \u5305\u540e\u5728\u8fd9\u91cc\u6309\u7c98\u8d34\u5feb\u6377\u952e\uff0cModLoader \u4f1a\u81ea\u52a8\u89e3\u5305\u5230 mods \u6587\u4ef6\u5939\u3002', importWaiting: '\u7b49\u5f85 zip \u6587\u4ef6...', importNoZip: '\u8bf7\u62d6\u5165\u6216\u7c98\u8d34 .zip \u6587\u4ef6\u3002', importNoPath: '\u65e0\u6cd5\u8bfb\u53d6\u8be5\u6587\u4ef6\u8def\u5f84\u3002', importing: '\u6b63\u5728\u5bfc\u5165 {name}...', importedMod: '\u5df2\u5bfc\u5165 {name}\u3002\u9700\u8981\u65f6\u52fe\u9009\u5b83\u5e76\u4fdd\u5b58 reload\u3002', importFailed: '\u5bfc\u5165\u5931\u8d25\uff1a{value}', importModeOff: '\u8fd4\u56de mod \u5217\u8868', invalidZip: '\u53ea\u80fd\u5bfc\u5165 .zip mod \u5305\u3002', zipNoMod: '\u8fd9\u4e2a zip \u5185\u6ca1\u6709 mod.json\u3002', zipMultipleMods: '\u8fd9\u4e2a zip \u5305\u542b\u591a\u4e2a mod \u6587\u4ef6\u5939\uff1b\u8bf7\u4e00\u6b21\u5bfc\u5165\u4e00\u4e2a mod\u3002', zipExtractFailed: '\u65e0\u6cd5\u89e3\u538b zip\uff1a{value}', folderOpened: '\u5df2\u6253\u5f00 mods \u6587\u4ef6\u5939\u3002', replaceRenamedUniqueTitle: '\u53d1\u73b0\u540c\u552f\u4e00\u7801 Mod', replaceRenamedUniqueMessage: '\u65b0\u6587\u4ef6\u8ddf\u5df2\u6709\u6587\u4ef6\u6709\u76f8\u540c\u7684 mod \u552f\u4e00\u7801\uff0c\u5b83\u5f88\u53ef\u80fd\u662f\u65e7\u6587\u4ef6\u7684\u66f4\u65b0\u548c\u6539\u540d\u3002\n{oldName} \u2192 {newName}\n\u662f\u5426\u8986\u76d6\u65e7\u6587\u4ef6\uff1f', replaceRenamedPreviousTitle: '\u53d1\u73b0 Mod \u6539\u540d', replaceRenamedPreviousMessage: '\u8fd9\u4e2a\u65b0\u6587\u4ef6\u662f\u5df2\u6709\u6587\u4ef6\u7684\u6539\u540d\u3002\n{oldName} \u2192 {newName}\n\u662f\u5426\u8986\u76d6\u65e7\u6587\u4ef6\uff1f', replaceOld: '\u8986\u76d6', keepImported: '\u4e0d\u8986\u76d6\uff08\u52a0\u5165\u65b0\u6587\u4ef6\uff09', uniqueCodeEditTitle: '\u63a8\u8350\u4fee\u6539 mod \u552f\u4e00\u7801', uniqueCodeEditMessage: '\u8fd9\u4e24\u4e2a mod \u4f1a\u5171\u7528\u540c\u4e00\u4e2a mod \u552f\u4e00\u7801\u3002\u662f\u5426\u5728\u52a0\u5165\u65b0\u6587\u4ef6\u524d\u4fee\u6539\u5bfc\u5165 mod \u7684\u552f\u4e00\u7801\uff1f', uniqueCodeLabel: 'mod \u552f\u4e00\u7801', uniqueCodeConfirm: '\u786e\u8ba4\u4fee\u6539', uniqueCodeSkip: '\u5426\uff08\u4e0d\u4fee\u6539\uff09', manifestReadFailed: '\u65e0\u6cd5\u8bfb\u53d6 mod.json\uff1a{value}', translationFile: '\u7ffb\u8bd1', translationFileTitle: '\u6253\u5f00\u7ffb\u8bd1\u6587\u4ef6', translationFileSynced: '\u7ffb\u8bd1\u6587\u4ef6\u5df2\u540c\u6b65\uff1a{path}', translationFileFailed: '\u7ffb\u8bd1\u6587\u4ef6\u5931\u8d25\uff1a{value}'
 		}
 	}
+	Object.assign(PANEL_TEXT.en, {
+		translationImportWriteModsTitle: 'Write translations to mod.json?',
+		translationImportWriteModsMessage: 'The imported file will replace ModLoader translations.json either way. Do you also want to write matching mod translation fields into installed mod.json files? This overwrites existing matching translation fields.',
+		translationImportWriteModsConfirm: 'Write to mod',
+		translationImportSkipMods: 'Do not write',
+		translationImportWriteModsResult: 'Mod write-back: {written} written, {unchanged} already current, {failed} failed.',
+		translationImportNoMatchingMods: 'No installed mod.json matched the imported mod entries.',
+		translationImportModFailures: 'Failures: {failures}'
+	})
 	Object.assign(PANEL_TEXT.sch, {
 		translationExport: '\u5bfc\u51fa',
 		translationExportTitle: '\u5bfc\u51fa\u7ffb\u8bd1\u5907\u4efd',
@@ -3461,7 +3470,14 @@
 		translationExportOverwriteTitle: '\u8986\u76d6\u7ffb\u8bd1\u5907\u4efd\uff1f',
 		translationExportOverwriteMessage: '\u76ee\u6807\u6587\u4ef6\u5df2\u5b58\u5728\u3002\n\u7f16\u8f91\u65f6\u95f4\uff1a{editedAt}\n{path}\n\u662f\u5426\u8986\u76d6\uff1f',
 		translationOverwriteConfirm: '\u8986\u76d6',
-		translationDialogUnavailable: '\u6587\u4ef6\u9009\u62e9\u5668\u4e0d\u53ef\u7528\u3002'
+		translationDialogUnavailable: '\u6587\u4ef6\u9009\u62e9\u5668\u4e0d\u53ef\u7528\u3002',
+		translationImportWriteModsTitle: '\u5199\u5165 mod.json\uff1f',
+		translationImportWriteModsMessage: '\u65e0\u8bba\u5982\u4f55\uff0c\u5bfc\u5165\u6587\u4ef6\u90fd\u4f1a\u8986\u76d6 ModLoader \u7684 translations.json\u3002\u662f\u5426\u4e5f\u5c06\u5339\u914d\u7684 mod \u7ffb\u8bd1\u5b57\u6bb5\u5199\u5165\u5df2\u5b89\u88c5\u7684 mod.json\uff1f\u8fd9\u4f1a\u8986\u76d6\u5df2\u6709\u7684\u5339\u914d\u7ffb\u8bd1\u5b57\u6bb5\u3002',
+		translationImportWriteModsConfirm: '\u5199\u5165 mod',
+		translationImportSkipMods: '\u4e0d\u5199\u5165 mod',
+		translationImportWriteModsResult: 'mod \u5199\u56de\uff1a\u5df2\u5199\u5165 {written}\uff0c\u5df2\u662f\u6700\u65b0 {unchanged}\uff0c\u5931\u8d25 {failed}\u3002',
+		translationImportNoMatchingMods: '\u6ca1\u6709\u5df2\u5b89\u88c5\u7684 mod.json \u5339\u914d\u5bfc\u5165\u6587\u4ef6\u4e2d\u7684 mod \u6761\u76ee\u3002',
+		translationImportModFailures: '\u5931\u8d25\uff1a{failures}'
 	})
 	PANEL_TEXT.modsch = PANEL_TEXT.sch
 	PANEL_TEXT.tch = PANEL_TEXT.sch
@@ -4260,12 +4276,39 @@
 		return mods[modId] || mods[modPath] || null
 	}
 
-	const applyTranslationCatalogToManifest = function (manifest, modId, modPath) {
-		const catalog = state.translationCatalog
+	const catalogModPatchHasWritableFields = function (patch) {
+		if (!isLocaleObject(patch)) return false
+		if (typeof patch.name === 'string') return true
+		if (typeof patch.description === 'string') return true
+		if (isLocaleObject(patch.config)) {
+			for (const configKey in patch.config) {
+				const source = patch.config[configKey]
+				if (!isLocaleObject(source)) continue
+				if (typeof source.label === 'string') return true
+				if (typeof source.description === 'string') return true
+				if (Array.isArray(source.valueLabels) || isLocaleObject(source.valueLabels)) return true
+			}
+		}
+		return false
+	}
+
+	const catalogHasModEntry = function (catalog, modKey) {
+		const key = String(modKey || '')
+		if (!key || !catalog || !isLocaleObject(catalog.languages)) return false
+		for (const language in catalog.languages) {
+			const mods = catalog.languages[language]?.mods
+			if (isLocaleObject(mods) && Object.prototype.hasOwnProperty.call(mods, key)) return true
+		}
+		return false
+	}
+
+	const applyTranslationCatalogValueToManifest = function (catalog, manifest, modId, modPath) {
+		let matched = false
 		if (!catalog || !isLocaleObject(catalog.languages) || !isLocaleObject(manifest)) return manifest
 		for (const language in catalog.languages) {
 			const patch = getCatalogModPatch(catalog.languages[language], modId || manifest.id, modPath)
-			if (!isLocaleObject(patch)) continue
+			if (!catalogModPatchHasWritableFields(patch)) continue
+			matched = true
 			if (!isLocaleObject(manifest.translations)) manifest.translations = {}
 			if (!isLocaleObject(manifest.translations[language])) manifest.translations[language] = {}
 			const target = manifest.translations[language]
@@ -4283,7 +4326,96 @@
 				}
 			}
 		}
+		manifest.__modloaderTranslationCatalogMatched = matched
 		return manifest
+	}
+
+	const applyTranslationCatalogToManifest = function (manifest, modId, modPath) {
+		const catalog = state.translationCatalog
+		const patched = applyTranslationCatalogValueToManifest(catalog, manifest, modId, modPath)
+		if (patched && typeof patched === 'object') delete patched.__modloaderTranslationCatalogMatched
+		return patched
+	}
+
+	const writeTranslationCatalogToModManifests = function (catalog) {
+		const tools = getModFileTools()
+		if (!tools) throw new Error(t('fileAccessUnavailable'))
+		const result = { matched: 0, written: 0, unchanged: 0, failed: 0, failures: [] }
+		if (!catalog || !isLocaleObject(catalog.languages)) return result
+		let entries = []
+		try {
+			entries = tools.fs.readdirSync(tools.modsDir, { withFileTypes: true })
+				.filter(function (entry) { return entry.isDirectory() })
+				.map(function (entry) { return entry.name })
+				.sort(function (a, b) { return a.localeCompare(b) })
+		} catch (error) {
+			result.failed++
+			result.failures.push('mods: ' + error.message)
+			return result
+		}
+		for (const name of entries) {
+			const manifestPath = tools.path.join(tools.modsDir, name, 'mod.json')
+			if (!tools.fs.existsSync(manifestPath)) continue
+			try {
+				let manifest = null
+				try {
+					manifest = JSON.parse(tools.fs.readFileSync(manifestPath, 'utf8'))
+				} catch (error) {
+					if (catalogHasModEntry(catalog, name)) throw error
+					continue
+				}
+				const modId = manifest.id || name
+				const next = applyTranslationCatalogValueToManifest(catalog, clone(manifest), modId, name)
+				const matched = !!next.__modloaderTranslationCatalogMatched
+				delete next.__modloaderTranslationCatalogMatched
+				if (!matched) continue
+				result.matched++
+				if (JSON.stringify(manifest) === JSON.stringify(next)) {
+					result.unchanged++
+					continue
+				}
+				tools.fs.writeFileSync(manifestPath, JSON.stringify(next, null, 2) + '\n', 'utf8')
+				result.written++
+			} catch (error) {
+				result.failed++
+				result.failures.push(name + ': ' + error.message)
+			}
+		}
+		return result
+	}
+
+	const confirmTranslationImportModWrite = function (panel) {
+		return showPanelChoice(panel, {
+			title: t('translationImportWriteModsTitle'),
+			message: t('translationImportWriteModsMessage'),
+			choices: [
+				{ value: true, text: t('translationImportWriteModsConfirm'), primary: true, danger: true },
+				{ value: false, text: t('translationImportSkipMods'), focus: true }
+			]
+		})
+	}
+
+	const summarizeTranslationImportModFailures = function (failures) {
+		const list = Array.isArray(failures) ? failures : []
+		const shown = list.slice(0, 3).join('; ')
+		const remaining = list.length - 3
+		return remaining > 0 ? shown + '; +' + remaining : shown
+	}
+
+	const formatTranslationImportResultMessage = function (result) {
+		if (!result) return ''
+		let message = t('translationImported', { source: result.source, path: result.path })
+		const write = result.modWrite
+		if (write) {
+			message += '\n' + t('translationImportWriteModsResult', {
+				written: write.written || 0,
+				unchanged: write.unchanged || 0,
+				failed: write.failed || 0
+			})
+			if ((write.matched || 0) === 0 && (write.failed || 0) === 0) message += '\n' + t('translationImportNoMatchingMods')
+			if (write.failures?.length) message += '\n' + t('translationImportModFailures', { failures: summarizeTranslationImportModFailures(write.failures) })
+		}
+		return message
 	}
 
 	const applyTranslationCatalogToLoadedMods = function () {
@@ -4478,7 +4610,7 @@
 		return { path: targetPath }
 	}
 
-	const importTranslationCatalogFile = async function () {
+	const importTranslationCatalogFile = async function (panel) {
 		const tools = getModFileTools()
 		if (!tools) throw new Error(t('fileAccessUnavailable'))
 		const result = await showTranslationOpenDialog({
@@ -4493,15 +4625,17 @@
 		if (result?.canceled || !sourcePath) return null
 		const source = JSON.parse(tools.fs.readFileSync(sourcePath, 'utf8'))
 		const catalog = normalizeImportedTranslationCatalog(source, tools.path.basename(sourcePath))
+		const writeMods = panel ? await confirmTranslationImportModWrite(panel) : false
 		const catalogPath = getTranslationCatalogPath()
 		tools.fs.mkdirSync(tools.path.dirname(catalogPath), { recursive: true })
 		tools.fs.writeFileSync(catalogPath, stringifyTranslationCatalog(catalog), 'utf8')
+		const modWrite = writeMods ? writeTranslationCatalogToModManifests(catalog) : null
 		state.translationCatalog = catalog
 		try { state.translationCatalogMtimeMs = tools.fs.statSync(catalogPath).mtimeMs } catch (error) { state.translationCatalogMtimeMs = -1 }
 		state.translationCatalogReadFailed = false
 		applyTranslationCatalogToLoadedMods()
 		ensureTranslationCatalogWatcher()
-		return { path: catalogPath, source: sourcePath }
+		return { path: catalogPath, source: sourcePath, modWrite }
 	}
 
 	const getEnabledPathSet = function () {
@@ -6787,8 +6921,8 @@
 				label: t('translationImport'),
 				title: t('translationImportTitle'),
 				async action() {
-					const result = await importTranslationCatalogFile()
-					return result ? { message: t('translationImported', { source: result.source, path: result.path }) } : null
+					const result = await importTranslationCatalogFile(panel)
+					return result ? { message: formatTranslationImportResultMessage(result) } : null
 				}
 			}
 		])
