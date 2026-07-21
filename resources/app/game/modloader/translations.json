@@ -1,5 +1,12 @@
 {
   "version": 1,
+  "_meta": {
+    "kind": "sixty-four.modloader.translations",
+    "formatVersion": 1,
+    "generator": "Sixty Four ModLoader",
+    "editedAt": "2026-07-21T17:49:22.690Z",
+    "lastAction": "sync"
+  },
   "description": "Edit this file to override ModLoader menu text and mod manifest/config translations. The structure is language -> modloader/mods -> text.",
   "languages": {
     "en": {
@@ -98,7 +105,18 @@
         "translationFile": "translations",
         "translationFileTitle": "Open translation file",
         "translationFileSynced": "Translation file synced: {path}",
-        "translationFileFailed": "Translation file failed: {value}"
+        "translationFileFailed": "Translation file failed: {value}",
+        "translationExport": "Export",
+        "translationExportTitle": "Export translations backup",
+        "translationExported": "Translation backup exported: {path}",
+        "translationImport": "Import",
+        "translationImportTitle": "Import translations file",
+        "translationImported": "Imported translations from {source} and saved to {path}",
+        "translationImportInvalid": "Selected file is not a ModLoader translations file.",
+        "translationExportOverwriteTitle": "Overwrite translation backup?",
+        "translationExportOverwriteMessage": "Target file already exists.\nEdit time: {editedAt}\n{path}\nOverwrite it?",
+        "translationOverwriteConfirm": "Overwrite",
+        "translationDialogUnavailable": "File dialog is unavailable."
       },
       "mods": {
         "Cattail_Tweaks_简体中文优化": {
@@ -402,7 +420,18 @@
         "translationFile": "翻译",
         "translationFileTitle": "打开翻译文件",
         "translationFileSynced": "翻译文件已同步：{path}",
-        "translationFileFailed": "翻译文件失败：{value}"
+        "translationFileFailed": "翻译文件失败：{value}",
+        "translationExport": "导出",
+        "translationExportTitle": "导出翻译备份",
+        "translationExported": "翻译备份已导出：{path}",
+        "translationImport": "导入",
+        "translationImportTitle": "导入翻译文件",
+        "translationImported": "已从 {source} 导入翻译，并保存到 {path}",
+        "translationImportInvalid": "选择的文件不是 ModLoader 翻译文件。",
+        "translationExportOverwriteTitle": "覆盖翻译备份？",
+        "translationExportOverwriteMessage": "目标文件已存在。\n编辑时间：{editedAt}\n{path}\n是否覆盖？",
+        "translationOverwriteConfirm": "覆盖",
+        "translationDialogUnavailable": "文件选择器不可用。"
       },
       "mods": {
         "Cattail_Tweaks_简体中文优化": {
@@ -702,7 +731,18 @@
         "translationFile": "翻译",
         "translationFileTitle": "打开翻译文件",
         "translationFileSynced": "翻译文件已同步：{path}",
-        "translationFileFailed": "翻译文件失败：{value}"
+        "translationFileFailed": "翻译文件失败：{value}",
+        "translationExport": "导出",
+        "translationExportTitle": "导出翻译备份",
+        "translationExported": "翻译备份已导出：{path}",
+        "translationImport": "导入",
+        "translationImportTitle": "导入翻译文件",
+        "translationImported": "已从 {source} 导入翻译，并保存到 {path}",
+        "translationImportInvalid": "选择的文件不是 ModLoader 翻译文件。",
+        "translationExportOverwriteTitle": "覆盖翻译备份？",
+        "translationExportOverwriteMessage": "目标文件已存在。\n编辑时间：{editedAt}\n{path}\n是否覆盖？",
+        "translationOverwriteConfirm": "覆盖",
+        "translationDialogUnavailable": "文件选择器不可用。"
       },
       "mods": {
         "Cattail_Tweaks_简体中文优化": {
@@ -1002,7 +1042,18 @@
         "translationFile": "翻译",
         "translationFileTitle": "打开翻译文件",
         "translationFileSynced": "翻译文件已同步：{path}",
-        "translationFileFailed": "翻译文件失败：{value}"
+        "translationFileFailed": "翻译文件失败：{value}",
+        "translationExport": "匯出",
+        "translationExportTitle": "匯出翻譯備份",
+        "translationExported": "翻譯備份已匯出：{path}",
+        "translationImport": "匯入",
+        "translationImportTitle": "匯入翻譯檔案",
+        "translationImported": "已從 {source} 匯入翻譯，並儲存到 {path}",
+        "translationImportInvalid": "選擇的檔案不是 ModLoader 翻譯檔案。",
+        "translationExportOverwriteTitle": "覆蓋翻譯備份？",
+        "translationExportOverwriteMessage": "目標檔案已存在。\n編輯時間：{editedAt}\n{path}\n是否覆蓋？",
+        "translationOverwriteConfirm": "覆蓋",
+        "translationDialogUnavailable": "檔案選擇器不可用。"
       },
       "mods": {
         "Cattail_Tweaks_简体中文优化": {
@@ -1180,7 +1231,19 @@
       }
     },
     "ru": {
-      "modloader": {},
+      "modloader": {
+        "translationExport": "Export",
+        "translationExportTitle": "Export translations backup",
+        "translationExported": "Translation backup exported: {path}",
+        "translationImport": "Import",
+        "translationImportTitle": "Import translations file",
+        "translationImported": "Imported translations from {source} and saved to {path}",
+        "translationImportInvalid": "Selected file is not a ModLoader translations file.",
+        "translationExportOverwriteTitle": "Overwrite translation backup?",
+        "translationExportOverwriteMessage": "Target file already exists.\nEdit time: {editedAt}\n{path}\nOverwrite it?",
+        "translationOverwriteConfirm": "Overwrite",
+        "translationDialogUnavailable": "File dialog is unavailable."
+      },
       "mods": {
         "Cattail_Tweaks_简体中文优化": {
           "name": "Оптимизация упрощенного китайского"
@@ -1357,7 +1420,19 @@
       }
     },
     "de": {
-      "modloader": {},
+      "modloader": {
+        "translationExport": "Exportieren",
+        "translationExportTitle": "Uebersetzungsbackup exportieren",
+        "translationExported": "Uebersetzungsbackup exportiert: {path}",
+        "translationImport": "Importieren",
+        "translationImportTitle": "Uebersetzungsdatei importieren",
+        "translationImported": "Uebersetzungen aus {source} importiert und in {path} gespeichert",
+        "translationImportInvalid": "Die ausgewaehlte Datei ist keine ModLoader-Uebersetzungsdatei.",
+        "translationExportOverwriteTitle": "Uebersetzungsbackup ueberschreiben?",
+        "translationExportOverwriteMessage": "Die Zieldatei existiert bereits.\nBearbeitungszeit: {editedAt}\n{path}\nUeberschreiben?",
+        "translationOverwriteConfirm": "Ueberschreiben",
+        "translationDialogUnavailable": "Dateiauswahl ist nicht verfuegbar."
+      },
       "mods": {
         "Cattail_Tweaks_简体中文优化": {
           "name": "Optimiertes vereinfachtes Chinesisch"
@@ -1534,7 +1609,19 @@
       }
     },
     "ptbr": {
-      "modloader": {},
+      "modloader": {
+        "translationExport": "Exportar",
+        "translationExportTitle": "Exportar backup das traducoes",
+        "translationExported": "Backup das traducoes exportado: {path}",
+        "translationImport": "Importar",
+        "translationImportTitle": "Importar arquivo de traducoes",
+        "translationImported": "Traducoes importadas de {source} e salvas em {path}",
+        "translationImportInvalid": "O arquivo selecionado nao e um arquivo de traducoes do ModLoader.",
+        "translationExportOverwriteTitle": "Sobrescrever backup das traducoes?",
+        "translationExportOverwriteMessage": "O arquivo de destino ja existe.\nHorario de edicao: {editedAt}\n{path}\nSobrescrever?",
+        "translationOverwriteConfirm": "Sobrescrever",
+        "translationDialogUnavailable": "O seletor de arquivos nao esta disponivel."
+      },
       "mods": {
         "Cattail_Tweaks_简体中文优化": {
           "name": "Otimização de chinês simplificado"
@@ -1711,7 +1798,19 @@
       }
     },
     "it": {
-      "modloader": {},
+      "modloader": {
+        "translationExport": "Esporta",
+        "translationExportTitle": "Esporta backup traduzioni",
+        "translationExported": "Backup traduzioni esportato: {path}",
+        "translationImport": "Importa",
+        "translationImportTitle": "Importa file traduzioni",
+        "translationImported": "Traduzioni importate da {source} e salvate in {path}",
+        "translationImportInvalid": "Il file selezionato non e un file di traduzioni ModLoader.",
+        "translationExportOverwriteTitle": "Sovrascrivere il backup traduzioni?",
+        "translationExportOverwriteMessage": "Il file di destinazione esiste gia.\nOra di modifica: {editedAt}\n{path}\nSovrascrivere?",
+        "translationOverwriteConfirm": "Sovrascrivi",
+        "translationDialogUnavailable": "Selettore file non disponibile."
+      },
       "mods": {
         "Cattail_Tweaks_简体中文优化": {
           "name": "Ottimizzazione cinese semplificato"
@@ -1888,7 +1987,19 @@
       }
     },
     "es": {
-      "modloader": {},
+      "modloader": {
+        "translationExport": "Exportar",
+        "translationExportTitle": "Exportar copia de traducciones",
+        "translationExported": "Copia de traducciones exportada: {path}",
+        "translationImport": "Importar",
+        "translationImportTitle": "Importar archivo de traducciones",
+        "translationImported": "Traducciones importadas desde {source} y guardadas en {path}",
+        "translationImportInvalid": "El archivo seleccionado no es un archivo de traducciones de ModLoader.",
+        "translationExportOverwriteTitle": "Sobrescribir copia de traducciones?",
+        "translationExportOverwriteMessage": "El archivo de destino ya existe.\nHora de edicion: {editedAt}\n{path}\nSobrescribir?",
+        "translationOverwriteConfirm": "Sobrescribir",
+        "translationDialogUnavailable": "El selector de archivos no esta disponible."
+      },
       "mods": {
         "Cattail_Tweaks_简体中文优化": {
           "name": "Optimización de chino simplificado"
@@ -2065,7 +2176,19 @@
       }
     },
     "fr": {
-      "modloader": {},
+      "modloader": {
+        "translationExport": "Exporter",
+        "translationExportTitle": "Exporter une sauvegarde des traductions",
+        "translationExported": "Sauvegarde des traductions exportee : {path}",
+        "translationImport": "Importer",
+        "translationImportTitle": "Importer un fichier de traductions",
+        "translationImported": "Traductions importees depuis {source} et enregistrees dans {path}",
+        "translationImportInvalid": "Le fichier selectionne n est pas un fichier de traductions ModLoader.",
+        "translationExportOverwriteTitle": "Ecraser la sauvegarde des traductions ?",
+        "translationExportOverwriteMessage": "Le fichier cible existe deja.\nHeure de modification : {editedAt}\n{path}\nL ecraser ?",
+        "translationOverwriteConfirm": "Ecraser",
+        "translationDialogUnavailable": "Le selecteur de fichiers est indisponible."
+      },
       "mods": {
         "Cattail_Tweaks_简体中文优化": {
           "name": "Optimisation chinois simplifié"
@@ -2242,7 +2365,19 @@
       }
     },
     "nl": {
-      "modloader": {},
+      "modloader": {
+        "translationExport": "Exporteren",
+        "translationExportTitle": "Vertalingsbackup exporteren",
+        "translationExported": "Vertalingsbackup geexporteerd: {path}",
+        "translationImport": "Importeren",
+        "translationImportTitle": "Vertalingsbestand importeren",
+        "translationImported": "Vertalingen geimporteerd uit {source} en opgeslagen in {path}",
+        "translationImportInvalid": "Het geselecteerde bestand is geen ModLoader-vertalingsbestand.",
+        "translationExportOverwriteTitle": "Vertalingsbackup overschrijven?",
+        "translationExportOverwriteMessage": "Het doelbestand bestaat al.\nBewerkingstijd: {editedAt}\n{path}\nOverschrijven?",
+        "translationOverwriteConfirm": "Overschrijven",
+        "translationDialogUnavailable": "Bestandskiezer is niet beschikbaar."
+      },
       "mods": {
         "Cattail_Tweaks_简体中文优化": {
           "name": "Vereenvoudigd Chinees verbeteren"
@@ -2419,7 +2554,19 @@
       }
     },
     "cz": {
-      "modloader": {},
+      "modloader": {
+        "translationExport": "Exportovat",
+        "translationExportTitle": "Exportovat zalohu prekladu",
+        "translationExported": "Zaloha prekladu exportovana: {path}",
+        "translationImport": "Importovat",
+        "translationImportTitle": "Importovat soubor prekladu",
+        "translationImported": "Preklady importovany z {source} a ulozeny do {path}",
+        "translationImportInvalid": "Vybrany soubor neni soubor prekladu ModLoaderu.",
+        "translationExportOverwriteTitle": "Prepsat zalohu prekladu?",
+        "translationExportOverwriteMessage": "Cilovy soubor jiz existuje.\nCas uprav: {editedAt}\n{path}\nPrepsat?",
+        "translationOverwriteConfirm": "Prepsat",
+        "translationDialogUnavailable": "Dialog vyberu souboru neni dostupny."
+      },
       "mods": {
         "Cattail_Tweaks_简体中文优化": {
           "name": "Optimalizace zjednodušené čínštiny"
@@ -2596,7 +2743,19 @@
       }
     },
     "pl": {
-      "modloader": {},
+      "modloader": {
+        "translationExport": "Eksportuj",
+        "translationExportTitle": "Eksportuj kopie tlumaczen",
+        "translationExported": "Kopia tlumaczen wyeksportowana: {path}",
+        "translationImport": "Importuj",
+        "translationImportTitle": "Importuj plik tlumaczen",
+        "translationImported": "Tlumaczenia zaimportowane z {source} i zapisane w {path}",
+        "translationImportInvalid": "Wybrany plik nie jest plikiem tlumaczen ModLoadera.",
+        "translationExportOverwriteTitle": "Nadpisac kopie tlumaczen?",
+        "translationExportOverwriteMessage": "Plik docelowy juz istnieje.\nCzas edycji: {editedAt}\n{path}\nNadpisac?",
+        "translationOverwriteConfirm": "Nadpisz",
+        "translationDialogUnavailable": "Okno wyboru pliku jest niedostepne."
+      },
       "mods": {
         "Cattail_Tweaks_简体中文优化": {
           "name": "Optymalizacja chińskiego uproszczonego"
@@ -2773,7 +2932,19 @@
       }
     },
     "jp": {
-      "modloader": {},
+      "modloader": {
+        "translationExport": "Export",
+        "translationExportTitle": "Export translations backup",
+        "translationExported": "Translation backup exported: {path}",
+        "translationImport": "Import",
+        "translationImportTitle": "Import translations file",
+        "translationImported": "Imported translations from {source} and saved to {path}",
+        "translationImportInvalid": "Selected file is not a ModLoader translations file.",
+        "translationExportOverwriteTitle": "Overwrite translation backup?",
+        "translationExportOverwriteMessage": "Target file already exists.\nEdit time: {editedAt}\n{path}\nOverwrite it?",
+        "translationOverwriteConfirm": "Overwrite",
+        "translationDialogUnavailable": "File dialog is unavailable."
+      },
       "mods": {
         "Cattail_Tweaks_简体中文优化": {
           "name": "簡体字中国語最適化"
@@ -2950,7 +3121,19 @@
       }
     },
     "kr": {
-      "modloader": {},
+      "modloader": {
+        "translationExport": "Export",
+        "translationExportTitle": "Export translations backup",
+        "translationExported": "Translation backup exported: {path}",
+        "translationImport": "Import",
+        "translationImportTitle": "Import translations file",
+        "translationImported": "Imported translations from {source} and saved to {path}",
+        "translationImportInvalid": "Selected file is not a ModLoader translations file.",
+        "translationExportOverwriteTitle": "Overwrite translation backup?",
+        "translationExportOverwriteMessage": "Target file already exists.\nEdit time: {editedAt}\n{path}\nOverwrite it?",
+        "translationOverwriteConfirm": "Overwrite",
+        "translationDialogUnavailable": "File dialog is unavailable."
+      },
       "mods": {
         "Cattail_Tweaks_简体中文优化": {
           "name": "간체 중국어 최적화"
@@ -3127,7 +3310,19 @@
       }
     },
     "thai": {
-      "modloader": {},
+      "modloader": {
+        "translationExport": "Export",
+        "translationExportTitle": "Export translations backup",
+        "translationExported": "Translation backup exported: {path}",
+        "translationImport": "Import",
+        "translationImportTitle": "Import translations file",
+        "translationImported": "Imported translations from {source} and saved to {path}",
+        "translationImportInvalid": "Selected file is not a ModLoader translations file.",
+        "translationExportOverwriteTitle": "Overwrite translation backup?",
+        "translationExportOverwriteMessage": "Target file already exists.\nEdit time: {editedAt}\n{path}\nOverwrite it?",
+        "translationOverwriteConfirm": "Overwrite",
+        "translationDialogUnavailable": "File dialog is unavailable."
+      },
       "mods": {
         "Cattail_Tweaks_简体中文优化": {
           "name": "ปรับปรุงภาษาจีนตัวย่อ"
@@ -3304,7 +3499,19 @@
       }
     },
     "hu": {
-      "modloader": {},
+      "modloader": {
+        "translationExport": "Exportalas",
+        "translationExportTitle": "Forditasi mentes exportalasa",
+        "translationExported": "Forditasi mentes exportalva: {path}",
+        "translationImport": "Importalas",
+        "translationImportTitle": "Forditasi fajl importalasa",
+        "translationImported": "Forditasok importalva innen: {source}, mentve ide: {path}",
+        "translationImportInvalid": "A kivalasztott fajl nem ModLoader forditasi fajl.",
+        "translationExportOverwriteTitle": "Felulirod a forditasi mentest?",
+        "translationExportOverwriteMessage": "A celfajl mar letezik.\nSzerkesztesi ido: {editedAt}\n{path}\nFelulirod?",
+        "translationOverwriteConfirm": "Feluliras",
+        "translationDialogUnavailable": "A fajlvalaszto nem erheto el."
+      },
       "mods": {
         "Cattail_Tweaks_简体中文优化": {
           "name": "Egyszerűsített kínai optimalizálás"
@@ -3481,7 +3688,19 @@
       }
     },
     "lv": {
-      "modloader": {},
+      "modloader": {
+        "translationExport": "Export",
+        "translationExportTitle": "Export translations backup",
+        "translationExported": "Translation backup exported: {path}",
+        "translationImport": "Import",
+        "translationImportTitle": "Import translations file",
+        "translationImported": "Imported translations from {source} and saved to {path}",
+        "translationImportInvalid": "Selected file is not a ModLoader translations file.",
+        "translationExportOverwriteTitle": "Overwrite translation backup?",
+        "translationExportOverwriteMessage": "Target file already exists.\nEdit time: {editedAt}\n{path}\nOverwrite it?",
+        "translationOverwriteConfirm": "Overwrite",
+        "translationDialogUnavailable": "File dialog is unavailable."
+      },
       "mods": {
         "Cattail_Tweaks_简体中文优化": {
           "name": "Vienkāršotās ķīniešu valodas uzlabojums"
@@ -3658,7 +3877,19 @@
       }
     },
     "ro": {
-      "modloader": {},
+      "modloader": {
+        "translationExport": "Exporta",
+        "translationExportTitle": "Exporta copia traducerilor",
+        "translationExported": "Copia traducerilor a fost exportata: {path}",
+        "translationImport": "Importa",
+        "translationImportTitle": "Importa fisierul de traduceri",
+        "translationImported": "Traduceri importate din {source} si salvate in {path}",
+        "translationImportInvalid": "Fisierul selectat nu este un fisier de traduceri ModLoader.",
+        "translationExportOverwriteTitle": "Suprascrii copia traducerilor?",
+        "translationExportOverwriteMessage": "Fisierul tinta exista deja.\nOra editarii: {editedAt}\n{path}\nSuprascrii?",
+        "translationOverwriteConfirm": "Suprascrie",
+        "translationDialogUnavailable": "Selectorul de fisiere nu este disponibil."
+      },
       "mods": {
         "Cattail_Tweaks_简体中文优化": {
           "name": "Optimizare chineză simplificată"
@@ -3835,7 +4066,19 @@
       }
     },
     "no": {
-      "modloader": {},
+      "modloader": {
+        "translationExport": "Eksporter",
+        "translationExportTitle": "Eksporter oversettelseskopi",
+        "translationExported": "Oversettelseskopi eksportert: {path}",
+        "translationImport": "Importer",
+        "translationImportTitle": "Importer oversettelsesfil",
+        "translationImported": "Oversettelser importert fra {source} og lagret i {path}",
+        "translationImportInvalid": "Den valgte filen er ikke en ModLoader-oversettelsesfil.",
+        "translationExportOverwriteTitle": "Overskrive oversettelseskopi?",
+        "translationExportOverwriteMessage": "Malfilen finnes allerede.\nRedigeringstid: {editedAt}\n{path}\nOverskrive?",
+        "translationOverwriteConfirm": "Overskriv",
+        "translationDialogUnavailable": "Filvelgeren er ikke tilgjengelig."
+      },
       "mods": {
         "Cattail_Tweaks_简体中文优化": {
           "name": "Optimalisering av forenklet kinesisk"

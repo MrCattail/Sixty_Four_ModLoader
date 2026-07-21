@@ -48,6 +48,19 @@ $results += [ordered]@{
     ok = $languageChangeHookOk
 }
 
+$renderApiContractTestPath = Join-Path $PSScriptRoot 'render-api-v1-contract.test.js'
+$renderApiContractOk = $false
+if (Test-Path -LiteralPath $renderApiContractTestPath) {
+	& node $renderApiContractTestPath
+	$renderApiContractOk = $LASTEXITCODE -eq 0
+}
+$results += [ordered]@{
+	description = 'Render API v1 runtime contract'
+	file = 'modloader\tools\render-api-v1-contract.test.js'
+	pattern = 'version, capabilities, ownership, conflicts, scope restore, master switch'
+	ok = $renderApiContractOk
+}
+
 $warnings = @()
 $enabledNames = @()
 $enabledPath = Join-Path $GameRoot 'mods\enabled.json'

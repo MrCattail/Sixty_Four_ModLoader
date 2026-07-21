@@ -347,13 +347,12 @@ ModLoader.register({
 			style.id = 'cattail-resource-glow-sharing-style'
 			style.textContent = `
 				#modloader-panel .cattail-resource-glow-share-tools { display: flex; align-items: center; gap: 7px; min-width: 0; margin-bottom: 2px; }
-				#modloader-panel .cattail-resource-glow-share-button { border: 1px solid rgba(255,255,255,.14); border-radius: 5px; padding: 5px 7px; background: rgba(255,255,255,.08); color: rgba(255,255,255,.78); cursor: pointer; }
-				#modloader-panel .cattail-resource-glow-share-button:hover { background: rgba(255,255,255,.14); color: rgba(255,255,255,.94); }
+				#modloader-panel .cattail-resource-glow-share-button { border: 1px solid var(--modloader-control-border); border-radius: 5px; padding: 5px 7px; background: var(--modloader-control-bg); color: var(--modloader-control-text); cursor: pointer; }
+				#modloader-panel .cattail-resource-glow-share-button:hover:not(:disabled) { background: var(--modloader-control-bg-hover); border-color: var(--modloader-control-border-hover); color: var(--modloader-control-text-hover); }
 				#modloader-panel .cattail-resource-glow-share-button:disabled { cursor: default; opacity: .45; }
-				#modloader-panel .cattail-resource-glow-share-status { min-width: 0; color: rgba(255,255,255,.5); font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-				#modloader-panel .cattail-resource-glow-share-status[data-tone="ok"] { color: #cfe9ff; }
-				#modloader-panel .cattail-resource-glow-share-status[data-tone="error"] { color: #ffb0b0; }
-				#modloader-panel.modloader-panel-theme-light .cattail-resource-glow-share-button { background: rgba(0,0,0,.055); border-color: rgba(0,0,0,.12); color: rgba(18,20,22,.78); }
+				#modloader-panel .cattail-resource-glow-share-status { min-width: 0; color: var(--modloader-text-subtle); font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+				#modloader-panel .cattail-resource-glow-share-status[data-tone="ok"] { color: var(--modloader-ok-text); }
+				#modloader-panel .cattail-resource-glow-share-status[data-tone="error"] { color: var(--modloader-error-text); }
 			`
 			document.head.appendChild(style)
 		}

@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, screen } = require('electron')
+const { app, BrowserWindow, ipcMain, screen, dialog } = require('electron')
 const fs = require('fs')
 const path = require('path')
 const { spawn } = require('child_process')
@@ -377,6 +377,31 @@ function closeModloaderWindow(id){
   try { if (record.window && !record.window.isDestroyed()) record.window.close() } catch (e) {}
   restoreModloaderParentWindowIfIdle()
 }
+
+function getModloaderDialogParent(event){
+  try {
+    const senderWindow = BrowserWindow.fromWebContents(event?.sender)
+    if (senderWindow && !senderWindow.isDestroyed()) return senderWindow
+  } catch (e) {}
+  if (win && !win.isDestroyed?.()) return win
+  return null
+}
+
+function normalizeModloaderDialogOptions(options){
+  return options && typeof options === 'object' ? options : {}
+}
+
+ipcMain.handle(`modloader:dialog:save`, async (event, options)=>{
+  const parent = getModloaderDialogParent(event)
+  const dialogOptions = normalizeModloaderDialogOptions(options)
+  return parent ? dialog.showSaveDialog(parent, dialogOptions) : dialog.showSaveDialog(dialogOptions)
+})
+
+ipcMain.handle(`modloader:dialog:open`, async (event, options)=>{
+  const parent = getModloaderDialogParent(event)
+  const dialogOptions = normalizeModloaderDialogOptions(options)
+  return parent ? dialog.showOpenDialog(parent, dialogOptions) : dialog.showOpenDialog(dialogOptions)
+})
 
 ipcMain.on(`modloader:window:ping`, (event)=>{
   event.returnValue = 'ok'

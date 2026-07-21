@@ -2,7 +2,7 @@
 	'use strict'
 
 	const state = {
-		version: '0.1.3',
+		version: '0.1.4',
 		booted: false,
 		mods: [],
 		modById: {},
@@ -56,10 +56,16 @@
 		vanillaGameHudSyncInstalled: false,
 		renderLayerManager: null,
 		renderLayerDefinitions: {},
+		renderLayerDefinitionOwners: {},
+		renderLayerDefinitionRegistrations: {},
 		renderCallbacks: {},
 		renderEventListeners: { ready: [], frameStart: [], frame: [] },
 		renderLayerDemandCallbacks: {},
 		renderPatchedMethods: {},
+		renderMethodRouteOwners: {},
+		renderMethodRouteRegistrations: {},
+		renderConflicts: [],
+		renderConflictSerial: 1,
 		renderLayerDemands: {},
 		renderActiveLayerDemands: {},
 		renderLastActiveLayerDemands: {},
@@ -438,6 +444,47 @@
 	}
 
 
+	const RENDER_API_VERSION = '1.0.0'
+	const RENDER_API_OWNER = 'ModLoader'
+	const RENDER_API_CONFLICT_LIMIT = 100
+	const RENDER_API_CAPABILITIES = Object.freeze({
+		canvas2dLayers: true,
+		customLayers: true,
+		layerDemand: true,
+		cachedLayers: true,
+		methodRouting: true,
+		scopedCleanup: true,
+		lifecycleEvents: true,
+		diagnostics: true,
+		conflictDiagnostics: true,
+		callbackErrorIsolation: true,
+		renderTiming: true,
+		webgl2Layers: false,
+		methodEmitters: false
+	})
+
+	const getRenderApiCapabilities = function () {
+		return Object.assign({}, RENDER_API_CAPABILITIES)
+	}
+
+	const supportsRenderCapability = function (name) {
+		return RENDER_API_CAPABILITIES[String(name || '')] === true
+	}
+
+	const getRenderApiContract = function () {
+		return {
+			name: 'Sixty Four ModLoader Render API',
+			version: RENDER_API_VERSION,
+			major: 1,
+			stability: 'stable',
+			versioning: 'semver',
+			backend: 'canvas2d',
+			layerContextTypes: [ '2d' ],
+			conflictResolution: 'last-registration-wins',
+			capabilities: getRenderApiCapabilities()
+		}
+	}
+
 	const RENDER_LAYER_DEFS = {
 		background: { id: 'background', order: 0, zIndex: 0, clearEachFrame: true },
 		buildings: { id: 'buildings', order: 10, zIndex: 10, clearEachFrame: true },
@@ -472,6 +519,70 @@
 	}
 
 	const DEFAULT_RENDER_METHOD_LAYERS = Object.assign({}, RENDER_METHOD_LAYERS)
+
+	const normalizeRenderOwner = function (owner) {
+		if (owner === undefined || owner === null || owner === '') return null
+		return String(owner)
+	}
+
+	const copyRenderConflictValue = function (value) {
+		if (!value || typeof value !== 'object') return value
+		return Object.assign({}, value)
+	}
+
+	const copyRenderConflict = function (entry) {
+		return {
+			id: entry.id,
+			type: entry.type,
+			key: entry.key,
+			existingOwner: entry.existingOwner,
+			incomingOwner: entry.incomingOwner,
+			previous: copyRenderConflictValue(entry.previous),
+			incoming: copyRenderConflictValue(entry.incoming),
+			resolution: entry.resolution,
+			frame: entry.frame
+		}
+	}
+
+	const recordRenderConflict = function (type, key, existingOwner, incomingOwner, previous, incoming) {
+		const entry = {
+			id: state.renderConflictSerial++,
+			type,
+			key,
+			existingOwner,
+			incomingOwner,
+			previous: copyRenderConflictValue(previous),
+			incoming: copyRenderConflictValue(incoming),
+			resolution: 'last-registration-wins',
+			frame: state.renderFrame
+		}
+		state.renderConflicts.push(entry)
+		if (state.renderConflicts.length > RENDER_API_CONFLICT_LIMIT) state.renderConflicts.splice(0, state.renderConflicts.length - RENDER_API_CONFLICT_LIMIT)
+		warn('Render API ' + type + ' conflict for ' + key + ': ' + existingOwner + ' -> ' + incomingOwner + '; last registration wins.')
+		return copyRenderConflict(entry)
+	}
+
+	const listRenderConflicts = function (options = {}) {
+		options = options || {}
+		const type = String(options.type || '').trim()
+		const key = String(options.key || options.id || '').trim()
+		const owner = String(options.owner || options.modId || '').trim()
+		let entries = state.renderConflicts.filter(function (entry) {
+			if (type && entry.type !== type) return false
+			if (key && entry.key !== key) return false
+			if (owner && entry.existingOwner !== owner && entry.incomingOwner !== owner) return false
+			return true
+		})
+		const limit = Number(options.limit)
+		if (Number.isFinite(limit) && limit >= 0) entries = entries.slice(Math.max(0, entries.length - Math.floor(limit)))
+		return entries.map(copyRenderConflict)
+	}
+
+	const clearRenderConflicts = function () {
+		const count = state.renderConflicts.length
+		state.renderConflicts = []
+		return count
+	}
 
 	const RENDER_CONTEXT_PROPS = [
 		'globalAlpha', 'globalCompositeOperation', 'imageSmoothingEnabled',
@@ -581,10 +692,12 @@
 			const layerId = RENDER_METHOD_LAYERS[methodName]
 			const demanded = hasRenderLayerDemand(layerId)
 			const routed = enabled && demanded
+			const owner = state.renderMethodRouteOwners[methodName] || (Object.prototype.hasOwnProperty.call(DEFAULT_RENDER_METHOD_LAYERS, methodName) ? RENDER_API_OWNER : null)
 			if (!includeInactive && !routed) return null
 			return {
 				method: methodName,
 				layer: layerId,
+				owner,
 				demanded,
 				routed,
 				builtIn: DEFAULT_RENDER_METHOD_LAYERS[methodName] === layerId,
@@ -1016,6 +1129,19 @@
 		return true
 	}
 
+	const markCursorDemandForAboveMainLayers = function () {
+		if (hasRenderLayerDemand('cursor')) return false
+		const cursorZIndex = getRenderLayerZIndex(getRenderLayerDef('cursor'))
+		const needsCursorLayer = Object.keys(state.renderActiveLayerDemands).some(function (id) {
+			if (state.renderActiveLayerDemands[id] !== true || id === 'cursor') return false
+			const zIndex = getRenderLayerZIndex(getRenderLayerDef(id))
+			return zIndex > MAIN_RENDER_LAYER_Z_INDEX && zIndex < cursorZIndex
+		})
+		if (!needsCursorLayer) return false
+		markActiveRenderLayerDemanded('cursor')
+		return true
+	}
+
 	const getExistingRenderLayerManager = function (game) {
 		game = getRenderGame(game)
 		if (game && game.__modloaderRenderLayerManager?.sourceCanvas === game.canvas) return game.__modloaderRenderLayerManager
@@ -1025,6 +1151,24 @@
 	const isRenderLayerCached = function (defOrId) {
 		const def = typeof defOrId === 'string' ? getRenderLayerDef(defOrId) : (defOrId || {})
 		return def.cache === true || def.cached === true || def.redrawWhenDirty === true || def.redrawOnDirty === true
+	}
+
+	const getRenderLayerDefinitionSignature = function (defOrId) {
+		const def = typeof defOrId === 'string' ? getRenderLayerDef(defOrId) : (defOrId || {})
+		const order = Number(def.order)
+		const zIndex = Number(def.zIndex)
+		return {
+			order: Number.isFinite(order) ? order : 45,
+			zIndex: Number.isFinite(zIndex) ? zIndex : (Number.isFinite(order) ? order : 45),
+			clearEachFrame: def.clearEachFrame !== false,
+			cached: isRenderLayerCached(def)
+		}
+	}
+
+	const sameRenderLayerDefinition = function (a, b) {
+		const left = getRenderLayerDefinitionSignature(a)
+		const right = getRenderLayerDefinitionSignature(b)
+		return left.order === right.order && left.zIndex === right.zIndex && left.clearEachFrame === right.clearEachFrame && left.cached === right.cached
 	}
 
 	const getRenderLayerDirtyGame = function (gameOrOptions) {
@@ -1088,8 +1232,11 @@
 		const layer = manager?.layers?.[normalized] || null
 		const canvas = layer?.canvas || null
 		const cached = isRenderLayerCached(def)
+		const owner = state.renderLayerDefinitionOwners[normalized] || (RENDER_LAYER_DEFS[normalized] ? RENDER_API_OWNER : null)
 		return {
 			id: normalized,
+			owner,
+			definitionOwner: owner,
 			order: Number(def.order) || 0,
 			zIndex: Number(def.zIndex) || Number(def.order) || 0,
 			clearEachFrame: def.clearEachFrame !== false,
@@ -1270,13 +1417,13 @@
 		return true
 	}
 
-	const ensureRenderLayer = function (manager, id, options = {}) {
+	const ensureRenderLayer = function (manager, id, options = {}, owner) {
 		if (!manager) return null
 		const normalized = normalizeRenderLayerId(id)
 		if (normalized === 'main' || normalized === 'world' || normalized === 'vanilla') {
 			return { id: 'main', order: MAIN_RENDER_LAYER_ORDER, zIndex: MAIN_RENDER_LAYER_Z_INDEX, canvas: manager.sourceCanvas, ctx: manager.game?.ctx, isMain: true, clearEachFrame: false }
 		}
-		if (options && Object.keys(options).length) registerRenderLayerDefinition(normalized, options)
+		if (options && Object.keys(options).length) registerRenderLayerDefinition(normalized, options, owner)
 		if (manager.layers[normalized]) {
 			applyRenderLayerDefinition(manager, manager.layers[normalized])
 			return manager.layers[normalized]
@@ -1402,14 +1549,14 @@
 		try { to.lineDashOffset = from.lineDashOffset } catch (error) {}
 	}
 
-	const withRenderLayer = function (game, layerId, fn, options = {}) {
+	const withRenderLayer = function (game, layerId, fn, options = {}, owner) {
 		game = getRenderGame(game)
 		if (!game || typeof fn !== 'function') return undefined
 		const drawOptions = resolveRenderDrawOptions(options)
 		if (!isRenderApiEnabled()) return drawOptions.allowWhenDisabled ? fn(game.ctx, game, null) : undefined
 		const manager = ensureRenderLayerManager(game)
 		if (!manager) return fn(game.ctx, game, null)
-		const layer = ensureRenderLayer(manager, layerId, drawOptions.layerOptions)
+		const layer = ensureRenderLayer(manager, layerId, drawOptions.layerOptions, owner)
 		if (!layer?.ctx || layer.isMain) return fn(game.ctx, game, layer)
 		if (layer.visible === false) return undefined
 		syncRenderLayerCanvas(manager, layer)
@@ -1427,9 +1574,12 @@
 		}
 	}
 
-	const registerRenderLayerDefinition = function (id, options = {}) {
+	const registerRenderLayerDefinition = function (id, options = {}, owner) {
 		options = options || {}
 		const normalized = normalizeRenderLayerId(id)
+		const previousEffectiveDefinition = getRenderLayerDef(normalized)
+		const previousRegisteredOwner = state.renderLayerDefinitionOwners[normalized] || null
+		const incomingOwner = normalizeRenderOwner(owner)
 		const current = state.renderLayerDefinitions[normalized] || {}
 		const order = Number(options.order ?? options.zIndex ?? current.order)
 		const zIndex = Number(options.zIndex ?? options.order ?? current.zIndex)
@@ -1449,7 +1599,13 @@
 		else if (isRenderLayerCached(next)) next.clearEachFrame = false
 		else if (current.clearEachFrame !== undefined) next.clearEachFrame = current.clearEachFrame
 		else delete next.clearEachFrame
+		const nextEffectiveDefinition = Object.assign({ id: normalized, order: 45, zIndex: 45, clearEachFrame: true }, RENDER_LAYER_DEFS[normalized] || {}, next)
+		if (incomingOwner && previousRegisteredOwner && incomingOwner !== previousRegisteredOwner && !sameRenderLayerDefinition(previousEffectiveDefinition, nextEffectiveDefinition)) {
+			recordRenderConflict('layer-definition', normalized, previousRegisteredOwner, incomingOwner, getRenderLayerDefinitionSignature(previousEffectiveDefinition), getRenderLayerDefinitionSignature(nextEffectiveDefinition))
+		}
 		state.renderLayerDefinitions[normalized] = next
+		if (incomingOwner) state.renderLayerDefinitionOwners[normalized] = incomingOwner
+		state.renderLayerDefinitionRegistrations[normalized] = { owner: incomingOwner, definition: next }
 		const manager = state.renderLayerManager
 		if (manager?.layers?.[normalized]) {
 			applyRenderLayerDefinition(manager, manager.layers[normalized])
@@ -1461,12 +1617,20 @@
 	const registerScopedRenderLayerDefinition = function (modId, id, options = {}) {
 		const normalized = normalizeRenderLayerId(id)
 		const hadDefinition = Object.prototype.hasOwnProperty.call(state.renderLayerDefinitions, normalized)
-		const previousDefinition = hadDefinition ? Object.assign({}, state.renderLayerDefinitions[normalized]) : null
-		const registeredDefinition = registerRenderLayerDefinition(normalized, options || {})
+		const previousDefinition = hadDefinition ? state.renderLayerDefinitions[normalized] : null
+		const hadOwner = Object.prototype.hasOwnProperty.call(state.renderLayerDefinitionOwners, normalized)
+		const previousOwner = hadOwner ? state.renderLayerDefinitionOwners[normalized] : null
+		const previousRegistration = state.renderLayerDefinitionRegistrations[normalized] || null
+		registerRenderLayerDefinition(normalized, options || {}, modId)
+		const registeredRegistration = state.renderLayerDefinitionRegistrations[normalized]
 		return function () {
-			if (state.renderLayerDefinitions[normalized] !== registeredDefinition) return
+			if (state.renderLayerDefinitionRegistrations[normalized] !== registeredRegistration) return
 			if (hadDefinition) state.renderLayerDefinitions[normalized] = previousDefinition
 			else delete state.renderLayerDefinitions[normalized]
+			if (hadOwner) state.renderLayerDefinitionOwners[normalized] = previousOwner
+			else delete state.renderLayerDefinitionOwners[normalized]
+			if (previousRegistration) state.renderLayerDefinitionRegistrations[normalized] = previousRegistration
+			else delete state.renderLayerDefinitionRegistrations[normalized]
 			const manager = state.renderLayerManager
 			if (manager?.layers?.[normalized]) {
 				applyRenderLayerDefinition(manager, manager.layers[normalized])
@@ -1506,11 +1670,11 @@
 		}
 	}
 
-	const getPublicRenderLayer = function (id, game, options) {
+	const getPublicRenderLayer = function (id, game, options, owner) {
 		const layerId = markRenderLayerDemanded(id, options || {})
 		if (!isRenderApiEnabled()) return null
 		const manager = ensureRenderLayerManager(game)
-		return publicRenderLayer(manager ? ensureRenderLayer(manager, layerId, options) : null)
+		return publicRenderLayer(manager ? ensureRenderLayer(manager, layerId, options, owner) : null)
 	}
 
 	const renderCallbackKey = function (modId, id) {
@@ -1631,7 +1795,7 @@
 		}
 		options = options || {}
 		const normalizedLayerId = normalizeRenderLayerId(layerId)
-		if (options.layerOptions && typeof options.layerOptions === 'object') registerRenderLayerDefinition(normalizedLayerId, options.layerOptions)
+		if (options.layerOptions && typeof options.layerOptions === 'object') registerRenderLayerDefinition(normalizedLayerId, options.layerOptions, modId)
 		const id = String(options.id || options.name || '') || undefined
 		const key = renderLayerDemandKey(modId, id)
 		state.renderLayerDemandCallbacks[key] = {
@@ -1715,7 +1879,12 @@
 		const createdLayers = listCreatedRenderLayers(game)
 		const callbacks = listRenderCallbacks({ game })
 		const layerDemanders = listRenderLayerDemandCallbacks({ game })
+		const conflicts = listRenderConflicts()
 		return {
+			version: RENDER_API_VERSION,
+			apiVersion: RENDER_API_VERSION,
+			stability: 'stable',
+			capabilities: getRenderApiCapabilities(),
 			enabled: isRenderApiEnabled(),
 			frame: state.renderFrame,
 			demandedLayers: listRenderLayerDemands(),
@@ -1726,6 +1895,8 @@
 			activeCallbacks: callbacks.filter(function (entry) { return entry.active }).map(function (entry) { return entry.key }),
 			layerDemanders: layerDemanders.length,
 			activeLayerDemanders: layerDemanders.filter(function (entry) { return entry.active }).map(function (entry) { return entry.key }),
+			conflicts: conflicts.length,
+			conflictCount: conflicts.length,
 			timing: getRenderTimingSummary()
 		}
 	}
@@ -1783,6 +1954,7 @@
 		state.renderFrame += 1
 		markBuiltInRenderLayerDemands(game)
 		markRenderCallbackLayerDemands(game)
+		markCursorDemandForAboveMainLayers()
 		markBackgroundDemandForUnderMainLayers()
 		const manager = ensureRenderLayerManager(game)
 		if (!manager) {
@@ -2002,14 +2174,27 @@
 			return function () {}
 		}
 		const normalizedLayerId = normalizeRenderLayerId(layerId)
-		if (options.layerOptions && typeof options.layerOptions === 'object') registerRenderLayerDefinition(normalizedLayerId, options.layerOptions)
+		if (options.layerOptions && typeof options.layerOptions === 'object') registerRenderLayerDefinition(normalizedLayerId, options.layerOptions, modId)
 		const previousLayerId = RENDER_METHOD_LAYERS[normalizedMethodName] || null
+		const previousRegistration = state.renderMethodRouteRegistrations[normalizedMethodName] || null
+		const previousOwner = state.renderMethodRouteOwners[normalizedMethodName] || null
+		const incomingOwner = normalizeRenderOwner(modId) || 'anonymous'
+		if (previousLayerId && previousOwner && incomingOwner !== previousOwner && previousLayerId !== normalizedLayerId) {
+			recordRenderConflict('method-route', normalizedMethodName, previousOwner, incomingOwner, previousLayerId, normalizedLayerId)
+		}
+		const registration = { owner: incomingOwner, layerId: normalizedLayerId }
 		RENDER_METHOD_LAYERS[normalizedMethodName] = normalizedLayerId
+		state.renderMethodRouteOwners[normalizedMethodName] = incomingOwner
+		state.renderMethodRouteRegistrations[normalizedMethodName] = registration
 		patchRenderLayerMethod(normalizedMethodName)
 		return function () {
-			if (RENDER_METHOD_LAYERS[normalizedMethodName] !== normalizedLayerId) return
+			if (state.renderMethodRouteRegistrations[normalizedMethodName] !== registration) return
 			if (previousLayerId) RENDER_METHOD_LAYERS[normalizedMethodName] = previousLayerId
 			else delete RENDER_METHOD_LAYERS[normalizedMethodName]
+			if (previousRegistration) state.renderMethodRouteRegistrations[normalizedMethodName] = previousRegistration
+			else delete state.renderMethodRouteRegistrations[normalizedMethodName]
+			if (previousRegistration && previousOwner) state.renderMethodRouteOwners[normalizedMethodName] = previousOwner
+			else delete state.renderMethodRouteOwners[normalizedMethodName]
 		}
 	}
 
@@ -2162,6 +2347,15 @@
 
 	const createRenderApi = function (modId) {
 		return {
+			version: RENDER_API_VERSION,
+			apiVersion: RENDER_API_VERSION,
+			stability: 'stable',
+			capabilities: RENDER_API_CAPABILITIES,
+			supports: supportsRenderCapability,
+			getCapabilities: getRenderApiCapabilities,
+			contract: getRenderApiContract,
+			conflicts: listRenderConflicts,
+			clearConflicts: clearRenderConflicts,
 			install(game) {
 				installRenderApi(game)
 				return state.renderLayerManager
@@ -2171,9 +2365,9 @@
 			createScope() { return createRenderScope(modId) },
 			scope() { return createRenderScope(modId) },
 			isAvailable(game) { return isRenderApiEnabled() && !!ensureRenderLayerManager(game) },
-			getLayer(id, game, options) { return getPublicRenderLayer(id, game, options) },
-			layer(id, game, options) { return getPublicRenderLayer(id, game, options) },
-			context(id, game, options) { return getPublicRenderLayer(id, game, options)?.ctx || null },
+			getLayer(id, game, options) { return getPublicRenderLayer(id, game, options, modId) },
+			layer(id, game, options) { return getPublicRenderLayer(id, game, options, modId) },
+			context(id, game, options) { return getPublicRenderLayer(id, game, options, modId)?.ctx || null },
 			demandedLayers: listRenderLayerDemands,
 			isLayerDemanded(id) { return hasRenderLayerDemand(id) },
 			describeLayer: describeRenderLayerInfo,
@@ -2227,13 +2421,13 @@
 				const game = getRenderGame(options.game)
 				return withRenderLayer(game, layerId, function (ctx, activeGame, layer) {
 					return fn(ctx, activeGame, publicRenderLayer(layer))
-				}, options)
+				}, options, modId)
 			},
 			onLayer(id, fn, options) { return registerRenderCallback(modId, id, fn, options || {}) },
 			on(id, fn, options) { return registerRenderCallback(modId, id, fn, options || {}) },
 			register(options) { return registerRenderCallback(modId, options || {}) },
-			registerLayer(id, options) { return registerRenderLayerDefinition(id, options || {}) },
-			defineLayer(id, options) { return registerRenderLayerDefinition(id, options || {}) },
+			registerLayer(id, options) { return registerRenderLayerDefinition(id, options || {}, modId) },
+			defineLayer(id, options) { return registerRenderLayerDefinition(id, options || {}, modId) },
 			clear(id, game) {
 				const layer = getPublicRenderLayer(id, game)
 				if (layer) layer.clear()
@@ -2259,8 +2453,8 @@
 				isDirty(id, game) { return isRenderLayerDirty(id, game) },
 				markDirty(id, game) { return markRenderLayerDirty(id, true, game) },
 				markClean(id, game) { return markRenderLayerDirty(id, false, game) },
-				register(id, options) { return registerRenderLayerDefinition(id, options || {}) },
-				define(id, options) { return registerRenderLayerDefinition(id, options || {}) },
+				register(id, options) { return registerRenderLayerDefinition(id, options || {}, modId) },
+				define(id, options) { return registerRenderLayerDefinition(id, options || {}, modId) },
 				demand(id, options) { return registerRenderLayerDemand(modId, id, options || {}) },
 				require(id, options) { return registerRenderLayerDemand(modId, id, options || {}) },
 				release(id, options) { return releaseRenderLayerDemand(id, options || {}) },
@@ -2271,8 +2465,8 @@
 					if (!manager) return []
 					return Object.keys(manager.layers).map(function (id) { return publicRenderLayer(manager.layers[id]) })
 				},
-				get(id, game, options) { return getPublicRenderLayer(id, game, options) },
-				ensure(id, options, game) { return getPublicRenderLayer(id, game, options) },
+				get(id, game, options) { return getPublicRenderLayer(id, game, options, modId) },
+				ensure(id, options, game) { return getPublicRenderLayer(id, game, options, modId) },
 				clear(id, game) {
 					const layer = getPublicRenderLayer(id, game)
 					if (layer) layer.clear()
@@ -2281,7 +2475,7 @@
 					const layerId = markRenderLayerDemanded(id, options)
 					return withRenderLayer(getRenderGame(options.game), layerId, function (ctx, activeGame, layer) {
 						return fn(ctx, activeGame, publicRenderLayer(layer))
-					}, options)
+					}, options, modId)
 				}
 			},
 			events: {
@@ -2297,6 +2491,12 @@
 				route(methodName, layerId, options) { return registerRenderMethodRoute(modId, methodName, layerId, options || {}) },
 				get(methodName) { return getRenderMethodLayer(methodName) },
 				isRouted(methodName) { return isRenderMethodRouted(methodName) }
+			},
+			diagnostics: {
+				summary(game) { return getRenderDiagnosticsSummary(game) },
+				conflicts: listRenderConflicts,
+				clearConflicts: clearRenderConflicts,
+				contract: getRenderApiContract
 			}
 		}
 	}
@@ -3225,6 +3425,7 @@
 			registerHud(options) { return registerGameHudItem(modId, options) },
 			registerGameHud(options) { return registerGameHudItem(modId, options) },
 			hud: createUiHudApi(modId),
+			theme: createUiThemeApi(),
 			pages: createUiPagesApi(modId)
 		}
 	}
@@ -3243,16 +3444,32 @@
 	}
 	const PANEL_TEXT = {
 		en: {
-			close: 'Close', hideToEdge: 'Hide to edge', showFromEdge: 'Show ModLoader menu', menuSettings: 'Menu Settings', themeMode: 'Theme', darkMode: 'Dark', lightMode: 'Light', hideMode: 'Auto-hide mode', autoHide: 'Auto-hide', manualHide: 'Manual', sortMod: 'Sort mod', sortConfigSection: 'Sort section', configSectionSorting: 'Config section sorting', configSectionSortingOn: 'On', configSectionSortingOff: 'Off', renderApi: 'Render API', renderApiOn: 'On', renderApiOff: 'Off', renderApiLayerDemands: 'Layer demands', renderApiCreatedLayers: 'Created layers', renderApiCallbacks: 'Callbacks active/total', renderApiLayerDemanders: 'Demanders active/total', renderApiMethodRoutes: 'Method routes', renderApiTiming: 'Timing', autoHideDelay: 'Auto-hide delay', secondsSuffix: 's', hideMenuDetails: 'Hide menu details', hideModFileDetails: 'Hide mod file details', show: 'Show', hide: 'Hide', installedMods: 'Installed mods', enabledEntries: 'Enabled entries', loadedMods: 'Loaded mods', issues: 'Issues', dataPatches: 'Data patches', wordPatches: 'Word patches', registeredLanguages: 'Registered languages', orphanEntities: 'Orphan entities', modManager: 'Mod Manager', selectAll: 'all', toggleNote: 'Toggle mods or edit config below.', changesRequireReload: 'Changes require reload.', configSaveNote: 'Config saved to localStorage; some mods need reload.', saveReload: 'Save & Reload', saveConfig: 'Save Config', insert: 'insert', folder: 'folder', deleteMod: 'Delete mod', config: 'Config', recentLog: 'Recent Log', noLogEntries: 'No log entries.', noModsFound: 'No mods with mod.json were found.', fileAccessUnavailable: 'File access is unavailable.', fileAccessLoadedOnly: 'File access is unavailable, so only loaded mods can be shown.', reloadHot: 'hot capable, reload now', reloadRestart: 'restart required', reloadRequired: 'reload required', idPrefix: 'id: {value}', uniquePrefix: 'unique: {value}', depsPrefix: 'deps: {value}', conflictsPrefix: 'conflicts: {value}', missingDependencies: 'Missing dependencies: {value}', conflictsEnabled: 'Conflicts enabled: {value}', savedReloading: 'Saved. Reloading...', saveFailed: 'Save failed: {value}', configSaved: 'Config saved.', noChanges: 'No changes to save.', changesCanceled: 'Canceled unsaved changes.', openFolderFailed: 'Could not open folder: {value}', deleteTitle: 'Delete Mod?', deleteMessage: 'Delete {name} from the mods folder? This cannot be undone.', deleteConfirm: 'Delete', cancel: 'Cancel', replaceTitle: 'Replace Mod?', replaceMessage: 'mods already contains {name}. Replace it with the imported mod?', replaceConfirm: 'Replace', deletedMod: 'Deleted {name}. Reload to unload already running code.', deleteFailed: 'Delete failed: {value}', importHint: 'Drop a file here or paste', importDetail: 'Drag a mod zip here, or copy a zip file and press paste. ModLoader will unpack it into the mods folder automatically.', importWaiting: 'Waiting for a zip file...', importNoZip: 'Drop or paste a .zip file.', importNoPath: 'Could not read the file path from the dropped file.', importing: 'Importing {name}...', importedMod: 'Imported {name}. Enable it and Save & Reload when ready.', importFailed: 'Import failed: {value}', importModeOff: 'Back to mod list', invalidZip: 'Only .zip mod packages can be imported.', zipNoMod: 'The zip does not contain a mod.json.', zipMultipleMods: 'The zip contains multiple mod folders; import one mod at a time.', zipExtractFailed: 'Could not extract zip: {value}', folderOpened: 'Opened mods folder.', replaceRenamedUniqueTitle: 'Update Renamed Mod?', replaceRenamedUniqueMessage: 'The new file has the same mod unique code as an installed mod. It is probably an update and rename.\n{oldName} -> {newName}\nReplace the old file?', replaceRenamedPreviousTitle: 'Mod Rename Detected', replaceRenamedPreviousMessage: 'This new file appears to be a rename of an installed file.\n{oldName} -> {newName}\nReplace the old file?', replaceOld: 'Replace', keepImported: 'Do not replace (add new file)', uniqueCodeEditTitle: 'Recommend changing mod unique code', uniqueCodeEditMessage: 'These two mods will share the same mod unique code. Change the imported mod unique code before adding it?', uniqueCodeLabel: 'Mod unique code', uniqueCodeConfirm: 'Confirm', uniqueCodeSkip: 'No', manifestReadFailed: 'Could not read mod.json: {value}', translationFile: 'translations', translationFileTitle: 'Open translation file', translationFileSynced: 'Translation file synced: {path}', translationFileFailed: 'Translation file failed: {value}'
+			close: 'Close', hideToEdge: 'Hide to edge', showFromEdge: 'Show ModLoader menu', menuSettings: 'Menu Settings', themeMode: 'Theme', darkMode: 'Dark', lightMode: 'Light', hideMode: 'Auto-hide mode', autoHide: 'Auto-hide', manualHide: 'Manual', sortMod: 'Sort mod', sortConfigSection: 'Sort section', configSectionSorting: 'Config section sorting', configSectionSortingOn: 'On', configSectionSortingOff: 'Off', renderApi: 'Render API', renderApiOn: 'On', renderApiOff: 'Off', renderApiLayerDemands: 'Layer demands', renderApiCreatedLayers: 'Created layers', renderApiCallbacks: 'Callbacks active/total', renderApiLayerDemanders: 'Demanders active/total', renderApiMethodRoutes: 'Method routes', renderApiTiming: 'Timing', autoHideDelay: 'Auto-hide delay', secondsSuffix: 's', hideMenuDetails: 'Hide menu details', hideModFileDetails: 'Hide mod file details', show: 'Show', hide: 'Hide', installedMods: 'Installed mods', enabledEntries: 'Enabled entries', loadedMods: 'Loaded mods', issues: 'Issues', dataPatches: 'Data patches', wordPatches: 'Word patches', registeredLanguages: 'Registered languages', orphanEntities: 'Orphan entities', modManager: 'Mod Manager', selectAll: 'all', toggleNote: 'Toggle mods or edit config below.', changesRequireReload: 'Changes require reload.', configSaveNote: 'Config saved to localStorage; some mods need reload.', saveReload: 'Save & Reload', saveConfig: 'Save Config', insert: 'insert', folder: 'folder', deleteMod: 'Delete mod', config: 'Config', recentLog: 'Recent Log', noLogEntries: 'No log entries.', noModsFound: 'No mods with mod.json were found.', fileAccessUnavailable: 'File access is unavailable.', fileAccessLoadedOnly: 'File access is unavailable, so only loaded mods can be shown.', reloadHot: 'hot capable, reload now', reloadRestart: 'restart required', reloadRequired: 'reload required', idPrefix: 'id: {value}', uniquePrefix: 'unique: {value}', depsPrefix: 'deps: {value}', conflictsPrefix: 'conflicts: {value}', missingDependencies: 'Missing dependencies: {value}', conflictsEnabled: 'Conflicts enabled: {value}', savedReloading: 'Saved. Reloading...', saveFailed: 'Save failed: {value}', configSaved: 'Config saved.', noChanges: 'No changes to save.', changesCanceled: 'Canceled unsaved changes.', openFolderFailed: 'Could not open folder: {value}', deleteTitle: 'Delete Mod?', deleteMessage: 'Delete {name} from the mods folder? This cannot be undone.', deleteConfirm: 'Delete', cancel: 'Cancel', replaceTitle: 'Replace Mod?', replaceMessage: 'mods already contains {name}. Replace it with the imported mod?', replaceConfirm: 'Replace', deletedMod: 'Deleted {name}. Reload to unload already running code.', deleteFailed: 'Delete failed: {value}', importHint: 'Drop a file here or paste', importDetail: 'Drag a mod zip here, or copy a zip file and press paste. ModLoader will unpack it into the mods folder automatically.', importWaiting: 'Waiting for a zip file...', importNoZip: 'Drop or paste a .zip file.', importNoPath: 'Could not read the file path from the dropped file.', importing: 'Importing {name}...', importedMod: 'Imported {name}. Enable it and Save & Reload when ready.', importFailed: 'Import failed: {value}', importModeOff: 'Back to mod list', invalidZip: 'Only .zip mod packages can be imported.', zipNoMod: 'The zip does not contain a mod.json.', zipMultipleMods: 'The zip contains multiple mod folders; import one mod at a time.', zipExtractFailed: 'Could not extract zip: {value}', folderOpened: 'Opened mods folder.', replaceRenamedUniqueTitle: 'Update Renamed Mod?', replaceRenamedUniqueMessage: 'The new file has the same mod unique code as an installed mod. It is probably an update and rename.\n{oldName} -> {newName}\nReplace the old file?', replaceRenamedPreviousTitle: 'Mod Rename Detected', replaceRenamedPreviousMessage: 'This new file appears to be a rename of an installed file.\n{oldName} -> {newName}\nReplace the old file?', replaceOld: 'Replace', keepImported: 'Do not replace (add new file)', uniqueCodeEditTitle: 'Recommend changing mod unique code', uniqueCodeEditMessage: 'These two mods will share the same mod unique code. Change the imported mod unique code before adding it?', uniqueCodeLabel: 'Mod unique code', uniqueCodeConfirm: 'Confirm', uniqueCodeSkip: 'No', manifestReadFailed: 'Could not read mod.json: {value}', translationFile: 'translations', translationFileTitle: 'Open translation file', translationFileSynced: 'Translation file synced: {path}', translationFileFailed: 'Translation file failed: {value}', translationExport: 'Export', translationExportTitle: 'Export translations backup', translationExported: 'Translation backup exported: {path}', translationImport: 'Import', translationImportTitle: 'Import translations file', translationImported: 'Imported translations from {source} and saved to {path}', translationImportInvalid: 'Selected file is not a ModLoader translations file.', translationExportOverwriteTitle: 'Overwrite translation backup?', translationExportOverwriteMessage: 'Target file already exists.\nEdit time: {editedAt}\n{path}\nOverwrite it?', translationOverwriteConfirm: 'Overwrite', translationDialogUnavailable: 'File dialog is unavailable.'
 		},
 		sch: {
 			close: '\u5173\u95ed', hideToEdge: '\u9690\u85cf\u5230\u8fb9\u7f18', showFromEdge: '\u663e\u793a ModLoader \u83dc\u5355', menuSettings: 'Mod \u83dc\u5355\u8bbe\u7f6e', themeMode: '\u4eae\u8272 / \u6697\u8272\u6a21\u5f0f', darkMode: '\u6697\u8272', lightMode: '\u4eae\u8272', hideMode: '\u81ea\u52a8\u9690\u85cf\u6a21\u5f0f', autoHide: '\u81ea\u52a8\u9690\u85cf', manualHide: '\u624b\u52a8\u9690\u85cf', sortMod: '\u6392\u5e8f mod', sortConfigSection: '\u6392\u5e8f\u5b50\u529f\u80fd', configSectionSorting: '\u5b50\u529f\u80fd\u624b\u52a8\u6392\u5e8f', configSectionSortingOn: '\u5f00\u542f', configSectionSortingOff: '\u5173\u95ed', renderApi: '\u6e32\u67d3 API', renderApiOn: '\u5f00\u542f', renderApiOff: '\u5173\u95ed', renderApiLayerDemands: '\u5df2\u9700\u6c42\u56fe\u5c42', renderApiCreatedLayers: '\u5df2\u521b\u5efa\u56fe\u5c42', renderApiCallbacks: '\u56de\u8c03 \u6d3b\u8dc3/\u603b\u6570', renderApiLayerDemanders: '\u9700\u6c42\u5668 \u6d3b\u8dc3/\u603b\u6570', renderApiMethodRoutes: '\u5df2\u8def\u7531\u65b9\u6cd5', renderApiTiming: '\u8017\u65f6', autoHideDelay: '\u81ea\u52a8\u9690\u85cf\u79d2\u6570', secondsSuffix: '\u79d2', hideMenuDetails: '\u9690\u85cf\u83dc\u5355\u8be6\u60c5', hideModFileDetails: '\u9690\u85cf mod \u6587\u4ef6\u8be6\u60c5', show: '\u663e\u793a', hide: '\u9690\u85cf', installedMods: '\u5df2\u5b89\u88c5 mod', enabledEntries: '\u542f\u7528\u6761\u76ee', loadedMods: '\u5df2\u52a0\u8f7d mod', issues: '\u95ee\u9898', dataPatches: '\u6570\u636e\u8865\u4e01', wordPatches: '\u6587\u672c\u8865\u4e01', registeredLanguages: '\u5df2\u6ce8\u518c\u8bed\u8a00', orphanEntities: '\u5b64\u7acb\u5b9e\u4f53', modManager: 'Mod \u7ba1\u7406', selectAll: '\u5168\u9009', toggleNote: '\u5728\u4e0b\u65b9\u5f00\u5173 mod \u6216\u7f16\u8f91\u914d\u7f6e\u3002', changesRequireReload: '\u6539\u52a8\u9700\u8981 reload\u3002', configSaveNote: '\u914d\u7f6e\u5df2\u4fdd\u5b58\u5230 localStorage\uff1b\u90e8\u5206 mod \u9700\u8981 reload \u751f\u6548\u3002', saveReload: '\u4fdd\u5b58\u5e76 Reload', saveConfig: '\u4fdd\u5b58\u914d\u7f6e', insert: '\u5bfc\u5165', folder: '\u6587\u4ef6\u5939', deleteMod: '\u5220\u9664 mod', config: '\u914d\u7f6e', recentLog: '\u6700\u8fd1\u65e5\u5fd7', noLogEntries: '\u6682\u65e0\u65e5\u5fd7\u3002', noModsFound: '\u6ca1\u6709\u627e\u5230\u5e26 mod.json \u7684 mod\u3002', fileAccessUnavailable: '\u6587\u4ef6\u8bbf\u95ee\u4e0d\u53ef\u7528\u3002', fileAccessLoadedOnly: '\u6587\u4ef6\u8bbf\u95ee\u4e0d\u53ef\u7528\uff0c\u6240\u4ee5\u53ea\u80fd\u663e\u793a\u5df2\u52a0\u8f7d\u7684 mod\u3002', reloadHot: '\u652f\u6301\u70ed\u5f00\u5173\uff0c\u5f53\u524d\u4ecd\u5efa\u8bae reload', reloadRestart: '\u9700\u8981\u91cd\u542f', reloadRequired: '\u9700\u8981 reload', idPrefix: 'id\uff1a{value}', uniquePrefix: '\u552f\u4e00\u7801\uff1a{value}', depsPrefix: '\u4f9d\u8d56\uff1a{value}', conflictsPrefix: '\u51b2\u7a81\uff1a{value}', missingDependencies: '\u7f3a\u5c11\u4f9d\u8d56\uff1a{value}', conflictsEnabled: '\u5df2\u542f\u7528\u51b2\u7a81\uff1a{value}', savedReloading: '\u5df2\u4fdd\u5b58\uff0c\u6b63\u5728 reload...', saveFailed: '\u4fdd\u5b58\u5931\u8d25\uff1a{value}', configSaved: '\u914d\u7f6e\u5df2\u4fdd\u5b58\u3002', noChanges: '\u6ca1\u6709\u9700\u8981\u4fdd\u5b58\u7684\u6539\u52a8\u3002', changesCanceled: '\u5df2\u53d6\u6d88\u672a\u4fdd\u5b58\u7684\u6539\u52a8\u3002', openFolderFailed: '\u65e0\u6cd5\u6253\u5f00\u6587\u4ef6\u5939\uff1a{value}', deleteTitle: '\u5220\u9664 Mod\uff1f', deleteMessage: '\u4ece mods \u6587\u4ef6\u5939\u5220\u9664 {name}\uff1f\u8fd9\u4e2a\u64cd\u4f5c\u4e0d\u80fd\u64a4\u9500\u3002', deleteConfirm: '\u5220\u9664', cancel: '\u53d6\u6d88', replaceTitle: '\u66ff\u6362 Mod\uff1f', replaceMessage: 'mods \u91cc\u5df2\u7ecf\u6709 {name}\u3002\u662f\u5426\u7528\u5bfc\u5165\u7684 mod \u66ff\u6362\u5b83\uff1f', replaceConfirm: '\u66ff\u6362', deletedMod: '\u5df2\u5220\u9664 {name}\u3002\u5df2\u7ecf\u8fd0\u884c\u7684\u4ee3\u7801\u9700\u8981 reload \u624d\u4f1a\u5378\u8f7d\u3002', deleteFailed: '\u5220\u9664\u5931\u8d25\uff1a{value}', importHint: '\u628a\u6587\u4ef6\u62d6\u5230\u8fd9\u91cc\u6216\u590d\u5236', importDetail: '\u53ef\u4ee5\u628a mod zip \u5305\u76f4\u63a5\u62d6\u5165\uff0c\u6216\u8005\u590d\u5236 zip \u5305\u540e\u5728\u8fd9\u91cc\u6309\u7c98\u8d34\u5feb\u6377\u952e\uff0cModLoader \u4f1a\u81ea\u52a8\u89e3\u5305\u5230 mods \u6587\u4ef6\u5939\u3002', importWaiting: '\u7b49\u5f85 zip \u6587\u4ef6...', importNoZip: '\u8bf7\u62d6\u5165\u6216\u7c98\u8d34 .zip \u6587\u4ef6\u3002', importNoPath: '\u65e0\u6cd5\u8bfb\u53d6\u8be5\u6587\u4ef6\u8def\u5f84\u3002', importing: '\u6b63\u5728\u5bfc\u5165 {name}...', importedMod: '\u5df2\u5bfc\u5165 {name}\u3002\u9700\u8981\u65f6\u52fe\u9009\u5b83\u5e76\u4fdd\u5b58 reload\u3002', importFailed: '\u5bfc\u5165\u5931\u8d25\uff1a{value}', importModeOff: '\u8fd4\u56de mod \u5217\u8868', invalidZip: '\u53ea\u80fd\u5bfc\u5165 .zip mod \u5305\u3002', zipNoMod: '\u8fd9\u4e2a zip \u5185\u6ca1\u6709 mod.json\u3002', zipMultipleMods: '\u8fd9\u4e2a zip \u5305\u542b\u591a\u4e2a mod \u6587\u4ef6\u5939\uff1b\u8bf7\u4e00\u6b21\u5bfc\u5165\u4e00\u4e2a mod\u3002', zipExtractFailed: '\u65e0\u6cd5\u89e3\u538b zip\uff1a{value}', folderOpened: '\u5df2\u6253\u5f00 mods \u6587\u4ef6\u5939\u3002', replaceRenamedUniqueTitle: '\u53d1\u73b0\u540c\u552f\u4e00\u7801 Mod', replaceRenamedUniqueMessage: '\u65b0\u6587\u4ef6\u8ddf\u5df2\u6709\u6587\u4ef6\u6709\u76f8\u540c\u7684 mod \u552f\u4e00\u7801\uff0c\u5b83\u5f88\u53ef\u80fd\u662f\u65e7\u6587\u4ef6\u7684\u66f4\u65b0\u548c\u6539\u540d\u3002\n{oldName} \u2192 {newName}\n\u662f\u5426\u8986\u76d6\u65e7\u6587\u4ef6\uff1f', replaceRenamedPreviousTitle: '\u53d1\u73b0 Mod \u6539\u540d', replaceRenamedPreviousMessage: '\u8fd9\u4e2a\u65b0\u6587\u4ef6\u662f\u5df2\u6709\u6587\u4ef6\u7684\u6539\u540d\u3002\n{oldName} \u2192 {newName}\n\u662f\u5426\u8986\u76d6\u65e7\u6587\u4ef6\uff1f', replaceOld: '\u8986\u76d6', keepImported: '\u4e0d\u8986\u76d6\uff08\u52a0\u5165\u65b0\u6587\u4ef6\uff09', uniqueCodeEditTitle: '\u63a8\u8350\u4fee\u6539 mod \u552f\u4e00\u7801', uniqueCodeEditMessage: '\u8fd9\u4e24\u4e2a mod \u4f1a\u5171\u7528\u540c\u4e00\u4e2a mod \u552f\u4e00\u7801\u3002\u662f\u5426\u5728\u52a0\u5165\u65b0\u6587\u4ef6\u524d\u4fee\u6539\u5bfc\u5165 mod \u7684\u552f\u4e00\u7801\uff1f', uniqueCodeLabel: 'mod \u552f\u4e00\u7801', uniqueCodeConfirm: '\u786e\u8ba4\u4fee\u6539', uniqueCodeSkip: '\u5426\uff08\u4e0d\u4fee\u6539\uff09', manifestReadFailed: '\u65e0\u6cd5\u8bfb\u53d6 mod.json\uff1a{value}', translationFile: '\u7ffb\u8bd1', translationFileTitle: '\u6253\u5f00\u7ffb\u8bd1\u6587\u4ef6', translationFileSynced: '\u7ffb\u8bd1\u6587\u4ef6\u5df2\u540c\u6b65\uff1a{path}', translationFileFailed: '\u7ffb\u8bd1\u6587\u4ef6\u5931\u8d25\uff1a{value}'
 		}
 	}
+	Object.assign(PANEL_TEXT.sch, {
+		translationExport: '\u5bfc\u51fa',
+		translationExportTitle: '\u5bfc\u51fa\u7ffb\u8bd1\u5907\u4efd',
+		translationExported: '\u7ffb\u8bd1\u5907\u4efd\u5df2\u5bfc\u51fa\uff1a{path}',
+		translationImport: '\u5bfc\u5165',
+		translationImportTitle: '\u5bfc\u5165\u7ffb\u8bd1\u6587\u4ef6',
+		translationImported: '\u5df2\u4ece {source} \u5bfc\u5165\u7ffb\u8bd1\uff0c\u5e76\u4fdd\u5b58\u5230 {path}',
+		translationImportInvalid: '\u9009\u62e9\u7684\u6587\u4ef6\u4e0d\u662f ModLoader \u7ffb\u8bd1\u6587\u4ef6\u3002',
+		translationExportOverwriteTitle: '\u8986\u76d6\u7ffb\u8bd1\u5907\u4efd\uff1f',
+		translationExportOverwriteMessage: '\u76ee\u6807\u6587\u4ef6\u5df2\u5b58\u5728\u3002\n\u7f16\u8f91\u65f6\u95f4\uff1a{editedAt}\n{path}\n\u662f\u5426\u8986\u76d6\uff1f',
+		translationOverwriteConfirm: '\u8986\u76d6',
+		translationDialogUnavailable: '\u6587\u4ef6\u9009\u62e9\u5668\u4e0d\u53ef\u7528\u3002'
+	})
 	PANEL_TEXT.modsch = PANEL_TEXT.sch
 	PANEL_TEXT.tch = PANEL_TEXT.sch
 	const TRANSLATION_CATALOG_FILE = 'translations.json'
 	const TRANSLATION_CATALOG_VERSION = 1
+	const TRANSLATION_CATALOG_KIND = 'sixty-four.modloader.translations'
+	const TRANSLATION_CATALOG_FORMAT_VERSION = 1
+	const TRANSLATION_CATALOG_META_KEY = '_meta'
 	const getPanelLanguage = function () {
 		const language = state.game?.language || ''
 		if (language === 'sch' || language === 'modsch') return 'sch'
@@ -3474,27 +3691,27 @@
 		const style = document.createElement('style')
 		style.id = 'modloader-panel-style'
 		style.textContent = `
-			#modloader-panel { position: fixed; right: 16px; top: 16px; z-index: 2147483647; box-sizing: border-box; width: min(860px, calc(100vw - 32px)); max-height: calc(100vh - 32px); overflow: auto; padding: 14px; border-radius: 8px; background: rgba(8, 10, 12, .94); color: rgba(255,255,255,.92); box-shadow: 0 12px 36px rgba(0,0,0,.35); font: 13px/1.45 Montserrat, Arial, sans-serif; transition: left .22s ease, top .22s ease, right .22s ease, background .16s ease, box-shadow .16s ease; }
+			#modloader-panel { --modloader-panel-bg: rgba(8, 10, 12, .94); --modloader-panel-text: rgba(255,255,255,.92); --modloader-text-strong: rgba(255,255,255,.9); --modloader-text: rgba(255,255,255,.74); --modloader-text-muted: rgba(255,255,255,.62); --modloader-text-subtle: rgba(255,255,255,.48); --modloader-border: rgba(255,255,255,.1); --modloader-border-strong: rgba(255,255,255,.16); --modloader-surface: rgba(255,255,255,.045); --modloader-surface-hover: rgba(255,255,255,.08); --modloader-surface-active: rgba(255,255,255,.14); --modloader-control-bg: rgba(255,255,255,.08); --modloader-control-bg-hover: rgba(255,255,255,.14); --modloader-control-border: rgba(255,255,255,.14); --modloader-control-border-hover: rgba(207,233,255,.3); --modloader-control-text: rgba(255,255,255,.78); --modloader-control-text-hover: rgba(255,255,255,.94); --modloader-input-bg: rgba(0,0,0,.22); --modloader-input-border: rgba(255,255,255,.16); --modloader-input-text: rgba(255,255,255,.92); --modloader-focus-border: rgba(207,233,255,.5); --modloader-panel-shadow: 0 12px 36px rgba(0,0,0,.35); --modloader-primary-bg: #f2f2ed; --modloader-primary-text: #111; --modloader-danger-bg: rgba(255,96,96,.2); --modloader-danger-border: rgba(255,96,96,.28); --modloader-danger-text: #ffd4d4; --modloader-warning-text: #ffe1a3; --modloader-error-text: #ffb0b0; --modloader-ok-text: #cfe9ff; --modloader-slider-fill-color: rgba(207,233,255,.82); --modloader-slider-track-color: rgba(255,255,255,.14); --modloader-slider-track-shadow: inset 0 1px 3px rgba(0,0,0,.42); position: fixed; right: 16px; top: 16px; z-index: 2147483647; box-sizing: border-box; width: min(860px, calc(100vw - 32px)); max-height: calc(100vh - 32px); overflow: auto; padding: 14px; border-radius: 8px; background: var(--modloader-panel-bg); color: var(--modloader-panel-text); box-shadow: var(--modloader-panel-shadow); font: 13px/1.45 Montserrat, Arial, sans-serif; transition: left .22s ease, top .22s ease, right .22s ease, background .16s ease, box-shadow .16s ease; }
 			#modloader-panel.modloader-panel-modal-open > :not(.modloader-modal) { filter: blur(4px); opacity: .52; pointer-events: none; user-select: none; }
 			#modloader-panel h2 { flex: 1 1 auto; min-width: 0; margin: 0; font-size: 16px; }
-			#modloader-panel h3 { margin: 14px 0 6px; font-size: 13px; color: rgba(255,255,255,.72); }
+			#modloader-panel h3 { margin: 14px 0 6px; font-size: 13px; color: var(--modloader-text); }
 			#modloader-panel button, #modloader-panel input, #modloader-panel textarea, #modloader-panel select { font: inherit; }
 			#modloader-panel .modloader-panel-header { display: flex; align-items: center; gap: 10px; margin: -3px -3px 8px; padding: 3px; cursor: grab; user-select: none; touch-action: none; }
 			#modloader-panel .modloader-panel-header:active { cursor: grabbing; }
 			#modloader-panel .modloader-panel-controls { display: inline-flex; align-items: center; gap: 4px; flex: 0 0 auto; }
-			#modloader-panel .modloader-panel-close, #modloader-panel .modloader-panel-edge, #modloader-panel .modloader-panel-settings { position: relative; display: grid; place-items: center; width: 24px; height: 24px; border: 0; border-radius: 5px; padding: 0; background: transparent; color: rgba(255,255,255,.8); cursor: pointer; }
+			#modloader-panel .modloader-panel-close, #modloader-panel .modloader-panel-edge, #modloader-panel .modloader-panel-settings { position: relative; display: grid; place-items: center; width: 24px; height: 24px; border: 0; border-radius: 5px; padding: 0; background: transparent; color: var(--modloader-control-text); cursor: pointer; }
 			#modloader-panel .modloader-panel-close:before, #modloader-panel .modloader-panel-close:after { content: ''; position: absolute; left: 50%; top: 50%; width: 15px; height: 2px; border-radius: 999px; background: currentColor; transform-origin: center; }
 			#modloader-panel .modloader-panel-close:before { transform: translate(-50%, -50%) rotate(45deg); }
 			#modloader-panel .modloader-panel-close:after { transform: translate(-50%, -50%) rotate(-45deg); }
 			#modloader-panel .modloader-panel-edge { font: 700 15px/1 Montserrat, Arial, sans-serif; letter-spacing: -1px; }
 			#modloader-panel .modloader-panel-edge-icon { display: block; transform: translateY(-1px); }
 			#modloader-panel .modloader-panel-settings:before { content: '\\2699'; display: block; font-size: 16px; line-height: 1; transform: translateY(1px); }
-			#modloader-panel .modloader-panel-settings.active, #modloader-panel .modloader-panel-edge:hover:not(:disabled), #modloader-panel .modloader-panel-settings:hover, #modloader-panel .modloader-panel-close:hover { color: #fff; background: rgba(255,255,255,.08); }
+			#modloader-panel .modloader-panel-settings.active, #modloader-panel .modloader-panel-edge:hover:not(:disabled), #modloader-panel .modloader-panel-settings:hover, #modloader-panel .modloader-panel-close:hover { color: var(--modloader-control-text-hover); background: var(--modloader-surface-hover); }
 			#modloader-panel .modloader-panel-edge:disabled { cursor: default; opacity: .34; }
 			#modloader-panel.modloader-panel-dragging { transition: none; }
 			#modloader-panel.modloader-panel-autohidden { width: 42px; height: 42px; max-height: 42px; overflow: visible; padding: 0; background: transparent; box-shadow: none; pointer-events: none; }
 			#modloader-panel.modloader-panel-autohidden > :not(.modloader-panel-tab) { display: none; }
-			#modloader-panel .modloader-panel-tab { position: absolute; inset: 0; display: none; place-items: center; width: 42px; height: 42px; border: 1px solid rgba(255,255,255,.14); border-radius: 8px; padding: 0; background: rgba(8,10,12,.9); color: inherit; box-shadow: 0 8px 22px rgba(0,0,0,.32); cursor: grab; pointer-events: auto; touch-action: none; }
+			#modloader-panel .modloader-panel-tab { position: absolute; inset: 0; display: none; place-items: center; width: 42px; height: 42px; border: 1px solid var(--modloader-control-border); border-radius: 8px; padding: 0; background: var(--modloader-panel-bg); color: inherit; box-shadow: var(--modloader-panel-shadow); cursor: grab; pointer-events: auto; touch-action: none; }
 			#modloader-panel .modloader-panel-tab:active { cursor: grabbing; }
 			#modloader-panel.modloader-panel-autohidden .modloader-panel-tab { display: grid; }
 			#modloader-panel.modloader-panel-hidden-left .modloader-panel-tab { border-radius: 0 8px 8px 0; }
@@ -3503,68 +3720,70 @@
 			#modloader-panel.modloader-panel-hidden-bottom .modloader-panel-tab { border-radius: 8px 8px 0 0; }
 			#modloader-panel .modloader-panel-tab-logo { width: 24px; height: 24px; border-radius: 5px; background: url('img/logo/sheet.png'); background-size: 400% 200%; box-shadow: inset 0 0 0 1px rgba(255,255,255,.14), 0 2px 8px rgba(0,0,0,.22); }
 			#modloader-panel .modloader-panel-settings-page { display: grid; gap: 9px; max-height: 0; margin: 0; padding: 0; border-top: 1px solid transparent; border-bottom: 1px solid transparent; opacity: 0; overflow: hidden; pointer-events: none; transform: translateY(-5px); transition: max-height .28s cubic-bezier(.18, .86, .2, 1), margin-bottom .28s cubic-bezier(.18, .86, .2, 1), padding-top .28s cubic-bezier(.18, .86, .2, 1), padding-bottom .28s cubic-bezier(.18, .86, .2, 1), border-color .24s ease, opacity .2s ease, transform .28s cubic-bezier(.18, .86, .2, 1); }
-			#modloader-panel .modloader-panel-settings-page.active { max-height: min(42vh, 420px); margin-bottom: 12px; padding: 10px 0 11px; border-color: rgba(255,255,255,.09); opacity: 1; pointer-events: auto; transform: translateY(0); }
-			#modloader-panel .modloader-panel-settings-title { color: rgba(255,255,255,.86); font-weight: 600; }
-			#modloader-panel .modloader-panel-settings-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; color: rgba(255,255,255,.72); }
-			#modloader-panel .modloader-panel-settings-options { display: inline-flex; align-items: center; gap: 4px; padding: 2px; border-radius: 7px; background: rgba(255,255,255,.07); }
-			#modloader-panel .modloader-panel-settings-option { border: 0; border-radius: 5px; padding: 5px 8px; background: transparent; color: rgba(255,255,255,.7); cursor: pointer; }
-			#modloader-panel .modloader-panel-settings-option.active { background: rgba(255,255,255,.92); color: rgba(10,12,14,.92); }
-			#modloader-panel .modloader-panel-settings-number-wrap { display: inline-flex; align-items: center; gap: 5px; color: rgba(255,255,255,.58); }
-			#modloader-panel .modloader-panel-settings-number { box-sizing: border-box; width: 66px; border: 1px solid rgba(255,255,255,.14); border-radius: 5px; padding: 4px 6px; background: rgba(0,0,0,.2); color: rgba(255,255,255,.88); text-align: right; outline: none; }
-			#modloader-panel .modloader-panel-settings-number:focus { border-color: rgba(207,233,255,.5); }
+			#modloader-panel .modloader-panel-settings-page.active { max-height: min(42vh, 420px); margin-bottom: 12px; padding: 10px 0 11px; border-color: var(--modloader-border); opacity: 1; pointer-events: auto; transform: translateY(0); }
+			#modloader-panel .modloader-panel-settings-title { color: var(--modloader-text-strong); font-weight: 600; }
+			#modloader-panel .modloader-panel-settings-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; color: var(--modloader-text); }
+			#modloader-panel .modloader-panel-settings-actions { display: inline-flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; }
+			#modloader-panel .modloader-panel-settings-options { display: inline-flex; align-items: center; gap: 4px; padding: 2px; border-radius: 7px; background: var(--modloader-surface-hover); }
+			#modloader-panel .modloader-panel-settings-option { border: 0; border-radius: 5px; padding: 5px 8px; background: transparent; color: var(--modloader-control-text); cursor: pointer; }
+			#modloader-panel .modloader-panel-settings-option.active { background: var(--modloader-primary-bg); color: var(--modloader-primary-text); }
+			#modloader-panel .modloader-panel-settings-number-wrap { display: inline-flex; align-items: center; gap: 5px; color: var(--modloader-text-muted); }
+			#modloader-panel .modloader-panel-settings-number { box-sizing: border-box; width: 66px; border: 1px solid var(--modloader-input-border); border-radius: 5px; padding: 4px 6px; background: var(--modloader-input-bg); color: var(--modloader-input-text); text-align: right; outline: none; }
+			#modloader-panel .modloader-panel-settings-number:focus { border-color: var(--modloader-focus-border); }
 			#modloader-panel .modloader-panel-settings-unit { font-size: 12px; }
-			#modloader-panel.modloader-panel-theme-light { background: rgba(248,248,246,.96); color: rgba(18,20,22,.94); box-shadow: 0 12px 36px rgba(0,0,0,.18); }
-			#modloader-panel.modloader-panel-theme-light h3, #modloader-panel.modloader-panel-theme-light .modloader-panel-note, #modloader-panel.modloader-panel-theme-light .modloader-panel-label, #modloader-panel.modloader-panel-theme-light .modloader-panel-settings-row, #modloader-panel.modloader-panel-theme-light .modloader-select-all-control { color: rgba(30,32,34,.68); }
-			#modloader-panel.modloader-panel-theme-light .modloader-panel-settings-title, #modloader-panel.modloader-panel-theme-light .modloader-panel-value, #modloader-panel.modloader-panel-theme-light .modloader-mod-path, #modloader-panel.modloader-panel-theme-light .modloader-mod-label, #modloader-panel.modloader-panel-theme-light .modloader-mod-config-title, #modloader-panel.modloader-panel-theme-light .modloader-config-label { color: rgba(18,20,22,.9); }
-			#modloader-panel.modloader-panel-theme-light .modloader-panel-close, #modloader-panel.modloader-panel-theme-light .modloader-panel-edge, #modloader-panel.modloader-panel-theme-light .modloader-panel-settings { color: rgba(18,20,22,.72); }
-			#modloader-panel.modloader-panel-theme-light .modloader-panel-settings.active, #modloader-panel.modloader-panel-theme-light .modloader-panel-edge:hover:not(:disabled), #modloader-panel.modloader-panel-theme-light .modloader-panel-settings:hover, #modloader-panel.modloader-panel-theme-light .modloader-panel-close:hover { color: #111; background: rgba(0,0,0,.08); }
-			#modloader-panel.modloader-panel-theme-light .modloader-panel-settings-page.active { border-color: rgba(0,0,0,.1); }
-			#modloader-panel.modloader-panel-theme-light .modloader-panel-settings-options { background: rgba(0,0,0,.06); }
-			#modloader-panel.modloader-panel-theme-light .modloader-panel-settings-option { color: rgba(18,20,22,.66); }
-			#modloader-panel.modloader-panel-theme-light .modloader-panel-settings-option.active { background: rgba(18,20,22,.9); color: #fff; }
-			#modloader-panel.modloader-panel-theme-light .modloader-panel-settings-number-wrap { color: rgba(18,20,22,.56); }
-			#modloader-panel.modloader-panel-theme-light .modloader-mod-toolbar { background: rgba(248,248,246,.96); }
-			#modloader-panel.modloader-panel-theme-light .modloader-mod-row, #modloader-panel.modloader-panel-theme-light .modloader-panel-log, #modloader-panel.modloader-panel-theme-light .modloader-import-zone { border-color: rgba(0,0,0,.1); background: rgba(0,0,0,.035); }
-			#modloader-panel.modloader-panel-theme-light .modloader-import-zone.dragging { border-color: rgba(18,20,22,.28); background: rgba(18,20,22,.06); }
-			#modloader-panel.modloader-panel-theme-light .modloader-import-copy { color: rgba(18,20,22,.62); }
-			#modloader-panel.modloader-panel-theme-light .modloader-import-title { color: rgba(18,20,22,.88); }
-			#modloader-panel.modloader-panel-theme-light .modloader-import-detail { color: rgba(18,20,22,.56); }
-			#modloader-panel.modloader-panel-theme-light .modloader-import-status { color: rgba(18,20,22,.62); }
-			#modloader-panel.modloader-panel-theme-light .modloader-mod-name, #modloader-panel.modloader-panel-theme-light .modloader-mod-version, #modloader-panel.modloader-panel-theme-light .modloader-mod-meta, #modloader-panel.modloader-panel-theme-light .modloader-config-meta { color: rgba(18,20,22,.58); }
-			#modloader-panel.modloader-panel-theme-light input.modloader-config-input:not([type="checkbox"]), #modloader-panel.modloader-panel-theme-light textarea.modloader-config-input, #modloader-panel.modloader-panel-theme-light select.modloader-config-input, #modloader-panel.modloader-panel-theme-light .modloader-panel-settings-number, #modloader-panel.modloader-panel-theme-light .modloader-resource-color-text, #modloader-panel.modloader-panel-theme-light .modloader-color-text { background: rgba(0,0,0,.045); border-color: rgba(0,0,0,.14); color: rgba(18,20,22,.92); }
-			#modloader-panel.modloader-panel-theme-light .modloader-config-slider-number { background: rgba(0,0,0,.045); border-color: rgba(0,0,0,.14); color: rgba(18,20,22,.92); }
-			#modloader-panel.modloader-panel-theme-light .modloader-config-slider-labels, #modloader-panel.modloader-panel-theme-light .modloader-config-slider-value { color: rgba(18,20,22,.58); }
-			#modloader-panel.modloader-panel-theme-light .modloader-config-slider-range::-webkit-slider-runnable-track { background: linear-gradient(90deg, rgba(18,20,22,.52) 0 var(--modloader-slider-fill, 0%), rgba(0,0,0,.12) var(--modloader-slider-fill, 0%) 100%); box-shadow: inset 0 1px 2px rgba(0,0,0,.18); }
-			#modloader-panel.modloader-panel-theme-light .modloader-config-slider-range::-moz-range-track { background: rgba(0,0,0,.12); box-shadow: inset 0 1px 2px rgba(0,0,0,.18); }
-			#modloader-panel.modloader-panel-theme-light .modloader-config-slider-range::-moz-range-progress { background: rgba(18,20,22,.52); }
-			#modloader-panel.modloader-panel-theme-light .modloader-action-button, #modloader-panel.modloader-panel-theme-light .modloader-modal-button, #modloader-panel.modloader-panel-theme-light .modloader-resource-color-reset, #modloader-panel.modloader-panel-theme-light .modloader-resource-color-share-button, #modloader-panel.modloader-panel-theme-light .modloader-color-reset, #modloader-panel.modloader-panel-theme-light .modloader-config-number-reset { background: rgba(0,0,0,.055); border-color: rgba(0,0,0,.12); color: rgba(18,20,22,.78); }
-			#modloader-panel.modloader-panel-theme-light .modloader-resource-color-share-status { color: rgba(18,20,22,.54); }
-			#modloader-panel.modloader-panel-theme-light .modloader-panel-tab { background: rgba(248,248,246,.95); border-color: rgba(0,0,0,.12); }
+			#modloader-panel.modloader-panel-theme-light { --modloader-panel-bg: rgba(248,248,246,.96); --modloader-panel-text: rgba(18,20,22,.94); --modloader-text-strong: rgba(18,20,22,.9); --modloader-text: rgba(30,32,34,.68); --modloader-text-muted: rgba(18,20,22,.58); --modloader-text-subtle: rgba(18,20,22,.46); --modloader-border: rgba(0,0,0,.1); --modloader-border-strong: rgba(0,0,0,.14); --modloader-surface: rgba(0,0,0,.035); --modloader-surface-hover: rgba(0,0,0,.06); --modloader-surface-active: rgba(0,0,0,.09); --modloader-control-bg: rgba(0,0,0,.055); --modloader-control-bg-hover: rgba(0,0,0,.09); --modloader-control-border: rgba(0,0,0,.12); --modloader-control-border-hover: rgba(0,0,0,.18); --modloader-control-text: rgba(18,20,22,.78); --modloader-control-text-hover: rgba(18,20,22,.92); --modloader-input-bg: rgba(0,0,0,.045); --modloader-input-border: rgba(0,0,0,.14); --modloader-input-text: rgba(18,20,22,.92); --modloader-focus-border: rgba(18,20,22,.32); --modloader-panel-shadow: 0 12px 36px rgba(0,0,0,.18); --modloader-primary-bg: rgba(18,20,22,.9); --modloader-primary-text: #fff; --modloader-danger-bg: rgba(155,31,45,.1); --modloader-danger-border: rgba(155,31,45,.24); --modloader-danger-text: #9b1f2d; --modloader-warning-text: rgba(120,78,0,.9); --modloader-error-text: #9b1f2d; --modloader-ok-text: rgba(18,20,22,.62); --modloader-slider-fill-color: rgba(18,20,22,.52); --modloader-slider-track-color: rgba(0,0,0,.12); --modloader-slider-track-shadow: inset 0 1px 2px rgba(0,0,0,.18); }
+			#modloader-panel.modloader-panel-theme-light h3, #modloader-panel.modloader-panel-theme-light .modloader-panel-note, #modloader-panel.modloader-panel-theme-light .modloader-panel-label, #modloader-panel.modloader-panel-theme-light .modloader-panel-settings-row, #modloader-panel.modloader-panel-theme-light .modloader-select-all-control { color: var(--modloader-text); }
+			#modloader-panel.modloader-panel-theme-light .modloader-panel-settings-title, #modloader-panel.modloader-panel-theme-light .modloader-panel-value, #modloader-panel.modloader-panel-theme-light .modloader-mod-path, #modloader-panel.modloader-panel-theme-light .modloader-mod-label, #modloader-panel.modloader-panel-theme-light .modloader-mod-config-title, #modloader-panel.modloader-panel-theme-light .modloader-config-label { color: var(--modloader-text-strong); }
+			#modloader-panel.modloader-panel-theme-light .modloader-panel-close, #modloader-panel.modloader-panel-theme-light .modloader-panel-edge, #modloader-panel.modloader-panel-theme-light .modloader-panel-settings { color: var(--modloader-control-text); }
+			#modloader-panel.modloader-panel-theme-light .modloader-panel-settings.active, #modloader-panel.modloader-panel-theme-light .modloader-panel-edge:hover:not(:disabled), #modloader-panel.modloader-panel-theme-light .modloader-panel-settings:hover, #modloader-panel.modloader-panel-theme-light .modloader-panel-close:hover { color: var(--modloader-control-text-hover); background: var(--modloader-surface-hover); }
+			#modloader-panel.modloader-panel-theme-light .modloader-panel-settings-page.active { border-color: var(--modloader-border); }
+			#modloader-panel.modloader-panel-theme-light .modloader-panel-settings-options { background: var(--modloader-surface-hover); }
+			#modloader-panel.modloader-panel-theme-light .modloader-panel-settings-option { color: var(--modloader-control-text); }
+			#modloader-panel.modloader-panel-theme-light .modloader-panel-settings-option.active { background: var(--modloader-primary-bg); color: var(--modloader-primary-text); }
+			#modloader-panel.modloader-panel-theme-light .modloader-panel-settings-number-wrap { color: var(--modloader-text-muted); }
+			#modloader-panel.modloader-panel-theme-light .modloader-mod-toolbar { background: var(--modloader-panel-bg); }
+			#modloader-panel.modloader-panel-theme-light .modloader-mod-row, #modloader-panel.modloader-panel-theme-light .modloader-panel-log, #modloader-panel.modloader-panel-theme-light .modloader-import-zone { border-color: var(--modloader-border); background: var(--modloader-surface); }
+			#modloader-panel.modloader-panel-theme-light .modloader-import-zone.dragging { border-color: var(--modloader-focus-border); background: var(--modloader-surface-active); }
+			#modloader-panel.modloader-panel-theme-light .modloader-import-copy { color: var(--modloader-text); }
+			#modloader-panel.modloader-panel-theme-light .modloader-import-title { color: var(--modloader-text-strong); }
+			#modloader-panel.modloader-panel-theme-light .modloader-import-detail { color: var(--modloader-text-muted); }
+			#modloader-panel.modloader-panel-theme-light .modloader-import-status { color: var(--modloader-ok-text); }
+			#modloader-panel.modloader-panel-theme-light .modloader-mod-name, #modloader-panel.modloader-panel-theme-light .modloader-mod-version, #modloader-panel.modloader-panel-theme-light .modloader-mod-meta, #modloader-panel.modloader-panel-theme-light .modloader-config-meta { color: var(--modloader-text-muted); }
+			#modloader-panel.modloader-panel-theme-light input.modloader-config-input:not([type="checkbox"]), #modloader-panel.modloader-panel-theme-light textarea.modloader-config-input, #modloader-panel.modloader-panel-theme-light select.modloader-config-input, #modloader-panel.modloader-panel-theme-light .modloader-panel-settings-number, #modloader-panel.modloader-panel-theme-light .modloader-resource-color-text, #modloader-panel.modloader-panel-theme-light .modloader-color-text { background: var(--modloader-input-bg); border-color: var(--modloader-input-border); color: var(--modloader-input-text); }
+			#modloader-panel.modloader-panel-theme-light .modloader-config-slider-number { background: var(--modloader-input-bg); border-color: var(--modloader-input-border); color: var(--modloader-input-text); }
+			#modloader-panel.modloader-panel-theme-light .modloader-config-slider-labels, #modloader-panel.modloader-panel-theme-light .modloader-config-slider-value { color: var(--modloader-text-muted); }
+			#modloader-panel.modloader-panel-theme-light .modloader-config-slider-range::-webkit-slider-runnable-track { background: linear-gradient(90deg, var(--modloader-slider-fill-color) 0 var(--modloader-slider-fill, 0%), var(--modloader-slider-track-color) var(--modloader-slider-fill, 0%) 100%); box-shadow: var(--modloader-slider-track-shadow); }
+			#modloader-panel.modloader-panel-theme-light .modloader-config-slider-range::-moz-range-track { background: var(--modloader-slider-track-color); box-shadow: var(--modloader-slider-track-shadow); }
+			#modloader-panel.modloader-panel-theme-light .modloader-config-slider-range::-moz-range-progress { background: var(--modloader-slider-fill-color); }
+			#modloader-panel.modloader-panel-theme-light .modloader-action-button, #modloader-panel.modloader-panel-theme-light .modloader-modal-button, #modloader-panel.modloader-panel-theme-light .modloader-resource-color-reset, #modloader-panel.modloader-panel-theme-light .modloader-resource-color-share-button, #modloader-panel.modloader-panel-theme-light .modloader-color-reset, #modloader-panel.modloader-panel-theme-light .modloader-config-number-reset, #modloader-panel.modloader-panel-theme-light .modloader-config-slider-reset { background: var(--modloader-control-bg); border-color: var(--modloader-control-border); color: var(--modloader-control-text); }
+			#modloader-panel.modloader-panel-theme-light .modloader-resource-color-reset:hover:not(:disabled), #modloader-panel.modloader-panel-theme-light .modloader-resource-color-share-button:hover:not(:disabled), #modloader-panel.modloader-panel-theme-light .modloader-color-reset:hover:not(:disabled), #modloader-panel.modloader-panel-theme-light .modloader-config-number-reset:hover:not(:disabled), #modloader-panel.modloader-panel-theme-light .modloader-config-slider-reset:hover:not(:disabled) { background: var(--modloader-control-bg-hover); border-color: var(--modloader-control-border-hover); color: var(--modloader-control-text-hover); }
+			#modloader-panel.modloader-panel-theme-light .modloader-resource-color-share-status { color: var(--modloader-text-subtle); }
+			#modloader-panel.modloader-panel-theme-light .modloader-panel-tab { background: var(--modloader-panel-bg); border-color: var(--modloader-control-border); }
 			#modloader-panel .modloader-panel-summary { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px 12px; margin: 8px 0 12px; }
-			#modloader-panel .modloader-panel-row { display: flex; gap: 12px; justify-content: space-between; border-top: 1px solid rgba(255,255,255,.1); padding: 5px 0; }
+			#modloader-panel .modloader-panel-row { display: flex; gap: 12px; justify-content: space-between; border-top: 1px solid var(--modloader-border); padding: 5px 0; }
 			#modloader-panel .modloader-panel-row-wide { grid-column: 1 / -1; }
-			#modloader-panel .modloader-panel-label { color: rgba(255,255,255,.62); }
+			#modloader-panel .modloader-panel-label { color: var(--modloader-text-muted); }
 			#modloader-panel .modloader-panel-value { min-width: 0; text-align: right; overflow-wrap: anywhere; }
 			#modloader-panel .modloader-panel-list { margin: 0; padding-left: 18px; }
-			#modloader-panel .modloader-panel-log { margin: 0; padding: 8px; border-radius: 6px; background: rgba(255,255,255,.08); white-space: pre-wrap; overflow-wrap: anywhere; }
+			#modloader-panel .modloader-panel-log { margin: 0; padding: 8px; border-radius: 6px; background: var(--modloader-surface-hover); white-space: pre-wrap; overflow-wrap: anywhere; }
 			#modloader-panel .modloader-panel-issues { margin: 8px 0 0; padding: 8px 8px 8px 24px; border-radius: 6px; background: rgba(255, 196, 87, .12); color: rgba(255,255,255,.92); }
-			#modloader-panel .modloader-panel-issue-error { color: #ffb0b0; }
-			#modloader-panel .modloader-panel-issue-warn { color: #ffe1a3; }
-			#modloader-panel .modloader-mod-toolbar { position: sticky; top: -14px; z-index: 2; display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 8px -2px 10px; padding: 8px 2px; background: rgba(8, 10, 12, .96); }
+			#modloader-panel .modloader-panel-issue-error { color: var(--modloader-error-text); }
+			#modloader-panel .modloader-panel-issue-warn { color: var(--modloader-warning-text); }
+			#modloader-panel .modloader-mod-toolbar { position: sticky; top: -14px; z-index: 2; display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 8px -2px 10px; padding: 8px 2px; background: var(--modloader-panel-bg); }
 			#modloader-panel .modloader-toolbar-left { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; min-width: 0; }
-			#modloader-panel .modloader-select-all-control { display: inline-flex; align-items: center; gap: 7px; flex: 0 0 auto; color: rgba(255,255,255,.78); font-size: 12px; cursor: pointer; user-select: none; }
+			#modloader-panel .modloader-select-all-control { display: inline-flex; align-items: center; gap: 7px; flex: 0 0 auto; color: var(--modloader-control-text); font-size: 12px; cursor: pointer; user-select: none; }
 			#modloader-panel .modloader-select-all-text { transform: translateY(.5px); }
-			#modloader-panel .modloader-panel-note { color: rgba(255,255,255,.7); }
-			#modloader-panel .modloader-panel-reload-note { display: none; color: #ffe1a3; }
+			#modloader-panel .modloader-panel-note { color: var(--modloader-text); }
+			#modloader-panel .modloader-panel-reload-note { display: none; color: var(--modloader-warning-text); }
 			#modloader-panel .modloader-panel-reload-note.active { display: inline; }
-			#modloader-panel .modloader-panel-config-note { position: absolute; right: 2px; top: calc(100% + 2px); display: block; box-sizing: border-box; max-width: min(520px, calc(100% - 16px)); overflow: hidden; border-radius: 999px; padding: 3px 8px; background: rgba(8,10,12,.88); color: rgba(207,233,255,.88); box-shadow: 0 5px 14px rgba(0,0,0,.22); opacity: 0; pointer-events: none; text-overflow: ellipsis; white-space: nowrap; transform: translateY(-3px); transition: opacity .14s ease, transform .14s ease; }
+			#modloader-panel .modloader-panel-config-note { position: absolute; right: 2px; top: calc(100% + 2px); display: block; box-sizing: border-box; max-width: min(520px, calc(100% - 16px)); overflow: hidden; border: 1px solid var(--modloader-border); border-radius: 999px; padding: 3px 8px; background: var(--modloader-panel-bg); color: var(--modloader-ok-text); box-shadow: 0 5px 14px rgba(0,0,0,.22); opacity: 0; pointer-events: none; text-overflow: ellipsis; white-space: nowrap; transform: translateY(-3px); transition: opacity .14s ease, transform .14s ease; }
 			#modloader-panel .modloader-panel-config-note.active { opacity: 1; transform: translateY(0); }
-			#modloader-panel.modloader-panel-theme-light .modloader-panel-config-note { border: 1px solid rgba(0,0,0,.08); background: rgba(248,248,246,.96); color: rgba(18,20,22,.58); box-shadow: 0 5px 14px rgba(0,0,0,.12); }
-			#modloader-panel .modloader-save-button { border: 0; border-radius: 6px; padding: 7px 10px; background: #f2f2ed; color: #111; cursor: pointer; }
+			#modloader-panel.modloader-panel-theme-light .modloader-panel-config-note { border-color: var(--modloader-border); background: var(--modloader-panel-bg); color: var(--modloader-ok-text); box-shadow: 0 5px 14px rgba(0,0,0,.12); }
+			#modloader-panel .modloader-save-button { border: 0; border-radius: 6px; padding: 7px 10px; background: var(--modloader-primary-bg); color: var(--modloader-primary-text); cursor: pointer; }
 			#modloader-panel .modloader-save-button:disabled { cursor: default; opacity: .45; }
 			#modloader-panel .modloader-toolbar-actions { display: inline-flex; align-items: center; gap: 6px; flex: 0 0 auto; }
-			#modloader-panel .modloader-action-button { display: inline-flex; align-items: center; gap: 6px; border: 1px solid rgba(255,255,255,.12); border-radius: 6px; padding: 7px 9px; background: rgba(255,255,255,.08); color: rgba(255,255,255,.88); cursor: pointer; }
-			#modloader-panel .modloader-action-button:hover, #modloader-panel .modloader-action-button.active { background: rgba(255,255,255,.14); border-color: rgba(207,233,255,.3); }
+			#modloader-panel .modloader-action-button { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--modloader-control-border); border-radius: 6px; padding: 7px 9px; background: var(--modloader-control-bg); color: var(--modloader-control-text); cursor: pointer; }
+			#modloader-panel .modloader-action-button:hover:not(:disabled), #modloader-panel .modloader-action-button.active { background: var(--modloader-control-bg-hover); border-color: var(--modloader-control-border-hover); color: var(--modloader-control-text-hover); }
 			#modloader-panel .modloader-action-button:disabled { cursor: default; opacity: .45; }
 			#modloader-panel .modloader-action-icon { position: relative; display: inline-block; width: 15px; height: 15px; flex: 0 0 auto; color: currentColor; }
 			#modloader-panel .modloader-action-icon-plus:before, #modloader-panel .modloader-action-icon-plus:after { content: ''; position: absolute; left: 50%; top: 50%; width: 13px; height: 2px; border-radius: 999px; background: currentColor; transform: translate(-50%, -50%); }
@@ -3572,24 +3791,27 @@
 			#modloader-panel .modloader-action-icon-folder { width: 16px; height: 12px; margin-top: 3px; border-radius: 3px; background: currentColor; }
 			#modloader-panel .modloader-action-icon-folder:before { content: ''; position: absolute; left: 2px; top: -2px; width: 6px; height: 3px; border-radius: 2px 2px 0 0; background: currentColor; }
 			#modloader-panel .modloader-action-icon-translation:before { content: 'Aa'; position: absolute; left: 50%; top: 50%; transform: translate(-50%, -52%); font: 700 10px/1 Montserrat, Arial, sans-serif; letter-spacing: -.5px; }
-			#modloader-panel .modloader-panel-error { margin: 8px 0; padding: 8px; border-radius: 6px; background: rgba(255, 96, 96, .14); color: #ffb0b0; }
-			#modloader-panel .modloader-import-zone { display: grid; place-items: center; min-height: 0; max-height: 0; opacity: 0; overflow: hidden; border: 1px solid transparent; border-radius: 7px; background: rgba(0,0,0,.16); box-shadow: inset 0 1px 18px rgba(0,0,0,.28); transform: translateY(-8px); transition: max-height .22s ease, min-height .22s ease, opacity .16s ease, transform .22s ease, border-color .16s ease; }
-			#modloader-panel .modloader-import-zone.active { min-height: 220px; max-height: 320px; opacity: 1; transform: translateY(0); border-color: rgba(255,255,255,.09); }
-			#modloader-panel .modloader-import-zone.dragging { border-color: rgba(207,233,255,.5); background: rgba(207,233,255,.08); }
-			#modloader-panel .modloader-import-copy { text-align: center; padding: 18px; color: rgba(255,255,255,.72); }
-			#modloader-panel .modloader-import-title { font-weight: 600; color: rgba(255,255,255,.9); }
-			#modloader-panel .modloader-import-detail { margin-top: 8px; max-width: 520px; color: rgba(255,255,255,.58); }
-			#modloader-panel .modloader-import-status { margin-top: 12px; color: #cfe9ff; }
+			#modloader-panel .modloader-action-icon-export:before, #modloader-panel .modloader-action-icon-import:before { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -55%); font: 700 13px/1 Montserrat, Arial, sans-serif; }
+			#modloader-panel .modloader-action-icon-export:before { content: '\\2191'; }
+			#modloader-panel .modloader-action-icon-import:before { content: '\\2193'; }
+			#modloader-panel .modloader-panel-error { margin: 8px 0; padding: 8px; border-radius: 6px; background: rgba(255, 96, 96, .14); color: var(--modloader-error-text); }
+			#modloader-panel .modloader-import-zone { display: grid; place-items: center; min-height: 0; max-height: 0; opacity: 0; overflow: hidden; border: 1px solid transparent; border-radius: 7px; background: var(--modloader-surface); box-shadow: inset 0 1px 18px rgba(0,0,0,.28); transform: translateY(-8px); transition: max-height .22s ease, min-height .22s ease, opacity .16s ease, transform .22s ease, border-color .16s ease; }
+			#modloader-panel .modloader-import-zone.active { min-height: 220px; max-height: 320px; opacity: 1; transform: translateY(0); border-color: var(--modloader-border); }
+			#modloader-panel .modloader-import-zone.dragging { border-color: var(--modloader-focus-border); background: var(--modloader-surface-active); }
+			#modloader-panel .modloader-import-copy { text-align: center; padding: 18px; color: var(--modloader-text); }
+			#modloader-panel .modloader-import-title { font-weight: 600; color: var(--modloader-text-strong); }
+			#modloader-panel .modloader-import-detail { margin-top: 8px; max-width: 520px; color: var(--modloader-text-muted); }
+			#modloader-panel .modloader-import-status { margin-top: 12px; color: var(--modloader-ok-text); }
 			#modloader-panel .modloader-mod-manager { display: grid; gap: 6px; max-height: min(48vh, 460px); overflow-x: hidden; overflow-y: auto; padding-right: 5px; scrollbar-gutter: stable; scrollbar-width: thin; scrollbar-color: rgba(185,185,185,.48) transparent; opacity: 1; transform: translateY(0); transition: opacity .16s ease, transform .18s ease, max-height .22s ease; }
 			#modloader-panel .modloader-mod-manager.modloader-mod-manager-importing { max-height: 0; opacity: 0; pointer-events: none; transform: translateY(8px); }
 			#modloader-panel .modloader-mod-manager::-webkit-scrollbar { width: 4px; }
 			#modloader-panel .modloader-mod-manager::-webkit-scrollbar-track { background: transparent; }
 			#modloader-panel .modloader-mod-manager::-webkit-scrollbar-thumb { border-radius: 999px; background: rgba(185,185,185,.48); }
 			#modloader-panel .modloader-mod-manager::-webkit-scrollbar-thumb:hover { background: rgba(210,210,210,.62); }
-			#modloader-panel .modloader-mod-row { --modloader-row-gap: 10px; --modloader-row-padding: 9px; --modloader-row-radius: 7px; --modloader-row-font-size: 13px; --modloader-row-check-offset: 2px; --modloader-row-actions-gap: 2px; --modloader-row-index-width: 13px; --modloader-row-index-size: 11px; --modloader-row-action-size: 25px; --modloader-row-action-radius: 5px; --modloader-row-sort-x: 7px; --modloader-row-sort-y: 7px; --modloader-row-sort-width: 11px; --modloader-row-sort-height: 2px; --modloader-row-sort-shadow-1: 5px; --modloader-row-sort-shadow-2: 10px; --modloader-row-delete-body-x: 8px; --modloader-row-delete-body-y: 9px; --modloader-row-delete-body-width: 9px; --modloader-row-delete-body-height: 10px; --modloader-row-delete-border: 2px; --modloader-row-delete-radius-small: 1px; --modloader-row-delete-radius-large: 3px; --modloader-row-delete-lid-x: 7px; --modloader-row-delete-lid-y: 6px; --modloader-row-delete-lid-width: 11px; --modloader-row-delete-lid-height: 2px; --modloader-row-delete-lid-shadow-x: 3px; --modloader-row-delete-lid-shadow-y: -3px; --modloader-row-delete-lid-shadow-spread: -1px; --modloader-row-title-gap: 8px; --modloader-row-meta-gap: 3px; --modloader-row-warning-gap: 5px; --modloader-row-switch-width: 46px; --modloader-row-switch-height: 24px; --modloader-row-switch-knob: 20px; --modloader-row-switch-pad: 2px; --modloader-row-switch-slide: 22px; --modloader-row-switch-label-off: 6px; --modloader-row-switch-label-on: 7px; --modloader-row-switch-label-size: 9px; --modloader-row-switch-letter-spacing: .25px; position: relative; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: var(--modloader-row-gap); align-items: flex-start; padding: var(--modloader-row-padding); border: 1px solid rgba(255,255,255,.1); border-radius: var(--modloader-row-radius); background: rgba(255,255,255,.045); font-size: var(--modloader-row-font-size); line-height: 1.45; transition: border-color .14s ease, background .14s ease, box-shadow .14s ease, opacity .14s ease; }
+			#modloader-panel .modloader-mod-row { --modloader-row-gap: 10px; --modloader-row-padding: 9px; --modloader-row-radius: 7px; --modloader-row-font-size: 13px; --modloader-row-check-offset: 2px; --modloader-row-actions-gap: 2px; --modloader-row-index-width: 13px; --modloader-row-index-size: 11px; --modloader-row-action-size: 25px; --modloader-row-action-radius: 5px; --modloader-row-sort-x: 7px; --modloader-row-sort-y: 7px; --modloader-row-sort-width: 11px; --modloader-row-sort-height: 2px; --modloader-row-sort-shadow-1: 5px; --modloader-row-sort-shadow-2: 10px; --modloader-row-delete-body-x: 8px; --modloader-row-delete-body-y: 9px; --modloader-row-delete-body-width: 9px; --modloader-row-delete-body-height: 10px; --modloader-row-delete-border: 2px; --modloader-row-delete-radius-small: 1px; --modloader-row-delete-radius-large: 3px; --modloader-row-delete-lid-x: 7px; --modloader-row-delete-lid-y: 6px; --modloader-row-delete-lid-width: 11px; --modloader-row-delete-lid-height: 2px; --modloader-row-delete-lid-shadow-x: 3px; --modloader-row-delete-lid-shadow-y: -3px; --modloader-row-delete-lid-shadow-spread: -1px; --modloader-row-title-gap: 8px; --modloader-row-meta-gap: 3px; --modloader-row-warning-gap: 5px; --modloader-row-switch-width: 46px; --modloader-row-switch-height: 24px; --modloader-row-switch-knob: 20px; --modloader-row-switch-pad: 2px; --modloader-row-switch-slide: 22px; --modloader-row-switch-label-off: 6px; --modloader-row-switch-label-on: 7px; --modloader-row-switch-label-size: 9px; --modloader-row-switch-letter-spacing: .25px; position: relative; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: var(--modloader-row-gap); align-items: flex-start; padding: var(--modloader-row-padding); border: 1px solid var(--modloader-border); border-radius: var(--modloader-row-radius); background: var(--modloader-surface); font-size: var(--modloader-row-font-size); line-height: 1.45; transition: border-color .14s ease, background .14s ease, box-shadow .14s ease, opacity .14s ease; }
 			#modloader-panel .modloader-mod-row-configurable { cursor: pointer; }
-			#modloader-panel .modloader-mod-row-configurable:hover { border-color: rgba(207,233,255,.28); }
-			#modloader-panel .modloader-mod-row-expanded { border-color: rgba(207,233,255,.5); box-shadow: 0 8px 22px rgba(0,0,0,.16); }
+			#modloader-panel .modloader-mod-row-configurable:hover { border-color: var(--modloader-control-border-hover); }
+			#modloader-panel .modloader-mod-row-expanded { border-color: var(--modloader-focus-border); box-shadow: 0 8px 22px rgba(0,0,0,.16); }
 			#modloader-panel .modloader-mod-row-moving { z-index: 3; will-change: transform; }
 			#modloader-panel .modloader-mod-row-dropping { z-index: 5; pointer-events: none; will-change: transform; }
 			#modloader-panel .modloader-mod-row-dragging { --modloader-row-gap: 11px; --modloader-row-padding: 9.9px; --modloader-row-radius: 7.7px; --modloader-row-font-size: 14.3px; --modloader-row-check-offset: 2.2px; --modloader-row-actions-gap: 2.2px; --modloader-row-index-width: 14.3px; --modloader-row-index-size: 12.1px; --modloader-row-action-size: 27.5px; --modloader-row-action-radius: 5.5px; --modloader-row-sort-x: 7.7px; --modloader-row-sort-y: 7.7px; --modloader-row-sort-width: 12.1px; --modloader-row-sort-height: 2.2px; --modloader-row-sort-shadow-1: 5.5px; --modloader-row-sort-shadow-2: 11px; --modloader-row-delete-body-x: 8.8px; --modloader-row-delete-body-y: 9.9px; --modloader-row-delete-body-width: 9.9px; --modloader-row-delete-body-height: 11px; --modloader-row-delete-border: 2.2px; --modloader-row-delete-radius-small: 1.1px; --modloader-row-delete-radius-large: 3.3px; --modloader-row-delete-lid-x: 7.7px; --modloader-row-delete-lid-y: 6.6px; --modloader-row-delete-lid-width: 12.1px; --modloader-row-delete-lid-height: 2.2px; --modloader-row-delete-lid-shadow-x: 3.3px; --modloader-row-delete-lid-shadow-y: -3.3px; --modloader-row-delete-lid-shadow-spread: -1.1px; --modloader-row-title-gap: 8.8px; --modloader-row-meta-gap: 3.3px; --modloader-row-warning-gap: 5.5px; --modloader-row-switch-width: 50.6px; --modloader-row-switch-height: 26.4px; --modloader-row-switch-knob: 22px; --modloader-row-switch-pad: 2.2px; --modloader-row-switch-slide: 24.2px; --modloader-row-switch-label-off: 6.6px; --modloader-row-switch-label-on: 7.7px; --modloader-row-switch-label-size: 9.9px; --modloader-row-switch-letter-spacing: .275px; z-index: 6; opacity: 1; border-color: rgba(207,233,255,.48); background: rgba(16,22,28,.82); box-shadow: 0 22px 48px rgba(0,0,0,.52), 0 0 0 1px rgba(207,233,255,.13), inset 0 1px 0 rgba(255,255,255,.1); backdrop-filter: blur(14px) saturate(1.18); -webkit-backdrop-filter: blur(14px) saturate(1.18); pointer-events: none; will-change: left, top; }
@@ -3600,85 +3822,85 @@
 			#modloader-panel .modloader-mod-check { margin-top: var(--modloader-row-check-offset); }
 			#modloader-panel .modloader-mod-main { min-width: 0; }
 			#modloader-panel .modloader-mod-actions { display: inline-flex; align-items: center; justify-content: flex-end; gap: var(--modloader-row-actions-gap); padding-top: 0; }
-			#modloader-panel .modloader-mod-index { min-width: var(--modloader-row-index-width); border: 0; padding: 0; background: transparent; color: rgba(255,255,255,.5); text-align: right; font-weight: 700; font-size: var(--modloader-row-index-size); line-height: 1; font-family: Montserrat, Arial, sans-serif; pointer-events: none; }
-			#modloader-panel .modloader-mod-delete, #modloader-panel .modloader-mod-sort { position: relative; width: var(--modloader-row-action-size); height: var(--modloader-row-action-size); border: 0; border-radius: var(--modloader-row-action-radius); background: transparent; color: rgba(255,255,255,.56); cursor: pointer; }
+			#modloader-panel .modloader-mod-index { min-width: var(--modloader-row-index-width); border: 0; padding: 0; background: transparent; color: var(--modloader-text-subtle); text-align: right; font-weight: 700; font-size: var(--modloader-row-index-size); line-height: 1; font-family: Montserrat, Arial, sans-serif; pointer-events: none; }
+			#modloader-panel .modloader-mod-delete, #modloader-panel .modloader-mod-sort { position: relative; width: var(--modloader-row-action-size); height: var(--modloader-row-action-size); border: 0; border-radius: var(--modloader-row-action-radius); background: transparent; color: var(--modloader-text-muted); cursor: pointer; }
 			#modloader-panel .modloader-mod-sort { cursor: grab; touch-action: none; }
 			#modloader-panel .modloader-mod-sort:active { cursor: grabbing; }
 			#modloader-panel .modloader-mod-sort:before { content: ''; position: absolute; left: var(--modloader-row-sort-x); top: var(--modloader-row-sort-y); width: var(--modloader-row-sort-width); height: var(--modloader-row-sort-height); border-radius: 999px; background: currentColor; box-shadow: 0 var(--modloader-row-sort-shadow-1) 0 currentColor, 0 var(--modloader-row-sort-shadow-2) 0 currentColor; }
 			#modloader-panel .modloader-mod-delete:hover { color: #ffb0b0; background: rgba(255,96,96,.1); }
-			#modloader-panel .modloader-mod-sort:hover { color: rgba(255,255,255,.86); background: rgba(255,255,255,.08); }
+			#modloader-panel .modloader-mod-sort:hover { color: var(--modloader-control-text-hover); background: var(--modloader-surface-hover); }
 			#modloader-panel .modloader-mod-delete:before { content: ''; position: absolute; left: var(--modloader-row-delete-body-x); top: var(--modloader-row-delete-body-y); width: var(--modloader-row-delete-body-width); height: var(--modloader-row-delete-body-height); border: var(--modloader-row-delete-border) solid currentColor; border-top: 0; border-radius: var(--modloader-row-delete-radius-small) var(--modloader-row-delete-radius-small) var(--modloader-row-delete-radius-large) var(--modloader-row-delete-radius-large); box-sizing: border-box; }
 			#modloader-panel .modloader-mod-delete:after { content: ''; position: absolute; left: var(--modloader-row-delete-lid-x); top: var(--modloader-row-delete-lid-y); width: var(--modloader-row-delete-lid-width); height: var(--modloader-row-delete-lid-height); border-radius: 999px; background: currentColor; box-shadow: var(--modloader-row-delete-lid-shadow-x) var(--modloader-row-delete-lid-shadow-y) 0 var(--modloader-row-delete-lid-shadow-spread) currentColor; }
 			#modloader-panel .modloader-mod-title { display: flex; flex-wrap: wrap; gap: var(--modloader-row-title-gap); align-items: baseline; }
 			#modloader-panel .modloader-mod-path { font-weight: 600; overflow-wrap: anywhere; }
-			#modloader-panel .modloader-mod-version { color: rgba(255,255,255,.58); }
-			#modloader-panel.modloader-panel-theme-light .modloader-mod-delete, #modloader-panel.modloader-panel-theme-light .modloader-mod-sort { color: rgba(18,20,22,.46); }
-			#modloader-panel.modloader-panel-theme-light .modloader-mod-sort:hover { color: rgba(18,20,22,.76); background: rgba(0,0,0,.06); }
-			#modloader-panel.modloader-panel-theme-light .modloader-mod-index { color: rgba(18,20,22,.46); }
-			#modloader-panel .modloader-mod-name { color: rgba(255,255,255,.72); overflow-wrap: anywhere; }
-			#modloader-panel .modloader-mod-meta { margin-top: var(--modloader-row-meta-gap); color: rgba(255,255,255,.62); overflow-wrap: anywhere; }
-			#modloader-panel .modloader-mod-warning { display: none; margin-top: var(--modloader-row-warning-gap); color: #ffe1a3; overflow-wrap: anywhere; }
+			#modloader-panel .modloader-mod-version { color: var(--modloader-text-muted); }
+			#modloader-panel.modloader-panel-theme-light .modloader-mod-delete, #modloader-panel.modloader-panel-theme-light .modloader-mod-sort { color: var(--modloader-text-subtle); }
+			#modloader-panel.modloader-panel-theme-light .modloader-mod-sort:hover { color: var(--modloader-control-text-hover); background: var(--modloader-surface-hover); }
+			#modloader-panel.modloader-panel-theme-light .modloader-mod-index { color: var(--modloader-text-subtle); }
+			#modloader-panel .modloader-mod-name { color: var(--modloader-text); overflow-wrap: anywhere; }
+			#modloader-panel .modloader-mod-meta { margin-top: var(--modloader-row-meta-gap); color: var(--modloader-text-muted); overflow-wrap: anywhere; }
+			#modloader-panel .modloader-mod-warning { display: none; margin-top: var(--modloader-row-warning-gap); color: var(--modloader-warning-text); overflow-wrap: anywhere; }
 			#modloader-panel .modloader-mod-warning.active { display: block; }
 			#modloader-panel .modloader-mod-config { max-height: 0; margin-top: 0; padding-top: 0; border-top: 1px solid transparent; opacity: 0; overflow: hidden; pointer-events: none; transform: translateY(-4px); transition: max-height .32s cubic-bezier(.18, .86, .2, 1), margin-top .32s cubic-bezier(.18, .86, .2, 1), padding-top .32s cubic-bezier(.18, .86, .2, 1), border-top-color .24s ease, opacity .22s ease, transform .32s cubic-bezier(.18, .86, .2, 1); }
-			#modloader-panel .modloader-mod-row-expanded .modloader-mod-config { max-height: min(42vh, 380px); margin-top: 8px; padding-top: 8px; border-top-color: rgba(255,255,255,.09); opacity: 1; pointer-events: auto; transform: translateY(0); }
-			#modloader-panel .modloader-mod-config-title { margin-bottom: 5px; color: rgba(255,255,255,.72); font-weight: 600; }
+			#modloader-panel .modloader-mod-row-expanded .modloader-mod-config { max-height: min(42vh, 380px); margin-top: 8px; padding-top: 8px; border-top-color: var(--modloader-border); opacity: 1; pointer-events: auto; transform: translateY(0); }
+			#modloader-panel .modloader-mod-config-title { margin-bottom: 5px; color: var(--modloader-text); font-weight: 600; }
 			#modloader-panel .modloader-mod-config-scroll { max-height: min(34vh, 310px); overflow-x: hidden; overflow-y: auto; padding-right: 5px; scrollbar-gutter: stable; scrollbar-width: thin; scrollbar-color: rgba(185,185,185,.48) transparent; }
 			#modloader-panel .modloader-mod-config-scroll::-webkit-scrollbar { width: 4px; }
 			#modloader-panel .modloader-mod-config-scroll::-webkit-scrollbar-track { background: transparent; }
 			#modloader-panel .modloader-mod-config-scroll::-webkit-scrollbar-thumb { border-radius: 999px; background: rgba(185,185,185,.48); }
 			#modloader-panel .modloader-mod-config-scroll::-webkit-scrollbar-thumb:hover { background: rgba(210,210,210,.62); }
-			#modloader-panel .modloader-config-section { position: relative; margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(185,185,185,.18); }
+			#modloader-panel .modloader-config-section { position: relative; margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--modloader-border); }
 			#modloader-panel .modloader-config-section:first-child { margin-top: 0; padding-top: 0; border-top: 0; }
-			#modloader-panel .modloader-config-section-header { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 22px; margin-bottom: 6px; color: rgba(255,255,255,.72); }
+			#modloader-panel .modloader-config-section-header { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 22px; margin-bottom: 6px; color: var(--modloader-text); }
 			#modloader-panel .modloader-config-section-title { flex: 1 1 auto; min-width: 0; font-weight: 600; overflow-wrap: anywhere; }
-			#modloader-panel .modloader-config-section-sort { position: relative; flex: 0 0 auto; width: 22px; height: 22px; border: 0; border-radius: 5px; background: transparent; color: rgba(255,255,255,.56); cursor: grab; touch-action: none; }
+			#modloader-panel .modloader-config-section-sort { position: relative; flex: 0 0 auto; width: 22px; height: 22px; border: 0; border-radius: 5px; background: transparent; color: var(--modloader-text-muted); cursor: grab; touch-action: none; }
 			#modloader-panel .modloader-config-section-sort-floating { position: absolute; right: 0; top: 0; z-index: 2; opacity: .58; }
 			#modloader-panel .modloader-config-section-sort-floating:hover { opacity: 1; }
 			#modloader-panel .modloader-config-section-sort:active { cursor: grabbing; }
 			#modloader-panel .modloader-config-section-sort:before { content: ''; position: absolute; left: 6px; top: 6px; width: 10px; height: 2px; border-radius: 999px; background: currentColor; box-shadow: 0 5px 0 currentColor, 0 10px 0 currentColor; }
-			#modloader-panel .modloader-config-section-sort:hover { color: rgba(255,255,255,.86); background: rgba(255,255,255,.08); }
+			#modloader-panel .modloader-config-section-sort:hover { color: var(--modloader-control-text-hover); background: var(--modloader-surface-hover); }
 			#modloader-panel .modloader-config-section-moving { z-index: 3; will-change: transform; }
 			#modloader-panel .modloader-config-section-dragging { z-index: 7; opacity: 1; margin-top: 0; border: 1px solid rgba(207,233,255,.34); border-radius: 7px; padding: 8px; background: rgba(16,22,28,.82); box-shadow: 0 18px 38px rgba(0,0,0,.46), 0 0 0 1px rgba(207,233,255,.12), inset 0 1px 0 rgba(255,255,255,.08); backdrop-filter: blur(14px) saturate(1.18); -webkit-backdrop-filter: blur(14px) saturate(1.18); pointer-events: none; will-change: left, top; }
 			#modloader-panel .modloader-config-section-placeholder { min-height: 20px; border: 1px solid transparent; border-radius: 6px; background: transparent; box-sizing: border-box; transition: height .16s ease, min-height .16s ease; }
 			#modloader-panel .modloader-mod-config-scroll > .modloader-config-field:first-child, #modloader-panel .modloader-config-section-body .modloader-config-field:first-child { margin-top: 0; }
 			#modloader-panel .modloader-config-field { display: grid; grid-template-columns: minmax(130px, .8fr) minmax(170px, 1fr); gap: 4px 10px; align-items: center; margin-top: 6px; }
-			#modloader-panel .modloader-config-section-start { margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(185,185,185,.18); }
-			#modloader-panel.modloader-panel-theme-light .modloader-config-section, #modloader-panel.modloader-panel-theme-light .modloader-config-section-start { border-top-color: rgba(18,20,22,.12); }
-			#modloader-panel.modloader-panel-theme-light .modloader-config-section-title { color: rgba(18,20,22,.66); }
-			#modloader-panel.modloader-panel-theme-light .modloader-config-section-sort { color: rgba(18,20,22,.46); }
-			#modloader-panel.modloader-panel-theme-light .modloader-config-section-sort:hover { color: rgba(18,20,22,.76); background: rgba(0,0,0,.06); }
+			#modloader-panel .modloader-config-section-start { margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--modloader-border); }
+			#modloader-panel.modloader-panel-theme-light .modloader-config-section, #modloader-panel.modloader-panel-theme-light .modloader-config-section-start { border-top-color: var(--modloader-border); }
+			#modloader-panel.modloader-panel-theme-light .modloader-config-section-title { color: var(--modloader-text); }
+			#modloader-panel.modloader-panel-theme-light .modloader-config-section-sort { color: var(--modloader-text-subtle); }
+			#modloader-panel.modloader-panel-theme-light .modloader-config-section-sort:hover { color: var(--modloader-control-text-hover); background: var(--modloader-surface-hover); }
 			#modloader-panel.modloader-panel-theme-light .modloader-config-section-dragging { border-color: rgba(18,20,22,.16); background: rgba(250,250,247,.86); box-shadow: 0 16px 34px rgba(0,0,0,.2), 0 0 0 1px rgba(18,20,22,.08), inset 0 1px 0 rgba(255,255,255,.7); }
 			#modloader-panel .modloader-config-field-disabled { opacity: .52; }
 			#modloader-panel .modloader-config-text { min-width: 0; }
-			#modloader-panel .modloader-config-label { display: block; color: rgba(255,255,255,.86); overflow-wrap: anywhere; }
-			#modloader-panel .modloader-config-meta { display: block; font-size: 11px; color: rgba(255,255,255,.48); overflow-wrap: anywhere; }
-			#modloader-panel input.modloader-config-input:not([type="checkbox"]), #modloader-panel textarea.modloader-config-input, #modloader-panel select.modloader-config-input { box-sizing: border-box; width: 100%; min-width: 0; border: 1px solid rgba(255,255,255,.16); border-radius: 5px; padding: 5px 6px; background: rgba(0,0,0,.22); color: rgba(255,255,255,.92); outline: none; }
+			#modloader-panel .modloader-config-label { display: block; color: var(--modloader-text-strong); overflow-wrap: anywhere; }
+			#modloader-panel .modloader-config-meta { display: block; font-size: 11px; color: var(--modloader-text-subtle); overflow-wrap: anywhere; }
+			#modloader-panel input.modloader-config-input:not([type="checkbox"]), #modloader-panel textarea.modloader-config-input, #modloader-panel select.modloader-config-input { box-sizing: border-box; width: 100%; min-width: 0; border: 1px solid var(--modloader-input-border); border-radius: 5px; padding: 5px 6px; background: var(--modloader-input-bg); color: var(--modloader-input-text); outline: none; }
 			#modloader-panel .modloader-config-number { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 5px; align-items: center; min-width: 0; }
-			#modloader-panel .modloader-config-number-reset { border: 1px solid rgba(255,255,255,.14); border-radius: 5px; padding: 5px 7px; background: rgba(255,255,255,.08); color: rgba(255,255,255,.78); cursor: pointer; }
-			#modloader-panel .modloader-config-number-reset:hover { background: rgba(255,255,255,.14); color: rgba(255,255,255,.94); }
-			#modloader-panel .modloader-config-number-reset:disabled { cursor: default; opacity: .45; }
-			#modloader-panel .modloader-config-slider { display: grid; grid-template-columns: minmax(0, 1fr) 66px; gap: 4px 8px; align-items: center; width: 100%; min-width: 0; --modloader-slider-thumb-half: 14px; }
-			#modloader-panel .modloader-config-slider-labeled { grid-template-columns: minmax(0, 1fr); }
+			#modloader-panel .modloader-config-number-reset, #modloader-panel .modloader-config-slider-reset { border: 1px solid var(--modloader-control-border); border-radius: 5px; padding: 5px 7px; background: var(--modloader-control-bg); color: var(--modloader-control-text); cursor: pointer; }
+			#modloader-panel .modloader-config-number-reset:hover:not(:disabled), #modloader-panel .modloader-config-slider-reset:hover:not(:disabled) { background: var(--modloader-control-bg-hover); border-color: var(--modloader-control-border-hover); color: var(--modloader-control-text-hover); }
+			#modloader-panel .modloader-config-number-reset:disabled, #modloader-panel .modloader-config-slider-reset:disabled { cursor: default; opacity: .45; }
+			#modloader-panel .modloader-config-slider { display: grid; grid-template-columns: minmax(0, 1fr) 66px auto; gap: 4px 8px; align-items: center; width: 100%; min-width: 0; --modloader-slider-thumb-half: 14px; }
+			#modloader-panel .modloader-config-slider-labeled { grid-template-columns: minmax(0, 1fr) auto; }
 			#modloader-panel .modloader-config-slider-range { appearance: none; -webkit-appearance: none; width: 100%; min-width: 0; height: 32px; margin: 0; background: transparent; cursor: grab; outline: none; }
 			#modloader-panel .modloader-config-slider-range:active { cursor: grabbing; }
-			#modloader-panel .modloader-config-slider-range::-webkit-slider-runnable-track { height: 6px; border-radius: 999px; background: linear-gradient(90deg, rgba(207,233,255,.82) 0 var(--modloader-slider-fill, 0%), rgba(255,255,255,.14) var(--modloader-slider-fill, 0%) 100%); box-shadow: inset 0 1px 3px rgba(0,0,0,.42); transition: background .14s ease, box-shadow .14s ease; }
+			#modloader-panel .modloader-config-slider-range::-webkit-slider-runnable-track { height: 6px; border-radius: 999px; background: linear-gradient(90deg, var(--modloader-slider-fill-color) 0 var(--modloader-slider-fill, 0%), var(--modloader-slider-track-color) var(--modloader-slider-fill, 0%) 100%); box-shadow: var(--modloader-slider-track-shadow); transition: background .14s ease, box-shadow .14s ease; }
 			#modloader-panel .modloader-config-slider-range::-webkit-slider-thumb { -webkit-appearance: none; width: 28px; height: 31px; margin-top: -12px; border: 0; background: url('img/resources.png') -196px 0 / 280px 31px no-repeat; filter: drop-shadow(0 2px 3px rgba(0,0,0,.55)) drop-shadow(0 0 5px rgba(207,233,255,.22)); transition: filter .14s ease; }
-			#modloader-panel .modloader-config-slider-range::-moz-range-track { height: 6px; border-radius: 999px; background: rgba(255,255,255,.14); box-shadow: inset 0 1px 3px rgba(0,0,0,.42); transition: background .14s ease, box-shadow .14s ease; }
-			#modloader-panel .modloader-config-slider-range::-moz-range-progress { height: 6px; border-radius: 999px; background: rgba(207,233,255,.82); }
+			#modloader-panel .modloader-config-slider-range::-moz-range-track { height: 6px; border-radius: 999px; background: var(--modloader-slider-track-color); box-shadow: var(--modloader-slider-track-shadow); transition: background .14s ease, box-shadow .14s ease; }
+			#modloader-panel .modloader-config-slider-range::-moz-range-progress { height: 6px; border-radius: 999px; background: var(--modloader-slider-fill-color); }
 			#modloader-panel .modloader-config-slider-range::-moz-range-thumb { width: 28px; height: 31px; border: 0; background: url('img/resources.png') -196px 0 / 280px 31px no-repeat; filter: drop-shadow(0 2px 3px rgba(0,0,0,.55)) drop-shadow(0 0 5px rgba(207,233,255,.22)); transition: filter .14s ease; }
 			#modloader-panel .modloader-config-slider-range:focus-visible::-webkit-slider-thumb { filter: drop-shadow(0 2px 3px rgba(0,0,0,.58)) drop-shadow(0 0 8px rgba(207,233,255,.52)); }
 			#modloader-panel .modloader-config-slider-range:focus-visible::-moz-range-thumb { filter: drop-shadow(0 2px 3px rgba(0,0,0,.58)) drop-shadow(0 0 8px rgba(207,233,255,.52)); }
-			#modloader-panel .modloader-config-slider-number { box-sizing: border-box; width: 66px; min-width: 0; border: 1px solid rgba(255,255,255,.16); border-radius: 5px; padding: 5px 6px; background: rgba(0,0,0,.22); color: rgba(255,255,255,.92); text-align: right; outline: none; }
-			#modloader-panel .modloader-config-slider-number:focus { border-color: rgba(207, 233, 255, .5); }
+			#modloader-panel .modloader-config-slider-number { box-sizing: border-box; width: 66px; min-width: 0; border: 1px solid var(--modloader-input-border); border-radius: 5px; padding: 5px 6px; background: var(--modloader-input-bg); color: var(--modloader-input-text); text-align: right; outline: none; }
+			#modloader-panel .modloader-config-slider-number:focus { border-color: var(--modloader-focus-border); }
 			#modloader-panel .modloader-config-slider-labeled .modloader-config-slider-number { display: none; }
-			#modloader-panel .modloader-config-slider-labels { position: relative; height: 13px; min-width: 0; margin: -9px var(--modloader-slider-thumb-half) 0; color: rgba(255,255,255,.48); font-size: 10px; }
+			#modloader-panel .modloader-config-slider-labels { grid-column: 1; position: relative; height: 13px; min-width: 0; margin: -9px var(--modloader-slider-thumb-half) 0; color: var(--modloader-text-subtle); font-size: 10px; }
 			#modloader-panel .modloader-config-slider-labels span { position: absolute; top: 0; max-width: 74px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: center; transform: translateX(-50%); }
-			#modloader-panel .modloader-config-slider-value { min-width: 0; text-align: center; color: rgba(255,255,255,.72); font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+			#modloader-panel .modloader-config-slider-value { grid-column: 1; min-width: 0; text-align: center; color: var(--modloader-text); font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 			#modloader-panel .modloader-config-slider[data-disabled=true] { opacity: .52; }
-			#modloader-panel .modloader-config-slider-range:disabled, #modloader-panel .modloader-config-slider-number:disabled { cursor: default; }
+			#modloader-panel .modloader-config-slider-range:disabled, #modloader-panel .modloader-config-slider-number:disabled, #modloader-panel .modloader-config-slider-reset:disabled { cursor: default; }
 			#modloader-panel .modloader-switch-input { appearance: none; -webkit-appearance: none; position: relative; width: 46px; height: 24px; margin: 0; border: 0; border-radius: 999px; background: rgba(18,21,24,.66); box-shadow: inset 0 2px 6px rgba(0,0,0,.48), inset 0 -1px 0 rgba(255,255,255,.06), inset 0 0 0 1px rgba(255,255,255,.08), 0 1px 2px rgba(255,255,255,.04); cursor: pointer; outline: none; transition: background .18s ease, box-shadow .18s ease, opacity .18s ease; vertical-align: middle; }
-			#modloader-panel .modloader-switch-input:before { content: ''; position: absolute; left: 2px; top: 2px; width: 20px; height: 20px; border-radius: 50%; background: linear-gradient(145deg, rgba(255,255,255,.98), rgba(220,230,237,.96)); box-shadow: 0 3px 7px rgba(0,0,0,.34), 0 1px 1px rgba(0,0,0,.24), inset 0 1px 1px rgba(255,255,255,.92), inset 0 -1px 2px rgba(0,0,0,.12); transition: transform .18s cubic-bezier(.2,.8,.2,1), box-shadow .18s ease; }
-			#modloader-panel .modloader-switch-input:after { content: 'OFF'; position: absolute; right: 6px; top: 50%; transform: translateY(-50%); color: rgba(255,255,255,.46); font: 700 9px/1 Montserrat, Arial, sans-serif; letter-spacing: .25px; text-shadow: 0 1px 2px rgba(0,0,0,.42); transition: left .18s ease, right .18s ease, color .18s ease, text-shadow .18s ease; }
+			#modloader-panel .modloader-switch-input:before { content: ''; position: absolute; z-index: 2; left: 2px; top: 2px; width: 20px; height: 20px; border-radius: 50%; background: linear-gradient(145deg, rgba(255,255,255,.98), rgba(220,230,237,.96)); box-shadow: 0 3px 7px rgba(0,0,0,.34), 0 1px 1px rgba(0,0,0,.24), inset 0 1px 1px rgba(255,255,255,.92), inset 0 -1px 2px rgba(0,0,0,.12); transition: transform .18s cubic-bezier(.2,.8,.2,1), box-shadow .18s ease; }
+			#modloader-panel .modloader-switch-input:after { content: 'OFF'; position: absolute; z-index: 1; right: 6px; top: 50%; transform: translateY(-50%); color: rgba(255,255,255,.46); font: 700 9px/1 Montserrat, Arial, sans-serif; letter-spacing: .25px; text-shadow: 0 1px 2px rgba(0,0,0,.42); pointer-events: none; transition: left .18s ease, right .18s ease, color .18s ease, text-shadow .18s ease; }
 			#modloader-panel .modloader-switch-input:checked { background: linear-gradient(135deg, rgba(227,253,67,.98), rgba(166,242,70,.96) 42%, rgba(76,185,107,.98)); box-shadow: inset 0 2px 5px rgba(0,0,0,.18), inset 0 -1px 0 rgba(255,255,255,.34), inset 0 0 0 1px rgba(255,255,255,.26), 0 0 10px rgba(227,253,67,.9), 0 0 24px rgba(166,242,70,.68), 0 0 46px rgba(166,242,70,.38), 0 0 72px rgba(76,185,107,.24); }
 			#modloader-panel .modloader-switch-input:checked:before { transform: translateX(22px); box-shadow: 0 3px 8px rgba(0,0,0,.3), 0 0 12px rgba(255,255,255,.34), 0 0 18px rgba(227,253,67,.42), inset 0 1px 1px rgba(255,255,255,.96), inset 0 -1px 2px rgba(0,0,0,.1); }
 			#modloader-panel .modloader-switch-input:checked:after { content: 'ON'; left: 7px; right: auto; color: #fff; text-shadow: 0 0 6px rgba(255,255,255,.62), 0 0 12px rgba(227,253,67,.56), 0 1px 2px rgba(0,0,0,.32); }
@@ -3692,44 +3914,47 @@
 			#modloader-panel .modloader-mod-row .modloader-switch-input:checked:before { transform: translateX(var(--modloader-row-switch-slide)); }
 			#modloader-panel .modloader-mod-row .modloader-switch-input:checked:after { left: var(--modloader-row-switch-label-on); right: auto; }
 			#modloader-panel textarea.modloader-config-input { min-height: 54px; resize: vertical; }
-			#modloader-panel .modloader-config-input:focus { border-color: rgba(207, 233, 255, .5); }
+			#modloader-panel .modloader-config-input:focus { border-color: var(--modloader-focus-border); }
 			#modloader-panel .modloader-config-field-invalid .modloader-config-input { border-color: rgba(255, 96, 96, .72); }
-			#modloader-panel .modloader-config-error { display: none; grid-column: 2; color: #ffb0b0; font-size: 11px; }
+			#modloader-panel .modloader-config-error { display: none; grid-column: 2; color: var(--modloader-error-text); font-size: 11px; }
 			#modloader-panel .modloader-config-error.active { display: block; }
 			#modloader-panel .modloader-color-input { display: grid; grid-template-columns: 34px minmax(0, 1fr) auto; gap: 8px; align-items: center; min-width: 0; }
-			#modloader-panel .modloader-color-picker { width: 30px; height: 28px; box-sizing: border-box; border: 1px solid rgba(255,255,255,.18); border-radius: 5px; padding: 0; background: transparent; color: inherit; cursor: pointer; }
-			#modloader-panel .modloader-color-text { box-sizing: border-box; width: 100%; min-width: 0; border: 1px solid rgba(255,255,255,.16); border-radius: 5px; padding: 5px 6px; background: rgba(0,0,0,.22); color: rgba(255,255,255,.92); outline: none; }
-			#modloader-panel .modloader-color-text:focus { border-color: rgba(207, 233, 255, .5); }
-			#modloader-panel .modloader-color-reset { border: 1px solid rgba(255,255,255,.14); border-radius: 5px; padding: 5px 7px; background: rgba(255,255,255,.08); color: rgba(255,255,255,.78); cursor: pointer; }
-			#modloader-panel .modloader-color-reset:hover { background: rgba(255,255,255,.14); color: rgba(255,255,255,.94); }
+			#modloader-panel .modloader-color-picker { width: 30px; height: 28px; box-sizing: border-box; border: 1px solid var(--modloader-border-strong); border-radius: 5px; padding: 0; background: transparent; color: inherit; cursor: pointer; }
+			#modloader-panel .modloader-color-text { box-sizing: border-box; width: 100%; min-width: 0; border: 1px solid var(--modloader-input-border); border-radius: 5px; padding: 5px 6px; background: var(--modloader-input-bg); color: var(--modloader-input-text); outline: none; }
+			#modloader-panel .modloader-color-text:focus { border-color: var(--modloader-focus-border); }
+			#modloader-panel .modloader-color-reset { border: 1px solid var(--modloader-control-border); border-radius: 5px; padding: 5px 7px; background: var(--modloader-control-bg); color: var(--modloader-control-text); cursor: pointer; }
+			#modloader-panel .modloader-color-reset:hover:not(:disabled) { background: var(--modloader-control-bg-hover); border-color: var(--modloader-control-border-hover); color: var(--modloader-control-text-hover); }
+			#modloader-panel .modloader-color-reset:disabled { cursor: default; opacity: .45; }
 			#modloader-panel .modloader-resource-colors { display: grid; gap: 6px; min-width: 0; }
 			#modloader-panel .modloader-resource-color-tools { display: flex; align-items: center; gap: 7px; min-width: 0; margin-bottom: 2px; }
-			#modloader-panel .modloader-resource-color-share-button { border: 1px solid rgba(255,255,255,.14); border-radius: 5px; padding: 5px 7px; background: rgba(255,255,255,.08); color: rgba(255,255,255,.78); cursor: pointer; }
-			#modloader-panel .modloader-resource-color-share-button:hover { background: rgba(255,255,255,.14); color: rgba(255,255,255,.94); }
+			#modloader-panel .modloader-resource-color-share-button { border: 1px solid var(--modloader-control-border); border-radius: 5px; padding: 5px 7px; background: var(--modloader-control-bg); color: var(--modloader-control-text); cursor: pointer; }
+			#modloader-panel .modloader-resource-color-share-button:hover:not(:disabled) { background: var(--modloader-control-bg-hover); border-color: var(--modloader-control-border-hover); color: var(--modloader-control-text-hover); }
 			#modloader-panel .modloader-resource-color-share-button:disabled { cursor: default; opacity: .45; }
-			#modloader-panel .modloader-resource-color-share-status { min-width: 0; color: rgba(255,255,255,.5); font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-			#modloader-panel .modloader-resource-color-share-status[data-tone="ok"] { color: #cfe9ff; }
-			#modloader-panel .modloader-resource-color-share-status[data-tone="error"] { color: #ffb0b0; }
+			#modloader-panel .modloader-resource-color-share-status { min-width: 0; color: var(--modloader-text-subtle); font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+			#modloader-panel .modloader-resource-color-share-status[data-tone="ok"] { color: var(--modloader-ok-text); }
+			#modloader-panel .modloader-resource-color-share-status[data-tone="error"] { color: var(--modloader-error-text); }
 			#modloader-panel .modloader-resource-color-row { display: grid; grid-template-columns: 38px 34px minmax(0, 1fr) auto; gap: 8px; align-items: center; min-width: 0; }
 			#modloader-panel .modloader-resource-colors-no-icons .modloader-resource-color-row { grid-template-columns: 34px minmax(0, 1fr) auto; }
 			#modloader-panel .modloader-resource-color-icon { display: block; width: 36px; height: 40px; background-image: url('img/resources.png'); background-size: 360px 40px; background-repeat: no-repeat; filter: drop-shadow(0 1px 2px rgba(255,255,255,.78)); }
 			#modloader-panel .modloader-resource-colors-no-icons .modloader-resource-color-icon { display: none; }
-			#modloader-panel .modloader-resource-color-picker { width: 30px; height: 28px; box-sizing: border-box; border: 1px solid rgba(255,255,255,.18); border-radius: 5px; padding: 0; background: transparent; color: inherit; cursor: pointer; }
-			#modloader-panel .modloader-resource-color-text { box-sizing: border-box; width: 100%; min-width: 0; border: 1px solid rgba(255,255,255,.16); border-radius: 5px; padding: 5px 6px; background: rgba(0,0,0,.22); color: rgba(255,255,255,.92); outline: none; }
-			#modloader-panel .modloader-resource-color-text:focus { border-color: rgba(207, 233, 255, .5); }
-			#modloader-panel .modloader-resource-color-reset { border: 1px solid rgba(255,255,255,.14); border-radius: 5px; padding: 5px 7px; background: rgba(255,255,255,.08); color: rgba(255,255,255,.78); cursor: pointer; }
-			#modloader-panel .modloader-resource-color-reset:hover { background: rgba(255,255,255,.14); color: rgba(255,255,255,.94); }
+			#modloader-panel .modloader-resource-color-picker { width: 30px; height: 28px; box-sizing: border-box; border: 1px solid var(--modloader-border-strong); border-radius: 5px; padding: 0; background: transparent; color: inherit; cursor: pointer; }
+			#modloader-panel .modloader-resource-color-text { box-sizing: border-box; width: 100%; min-width: 0; border: 1px solid var(--modloader-input-border); border-radius: 5px; padding: 5px 6px; background: var(--modloader-input-bg); color: var(--modloader-input-text); outline: none; }
+			#modloader-panel .modloader-resource-color-text:focus { border-color: var(--modloader-focus-border); }
+			#modloader-panel .modloader-resource-color-reset { border: 1px solid var(--modloader-control-border); border-radius: 5px; padding: 5px 7px; background: var(--modloader-control-bg); color: var(--modloader-control-text); cursor: pointer; }
+			#modloader-panel .modloader-resource-color-reset:hover:not(:disabled) { background: var(--modloader-control-bg-hover); border-color: var(--modloader-control-border-hover); color: var(--modloader-control-text-hover); }
+			#modloader-panel .modloader-resource-color-reset:disabled { cursor: default; opacity: .45; }
 			#modloader-panel .modloader-modal { position: absolute; inset: 0; z-index: 5; display: grid; place-items: center; padding: 16px; background: rgba(8,10,12,.2); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }
-			#modloader-panel .modloader-modal-box { width: min(420px, 100%); border: 1px solid rgba(255,255,255,.12); border-radius: 8px; padding: 14px; background: rgba(10,12,14,.92); box-shadow: 0 14px 36px rgba(0,0,0,.36); }
-			#modloader-panel .modloader-modal-title { margin: 0 0 8px; font-size: 14px; color: rgba(255,255,255,.94); }
-			#modloader-panel .modloader-modal-message { color: rgba(255,255,255,.72); overflow-wrap: anywhere; white-space: pre-line; }
-			#modloader-panel .modloader-modal-input { box-sizing: border-box; width: 100%; margin-top: 10px; border: 1px solid rgba(255,255,255,.16); border-radius: 6px; padding: 7px 8px; background: rgba(0,0,0,.24); color: rgba(255,255,255,.92); outline: none; }
-			#modloader-panel .modloader-modal-input:focus { border-color: rgba(207,233,255,.5); }
+			#modloader-panel .modloader-modal-box { width: min(420px, 100%); border: 1px solid var(--modloader-border-strong); border-radius: 8px; padding: 14px; background: var(--modloader-panel-bg); box-shadow: var(--modloader-panel-shadow); }
+			#modloader-panel .modloader-modal-title { margin: 0 0 8px; font-size: 14px; color: var(--modloader-text-strong); }
+			#modloader-panel .modloader-modal-message { color: var(--modloader-text); overflow-wrap: anywhere; white-space: pre-line; }
+			#modloader-panel .modloader-modal-input { box-sizing: border-box; width: 100%; margin-top: 10px; border: 1px solid var(--modloader-input-border); border-radius: 6px; padding: 7px 8px; background: var(--modloader-input-bg); color: var(--modloader-input-text); outline: none; }
+			#modloader-panel .modloader-modal-input:focus { border-color: var(--modloader-focus-border); }
 			#modloader-panel .modloader-modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px; }
-			#modloader-panel .modloader-modal-button { border: 1px solid rgba(255,255,255,.14); border-radius: 6px; padding: 7px 10px; background: rgba(255,255,255,.08); color: rgba(255,255,255,.9); cursor: pointer; }
-			#modloader-panel .modloader-modal-button:hover { background: rgba(255,255,255,.14); }
-			#modloader-panel .modloader-modal-button-primary { background: #f2f2ed; color: #111; border-color: transparent; }
-			#modloader-panel .modloader-modal-button-danger { background: rgba(255,96,96,.2); color: #ffd4d4; border-color: rgba(255,96,96,.28); }
+			#modloader-panel .modloader-modal-button { border: 1px solid var(--modloader-control-border); border-radius: 6px; padding: 7px 10px; background: var(--modloader-control-bg); color: var(--modloader-control-text); cursor: pointer; }
+			#modloader-panel .modloader-modal-button:hover:not(:disabled) { background: var(--modloader-control-bg-hover); border-color: var(--modloader-control-border-hover); color: var(--modloader-control-text-hover); }
+			#modloader-panel .modloader-modal-button:disabled { cursor: default; opacity: .45; }
+			#modloader-panel .modloader-modal-button-primary { background: var(--modloader-primary-bg); color: var(--modloader-primary-text); border-color: transparent; }
+			#modloader-panel .modloader-modal-button-danger { background: var(--modloader-danger-bg); color: var(--modloader-danger-text); border-color: var(--modloader-danger-border); }
 			@media (max-width: 640px) {
 				#modloader-panel .modloader-panel-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 				#modloader-panel .modloader-config-field { grid-template-columns: 1fr; }
@@ -3753,10 +3978,14 @@
 			const childProcess = require('child_process')
 			let shell = null
 			let clipboard = null
+			let ipcRenderer = null
+			let dialog = null
 			try {
 				const electron = require('electron')
 				shell = electron?.shell || null
 				clipboard = electron?.clipboard || null
+				ipcRenderer = electron?.ipcRenderer || null
+				dialog = electron?.dialog || electron?.remote?.dialog || null
 			} catch (error) {}
 			const gameRoot = path.dirname(url.fileURLToPath(window.location.href))
 			state.modFileTools = {
@@ -3767,6 +3996,8 @@
 				childProcess,
 				shell,
 				clipboard,
+				ipcRenderer,
+				dialog,
 				gameRoot,
 				modsDir: path.join(gameRoot, 'mods'),
 				enabledPath: path.join(gameRoot, 'mods', 'enabled.json')
@@ -3799,6 +4030,69 @@
 		const declared = isLanguageSupportDeclared(manifest)
 		if (declared !== null) return declared
 		return !!(getManifestTranslationRoot(manifest) || isLocaleObject(manifest?.words) || Array.isArray(manifest?.locale) || Array.isArray(manifest?.languages))
+	}
+
+	const padTranslationDatePart = function (value) {
+		return String(value).padStart(2, '0')
+	}
+
+	const formatTranslationCatalogFileTimestamp = function (date) {
+		const value = date instanceof Date ? date : new Date()
+		return [
+			value.getFullYear(),
+			padTranslationDatePart(value.getMonth() + 1),
+			padTranslationDatePart(value.getDate())
+		].join('') + '-' + [
+			padTranslationDatePart(value.getHours()),
+			padTranslationDatePart(value.getMinutes()),
+			padTranslationDatePart(value.getSeconds())
+		].join('')
+	}
+
+	const createTranslationCatalogExportName = function (date) {
+		return 'Translations-' + formatTranslationCatalogFileTimestamp(date) + '.json'
+	}
+
+	const stringifyTranslationCatalog = function (catalog) {
+		return JSON.stringify(catalog, null, 2) + '\n'
+	}
+
+	const ensureTranslationCatalogMetadata = function (catalog) {
+		if (!isLocaleObject(catalog)) return null
+		if (!isLocaleObject(catalog[TRANSLATION_CATALOG_META_KEY])) catalog[TRANSLATION_CATALOG_META_KEY] = {}
+		const meta = catalog[TRANSLATION_CATALOG_META_KEY]
+		meta.kind = TRANSLATION_CATALOG_KIND
+		meta.formatVersion = TRANSLATION_CATALOG_FORMAT_VERSION
+		meta.generator = 'Sixty Four ModLoader'
+		return meta
+	}
+
+	const markTranslationCatalogEdited = function (catalog, action, options) {
+		const meta = ensureTranslationCatalogMetadata(catalog)
+		if (!meta) return catalog
+		const now = options?.now instanceof Date ? options.now : new Date()
+		meta.editedAt = now.toISOString()
+		if (action) meta.lastAction = action
+		if (options?.sourceName) meta.sourceName = options.sourceName
+		if (options?.exportedAt) meta.exportedAt = options.exportedAt
+		return catalog
+	}
+
+	const isTaggedTranslationCatalog = function (value) {
+		const meta = value?.[TRANSLATION_CATALOG_META_KEY]
+		if (!isLocaleObject(meta)) return false
+		return meta.kind === TRANSLATION_CATALOG_KIND || meta.type === TRANSLATION_CATALOG_KIND || meta.schema === TRANSLATION_CATALOG_KIND
+	}
+
+	const looksLikeTranslationCatalog = function (value) {
+		return isLocaleObject(value) && isLocaleObject(value.languages)
+	}
+
+	const normalizeImportedTranslationCatalog = function (value, sourceName) {
+		if (!isTaggedTranslationCatalog(value) && !looksLikeTranslationCatalog(value)) throw new Error(t('translationImportInvalid'))
+		const catalog = normalizeTranslationCatalog(clone(value))
+		markTranslationCatalogEdited(catalog, 'import', { sourceName })
+		return catalog
 	}
 
 	const normalizeTranslationCatalog = function (value) {
@@ -3951,6 +4245,7 @@
 			description: 'Edit this file to override ModLoader menu text and mod manifest/config translations. The structure is language -> modloader/mods -> text.',
 			languages: {}
 		}
+		ensureTranslationCatalogMetadata(catalog)
 		for (const language of Object.keys(PANEL_TEXT)) {
 			const group = ensureCatalogLanguage(catalog, language)
 			Object.assign(group.modloader, clone(PANEL_TEXT[language]))
@@ -4057,8 +4352,13 @@
 		if (tools.fs.existsSync(catalogPath)) current = normalizeTranslationCatalog(JSON.parse(tools.fs.readFileSync(catalogPath, 'utf8')))
 		const snapshot = createTranslationCatalogSnapshot(mods || [])
 		const merged = mergeMissingCatalogDefaults(current || {}, snapshot)
-		const before = current ? JSON.stringify(current, null, 2) + '\n' : ''
-		const after = JSON.stringify(merged, null, 2) + '\n'
+		ensureTranslationCatalogMetadata(merged)
+		const before = current ? stringifyTranslationCatalog(current) : ''
+		let after = stringifyTranslationCatalog(merged)
+		if (before !== after) {
+			markTranslationCatalogEdited(merged, 'sync')
+			after = stringifyTranslationCatalog(merged)
+		}
 		if (before !== after) tools.fs.writeFileSync(catalogPath, after, 'utf8')
 		state.translationCatalog = merged
 		try { state.translationCatalogMtimeMs = tools.fs.statSync(catalogPath).mtimeMs } catch (error) { state.translationCatalogMtimeMs = -1 }
@@ -4077,6 +4377,131 @@
 			return
 		}
 		tools.childProcess.spawn('explorer.exe', [catalogPath], { detached: true, stdio: 'ignore', windowsHide: true }).unref()
+	}
+
+	const showTranslationSaveDialog = async function (options) {
+		const tools = getModFileTools()
+		if (!tools) throw new Error(t('fileAccessUnavailable'))
+		if (tools.ipcRenderer?.invoke) return tools.ipcRenderer.invoke('modloader:dialog:save', options || {})
+		if (tools.dialog?.showSaveDialog) return tools.dialog.showSaveDialog(options || {})
+		throw new Error(t('translationDialogUnavailable'))
+	}
+
+	const showTranslationOpenDialog = async function (options) {
+		const tools = getModFileTools()
+		if (!tools) throw new Error(t('fileAccessUnavailable'))
+		if (tools.ipcRenderer?.invoke) return tools.ipcRenderer.invoke('modloader:dialog:open', options || {})
+		if (tools.dialog?.showOpenDialog) return tools.dialog.showOpenDialog(options || {})
+		throw new Error(t('translationDialogUnavailable'))
+	}
+
+	const getDefaultTranslationExportPath = function () {
+		const tools = getModFileTools()
+		if (!tools) throw new Error(t('fileAccessUnavailable'))
+		const documents = tools.path.join(tools.os.homedir(), 'Documents')
+		const base = tools.fs.existsSync(documents) ? documents : tools.gameRoot
+		return tools.path.join(base, createTranslationCatalogExportName(new Date()))
+	}
+
+	const getTranslationCatalogDisplayTime = function (value) {
+		if (!value) return ''
+		try {
+			const date = value instanceof Date ? value : new Date(value)
+			if (!Number.isFinite(date.getTime())) return String(value)
+			return date.toLocaleString()
+		} catch (error) {
+			return String(value)
+		}
+	}
+
+	const getTranslationFileEditTime = function (filePath) {
+		const tools = getModFileTools()
+		if (!tools || !filePath) return ''
+		try {
+			const data = JSON.parse(tools.fs.readFileSync(filePath, 'utf8'))
+			const meta = data?.[TRANSLATION_CATALOG_META_KEY]
+			const time = meta?.editedAt || meta?.exportedAt || meta?.importedAt
+			if (time) return getTranslationCatalogDisplayTime(time)
+		} catch (error) {}
+		try {
+			return getTranslationCatalogDisplayTime(tools.fs.statSync(filePath).mtime)
+		} catch (error) {
+			return ''
+		}
+	}
+
+	const getCurrentTranslationCatalogForExport = function () {
+		const tools = getModFileTools()
+		if (!tools) throw new Error(t('fileAccessUnavailable'))
+		let catalog = readTranslationCatalogFromDisk({ force: true, silent: true })
+		if (!catalog) {
+			const availableMods = readAvailableMods().mods
+			syncTranslationCatalogFile(availableMods)
+			catalog = state.translationCatalog
+		}
+		catalog = normalizeTranslationCatalog(clone(catalog || {}))
+		const meta = ensureTranslationCatalogMetadata(catalog)
+		const now = new Date()
+		if (!meta.editedAt) {
+			try { meta.editedAt = tools.fs.statSync(getTranslationCatalogPath()).mtime.toISOString() } catch (error) { meta.editedAt = now.toISOString() }
+		}
+		meta.exportedAt = now.toISOString()
+		meta.lastAction = 'export'
+		return catalog
+	}
+
+	const exportTranslationCatalogFile = async function (panel) {
+		const tools = getModFileTools()
+		if (!tools) throw new Error(t('fileAccessUnavailable'))
+		const catalog = getCurrentTranslationCatalogForExport()
+		const result = await showTranslationSaveDialog({
+			title: t('translationExportTitle'),
+			defaultPath: getDefaultTranslationExportPath(),
+			filters: [
+				{ name: 'Translations JSON', extensions: [ 'json' ] },
+				{ name: 'All Files', extensions: [ '*' ] }
+			]
+		})
+		const targetPath = result?.filePath || ''
+		if (result?.canceled || !targetPath) return null
+		if (tools.fs.existsSync(targetPath)) {
+			const editedAt = getTranslationFileEditTime(targetPath) || '-'
+			const confirmed = await showPanelConfirm(panel, {
+				title: t('translationExportOverwriteTitle'),
+				message: t('translationExportOverwriteMessage', { editedAt, path: targetPath }),
+				confirmText: t('translationOverwriteConfirm'),
+				danger: true
+			})
+			if (!confirmed) return null
+		}
+		tools.fs.writeFileSync(targetPath, stringifyTranslationCatalog(catalog), 'utf8')
+		return { path: targetPath }
+	}
+
+	const importTranslationCatalogFile = async function () {
+		const tools = getModFileTools()
+		if (!tools) throw new Error(t('fileAccessUnavailable'))
+		const result = await showTranslationOpenDialog({
+			title: t('translationImportTitle'),
+			filters: [
+				{ name: 'Translations JSON', extensions: [ 'json' ] },
+				{ name: 'All Files', extensions: [ '*' ] }
+			],
+			properties: [ 'openFile' ]
+		})
+		const sourcePath = result?.filePaths?.[0] || ''
+		if (result?.canceled || !sourcePath) return null
+		const source = JSON.parse(tools.fs.readFileSync(sourcePath, 'utf8'))
+		const catalog = normalizeImportedTranslationCatalog(source, tools.path.basename(sourcePath))
+		const catalogPath = getTranslationCatalogPath()
+		tools.fs.mkdirSync(tools.path.dirname(catalogPath), { recursive: true })
+		tools.fs.writeFileSync(catalogPath, stringifyTranslationCatalog(catalog), 'utf8')
+		state.translationCatalog = catalog
+		try { state.translationCatalogMtimeMs = tools.fs.statSync(catalogPath).mtimeMs } catch (error) { state.translationCatalogMtimeMs = -1 }
+		state.translationCatalogReadFailed = false
+		applyTranslationCatalogToLoadedMods()
+		ensureTranslationCatalogWatcher()
+		return { path: catalogPath, source: sourcePath }
 	}
 
 	const getEnabledPathSet = function () {
@@ -4921,6 +5346,14 @@
 		return clampNumber(Number(snapped.toFixed(getSliderPrecision(bounds))), bounds.min, bounds.max)
 	}
 
+	const getSliderResetValue = function (item, bounds) {
+		let value = getFiniteConfigNumber(item?.default)
+		if (value === null) value = getSliderAliasNumber(item, item?.default)
+		if (value === null) value = getFiniteConfigNumber(item?.min)
+		if (value === null) value = 0
+		return snapSliderValue(value, bounds)
+	}
+
 	const getSliderPercent = function (value, bounds) {
 		const number = getFiniteConfigNumber(value)
 		if (number === null || bounds.max <= bounds.min) return 0
@@ -4945,6 +5378,11 @@
 		number.step = bounds.step
 		number.value = formatSliderNumber(bounds.value, bounds)
 		number.spellcheck = false
+
+		const reset = element('button', 'modloader-config-slider-reset', getInlineLocalizedText(CONFIG_INLINE_TEXT.reset))
+		reset.type = 'button'
+		reset.title = getInlineLocalizedText(CONFIG_INLINE_TEXT.reset)
+		reset.setAttribute('aria-label', getInlineLocalizedText(CONFIG_INLINE_TEXT.reset))
 
 		const labels = element('div', 'modloader-config-slider-labels')
 		const valueLabel = element('span', 'modloader-config-slider-value')
@@ -5025,6 +5463,12 @@
 		number.addEventListener('change', function () {
 			commitSliderValue(number.value)
 		})
+		reset.addEventListener('click', function (event) {
+			event.preventDefault()
+			event.stopPropagation()
+			commitSliderValue(getSliderResetValue(item, bounds))
+			root.dispatchEvent(new Event('input', { bubbles: true }))
+		})
 		setSliderValue(bounds.value, { snap: true })
 
 		root.readConfigValue = function () {
@@ -5040,6 +5484,7 @@
 				root.dataset.disabled = value ? 'true' : 'false'
 				range.disabled = !!value
 				number.disabled = !!value
+				reset.disabled = !!value
 				if (value) cancelSnapAnimation()
 			}
 		})
@@ -5050,9 +5495,9 @@
 				label.style.left = getSliderPercent(labelValue, bounds).toFixed(4) + '%'
 				labels.appendChild(label)
 			}
-			root.append(range, number, labels, valueLabel)
+			root.append(range, number, reset, labels, valueLabel)
 		} else {
-			root.append(range, number)
+			root.append(range, number, reset)
 		}
 		return root
 	}
@@ -5542,6 +5987,41 @@
 	const PANEL_AUTO_HIDE_SECONDS_MIN = 0.5
 	const PANEL_AUTO_HIDE_SECONDS_MAX = 60
 	const PANEL_STATE_STORAGE_KEY = 'modloader:panelState'
+	const PANEL_THEME_TOKEN_NAMES = Object.freeze([
+		'--modloader-panel-bg',
+		'--modloader-panel-text',
+		'--modloader-text-strong',
+		'--modloader-text',
+		'--modloader-text-muted',
+		'--modloader-text-subtle',
+		'--modloader-border',
+		'--modloader-border-strong',
+		'--modloader-surface',
+		'--modloader-surface-hover',
+		'--modloader-surface-active',
+		'--modloader-control-bg',
+		'--modloader-control-bg-hover',
+		'--modloader-control-border',
+		'--modloader-control-border-hover',
+		'--modloader-control-text',
+		'--modloader-control-text-hover',
+		'--modloader-input-bg',
+		'--modloader-input-border',
+		'--modloader-input-text',
+		'--modloader-focus-border',
+		'--modloader-panel-shadow',
+		'--modloader-primary-bg',
+		'--modloader-primary-text',
+		'--modloader-danger-bg',
+		'--modloader-danger-border',
+		'--modloader-danger-text',
+		'--modloader-warning-text',
+		'--modloader-error-text',
+		'--modloader-ok-text',
+		'--modloader-slider-fill-color',
+		'--modloader-slider-track-color',
+		'--modloader-slider-track-shadow'
+	])
 
 	const clampNumber = function (value, min, max) {
 		return Math.min(Math.max(value, min), max)
@@ -5553,6 +6033,48 @@
 
 	const isValidPanelHideMode = function (value) {
 		return value === 'auto' || value === 'manual'
+	}
+
+	const normalizePanelThemeTokenName = function (name) {
+		const text = String(name || '').trim()
+		if (!text) return ''
+		if (text.indexOf('--') === 0) return text
+		const kebab = text
+			.replace(/([a-z0-9])([A-Z])/g, '$1-$2')
+			.replace(/[_\s]+/g, '-')
+			.toLowerCase()
+			.replace(/^-+/, '')
+		return '--modloader-' + kebab.replace(/^modloader-/, '')
+	}
+
+	const getPanelThemeMode = function () {
+		return isValidPanelTheme(state.panelSettings.theme) ? state.panelSettings.theme : 'dark'
+	}
+
+	const getPanelThemeTokenValue = function (name, fallback) {
+		const token = normalizePanelThemeTokenName(name)
+		if (!token) return fallback === undefined ? '' : fallback
+		const panel = document.getElementById('modloader-panel')
+		if (!panel || typeof window.getComputedStyle !== 'function') return fallback === undefined ? '' : fallback
+		const value = window.getComputedStyle(panel).getPropertyValue(token).trim()
+		return value || (fallback === undefined ? '' : fallback)
+	}
+
+	const createUiThemeApi = function () {
+		return {
+			mode: getPanelThemeMode,
+			current: getPanelThemeMode,
+			tokens() { return PANEL_THEME_TOKEN_NAMES.slice() },
+			token: normalizePanelThemeTokenName,
+			value: getPanelThemeTokenValue,
+			applyToken(target, property, name, fallback) {
+				if (!target?.style || !property) return target
+				const token = normalizePanelThemeTokenName(name)
+				if (!token) return target
+				target.style.setProperty(String(property), fallback === undefined ? `var(${token})` : `var(${token}, ${fallback})`)
+				return target
+			}
+		}
 	}
 
 	const normalizePanelAutoHideSeconds = function (value) {
@@ -6198,24 +6720,26 @@
 				clearPanelAutoHideTimer()
 			}
 		})
-		const addSettingsButtonRow = function (label, buttonLabel, title) {
+		const addSettingsButtonRow = function (label, buttons) {
 			const row = element('div', 'modloader-panel-settings-row')
 			row.appendChild(element('span', '', label))
-			const button = createPanelActionButton('translation', buttonLabel, title)
-			button.disabled = !getModFileTools()
-			button.onclick = async function (event) {
-				event.preventDefault()
-				try {
-					const availableMods = readAvailableMods().mods
-					const result = syncTranslationCatalogFile(availableMods)
-					await openTranslationCatalogFile(result.path)
-					state.panelMessage = t('translationFileSynced', { path: result.path })
-				} catch (error) {
-					state.panelMessage = t('translationFileFailed', { value: error.message })
+			const actions = element('span', 'modloader-panel-settings-actions')
+			for (const options of buttons || []) {
+				const button = createPanelActionButton(options.icon || 'translation', options.label, options.title)
+				button.disabled = !getModFileTools()
+				button.onclick = async function (event) {
+					event.preventDefault()
+					try {
+						const result = await options.action()
+						if (result?.message) state.panelMessage = result.message
+					} catch (error) {
+						state.panelMessage = t('translationFileFailed', { value: error.message })
+					}
+					renderPanel()
 				}
-				renderPanel()
+				actions.appendChild(button)
 			}
-			row.appendChild(button)
+			row.appendChild(actions)
 			settingsPage.appendChild(row)
 		}
 		addSettingsNumberRow(t('autoHideDelay'), state.panelSettings.autoHideSeconds, function (value) {
@@ -6237,7 +6761,37 @@
 			{ value: true, label: t('renderApiOn') },
 			{ value: false, label: t('renderApiOff') }
 		], isRenderApiEnabled(), function (value) { setRenderApiEnabled(value !== false) })
-		addSettingsButtonRow(t('translationFile'), t('translationFile'), t('translationFileTitle'))
+		addSettingsButtonRow(t('translationFile'), [
+			{
+				icon: 'translation',
+				label: t('translationFile'),
+				title: t('translationFileTitle'),
+				async action() {
+					const availableMods = readAvailableMods().mods
+					const result = syncTranslationCatalogFile(availableMods)
+					await openTranslationCatalogFile(result.path)
+					return { message: t('translationFileSynced', { path: result.path }) }
+				}
+			},
+			{
+				icon: 'export',
+				label: t('translationExport'),
+				title: t('translationExportTitle'),
+				async action() {
+					const result = await exportTranslationCatalogFile(panel)
+					return result ? { message: t('translationExported', { path: result.path }) } : null
+				}
+			},
+			{
+				icon: 'import',
+				label: t('translationImport'),
+				title: t('translationImportTitle'),
+				async action() {
+					const result = await importTranslationCatalogFile()
+					return result ? { message: t('translationImported', { source: result.source, path: result.path }) } : null
+				}
+			}
+		])
 		panel.appendChild(settingsPage)
 
 		const panelMouseEnter = function () { clearPanelAutoHideTimer() }
@@ -7055,7 +7609,7 @@
 				const createConfigField = function (item, target) {
 					const type = getConfigType(item)
 					const value = modConfig.values[item.key]
-					const field = element(type === 'boolean' ? 'div' : 'label', 'modloader-config-field')
+					const field = element(type === 'boolean' || isResourceColorsConfigItem(item, type) ? 'div' : 'label', 'modloader-config-field')
 					const text = element('span', 'modloader-config-text')
 					const localizedConfigLabel = getLocalizedConfigText(mod.manifest, item, 'label', item.key)
 					const localizedConfigDescription = getLocalizedConfigText(mod.manifest, item, 'description', '')

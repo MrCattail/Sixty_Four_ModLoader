@@ -101,6 +101,27 @@ opt out, or `hudSide` to choose a different hide edge.
 
 ## Render Layers API
 
+The Canvas2D Render API is a stable v1 contract. Read `api.render.version` (or
+`api.render.apiVersion`) for the semantic version, call
+`api.render.supports(capability)` before using an optional feature, and use
+`api.render.getCapabilities()` or `api.render.contract()` for a machine-readable
+snapshot. The capability names shipped by v1 are `canvas2dLayers`,
+`customLayers`, `layerDemand`, `cachedLayers`, `methodRouting`, `scopedCleanup`,
+`lifecycleEvents`, `diagnostics`, `conflictDiagnostics`,
+`callbackErrorIsolation`, and `renderTiming`. `webgl2Layers` and
+`methodEmitters` currently report `false`; future GPU support will be additive
+and must not change the existing Canvas2D callback contract.
+
+```js
+if (api.render.supports('canvas2dLayers')) {
+  console.log(api.render.version, api.render.contract())
+}
+```
+
+Render API 1.x preserves the documented methods and Canvas2D behavior; new
+capabilities may be added in a minor release, while an incompatible contract
+change requires a new major version.
+
 ModLoader creates a stacked canvas renderer around the vanilla game canvas. The
 vanilla canvas remains the main world canvas, and layer canvases are created
 lazily. When a mod registers or accesses a layer, matching safe vanilla draw
@@ -142,20 +163,40 @@ Built-in layer ids are `background`, `buildings`, `effects`, `interaction`,
 Custom layers can be registered with `api.render.registerLayer(id, { order, zIndex, clearEachFrame, cache })`, `api.render.defineLayer(id, options)`, or `api.render.layers.define(id, options)`; this defines or updates the layer but does not create or demand a canvas by itself. Passing `{ cache: true }` / `{ cached: true }` defaults `clearEachFrame` to false and redraws callbacks or routed methods only while the layer is dirty.
 Render callbacks accept `enabled: false` or an `enabled(ctx)` predicate; disabled callbacks are skipped before their layer is touched for that frame. Prefer `enabled(ctx)` for hot toggles or overlays that are only visible in specific game states. Pass `space: 'screen'` when a callback draws screen-space UI or full-screen overlays; this defaults `copyTransform` and `copyState` to `false` for that callback.
 Use `api.render.demandLayer(id, { enabled })` or `api.render.layers.demand(id, { enabled })` when a mod only needs a layer or routed vanilla method to be active for the frame and does not need to draw its own callback. Demanding `background`, or any layer below the main canvas such as `buildings`, also enables routing of the vanilla full-canvas black/white background fill to the background layer.
+When an active layer sits above the main canvas but below the built-in `cursor`
+layer, ModLoader also demands `cursor` for that frame. This keeps the vanilla
+cursor above routed resource UI and custom mid-stack overlays. The cursor canvas
+still receives no draw when the vanilla game hides its cursor, and layers
+intentionally placed above the cursor keep their higher ordering.
 Use `api.render.layers.get(id)` to access a layer canvas/context directly.
 Use `api.render.demandedLayers()` or `api.render.layers.demands()` to inspect which layer ids are active for the current frame, and `api.render.isLayerDemanded(id)` / `api.render.layers.isDemanded(id)` to check one active layer without creating it. Direct `getLayer()` / `withLayer()` access keeps a persistent demand by default; pass `{ persistent: false }` / `{ persist: false }` for current-frame-only access, or call `api.render.releaseLayer(id)` / `api.render.layers.release(id)` to release an existing persistent direct-access demand. Use `{ currentFrame: true }` only when the current active mark should be cleared too. `onLayer()` callbacks and `demandLayer()` entries only demand their layer while enabled. Use `api.render.markDirty(id)` / `api.render.markClean(id)` / `api.render.isDirty(id)` or the matching `api.render.layers.*` helpers to control cached redraws. Render callback contexts include `cached`, `dirty`, and `redraw`. Only active layer canvases are shown, synced, and cleared during the normal frame path.
-Use `api.render.describeLayer(id)` / `api.render.layers.describe(id)`, `api.render.definedLayers()`, `api.render.createdLayers()`, `api.render.callbacks()`, `api.render.layerDemanders()`, and `api.render.summary()` for read-only diagnostics that do not create canvases or demand layers; layer diagnostics include cache/dirty fields and remain safe before a game or render manager exists.
+Use `api.render.describeLayer(id)` / `api.render.layers.describe(id)`, `api.render.definedLayers()`, `api.render.createdLayers()`, `api.render.callbacks()`, `api.render.layerDemanders()`, and `api.render.summary()` for read-only diagnostics that do not create canvases or demand layers; layer diagnostics include cache/dirty fields plus `owner` / `definitionOwner` and remain safe before a game or render manager exists.
+If different registered mod owners redefine a layer with incompatible order,
+z-index, clear, or cache behavior, or route the same method to different
+layers, v1 records a conflict and logs a warning. A first intentional override
+of a built-in default establishes the mod owner without producing a warning.
+The compatibility rule is
+`last-registration-wins`; disposing a scope restores the previous registration
+when it is still the active one. Inspect copied conflict records with
+`api.render.conflicts({ type, key, owner, limit })` or
+`api.render.diagnostics.conflicts()`, clear them with
+`api.render.clearConflicts()`, and read `summary().conflictCount` for the current
+count. Conflict types are `layer-definition` and `method-route`.
 Render timing diagnostics are disabled by default; enable them temporarily with `api.render.timing.enable({ samples: 240 })`, inspect `api.render.timing.summary()`, `console.table(api.render.timing.methods())`, or `console.table(api.render.timing.entities())`, then call `api.render.timing.disable()` when finished. Timing records `renderloop`, routed vanilla render methods, Render API callbacks, built-in overlay redraws, and entity render/darkrender calls grouped by entity name while inside `renderEntities()` or `renderConductors()`. Pass `{ entities: false }` to `enable()` to skip entity-level patching for a method-only timing run. Pass `{ entityDetailMethods: ['drawResources'] }` to also time selected nested entity submethods; detail rows use their actual `renderMethod`, `summary().entityDetailMethods` and `timing.detailMethods()` report the active allowlist, and passing an empty array returns to render/darkrender-only timing. Detail timing is opt-in, accepts at most 16 JavaScript method names, and is restored with the other entity timing wrappers when timing is disabled. Pass `{ vfx: true }` to additionally time active objects in `game.vfx` and `game.chasmVfx` by constructor and render context, then inspect `console.table(api.render.timing.vfx())`; VFX timing is also opt-in and `summary().vfxEnabled` / `summary().topVfx` report its state and leading rows.
 Use `api.render.onReady(fn)`, `api.render.onFrameStart(fn)`, and `api.render.onFrame(fn)` for render lifecycle notifications; callbacks receive a lightweight context and return cleanup functions. The grouped aliases `api.render.events.ready(fn)`, `api.render.events.frameStart(fn)`, and `api.render.events.frame(fn)` are also available.
 Use `api.render.createScope()` or `api.render.scope()` to group cleanup-returning render registrations. The returned scope exposes `add(cleanup)`, `dispose()` / `cleanup()` / `stop()`, and scoped wrappers for layer callbacks, scoped layer definitions, layer demands, method routes, and render events; disposal is idempotent, runs cleanups in reverse registration order, and restores scoped layer definitions only while they still match the scope-owned definition.
 Use `api.render.routeMethod(methodName, layerId)` or `api.render.routes.register(methodName, layerId)` to add a routed `Game.prototype` render method; routing still only happens when the API is enabled and the target layer is demanded for that frame.
 Built-in safe vanilla routes include world/entity stack draws such as `renderConductors` / `renderChasmVFX` / `renderEntities` -> `buildings`, `renderVFX` -> `effects`, interaction overlays such as `renderAvailability` / `renderSOI` / `renderHoveredCell` / `renderAffected` / `renderGrid` -> `interaction`, resource UI -> `ui`, hollow/slowdown screen effects -> `screen-effects`, and `renderCursor` -> `cursor`.
 Do not register the vanilla `buildings` route as cached unless the original draw order is preserved. `Game.renderEntities()` replays entities in sorted map order, and static-looking sprites can be interleaved with animated, progress-state, or random-effect machines. Future building/entity caching should replay cached entries in the same original sequence, such as per entity or per sorted slice with explicit dirty signatures, instead of globally separating static and dynamic entity layers.
-Use `api.render.routedMethods()` / `api.render.methodRoutes()` to inspect which vanilla render methods currently route because the Render API is enabled and their target layer is demanded. Pass `{ all: true }` to include inactive routes; entries include `method`, `layer`, `demanded`, `routed`, `builtIn`, `custom`, and `patched`. Use `api.render.isMethodRouted(methodName)` and `api.render.getMethodLayer(methodName)` for single-method checks.
+Use `api.render.routedMethods()` / `api.render.methodRoutes()` to inspect which vanilla render methods currently route because the Render API is enabled and their target layer is demanded. Pass `{ all: true }` to include inactive routes; entries include `method`, `layer`, `owner`, `demanded`, `routed`, `builtIn`, `custom`, and `patched`. Use `api.render.isMethodRouted(methodName)` and `api.render.getMethodLayer(methodName)` for single-method checks.
 The `Ctrl+M` ModLoader panel shows the same Render API switch state, demanded layer ids, created layer ids, callback active/total counts, demand-only layer demander active/total counts, and active method routes in its summary block.
 The ModLoader menu settings page includes a Render API switch. Turning it off
 returns vanilla draw calls to the main canvas and skips registered render-layer
 callbacks until it is turned on again.
+`modloader/tools/verify.ps1` runs the v1 runtime contract test, including
+capability discovery, competing mod ownership, nested scope restoration,
+shared-layer callback error isolation, route fallback while disabled, resize
+synchronization, and cleanup after disposal.
 
 ## Translation Catalog
 

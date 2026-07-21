@@ -6,6 +6,7 @@
 	const configKey = 'enableChasmTransferPathIndex'
 	let previewEnabled = null
 	let configuredEnabled = true
+	let directRenderEnabled = true
 	let activeGame = null
 
 	const stats = {
@@ -18,6 +19,11 @@
 		binarySearchSteps: 0,
 		totalIndexedSegments: 0,
 		maxIndexedSegments: 0,
+		directRenderCalls: 0,
+		directRenderFallbacks: 0,
+		directSamples: 0,
+		directBinarySearchSteps: 0,
+		directRenderFallbackReasons: {},
 		fallbackReasons: {}
 	}
 
@@ -64,6 +70,21 @@
 				return point
 			}
 		})
+		if (typeof prototype.render === 'function') {
+			api.patch(prototype, 'render', function (original) {
+				return function () {
+					if (isEnabled(api) && directRenderEnabled) {
+						const fallbackReason = renderIndexedTransfer(this)
+						if (!fallbackReason) {
+							stats.directRenderCalls++
+							return
+						}
+						recordDirectRenderFallback(fallbackReason)
+					}
+					return original.apply(this, arguments)
+				}
+			})
+		}
 	}
 
 	function installDebugApi(api) {
@@ -72,13 +93,19 @@
 				const avoidedSegmentChecks = Math.max(0, stats.linearSegmentChecks - stats.binarySearchSteps)
 				return Object.assign({}, stats, {
 					enabled: isEnabled(api),
+					directRenderEnabled,
 					hitRate: stats.lookups ? roundNumber(stats.indexedLookups / stats.lookups, 4) : 0,
 					avgIndexedSegments: stats.indexBuilds ? roundNumber(stats.totalIndexedSegments / stats.indexBuilds, 3) : 0,
 					avgLinearSegmentChecks: stats.indexedLookups ? roundNumber(stats.linearSegmentChecks / stats.indexedLookups, 3) : 0,
 					avgBinarySearchSteps: stats.indexedLookups ? roundNumber(stats.binarySearchSteps / stats.indexedLookups, 3) : 0,
 					avoidedSegmentChecks,
+					directRenderFallbackReasons: Object.assign({}, stats.directRenderFallbackReasons),
 					fallbackReasons: Object.assign({}, stats.fallbackReasons)
 				})
+			},
+			setDirectRenderEnabled(enabled) {
+				directRenderEnabled = enabled !== false
+				return this.stats()
 			},
 			resetStats() {
 				resetStats()
@@ -143,8 +170,117 @@
 		return {
 			path,
 			totalPathLength,
-			segments
+			segments,
+			samples: new Float64Array(18)
 		}
+	}
+
+	function renderIndexedTransfer(effect) {
+		const master = effect?.master
+		const path = effect?.path
+		const visibility = effect?.visibility
+		if (!master || !visibility || !Array.isArray(path)) return 'missing-render-data'
+		if (!visibility[master.plane] || path.length < 2) return ''
+		const resources = effect.resources
+		const ctx = master.ctx
+		const codexResources = master.codex?.resources
+		const translation = master.translation
+		if (!Array.isArray(resources) || !ctx || !codexResources || !Array.isArray(translation)) return 'missing-render-context'
+		if (typeof ctx.beginPath !== 'function' || typeof ctx.lineTo !== 'function' || typeof ctx.stroke !== 'function') return 'unsupported-render-context'
+		const time = effect.time
+		const maxEndTime = effect.maxEndTime
+		const unit = master.unit
+		const zoom = master.zoom
+		const w2 = master.w2
+		const h2 = master.h2
+		if (![time, maxEndTime, unit, zoom, w2, h2, translation[0], translation[1]].every(Number.isFinite) || maxEndTime === 0) return 'invalid-render-numbers'
+		for (let resourceIndex = 0; resourceIndex < resources.length; resourceIndex++) {
+			if (!resources[resourceIndex]) continue
+			if (!Array.isArray(codexResources[resourceIndex]?.triplet)) return 'missing-resource-color'
+		}
+		const index = getOrBuildPathIndex(effect)
+		if (!index) return 'invalid-path'
+
+		const beauty = 8
+		const step = .9 / beauty
+		const threshold = 2
+		const start = time / maxEndTime * index.totalPathLength
+		const translationX = translation[0]
+		const translationY = translation[1]
+		const samples = index.samples
+		for (let sampleIndex = 0; sampleIndex <= beauty; sampleIndex++) {
+			const length = start - sampleIndex * step
+			if (!writeIndexedPoint(index, length, samples, sampleIndex * 2)) return 'sample-failed'
+		}
+		ctx.lineWidth = unit * .02
+		for (let resourceIndex = 0; resourceIndex < resources.length; resourceIndex++) {
+			if (!resources[resourceIndex]) continue
+			const deviation = (resourceIndex - 2.6) * unit * .03
+			ctx.strokeStyle = codexResources[resourceIndex].triplet[0]
+			ctx.beginPath()
+			let hasLast = false
+			let lastU = 0
+			let lastV = 0
+			for (let sampleIndex = 0; sampleIndex <= beauty; sampleIndex++) {
+				const sampleOffset = sampleIndex * 2
+				const u = samples[sampleOffset]
+				const v = samples[sampleOffset + 1]
+				if (hasLast && Math.max(Math.abs(u - lastU), Math.abs(v - lastV)) > threshold) {
+					ctx.stroke()
+					ctx.beginPath()
+				}
+				hasLast = true
+				lastU = u
+				lastV = v
+				const x = (u * .866 - v * .866) * unit - translationX * zoom + w2
+				const y = (u * .5 + v * .5) * unit - translationY * zoom + h2 - deviation
+				ctx.lineTo(x, y)
+			}
+			ctx.stroke()
+		}
+		return ''
+	}
+
+	function writeIndexedPoint(index, length, samples, sampleOffset) {
+		const path = index.path
+		if (length <= 0) {
+			samples[sampleOffset] = path[0][0]
+			samples[sampleOffset + 1] = path[0][1]
+			stats.directSamples++
+			return true
+		}
+		if (length >= index.totalPathLength) {
+			const point = path[path.length - 1]
+			samples[sampleOffset] = point[0]
+			samples[sampleOffset + 1] = point[1]
+			stats.directSamples++
+			return true
+		}
+		let low = 0
+		let high = index.segments.length - 1
+		let binarySearchSteps = 0
+		while (low <= high) {
+			binarySearchSteps++
+			const middle = (low + high) >> 1
+			const segment = index.segments[middle]
+			if (length < segment.start) {
+				high = middle - 1
+				continue
+			}
+			if (length >= segment.end) {
+				low = middle + 1
+				continue
+			}
+			const p1 = path[segment.pathIndex]
+			const p2 = path[segment.pathIndex + 1]
+			const factor = (length - segment.start) / segment.length
+			samples[sampleOffset] = p1[0] + (p2[0] - p1[0]) * factor
+			samples[sampleOffset + 1] = p1[1] + (p2[1] - p1[1]) * factor
+			stats.directSamples++
+			stats.directBinarySearchSteps += binarySearchSteps
+			return true
+		}
+		return false
 	}
 
 	function getIndexedPointAtLength(effect, index, length) {
@@ -226,6 +362,11 @@
 		return original.apply(effect, args)
 	}
 
+	function recordDirectRenderFallback(reason) {
+		stats.directRenderFallbacks++
+		stats.directRenderFallbackReasons[reason] = (stats.directRenderFallbackReasons[reason] || 0) + 1
+	}
+
 	function resetStats() {
 		stats.lookups = 0
 		stats.indexedLookups = 0
@@ -236,6 +377,11 @@
 		stats.binarySearchSteps = 0
 		stats.totalIndexedSegments = 0
 		stats.maxIndexedSegments = 0
+		stats.directRenderCalls = 0
+		stats.directRenderFallbacks = 0
+		stats.directSamples = 0
+		stats.directBinarySearchSteps = 0
+		stats.directRenderFallbackReasons = {}
 		stats.fallbackReasons = {}
 	}
 

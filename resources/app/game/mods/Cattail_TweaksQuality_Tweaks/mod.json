@@ -112,9 +112,9 @@
     },
     "disableIdleSplash": {
       "type": "boolean",
-      "label": "Disable startup loading screen",
+      "label": "Disable offline earnings simulation",
       "default": true,
-      "description": "Skip the startup idle-time loading screen. This also skips the original offline catch-up simulation that screen runs.",
+      "description": "Skip the offline earnings simulation when loading a save. Time spent away will grant no offline resources or other simulated progress.",
       "reloadPolicy": "hot",
       "section": "idleSplashDisable"
     },
@@ -1110,7 +1110,7 @@
       "section": "viewDistance"
     }
   },
-  "description": "Combines view distance limits, dynamic camera projection, ending skip, accessibility buttons, reduced-flashes layer preference, stabilizer surge flash reduction, gradient mine flash suppression, startup loading screen skip, void return fade skip, resource glow colors, chasm line rendering, floor grid outlines, play-time counter, Shift/Ctrl zoom shortcut control, and explainer fixes into one multi-entry quality mod.",
+  "description": "Combines view distance limits, dynamic camera projection, ending skip, accessibility buttons, reduced-flashes layer preference, stabilizer surge flash reduction, gradient mine flash suppression, offline earnings simulation control, void return fade skip, resource glow colors, chasm line rendering, floor grid outlines, play-time counter, Shift/Ctrl zoom shortcut control, and explainer fixes into one multi-entry quality mod.",
   "reloadOnConfigChange": true,
   "translations": {
     "sch": {
@@ -1214,8 +1214,8 @@
           "description": "阻止梯度矿井在虚空维度转化 Reality 时产生的全屏闪烁，但保留闪电路径、音效和资源产出。"
         },
         "disableIdleSplash": {
-          "label": "禁用启动加载画面",
-          "description": "跳过进游戏时的离线时间加载画面。这个画面负责运行原版离线快进模拟，因此开启后也会跳过这段原版离线模拟。"
+          "label": "禁用离线收益模拟",
+          "description": "读取存档时跳过离线收益模拟。离开游戏期间不会获得任何离线资源，也不会产生其他模拟进度。"
         }
       }
     },
@@ -1320,8 +1320,8 @@
           "description": "阻止梯度矿井在虚空维度转化 Reality 时产生的全屏闪烁，但保留闪电路径、音效和资源产出。"
         },
         "disableIdleSplash": {
-          "label": "禁用启动加载画面",
-          "description": "跳过进游戏时的离线时间加载画面。这个画面负责运行原版离线快进模拟，因此开启后也会跳过这段原版离线模拟。"
+          "label": "禁用离线收益模拟",
+          "description": "读取存档时跳过离线收益模拟。离开游戏期间不会获得任何离线资源，也不会产生其他模拟进度。"
         }
       }
     },
@@ -1415,8 +1415,8 @@
           "description": "Prevent Gradient mine Reality conversion lightning from filling the screen, while keeping the lightning path, sound, and resource production."
         },
         "disableIdleSplash": {
-          "label": "Disable startup loading screen",
-          "description": "Skip the startup idle-time loading screen. This also skips the original offline catch-up simulation that screen runs."
+          "label": "Disable offline earnings simulation",
+          "description": "Skip the offline earnings simulation when loading a save. Time spent away will grant no offline resources or other simulated progress."
         }
       }
     },
@@ -1510,8 +1510,8 @@
           "description": "Ubiraet polnoekrannuyu vspyshku molnii pri preobrazovanii Reality gradientnoy shakhtoy, sohranyaya liniyu molnii, zvuk i proizvodstvo resursov."
         },
         "disableIdleSplash": {
-          "label": "Otklyuchit ekran zagruzki pri starte",
-          "description": "Propuskaet startovyy ekran dogonki prostoya. Eto takzhe propuskaet originalnuyu oflayn-simulyatsiyu, kotoruyu on zapuskaet."
+          "label": "Otklyuchit simulyatsiyu oflayn-dokhoda",
+          "description": "Pri zagruzke sokhraneniya propuskaet simulyatsiyu oflayn-dokhoda. Za vremya vne igry ne budut nachisleny resursy ili drugoy smodelirovannyy progress."
         }
       }
     },
@@ -1605,8 +1605,8 @@
           "description": "Verhindert den Vollbildblitz bei der Reality-Umwandlung der Gradientmine, behalt aber Blitzpfad, Ton und Ressourcenproduktion."
         },
         "disableIdleSplash": {
-          "label": "Start-Ladebildschirm deaktivieren",
-          "description": "Uberspringt den Startbildschirm fur Leerlaufzeit. Dadurch wird auch die originale Offline-Aufholsimulation ubersprungen."
+          "label": "Offline-Ertragssimulation deaktivieren",
+          "description": "Überspringt beim Laden eines Spielstands die Offline-Ertragssimulation. Für die Zeit außerhalb des Spiels werden weder Ressourcen noch anderer simulierter Fortschritt gewährt."
         }
       }
     },
@@ -1700,8 +1700,8 @@
           "description": "Impede que o raio de conversao de Reality da mina gradiente preencha a tela, mantendo caminho do raio, som e producao de recursos."
         },
         "disableIdleSplash": {
-          "label": "Desativar tela de carregamento inicial",
-          "description": "Pula a tela inicial de tempo ocioso. Isso tambem pula a simulacao offline original executada por essa tela."
+          "label": "Desativar simulação de ganhos offline",
+          "description": "Ignora a simulação de ganhos offline ao carregar um jogo salvo. O tempo fora do jogo não concederá recursos nem outro progresso simulado."
         }
       }
     },
@@ -1795,8 +1795,8 @@
           "description": "Evita il lampo a schermo intero della conversione Reality della miniera gradiente, mantenendo linea del fulmine, audio e produzione."
         },
         "disableIdleSplash": {
-          "label": "Disattiva schermata di avvio",
-          "description": "Salta la schermata iniziale del tempo inattivo. Salta anche la simulazione offline originale eseguita da quella schermata."
+          "label": "Disattiva simulazione guadagni offline",
+          "description": "Salta la simulazione dei guadagni offline quando carichi un salvataggio. Il tempo trascorso fuori dal gioco non fornirà risorse né altri progressi simulati."
         }
       }
     },
@@ -1890,8 +1890,8 @@
           "description": "Evita que el rayo de conversion de Reality de la mina gradiente llene la pantalla, manteniendo trayectoria, sonido y produccion."
         },
         "disableIdleSplash": {
-          "label": "Desactivar pantalla de carga inicial",
-          "description": "Omite la pantalla inicial de tiempo inactivo. Tambien omite la simulacion offline original que ejecuta esa pantalla."
+          "label": "Desactivar simulación de ganancias offline",
+          "description": "Omite la simulación de ganancias offline al cargar una partida. El tiempo fuera del juego no otorgará recursos ni otros progresos simulados."
         }
       }
     },
@@ -1985,8 +1985,8 @@
           "description": "Empeche l eclair de conversion de Reality de la mine gradient de remplir l ecran, tout en gardant le trajet, le son et la production."
         },
         "disableIdleSplash": {
-          "label": "Desactiver ecran de chargement initial",
-          "description": "Ignore l ecran initial de temps inactif. Cela ignore aussi la simulation hors ligne originale lancee par cet ecran."
+          "label": "Désactiver la simulation des gains hors ligne",
+          "description": "Ignore la simulation des gains hors ligne lors du chargement d'une sauvegarde. Le temps passé hors du jeu n'accordera aucune ressource ni autre progression simulée."
         }
       }
     },
@@ -2080,8 +2080,8 @@
           "description": "Voorkomt dat de Reality-omzettingsbliksem van de gradientmijn het scherm vult, met behoud van bliksempad, geluid en productie."
         },
         "disableIdleSplash": {
-          "label": "Opstartlaadscherm uitschakelen",
-          "description": "Slaat het opstartscherm voor inactieve tijd over. Dit slaat ook de originele offline inhaalsimulatie over."
+          "label": "Offline-opbrengstsimulatie uitschakelen",
+          "description": "Slaat de offline-opbrengstsimulatie over bij het laden van een opgeslagen spel. Tijd buiten het spel levert geen grondstoffen of andere gesimuleerde voortgang op."
         }
       }
     },
@@ -2175,8 +2175,8 @@
           "description": "Zabrani celoplosnemu zablesku pri Reality konverzi gradientniho dolu, ale ponecha drahu blesku, zvuk a produkci."
         },
         "disableIdleSplash": {
-          "label": "Vypnout uvodni nacitaci obrazovku",
-          "description": "Preskoci uvodni obrazovku necinneho casu. Tim se preskoci i puvodni offline dosimulovani, ktere tato obrazovka spousti."
+          "label": "Vypnout simulaci offline výdělků",
+          "description": "Při načítání uložené hry přeskočí simulaci offline výdělků. Za čas mimo hru nezískáš žádné suroviny ani jiný simulovaný postup."
         }
       }
     },
@@ -2270,8 +2270,8 @@
           "description": "Usuwa pelnoekranowy blysk pioruna przy konwersji Reality w kopalni gradientowej, zachowujac linie, dzwiek i produkcje."
         },
         "disableIdleSplash": {
-          "label": "Wylacz ekran ladowania startowego",
-          "description": "Pomija startowy ekran czasu bezczynnosci. Pomija tez oryginalna symulacje offline uruchamiana przez ten ekran."
+          "label": "Wyłącz symulację zysków offline",
+          "description": "Pomija symulację zysków offline podczas wczytywania zapisu. Czas poza grą nie zapewni zasobów ani innych symulowanych postępów."
         }
       }
     },
@@ -2365,8 +2365,8 @@
           "description": "勾配鉱山の Reality 変換で発生する画面全体の点滅を防ぎ、雷の軌道、音、資源生産は維持します。"
         },
         "disableIdleSplash": {
-          "label": "起動時ロード画面を無効化",
-          "description": "起動時の放置時間ロード画面をスキップします。この画面が実行する原版のオフライン追いつきシミュレーションもスキップされます。"
+          "label": "オフライン収益シミュレーションを無効化",
+          "description": "セーブデータの読み込み時にオフライン収益シミュレーションをスキップします。ゲームを離れていた時間による資源やその他の進行は得られません。"
         }
       }
     },
@@ -2460,8 +2460,8 @@
           "description": "그라디언트 광산의 Reality 변환 번개가 전체 화면을 채우는 섬광을 막고, 번개 경로와 소리, 자원 생산은 유지합니다."
         },
         "disableIdleSplash": {
-          "label": "시작 로딩 화면 비활성화",
-          "description": "시작 시 유휴 시간 로딩 화면을 건너뜁니다. 이 화면이 실행하는 원본 오프라인 따라잡기 시뮬레이션도 건너뜁니다."
+          "label": "오프라인 수익 시뮬레이션 비활성화",
+          "description": "저장 파일을 불러올 때 오프라인 수익 시뮬레이션을 건너뜁니다. 게임을 떠나 있던 시간 동안 자원이나 기타 진행도를 얻지 않습니다."
         }
       }
     },
@@ -2555,8 +2555,8 @@
           "description": "防止梯度礦井在虛空維度轉化 Reality 時產生全螢幕閃爍，但保留閃電路徑、音效和資源產出。"
         },
         "disableIdleSplash": {
-          "label": "停用啟動載入畫面",
-          "description": "跳過進入遊戲時的離線時間載入畫面。這個畫面會執行原版離線快進模擬，因此啟用後也會跳過這段原版離線模擬。"
+          "label": "停用離線收益模擬",
+          "description": "讀取存檔時跳過離線收益模擬。離開遊戲期間不會獲得任何離線資源，也不會產生其他模擬進度。"
         }
       }
     },
@@ -2650,8 +2650,8 @@
           "description": "Prevents the Gradient mine Reality lightning from filling the screen while keeping its path, sound, and production."
         },
         "disableIdleSplash": {
-          "label": "Disable startup loading screen",
-          "description": "Skips the startup idle-time loading screen and the original offline catch-up simulation run by that screen."
+          "label": "ปิดการจำลองรายได้ออฟไลน์",
+          "description": "ข้ามการจำลองรายได้ออฟไลน์เมื่อโหลดเซฟ เวลาที่ไม่ได้เล่นจะไม่ให้ทรัพยากรหรือความคืบหน้าอื่นจากการจำลอง"
         }
       }
     },
@@ -2745,8 +2745,8 @@
           "description": "Megakadalyozza a gradientbanya Reality atalakitasanak teljes kepernyos villanasat, de megtartja a villam utjat, hangjat es termeleset."
         },
         "disableIdleSplash": {
-          "label": "Inditasi betoltokepernyo kikapcsolasa",
-          "description": "Atugorja az inditasi uresjarati ido kepernyot. Ezzel az eredeti offline felzarkoztato szimulacio is kimarad."
+          "label": "Offline bevételszimuláció kikapcsolása",
+          "description": "Mentés betöltésekor kihagyja az offline bevételszimulációt. A játékon kívül töltött időért nem jár erőforrás vagy más szimulált előrehaladás."
         }
       }
     },
@@ -2840,8 +2840,8 @@
           "description": "Neatlauj gradienta raktuves Reality parveides zibenim aizpildit ekranu, bet saglaba zibens liniju, skanu un razosanu."
         },
         "disableIdleSplash": {
-          "label": "Izslegt starta ielades ekranu",
-          "description": "Izlaiz starta dikstaves laika ekranu. Tas ari izlaiz originalo bezsaistes panaksanas simulaciju, ko sis ekrans palaiz."
+          "label": "Atspējot bezsaistes ienākumu simulāciju",
+          "description": "Ielādējot saglabātu spēli, izlaiž bezsaistes ienākumu simulāciju. Par laiku ārpus spēles netiks piešķirti resursi vai cits simulēts progress."
         }
       }
     },
@@ -2935,8 +2935,8 @@
           "description": "Impiedica fulgerul de conversie Reality al minei gradient sa umple ecranul, pastrand traseul, sunetul si productia."
         },
         "disableIdleSplash": {
-          "label": "Dezactiveaza ecranul de incarcare initial",
-          "description": "Sari peste ecranul initial de timp inactiv. Aceasta sare si peste simularea offline originala rulata de acel ecran."
+          "label": "Dezactivează simularea câștigurilor offline",
+          "description": "Omite simularea câștigurilor offline la încărcarea unei salvări. Timpul petrecut în afara jocului nu va acorda resurse sau alt progres simulat."
         }
       }
     },
@@ -3030,8 +3030,8 @@
           "description": "Hindrer Reality-konverteringslyn fra gradientgruven i a fylle skjermen, men beholder lynbane, lyd og produksjon."
         },
         "disableIdleSplash": {
-          "label": "Deaktiver oppstartslasteskjerm",
-          "description": "Hopper over oppstartsskjermen for inaktiv tid. Dette hopper ogsa over den originale offline-innhentingssimuleringen."
+          "label": "Deaktiver simulering av offline-inntekter",
+          "description": "Hopper over simuleringen av offline-inntekter når et lagret spill lastes. Tid borte fra spillet gir ingen ressurser eller annen simulert fremgang."
         }
       }
     }
