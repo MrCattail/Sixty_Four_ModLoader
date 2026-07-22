@@ -18,6 +18,7 @@
     "scripts/stabilizer-surge-flash-reduction.js",
     "scripts/gradient-lightning-flash-disable.js",
     "scripts/idle-splash-disable.js",
+    "scripts/procedural-icons.js",
     "scripts/resource-glow-colors.js",
     "scripts/explainer-fix.js",
     "scripts/ending-skip.js",
@@ -335,7 +336,7 @@
       "section": "resourceGlowColors"
     },
     "resourceGlowColors": {
-      "type": "resourceColors",
+      "type": "colorPalette",
       "label": "Resource glow palette",
       "default": {
         "0": "#484856",
@@ -348,6 +349,89 @@
         "7": "#D3AC92",
         "9": "#FFFFFF"
       },
+      "share": true,
+      "entries": [
+        {
+          "key": "0",
+          "label": "Charonite",
+          "icon": {
+            "type": "resource",
+            "index": 0
+          }
+        },
+        {
+          "key": "1",
+          "label": "Elmerine",
+          "icon": {
+            "type": "resource",
+            "index": 1
+          }
+        },
+        {
+          "key": "2",
+          "label": "Qanetite",
+          "icon": {
+            "type": "resource",
+            "index": 2
+          }
+        },
+        {
+          "key": "3",
+          "label": "Beta-Pylene",
+          "icon": {
+            "type": "resource",
+            "index": 3
+          }
+        },
+        {
+          "key": "4",
+          "label": "Hell Gem",
+          "icon": {
+            "type": "resource",
+            "index": 4
+          }
+        },
+        {
+          "key": "5",
+          "label": "Chromalit",
+          "icon": {
+            "type": "resource",
+            "index": 5
+          }
+        },
+        {
+          "key": "6",
+          "label": "Celestial foam",
+          "icon": {
+            "type": "resource",
+            "index": 6
+          }
+        },
+        {
+          "key": "7",
+          "label": "Hollow stone",
+          "icon": {
+            "type": "resource",
+            "index": 7
+          }
+        },
+        {
+          "key": "8",
+          "label": "Void",
+          "icon": {
+            "type": "resource",
+            "index": 8
+          }
+        },
+        {
+          "key": "9",
+          "label": "Reality",
+          "icon": {
+            "type": "resource",
+            "index": 9
+          }
+        }
+      ],
       "description": "Per-resource glow color overrides. Empty rows use each resource's native color.",
       "reloadPolicy": "hot",
       "section": "resourceGlowColors"
@@ -449,6 +533,11 @@
       "default": "#CBC3E5",
       "defaultColor": "#1D232B",
       "allowAuto": true,
+      "icon": {
+        "type": "procedural",
+        "renderer": "voidAltarWave",
+        "fill": "currentColor"
+      },
       "autoLabel": {
         "en": "Auto",
         "sch": "自动",
@@ -481,6 +570,11 @@
       "default": "#121212",
       "defaultColor": "#FFFFFF",
       "allowAuto": true,
+      "icon": {
+        "type": "procedural",
+        "renderer": "voidAltarWave",
+        "fill": "currentColor"
+      },
       "autoLabel": {
         "en": "Auto",
         "sch": "自动",

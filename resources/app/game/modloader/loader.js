@@ -46,6 +46,7 @@
 		panelAutoHideTimer: null,
 		uiButtons: {},
 		uiDocks: {},
+		uiProceduralIconRenderers: {},
 		gameHudHidden: false,
 		gameHudSnapshot: null,
 		gameHudItems: {},
@@ -3425,6 +3426,7 @@
 			registerHud(options) { return registerGameHudItem(modId, options) },
 			registerGameHud(options) { return registerGameHudItem(modId, options) },
 			hud: createUiHudApi(modId),
+			icons: createUiIconsApi(modId),
 			theme: createUiThemeApi(),
 			pages: createUiPagesApi(modId)
 		}
@@ -3935,13 +3937,17 @@
 			#modloader-panel .modloader-config-error { display: none; grid-column: 2; color: var(--modloader-error-text); font-size: 11px; }
 			#modloader-panel .modloader-config-error.active { display: block; }
 			#modloader-panel .modloader-color-input { display: grid; grid-template-columns: 34px minmax(0, 1fr) auto; gap: 8px; align-items: center; min-width: 0; }
+			#modloader-panel .modloader-color-input.modloader-color-with-icon { grid-template-columns: 38px 34px minmax(0, 1fr) auto; }
+			#modloader-panel .modloader-color-icon { display: block; width: 36px; height: 40px; background-repeat: no-repeat; background-position: center; background-size: contain; filter: drop-shadow(0 1px 2px rgba(255,255,255,.78)); }
+			#modloader-panel canvas.modloader-color-icon { background: transparent; }
 			#modloader-panel .modloader-color-picker { width: 30px; height: 28px; box-sizing: border-box; border: 1px solid var(--modloader-border-strong); border-radius: 5px; padding: 0; background: transparent; color: inherit; cursor: pointer; }
 			#modloader-panel .modloader-color-text { box-sizing: border-box; width: 100%; min-width: 0; border: 1px solid var(--modloader-input-border); border-radius: 5px; padding: 5px 6px; background: var(--modloader-input-bg); color: var(--modloader-input-text); outline: none; }
 			#modloader-panel .modloader-color-text:focus { border-color: var(--modloader-focus-border); }
 			#modloader-panel .modloader-color-reset { border: 1px solid var(--modloader-control-border); border-radius: 5px; padding: 5px 7px; background: var(--modloader-control-bg); color: var(--modloader-control-text); cursor: pointer; }
 			#modloader-panel .modloader-color-reset:hover:not(:disabled) { background: var(--modloader-control-bg-hover); border-color: var(--modloader-control-border-hover); color: var(--modloader-control-text-hover); }
 			#modloader-panel .modloader-color-reset:disabled { cursor: default; opacity: .45; }
-			#modloader-panel .modloader-resource-colors { display: grid; gap: 6px; min-width: 0; }
+			#modloader-panel .modloader-color-icon-resource, #modloader-panel .modloader-resource-color-icon { background-image: url('img/resources.png'); background-size: 360px 40px; background-position-y: 0; }
+			#modloader-panel .modloader-color-palette, #modloader-panel .modloader-resource-colors { display: grid; gap: 6px; min-width: 0; }
 			#modloader-panel .modloader-resource-color-tools { display: flex; align-items: center; gap: 7px; min-width: 0; margin-bottom: 2px; }
 			#modloader-panel .modloader-resource-color-share-button { border: 1px solid var(--modloader-control-border); border-radius: 5px; padding: 5px 7px; background: var(--modloader-control-bg); color: var(--modloader-control-text); cursor: pointer; }
 			#modloader-panel .modloader-resource-color-share-button:hover:not(:disabled) { background: var(--modloader-control-bg-hover); border-color: var(--modloader-control-border-hover); color: var(--modloader-control-text-hover); }
@@ -3950,8 +3956,8 @@
 			#modloader-panel .modloader-resource-color-share-status[data-tone="ok"] { color: var(--modloader-ok-text); }
 			#modloader-panel .modloader-resource-color-share-status[data-tone="error"] { color: var(--modloader-error-text); }
 			#modloader-panel .modloader-resource-color-row { display: grid; grid-template-columns: 38px 34px minmax(0, 1fr) auto; gap: 8px; align-items: center; min-width: 0; }
-			#modloader-panel .modloader-resource-colors-no-icons .modloader-resource-color-row { grid-template-columns: 34px minmax(0, 1fr) auto; }
-			#modloader-panel .modloader-resource-color-icon { display: block; width: 36px; height: 40px; background-image: url('img/resources.png'); background-size: 360px 40px; background-repeat: no-repeat; filter: drop-shadow(0 1px 2px rgba(255,255,255,.78)); }
+			#modloader-panel .modloader-resource-colors-no-icons .modloader-resource-color-row, #modloader-panel .modloader-color-palette-no-icons .modloader-resource-color-row { grid-template-columns: 34px minmax(0, 1fr) auto; }
+			#modloader-panel .modloader-resource-color-icon { display: block; width: 36px; height: 40px; background-repeat: no-repeat; filter: drop-shadow(0 1px 2px rgba(255,255,255,.78)); }
 			#modloader-panel .modloader-resource-colors-no-icons .modloader-resource-color-icon { display: none; }
 			#modloader-panel .modloader-resource-color-picker { width: 30px; height: 28px; box-sizing: border-box; border: 1px solid var(--modloader-border-strong); border-radius: 5px; padding: 0; background: transparent; color: inherit; cursor: pointer; }
 			#modloader-panel .modloader-resource-color-text { box-sizing: border-box; width: 100%; min-width: 0; border: 1px solid var(--modloader-input-border); border-radius: 5px; padding: 5px 6px; background: var(--modloader-input-bg); color: var(--modloader-input-text); outline: none; }
@@ -4907,8 +4913,8 @@
 	const getConfigType = function (item) {
 		return String(item.type || inferConfigType(item.default) || 'string').toLowerCase()
 	}
-	const isResourceColorsConfigType = function (type) {
-		return type === 'resourcecolors' || type === 'resource-colors' || type === 'resource_glow_colors' || type === 'resourcecolorpalette' || type === 'resource-color-palette' || type === 'colorpalette' || type === 'color-palette'
+	const isColorPaletteConfigType = function (type) {
+		return type === 'colorpalette' || type === 'color-palette'
 	}
 
 	const isColorConfigType = function (type) {
@@ -4927,9 +4933,9 @@
 		return String(item.control || item.input || item.ui || item.widget || item.display || '').toLowerCase()
 	}
 
-	const isResourceColorsConfigItem = function (item, type) {
+	const isColorPaletteConfigItem = function (item, type) {
 		const control = getConfigControl(item)
-		return isResourceColorsConfigType(type) || item.resourceColors === true || control === 'resourcecolors' || control === 'resource-colors' || control === 'resource_glow_colors' || control === 'colorpalette' || control === 'color-palette'
+		return isColorPaletteConfigType(type) || item.colorPalette === true || control === 'colorpalette' || control === 'color-palette'
 	}
 
 	const isSliderConfigItem = function (item, type) {
@@ -5086,17 +5092,217 @@
 		return String(value)
 	}
 
-	const shouldShowResourceColorSharing = function (item) {
+	const shouldShowColorPaletteSharing = function (item) {
 		const value = item.importExport ?? item.exportImport ?? item.share ?? item.sharing ?? item.colorSharing
-		return value !== false
+		if (value && typeof value === 'object') return value.enabled === true || value.show === true
+		return value === true || value === 'true' || value === 1 || value === '1'
 	}
 
-	const shouldShowResourceColorIcons = function (item) {
+	const shouldShowColorPaletteIcons = function (item) {
 		const value = item.showIcons ?? item.showIcon ?? item.icons ?? item.resourceIcons
 		return value !== false
 	}
 
-	const getResourceColorShareType = function (item) {
+	const getColorIconModel = function (source, fallbackResourceIndex) {
+		if (!source || source.icon === false || source.showIcon === false) return null
+		const raw = source.icon ?? source.leadingIcon ?? source.resourceIcon ?? source.resourceIndex ?? source.resource
+		if (raw === undefined || raw === null || raw === true) return null
+		const icon = isObject(raw) ? raw : { type: 'resource', index: raw }
+		const type = String(icon.type || icon.kind || '').trim().toLowerCase()
+		if (type === 'procedural' || type === 'canvas' || type === 'dynamic') {
+			return {
+				type: 'procedural',
+				renderer: String(icon.renderer || icon.name || icon.effect || '').trim(),
+				fill: icon.fill ?? icon.color ?? icon.value ?? 'currentColor',
+				stroke: icon.stroke,
+				background: icon.background,
+				width: getFiniteConfigNumber(icon.width),
+				height: getFiniteConfigNumber(icon.height),
+				title: pickLocalizedText(icon.title || source.name || source.label, getLocaleCandidates())
+			}
+		}
+		const resourceSource = icon.index ?? icon.resourceIndex ?? icon.resourceId ?? icon.resource ?? icon.id ?? source.resourceIcon ?? fallbackResourceIndex
+		if (type === 'resource' || type === 'resources' || resourceSource !== undefined) {
+			const index = getFiniteConfigNumber(resourceSource)
+			if (index === null) return null
+			return {
+				type: 'resource',
+				index: Math.max(0, Math.floor(index)),
+				title: pickLocalizedText(icon.title || source.name || source.label, getLocaleCandidates())
+			}
+		}
+		const image = icon.url || icon.src || icon.image
+		if (image) {
+			return {
+				type: 'image',
+				url: String(image),
+				title: pickLocalizedText(icon.title || source.name || source.label, getLocaleCandidates())
+			}
+		}
+		return null
+	}
+
+	const normalizeProceduralIconRendererName = function (value) {
+		return String(value || '').replace(/[^a-z0-9]/gi, '').toLowerCase()
+	}
+
+	const registerProceduralColorIconRenderer = function (modId, name, renderer) {
+		const key = normalizeProceduralIconRendererName(name)
+		if (!key || typeof renderer !== 'function') {
+			warn('Ignoring procedural UI icon renderer registration with an invalid name or renderer.', { modId, name })
+			return function () {}
+		}
+		const registration = {
+			modId: modId || 'anonymous',
+			name: String(name),
+			renderer
+		}
+		state.uiProceduralIconRenderers[key] = registration
+		return function () {
+			if (state.uiProceduralIconRenderers[key] === registration) delete state.uiProceduralIconRenderers[key]
+		}
+	}
+
+	const unregisterProceduralColorIconRenderer = function (modId, name) {
+		const key = normalizeProceduralIconRendererName(name)
+		const registration = key ? state.uiProceduralIconRenderers[key] : null
+		if (!registration || registration.modId !== (modId || 'anonymous')) return false
+		delete state.uiProceduralIconRenderers[key]
+		return true
+	}
+
+	const getProceduralColorIconRenderer = function (name) {
+		const key = normalizeProceduralIconRendererName(name)
+		return key ? (state.uiProceduralIconRenderers[key] || null) : null
+	}
+
+	const createUiIconsApi = function (modId) {
+		return {
+			registerProcedural(name, renderer) { return registerProceduralColorIconRenderer(modId, name, renderer) },
+			registerCanvas(name, renderer) { return registerProceduralColorIconRenderer(modId, name, renderer) },
+			register(name, renderer) { return registerProceduralColorIconRenderer(modId, name, renderer) },
+			unregisterProcedural(name) { return unregisterProceduralColorIconRenderer(modId, name) },
+			unregisterCanvas(name) { return unregisterProceduralColorIconRenderer(modId, name) },
+			unregister(name) { return unregisterProceduralColorIconRenderer(modId, name) },
+			hasProcedural(name) { return !!getProceduralColorIconRenderer(name) }
+		}
+	}
+
+	const getProceduralColorIconColor = function (value, options, fallback) {
+		const text = String(value ?? '').trim()
+		if (!text || text.toLowerCase() === 'currentcolor') {
+			const current = typeof options?.getColor === 'function' ? options.getColor() : ''
+			return normalizePanelHexColor(current) || normalizePanelHexColor(fallback) || '#FFFFFF'
+		}
+		return normalizePanelHexColor(text) || normalizePanelHexColor(fallback) || '#FFFFFF'
+	}
+
+	const resizeProceduralColorIconCanvas = function (canvas, width, height) {
+		const dpr = Math.max(1, Math.min(3, typeof window !== 'undefined' ? (Number(window.devicePixelRatio) || 1) : 1))
+		const pixelWidth = Math.max(1, Math.round(width * dpr))
+		const pixelHeight = Math.max(1, Math.round(height * dpr))
+		if (canvas.width !== pixelWidth) canvas.width = pixelWidth
+		if (canvas.height !== pixelHeight) canvas.height = pixelHeight
+		canvas.style.width = width + 'px'
+		canvas.style.height = height + 'px'
+		const ctx = canvas.getContext('2d')
+		if (ctx) ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
+		return ctx
+	}
+
+	const renderProceduralColorIcon = function (canvas, iconModel, options) {
+		const width = Math.max(8, iconModel.width || 36)
+		const height = Math.max(8, iconModel.height || 40)
+		const ctx = resizeProceduralColorIconCanvas(canvas, width, height)
+		if (!ctx) return
+		ctx.clearRect(0, 0, width, height)
+		const registration = getProceduralColorIconRenderer(iconModel.renderer)
+		if (!registration || typeof registration.renderer !== 'function') return
+		const now = typeof performance !== 'undefined' && typeof performance.now === 'function' ? performance.now() : Date.now()
+		const timeMs = Number(options?.time) || now
+		const fill = getProceduralColorIconColor(iconModel.fill, options, '#FFFFFF')
+		const stroke = getProceduralColorIconColor(iconModel.stroke, options, fill)
+		const background = normalizePanelHexColor(iconModel.background)
+		try {
+			registration.renderer({
+				canvas,
+				ctx,
+				width,
+				height,
+				time: timeMs / 1000,
+				timeMs,
+				color: fill,
+				fill,
+				stroke,
+				background,
+				icon: iconModel,
+				item: options?.item || null,
+				entry: options?.entry || null,
+				key: options?.key ?? options?.entry?.id ?? options?.item?.key,
+				value: typeof options?.getColor === 'function' ? options.getColor() : undefined
+			})
+			delete canvas.dataset.modloaderProceduralIconError
+		} catch (error) {
+			if (canvas.dataset.modloaderProceduralIconError !== registration.name) {
+				canvas.dataset.modloaderProceduralIconError = registration.name
+				warn(`Procedural UI icon renderer ${registration.name} from ${registration.modId} failed.`, error)
+			}
+		}
+	}
+
+	const startProceduralColorIconAnimation = function (canvas, iconModel, options) {
+		let frame = 0
+		let stopped = false
+		let hasConnected = false
+		const stop = function () {
+			stopped = true
+			if (frame && typeof window !== 'undefined' && typeof window.cancelAnimationFrame === 'function') window.cancelAnimationFrame(frame)
+			frame = 0
+		}
+		const tick = function () {
+			if (stopped) return
+			if (canvas.isConnected) hasConnected = true
+			else if (hasConnected) {
+				stop()
+				return
+			}
+			const now = typeof performance !== 'undefined' && typeof performance.now === 'function' ? performance.now() : Date.now()
+			renderProceduralColorIcon(canvas, iconModel, Object.assign({}, options, { time: now }))
+			if (typeof window !== 'undefined' && typeof window.requestAnimationFrame === 'function') frame = window.requestAnimationFrame(tick)
+		}
+		tick()
+		return stop
+	}
+
+	const createColorIconElement = function (iconModel, className, options) {
+		if (iconModel?.type === 'procedural') {
+			const canvas = element('canvas', className || 'modloader-color-icon')
+			canvas.classList.add('modloader-color-icon-procedural')
+			canvas.setAttribute('aria-hidden', 'true')
+			if (iconModel.title) canvas.title = iconModel.title
+			const stop = startProceduralColorIconAnimation(canvas, iconModel, options || {})
+			if (typeof options?.addCleanup === 'function') options.addCleanup(stop)
+			else canvas.__modloaderCleanup = stop
+			return canvas
+		}
+		const icon = element('span', className || 'modloader-color-icon')
+		if (!iconModel) {
+			icon.style.visibility = 'hidden'
+			return icon
+		}
+		if (iconModel.title) icon.title = iconModel.title
+		if (iconModel.type === 'resource') {
+			icon.classList.add('modloader-color-icon-resource')
+			icon.style.backgroundPosition = '-' + (iconModel.index * 36) + 'px 0'
+		} else if (iconModel.type === 'image') {
+			icon.style.backgroundImage = 'url("' + String(iconModel.url).replace(/"/g, '\\"') + '")'
+			icon.style.backgroundPosition = 'center'
+			icon.style.backgroundSize = 'contain'
+		}
+		return icon
+	}
+
+	const getColorPaletteShareType = function (item) {
 		return String(item.shareType || item.exportType || item.clipboardType || (item.key === 'resourceGlowColors' ? 'CattailResourceGlowColors' : 'ModLoaderColorPalette'))
 	}
 
@@ -5141,7 +5347,7 @@
 		}, 2400)
 	}
 
-	const readResourceColorsFromInput = function (root, options) {
+	const readColorPaletteFromInput = function (root, options) {
 		const includeDefaults = !!options?.includeDefaults
 		const out = {}
 		const rows = root.querySelectorAll('.modloader-resource-color-row')
@@ -5154,23 +5360,23 @@
 		return out
 	}
 
-	const createResourceColorShareText = function (item, root) {
+	const createColorPaletteShareText = function (item, root) {
 		return JSON.stringify({
-			type: getResourceColorShareType(item),
+			type: getColorPaletteShareType(item),
 			version: 1,
 			key: item.key || '',
-			colors: readResourceColorsFromInput(root, { includeDefaults: item.exportDefaults !== false })
+			colors: readColorPaletteFromInput(root, { includeDefaults: item.exportDefaults !== false })
 		}, null, 2)
 	}
-	const normalizeResourceColorImportKey = function (key) {
+	const normalizeColorPaletteImportKey = function (key) {
 		const text = String(key ?? '').trim()
 		if (!text) return ''
 		const resourceMatch = text.match(/^r(\d+)$/i)
 		return resourceMatch ? String(Number(resourceMatch[1])) : text
 	}
 
-	const addResourceColorImportValue = function (out, key, value) {
-		const id = normalizeResourceColorImportKey(key)
+	const addColorPaletteImportValue = function (out, key, value) {
+		const id = normalizeColorPaletteImportKey(key)
 		const raw = value && typeof value === 'object' && !Array.isArray(value) ? (value.color ?? value.value ?? value.hex) : value
 		const color = normalizePanelHexColor(raw)
 		if (!id && color) return
@@ -5178,16 +5384,16 @@
 		if (id && color) out[id] = color
 	}
 
-	const normalizeResourceColorImportData = function (data) {
-		const source = data && (data.colors ?? data.resourceGlowColors ?? data.resourceColors ?? data.palette ?? data)
+	const normalizeColorPaletteImportData = function (data) {
+		const source = data && (data.colors ?? data.colorPalette ?? data.palette ?? data.resourceGlowColors ?? data)
 		const out = {}
 		if (Array.isArray(source)) {
 			source.forEach(function (value, index) {
 				const key = value && typeof value === 'object' && !Array.isArray(value) ? (value.id ?? value.key ?? value.resource ?? index) : index
-				addResourceColorImportValue(out, key, value)
+				addColorPaletteImportValue(out, key, value)
 			})
 		} else if (source && typeof source === 'object') {
-			Object.keys(source).forEach(function (key) { addResourceColorImportValue(out, key, source[key]) })
+			Object.keys(source).forEach(function (key) { addColorPaletteImportValue(out, key, source[key]) })
 		} else {
 			throw new Error(getInlineLocalizedText(CONFIG_INLINE_TEXT.colorClipboardInvalid))
 		}
@@ -5195,7 +5401,7 @@
 		return out
 	}
 
-	const parseResourceColorLines = function (value) {
+	const parseColorPaletteLines = function (value) {
 		const out = {}
 		let nextId = 0
 		String(value || '').split(/[\r\n,;]+/).map(function (part) { return part.trim() }).filter(Boolean).forEach(function (part) {
@@ -5203,7 +5409,7 @@
 			if (!match) throw new Error(getInlineLocalizedText(CONFIG_INLINE_TEXT.colorClipboardInvalid))
 			const color = normalizePanelHexColor(match[2])
 			if (!color) throw new Error(getInlineLocalizedText(CONFIG_INLINE_TEXT.colorClipboardInvalid))
-			const id = match[1] !== undefined ? normalizeResourceColorImportKey(match[1]) : String(nextId++)
+			const id = match[1] !== undefined ? normalizeColorPaletteImportKey(match[1]) : String(nextId++)
 			if (!id) throw new Error(getInlineLocalizedText(CONFIG_INLINE_TEXT.colorClipboardInvalid))
 			out[id] = color
 		})
@@ -5211,20 +5417,20 @@
 		return out
 	}
 
-	const parseResourceColorShareText = function (value) {
+	const parseColorPaletteShareText = function (value) {
 		const source = String(value || '').trim()
 		if (!source) throw new Error(getInlineLocalizedText(CONFIG_INLINE_TEXT.colorClipboardEmpty))
 		if (/^[\[{]/.test(source)) {
 			try {
-				return normalizeResourceColorImportData(JSON.parse(source))
+				return normalizeColorPaletteImportData(JSON.parse(source))
 			} catch (error) {
 				throw new Error(error.message || getInlineLocalizedText(CONFIG_INLINE_TEXT.colorClipboardInvalid))
 			}
 		}
-		return parseResourceColorLines(source)
+		return parseColorPaletteLines(source)
 	}
 
-	const applyResourceColorsToInput = function (root, colors) {
+	const applyColorPaletteToInput = function (root, colors) {
 		let applied = 0
 		root.querySelectorAll('.modloader-resource-color-row').forEach(function (row) {
 			const id = row.dataset.resourceId
@@ -5242,7 +5448,7 @@
 		root.dispatchEvent(new Event('input', { bubbles: true }))
 		return applied
 	}
-	const createResourceColorShareTools = function (item, root) {
+	const createColorPaletteShareTools = function (item, root) {
 		const tools = element('div', 'modloader-resource-color-tools')
 		const exportButton = element('button', 'modloader-resource-color-share-button', getInlineLocalizedText(CONFIG_INLINE_TEXT.exportColors))
 		exportButton.type = 'button'
@@ -5255,7 +5461,7 @@
 			event.preventDefault()
 			event.stopPropagation()
 			try {
-				await writePanelClipboardText(createResourceColorShareText(item, root))
+				await writePanelClipboardText(createColorPaletteShareText(item, root))
 				setResourceColorShareStatus(status, getInlineLocalizedText(CONFIG_INLINE_TEXT.colorsCopied), 'ok')
 			} catch (error) {
 				setResourceColorShareStatus(status, error.message || getInlineLocalizedText(CONFIG_INLINE_TEXT.colorExportFailed), 'error')
@@ -5265,7 +5471,7 @@
 			event.preventDefault()
 			event.stopPropagation()
 			try {
-				const count = applyResourceColorsToInput(root, parseResourceColorShareText(await readPanelClipboardText()))
+				const count = applyColorPaletteToInput(root, parseColorPaletteShareText(await readPanelClipboardText()))
 				setResourceColorShareStatus(status, getInlineLocalizedText(CONFIG_INLINE_TEXT.colorsImported, { count }), 'ok')
 			} catch (error) {
 				setResourceColorShareStatus(status, error.message || getInlineLocalizedText(CONFIG_INLINE_TEXT.colorImportFailed), 'error')
@@ -5274,22 +5480,20 @@
 		tools.append(exportButton, importButton, status)
 		return tools
 	}
-	const createResourceColorsInput = function (item, value) {
-		const root = element('div', 'modloader-resource-colors modloader-config-input')
+	const createColorPaletteConfigInput = function (item, value, options) {
+		const root = element('div', 'modloader-color-palette modloader-resource-colors modloader-config-input')
+		root.dataset.modloaderColorPalette = 'true'
 		root.dataset.modloaderResourceColors = 'true'
 		root.dataset.cattailGlowSharing = 'true'
-		const showIcons = shouldShowResourceColorIcons(item)
-		if (!showIcons) root.classList.add('modloader-resource-colors-no-icons')
-		if (shouldShowResourceColorSharing(item)) root.appendChild(createResourceColorShareTools(item, root))
-		const resources = getResourceColorConfigRows(item, value)
+		if (shouldShowColorPaletteSharing(item)) root.appendChild(createColorPaletteShareTools(item, root))
+		const resources = getColorPaletteConfigRows(item, value)
+		const showIcons = shouldShowColorPaletteIcons(item) && resources.some(function (resource) { return !!resource.iconModel })
+		if (!showIcons) root.classList.add('modloader-resource-colors-no-icons', 'modloader-color-palette-no-icons')
 		for (const resource of resources) {
 			const row = element('div', 'modloader-resource-color-row')
 			row.dataset.resourceId = String(resource.id)
+			row.dataset.paletteKey = String(resource.id)
 			row.dataset.defaultColor = resource.defaultColor
-
-			const icon = element('span', 'modloader-resource-color-icon')
-			icon.style.backgroundPosition = '-' + (resource.iconIndex * 36) + 'px 0'
-			icon.title = resource.name
 
 			const picker = element('input', 'modloader-resource-color-picker')
 			picker.type = 'color'
@@ -5301,6 +5505,13 @@
 			textInput.spellcheck = false
 			textInput.value = resource.color
 			textInput.setAttribute('aria-label', getInlineLocalizedText(CONFIG_INLINE_TEXT.glowColorLabel, { name: resource.name }))
+
+			const icon = createColorIconElement(resource.iconModel, 'modloader-resource-color-icon', Object.assign({}, options, {
+				item,
+				entry: resource.entry || resource,
+				key: resource.id,
+				getColor() { return normalizePanelHexColor(textInput.value) || row.dataset.defaultColor || resource.defaultColor }
+			}))
 
 			const reset = element('button', 'modloader-resource-color-reset', getInlineLocalizedText(CONFIG_INLINE_TEXT.reset))
 			reset.type = 'button'
@@ -5321,16 +5532,13 @@
 				root.dispatchEvent(new Event('input', { bubbles: true }))
 			})
 
-			if (showIcons) {
-				if (resource.showIcon === false) icon.style.visibility = 'hidden'
-				row.appendChild(icon)
-			}
+			if (showIcons) row.appendChild(icon)
 			row.append(picker, textInput, reset)
 			root.appendChild(row)
 		}
 
 		root.readConfigValue = function () {
-			return readResourceColorsFromInput(root, { includeDefaults: false })
+			return readColorPaletteFromInput(root, { includeDefaults: false })
 		}
 
 		Object.defineProperty(root, 'disabled', {
@@ -5342,38 +5550,49 @@
 		})
 		return root
 	}
-	const getResourceColorConfigRows = function (item, value) {
+	const getColorPaletteConfigRows = function (item, value) {
 		const overrides = isObject(value) ? value : {}
 		const defaultOverrides = isObject(item?.default) ? item.default : {}
 		const gameResources = state.game?.codex?.resources || []
-		const manifestResources = Array.isArray(item.resources) ? item.resources : (Array.isArray(item.rows) ? item.rows : (Array.isArray(item.colors) ? item.colors : []))
-		const count = Math.max(Number(item.count) || 0, gameResources.length, manifestResources.length, 10)
+		const manifestResources = Array.isArray(item.entries) ? item.entries : (Array.isArray(item.rows) ? item.rows : (Array.isArray(item.colors) ? item.colors : (Array.isArray(item.resources) ? item.resources : [])))
+		const keyedEntries = []
+		const seenKeys = new Set()
+		const addKey = function (key) {
+			if (key === undefined || key === null) return
+			const text = String(key)
+			if (seenKeys.has(text)) return
+			seenKeys.add(text)
+			keyedEntries.push({ key: text })
+		}
+		for (const entry of manifestResources) addKey(entry?.key ?? entry?.id)
+		Object.keys(defaultOverrides).forEach(addKey)
+		Object.keys(overrides).forEach(addKey)
+		const count = Math.max(Number(item.count) || 0, manifestResources.length, keyedEntries.length)
 		const rows = []
 		for (let i = 0; i < count; i++) {
-			const manifestResource = manifestResources[i] || {}
+			const manifestResource = manifestResources[i] || keyedEntries[i] || {}
 			const explicitId = manifestResource.id ?? manifestResource.key
 			const id = explicitId !== undefined ? String(explicitId) : String(i)
-			let resourceIndex = getFiniteConfigNumber(manifestResource.resourceIndex ?? manifestResource.resourceId ?? manifestResource.resource ?? explicitId)
+			let resourceIndex = getFiniteConfigNumber(manifestResource.resourceIndex ?? manifestResource.resourceId ?? manifestResource.resource ?? manifestResource.resourceIcon ?? explicitId)
 			if (resourceIndex === null) resourceIndex = i
 			const resource = gameResources[resourceIndex] || gameResources[i] || {}
-			let iconIndex = getFiniteConfigNumber(manifestResource.iconIndex ?? manifestResource.icon ?? resourceIndex)
-			if (iconIndex === null) iconIndex = i
-			const nativeDefaultColor = normalizePanelHexColor(manifestResource.defaultColor) || normalizePanelHexColor(resource?.triplet?.[2]) || normalizePanelHexColor(resource?.triplet?.[1]) || normalizePanelHexColor(resource?.triplet?.[0]) || normalizePanelHexColor(manifestResource.color) || '#FFFFFF'
-			const defaultOverride = getResourceColorConfigValue(defaultOverrides, id, i)
+			const nativeDefaultColor = normalizePanelHexColor(manifestResource.default) || normalizePanelHexColor(manifestResource.defaultColor) || normalizePanelHexColor(resource?.triplet?.[2]) || normalizePanelHexColor(resource?.triplet?.[1]) || normalizePanelHexColor(resource?.triplet?.[0]) || normalizePanelHexColor(manifestResource.color) || '#FFFFFF'
+			const defaultOverride = getColorPaletteConfigValue(defaultOverrides, id, i)
 			const defaultColor = normalizePanelHexColor(defaultOverride) || nativeDefaultColor
-			const override = getResourceColorConfigValue(overrides, id, i)
+			const override = getColorPaletteConfigValue(overrides, id, i)
 			rows.push({
 				id,
 				name: pickLocalizedText(manifestResource.name || manifestResource.label, getLocaleCandidates()) || String(resource.name || manifestResource.name || manifestResource.label || ('Resource ' + (i + 1))),
 				defaultColor,
 				color: normalizePanelHexColor(override) || defaultColor,
-				iconIndex: Math.max(0, iconIndex),
-				showIcon: manifestResource.icon !== false && manifestResource.showIcon !== false
+				entry: manifestResource,
+				resourceIndex,
+				iconModel: getColorIconModel(manifestResource, undefined)
 			})
 		}
 		return rows
 	}
-	const getResourceColorConfigValue = function (source, id, index) {
+	const getColorPaletteConfigValue = function (source, id, index) {
 		if (!isObject(source)) return undefined
 		return source[id] ?? source[String(id)] ?? source[index] ?? source[String(index)] ?? source['r' + id] ?? source['r' + index]
 	}
@@ -5648,10 +5867,12 @@
 		return normalizePanelHexColor(item?.default) || normalizePanelHexColor(item?.defaultColor) || normalizePanelHexColor(item?.colorDefault) || '#FFFFFF'
 	}
 
-	const createColorConfigInput = function (item, value) {
+	const createColorConfigInput = function (item, value, options) {
 		const root = element('div', 'modloader-color-input modloader-config-input')
 		const displayDefault = getColorConfigDisplayDefault(item)
 		const allowAuto = item?.allowAuto === true
+		const iconModel = getColorIconModel(item)
+		if (iconModel) root.classList.add('modloader-color-with-icon')
 		let auto = allowAuto && !normalizePanelHexColor(value)
 		const picker = element('input', 'modloader-color-picker')
 		picker.type = 'color'
@@ -5734,6 +5955,17 @@
 			}
 		})
 
+		const getIconColor = function () {
+			const explicit = normalizePanelHexColor(textInput.value)
+			if (explicit) return explicit
+			if (auto) return normalizePanelHexColor(item?.defaultColor) || displayDefault
+			return displayDefault
+		}
+		if (iconModel) root.appendChild(createColorIconElement(iconModel, 'modloader-color-icon', Object.assign({}, options, {
+			item,
+			key: item?.key,
+			getColor: getIconColor
+		})))
 		root.append(picker, textInput, reset)
 		return root
 	}
@@ -5782,10 +6014,10 @@
 		return root
 	}
 
-	const createConfigInput = function (item, value) {
+	const createConfigInput = function (item, value, options) {
 		const type = getConfigType(item)
-		if (isResourceColorsConfigItem(item, type)) return createResourceColorsInput(item, value)
-		if (isColorConfigType(type)) return createColorConfigInput(item, value)
+		if (isColorPaletteConfigItem(item, type)) return createColorPaletteConfigInput(item, value, options)
+		if (isColorConfigType(type)) return createColorConfigInput(item, value, options)
 		if (isSliderConfigItem(item, type)) return createSliderConfigInput(item, value, type)
 		const input = element(type === 'array' || type === 'object' ? 'textarea' : 'input', 'modloader-config-input')
 		if (type === 'boolean') {
@@ -5807,7 +6039,7 @@
 
 	const readConfigInputValue = function (item, input) {
 		const type = getConfigType(item)
-		if (isResourceColorsConfigItem(item, type)) return input.readConfigValue()
+		if (isColorPaletteConfigItem(item, type)) return input.readConfigValue()
 		if (isColorConfigType(type)) return input.readConfigValue()
 		if (isSliderConfigItem(item, type)) return input.readConfigValue()
 		if (type === 'boolean') return !!input.checked
@@ -7743,7 +7975,7 @@
 				const createConfigField = function (item, target) {
 					const type = getConfigType(item)
 					const value = modConfig.values[item.key]
-					const field = element(type === 'boolean' || isResourceColorsConfigItem(item, type) ? 'div' : 'label', 'modloader-config-field')
+					const field = element(type === 'boolean' || isColorPaletteConfigItem(item, type) ? 'div' : 'label', 'modloader-config-field')
 					const text = element('span', 'modloader-config-text')
 					const localizedConfigLabel = getLocalizedConfigText(mod.manifest, item, 'label', item.key)
 					const localizedConfigDescription = getLocalizedConfigText(mod.manifest, item, 'description', '')
@@ -7753,7 +7985,7 @@
 					if (localizedConfigDescription) text.title = localizedConfigDescription
 					const controlLabel = isSliderConfigItem(item, type) && !isSliderConfigType(type) ? ' | slider' : ''
 					text.appendChild(element('span', 'modloader-config-meta', item.key + ' | ' + type + controlLabel))
-					const input = createConfigInput(item, value)
+					const input = createConfigInput(item, value, { addCleanup, mod, item, key: item.key })
 					const error = element('span', 'modloader-config-error')
 					const model = {
 						mod,
