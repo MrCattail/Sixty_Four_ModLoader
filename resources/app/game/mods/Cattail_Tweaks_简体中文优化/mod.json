@@ -2,7 +2,7 @@
   "id": "Cattail_Tweaks_简体中文优化",
   "uniqueId": "Cattail_Tweaks_简体中文优化",
   "name": "Optimized Simplified Chinese Locale",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "previousVersion": {
     "name": "Optimized Simplified Chinese Locale",
     "version": "0.1.0"
@@ -14,8 +14,9 @@
   "languages": [
     "modsch"
   ],
-  "locale": [
-    "locale/modsch.json"
+  "entries": [
+    "locale/trilingual-data.js",
+    "scripts/trilingual-loader.js"
   ],
   "description": "Adds the 中文优化版 language extracted from the previous modified words.js.",
   "translations": {
