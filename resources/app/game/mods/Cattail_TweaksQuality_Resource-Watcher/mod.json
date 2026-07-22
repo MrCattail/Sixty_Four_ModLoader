@@ -1,0 +1,81 @@
+{
+  "id": "Cattail_TweaksQuality_Resource-Watcher",
+  "uniqueId": "Cattail_TweaksQuality_Resource-Watcher",
+  "name": "Resource Watcher",
+  "version": "0.1.0",
+  "previousVersion": {
+    "name": "Resource Watcher",
+    "version": "0.1.0"
+  },
+  "loaderVersion": ">=0.1.0",
+  "languageSupport": {
+    "gameLanguage": true
+  },
+  "entry": "scripts/main.js",
+  "description": "Adds a bottom-right resource watcher button that shrinks the game into an always-on-top resource monitor without changing vanilla scripts. Integrates with Dynamic Details resource-source data when that mod is enabled.",
+  "translations": {
+    "sch": {
+      "name": "资源监视器",
+      "description": "添加右下角资源监视按钮，可将游戏缩小成置顶资源监视窗口，不修改原版脚本。启用 Dynamic Details 时会联动资源来源数据。"
+    },
+    "modsch": {
+      "name": "资源监视器",
+      "description": "添加右下角资源监视按钮，可将游戏缩小成置顶资源监视窗口，不修改原版脚本。启用 Dynamic Details 时会联动资源来源数据。"
+    },
+    "en": {
+      "name": "Resource Watcher",
+      "description": "Adds a bottom-right resource watcher button that shrinks the game into an always-on-top resource monitor without changing vanilla scripts. Integrates with Dynamic Details resource-source data when that mod is enabled."
+    },
+    "ru": {
+      "name": "Монитор ресурсов"
+    },
+    "de": {
+      "name": "Ressourcenmonitor"
+    },
+    "ptbr": {
+      "name": "Monitor de recursos"
+    },
+    "it": {
+      "name": "Monitor risorse"
+    },
+    "es": {
+      "name": "Monitor de recursos"
+    },
+    "fr": {
+      "name": "Moniteur de ressources"
+    },
+    "nl": {
+      "name": "Grondstoffenmonitor"
+    },
+    "cz": {
+      "name": "Sledování surovin"
+    },
+    "pl": {
+      "name": "Monitor zasobów"
+    },
+    "jp": {
+      "name": "資源ウォッチャー"
+    },
+    "kr": {
+      "name": "자원 감시기"
+    },
+    "tch": {
+      "name": "資源監視器"
+    },
+    "thai": {
+      "name": "ตัวเฝ้าดูทรัพยากร"
+    },
+    "hu": {
+      "name": "Erőforrás-figyelő"
+    },
+    "lv": {
+      "name": "Resursu pārraugs"
+    },
+    "ro": {
+      "name": "Monitor resurse"
+    },
+    "no": {
+      "name": "Ressursovervåker"
+    }
+  }
+}

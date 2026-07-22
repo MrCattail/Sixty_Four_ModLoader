@@ -1,0 +1,11 @@
+{
+  "id": "template-behavior",
+  "name": "Template Behavior",
+  "version": "0.1.0",
+  "loaderVersion": ">=0.1.0",
+  "languageSupport": {
+    "gameLanguage": false
+  },
+  "entry": "scripts/main.js",
+  "description": "Template for behavior hooks and careful patches. Do not enable directly."
+}

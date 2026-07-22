@@ -1,0 +1,87 @@
+{
+  "id": "Cattail_Tweaks_简体中文优化",
+  "uniqueId": "Cattail_Tweaks_简体中文优化",
+  "name": "Optimized Simplified Chinese Locale",
+  "version": "0.2.0",
+  "previousVersion": {
+    "name": "Optimized Simplified Chinese Locale",
+    "version": "0.1.0"
+  },
+  "loaderVersion": ">=0.1.0",
+  "languageSupport": {
+    "gameLanguage": true
+  },
+  "languages": [
+    "modsch"
+  ],
+  "entries": [
+    "locale/trilingual-data.js",
+    "scripts/trilingual-loader.js"
+  ],
+  "description": "Adds the 中文优化版 language extracted from the previous modified words.js.",
+  "translations": {
+    "sch": {
+      "name": "简体中文优化",
+      "description": "简体中文优化版。"
+    },
+    "modsch": {
+      "name": "简体中文优化",
+      "description": "简体中文优化版。"
+    },
+    "en": {
+      "name": "Optimized Simplified Chinese Locale",
+      "description": "Adds the 中文优化版 language extracted from the previous modified words.js."
+    },
+    "ru": {
+      "name": "Оптимизация упрощенного китайского"
+    },
+    "de": {
+      "name": "Optimiertes vereinfachtes Chinesisch"
+    },
+    "ptbr": {
+      "name": "Otimização de chinês simplificado"
+    },
+    "it": {
+      "name": "Ottimizzazione cinese semplificato"
+    },
+    "es": {
+      "name": "Optimización de chino simplificado"
+    },
+    "fr": {
+      "name": "Optimisation chinois simplifié"
+    },
+    "nl": {
+      "name": "Vereenvoudigd Chinees verbeteren"
+    },
+    "cz": {
+      "name": "Optimalizace zjednodušené čínštiny"
+    },
+    "pl": {
+      "name": "Optymalizacja chińskiego uproszczonego"
+    },
+    "jp": {
+      "name": "簡体字中国語最適化"
+    },
+    "kr": {
+      "name": "간체 중국어 최적화"
+    },
+    "tch": {
+      "name": "簡體中文優化"
+    },
+    "thai": {
+      "name": "ปรับปรุงภาษาจีนตัวย่อ"
+    },
+    "hu": {
+      "name": "Egyszerűsített kínai optimalizálás"
+    },
+    "lv": {
+      "name": "Vienkāršotās ķīniešu valodas uzlabojums"
+    },
+    "ro": {
+      "name": "Optimizare chineză simplificată"
+    },
+    "no": {
+      "name": "Optimalisering av forenklet kinesisk"
+    }
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "id": "example-asset-replace",
+  "name": "Example Asset Replace",
+  "version": "0.1.0",
+  "loaderVersion": ">=0.1.0",
+  "languageSupport": {
+    "gameLanguage": false
+  },
+  "entry": "scripts/main.js",
+  "description": "Example asset replacement mod. Disabled by default."
+}

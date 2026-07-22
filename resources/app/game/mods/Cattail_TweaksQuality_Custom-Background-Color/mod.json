@@ -1,0 +1,581 @@
+{
+  "id": "Cattail_TweaksQuality_Custom-Background-Color",
+  "uniqueId": "Cattail_TweaksQuality_Custom-Background-Color",
+  "name": "Custom Background Color",
+  "version": "0.1.2",
+  "previousVersion": {
+    "name": "Dynamic Background Sprite Cleanup",
+    "version": "0.1.2"
+  },
+  "loaderVersion": ">=0.1.0",
+  "languageSupport": {
+    "gameLanguage": true
+  },
+  "entry": "scripts/main.js",
+  "dependencies": [
+    "Cattail_TweaksQuality_Tweaks"
+  ],
+  "description": "Cleans reality-plane machine sprites so their baked white matte becomes transparent and their baked floor shadows render as neutral alpha shadows.",
+  "config": {
+    "globalThresholds": {
+      "type": "object",
+      "default": {
+        "matte": 1,
+        "shadow": 1,
+        "edge": 1
+      },
+      "description": "Global cleanup multipliers. matte/shadow/edge are 0-3. Lower preserves more sprite detail; higher removes more matte, shadow, or edge fringe."
+    },
+    "spriteThresholds": {
+      "type": "object",
+      "default": {
+        "img/annihilator.png": {
+          "matte": 1,
+          "shadow": 1,
+          "edge": 1,
+          "frames": {
+            "5": {
+              "matte": 1,
+              "shadow": 1,
+              "edge": 1
+            }
+          }
+        },
+        "img/auxpump.png": {
+          "matte": 1,
+          "shadow": 1,
+          "edge": 1
+        },
+        "img/auxpump1.png": {
+          "matte": 1,
+          "shadow": 1,
+          "edge": 1
+        },
+        "img/c1-3.png": {
+          "matte": 1,
+          "shadow": 1,
+          "edge": 1
+        },
+        "img/c31-2.png": {
+          "matte": 1,
+          "shadow": 1,
+          "edge": 1
+        },
+        "img/c4-1.png": {
+          "matte": 1,
+          "shadow": 1,
+          "edge": 1
+        },
+        "img/c7-6.png": {
+          "matte": 1,
+          "shadow": 1,
+          "edge": 1
+        },
+        "img/channel.png": {
+          "matte": 1,
+          "shadow": 1,
+          "edge": 1
+        },
+        "img/channel2.png": {
+          "matte": 1,
+          "shadow": 1,
+          "edge": 1
+        },
+        "img/chasm.png": {
+          "matte": 1,
+          "shadow": 1,
+          "edge": 1
+        },
+        "img/clicker1.png": {
+          "matte": 1,
+          "shadow": 1,
+          "edge": 1
+        },
+        "img/clicker2.png": {
+          "matte": 1,
+          "shadow": 1,
+          "edge": 1
+        },
+        "img/clicker3.png": {
+          "matte": 1,
+          "shadow": 1,
+          "edge": 1
+        },
+        "img/conductor.png": {
+          "matte": 1,
+          "shadow": 1,
+          "edge": 1
+        },
+        "img/consumer.png": {
+          "matte": 1,
+          "shadow": 1,
+          "edge": 1
+        },
+        "img/cookie.png": {
+          "matte": 1,
+          "shadow": 1,
+          "edge": 1
+        },
+        "img/des.png": {
+          "matte": 1,
+          "shadow": 1,
+          "edge": 1
+        },
+        "img/des2.png": {
+          "matte": 1,
+          "shadow": 1,
+          "edge": 1
+        },
+        "img/des2a.png": {
+          "matte": 1,
+          "shadow": 1,
+          "edge": 1
+        },
+        "img/double2.png": {
+          "matte": 1,
+          "shadow": 1,
+          "edge": 1
+        },
+        "img/double_spr.png": {
+          "matte": 1,
+          "shadow": 1,
+          "edge": 1
+        },
+        "img/entropy.png": {
+          "matte": 1,
+          "shadow": 1,
+          "edge": 1
+        },
+        "img/entropy2.png": {
+          "matte": 1,
+          "shadow": 1,
+          "edge": 1
+        },
+        "img/entropy2a.png": {
+          "matte": 1,
+          "shadow": 1,
+          "edge": 1
+        },
+        "img/entropy3.png": {
+          "matte": 1,
+          "shadow": 1,
+          "edge": 1
+        },
+        "img/eye.png": {
+          "matte": 1,
+          "shadow": 1,
+          "edge": 1
+        },
+        "img/flower.png": {
+          "matte": 1,
+          "shadow": 1,
+          "edge": 1
+        },
+        "img/fruit.png": {
+          "matte": 1,
+          "shadow": 1,
+          "edge": 1
+        },
+        "img/generaldecay.png": {
+          "matte": 1,
+          "shadow": 1,
+          "edge": 1
+        },
+        "img/gradient.png": {
+          "matte": 1,
+          "shadow": 1,
+          "edge": 1
+        },
+        "img/hollow.png": {
+          "matte": 1,
+          "shadow": 1,
+          "edge": 1
+        },
+        "img/injector.png": {
+          "matte": 1,
+          "shadow": 1,
+          "edge": 1
+        },
+        "img/mega1.png": {
+          "matte": 1,
+          "shadow": 1,
+          "edge": 1
+        },
+        "img/mega1a.png": {
+          "matte": 1,
+          "shadow": 1,
+          "edge": 1
+        },
+        "img/mega1b.png": {
+          "matte": 1,
+          "shadow": 1,
+          "edge": 1
+        },
+        "img/pinhole.png": {
+          "matte": 1,
+          "shadow": 1,
+          "edge": 1
+        },
+        "img/preheater.png": {
+          "matte": 1,
+          "shadow": 1,
+          "edge": 1
+        },
+        "img/puncture.png": {
+          "matte": 1,
+          "shadow": 1,
+          "edge": 1
+        },
+        "img/reactor.png": {
+          "matte": 1,
+          "shadow": 1,
+          "edge": 1
+        },
+        "img/recycler.png": {
+          "matte": 1,
+          "shadow": 1,
+          "edge": 1
+        },
+        "img/recycler2.png": {
+          "matte": 1,
+          "shadow": 1,
+          "edge": 1
+        },
+        "img/reflector.png": {
+          "matte": 1,
+          "shadow": 1,
+          "edge": 1
+        },
+        "img/silo.png": {
+          "matte": 1,
+          "shadow": 1,
+          "edge": 1
+        },
+        "img/silo2.png": {
+          "matte": 1,
+          "shadow": 1,
+          "edge": 1
+        },
+        "img/stabilizer.png": {
+          "matte": 1,
+          "shadow": 1,
+          "edge": 1
+        },
+        "img/stabilizer2.png": {
+          "matte": 1,
+          "shadow": 1,
+          "edge": 1
+        },
+        "img/stabilizer3.png": {
+          "matte": 1,
+          "shadow": 1,
+          "edge": 1
+        },
+        "img/strange.png": {
+          "matte": 1,
+          "shadow": 1,
+          "edge": 1
+        },
+        "img/strange1.png": {
+          "matte": 1,
+          "shadow": 1,
+          "edge": 1
+        },
+        "img/strange2.png": {
+          "matte": 1,
+          "shadow": 1,
+          "edge": 1
+        },
+        "img/strange3.png": {
+          "matte": 1,
+          "shadow": 1,
+          "edge": 1
+        },
+        "img/valve.png": {
+          "matte": 1,
+          "shadow": 1,
+          "edge": 1
+        },
+        "img/vault.png": {
+          "matte": 1,
+          "shadow": 1,
+          "edge": 1
+        },
+        "img/vessel.png": {
+          "matte": 1,
+          "shadow": 1,
+          "edge": 1
+        },
+        "img/vessel2.png": {
+          "matte": 1,
+          "shadow": 1,
+          "edge": 1
+        },
+        "img/voidsculpture.png": {
+          "matte": 1,
+          "shadow": 1,
+          "edge": 1
+        },
+        "img/waypoint.png": {
+          "matte": 1,
+          "shadow": 1,
+          "edge": 1,
+          "frames": {
+            "1": {
+              "matte": 1,
+              "shadow": 1,
+              "edge": 1
+            },
+            "2": {
+              "matte": 1,
+              "shadow": 1,
+              "edge": 1
+            },
+            "3": {
+              "matte": 1,
+              "shadow": 1,
+              "edge": 1
+            }
+          }
+        },
+        "img/waypoint2.png": {
+          "matte": 1,
+          "shadow": 1,
+          "edge": 1
+        }
+      },
+      "description": "Per-image cleanup keyed by img/*.png. Supports matte/shadow/edge, enabled:false, matteDistance, matteLuma, matteSaturation, matteSeeds:[[x,y]], and one-based frames:{\"5\":{...}} overrides."
+    }
+  },
+  "translations": {
+    "sch": {
+      "name": "自定义背景颜色",
+      "description": "清理现实世界机器贴图，让烘焙的白色底色变透明，并将烘焙地面阴影渲染为中性透明阴影。",
+      "config": {
+        "globalThresholds": {
+          "label": "全局清理阈值",
+          "description": "全局清理倍率。matte/shadow/edge 范围为 0-3。数值越低保留越多贴图细节，越高会移除更多底色、阴影或边缘杂色。"
+        },
+        "spriteThresholds": {
+          "label": "贴图清理阈值",
+          "description": "按 img/*.png 设置单张图片清理参数。支持 matte/shadow/edge、enabled:false、matteDistance、matteLuma、matteSaturation、matteSeeds:[[x,y]]，以及从 1 开始的 frames:{\"5\":{...}} 帧覆盖。"
+        }
+      }
+    },
+    "modsch": {
+      "name": "背景颜色自定义",
+      "description": "清理现实世界机器贴图，让烘焙的白色底色变透明，并将烘焙地面阴影渲染为中性透明阴影。",
+      "config": {
+        "globalThresholds": {
+          "label": "全局清理阈值",
+          "description": "全局清理倍率。matte/shadow/edge 范围为 0-3。数值越低保留越多贴图细节，越高会移除更多底色、阴影或边缘杂色。"
+        },
+        "spriteThresholds": {
+          "label": "贴图清理阈值",
+          "description": "按 img/*.png 设置单张图片清理参数。支持 matte/shadow/edge、enabled:false、matteDistance、matteLuma、matteSaturation、matteSeeds:[[x,y]]，以及从 1 开始的 frames:{\"5\":{...}} 帧覆盖。"
+        }
+      }
+    },
+    "en": {
+      "name": "Custom Background Color",
+      "config": {
+        "globalThresholds": {
+          "label": "Global cleanup thresholds",
+          "description": "Global cleanup multipliers. matte/shadow/edge are 0-3. Lower preserves more sprite detail; higher removes more matte, shadow, or edge fringe."
+        },
+        "spriteThresholds": {
+          "label": "Sprite cleanup thresholds",
+          "description": "Per-image cleanup keyed by img/*.png. Supports matte/shadow/edge, enabled:false, matteDistance, matteLuma, matteSaturation, matteSeeds:[[x,y]], and one-based frames:{\"5\":{...}} overrides."
+        }
+      },
+      "description": "Cleans reality-plane machine sprites so their baked white matte becomes transparent and their baked floor shadows render as neutral alpha shadows."
+    },
+    "ru": {
+      "name": "Пользовательский цвет фона",
+      "config": {
+        "globalThresholds": {
+          "label": "Глобальные пороги очистки"
+        },
+        "spriteThresholds": {
+          "label": "Пороги очистки спрайтов"
+        }
+      }
+    },
+    "de": {
+      "name": "Eigene Hintergrundfarbe",
+      "config": {
+        "globalThresholds": {
+          "label": "Globale Bereinigungsschwellen"
+        },
+        "spriteThresholds": {
+          "label": "Sprite-Bereinigungsschwellen"
+        }
+      }
+    },
+    "ptbr": {
+      "name": "Cor de fundo personalizada",
+      "config": {
+        "globalThresholds": {
+          "label": "Limites globais de limpeza"
+        },
+        "spriteThresholds": {
+          "label": "Limites de limpeza dos sprites"
+        }
+      }
+    },
+    "it": {
+      "name": "Colore sfondo personalizzato",
+      "config": {
+        "globalThresholds": {
+          "label": "Soglie globali di pulizia"
+        },
+        "spriteThresholds": {
+          "label": "Soglie pulizia sprite"
+        }
+      }
+    },
+    "es": {
+      "name": "Color de fondo personalizado",
+      "config": {
+        "globalThresholds": {
+          "label": "Umbrales globales de limpieza"
+        },
+        "spriteThresholds": {
+          "label": "Umbrales de limpieza de sprites"
+        }
+      }
+    },
+    "fr": {
+      "name": "Couleur de fond personnalisée",
+      "config": {
+        "globalThresholds": {
+          "label": "Seuils globaux de nettoyage"
+        },
+        "spriteThresholds": {
+          "label": "Seuils de nettoyage des sprites"
+        }
+      }
+    },
+    "nl": {
+      "name": "Aangepaste achtergrondkleur",
+      "config": {
+        "globalThresholds": {
+          "label": "Algemene opschoondrempels"
+        },
+        "spriteThresholds": {
+          "label": "Sprite-opschoondrempels"
+        }
+      }
+    },
+    "cz": {
+      "name": "Vlastní barva pozadí",
+      "config": {
+        "globalThresholds": {
+          "label": "Globální prahy čištění"
+        },
+        "spriteThresholds": {
+          "label": "Prahy čištění spritů"
+        }
+      }
+    },
+    "pl": {
+      "name": "Niestandardowy kolor tła",
+      "config": {
+        "globalThresholds": {
+          "label": "Globalne progi czyszczenia"
+        },
+        "spriteThresholds": {
+          "label": "Progi czyszczenia sprite’ów"
+        }
+      }
+    },
+    "jp": {
+      "name": "カスタム背景色",
+      "config": {
+        "globalThresholds": {
+          "label": "グローバル清掃しきい値"
+        },
+        "spriteThresholds": {
+          "label": "スプライト清掃しきい値"
+        }
+      }
+    },
+    "kr": {
+      "name": "사용자 지정 배경색",
+      "config": {
+        "globalThresholds": {
+          "label": "전역 정리 임계값"
+        },
+        "spriteThresholds": {
+          "label": "스프라이트 정리 임계값"
+        }
+      }
+    },
+    "tch": {
+      "name": "自訂背景顏色",
+      "config": {
+        "globalThresholds": {
+          "label": "全域清理閾值"
+        },
+        "spriteThresholds": {
+          "label": "貼圖清理閾值"
+        }
+      }
+    },
+    "thai": {
+      "name": "สีพื้นหลังแบบกำหนดเอง",
+      "config": {
+        "globalThresholds": {
+          "label": "เกณฑ์ล้างแบบรวม"
+        },
+        "spriteThresholds": {
+          "label": "เกณฑ์ล้างสไปรต์"
+        }
+      }
+    },
+    "hu": {
+      "name": "Egyéni háttérszín",
+      "config": {
+        "globalThresholds": {
+          "label": "Globális tisztítási küszöbök"
+        },
+        "spriteThresholds": {
+          "label": "Sprite-tisztítási küszöbök"
+        }
+      }
+    },
+    "lv": {
+      "name": "Pielāgota fona krāsa",
+      "config": {
+        "globalThresholds": {
+          "label": "Globālie tīrīšanas sliekšņi"
+        },
+        "spriteThresholds": {
+          "label": "Spraitu tīrīšanas sliekšņi"
+        }
+      }
+    },
+    "ro": {
+      "name": "Culoare fundal personalizată",
+      "config": {
+        "globalThresholds": {
+          "label": "Praguri globale de curățare"
+        },
+        "spriteThresholds": {
+          "label": "Praguri curățare sprite-uri"
+        }
+      }
+    },
+    "no": {
+      "name": "Egendefinert bakgrunnsfarge",
+      "config": {
+        "globalThresholds": {
+          "label": "Globale oppryddingsterskler"
+        },
+        "spriteThresholds": {
+          "label": "Oppryddingsterskler for spriter"
+        }
+      }
+    }
+  }
+}

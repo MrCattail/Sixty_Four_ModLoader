@@ -1,0 +1,1566 @@
+{
+  "id": "Cattail_TweaksX_Reality-Pack",
+  "uniqueId": "Cattail_TweaksX_Reality-Pack",
+  "name": "Reality Pack",
+  "version": "0.1.0",
+  "previousVersions": [
+    {
+      "name": "Auto Reality Collect",
+      "version": "0.1.0"
+    },
+    {
+      "name": "Scan Reality Surges",
+      "version": "0.1.0"
+    },
+    {
+      "name": "Long Silo Fill",
+      "version": "0.1.0"
+    }
+  ],
+  "loaderVersion": ">=0.1.0",
+  "languageSupport": {
+    "gameLanguage": true
+  },
+  "entries": [
+    "scripts/config-migration.js",
+    "scripts/reality-auto-collect.js",
+    "scripts/scan-reality-surges.js",
+    "scripts/scan-reality-slider.js",
+    "scripts/hollow-vent-reality.js",
+    "scripts/hollow-time-flow.js",
+    "scripts/flat-build-costs.js",
+    "scripts/super-silo.js"
+  ],
+  "conflicts": [
+    "Cattail_TweaksX_Reality-Auto-Collect",
+    "Cattail_TweaksX_Scan-Reality-Surges",
+    "Cattail_TweaksX_Super-Silo"
+  ],
+  "config": {
+    "enableRealityAutoCollect": {
+      "type": "boolean",
+      "label": "Reality auto collect",
+      "default": true,
+      "description": "Automatically collect ready Reality / soul power in the void world.",
+      "reloadPolicy": "hot",
+      "section": "realityAutoCollect"
+    },
+    "enableScanRealitySurges": {
+      "type": "boolean",
+      "label": "Scan reality surges",
+      "default": true,
+      "description": "Create random reality-plane surges when a supercritical kernel lands.",
+      "reloadPolicy": "hot",
+      "section": "scanRealitySurges"
+    },
+    "enableScanRealitySlider": {
+      "type": "boolean",
+      "label": "Supercritical kernel slider",
+      "default": true,
+      "description": "Show the supercritical kernel range and Reality infusion slider on its shop card.",
+      "reloadPolicy": "hot",
+      "section": "scanRealitySurges"
+    },
+    "enableScanRealitySurgesSliderStrength": {
+      "type": "boolean",
+      "label": "Scale surge strength by Reality infusion",
+      "default": true,
+      "description": "Use the supercritical kernel slider Reality infusion to scale surge count and spawn radius.",
+      "reloadPolicy": "hot",
+      "section": "scanRealitySurges"
+    },
+    "surgeCount": {
+      "type": "number",
+      "label": "Surge count",
+      "default": 8,
+      "min": 1,
+      "max": 64,
+      "step": 1,
+      "description": "Number of random surges to create when a supercritical kernel lands.",
+      "reloadPolicy": "hot",
+      "section": "scanRealitySurges"
+    },
+    "surgeRadius": {
+      "type": "number",
+      "label": "Spawn radius",
+      "default": 8,
+      "min": 1,
+      "max": 64,
+      "step": 1,
+      "description": "Circular radius, in cells, used to search for empty reality-plane spawn spots.",
+      "reloadPolicy": "hot",
+      "section": "scanRealitySurges"
+    },
+    "enableSuperSilo": {
+      "type": "boolean",
+      "label": "Super Silo",
+      "default": true,
+      "description": "Keep activated silos filled with the configured long fill amount.",
+      "reloadPolicy": "hot",
+      "section": "superSilo"
+    },
+    "fillAmount": {
+      "type": "number",
+      "label": "Long fill amount",
+      "default": 1000000,
+      "min": 1,
+      "step": 1,
+      "description": "Fill value assigned to activated silos.",
+      "reloadPolicy": "hot",
+      "section": "superSilo"
+    },
+    "enableHollowVentReality": {
+      "type": "boolean",
+      "label": "Hollow vent Reality source",
+      "default": true,
+      "description": "Let hollow vents grow Reality symbols that are automatically harvested through the void altar.",
+      "reloadPolicy": "hot",
+      "section": "hollowVentReality"
+    },
+    "ventRealityInterval": {
+      "type": "number",
+      "label": "Vent production time",
+      "default": 8,
+      "min": 1,
+      "max": 3600,
+      "step": 1,
+      "description": "Seconds each hollow vent takes to grow a Reality symbol.",
+      "reloadPolicy": "hot",
+      "section": "hollowVentReality"
+    },
+    "ventRealityAmount": {
+      "type": "number",
+      "label": "Small vent Reality",
+      "default": 64,
+      "min": 0,
+      "max": 1000000,
+      "step": 0.01,
+      "description": "Reality gained from each small hollow vent symbol.",
+      "reloadPolicy": "hot",
+      "section": "hollowVentReality"
+    },
+    "ventRealityLargeMultiplier": {
+      "type": "number",
+      "label": "Large vent multiplier",
+      "default": 8,
+      "min": 0,
+      "max": 1000000,
+      "step": 0.1,
+      "description": "Multiplier applied to the large hollow vent Reality output.",
+      "reloadPolicy": "hot",
+      "section": "hollowVentReality"
+    },
+    "hollowTimeFlowMode": {
+      "type": "slider",
+      "valueType": "integer",
+      "integer": true,
+      "label": "Hollow Stone time flow",
+      "default": 0,
+      "min": -1,
+      "max": 2,
+      "step": 1,
+      "valueLabels": {
+        "0": "Normal",
+        "1": "Acceleration",
+        "2": "Random",
+        "-1": "Slowdown"
+      },
+      "description": "Continuously choose the Hollow Stone time distortion mode: slowdown, normal, acceleration, or random vanilla multiplier.",
+      "reloadPolicy": "hot",
+      "section": "hollowTimeFlow",
+      "sectionLabel": {
+        "en": "Hollow Stone time flow",
+        "ru": "Ход времени Hollow Stone",
+        "de": "Zeitfluss des Hohlsteins",
+        "ptbr": "Fluxo de tempo da Pedra Oca",
+        "it": "Flusso temporale della Pietra Cava",
+        "es": "Flujo temporal de la Piedra hueca",
+        "fr": "Flux temporel de la pierre creuse",
+        "nl": "Tijdstroom van de holle steen",
+        "cz": "Tok času Dutého kamene",
+        "pl": "Przepływ czasu Pustego Kamienia",
+        "jp": "ホロウストーンの時間の流れ",
+        "kr": "공허석 시간 흐름",
+        "sch": "空心石时间流向",
+        "tch": "空心石時間流向",
+        "thai": "การไหลของเวลาหินกลวง",
+        "hu": "Üreges kő időáramlása",
+        "lv": "Dobā akmens laika plūsma",
+        "ro": "Fluxul timpului pentru piatra goală",
+        "no": "Tidsflyt for hul stein",
+        "modsch": "空心石时间流向"
+      }
+    },
+    "enableFlatBuildCosts": {
+      "type": "boolean",
+      "label": "Disable build cost scaling",
+      "default": false,
+      "description": "Keep every building at its base construction cost instead of scaling by existing building count.",
+      "reloadPolicy": "hot",
+      "section": "flatBuildCosts"
+    }
+  },
+  "description": "Combines Auto Reality Collect, Scan Reality Surges, and Super Silo into one TweaksX mod.",
+  "translations": {
+    "en": {
+      "name": "Reality Pack",
+      "description": "Combines Auto Reality Collect, Scan Reality Surges, and Super Silo into one TweaksX mod.",
+      "config": {
+        "surgeCount": {
+          "label": "Surge count",
+          "description": "Number of random surges to create when a supercritical kernel lands."
+        },
+        "surgeRadius": {
+          "label": "Spawn radius",
+          "description": "Circular radius, in cells, used to search for empty reality-plane spawn spots."
+        },
+        "fillAmount": {
+          "label": "Long fill amount",
+          "description": "Fill value assigned to activated silos."
+        },
+        "enableRealityAutoCollect": {
+          "label": "Reality auto collect",
+          "description": "Automatically collect ready Reality / soul power in the void world."
+        },
+        "enableScanRealitySurges": {
+          "label": "Scan reality surges",
+          "description": "Create random reality-plane surges when a supercritical kernel lands."
+        },
+        "enableSuperSilo": {
+          "label": "Super Silo",
+          "description": "Keep activated silos filled with the configured long fill amount."
+        },
+        "enableScanRealitySlider": {
+          "label": "Supercritical kernel slider",
+          "description": "Show the supercritical kernel range and Reality infusion slider on its shop card."
+        },
+        "enableScanRealitySurgesSliderStrength": {
+          "label": "Strength follows Reality infusion",
+          "description": "When enabled, surge count and spawn radius scale with the supercritical kernel Reality infusion; when disabled, the configured count and radius are used."
+        },
+        "enableHollowVentReality": {
+          "label": "Hollow vent Reality source",
+          "description": "Let hollow vents grow Reality symbols that are automatically harvested through the void altar."
+        },
+        "ventRealityInterval": {
+          "label": "Vent production time",
+          "description": "Seconds each hollow vent takes to grow a Reality symbol."
+        },
+        "ventRealityAmount": {
+          "label": "Small vent Reality",
+          "description": "Reality gained from each small hollow vent symbol."
+        },
+        "ventRealityLargeMultiplier": {
+          "label": "Large vent multiplier",
+          "description": "Multiplier applied to the large hollow vent Reality output."
+        },
+        "enableFlatBuildCosts": {
+          "label": "Disable build cost scaling",
+          "description": "Keep every building at its base construction cost instead of scaling by existing building count."
+        },
+        "hollowTimeFlowMode": {
+          "label": "Hollow Stone time flow",
+          "description": "Continuously choose the Hollow Stone time distortion mode: slowdown, normal, acceleration, or random vanilla multiplier.",
+          "valueLabels": {
+            "0": "Normal",
+            "1": "Acceleration",
+            "2": "Random",
+            "-1": "Slowdown"
+          }
+        }
+      }
+    },
+    "ru": {
+      "name": "Пакет Reality",
+      "description": "Объединяет автосбор Reality, волны от сканирования и супер-силос в один мод TweaksX.",
+      "config": {
+        "surgeCount": {
+          "label": "Количество волн",
+          "description": "Number of random surges to create when a supercritical kernel lands."
+        },
+        "surgeRadius": {
+          "label": "Радиус появления",
+          "description": "Circular radius, in cells, used to search for empty reality-plane spawn spots."
+        },
+        "fillAmount": {
+          "label": "Длинное заполнение",
+          "description": "Fill value assigned to activated silos."
+        },
+        "enableRealityAutoCollect": {
+          "label": "Автосбор Reality",
+          "description": "Автоматически собирает готовую Reality / soul power в пустотном мире."
+        },
+        "enableScanRealitySurges": {
+          "label": "Волны Reality от сканирования",
+          "description": "Создает случайные волны на плоскости Reality при падении сверхкритического ядра."
+        },
+        "enableSuperSilo": {
+          "label": "Супер-силос",
+          "description": "Поддерживает активированные силосы заполненными заданным длинным значением."
+        },
+        "enableScanRealitySlider": {
+          "label": "Ползунок сверхкритического ядра",
+          "description": "Показывает диаметр области и ползунок вливания Reality на карточке покупки сверхкритического ядра."
+        },
+        "enableScanRealitySurgesSliderStrength": {
+          "label": "Сила зависит от вливания Reality",
+          "description": "When enabled, surge count and spawn radius scale with the supercritical kernel Reality infusion; when disabled, the configured count and radius are used."
+        },
+        "enableHollowVentReality": {
+          "label": "Источник Reality из полых вентилей",
+          "description": "Полые вентили выращивают символы Reality, которые автоматически собираются через алтарь пустоты."
+        },
+        "ventRealityInterval": {
+          "label": "Время производства вентиля",
+          "description": "Сколько секунд полый вентиль выращивает символ Reality."
+        },
+        "ventRealityAmount": {
+          "label": "Reality малого вентиля",
+          "description": "Количество Reality от символа малого полого вентиля."
+        },
+        "ventRealityLargeMultiplier": {
+          "label": "Множитель большого вентиля",
+          "description": "Множитель выхода Reality для большого полого вентиля."
+        },
+        "enableFlatBuildCosts": {
+          "label": "Отключить рост цены строительства",
+          "description": "Каждое здание сохраняет базовую цену строительства и не дорожает от количества уже построенных."
+        },
+        "hollowTimeFlowMode": {
+          "label": "Ход времени Hollow Stone",
+          "description": "Постоянно выбирает режим искажения времени Hollow Stone: замедление, обычный режим, ускорение или случайный оригинальный множитель.",
+          "valueLabels": {
+            "0": "Нормально",
+            "1": "Ускорение",
+            "2": "Случайно",
+            "-1": "Замедление"
+          }
+        }
+      }
+    },
+    "de": {
+      "name": "Reality-Paket",
+      "description": "Kombiniert Reality-Autosammlung, Scan-Realitätswellen und Super-Silo in einem TweaksX-Mod.",
+      "config": {
+        "surgeCount": {
+          "label": "Wellenanzahl",
+          "description": "Anzahl zufaelliger Wellen beim Einschlag eines superkritischen Kerns."
+        },
+        "surgeRadius": {
+          "label": "Spawnradius",
+          "description": "Kreisradius in Zellen zur Suche nach freien Spawnfeldern."
+        },
+        "fillAmount": {
+          "label": "Lange Füllmenge",
+          "description": "Fill value assigned to activated silos."
+        },
+        "enableRealityAutoCollect": {
+          "label": "Reality automatisch sammeln",
+          "description": "Sammelt bereite Reality / Soul Power in der Leerenwelt automatisch ein."
+        },
+        "enableScanRealitySurges": {
+          "label": "Scan-Realitätswellen",
+          "description": "Erzeugt zufällige Realitätswellen, wenn ein superkritischer Kern landet."
+        },
+        "enableSuperSilo": {
+          "label": "Super-Silo",
+          "description": "Hält aktivierte Silos mit der eingestellten langen Füllmenge gefüllt."
+        },
+        "enableScanRealitySlider": {
+          "label": "Regler für superkritischen Kern",
+          "description": "Zeigt den Reichweitendurchmesser und den Reality-Infusionsregler auf der Kaufkarte des superkritischen Kerns."
+        },
+        "enableScanRealitySurgesSliderStrength": {
+          "label": "Staerke folgt Reality-Infusion",
+          "description": "When enabled, surge count and spawn radius scale with the supercritical kernel Reality infusion; when disabled, the configured count and radius are used."
+        },
+        "enableHollowVentReality": {
+          "label": "Reality-Quelle aus Hohl-Vents",
+          "description": "Hohl-Vents lassen Reality-Symbole wachsen, die automatisch über den Leerenaltar geerntet werden."
+        },
+        "ventRealityInterval": {
+          "label": "Vent-Produktionszeit",
+          "description": "Sekunden, die ein Hohl-Vent braucht, um ein Reality-Symbol wachsen zu lassen."
+        },
+        "ventRealityAmount": {
+          "label": "Reality kleiner Vents",
+          "description": "Reality-Ertrag jedes Symbols eines kleinen Hohl-Vents."
+        },
+        "ventRealityLargeMultiplier": {
+          "label": "Multiplikator großer Vents",
+          "description": "Multiplikator für den Reality-Ertrag des großen Hohl-Vents."
+        },
+        "enableFlatBuildCosts": {
+          "label": "Baukosten-Skalierung aus",
+          "description": "Jedes Gebäude behält seine Grundbaukosten, statt mit der vorhandenen Anzahl teurer zu werden."
+        },
+        "hollowTimeFlowMode": {
+          "label": "Zeitfluss des Hohlsteins",
+          "description": "Wählt dauerhaft den Zeitverzerrungsmodus des Hohlsteins: Verlangsamung, normal, Beschleunigung oder zufälliger Vanilla-Multiplikator.",
+          "valueLabels": {
+            "0": "Normal",
+            "1": "Beschleunigung",
+            "2": "Zufällig",
+            "-1": "Verlangsamung"
+          }
+        }
+      }
+    },
+    "ptbr": {
+      "name": "Pacote Reality",
+      "description": "Combina coleta automática de Reality, surtos de varredura e Super Silo em um mod TweaksX.",
+      "config": {
+        "surgeCount": {
+          "label": "Quantidade de surtos",
+          "description": "Numero de surtos aleatorios criados quando um nucleo supercritico cai."
+        },
+        "surgeRadius": {
+          "label": "Raio de surgimento",
+          "description": "Raio circular, em celulas, usado para procurar espacos vazios."
+        },
+        "fillAmount": {
+          "label": "Valor de enchimento longo",
+          "description": "Fill value assigned to activated silos."
+        },
+        "enableRealityAutoCollect": {
+          "label": "Coleta automática de Reality",
+          "description": "Coleta automaticamente Reality / soul power pronta no mundo vazio."
+        },
+        "enableScanRealitySurges": {
+          "label": "Surtos de Reality por varredura",
+          "description": "Cria surtos aleatórios no plano Reality quando um núcleo supercrítico cai."
+        },
+        "enableSuperSilo": {
+          "label": "Super Silo",
+          "description": "Mantém silos ativados preenchidos com o valor longo configurado."
+        },
+        "enableScanRealitySlider": {
+          "label": "Controle do núcleo supercrítico",
+          "description": "Mostra o diâmetro do alcance e o controle de infusão de Reality no cartão de compra do núcleo supercrítico."
+        },
+        "enableScanRealitySurgesSliderStrength": {
+          "label": "Forca pela infusao Reality",
+          "description": "When enabled, surge count and spawn radius scale with the supercritical kernel Reality infusion; when disabled, the configured count and radius are used."
+        },
+        "enableHollowVentReality": {
+          "label": "Fonte de Reality dos vents ocos",
+          "description": "Vents ocos geram símbolos de Reality que são coletados automaticamente pelo altar do vazio."
+        },
+        "ventRealityInterval": {
+          "label": "Tempo de produção do vent",
+          "description": "Segundos para cada vent oco gerar um símbolo de Reality."
+        },
+        "ventRealityAmount": {
+          "label": "Reality do vent pequeno",
+          "description": "Reality obtida de cada símbolo de vent oco pequeno."
+        },
+        "ventRealityLargeMultiplier": {
+          "label": "Multiplicador do vent grande",
+          "description": "Multiplicador aplicado à produção de Reality do vent oco grande."
+        },
+        "enableFlatBuildCosts": {
+          "label": "Desativar escala de custo de construção",
+          "description": "Cada construção mantém o custo base, sem aumentar conforme a quantidade já construída."
+        },
+        "hollowTimeFlowMode": {
+          "label": "Fluxo de tempo da Pedra Oca",
+          "description": "Escolhe continuamente o modo de distorção temporal da Pedra Oca: desaceleração, normal, aceleração ou multiplicador aleatório original.",
+          "valueLabels": {
+            "0": "Normal",
+            "1": "Aceleração",
+            "2": "Aleatório",
+            "-1": "Desaceleração"
+          }
+        }
+      }
+    },
+    "it": {
+      "name": "Pacchetto Reality",
+      "description": "Unisce raccolta automatica Reality, impulsi da scansione e Super Silo in un mod TweaksX.",
+      "config": {
+        "surgeCount": {
+          "label": "Numero impulsi",
+          "description": "Numero di impulsi casuali creati quando atterra un nucleo supercritico."
+        },
+        "surgeRadius": {
+          "label": "Raggio generazione",
+          "description": "Raggio circolare, in celle, usato per cercare spazi liberi."
+        },
+        "fillAmount": {
+          "label": "Riempimento lungo",
+          "description": "Fill value assigned to activated silos."
+        },
+        "enableRealityAutoCollect": {
+          "label": "Raccolta automatica Reality",
+          "description": "Raccoglie automaticamente Reality / soul power pronta nel mondo del vuoto."
+        },
+        "enableScanRealitySurges": {
+          "label": "Impulsi Reality da scansione",
+          "description": "Genera impulsi casuali sul piano Reality quando atterra un nucleo supercritico."
+        },
+        "enableSuperSilo": {
+          "label": "Super Silo",
+          "description": "Mantiene i silo attivati pieni con il valore lungo configurato."
+        },
+        "enableScanRealitySlider": {
+          "label": "Cursore nucleo supercritico",
+          "description": "Mostra il diametro del raggio e il cursore di infusione Reality sulla scheda di acquisto del nucleo supercritico."
+        },
+        "enableScanRealitySurgesSliderStrength": {
+          "label": "Forza da infusione Reality",
+          "description": "When enabled, surge count and spawn radius scale with the supercritical kernel Reality infusion; when disabled, the configured count and radius are used."
+        },
+        "enableHollowVentReality": {
+          "label": "Fonte Reality dei venti cavi",
+          "description": "I venti cavi fanno crescere simboli Reality raccolti automaticamente tramite l’altare del vuoto."
+        },
+        "ventRealityInterval": {
+          "label": "Tempo produzione vent",
+          "description": "Secondi necessari a ogni vento cavo per far crescere un simbolo Reality."
+        },
+        "ventRealityAmount": {
+          "label": "Reality vento piccolo",
+          "description": "Reality ottenuta da ogni simbolo di un piccolo vento cavo."
+        },
+        "ventRealityLargeMultiplier": {
+          "label": "Moltiplicatore vento grande",
+          "description": "Moltiplicatore applicato alla produzione Reality del grande vento cavo."
+        },
+        "enableFlatBuildCosts": {
+          "label": "Disattiva scala costi costruzione",
+          "description": "Ogni edificio mantiene il costo base invece di aumentare in base a quelli già costruiti."
+        },
+        "hollowTimeFlowMode": {
+          "label": "Flusso temporale della Pietra Cava",
+          "description": "Sceglie continuamente la modalità di distorsione temporale della Pietra Cava: rallentamento, normale, accelerazione o moltiplicatore casuale originale.",
+          "valueLabels": {
+            "0": "Normale",
+            "1": "Accelerazione",
+            "2": "Casuale",
+            "-1": "Rallentamento"
+          }
+        }
+      }
+    },
+    "es": {
+      "name": "Paquete Reality",
+      "description": "Combina recolección automática de Reality, oleadas por escaneo y Súper silo en un mod TweaksX.",
+      "config": {
+        "surgeCount": {
+          "label": "Cantidad de oleadas",
+          "description": "Numero de oleadas aleatorias creadas cuando cae un nucleo supercritico."
+        },
+        "surgeRadius": {
+          "label": "Radio de aparición",
+          "description": "Radio circular, en celdas, usado para buscar espacios vacios."
+        },
+        "fillAmount": {
+          "label": "Valor de llenado largo",
+          "description": "Fill value assigned to activated silos."
+        },
+        "enableRealityAutoCollect": {
+          "label": "Recolección automática de Reality",
+          "description": "Recolecta automáticamente Reality / soul power lista en el mundo del vacío."
+        },
+        "enableScanRealitySurges": {
+          "label": "Oleadas Reality por escaneo",
+          "description": "Genera oleadas aleatorias en el plano Reality cuando cae un núcleo supercrítico."
+        },
+        "enableSuperSilo": {
+          "label": "Súper silo",
+          "description": "Mantiene los silos activados llenos con el valor largo configurado."
+        },
+        "enableScanRealitySlider": {
+          "label": "Control del núcleo supercrítico",
+          "description": "Muestra el diámetro de alcance y el control de inyección de Reality en la tarjeta de compra del núcleo supercrítico."
+        },
+        "enableScanRealitySurgesSliderStrength": {
+          "label": "Fuerza por inyeccion Reality",
+          "description": "When enabled, surge count and spawn radius scale with the supercritical kernel Reality infusion; when disabled, the configured count and radius are used."
+        },
+        "enableHollowVentReality": {
+          "label": "Fuente de Reality de vents huecos",
+          "description": "Los vents huecos cultivan símbolos de Reality que se recogen automáticamente mediante el altar del vacío."
+        },
+        "ventRealityInterval": {
+          "label": "Tiempo de producción del vent",
+          "description": "Segundos que tarda cada vent hueco en cultivar un símbolo de Reality."
+        },
+        "ventRealityAmount": {
+          "label": "Reality de vent pequeño",
+          "description": "Reality obtenida de cada símbolo de vent hueco pequeño."
+        },
+        "ventRealityLargeMultiplier": {
+          "label": "Multiplicador de vent grande",
+          "description": "Multiplicador aplicado a la producción de Reality del vent hueco grande."
+        },
+        "enableFlatBuildCosts": {
+          "label": "Desactivar escala de coste de construcción",
+          "description": "Cada edificio mantiene su coste base y no aumenta según la cantidad ya construida."
+        },
+        "hollowTimeFlowMode": {
+          "label": "Flujo temporal de la Piedra hueca",
+          "description": "Elige continuamente el modo de distorsión temporal de la Piedra hueca: desaceleración, normal, aceleración o multiplicador aleatorio original.",
+          "valueLabels": {
+            "0": "Normal",
+            "1": "Aceleración",
+            "2": "Aleatorio",
+            "-1": "Desaceleración"
+          }
+        }
+      }
+    },
+    "fr": {
+      "name": "Pack Reality",
+      "description": "Regroupe la collecte auto de Reality, les surges de scan et le Super silo dans un mod TweaksX.",
+      "config": {
+        "surgeCount": {
+          "label": "Nombre de surges",
+          "description": "Nombre de surges aleatoires creees quand un noyau supercritique atterrit."
+        },
+        "surgeRadius": {
+          "label": "Rayon apparition",
+          "description": "Rayon circulaire, en cellules, utilise pour trouver des emplacements libres."
+        },
+        "fillAmount": {
+          "label": "Remplissage long",
+          "description": "Fill value assigned to activated silos."
+        },
+        "enableRealityAutoCollect": {
+          "label": "Collecte auto de Reality",
+          "description": "Collecte automatiquement Reality / soul power prête dans le monde du vide."
+        },
+        "enableScanRealitySurges": {
+          "label": "Surges Reality de scan",
+          "description": "Crée des surges aléatoires dans le plan Reality quand un noyau supercritique atterrit."
+        },
+        "enableSuperSilo": {
+          "label": "Super silo",
+          "description": "Garde les silos activés remplis avec la valeur longue configurée."
+        },
+        "enableScanRealitySlider": {
+          "label": "Curseur du noyau supercritique",
+          "description": "Affiche le diamètre de portée et le curseur d’injection de Reality sur la carte d’achat du noyau supercritique."
+        },
+        "enableScanRealitySurgesSliderStrength": {
+          "label": "Puissance par injection Reality",
+          "description": "When enabled, surge count and spawn radius scale with the supercritical kernel Reality infusion; when disabled, the configured count and radius are used."
+        },
+        "enableHollowVentReality": {
+          "label": "Source Reality des évents creux",
+          "description": "Les évents creux font pousser des symboles Reality automatiquement récoltés par l’autel du vide."
+        },
+        "ventRealityInterval": {
+          "label": "Temps de production de l’évent",
+          "description": "Secondes nécessaires à chaque évent creux pour faire pousser un symbole Reality."
+        },
+        "ventRealityAmount": {
+          "label": "Reality du petit évent",
+          "description": "Reality obtenue pour chaque symbole de petit évent creux."
+        },
+        "ventRealityLargeMultiplier": {
+          "label": "Multiplicateur du grand évent",
+          "description": "Multiplicateur appliqué à la production Reality du grand évent creux."
+        },
+        "enableFlatBuildCosts": {
+          "label": "Désactiver l’échelle du coût de construction",
+          "description": "Chaque bâtiment garde son coût de base au lieu d’augmenter avec le nombre déjà construit."
+        },
+        "hollowTimeFlowMode": {
+          "label": "Flux temporel de la pierre creuse",
+          "description": "Choisit en continu le mode de distorsion temporelle de la pierre creuse : ralentissement, normal, accélération ou multiplicateur aléatoire d’origine.",
+          "valueLabels": {
+            "0": "Normal",
+            "1": "Accélération",
+            "2": "Aléatoire",
+            "-1": "Ralentissement"
+          }
+        }
+      }
+    },
+    "nl": {
+      "name": "Reality-pakket",
+      "description": "Combineert Reality automatisch verzamelen, scan-golven en Super-silo in een TweaksX-mod.",
+      "config": {
+        "surgeCount": {
+          "label": "Aantal golven",
+          "description": "Aantal willekeurige golven dat ontstaat wanneer een superkritische kern landt."
+        },
+        "surgeRadius": {
+          "label": "Verschijnradius",
+          "description": "Cirkelradius in cellen om vrije plekken te zoeken."
+        },
+        "fillAmount": {
+          "label": "Lange vulwaarde",
+          "description": "Fill value assigned to activated silos."
+        },
+        "enableRealityAutoCollect": {
+          "label": "Reality automatisch verzamelen",
+          "description": "Verzamelt automatisch klaarstaande Reality / soul power in de leegtewereld."
+        },
+        "enableScanRealitySurges": {
+          "label": "Reality-golven door scan",
+          "description": "Maakt willekeurige golven in het Reality-vlak wanneer een superkritische kern landt."
+        },
+        "enableSuperSilo": {
+          "label": "Super-silo",
+          "description": "Houdt geactiveerde silo’s gevuld met de ingestelde lange vulwaarde."
+        },
+        "enableScanRealitySlider": {
+          "label": "Schuif voor superkritische kern",
+          "description": "Toont de bereikdiameter en Reality-injectieschuif op de aankoopkaart van de superkritische kern."
+        },
+        "enableScanRealitySurgesSliderStrength": {
+          "label": "Kracht volgt Reality-injectie",
+          "description": "When enabled, surge count and spawn radius scale with the supercritical kernel Reality infusion; when disabled, the configured count and radius are used."
+        },
+        "enableHollowVentReality": {
+          "label": "Reality-bron uit holle vents",
+          "description": "Holle vents laten Reality-symbolen groeien die automatisch via het leegte-altaar worden geoogst."
+        },
+        "ventRealityInterval": {
+          "label": "Productietijd vent",
+          "description": "Seconden die elke holle vent nodig heeft om een Reality-symbool te laten groeien."
+        },
+        "ventRealityAmount": {
+          "label": "Reality kleine vent",
+          "description": "Reality uit elk symbool van een kleine holle vent."
+        },
+        "ventRealityLargeMultiplier": {
+          "label": "Vermenigvuldiger grote vent",
+          "description": "Vermenigvuldiger voor de Reality-opbrengst van de grote holle vent."
+        },
+        "enableFlatBuildCosts": {
+          "label": "Bouwkostenschaal uit",
+          "description": "Elk gebouw behoudt zijn basisbouwkosten in plaats van duurder te worden door het aantal bestaande gebouwen."
+        },
+        "hollowTimeFlowMode": {
+          "label": "Tijdstroom van de holle steen",
+          "description": "Kiest voortdurend de tijdvervormingsmodus van de holle steen: vertraging, normaal, versnelling of een willekeurige originele vermenigvuldiger.",
+          "valueLabels": {
+            "0": "Normaal",
+            "1": "Versnelling",
+            "2": "Willekeurig",
+            "-1": "Vertraging"
+          }
+        }
+      }
+    },
+    "cz": {
+      "name": "Balíček Reality",
+      "description": "Spojuje automatický sběr Reality, vlny ze skenu a Super silo do jednoho modu TweaksX.",
+      "config": {
+        "surgeCount": {
+          "label": "Počet vln",
+          "description": "Pocet nahodnych vln pri dopadu superkritickeho jadra."
+        },
+        "surgeRadius": {
+          "label": "Poloměr vzniku",
+          "description": "Kruhovy polomer v bunkach pro hledani volnych mist."
+        },
+        "fillAmount": {
+          "label": "Dlouhé naplnění",
+          "description": "Fill value assigned to activated silos."
+        },
+        "enableRealityAutoCollect": {
+          "label": "Automatický sběr Reality",
+          "description": "Automaticky sbírá připravenou Reality / soul power ve světě prázdnoty."
+        },
+        "enableScanRealitySurges": {
+          "label": "Vlny Reality ze skenu",
+          "description": "Vytvoří náhodné vlny v rovině Reality při dopadu superkritického jádra."
+        },
+        "enableSuperSilo": {
+          "label": "Super silo",
+          "description": "Udržuje aktivovaná sila naplněná nastavenou dlouhou hodnotou."
+        },
+        "enableScanRealitySlider": {
+          "label": "Posuvník superkritického jádra",
+          "description": "Zobrazí průměr dosahu a posuvník vložení Reality na nákupní kartě superkritického jádra."
+        },
+        "enableScanRealitySurgesSliderStrength": {
+          "label": "Sila podle vlozene Reality",
+          "description": "When enabled, surge count and spawn radius scale with the supercritical kernel Reality infusion; when disabled, the configured count and radius are used."
+        },
+        "enableHollowVentReality": {
+          "label": "Zdroj Reality z dutých průduchů",
+          "description": "Duté průduchy pěstují symboly Reality, které se automaticky sklidí přes oltář prázdnoty."
+        },
+        "ventRealityInterval": {
+          "label": "Doba produkce průduchu",
+          "description": "Kolik sekund potřebuje dutý průduch k vypěstování symbolu Reality."
+        },
+        "ventRealityAmount": {
+          "label": "Reality malého průduchu",
+          "description": "Reality získaná z každého symbolu malého dutého průduchu."
+        },
+        "ventRealityLargeMultiplier": {
+          "label": "Násobitel velkého průduchu",
+          "description": "Násobitel výstupu Reality u velkého dutého průduchu."
+        },
+        "enableFlatBuildCosts": {
+          "label": "Vypnout škálování stavební ceny",
+          "description": "Každá stavba si ponechá základní cenu a nezdražuje podle počtu již postavených kusů."
+        },
+        "hollowTimeFlowMode": {
+          "label": "Tok času Dutého kamene",
+          "description": "Průběžně vybírá režim časového zkreslení Dutého kamene: zpomalení, normální stav, zrychlení nebo náhodný původní násobitel.",
+          "valueLabels": {
+            "0": "Normálně",
+            "1": "Zrychlení",
+            "2": "Náhodně",
+            "-1": "Zpomalení"
+          }
+        }
+      }
+    },
+    "pl": {
+      "name": "Pakiet Reality",
+      "description": "Łączy automatyczne zbieranie Reality, skoki po skanie i Super silos w jeden mod TweaksX.",
+      "config": {
+        "surgeCount": {
+          "label": "Liczba skoków",
+          "description": "Liczba losowych skokow po upadku superkrytycznego jadra."
+        },
+        "surgeRadius": {
+          "label": "Promień pojawiania",
+          "description": "Okragly promien w komorkach do szukania wolnych miejsc."
+        },
+        "fillAmount": {
+          "label": "Długie napełnienie",
+          "description": "Fill value assigned to activated silos."
+        },
+        "enableRealityAutoCollect": {
+          "label": "Automatyczne zbieranie Reality",
+          "description": "Automatycznie zbiera gotowe Reality / soul power w świecie pustki."
+        },
+        "enableScanRealitySurges": {
+          "label": "Skoki Reality po skanie",
+          "description": "Tworzy losowe skoki na płaszczyźnie Reality po upadku superkrytycznego jądra."
+        },
+        "enableSuperSilo": {
+          "label": "Super silos",
+          "description": "Utrzymuje aktywowane silosy napełnione skonfigurowaną długą wartością."
+        },
+        "enableScanRealitySlider": {
+          "label": "Suwak superkrytycznego jądra",
+          "description": "Pokazuje średnicę zasięgu i suwak wlewu Reality na karcie zakupu superkrytycznego jądra."
+        },
+        "enableScanRealitySurgesSliderStrength": {
+          "label": "Sila wedlug wlewu Reality",
+          "description": "When enabled, surge count and spawn radius scale with the supercritical kernel Reality infusion; when disabled, the configured count and radius are used."
+        },
+        "enableHollowVentReality": {
+          "label": "Źródło Reality z pustych ujść",
+          "description": "Puste ujścia hodują symbole Reality automatycznie zbierane przez ołtarz pustki."
+        },
+        "ventRealityInterval": {
+          "label": "Czas produkcji ujścia",
+          "description": "Sekundy potrzebne pustemu ujściu na wyhodowanie symbolu Reality."
+        },
+        "ventRealityAmount": {
+          "label": "Reality małego ujścia",
+          "description": "Reality uzyskiwana z każdego symbolu małego pustego ujścia."
+        },
+        "ventRealityLargeMultiplier": {
+          "label": "Mnożnik dużego ujścia",
+          "description": "Mnożnik produkcji Reality dużego pustego ujścia."
+        },
+        "enableFlatBuildCosts": {
+          "label": "Wyłącz skalowanie kosztu budowy",
+          "description": "Każdy budynek zachowuje bazowy koszt budowy zamiast drożeć wraz z liczbą już zbudowanych."
+        },
+        "hollowTimeFlowMode": {
+          "label": "Przepływ czasu Pustego Kamienia",
+          "description": "Stale wybiera tryb zniekształcenia czasu Pustego Kamienia: spowolnienie, normalnie, przyspieszenie albo losowy oryginalny mnożnik.",
+          "valueLabels": {
+            "0": "Normalnie",
+            "1": "Przyspieszenie",
+            "2": "Losowo",
+            "-1": "Spowolnienie"
+          }
+        }
+      }
+    },
+    "jp": {
+      "name": "Realityパック",
+      "description": "Reality自動回収、スキャン発生サージ、スーパーサイロを1つのTweaksX modに統合します。",
+      "config": {
+        "surgeCount": {
+          "label": "サージ数",
+          "description": "超臨界カーネルが着地した時に生成するランダムサージの数。"
+        },
+        "surgeRadius": {
+          "label": "生成半径",
+          "description": "現実面の空きマスを探す円形半径（マス数）。"
+        },
+        "fillAmount": {
+          "label": "長時間補充量",
+          "description": "Fill value assigned to activated silos."
+        },
+        "enableRealityAutoCollect": {
+          "label": "Reality自動回収",
+          "description": "虚空世界で準備済みのReality / soul powerを自動回収します。"
+        },
+        "enableScanRealitySurges": {
+          "label": "スキャンRealityサージ",
+          "description": "超臨界カーネルが着地した時にReality面へランダムなサージを生成します。"
+        },
+        "enableSuperSilo": {
+          "label": "スーパーサイロ",
+          "description": "有効化されたサイロを設定した長時間補充量で維持します。"
+        },
+        "enableScanRealitySlider": {
+          "label": "超臨界コアスライダー",
+          "description": "超臨界コアの購入カードに範囲直径とReality注入スライダーを表示します。"
+        },
+        "enableScanRealitySurgesSliderStrength": {
+          "label": "Reality注入で強度決定",
+          "description": "When enabled, surge count and spawn radius scale with the supercritical kernel Reality infusion; when disabled, the configured count and radius are used."
+        },
+        "enableHollowVentReality": {
+          "label": "空洞ベントのReality源",
+          "description": "空洞ベントがRealityシンボルを育て、虚空祭壇を通して自動収穫します。"
+        },
+        "ventRealityInterval": {
+          "label": "ベント生産時間",
+          "description": "各空洞ベントがRealityシンボルを育てる秒数。"
+        },
+        "ventRealityAmount": {
+          "label": "小ベントReality",
+          "description": "小さな空洞ベントのシンボル1つから得るReality。"
+        },
+        "ventRealityLargeMultiplier": {
+          "label": "大ベント倍率",
+          "description": "大きな空洞ベントのReality出力に適用する倍率。"
+        },
+        "enableFlatBuildCosts": {
+          "label": "建設コスト倍率を無効化",
+          "description": "各建物の建設コストを基礎価格のままにし、建設済み数で上昇しないようにします。"
+        },
+        "hollowTimeFlowMode": {
+          "label": "ホロウストーンの時間の流れ",
+          "description": "ホロウストーンの時間歪曲モードを継続的に選びます：減速、通常、加速、またはバニラのランダム倍率。",
+          "valueLabels": {
+            "0": "通常",
+            "1": "時間加速",
+            "2": "ランダム",
+            "-1": "時間減速"
+          }
+        }
+      }
+    },
+    "kr": {
+      "name": "Reality 팩",
+      "description": "Reality 자동 수집, 스캔 현실 쇄도, 슈퍼 사일로를 하나의 TweaksX 모드로 합칩니다.",
+      "config": {
+        "surgeCount": {
+          "label": "쇄도 수",
+          "description": "초임계 핵이 착지할 때 생성할 무작위 쇄도 수입니다."
+        },
+        "surgeRadius": {
+          "label": "생성 반경",
+          "description": "현실 평면의 빈 칸을 찾는 원형 반경입니다."
+        },
+        "fillAmount": {
+          "label": "긴 충전값",
+          "description": "Fill value assigned to activated silos."
+        },
+        "enableRealityAutoCollect": {
+          "label": "Reality 자동 수집",
+          "description": "공허 세계에서 준비된 Reality / soul power를 자동으로 수집합니다."
+        },
+        "enableScanRealitySurges": {
+          "label": "스캔 Reality 쇄도",
+          "description": "초임계 커널이 착지할 때 Reality 평면에 무작위 쇄도를 생성합니다."
+        },
+        "enableSuperSilo": {
+          "label": "슈퍼 사일로",
+          "description": "활성화된 사일로를 설정된 긴 충전값으로 유지합니다."
+        },
+        "enableScanRealitySlider": {
+          "label": "초임계 핵 슬라이더",
+          "description": "초임계 핵 구매 카드에 범위 지름과 Reality 주입 슬라이더를 표시합니다."
+        },
+        "enableScanRealitySurgesSliderStrength": {
+          "label": "Reality 주입으로 강도 결정",
+          "description": "When enabled, surge count and spawn radius scale with the supercritical kernel Reality infusion; when disabled, the configured count and radius are used."
+        },
+        "enableHollowVentReality": {
+          "label": "빈 통풍구 Reality 원천",
+          "description": "빈 통풍구가 Reality 상징을 키우고 공허 제단을 통해 자동 수확합니다."
+        },
+        "ventRealityInterval": {
+          "label": "통풍구 생산 시간",
+          "description": "각 빈 통풍구가 Reality 상징을 키우는 초 단위 시간."
+        },
+        "ventRealityAmount": {
+          "label": "작은 통풍구 Reality",
+          "description": "작은 빈 통풍구 상징 하나에서 얻는 Reality."
+        },
+        "ventRealityLargeMultiplier": {
+          "label": "큰 통풍구 배율",
+          "description": "큰 빈 통풍구의 Reality 생산량에 적용되는 배율."
+        },
+        "enableFlatBuildCosts": {
+          "label": "건설 비용 배율 끄기",
+          "description": "모든 건물이 기존 건설 수에 따라 비싸지지 않고 기본 건설 비용을 유지합니다."
+        },
+        "hollowTimeFlowMode": {
+          "label": "공허석 시간 흐름",
+          "description": "공허석 시간 왜곡 모드를 계속 선택합니다: 시간 감속, 정상, 시간 가속 또는 원본 무작위 배율.",
+          "valueLabels": {
+            "0": "정상",
+            "1": "시간 가속",
+            "2": "무작위",
+            "-1": "시간 감속"
+          }
+        }
+      }
+    },
+    "sch": {
+      "name": "机制修改",
+      "description": "修改游戏的机制，可能会影响游戏平衡",
+      "config": {
+        "surgeCount": {
+          "label": "浪涌数量",
+          "description": "可修改内核振动现实结构后浪涌生成范围内的浪涌数量。"
+        },
+        "surgeRadius": {
+          "label": "浪涌生成半径",
+          "description": "可修改内核振动现实结构后浪涌的生成范围。"
+        },
+        "fillAmount": {
+          "label": "筒仓填充值",
+          "description": "可修改超级筒仓的填充值"
+        },
+        "enableRealityAutoCollect": {
+          "label": "现实自动收集",
+          "description": "自动收集在虚空维度中完全发亮的符号。"
+        },
+        "enableScanRealitySurges": {
+          "label": "强力超临界内核",
+          "description": "超临界内核得到加强。在震荡现实结构时，会在现实对应位置震出一些浪涌。"
+        },
+        "enableSuperSilo": {
+          "label": "超级筒仓",
+          "description": "让已激活的筒仓保持配置的超长填充值。"
+        },
+        "enableScanRealitySlider": {
+          "label": "可控超临界内核",
+          "description": "可以注入现实来提升超临界内核的威力。"
+        },
+        "enableScanRealitySurgesSliderStrength": {
+          "label": "根据现实注入多少决定强度",
+          "description": "开启后，浪涌数量和生成半径会根据超临界内核注入的现实调整；关闭后使用配置里的数量和生成半径。"
+        },
+        "enableHollowVentReality": {
+          "label": "虚空维度裂缝现实渗入",
+          "description": "空心石在虚空维度的穿孔裂缝会持续渗入现实。"
+        },
+        "ventRealityInterval": {
+          "label": "现实渗入时间",
+          "description": "每个现实渗入所需的秒数。"
+        },
+        "ventRealityAmount": {
+          "label": "现实渗入数量",
+          "description": "每个空心石渗入的现实的数量。"
+        },
+        "ventRealityLargeMultiplier": {
+          "label": "大空心石现实渗入倍率",
+          "description": "大空心石渗入的现实的数量倍率。"
+        },
+        "enableFlatBuildCosts": {
+          "label": "关闭建造耗材倍率",
+          "description": "每个建筑始终按基础耗材价格建造，不再随已建数量提高。"
+        },
+        "hollowTimeFlowMode": {
+          "label": "空心石时间流向",
+          "description": "持续选择空心石时间扭曲模式：时间减速、正常、时间加速或随机原版倍率。",
+          "valueLabels": {
+            "0": "正常",
+            "1": "时间加速",
+            "2": "随机",
+            "-1": "时间减速"
+          }
+        }
+      }
+    },
+    "tch": {
+      "name": "Reality 整合包",
+      "description": "將自動 Reality 收集、超臨界浪湧和超級 Silo 整合為一個 TweaksX mod。",
+      "config": {
+        "surgeCount": {
+          "label": "浪湧數量",
+          "description": "每次超臨界核心落地時嘗試生成的隨機浪湧數量。"
+        },
+        "surgeRadius": {
+          "label": "生成半徑",
+          "description": "以落點為中心搜尋現實世界空格的圓形半徑（格）。"
+        },
+        "fillAmount": {
+          "label": "超長填充值",
+          "description": "Fill value assigned to activated silos."
+        },
+        "enableRealityAutoCollect": {
+          "label": "自動 Reality 收集",
+          "description": "在虛空世界自動收集已經準備好的 Reality / soul power。"
+        },
+        "enableScanRealitySurges": {
+          "label": "超臨界浪湧",
+          "description": "超臨界內核落地時，在 Reality 平面生成隨機浪湧。"
+        },
+        "enableSuperSilo": {
+          "label": "超級 Silo",
+          "description": "讓已啟動的 Silo 保持設定的超長填充值。"
+        },
+        "enableScanRealitySlider": {
+          "label": "超臨界核心滑桿",
+          "description": "在超臨界核心購買卡片上顯示範圍直徑和 Reality 注入滑桿。"
+        },
+        "enableScanRealitySurgesSliderStrength": {
+          "label": "根據現實注入多少決定強度",
+          "description": "開啟後，浪湧數量和生成半徑會根據超臨界核心注入的現實調整；關閉後使用配置裡的數量和生成半徑。"
+        },
+        "enableHollowVentReality": {
+          "label": "空心噴口 Reality 來源",
+          "description": "讓空心石噴口生長 Reality 符號，並透過虛空祭壇自動收割。"
+        },
+        "ventRealityInterval": {
+          "label": "噴口生產時間",
+          "description": "每個空心噴口生長一個 Reality 符號所需的秒數。"
+        },
+        "ventRealityAmount": {
+          "label": "小噴口 Reality",
+          "description": "每個小空心噴口符號提供的 Reality。"
+        },
+        "ventRealityLargeMultiplier": {
+          "label": "大噴口倍率",
+          "description": "套用於大空心噴口 Reality 產出的倍率。"
+        },
+        "enableFlatBuildCosts": {
+          "label": "關閉建造耗材倍率",
+          "description": "每個建築始終按基礎耗材價格建造，不再隨已建數量提高。"
+        },
+        "hollowTimeFlowMode": {
+          "label": "空心石時間流向",
+          "description": "持續選擇空心石時間扭曲模式：時間減速、正常、時間加速或隨機原版倍率。",
+          "valueLabels": {
+            "0": "正常",
+            "1": "時間加速",
+            "2": "隨機",
+            "-1": "時間減速"
+          }
+        }
+      }
+    },
+    "thai": {
+      "name": "แพ็ก Reality",
+      "description": "รวมการเก็บ Reality อัตโนมัติ คลื่นพลังจากการสแกน และไซโลพิเศษไว้ในม็อด TweaksX เดียว",
+      "config": {
+        "surgeCount": {
+          "label": "จำนวนคลื่นพลัง",
+          "description": "Number of random surges to create when a supercritical kernel lands."
+        },
+        "surgeRadius": {
+          "label": "รัศมีเกิด",
+          "description": "Circular radius, in cells, used to search for empty reality-plane spawn spots."
+        },
+        "fillAmount": {
+          "label": "ค่าการเติมยาว",
+          "description": "Fill value assigned to activated silos."
+        },
+        "enableRealityAutoCollect": {
+          "label": "เก็บ Reality อัตโนมัติ",
+          "description": "เก็บ Reality / soul power ที่พร้อมแล้วในโลกวอยด์โดยอัตโนมัติ"
+        },
+        "enableScanRealitySurges": {
+          "label": "คลื่นพลัง Reality จากสแกน",
+          "description": "สร้างคลื่นพลังแบบสุ่มบนระนาบ Reality เมื่อแกนเหนือวิกฤตตกถึงพื้น"
+        },
+        "enableSuperSilo": {
+          "label": "ไซโลพิเศษ",
+          "description": "คงค่าเติมของไซโลที่เปิดใช้แล้วไว้ตามค่าการเติมยาวที่ตั้งไว้"
+        },
+        "enableScanRealitySlider": {
+          "label": "แถบเลื่อนแกนเหนือวิกฤต",
+          "description": "แสดงเส้นผ่านศูนย์กลางระยะและแถบเลื่อนเติม Reality บนการ์ดซื้อแกนเหนือวิกฤต"
+        },
+        "enableScanRealitySurgesSliderStrength": {
+          "label": "พลังตามการเติม Reality",
+          "description": "When enabled, surge count and spawn radius scale with the supercritical kernel Reality infusion; when disabled, the configured count and radius are used."
+        },
+        "enableHollowVentReality": {
+          "label": "แหล่ง Reality จากช่องกลวง",
+          "description": "ช่องกลวงจะปลูกสัญลักษณ์ Reality และเก็บเกี่ยวอัตโนมัติผ่านแท่นบูชาความว่างเปล่า"
+        },
+        "ventRealityInterval": {
+          "label": "เวลาผลิตของช่อง",
+          "description": "จำนวนวินาทีที่ช่องกลวงใช้ปลูกสัญลักษณ์ Reality หนึ่งอัน"
+        },
+        "ventRealityAmount": {
+          "label": "Reality จากช่องเล็ก",
+          "description": "Reality ที่ได้จากสัญลักษณ์ของช่องกลวงขนาดเล็กแต่ละอัน"
+        },
+        "ventRealityLargeMultiplier": {
+          "label": "ตัวคูณช่องใหญ่",
+          "description": "ตัวคูณผลผลิต Reality ของช่องกลวงขนาดใหญ่"
+        },
+        "enableFlatBuildCosts": {
+          "label": "ปิดการเพิ่มต้นทุนก่อสร้าง",
+          "description": "สิ่งปลูกสร้างทุกชนิดใช้ต้นทุนพื้นฐานเสมอ ไม่เพิ่มตามจำนวนที่สร้างไว้แล้ว"
+        },
+        "hollowTimeFlowMode": {
+          "label": "การไหลของเวลาหินกลวง",
+          "description": "เลือกโหมดบิดเบือนเวลาของหินกลวงอย่างต่อเนื่อง: ช้าลง, ปกติ, เร่งเวลา หรือสุ่มตัวคูณแบบเดิม",
+          "valueLabels": {
+            "0": "ปกติ",
+            "1": "เร่งเวลา",
+            "2": "สุ่ม",
+            "-1": "ช้าลง"
+          }
+        }
+      }
+    },
+    "hu": {
+      "name": "Reality csomag",
+      "description": "Egy TweaksX modba egyesíti a Reality automatikus gyűjtést, a scan hullámokat és a szuper silót.",
+      "config": {
+        "surgeCount": {
+          "label": "Hullámok száma",
+          "description": "A becsapodaskor letrehozott veletlen hullamok szama."
+        },
+        "surgeRadius": {
+          "label": "Megjelenési sugár",
+          "description": "Kor alaku sugar cellakban, ahol ures helyeket keres."
+        },
+        "fillAmount": {
+          "label": "Hosszú feltöltési érték",
+          "description": "Fill value assigned to activated silos."
+        },
+        "enableRealityAutoCollect": {
+          "label": "Reality automatikus gyűjtése",
+          "description": "Automatikusan összegyűjti a kész Reality / soul power értéket az üresség világában."
+        },
+        "enableScanRealitySurges": {
+          "label": "Scan Reality hullámok",
+          "description": "Véletlen Reality-sík hullámokat hoz létre, amikor egy szuperkritikus mag földet ér."
+        },
+        "enableSuperSilo": {
+          "label": "Szuper siló",
+          "description": "Az aktivált silókat a beállított hosszú feltöltési értéken tartja."
+        },
+        "enableScanRealitySlider": {
+          "label": "Szuperkritikus mag csúszka",
+          "description": "Megjeleníti a hatótáv átmérőjét és a Reality-betöltés csúszkáját a szuperkritikus mag vásárlási kártyáján."
+        },
+        "enableScanRealitySurgesSliderStrength": {
+          "label": "Ero a Reality-betoltestol",
+          "description": "When enabled, surge count and spawn radius scale with the supercritical kernel Reality infusion; when disabled, the configured count and radius are used."
+        },
+        "enableHollowVentReality": {
+          "label": "Reality-forrás üreges nyílásokból",
+          "description": "Az üreges nyílások Reality szimbólumokat növesztenek, amelyeket az üresség oltára automatikusan begyűjt."
+        },
+        "ventRealityInterval": {
+          "label": "Nyílás termelési ideje",
+          "description": "Másodperc, amíg egy üreges nyílás Reality szimbólumot növeszt."
+        },
+        "ventRealityAmount": {
+          "label": "Kis nyílás Reality",
+          "description": "Reality mennyiség minden kis üreges nyílás szimbólumából."
+        },
+        "ventRealityLargeMultiplier": {
+          "label": "Nagy nyílás szorzó",
+          "description": "A nagy üreges nyílás Reality termelésére alkalmazott szorzó."
+        },
+        "enableFlatBuildCosts": {
+          "label": "Építési költség skálázása ki",
+          "description": "Minden épület megtartja az alap építési költségét, és nem drágul a már megépített darabszám alapján."
+        },
+        "hollowTimeFlowMode": {
+          "label": "Üreges kő időáramlása",
+          "description": "Folyamatosan kiválasztja az Üreges kő időtorzítási módját: lassítás, normál, gyorsítás vagy véletlen eredeti szorzó.",
+          "valueLabels": {
+            "0": "Normál",
+            "1": "Gyorsítás",
+            "2": "Véletlen",
+            "-1": "Lassítás"
+          }
+        }
+      }
+    },
+    "lv": {
+      "name": "Reality paka",
+      "description": "Apvieno automātisku Reality savākšanu, skenēšanas viļņus un Super Silo vienā TweaksX modā.",
+      "config": {
+        "surgeCount": {
+          "label": "Viļņu skaits",
+          "description": "Nejauso vilnu skaits, kas rodas kodolam piezemejoties."
+        },
+        "surgeRadius": {
+          "label": "Rašanās radiuss",
+          "description": "Aplveida radiuss sunas, kura meklet brivas vietas."
+        },
+        "fillAmount": {
+          "label": "Ilgās uzpildes vērtība",
+          "description": "Fill value assigned to activated silos."
+        },
+        "enableRealityAutoCollect": {
+          "label": "Automātiska Reality savākšana",
+          "description": "Automātiski savāc gatavo Reality / soul power tukšuma pasaulē."
+        },
+        "enableScanRealitySurges": {
+          "label": "Skenēšanas Reality viļņi",
+          "description": "Izveido nejaušus Reality plaknes viļņus, kad superkritiskais kodols piezemējas."
+        },
+        "enableSuperSilo": {
+          "label": "Super Silo",
+          "description": "Uztur aktivizētās tvertnes piepildītas ar iestatīto ilgo uzpildes vērtību."
+        },
+        "enableScanRealitySlider": {
+          "label": "Superkritiskā kodola slīdnis",
+          "description": "Rāda diapazona diametru un Reality ieplūdes slīdni superkritiskā kodola iegādes kartītē."
+        },
+        "enableScanRealitySurgesSliderStrength": {
+          "label": "Speks pec Reality iepludes",
+          "description": "When enabled, surge count and spawn radius scale with the supercritical kernel Reality infusion; when disabled, the configured count and radius are used."
+        },
+        "enableHollowVentReality": {
+          "label": "Reality avots no dobajām atverēm",
+          "description": "Dobās atveres audzē Reality simbolus, kas automātiski tiek savākti caur tukšuma altāri."
+        },
+        "ventRealityInterval": {
+          "label": "Atveres ražošanas laiks",
+          "description": "Sekundes, kas dobajai atverei vajadzīgas Reality simbola izaudzēšanai."
+        },
+        "ventRealityAmount": {
+          "label": "Mazās atveres Reality",
+          "description": "Reality daudzums no katra mazās dobās atveres simbola."
+        },
+        "ventRealityLargeMultiplier": {
+          "label": "Lielās atveres reizinātājs",
+          "description": "Reizinātājs lielās dobās atveres Reality ieguvei."
+        },
+        "enableFlatBuildCosts": {
+          "label": "Izslēgt būves izmaksu mērogošanu",
+          "description": "Katra būve saglabā pamata būvniecības izmaksas, nevis kļūst dārgāka pēc jau uzbūvētā skaita."
+        },
+        "hollowTimeFlowMode": {
+          "label": "Dobā akmens laika plūsma",
+          "description": "Nepārtraukti izvēlas Dobā akmens laika kropļojuma režīmu: palēninājums, normāli, paātrinājums vai nejaušs oriģinālais reizinātājs.",
+          "valueLabels": {
+            "0": "Normāli",
+            "1": "Paātrinājums",
+            "2": "Nejauši",
+            "-1": "Palēninājums"
+          }
+        }
+      }
+    },
+    "ro": {
+      "name": "Pachet Reality",
+      "description": "Combină colectarea automată Reality, valurile de scanare și Super siloz într-un singur mod TweaksX.",
+      "config": {
+        "surgeCount": {
+          "label": "Număr de valuri",
+          "description": "Numarul de valuri aleatorii create cand aterizeaza un nucleu supercritic."
+        },
+        "surgeRadius": {
+          "label": "Raza de apariție",
+          "description": "Raza circulara, in celule, folosita pentru a cauta locuri libere."
+        },
+        "fillAmount": {
+          "label": "Valoare umplere lungă",
+          "description": "Fill value assigned to activated silos."
+        },
+        "enableRealityAutoCollect": {
+          "label": "Colectare automată Reality",
+          "description": "Colectează automat Reality / soul power pregătită în lumea vidului."
+        },
+        "enableScanRealitySurges": {
+          "label": "Valuri Reality la scanare",
+          "description": "Creează valuri aleatorii în planul Reality când aterizează un nucleu supercritic."
+        },
+        "enableSuperSilo": {
+          "label": "Super siloz",
+          "description": "Menține silozurile activate umplute cu valoarea lungă configurată."
+        },
+        "enableScanRealitySlider": {
+          "label": "Glisor nucleu supercritic",
+          "description": "Afișează diametrul razei și glisorul de infuzie Reality pe cardul de cumpărare al nucleului supercritic."
+        },
+        "enableScanRealitySurgesSliderStrength": {
+          "label": "Putere dupa infuzia Reality",
+          "description": "When enabled, surge count and spawn radius scale with the supercritical kernel Reality infusion; when disabled, the configured count and radius are used."
+        },
+        "enableHollowVentReality": {
+          "label": "Sursă Reality din venturi goale",
+          "description": "Venturile goale cresc simboluri Reality colectate automat prin altarul vidului."
+        },
+        "ventRealityInterval": {
+          "label": "Timp producție vent",
+          "description": "Secunde necesare unui vent gol pentru a crește un simbol Reality."
+        },
+        "ventRealityAmount": {
+          "label": "Reality vent mic",
+          "description": "Reality obținută din fiecare simbol al unui vent gol mic."
+        },
+        "ventRealityLargeMultiplier": {
+          "label": "Multiplicator vent mare",
+          "description": "Multiplicator aplicat producției Reality a ventului gol mare."
+        },
+        "enableFlatBuildCosts": {
+          "label": "Dezactivează scalarea costului de construire",
+          "description": "Fiecare clădire păstrează costul de bază, fără să crească după numărul deja construit."
+        },
+        "hollowTimeFlowMode": {
+          "label": "Fluxul timpului pentru piatra goală",
+          "description": "Alege continuu modul de distorsiune temporală al pietrei goale: încetinire, normal, accelerare sau multiplicator original aleatoriu.",
+          "valueLabels": {
+            "0": "Normal",
+            "1": "Accelerare",
+            "2": "Aleatoriu",
+            "-1": "Încetinire"
+          }
+        }
+      }
+    },
+    "no": {
+      "name": "Reality-pakke",
+      "description": "Kombinerer automatisk Reality-innsamling, skanningsbølger og Super-silo i én TweaksX-mod.",
+      "config": {
+        "surgeCount": {
+          "label": "Antall bølger",
+          "description": "Antall tilfeldige bolger som lages naar en superkritisk kjerne lander."
+        },
+        "surgeRadius": {
+          "label": "Oppståelsesradius",
+          "description": "Sirkelradius i celler for aa finne ledige plasser."
+        },
+        "fillAmount": {
+          "label": "Lang fyllverdi",
+          "description": "Fill value assigned to activated silos."
+        },
+        "enableRealityAutoCollect": {
+          "label": "Automatisk Reality-innsamling",
+          "description": "Samler automatisk klar Reality / soul power i tomromsverdenen."
+        },
+        "enableScanRealitySurges": {
+          "label": "Reality-bølger fra skanning",
+          "description": "Lager tilfeldige bølger i Reality-planet når en superkritisk kjerne lander."
+        },
+        "enableSuperSilo": {
+          "label": "Super-silo",
+          "description": "Holder aktiverte siloer fylt med den konfigurerte lange fyllverdien."
+        },
+        "enableScanRealitySlider": {
+          "label": "Skyver for superkritisk kjerne",
+          "description": "Viser rekkeviddediameteren og Reality-infusjonsskyveren på kjøpskortet for den superkritiske kjernen."
+        },
+        "enableScanRealitySurgesSliderStrength": {
+          "label": "Styrke folger Reality-infusjon",
+          "description": "When enabled, surge count and spawn radius scale with the supercritical kernel Reality infusion; when disabled, the configured count and radius are used."
+        },
+        "enableHollowVentReality": {
+          "label": "Reality-kilde fra hule ventiler",
+          "description": "Hule ventiler dyrker Reality-symboler som automatisk høstes gjennom tomhetsalteret."
+        },
+        "ventRealityInterval": {
+          "label": "Produksjonstid for ventil",
+          "description": "Sekunder hver hul ventil bruker på å dyrke et Reality-symbol."
+        },
+        "ventRealityAmount": {
+          "label": "Reality fra liten ventil",
+          "description": "Reality fra hvert symbol i en liten hul ventil."
+        },
+        "ventRealityLargeMultiplier": {
+          "label": "Multiplikator for stor ventil",
+          "description": "Multiplikator brukt på Reality-produksjonen til den store hule ventilen."
+        },
+        "enableFlatBuildCosts": {
+          "label": "Slå av byggkostnadsskalering",
+          "description": "Hver bygning beholder grunnkostnaden i stedet for å bli dyrere ut fra antallet som allerede er bygget."
+        },
+        "hollowTimeFlowMode": {
+          "label": "Tidsflyt for hul stein",
+          "description": "Velger kontinuerlig tidsforvrengningsmodus for hul stein: bremsing, normal, akselerasjon eller tilfeldig original multiplikator.",
+          "valueLabels": {
+            "0": "Normal",
+            "1": "Akselerasjon",
+            "2": "Tilfeldig",
+            "-1": "Bremsing"
+          }
+        }
+      }
+    },
+    "modsch": {
+      "name": "机制修改",
+      "description": "修改游戏的机制，可能会影响游戏平衡。",
+      "config": {
+        "surgeCount": {
+          "label": "浪涌数量",
+          "description": "可修改内核振动现实结构后浪涌生成范围内的浪涌数量。"
+        },
+        "surgeRadius": {
+          "label": "浪涌生成半径",
+          "description": "可修改内核振动现实结构后浪涌的生成范围。"
+        },
+        "fillAmount": {
+          "label": "筒仓填充值",
+          "description": "可修改超级筒仓的填充值"
+        },
+        "enableRealityAutoCollect": {
+          "label": "现实自动收集",
+          "description": "自动收集在虚空维度中完全发亮的符号。"
+        },
+        "enableScanRealitySurges": {
+          "label": "强力超临界内核",
+          "description": "超临界内核得到加强。在震荡现实结构时，会在现实对应位置震出一些浪涌。"
+        },
+        "enableSuperSilo": {
+          "label": "超级筒仓",
+          "description": "让已激活的筒仓保持配置的超长填充值。"
+        },
+        "enableScanRealitySlider": {
+          "label": "可控超临界内核",
+          "description": "可以注入现实来提升超临界内核的威力。"
+        },
+        "enableScanRealitySurgesSliderStrength": {
+          "label": "根据现实注入多少决定强度",
+          "description": "开启后，浪涌数量和生成半径会根据超临界内核注入的现实调整；关闭后使用配置里的数量和生成半径。"
+        },
+        "enableHollowVentReality": {
+          "label": "虚空维度裂缝现实渗入",
+          "description": "空心石在虚空维度的穿孔裂缝会持续渗入现实。"
+        },
+        "ventRealityInterval": {
+          "label": "现实渗入时间",
+          "description": "每个现实渗入所需的秒数。"
+        },
+        "ventRealityAmount": {
+          "label": "现实渗入数量",
+          "description": "每个空心石渗入的现实的数量。"
+        },
+        "ventRealityLargeMultiplier": {
+          "label": "大空心石现实渗入倍率",
+          "description": "大空心石渗入的现实的数量倍率。"
+        },
+        "enableFlatBuildCosts": {
+          "label": "关闭建造耗材倍率",
+          "description": "每个建筑始终按基础耗材价格建造，不再随已建数量提高。"
+        },
+        "hollowTimeFlowMode": {
+          "label": "空心石时间流向",
+          "description": "持续选择空心石时间扭曲模式：时间减速、正常、时间加速或随机原版倍率。",
+          "valueLabels": {
+            "0": "正常",
+            "1": "时间加速",
+            "2": "随机",
+            "-1": "时间减速"
+          }
+        }
+      }
+    }
+  }
+}

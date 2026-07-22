@@ -1,0 +1,16 @@
+{
+  "id": "example-zh-cn",
+  "name": "Example Simplified Chinese Locale",
+  "version": "0.1.0",
+  "loaderVersion": ">=0.1.0",
+  "languageSupport": {
+    "gameLanguage": true
+  },
+  "languages": [
+    "zh-cn"
+  ],
+  "locale": [
+    "locale/zh-cn.json"
+  ],
+  "description": "Example locale patch. Disabled by default."
+}

@@ -1,0 +1,29 @@
+{
+  "id": "template-building",
+  "name": "Template Building",
+  "version": "0.1.0",
+  "loaderVersion": ">=0.1.0",
+  "languageSupport": {
+    "gameLanguage": true
+  },
+  "entry": "scripts/main.js",
+  "config": {
+    "basePrice": {
+      "type": "number",
+      "label": "Base price",
+      "default": 64,
+      "min": 1
+    }
+  },
+  "words": {
+    "en": {
+      "entities": {
+        "template_building": {
+          "name": "Template Building",
+          "description": "A starter modded building."
+        }
+      }
+    }
+  },
+  "description": "Template for a new building. Do not enable directly."
+}

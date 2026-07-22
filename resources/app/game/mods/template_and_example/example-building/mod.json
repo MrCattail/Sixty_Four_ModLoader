@@ -1,0 +1,48 @@
+{
+  "id": "example-building",
+  "name": "Example Building",
+  "version": "0.1.0",
+  "loaderVersion": ">=0.1.0",
+  "languageSupport": {
+    "gameLanguage": true
+  },
+  "entry": "scripts/main.js",
+  "description": "Registers a tiny configurable example building. Disabled by default.",
+  "config": {
+    "enabledInShop": {
+      "type": "boolean",
+      "label": "Show Soul Lamp in shop",
+      "default": true
+    },
+    "basePrice": {
+      "type": "number",
+      "label": "Soul Lamp base price",
+      "default": 64,
+      "min": 1
+    },
+    "priceExponent": {
+      "type": "number",
+      "label": "Soul Lamp price exponent",
+      "default": 1.15,
+      "min": 1
+    }
+  },
+  "words": {
+    "en": {
+      "entities": {
+        "mod_soul_lamp": {
+          "name": "Soul Lamp",
+          "description": "A small modded building used to test entity registration, shop display, placement, saves, and config."
+        }
+      }
+    },
+    "zh-cn": {
+      "entities": {
+        "mod_soul_lamp": {
+          "name": "灵魂灯",
+          "description": "用于测试建筑注册、商店显示、放置、存档和配置的 mod 示例建筑。"
+        }
+      }
+    }
+  }
+}

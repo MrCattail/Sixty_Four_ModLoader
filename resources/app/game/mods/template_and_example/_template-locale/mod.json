@@ -1,0 +1,16 @@
+{
+  "id": "template-locale",
+  "name": "Template Locale",
+  "version": "0.1.0",
+  "loaderVersion": ">=0.1.0",
+  "languageSupport": {
+    "gameLanguage": true
+  },
+  "languages": [
+    "my-lang"
+  ],
+  "locale": [
+    "locale/my-lang.json"
+  ],
+  "description": "Template for a new language or translation patch. Do not enable directly."
+}

@@ -1,0 +1,413 @@
+{
+  "id": "Cattail_TweaksQuality_Better-UIs",
+  "uniqueId": "Cattail_TweaksQuality_Better-UIs",
+  "name": "Better UIs",
+  "version": "0.1.0",
+  "previousVersion": {
+    "name": "Interface Pack",
+    "version": "0.1.0"
+  },
+  "loaderVersion": ">=0.1.0",
+  "languageSupport": {
+    "gameLanguage": true
+  },
+  "entries": [
+    "scripts/shop-categories.js",
+    "scripts/save-slots.js",
+    "scripts/language-menu.js",
+    "scripts/settings-page.js"
+  ],
+  "conflicts": [
+    "Cattail_TweaksQuality_Language-Menu",
+    "Cattail_TweaksQuality_Saves-Slots",
+    "Cattail_TweaksQuality_Shop-Categories"
+  ],
+  "config": {
+    "enableShopCategories": {
+      "type": "boolean",
+      "label": "Shop categories",
+      "default": true,
+      "description": "Show the optional categorized compact building shop view.",
+      "section": "shopCategories"
+    },
+    "enableSaveSlots": {
+      "type": "boolean",
+      "label": "Save slots",
+      "default": true,
+      "description": "Show the in-game save-slot page with import and export actions.",
+      "section": "saveSlots"
+    },
+    "enableLanguageMenu": {
+      "type": "boolean",
+      "label": "Language menu",
+      "default": true,
+      "description": "Use the scrollable language selection page on the splash menu.",
+      "section": "languageMenu"
+    },
+    "enableSettingsPage": {
+      "type": "boolean",
+      "label": "Settings page",
+      "default": true,
+      "description": "Add the in-game settings page to the splash menu.",
+      "section": "settingsPage"
+    }
+  },
+  "description": "Combines shop categories, save slots, and the language menu into one multi-entry interface quality mod.",
+  "reloadOnConfigChange": true,
+  "translations": {
+    "sch": {
+      "name": "更好的UI界面",
+      "description": "将商店分类、存档栏和语言菜单整合为一个界面优化 mod。",
+      "config": {
+        "enableShopCategories": {
+          "label": "商店分类",
+          "description": "可将建筑建造卡的视图切换至可按照分类进行收缩/展开。"
+        },
+        "enableSaveSlots": {
+          "label": "存档栏",
+          "description": "新增游戏内存档页，并提供导入和导出功能。"
+        },
+        "enableLanguageMenu": {
+          "label": "语言菜单",
+          "description": "语言切换功能新增滚动列表。"
+        },
+        "enableSettingsPage": {
+          "label": "设置页面",
+          "description": "在主菜单新增游戏内设置页面。"
+        }
+      }
+    },
+    "modsch": {
+      "name": "更好的UI界面",
+      "description": "将商店分类、存档栏和语言菜单整合为一个界面优化 mod。",
+      "config": {
+        "enableShopCategories": {
+          "label": "建筑分类",
+          "description": "可将建筑建造卡的视图切换至可按照分类进行收缩/展开。"
+        },
+        "enableSaveSlots": {
+          "label": "存档栏",
+          "description": "新增游戏内存档页，并提供导入和导出功能。"
+        },
+        "enableLanguageMenu": {
+          "label": "语言菜单",
+          "description": "语言切换功能新增滚动列表。"
+        },
+        "enableSettingsPage": {
+          "label": "设置页面",
+          "description": "在主菜单新增游戏内设置页面。"
+        }
+      }
+    },
+    "en": {
+      "name": "Better UIs",
+      "config": {
+        "enableShopCategories": {
+          "label": "Shop categories",
+          "description": "Show the optional categorized compact building shop view."
+        },
+        "enableSaveSlots": {
+          "label": "Save slots",
+          "description": "Show the in-game save-slot page with import and export actions."
+        },
+        "enableLanguageMenu": {
+          "label": "Language menu",
+          "description": "Use the scrollable language selection page on the splash menu."
+        },
+        "enableSettingsPage": {
+          "label": "Settings page"
+        }
+      },
+      "description": "Combines shop categories, save slots, and the language menu into one multi-entry interface quality mod."
+    },
+    "ru": {
+      "name": "Улучшенный интерфейс",
+      "config": {
+        "enableShopCategories": {
+          "label": "Категории магазина"
+        },
+        "enableSaveSlots": {
+          "label": "Ячейки сохранения"
+        },
+        "enableLanguageMenu": {
+          "label": "Меню языка"
+        },
+        "enableSettingsPage": {
+          "label": "Страница настроек"
+        }
+      }
+    },
+    "de": {
+      "name": "Bessere Oberflächen",
+      "config": {
+        "enableShopCategories": {
+          "label": "Shop-Kategorien"
+        },
+        "enableSaveSlots": {
+          "label": "Speicherplätze"
+        },
+        "enableLanguageMenu": {
+          "label": "Sprachmenü"
+        },
+        "enableSettingsPage": {
+          "label": "Einstellungsseite"
+        }
+      }
+    },
+    "ptbr": {
+      "name": "Interfaces melhores",
+      "config": {
+        "enableShopCategories": {
+          "label": "Categorias da loja"
+        },
+        "enableSaveSlots": {
+          "label": "Espaços de save"
+        },
+        "enableLanguageMenu": {
+          "label": "Menu de idioma"
+        },
+        "enableSettingsPage": {
+          "label": "Página de configurações"
+        }
+      }
+    },
+    "it": {
+      "name": "Interfacce migliori",
+      "config": {
+        "enableShopCategories": {
+          "label": "Categorie negozio"
+        },
+        "enableSaveSlots": {
+          "label": "Slot salvataggio"
+        },
+        "enableLanguageMenu": {
+          "label": "Menu lingua"
+        },
+        "enableSettingsPage": {
+          "label": "Pagina impostazioni"
+        }
+      }
+    },
+    "es": {
+      "name": "Interfaces mejoradas",
+      "config": {
+        "enableShopCategories": {
+          "label": "Categorías de tienda"
+        },
+        "enableSaveSlots": {
+          "label": "Ranuras de guardado"
+        },
+        "enableLanguageMenu": {
+          "label": "Menú de idioma"
+        },
+        "enableSettingsPage": {
+          "label": "Página de ajustes"
+        }
+      }
+    },
+    "fr": {
+      "name": "Interfaces améliorées",
+      "config": {
+        "enableShopCategories": {
+          "label": "Catégories de boutique"
+        },
+        "enableSaveSlots": {
+          "label": "Emplacements de sauvegarde"
+        },
+        "enableLanguageMenu": {
+          "label": "Menu de langue"
+        },
+        "enableSettingsPage": {
+          "label": "Page des paramètres"
+        }
+      }
+    },
+    "nl": {
+      "name": "Betere interfaces",
+      "config": {
+        "enableShopCategories": {
+          "label": "Winkelcategorieën"
+        },
+        "enableSaveSlots": {
+          "label": "Opslagsleuven"
+        },
+        "enableLanguageMenu": {
+          "label": "Taalmenu"
+        },
+        "enableSettingsPage": {
+          "label": "Instellingenpagina"
+        }
+      }
+    },
+    "cz": {
+      "name": "Lepší rozhraní",
+      "config": {
+        "enableShopCategories": {
+          "label": "Kategorie obchodu"
+        },
+        "enableSaveSlots": {
+          "label": "Pozice uložení"
+        },
+        "enableLanguageMenu": {
+          "label": "Nabídka jazyka"
+        },
+        "enableSettingsPage": {
+          "label": "Stránka nastavení"
+        }
+      }
+    },
+    "pl": {
+      "name": "Lepsze interfejsy",
+      "config": {
+        "enableShopCategories": {
+          "label": "Kategorie sklepu"
+        },
+        "enableSaveSlots": {
+          "label": "Sloty zapisu"
+        },
+        "enableLanguageMenu": {
+          "label": "Menu języka"
+        },
+        "enableSettingsPage": {
+          "label": "Strona ustawień"
+        }
+      }
+    },
+    "jp": {
+      "name": "UI改善",
+      "config": {
+        "enableShopCategories": {
+          "label": "ショップ分類"
+        },
+        "enableSaveSlots": {
+          "label": "セーブスロット"
+        },
+        "enableLanguageMenu": {
+          "label": "言語メニュー"
+        },
+        "enableSettingsPage": {
+          "label": "設定ページ"
+        }
+      }
+    },
+    "kr": {
+      "name": "개선된 UI",
+      "config": {
+        "enableShopCategories": {
+          "label": "상점 카테고리"
+        },
+        "enableSaveSlots": {
+          "label": "저장 슬롯"
+        },
+        "enableLanguageMenu": {
+          "label": "언어 메뉴"
+        },
+        "enableSettingsPage": {
+          "label": "설정 페이지"
+        }
+      }
+    },
+    "tch": {
+      "name": "更好的介面",
+      "config": {
+        "enableShopCategories": {
+          "label": "商店分類"
+        },
+        "enableSaveSlots": {
+          "label": "存檔欄"
+        },
+        "enableLanguageMenu": {
+          "label": "語言選單"
+        },
+        "enableSettingsPage": {
+          "label": "設定頁面"
+        }
+      }
+    },
+    "thai": {
+      "name": "UI ที่ดีขึ้น",
+      "config": {
+        "enableShopCategories": {
+          "label": "หมวดหมู่ร้านค้า"
+        },
+        "enableSaveSlots": {
+          "label": "ช่องเซฟ"
+        },
+        "enableLanguageMenu": {
+          "label": "เมนูภาษา"
+        },
+        "enableSettingsPage": {
+          "label": "หน้าการตั้งค่า"
+        }
+      }
+    },
+    "hu": {
+      "name": "Jobb felületek",
+      "config": {
+        "enableShopCategories": {
+          "label": "Bolt kategóriái"
+        },
+        "enableSaveSlots": {
+          "label": "Mentési helyek"
+        },
+        "enableLanguageMenu": {
+          "label": "Nyelv menü"
+        },
+        "enableSettingsPage": {
+          "label": "Beállítások oldala"
+        }
+      }
+    },
+    "lv": {
+      "name": "Labākas saskarnes",
+      "config": {
+        "enableShopCategories": {
+          "label": "Veikala kategorijas"
+        },
+        "enableSaveSlots": {
+          "label": "Saglabāšanas vietas"
+        },
+        "enableLanguageMenu": {
+          "label": "Valodas izvēlne"
+        },
+        "enableSettingsPage": {
+          "label": "Iestatījumu lapa"
+        }
+      }
+    },
+    "ro": {
+      "name": "Interfețe mai bune",
+      "config": {
+        "enableShopCategories": {
+          "label": "Categorii magazin"
+        },
+        "enableSaveSlots": {
+          "label": "Sloturi salvare"
+        },
+        "enableLanguageMenu": {
+          "label": "Meniu limbă"
+        },
+        "enableSettingsPage": {
+          "label": "Pagină de setări"
+        }
+      }
+    },
+    "no": {
+      "name": "Bedre grensesnitt",
+      "config": {
+        "enableShopCategories": {
+          "label": "Butikkategorier"
+        },
+        "enableSaveSlots": {
+          "label": "Lagringsplasser"
+        },
+        "enableLanguageMenu": {
+          "label": "Språkmeny"
+        },
+        "enableSettingsPage": {
+          "label": "Innstillingsside"
+        }
+      }
+    }
+  }
+}

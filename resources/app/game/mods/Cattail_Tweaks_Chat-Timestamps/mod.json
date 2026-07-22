@@ -1,0 +1,81 @@
+{
+  "id": "Cattail_Tweaks_Chat-Timestamps",
+  "uniqueId": "Cattail_Tweaks_Chat-Timestamps",
+  "name": "Chat Timestamps",
+  "version": "0.1.3",
+  "previousVersion": {
+    "name": "Chat Timestamps",
+    "version": "0.1.3"
+  },
+  "loaderVersion": ">=0.1.0",
+  "languageSupport": {
+    "gameLanguage": true
+  },
+  "entry": "scripts/main.js",
+  "description": "Adds timestamps to chat bubbles and persists them in saves.",
+  "translations": {
+    "sch": {
+      "name": "聊天时间戳",
+      "description": "给聊天气泡添加时间戳，并将时间戳保存到存档。"
+    },
+    "modsch": {
+      "name": "聊天时间戳",
+      "description": "给聊天气泡添加时间戳，并将时间戳保存到存档。"
+    },
+    "en": {
+      "name": "Chat Timestamps",
+      "description": "Adds timestamps to chat bubbles and persists them in saves."
+    },
+    "ru": {
+      "name": "Временные метки чата"
+    },
+    "de": {
+      "name": "Chat-Zeitstempel"
+    },
+    "ptbr": {
+      "name": "Horários do chat"
+    },
+    "it": {
+      "name": "Timestamp chat"
+    },
+    "es": {
+      "name": "Marcas de tiempo del chat"
+    },
+    "fr": {
+      "name": "Horodatage du chat"
+    },
+    "nl": {
+      "name": "Chat-tijdstempels"
+    },
+    "cz": {
+      "name": "Časové značky chatu"
+    },
+    "pl": {
+      "name": "Znaczniki czasu czatu"
+    },
+    "jp": {
+      "name": "チャット時刻表示"
+    },
+    "kr": {
+      "name": "채팅 타임스탬프"
+    },
+    "tch": {
+      "name": "聊天時間戳"
+    },
+    "thai": {
+      "name": "เวลาในแชต"
+    },
+    "hu": {
+      "name": "Chat időbélyegek"
+    },
+    "lv": {
+      "name": "Tērzēšanas laika zīmogi"
+    },
+    "ro": {
+      "name": "Marcaje timp chat"
+    },
+    "no": {
+      "name": "Tidsstempler for chat"
+    }
+  }
+}

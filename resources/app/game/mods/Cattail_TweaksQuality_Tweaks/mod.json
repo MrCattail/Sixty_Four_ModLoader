@@ -1,0 +1,3324 @@
+{
+  "id": "Cattail_TweaksQuality_Tweaks",
+  "uniqueId": "Cattail_TweaksQuality_Tweaks",
+  "name": "Tweaks",
+  "version": "0.1.0",
+  "previousVersion": {
+    "name": "Accessibility Pack",
+    "version": "0.1.0"
+  },
+  "loaderVersion": ">=0.1.0",
+  "languageSupport": {
+    "gameLanguage": true
+  },
+  "entries": [
+    "scripts/shift-ctrl-zoom-disable.js",
+    "scripts/view-distance.js",
+    "scripts/void-return-fade-skip.js",
+    "scripts/stabilizer-surge-flash-reduction.js",
+    "scripts/gradient-lightning-flash-disable.js",
+    "scripts/idle-splash-disable.js",
+    "scripts/procedural-icons.js",
+    "scripts/resource-glow-colors.js",
+    "scripts/explainer-fix.js",
+    "scripts/ending-skip.js",
+    "scripts/accessibility-buttons.js",
+    "scripts/reduced-flashes-layering.js",
+    "scripts/chasm-line-renderer.js",
+    "scripts/chasm-transfer-path-index.js",
+    "scripts/resource-explosion-bezier-fast-path.js",
+    "scripts/floor-grid-lines.js",
+    "scripts/play-time-counter.js",
+    "scripts/dynamic-camera.js",
+    "scripts/cube-resource-cache.js",
+    "scripts/entity-sprite-cache.js",
+    "scripts/entity-slice-cache.js",
+    "scripts/entity-webgl-renderer.js",
+    "scripts/resource-icon-cache.js",
+    "scripts/resource-render-timing.js",
+    "scripts/shop-scroll-anchor-fix.js",
+    "scripts/gradient-puncture-relocation-fix.js",
+    "scripts/gradient-relocation-penalty-fix.js",
+    "scripts/scan-range-preview.js"
+  ],
+  "conflicts": [
+    "Cattail_TweaksQuality_View-Distance",
+    "Cattail_TweaksQuality_Ending-Skip",
+    "Cattail_TweaksQuality_Accessibility-Buttons",
+    "Cattail_Tweaks_Explainer-Language-Fix",
+    "Cattail_TweaksQuality_Dynamic-Camera"
+  ],
+  "config": {
+    "enableExplainerFix": {
+      "type": "boolean",
+      "label": "Explainer fix",
+      "default": true,
+      "description": "Refresh pulsing explainer hints after language changes and use readable light text in the void.",
+      "reloadPolicy": "hot",
+      "section": "explainerFix"
+    },
+    "enableEndingSkip": {
+      "type": "boolean",
+      "label": "Ending skip",
+      "default": true,
+      "description": "Show a skip button during the pinhole ending and credits sequence.",
+      "section": "endingSkip"
+    },
+    "enableAccessibilityButtons": {
+      "type": "boolean",
+      "label": "Accessibility buttons",
+      "default": true,
+      "description": "Show the bottom accessibility control bar and reality-floor color palette.",
+      "section": "accessibilityButtons"
+    },
+    "enableResourceLayersAboveReducedFlashes": {
+      "type": "boolean",
+      "label": {
+        "en": "Resources/lines above reduced flashes",
+        "sch": "资源和绘线显示在变暗遮罩上方",
+        "modsch": "资源和绘线显示在变暗遮罩上方",
+        "tch": "資源和繪線顯示在變暗遮罩上方"
+      },
+      "default": false,
+      "description": {
+        "en": "Draw resource UI and resource/chasm lines above the reduced-flashes dark overlay with the Render API on or off. Turning this off keeps the vanilla order where the overlay darkens them.",
+        "sch": "无论渲染 API 开启或关闭，都让资源 UI、资源来源绘线和逆裂缝绘线显示在 reduced flashes 的变暗遮罩上方。关闭此选项时保持原版顺序，由遮罩压暗它们。",
+        "modsch": "无论渲染 API 开启或关闭，都让资源 UI、资源来源绘线和逆裂缝绘线显示在 reduced flashes 的变暗遮罩上方。关闭此选项时保持原版顺序，由遮罩压暗它们。",
+        "tch": "無論渲染 API 開啟或關閉，都讓資源 UI、資源來源繪線和逆裂縫繪線顯示在 reduced flashes 的變暗遮罩上方。關閉此選項時保持原版順序，由遮罩壓暗它們。"
+      },
+      "reloadPolicy": "hot",
+      "section": "reducedFlashesLayering",
+      "sectionLabel": {
+        "en": "Reduced flashes layering",
+        "sch": "变暗遮罩层级",
+        "modsch": "变暗遮罩层级",
+        "tch": "變暗遮罩層級"
+      }
+    },
+    "enableStabilizerSurgeFlashReduction": {
+      "type": "boolean",
+      "label": "Stabilizer surge flash reduction",
+      "default": true,
+      "description": "After the void altar exists, hide full-screen flashes caused by stabilizer-triggered surge effects.",
+      "reloadPolicy": "hot",
+      "section": "stabilizerSurgeFlashReduction"
+    },
+    "disableGradientLightningFlash": {
+      "type": "boolean",
+      "label": "Disable gradient mine flash",
+      "default": true,
+      "description": "Prevent Gradient mine Reality conversion lightning from filling the screen, while keeping the lightning path, sound, and resource production.",
+      "reloadPolicy": "hot",
+      "section": "gradientLightningFlashDisable"
+    },
+    "disableIdleSplash": {
+      "type": "boolean",
+      "label": "Disable offline earnings simulation",
+      "default": true,
+      "description": "Skip the offline earnings simulation when loading a save. Time spent away will grant no offline resources or other simulated progress.",
+      "reloadPolicy": "hot",
+      "section": "idleSplashDisable"
+    },
+    "enableScanRangePreview": {
+      "type": "boolean",
+      "label": {
+        "en": "Scan range preview",
+        "sch": "超临界内核范围预览",
+        "modsch": "超临界内核范围预览",
+        "tch": "超臨界內核範圍預覽",
+        "ru": "Предпросмотр радиуса сканирования",
+        "de": "Scan-Reichweitenvorschau",
+        "ptbr": "Previa do alcance do scan",
+        "it": "Anteprima raggio scan",
+        "es": "Vista previa del alcance del scan",
+        "fr": "Apercu de portee du scan",
+        "nl": "Scanbereik-voorbeeld",
+        "cz": "Nahled dosahu skenu",
+        "pl": "Podglad zasiegu skanu",
+        "jp": "スキャン範囲プレビュー",
+        "kr": "스캔 범위 미리보기",
+        "thai": "ตัวอย่างระยะสแกน",
+        "hu": "Szkennelési tartomány előnézet",
+        "lv": "Skanesanas diapazona priekskatijums",
+        "ro": "Previzualizare raza scanarii",
+        "no": "Forhandsvis skannerekkevidde"
+      },
+      "default": true,
+      "description": {
+        "en": "When placing the supercritical kernel, show the actual scan radius instead of the generic 3x3 building range.",
+        "sch": "放置超临界内核时，显示实际扫描范围，而不是通用的3x3建筑范围。",
+        "modsch": "放置超临界内核时，显示实际扫描范围，而不是通用的3x3建筑范围。",
+        "tch": "放置超臨界內核時，顯示實際掃描範圍，而不是通用的3x3建築範圍。",
+        "ru": "При размещении сверхкритического ядра показывает настоящий радиус сканирования вместо обычной зоны 3x3.",
+        "de": "Zeigt beim Platzieren des Supercritical Kernel den echten Scanradius statt der normalen 3x3-Baureichweite.",
+        "ptbr": "Ao posicionar o nucleo supercritico, mostra o alcance real do scan em vez da area comum 3x3.",
+        "it": "Quando posizioni il nucleo supercritico, mostra il vero raggio di scan invece dell'area generica 3x3.",
+        "es": "Al colocar el nucleo supercritico, muestra el alcance real del scan en vez del rango generico 3x3.",
+        "fr": "Lors du placement du noyau supercritique, affiche la vraie portee du scan au lieu de la zone 3x3 generique.",
+        "nl": "Toont bij het plaatsen van de superkritieke kern het echte scanbereik in plaats van het gewone 3x3-bereik.",
+        "cz": "Pri umisteni superkritickeho jadra zobrazi skutecny dosah skenu misto obecne oblasti 3x3.",
+        "pl": "Podczas stawiania jadra superkrytycznego pokazuje prawdziwy zasieg skanu zamiast zwyklego obszaru 3x3.",
+        "jp": "超臨界核を配置するとき、通常の3x3範囲ではなく実際のスキャン範囲を表示します。",
+        "kr": "초임계 코어를 배치할 때 일반 3x3 범위 대신 실제 스캔 범위를 표시합니다.",
+        "thai": "เมื่อวางแกนเหนือวิกฤต จะแสดงระยะสแกนจริงแทนระยะอาคาร 3x3 ทั่วไป",
+        "hu": "A szuperkritikus mag elhelyezesekor a valodi szkennelési tartomanyt mutatja az altalanos 3x3 helyett.",
+        "lv": "Novietojot superkritisko kodolu, rada isto skanesanas diapazonu, nevis parasto 3x3 buvesanas zonu.",
+        "ro": "La plasarea nucleului supercritic, arata raza reala de scanare in locul zonei generice 3x3.",
+        "no": "Nar du plasserer den superkritiske kjernen, vises den faktiske skannerekkevidden i stedet for vanlig 3x3-byggerekkevidde."
+      },
+      "reloadPolicy": "hot",
+      "section": "scanRangePreview"
+    },
+    "enableShopScrollAnchorFix": {
+      "type": "boolean",
+      "label": {
+        "en": "Shop scroll anchor fix",
+        "sch": "商店滚动定位修复",
+        "modsch": "商店滚动定位修复",
+        "tch": "商店滾動定位修復",
+        "ru": "Исправление прокрутки магазина",
+        "de": "Shop-Scrollanker-Fix",
+        "ptbr": "Correcao da rolagem da loja",
+        "it": "Correzione scorrimento negozio",
+        "es": "Correccion del desplazamiento de la tienda",
+        "fr": "Correctif ancrage boutique",
+        "nl": "Winkel-scrollanker fix",
+        "cz": "Oprava ukotveni rolovani obchodu",
+        "pl": "Naprawa przewijania sklepu",
+        "jp": "ショップスクロール固定修正",
+        "kr": "상점 스크롤 고정 수정",
+        "thai": "แก้การยึดตำแหน่งเลื่อนร้านค้า",
+        "hu": "Bolt gorgetesi horgony javitas",
+        "lv": "Veikala ritinasanas enkurvietas labojums",
+        "ro": "Corectie ancorare derulare magazin",
+        "no": "Fiks for butikkrulling"
+      },
+      "default": true,
+      "description": {
+        "en": "Keeps Q-copy and shop-card focus scrolling inside the shop panel so the whole game view does not shift or expose a bottom white line.",
+        "sch": "将 Q 复制和商店卡片聚焦滚动限制在商店面板内，避免整个游戏画面上移并露出底部白边。",
+        "modsch": "将 Q 复制和商店卡片聚焦滚动限制在商店面板内，避免整个游戏画面上移并露出底部白边。",
+        "tch": "將 Q 複製和商店卡片聚焦滾動限制在商店面板內，避免整個遊戲畫面上移並露出底部白邊。",
+        "ru": "Ограничивает прокрутку при Q-копировании и фокусе карточек панелью магазина, чтобы весь экран игры не сдвигался и не показывал белую линию снизу.",
+        "de": "Begrenzt das Scrollen beim Q-Kopieren und beim Fokussieren von Shop-Karten auf das Shopfeld, damit die Spielansicht nicht nach oben rutscht.",
+        "ptbr": "Mantem a rolagem do copiar com Q e do foco dos cartoes dentro do painel da loja, evitando que a tela suba e mostre uma linha branca inferior.",
+        "it": "Mantiene lo scorrimento di copia con Q e del focus delle schede dentro il pannello negozio, evitando lo spostamento della schermata.",
+        "es": "Mantiene el desplazamiento de copiar con Q y del enfoque de tarjetas dentro del panel de tienda para evitar que la vista suba y deje una linea blanca abajo.",
+        "fr": "Garde le defilement de copie Q et de focus des cartes dans le panneau boutique afin que la vue du jeu ne remonte pas.",
+        "nl": "Houdt Q-kopie en kaartfocus-scrollen binnen het winkelpaneel zodat het spelbeeld niet omhoog schuift.",
+        "cz": "Drzi rolovani pri kopirovani Q a zamerovani karet uvnitr panelu obchodu, aby se cela hra neposunula nahoru.",
+        "pl": "Utrzymuje przewijanie kopiowania Q i fokusu kart wewnatrz panelu sklepu, aby widok gry nie przesuwal sie w gore.",
+        "jp": "Qコピーやショップカードへのフォーカス時のスクロールをショップ内に限定し、画面全体のずれと下部の白線を防ぎます。",
+        "kr": "Q 복사와 상점 카드 포커스 스크롤을 상점 패널 안으로 제한해 화면 전체가 위로 밀리거나 하단 흰 줄이 보이지 않게 합니다.",
+        "thai": "จำกัดการเลื่อนจากการคัดลอกด้วย Q และการโฟกัสการ์ดให้อยู่ในแผงร้านค้า เพื่อไม่ให้ภาพเกมขยับขึ้นและเกิดเส้นขาวด้านล่าง",
+        "hu": "A Q masolas es a boltkartya fokusz gorgeteset a boltpanelen belul tartja, igy a jatekkep nem csuszik fel.",
+        "lv": "Notur Q kopesanas un veikala kartisu fokusa ritinasanu veikala paneli, lai speles skats nepabiditos uz augsu.",
+        "ro": "Pastreaza derularea pentru copierea cu Q si focalizarea cardurilor in panoul magazinului, ca imaginea jocului sa nu urce.",
+        "no": "Holder Q-kopiering og kortfokus-rulling inne i butikkpanelet slik at spillbildet ikke skyves opp."
+      },
+      "reloadPolicy": "hot",
+      "section": "shopScrollAnchorFix"
+    },
+    "enableGradientPunctureRelocationFix": {
+      "type": "boolean",
+      "label": {
+        "en": "Gradient relocation to puncture fix",
+        "sch": "梯度矿井搬迁到穿刺点修复",
+        "modsch": "梯度矿井搬迁到穿刺点修复",
+        "tch": "梯度礦井搬遷到穿刺點修復",
+        "ru": "Перенос градиентной шахты на прокол",
+        "de": "Gradientmine-auf-Punktur-Fix",
+        "ptbr": "Correcao de realocar mina gradiente ao puncture",
+        "it": "Correzione spostamento miniera gradiente su puncture",
+        "es": "Correccion de traslado de mina gradiente al puncture",
+        "fr": "Correctif deplacement mine gradient vers puncture",
+        "nl": "Gradientmijn naar puncture verplaatsen fix",
+        "cz": "Oprava presunu gradientniho dolu na puncture",
+        "pl": "Naprawa przenoszenia kopalni gradientowej na puncture",
+        "jp": "勾配鉱山の穿刺点移動修正",
+        "kr": "그래디언트 광산을 천공점으로 이동 수정",
+        "thai": "แก้การย้ายเหมือง Gradient ไปยังจุด Puncture",
+        "hu": "Gradientbanya puncture athelyezes javitas",
+        "lv": "Gradienta raktuves parvietosana uz puncture",
+        "ro": "Corectie mutare mina gradient pe puncture",
+        "no": "Fiks flytting av gradientgruve til puncture"
+      },
+      "default": true,
+      "description": {
+        "en": "Allows relocating an existing Gradient mine onto a Puncture point, matching the vanilla build-upgrade behavior that already allows building Gradient directly on Puncture.",
+        "sch": "允许将现有梯度矿井搬迁到穿刺点上，和原版已经允许直接在穿刺点上建造梯度矿井的行为保持一致。",
+        "modsch": "允许将现有梯度矿井搬迁到穿刺点上，和原版已经允许直接在穿刺点上建造梯度矿井的行为保持一致。",
+        "tch": "允許將現有梯度礦井搬遷到穿刺點上，和原版已經允許直接在穿刺點上建造梯度礦井的行為保持一致。",
+        "ru": "Разрешает переносить существующую градиентную шахту на точку прокола, как уже позволяет обычное строительство-улучшение.",
+        "de": "Erlaubt das Verschieben einer bestehenden Gradientmine auf eine Punktur, passend zum Vanilla-Bauupgrade.",
+        "ptbr": "Permite realocar uma mina gradiente existente para um puncture, igual ao upgrade de construcao original.",
+        "it": "Permette di spostare una miniera gradiente esistente su un puncture, come gia consente l upgrade di costruzione originale.",
+        "es": "Permite trasladar una mina gradiente existente a un puncture, igual que la mejora de construccion original.",
+        "fr": "Permet de deplacer une mine gradient existante sur un puncture, comme le permet deja l amelioration de construction vanilla.",
+        "nl": "Staat toe een bestaande gradientmijn naar een puncture te verplaatsen, net als de vanilla bouw-upgrade.",
+        "cz": "Umoznuje presunout existujici gradientni dul na puncture, stejne jako puvodni stavebni vylepseni.",
+        "pl": "Pozwala przeniesc istniejaca kopalnie gradientowa na puncture, tak jak pozwala na to oryginalne ulepszenie budowy.",
+        "jp": "既存の勾配鉱山を穿刺点へ移動できるようにし、穿刺点上に直接建てられる原版のアップグレード挙動と揃えます。",
+        "kr": "기존 그래디언트 광산을 천공점 위로 옮길 수 있게 해, 원래 건설 업그레이드 동작과 맞춥니다.",
+        "thai": "อนุญาตให้ย้ายเหมือง Gradient ที่มีอยู่ไปบนจุด Puncture ให้ตรงกับพฤติกรรมอัปเกรดการสร้างของเกมเดิม",
+        "hu": "Engedi a meglevo gradientbanya athelyezeset puncture pontra, az eredeti epitasi fejlesztes viselkedesehez igazodva.",
+        "lv": "Atlauj parvietot esosu gradienta raktuvi uz puncture punktu, tapat ka to atlauj pamata buvesanas uzlabojums.",
+        "ro": "Permite mutarea unei mine gradient existente pe un puncture, la fel ca imbunatatirea de construire originala.",
+        "no": "Lar en eksisterende gradientgruve flyttes til et puncture-punkt, likt den opprinnelige byggeoppgraderingen."
+      },
+      "reloadPolicy": "hot",
+      "section": "gradientPunctureRelocationFix"
+    },
+    "enableGradientRelocationPenaltyFix": {
+      "type": "boolean",
+      "label": {
+        "en": "Keep Gradient mine penalty when relocating",
+        "sch": "搬迁梯度矿井时保留惩罚值",
+        "modsch": "搬迁梯度矿井时保留惩罚值",
+        "tch": "搬遷梯度礦井時保留懲罰值",
+        "ru": "Сохранять штраф градиентной шахты при переносе",
+        "de": "Gradientminen-Strafe beim Verschieben behalten",
+        "ptbr": "Manter penalidade da mina gradiente ao realocar",
+        "it": "Mantieni penalita miniera gradiente nello spostamento",
+        "es": "Mantener penalizacion de mina gradiente al trasladar",
+        "fr": "Conserver la penalite de la mine gradient au deplacement",
+        "nl": "Gradientmijn-penalty behouden bij verplaatsen",
+        "cz": "Zachovat penalizaci gradientniho dolu pri presunu",
+        "pl": "Zachowaj kare kopalni gradientowej przy przenoszeniu",
+        "jp": "勾配鉱山移動時のペナルティ保持",
+        "kr": "그래디언트 광산 이동 시 패널티 유지",
+        "thai": "คงค่าโทษของเหมือง Gradient เมื่อย้าย",
+        "hu": "Gradientbanya buntetes megtartasa athelyezeskor",
+        "lv": "Saglabat gradienta raktuves sodu parvietojot",
+        "ro": "Pastreaza penalizarea minei gradient la mutare",
+        "no": "Behold gradientgruve-straff ved flytting"
+      },
+      "default": true,
+      "description": {
+        "en": "Prevents the E-key relocation flow from forcing an existing Gradient mine penalty back to 0.5.",
+        "sch": "防止使用 E 快捷键搬迁现有梯度矿井时，原有 penalty 被原版强制改回 0.5。",
+        "modsch": "防止使用 E 快捷键搬迁现有梯度矿井时，原有 penalty 被原版强制改回 0.5。",
+        "tch": "防止使用 E 快捷鍵搬遷現有梯度礦井時，原有 penalty 被原版強制改回 0.5。",
+        "ru": "Не дает переносу через E принудительно сбрасывать штраф существующей градиентной шахты до 0.5.",
+        "de": "Verhindert, dass das Verschieben per E die bestehende Gradientminen-Strafe auf 0.5 zuruecksetzt.",
+        "ptbr": "Impede que a realocacao pela tecla E force a penalidade de uma mina gradiente existente para 0.5.",
+        "it": "Impedisce allo spostamento con E di riportare a 0.5 la penalita di una miniera gradiente esistente.",
+        "es": "Evita que el traslado con E fuerce a 0.5 la penalizacion de una mina gradiente existente.",
+        "fr": "Empeche le deplacement avec E de remettre a 0.5 la penalite dune mine gradient existante.",
+        "nl": "Voorkomt dat verplaatsen met E de penalty van een bestaande gradientmijn naar 0.5 terugzet.",
+        "cz": "Zabrani tomu, aby presun klavesou E vratil penalizaci existujiciho gradientniho dolu na 0.5.",
+        "pl": "Zapobiega wymuszaniu kary 0.5 dla istniejacej kopalni gradientowej podczas przenoszenia klawiszem E.",
+        "jp": "Eキー移動で既存の勾配鉱山のペナルティが0.5へ強制的に戻るのを防ぎます。",
+        "kr": "E 키 이동 시 기존 그래디언트 광산의 penalty가 0.5로 강제로 돌아가는 것을 막습니다.",
+        "thai": "ป้องกันไม่ให้การย้ายด้วยปุ่ม E บังคับค่า penalty ของเหมือง Gradient เดิมกลับเป็น 0.5",
+        "hu": "Megakadalyozza, hogy az E billentyus athelyezes a meglevo gradientbanya bunteteset 0.5-re allitsa vissza.",
+        "lv": "Nelauj E taustina parvietosanai piespiedu karta atiestatit esosas gradienta raktuves sodu uz 0.5.",
+        "ro": "Impiedica mutarea cu tasta E sa forteze penalizarea unei mine gradient existente inapoi la 0.5.",
+        "no": "Hindrer at flytting med E tvinger straffen til en eksisterende gradientgruve tilbake til 0.5."
+      },
+      "reloadPolicy": "hot",
+      "section": "gradientRelocationPenaltyFix"
+    },
+    "enableVoidReturnFadeSkip": {
+      "type": "boolean",
+      "label": "Skip void return fade",
+      "default": true,
+      "description": "When returning from the void to reality, remove the long white recovery fade and show the clear view immediately.",
+      "reloadPolicy": "hot",
+      "section": "voidReturnFadeSkip"
+    },
+    "enableResourceGlowColors": {
+      "type": "boolean",
+      "label": "Resource glow colors",
+      "default": true,
+      "description": "Color resource icon glows by resource, with optional per-resource overrides.",
+      "reloadPolicy": "hot",
+      "section": "resourceGlowColors"
+    },
+    "resourceGlowColors": {
+      "type": "colorPalette",
+      "label": "Resource glow palette",
+      "default": {
+        "0": "#484856",
+        "1": "#FDE591",
+        "2": "#795CF0",
+        "3": "#DB5C5C",
+        "4": "#A2E689",
+        "5": "#CCF2FF",
+        "6": "#D7D7E0",
+        "7": "#D3AC92",
+        "9": "#FFFFFF"
+      },
+      "share": true,
+      "entries": [
+        {
+          "key": "0",
+          "label": "Charonite",
+          "icon": {
+            "type": "resource",
+            "index": 0
+          }
+        },
+        {
+          "key": "1",
+          "label": "Elmerine",
+          "icon": {
+            "type": "resource",
+            "index": 1
+          }
+        },
+        {
+          "key": "2",
+          "label": "Qanetite",
+          "icon": {
+            "type": "resource",
+            "index": 2
+          }
+        },
+        {
+          "key": "3",
+          "label": "Beta-Pylene",
+          "icon": {
+            "type": "resource",
+            "index": 3
+          }
+        },
+        {
+          "key": "4",
+          "label": "Hell Gem",
+          "icon": {
+            "type": "resource",
+            "index": 4
+          }
+        },
+        {
+          "key": "5",
+          "label": "Chromalit",
+          "icon": {
+            "type": "resource",
+            "index": 5
+          }
+        },
+        {
+          "key": "6",
+          "label": "Celestial foam",
+          "icon": {
+            "type": "resource",
+            "index": 6
+          }
+        },
+        {
+          "key": "7",
+          "label": "Hollow stone",
+          "icon": {
+            "type": "resource",
+            "index": 7
+          }
+        },
+        {
+          "key": "8",
+          "label": "Void",
+          "icon": {
+            "type": "resource",
+            "index": 8
+          }
+        },
+        {
+          "key": "9",
+          "label": "Reality",
+          "icon": {
+            "type": "resource",
+            "index": 9
+          }
+        }
+      ],
+      "description": "Per-resource glow color overrides. Empty rows use each resource's native color.",
+      "reloadPolicy": "hot",
+      "section": "resourceGlowColors"
+    },
+    "enableChasmLineRenderer": {
+      "type": "boolean",
+      "label": "Chasm line renderer",
+      "default": true,
+      "description": "Allow this mod to replace the chasm-to-resource lines with the selected renderer.",
+      "reloadPolicy": "hot",
+      "section": "chasmLineRenderer"
+    },
+    "chasmLineRendererMode": {
+      "type": "slider",
+      "valueType": "integer",
+      "integer": true,
+      "label": "Chasm line rendering mode",
+      "default": 1,
+      "min": 0,
+      "max": 1,
+      "step": 1,
+      "valueLabels": {
+        "0": {
+          "en": "Canvas 2D",
+          "sch": "Canvas 2D",
+          "modsch": "Canvas 2D",
+          "ru": "Canvas 2D",
+          "de": "Canvas 2D",
+          "ptbr": "Canvas 2D",
+          "it": "Canvas 2D",
+          "es": "Canvas 2D",
+          "fr": "Canvas 2D",
+          "nl": "Canvas 2D",
+          "cz": "Canvas 2D",
+          "pl": "Canvas 2D",
+          "jp": "Canvas 2D",
+          "kr": "Canvas 2D",
+          "tch": "Canvas 2D",
+          "thai": "Canvas 2D",
+          "hu": "Canvas 2D",
+          "lv": "Canvas 2D",
+          "ro": "Canvas 2D",
+          "no": "Canvas 2D"
+        },
+        "1": {
+          "en": "WebGL",
+          "sch": "WebGL",
+          "modsch": "WebGL",
+          "ru": "WebGL",
+          "de": "WebGL",
+          "ptbr": "WebGL",
+          "it": "WebGL",
+          "es": "WebGL",
+          "fr": "WebGL",
+          "nl": "WebGL",
+          "cz": "WebGL",
+          "pl": "WebGL",
+          "jp": "WebGL",
+          "kr": "WebGL",
+          "tch": "WebGL",
+          "thai": "WebGL",
+          "hu": "WebGL",
+          "lv": "WebGL",
+          "ro": "WebGL",
+          "no": "WebGL"
+        }
+      },
+      "valueAliases": {
+        "canvas": 0,
+        "canvas2d": 0,
+        "canvas 2d": 0,
+        "vanilla": 0,
+        "webgl": 1,
+        "gpu": 1
+      },
+      "description": "Canvas 2D uses the original game drawing. WebGL renders the same chasm-to-resource curves through a GPU-backed canvas.",
+      "reloadPolicy": "hot",
+      "section": "chasmLineRenderer"
+    },
+    "enableChasmLineDistanceOverride": {
+      "type": "boolean",
+      "label": "Chasm lines ignore distance",
+      "default": true,
+      "description": "Keep rendering chasm-to-resource lines even when the chasm is outside the normal visible range.",
+      "reloadPolicy": "hot",
+      "section": "chasmLineRenderer"
+    },
+    "enableFloorGridLines": {
+      "type": "boolean",
+      "label": "Floor grid outlines",
+      "default": true,
+      "description": "Draw thin outlines around the in-game floor cells.",
+      "reloadPolicy": "hot",
+      "section": "floorGridLines"
+    },
+    "floorGridLineRealityColor": {
+      "type": "color",
+      "label": "Reality floor grid outline color",
+      "default": "#CBC3E5",
+      "defaultColor": "#1D232B",
+      "allowAuto": true,
+      "icon": {
+        "type": "procedural",
+        "renderer": "voidAltarWave",
+        "fill": "currentColor"
+      },
+      "autoLabel": {
+        "en": "Auto",
+        "sch": "自动",
+        "modsch": "自动",
+        "tch": "自動",
+        "ru": "Avto",
+        "de": "Auto",
+        "ptbr": "Auto",
+        "it": "Auto",
+        "es": "Auto",
+        "fr": "Auto",
+        "nl": "Auto",
+        "cz": "Auto",
+        "pl": "Auto",
+        "jp": "Auto",
+        "kr": "Auto",
+        "thai": "Auto",
+        "hu": "Auto",
+        "lv": "Auto",
+        "ro": "Auto",
+        "no": "Auto"
+      },
+      "description": "Leave empty to use the default dark gray outline in reality.",
+      "reloadPolicy": "hot",
+      "section": "floorGridLines"
+    },
+    "floorGridLineVoidColor": {
+      "type": "color",
+      "label": "Void floor grid outline color",
+      "default": "#121212",
+      "defaultColor": "#FFFFFF",
+      "allowAuto": true,
+      "icon": {
+        "type": "procedural",
+        "renderer": "voidAltarWave",
+        "fill": "currentColor"
+      },
+      "autoLabel": {
+        "en": "Auto",
+        "sch": "自动",
+        "modsch": "自动",
+        "tch": "自動",
+        "ru": "Avto",
+        "de": "Auto",
+        "ptbr": "Auto",
+        "it": "Auto",
+        "es": "Auto",
+        "fr": "Auto",
+        "nl": "Auto",
+        "cz": "Auto",
+        "pl": "Auto",
+        "jp": "Auto",
+        "kr": "Auto",
+        "thai": "Auto",
+        "hu": "Auto",
+        "lv": "Auto",
+        "ro": "Auto",
+        "no": "Auto"
+      },
+      "description": "Leave empty to use the default white outline in the void.",
+      "reloadPolicy": "hot",
+      "section": "floorGridLines"
+    },
+    "enableCubeResourceRenderCache": {
+      "type": "boolean",
+      "label": {
+        "en": "Cube resource render cache",
+        "sch": "稳定 Cube 资源渲染缓存",
+        "modsch": "稳定 Cube 资源渲染缓存",
+        "tch": "穩定 Cube 資源渲染緩存",
+        "ru": "Cube resource render cache",
+        "de": "Cube resource render cache",
+        "ptbr": "Cube resource render cache",
+        "it": "Cube resource render cache",
+        "es": "Cube resource render cache",
+        "fr": "Cube resource render cache",
+        "nl": "Cube resource render cache",
+        "cz": "Cube resource render cache",
+        "pl": "Cube resource render cache",
+        "jp": "Cube resource render cache",
+        "kr": "Cube resource render cache",
+        "thai": "Cube resource render cache",
+        "hu": "Cube resource render cache",
+        "lv": "Cube resource render cache",
+        "ro": "Cube resource render cache",
+        "no": "Cube resource render cache"
+      },
+      "default": true,
+      "description": {
+        "en": "Cache the resource sprites inside stable Cubes as one offscreen image. Turn this off if Cube resources look stale or misaligned.",
+        "sch": "将稳定 Cube 里的资源 sprite 合成为一张离屏图像。如果 Cube 资源看起来未刷新或错位，请关闭此项。",
+        "modsch": "将稳定 Cube 里的资源 sprite 合成为一张离屏图像。如果 Cube 资源看起来未刷新或错位，请关闭此项。",
+        "tch": "將穩定 Cube 裡的資源 sprite 合成為一張離屏圖像。如果 Cube 資源看起來未更新或錯位，請關閉此項。",
+        "ru": "Cache the resource sprites inside stable Cubes as one offscreen image. Turn this off if Cube resources look stale or misaligned.",
+        "de": "Cache the resource sprites inside stable Cubes as one offscreen image. Turn this off if Cube resources look stale or misaligned.",
+        "ptbr": "Cache the resource sprites inside stable Cubes as one offscreen image. Turn this off if Cube resources look stale or misaligned.",
+        "it": "Cache the resource sprites inside stable Cubes as one offscreen image. Turn this off if Cube resources look stale or misaligned.",
+        "es": "Cache the resource sprites inside stable Cubes as one offscreen image. Turn this off if Cube resources look stale or misaligned.",
+        "fr": "Cache the resource sprites inside stable Cubes as one offscreen image. Turn this off if Cube resources look stale or misaligned.",
+        "nl": "Cache the resource sprites inside stable Cubes as one offscreen image. Turn this off if Cube resources look stale or misaligned.",
+        "cz": "Cache the resource sprites inside stable Cubes as one offscreen image. Turn this off if Cube resources look stale or misaligned.",
+        "pl": "Cache the resource sprites inside stable Cubes as one offscreen image. Turn this off if Cube resources look stale or misaligned.",
+        "jp": "Cache the resource sprites inside stable Cubes as one offscreen image. Turn this off if Cube resources look stale or misaligned.",
+        "kr": "Cache the resource sprites inside stable Cubes as one offscreen image. Turn this off if Cube resources look stale or misaligned.",
+        "thai": "Cache the resource sprites inside stable Cubes as one offscreen image. Turn this off if Cube resources look stale or misaligned.",
+        "hu": "Cache the resource sprites inside stable Cubes as one offscreen image. Turn this off if Cube resources look stale or misaligned.",
+        "lv": "Cache the resource sprites inside stable Cubes as one offscreen image. Turn this off if Cube resources look stale or misaligned.",
+        "ro": "Cache the resource sprites inside stable Cubes as one offscreen image. Turn this off if Cube resources look stale or misaligned.",
+        "no": "Cache the resource sprites inside stable Cubes as one offscreen image. Turn this off if Cube resources look stale or misaligned."
+      },
+      "reloadPolicy": "hot",
+      "section": "renderPerformance",
+      "sectionLabel": {
+        "en": "Render performance",
+        "sch": "渲染性能",
+        "modsch": "渲染性能",
+        "tch": "渲染效能",
+        "ru": "Render performance",
+        "de": "Render performance",
+        "ptbr": "Render performance",
+        "it": "Render performance",
+        "es": "Render performance",
+        "fr": "Render performance",
+        "nl": "Render performance",
+        "cz": "Render performance",
+        "pl": "Render performance",
+        "jp": "Render performance",
+        "kr": "Render performance",
+        "thai": "Render performance",
+        "hu": "Render performance",
+        "lv": "Render performance",
+        "ro": "Render performance",
+        "no": "Render performance"
+      }
+    },
+    "enableDamagedCubeResourceRenderCache": {
+      "type": "boolean",
+      "label": {
+        "en": "Damaged Cube resource cache",
+        "sch": "受损 Cube 资源缓存",
+        "modsch": "受损 Cube 资源缓存",
+        "tch": "受損 Cube 資源緩存",
+        "ru": "Damaged Cube resource cache",
+        "de": "Damaged Cube resource cache",
+        "ptbr": "Damaged Cube resource cache",
+        "it": "Damaged Cube resource cache",
+        "es": "Damaged Cube resource cache",
+        "fr": "Damaged Cube resource cache",
+        "nl": "Damaged Cube resource cache",
+        "cz": "Damaged Cube resource cache",
+        "pl": "Damaged Cube resource cache",
+        "jp": "Damaged Cube resource cache",
+        "kr": "Damaged Cube resource cache",
+        "thai": "Damaged Cube resource cache",
+        "hu": "Damaged Cube resource cache",
+        "lv": "Damaged Cube resource cache",
+        "ro": "Damaged Cube resource cache",
+        "no": "Damaged Cube resource cache"
+      },
+      "default": true,
+      "description": {
+        "en": "Also cache damaged Cubes by keeping their resource offsets and approximating per-resource shake as a whole cached-image jitter. Turn this off to preserve exact vanilla damaged-Cube shake.",
+        "sch": "同时缓存受损 Cube：保留资源偏移，并将逐资源抖动近似为整张缓存图的轻微抖动。若要保留原版受损 Cube 的精确抖动，请关闭此项。",
+        "modsch": "同时缓存受损 Cube：保留资源偏移，并将逐资源抖动近似为整张缓存图的轻微抖动。若要保留原版受损 Cube 的精确抖动，请关闭此项。",
+        "tch": "同時緩存受損 Cube：保留資源偏移，並將逐資源抖動近似為整張緩存圖的輕微抖動。若要保留原版受損 Cube 的精確抖動，請關閉此項。",
+        "ru": "Also cache damaged Cubes by keeping their resource offsets and approximating per-resource shake as a whole cached-image jitter. Turn this off to preserve exact vanilla damaged-Cube shake.",
+        "de": "Also cache damaged Cubes by keeping their resource offsets and approximating per-resource shake as a whole cached-image jitter. Turn this off to preserve exact vanilla damaged-Cube shake.",
+        "ptbr": "Also cache damaged Cubes by keeping their resource offsets and approximating per-resource shake as a whole cached-image jitter. Turn this off to preserve exact vanilla damaged-Cube shake.",
+        "it": "Also cache damaged Cubes by keeping their resource offsets and approximating per-resource shake as a whole cached-image jitter. Turn this off to preserve exact vanilla damaged-Cube shake.",
+        "es": "Also cache damaged Cubes by keeping their resource offsets and approximating per-resource shake as a whole cached-image jitter. Turn this off to preserve exact vanilla damaged-Cube shake.",
+        "fr": "Also cache damaged Cubes by keeping their resource offsets and approximating per-resource shake as a whole cached-image jitter. Turn this off to preserve exact vanilla damaged-Cube shake.",
+        "nl": "Also cache damaged Cubes by keeping their resource offsets and approximating per-resource shake as a whole cached-image jitter. Turn this off to preserve exact vanilla damaged-Cube shake.",
+        "cz": "Also cache damaged Cubes by keeping their resource offsets and approximating per-resource shake as a whole cached-image jitter. Turn this off to preserve exact vanilla damaged-Cube shake.",
+        "pl": "Also cache damaged Cubes by keeping their resource offsets and approximating per-resource shake as a whole cached-image jitter. Turn this off to preserve exact vanilla damaged-Cube shake.",
+        "jp": "Also cache damaged Cubes by keeping their resource offsets and approximating per-resource shake as a whole cached-image jitter. Turn this off to preserve exact vanilla damaged-Cube shake.",
+        "kr": "Also cache damaged Cubes by keeping their resource offsets and approximating per-resource shake as a whole cached-image jitter. Turn this off to preserve exact vanilla damaged-Cube shake.",
+        "thai": "Also cache damaged Cubes by keeping their resource offsets and approximating per-resource shake as a whole cached-image jitter. Turn this off to preserve exact vanilla damaged-Cube shake.",
+        "hu": "Also cache damaged Cubes by keeping their resource offsets and approximating per-resource shake as a whole cached-image jitter. Turn this off to preserve exact vanilla damaged-Cube shake.",
+        "lv": "Also cache damaged Cubes by keeping their resource offsets and approximating per-resource shake as a whole cached-image jitter. Turn this off to preserve exact vanilla damaged-Cube shake.",
+        "ro": "Also cache damaged Cubes by keeping their resource offsets and approximating per-resource shake as a whole cached-image jitter. Turn this off to preserve exact vanilla damaged-Cube shake.",
+        "no": "Also cache damaged Cubes by keeping their resource offsets and approximating per-resource shake as a whole cached-image jitter. Turn this off to preserve exact vanilla damaged-Cube shake."
+      },
+      "reloadPolicy": "hot",
+      "section": "renderPerformance"
+    },
+    "enableEntitySpriteRenderCache": {
+      "type": "boolean",
+      "label": {
+        "en": "Entity sprite render cache",
+        "sch": "实体 sprite 渲染缓存",
+        "modsch": "实体 sprite 渲染缓存",
+        "tch": "實體 sprite 渲染緩存",
+        "ru": "Entity sprite render cache",
+        "de": "Entity sprite render cache",
+        "ptbr": "Entity sprite render cache",
+        "it": "Entity sprite render cache",
+        "es": "Entity sprite render cache",
+        "fr": "Entity sprite render cache",
+        "nl": "Entity sprite render cache",
+        "cz": "Entity sprite render cache",
+        "pl": "Entity sprite render cache",
+        "jp": "Entity sprite render cache",
+        "kr": "Entity sprite render cache",
+        "thai": "Entity sprite render cache",
+        "hu": "Entity sprite render cache",
+        "lv": "Entity sprite render cache",
+        "ro": "Entity sprite render cache",
+        "no": "Entity sprite render cache"
+      },
+      "default": true,
+      "description": {
+        "en": "Cache pre-scaled sprite frames for selected high-cost entities such as Silo2, Double Channel, and Recycler Mk II. Turn this off if those buildings look stale or misaligned.",
+        "sch": "为 Silo2、Double Channel 和 Recycler Mk II 等高成本实体缓存预缩放 sprite 帧。如果这些建筑看起来未刷新或错位，请关闭此项。",
+        "modsch": "为 Silo2、Double Channel 和 Recycler Mk II 等高成本实体缓存预缩放 sprite 帧。如果这些建筑看起来未刷新或错位，请关闭此项。",
+        "tch": "為 Silo2、Double Channel 和 Recycler Mk II 等高成本實體緩存預縮放 sprite 幀。如果這些建築看起來未更新或錯位，請關閉此項。",
+        "ru": "Cache pre-scaled sprite frames for selected high-cost entities such as Silo2, Double Channel, and Recycler Mk II. Turn this off if those buildings look stale or misaligned.",
+        "de": "Cache pre-scaled sprite frames for selected high-cost entities such as Silo2, Double Channel, and Recycler Mk II. Turn this off if those buildings look stale or misaligned.",
+        "ptbr": "Cache pre-scaled sprite frames for selected high-cost entities such as Silo2, Double Channel, and Recycler Mk II. Turn this off if those buildings look stale or misaligned.",
+        "it": "Cache pre-scaled sprite frames for selected high-cost entities such as Silo2, Double Channel, and Recycler Mk II. Turn this off if those buildings look stale or misaligned.",
+        "es": "Cache pre-scaled sprite frames for selected high-cost entities such as Silo2, Double Channel, and Recycler Mk II. Turn this off if those buildings look stale or misaligned.",
+        "fr": "Cache pre-scaled sprite frames for selected high-cost entities such as Silo2, Double Channel, and Recycler Mk II. Turn this off if those buildings look stale or misaligned.",
+        "nl": "Cache pre-scaled sprite frames for selected high-cost entities such as Silo2, Double Channel, and Recycler Mk II. Turn this off if those buildings look stale or misaligned.",
+        "cz": "Cache pre-scaled sprite frames for selected high-cost entities such as Silo2, Double Channel, and Recycler Mk II. Turn this off if those buildings look stale or misaligned.",
+        "pl": "Cache pre-scaled sprite frames for selected high-cost entities such as Silo2, Double Channel, and Recycler Mk II. Turn this off if those buildings look stale or misaligned.",
+        "jp": "Cache pre-scaled sprite frames for selected high-cost entities such as Silo2, Double Channel, and Recycler Mk II. Turn this off if those buildings look stale or misaligned.",
+        "kr": "Cache pre-scaled sprite frames for selected high-cost entities such as Silo2, Double Channel, and Recycler Mk II. Turn this off if those buildings look stale or misaligned.",
+        "thai": "Cache pre-scaled sprite frames for selected high-cost entities such as Silo2, Double Channel, and Recycler Mk II. Turn this off if those buildings look stale or misaligned.",
+        "hu": "Cache pre-scaled sprite frames for selected high-cost entities such as Silo2, Double Channel, and Recycler Mk II. Turn this off if those buildings look stale or misaligned.",
+        "lv": "Cache pre-scaled sprite frames for selected high-cost entities such as Silo2, Double Channel, and Recycler Mk II. Turn this off if those buildings look stale or misaligned.",
+        "ro": "Cache pre-scaled sprite frames for selected high-cost entities such as Silo2, Double Channel, and Recycler Mk II. Turn this off if those buildings look stale or misaligned.",
+        "no": "Cache pre-scaled sprite frames for selected high-cost entities such as Silo2, Double Channel, and Recycler Mk II. Turn this off if those buildings look stale or misaligned."
+      },
+      "reloadPolicy": "hot",
+      "section": "renderPerformance"
+    },
+    "enableEntitySliceRenderCache": {
+      "type": "boolean",
+      "label": {
+        "en": "Entity slice render cache",
+        "sch": "实体切片渲染缓存",
+        "modsch": "实体切片渲染缓存",
+        "tch": "實體切片渲染緩存",
+        "ru": "Entity slice render cache",
+        "de": "Entity slice render cache",
+        "ptbr": "Entity slice render cache",
+        "it": "Entity slice render cache",
+        "es": "Entity slice render cache",
+        "fr": "Entity slice render cache",
+        "nl": "Entity slice render cache",
+        "cz": "Entity slice render cache",
+        "pl": "Entity slice render cache",
+        "jp": "Entity slice render cache",
+        "kr": "Entity slice render cache",
+        "thai": "Entity slice render cache",
+        "hu": "Entity slice render cache",
+        "lv": "Entity slice render cache",
+        "ro": "Entity slice render cache",
+        "no": "Entity slice render cache"
+      },
+      "default": true,
+      "description": {
+        "en": "Cache consecutive safe static entity draws as ordered offscreen slices. Turn this off if buildings look stale, clipped, or incorrectly layered.",
+        "sch": "将连续的安全静态实体按原顺序合成为离屏切片缓存。如果建筑看起来未刷新、被裁切或层级不对，请关闭此项。",
+        "modsch": "将连续的安全静态实体按原顺序合成为离屏切片缓存。如果建筑看起来未刷新、被裁切或层级不对，请关闭此项。",
+        "tch": "將連續的安全靜態實體按原順序合成為離屏切片緩存。如果建築看起來未更新、被裁切或層級不對，請關閉此項。",
+        "ru": "Cache consecutive safe static entity draws as ordered offscreen slices. Turn this off if buildings look stale, clipped, or incorrectly layered.",
+        "de": "Cache consecutive safe static entity draws as ordered offscreen slices. Turn this off if buildings look stale, clipped, or incorrectly layered.",
+        "ptbr": "Cache consecutive safe static entity draws as ordered offscreen slices. Turn this off if buildings look stale, clipped, or incorrectly layered.",
+        "it": "Cache consecutive safe static entity draws as ordered offscreen slices. Turn this off if buildings look stale, clipped, or incorrectly layered.",
+        "es": "Cache consecutive safe static entity draws as ordered offscreen slices. Turn this off if buildings look stale, clipped, or incorrectly layered.",
+        "fr": "Cache consecutive safe static entity draws as ordered offscreen slices. Turn this off if buildings look stale, clipped, or incorrectly layered.",
+        "nl": "Cache consecutive safe static entity draws as ordered offscreen slices. Turn this off if buildings look stale, clipped, or incorrectly layered.",
+        "cz": "Cache consecutive safe static entity draws as ordered offscreen slices. Turn this off if buildings look stale, clipped, or incorrectly layered.",
+        "pl": "Cache consecutive safe static entity draws as ordered offscreen slices. Turn this off if buildings look stale, clipped, or incorrectly layered.",
+        "jp": "Cache consecutive safe static entity draws as ordered offscreen slices. Turn this off if buildings look stale, clipped, or incorrectly layered.",
+        "kr": "Cache consecutive safe static entity draws as ordered offscreen slices. Turn this off if buildings look stale, clipped, or incorrectly layered.",
+        "thai": "Cache consecutive safe static entity draws as ordered offscreen slices. Turn this off if buildings look stale, clipped, or incorrectly layered.",
+        "hu": "Cache consecutive safe static entity draws as ordered offscreen slices. Turn this off if buildings look stale, clipped, or incorrectly layered.",
+        "lv": "Cache consecutive safe static entity draws as ordered offscreen slices. Turn this off if buildings look stale, clipped, or incorrectly layered.",
+        "ro": "Cache consecutive safe static entity draws as ordered offscreen slices. Turn this off if buildings look stale, clipped, or incorrectly layered.",
+        "no": "Cache consecutive safe static entity draws as ordered offscreen slices. Turn this off if buildings look stale, clipped, or incorrectly layered."
+      },
+      "reloadPolicy": "hot",
+      "section": "renderPerformance"
+    },
+    "enableExperimentalEntityWebGLRecorder": {
+      "type": "boolean",
+      "label": {
+        "en": "Experimental WebGL command recorder",
+        "sch": "实验性 WebGL 命令记录器",
+        "modsch": "实验性 WebGL 命令记录器",
+        "tch": "實驗性 WebGL 命令記錄器",
+        "ru": "Experimental WebGL command recorder",
+        "de": "Experimental WebGL command recorder",
+        "ptbr": "Experimental WebGL command recorder",
+        "it": "Experimental WebGL command recorder",
+        "es": "Experimental WebGL command recorder",
+        "fr": "Experimental WebGL command recorder",
+        "nl": "Experimental WebGL command recorder",
+        "cz": "Experimental WebGL command recorder",
+        "pl": "Experimental WebGL command recorder",
+        "jp": "Experimental WebGL command recorder",
+        "kr": "Experimental WebGL command recorder",
+        "thai": "Experimental WebGL command recorder",
+        "hu": "Experimental WebGL command recorder",
+        "lv": "Experimental WebGL command recorder",
+        "ro": "Experimental WebGL command recorder",
+        "no": "Experimental WebGL command recorder"
+      },
+      "default": false,
+      "description": {
+        "en": "Record ordered entity Canvas commands for the experimental WebGL renderer without changing visible output. Enable only while profiling because recording adds overhead.",
+        "sch": "为实验性 WebGL 渲染器记录有序实体 Canvas 命令，不改变可见画面。记录会增加开销，仅在性能分析时启用。",
+        "modsch": "为实验性 WebGL 渲染器记录有序实体 Canvas 命令，不改变可见画面。记录会增加开销，仅在性能分析时启用。",
+        "tch": "為實驗性 WebGL 渲染器記錄有序實體 Canvas 命令，不改變可見畫面。記錄會增加開銷，僅在效能分析時啟用。",
+        "ru": "Record ordered entity Canvas commands for the experimental WebGL renderer without changing visible output. Enable only while profiling because recording adds overhead.",
+        "de": "Record ordered entity Canvas commands for the experimental WebGL renderer without changing visible output. Enable only while profiling because recording adds overhead.",
+        "ptbr": "Record ordered entity Canvas commands for the experimental WebGL renderer without changing visible output. Enable only while profiling because recording adds overhead.",
+        "it": "Record ordered entity Canvas commands for the experimental WebGL renderer without changing visible output. Enable only while profiling because recording adds overhead.",
+        "es": "Record ordered entity Canvas commands for the experimental WebGL renderer without changing visible output. Enable only while profiling because recording adds overhead.",
+        "fr": "Record ordered entity Canvas commands for the experimental WebGL renderer without changing visible output. Enable only while profiling because recording adds overhead.",
+        "nl": "Record ordered entity Canvas commands for the experimental WebGL renderer without changing visible output. Enable only while profiling because recording adds overhead.",
+        "cz": "Record ordered entity Canvas commands for the experimental WebGL renderer without changing visible output. Enable only while profiling because recording adds overhead.",
+        "pl": "Record ordered entity Canvas commands for the experimental WebGL renderer without changing visible output. Enable only while profiling because recording adds overhead.",
+        "jp": "Record ordered entity Canvas commands for the experimental WebGL renderer without changing visible output. Enable only while profiling because recording adds overhead.",
+        "kr": "Record ordered entity Canvas commands for the experimental WebGL renderer without changing visible output. Enable only while profiling because recording adds overhead.",
+        "thai": "Record ordered entity Canvas commands for the experimental WebGL renderer without changing visible output. Enable only while profiling because recording adds overhead.",
+        "hu": "Record ordered entity Canvas commands for the experimental WebGL renderer without changing visible output. Enable only while profiling because recording adds overhead.",
+        "lv": "Record ordered entity Canvas commands for the experimental WebGL renderer without changing visible output. Enable only while profiling because recording adds overhead.",
+        "ro": "Record ordered entity Canvas commands for the experimental WebGL renderer without changing visible output. Enable only while profiling because recording adds overhead.",
+        "no": "Record ordered entity Canvas commands for the experimental WebGL renderer without changing visible output. Enable only while profiling because recording adds overhead."
+      },
+      "reloadPolicy": "hot",
+      "section": "renderPerformance"
+    },
+    "enableResourceIconRenderCache": {
+      "type": "boolean",
+      "label": {
+        "en": "Resource icon render cache",
+        "sch": "资源图标渲染缓存",
+        "modsch": "资源图标渲染缓存",
+        "tch": "資源圖示渲染緩存",
+        "ru": "Resource icon render cache",
+        "de": "Resource icon render cache",
+        "ptbr": "Resource icon render cache",
+        "it": "Resource icon render cache",
+        "es": "Resource icon render cache",
+        "fr": "Resource icon render cache",
+        "nl": "Resource icon render cache",
+        "cz": "Resource icon render cache",
+        "pl": "Resource icon render cache",
+        "jp": "Resource icon render cache",
+        "kr": "Resource icon render cache",
+        "thai": "Resource icon render cache",
+        "hu": "Resource icon render cache",
+        "lv": "Resource icon render cache",
+        "ro": "Resource icon render cache",
+        "no": "Resource icon render cache"
+      },
+      "default": true,
+      "description": {
+        "en": "Cache pre-scaled resource icons used by the resource HUD and flying resource transfers. Turn this off if resource icons look stale or misaligned while zooming.",
+        "sch": "缓存资源 HUD 和飞行资源转移使用的预缩放资源图标。如果缩放时资源图标未刷新或错位，请关闭此项。",
+        "modsch": "缓存资源 HUD 和飞行资源转移使用的预缩放资源图标。如果缩放时资源图标未刷新或错位，请关闭此项。",
+        "tch": "緩存資源 HUD 和飛行資源轉移使用的預縮放資源圖示。如果縮放時資源圖示未更新或錯位，請關閉此項。",
+        "ru": "Cache pre-scaled resource icons used by the resource HUD and flying resource transfers. Turn this off if resource icons look stale or misaligned while zooming.",
+        "de": "Cache pre-scaled resource icons used by the resource HUD and flying resource transfers. Turn this off if resource icons look stale or misaligned while zooming.",
+        "ptbr": "Cache pre-scaled resource icons used by the resource HUD and flying resource transfers. Turn this off if resource icons look stale or misaligned while zooming.",
+        "it": "Cache pre-scaled resource icons used by the resource HUD and flying resource transfers. Turn this off if resource icons look stale or misaligned while zooming.",
+        "es": "Cache pre-scaled resource icons used by the resource HUD and flying resource transfers. Turn this off if resource icons look stale or misaligned while zooming.",
+        "fr": "Cache pre-scaled resource icons used by the resource HUD and flying resource transfers. Turn this off if resource icons look stale or misaligned while zooming.",
+        "nl": "Cache pre-scaled resource icons used by the resource HUD and flying resource transfers. Turn this off if resource icons look stale or misaligned while zooming.",
+        "cz": "Cache pre-scaled resource icons used by the resource HUD and flying resource transfers. Turn this off if resource icons look stale or misaligned while zooming.",
+        "pl": "Cache pre-scaled resource icons used by the resource HUD and flying resource transfers. Turn this off if resource icons look stale or misaligned while zooming.",
+        "jp": "Cache pre-scaled resource icons used by the resource HUD and flying resource transfers. Turn this off if resource icons look stale or misaligned while zooming.",
+        "kr": "Cache pre-scaled resource icons used by the resource HUD and flying resource transfers. Turn this off if resource icons look stale or misaligned while zooming.",
+        "thai": "Cache pre-scaled resource icons used by the resource HUD and flying resource transfers. Turn this off if resource icons look stale or misaligned while zooming.",
+        "hu": "Cache pre-scaled resource icons used by the resource HUD and flying resource transfers. Turn this off if resource icons look stale or misaligned while zooming.",
+        "lv": "Cache pre-scaled resource icons used by the resource HUD and flying resource transfers. Turn this off if resource icons look stale or misaligned while zooming.",
+        "ro": "Cache pre-scaled resource icons used by the resource HUD and flying resource transfers. Turn this off if resource icons look stale or misaligned while zooming.",
+        "no": "Cache pre-scaled resource icons used by the resource HUD and flying resource transfers. Turn this off if resource icons look stale or misaligned while zooming."
+      },
+      "reloadPolicy": "hot",
+      "section": "renderPerformance"
+    },
+    "enableChasmTransferPathIndex": {
+      "type": "boolean",
+      "label": {
+        "en": "Chasm transfer path index",
+        "sch": "裂隙传输路径索引",
+        "modsch": "裂隙传输路径索引",
+        "tch": "裂隙傳輸路徑索引",
+        "ru": "Chasm transfer path index",
+        "de": "Chasm transfer path index",
+        "ptbr": "Chasm transfer path index",
+        "it": "Chasm transfer path index",
+        "es": "Chasm transfer path index",
+        "fr": "Chasm transfer path index",
+        "nl": "Chasm transfer path index",
+        "cz": "Chasm transfer path index",
+        "pl": "Chasm transfer path index",
+        "jp": "Chasm transfer path index",
+        "kr": "Chasm transfer path index",
+        "thai": "Chasm transfer path index",
+        "hu": "Chasm transfer path index",
+        "lv": "Chasm transfer path index",
+        "ro": "Chasm transfer path index",
+        "no": "Chasm transfer path index"
+      },
+      "default": true,
+      "description": {
+        "en": "Use a per-effect segment index to locate moving Chasm transfer lines without repeatedly scanning the whole path. Turn this off if Chasm transfer trails jump or follow the wrong route.",
+        "sch": "为每个裂隙传输特效建立一次路径分段索引，避免移动光迹反复扫描整条路径。如果裂隙传输光迹跳动或走错路线，请关闭此项。",
+        "modsch": "为每个裂隙传输特效建立一次路径分段索引，避免移动光迹反复扫描整条路径。如果裂隙传输光迹跳动或走错路线，请关闭此项。",
+        "tch": "為每個裂隙傳輸特效建立一次路徑分段索引，避免移動光跡反覆掃描整條路徑。如果裂隙傳輸光跡跳動或走錯路線，請關閉此項。",
+        "ru": "Use a per-effect segment index to locate moving Chasm transfer lines without repeatedly scanning the whole path. Turn this off if Chasm transfer trails jump or follow the wrong route.",
+        "de": "Use a per-effect segment index to locate moving Chasm transfer lines without repeatedly scanning the whole path. Turn this off if Chasm transfer trails jump or follow the wrong route.",
+        "ptbr": "Use a per-effect segment index to locate moving Chasm transfer lines without repeatedly scanning the whole path. Turn this off if Chasm transfer trails jump or follow the wrong route.",
+        "it": "Use a per-effect segment index to locate moving Chasm transfer lines without repeatedly scanning the whole path. Turn this off if Chasm transfer trails jump or follow the wrong route.",
+        "es": "Use a per-effect segment index to locate moving Chasm transfer lines without repeatedly scanning the whole path. Turn this off if Chasm transfer trails jump or follow the wrong route.",
+        "fr": "Use a per-effect segment index to locate moving Chasm transfer lines without repeatedly scanning the whole path. Turn this off if Chasm transfer trails jump or follow the wrong route.",
+        "nl": "Use a per-effect segment index to locate moving Chasm transfer lines without repeatedly scanning the whole path. Turn this off if Chasm transfer trails jump or follow the wrong route.",
+        "cz": "Use a per-effect segment index to locate moving Chasm transfer lines without repeatedly scanning the whole path. Turn this off if Chasm transfer trails jump or follow the wrong route.",
+        "pl": "Use a per-effect segment index to locate moving Chasm transfer lines without repeatedly scanning the whole path. Turn this off if Chasm transfer trails jump or follow the wrong route.",
+        "jp": "Use a per-effect segment index to locate moving Chasm transfer lines without repeatedly scanning the whole path. Turn this off if Chasm transfer trails jump or follow the wrong route.",
+        "kr": "Use a per-effect segment index to locate moving Chasm transfer lines without repeatedly scanning the whole path. Turn this off if Chasm transfer trails jump or follow the wrong route.",
+        "thai": "Use a per-effect segment index to locate moving Chasm transfer lines without repeatedly scanning the whole path. Turn this off if Chasm transfer trails jump or follow the wrong route.",
+        "hu": "Use a per-effect segment index to locate moving Chasm transfer lines without repeatedly scanning the whole path. Turn this off if Chasm transfer trails jump or follow the wrong route.",
+        "lv": "Use a per-effect segment index to locate moving Chasm transfer lines without repeatedly scanning the whole path. Turn this off if Chasm transfer trails jump or follow the wrong route.",
+        "ro": "Use a per-effect segment index to locate moving Chasm transfer lines without repeatedly scanning the whole path. Turn this off if Chasm transfer trails jump or follow the wrong route.",
+        "no": "Use a per-effect segment index to locate moving Chasm transfer lines without repeatedly scanning the whole path. Turn this off if Chasm transfer trails jump or follow the wrong route."
+      },
+      "reloadPolicy": "hot",
+      "section": "renderPerformance"
+    },
+    "enableResourceExplosionBezierFastPath": {
+      "type": "boolean",
+      "label": {
+        "en": "Resource explosion curve fast path",
+        "sch": "资源爆炸曲线快速路径",
+        "modsch": "资源爆炸曲线快速路径",
+        "tch": "資源爆炸曲線快速路徑",
+        "ru": "Resource explosion curve fast path",
+        "de": "Resource explosion curve fast path",
+        "ptbr": "Resource explosion curve fast path",
+        "it": "Resource explosion curve fast path",
+        "es": "Resource explosion curve fast path",
+        "fr": "Resource explosion curve fast path",
+        "nl": "Resource explosion curve fast path",
+        "cz": "Resource explosion curve fast path",
+        "pl": "Resource explosion curve fast path",
+        "jp": "Resource explosion curve fast path",
+        "kr": "Resource explosion curve fast path",
+        "thai": "Resource explosion curve fast path",
+        "hu": "Resource explosion curve fast path",
+        "lv": "Resource explosion curve fast path",
+        "ro": "Resource explosion curve fast path",
+        "no": "Resource explosion curve fast path"
+      },
+      "default": true,
+      "description": {
+        "en": "Use an analytically equivalent fast formula for the special cubic Bezier trails used by resource explosions. Turn this off if explosion trails change shape or position.",
+        "sch": "为资源爆炸使用的特殊三次 Bezier 光迹采用解析等价的快速公式。如果爆炸光迹的形状或位置发生变化，请关闭此项。",
+        "modsch": "为资源爆炸使用的特殊三次 Bezier 光迹采用解析等价的快速公式。如果爆炸光迹的形状或位置发生变化，请关闭此项。",
+        "tch": "為資源爆炸使用的特殊三次 Bezier 光跡採用解析等價的快速公式。如果爆炸光跡的形狀或位置發生變化，請關閉此項。",
+        "ru": "Use an analytically equivalent fast formula for the special cubic Bezier trails used by resource explosions. Turn this off if explosion trails change shape or position.",
+        "de": "Use an analytically equivalent fast formula for the special cubic Bezier trails used by resource explosions. Turn this off if explosion trails change shape or position.",
+        "ptbr": "Use an analytically equivalent fast formula for the special cubic Bezier trails used by resource explosions. Turn this off if explosion trails change shape or position.",
+        "it": "Use an analytically equivalent fast formula for the special cubic Bezier trails used by resource explosions. Turn this off if explosion trails change shape or position.",
+        "es": "Use an analytically equivalent fast formula for the special cubic Bezier trails used by resource explosions. Turn this off if explosion trails change shape or position.",
+        "fr": "Use an analytically equivalent fast formula for the special cubic Bezier trails used by resource explosions. Turn this off if explosion trails change shape or position.",
+        "nl": "Use an analytically equivalent fast formula for the special cubic Bezier trails used by resource explosions. Turn this off if explosion trails change shape or position.",
+        "cz": "Use an analytically equivalent fast formula for the special cubic Bezier trails used by resource explosions. Turn this off if explosion trails change shape or position.",
+        "pl": "Use an analytically equivalent fast formula for the special cubic Bezier trails used by resource explosions. Turn this off if explosion trails change shape or position.",
+        "jp": "Use an analytically equivalent fast formula for the special cubic Bezier trails used by resource explosions. Turn this off if explosion trails change shape or position.",
+        "kr": "Use an analytically equivalent fast formula for the special cubic Bezier trails used by resource explosions. Turn this off if explosion trails change shape or position.",
+        "thai": "Use an analytically equivalent fast formula for the special cubic Bezier trails used by resource explosions. Turn this off if explosion trails change shape or position.",
+        "hu": "Use an analytically equivalent fast formula for the special cubic Bezier trails used by resource explosions. Turn this off if explosion trails change shape or position.",
+        "lv": "Use an analytically equivalent fast formula for the special cubic Bezier trails used by resource explosions. Turn this off if explosion trails change shape or position.",
+        "ro": "Use an analytically equivalent fast formula for the special cubic Bezier trails used by resource explosions. Turn this off if explosion trails change shape or position.",
+        "no": "Use an analytically equivalent fast formula for the special cubic Bezier trails used by resource explosions. Turn this off if explosion trails change shape or position."
+      },
+      "reloadPolicy": "hot",
+      "section": "renderPerformance"
+    },
+    "enablePlayTimeCounter": {
+      "type": "boolean",
+      "label": "Play time counter",
+      "default": true,
+      "description": "Show the active run play-time counter on the game canvas.",
+      "reloadPolicy": "hot",
+      "section": "playTimeCounter"
+    },
+    "playTimeCounterPosition": {
+      "type": "slider",
+      "label": "Play time counter position",
+      "default": 1,
+      "description": "Slide between bottom-left, top-center, and bottom-right.",
+      "reloadPolicy": "hot",
+      "valueType": "integer",
+      "min": 0,
+      "max": 2,
+      "step": 1,
+      "valueLabels": {
+        "0": {
+          "en": "bottom-left",
+          "sch": "左下角",
+          "modsch": "左下角",
+          "ru": "Внизу слева",
+          "de": "Unten links",
+          "ptbr": "Inferior esquerdo",
+          "it": "In basso a sinistra",
+          "es": "Abajo izquierda",
+          "fr": "En bas a gauche",
+          "nl": "Linksonder",
+          "cz": "Vlevo dole",
+          "pl": "Lewy dol",
+          "jp": "左下",
+          "kr": "왼쪽 아래",
+          "tch": "左下角",
+          "thai": "มุมซ้ายล่าง",
+          "hu": "Bal also",
+          "lv": "Apaksa pa kreisi",
+          "ro": "Jos stanga",
+          "no": "Nederst til venstre"
+        },
+        "1": {
+          "en": "top-center",
+          "sch": "顶部居中",
+          "modsch": "顶部居中",
+          "ru": "Вверху по центру",
+          "de": "Oben mittig",
+          "ptbr": "Superior central",
+          "it": "In alto al centro",
+          "es": "Arriba centro",
+          "fr": "En haut au centre",
+          "nl": "Boven midden",
+          "cz": "Nahore uprostred",
+          "pl": "Gora srodek",
+          "jp": "上部中央",
+          "kr": "상단 중앙",
+          "tch": "頂部置中",
+          "thai": "กึ่งกลางด้านบน",
+          "hu": "Felul kozepen",
+          "lv": "Augsa centra",
+          "ro": "Sus centru",
+          "no": "Overst i midten"
+        },
+        "2": {
+          "en": "bottom-right",
+          "sch": "右下角",
+          "modsch": "右下角",
+          "ru": "Внизу справа",
+          "de": "Unten rechts",
+          "ptbr": "Inferior direito",
+          "it": "In basso a destra",
+          "es": "Abajo derecha",
+          "fr": "En bas a droite",
+          "nl": "Rechtsonder",
+          "cz": "Vpravo dole",
+          "pl": "Prawy dol",
+          "jp": "右下",
+          "kr": "오른쪽 아래",
+          "tch": "右下角",
+          "thai": "มุมขวาล่าง",
+          "hu": "Jobb also",
+          "lv": "Apaksa pa labi",
+          "ro": "Jos dreapta",
+          "no": "Nederst til hoyre"
+        }
+      },
+      "valueAliases": {
+        "bottom-left": 0,
+        "bottom left": 0,
+        "left-bottom": 0,
+        "left bottom": 0,
+        "left": 0,
+        "top-center": 1,
+        "top center": 1,
+        "center-top": 1,
+        "top": 1,
+        "bottom-right": 2,
+        "bottom right": 2,
+        "bottom": 2,
+        "right": 2
+      },
+      "section": "playTimeCounter"
+    },
+    "disableShiftCtrlZoomShortcut": {
+      "type": "boolean",
+      "label": "Disable Shift/Ctrl zoom shortcut",
+      "default": true,
+      "description": "Prevent pressing Shift or Ctrl alone from resetting the camera zoom, while keeping Shift/Ctrl + wheel zooming available.",
+      "reloadPolicy": "hot",
+      "section": "shiftCtrlZoomShortcut"
+    },
+    "enableDynamicCamera": {
+      "type": "boolean",
+      "label": "Dynamic camera",
+      "default": true,
+      "description": "Enable keyboard-controlled camera pitch and rotation.",
+      "reloadPolicy": "hot",
+      "section": "dynamicCamera"
+    },
+    "cameraPitch": {
+      "type": "slider",
+      "valueType": "number",
+      "label": "Camera pitch",
+      "default": 0.87,
+      "min": 0.18,
+      "max": 1.15,
+      "step": 0.01,
+      "description": "Live pitch control. 0.50 matches vanilla; larger values look more top-down.",
+      "reloadPolicy": "hot",
+      "section": "dynamicCamera"
+    },
+    "cameraYaw": {
+      "type": "slider",
+      "valueType": "number",
+      "label": "Camera rotation",
+      "default": 45,
+      "min": -180,
+      "max": 180,
+      "step": 1,
+      "description": "Live rotation control in degrees.",
+      "reloadPolicy": "hot",
+      "section": "dynamicCamera"
+    },
+    "enableViewDistance": {
+      "type": "boolean",
+      "label": "View distance limits",
+      "default": true,
+      "description": "Use expanded camera zoom limits.",
+      "section": "viewDistance"
+    },
+    "farthestZoom": {
+      "type": "number",
+      "label": "Farthest zoom",
+      "default": 0.03,
+      "min": 0.03,
+      "max": 1,
+      "step": 0.01,
+      "description": "Lower values show more of the world. Vanilla far limit is 0.3.",
+      "section": "viewDistance"
+    },
+    "closestZoom": {
+      "type": "number",
+      "label": "Closest zoom",
+      "default": 4,
+      "min": 1,
+      "max": 24,
+      "step": 0.1,
+      "description": "Higher values zoom closer to the world. Vanilla near limit is 2.",
+      "section": "viewDistance"
+    },
+    "fallbackZoom": {
+      "type": "number",
+      "label": "Fallback zoom",
+      "default": 1,
+      "min": 0.03,
+      "max": 24,
+      "step": 0.01,
+      "description": "Used when the saved zoom value is missing or invalid.",
+      "section": "viewDistance"
+    }
+  },
+  "description": "Combines view distance limits, dynamic camera projection, ending skip, accessibility buttons, reduced-flashes layer preference, stabilizer surge flash reduction, gradient mine flash suppression, offline earnings simulation control, void return fade skip, resource glow colors, chasm line rendering, floor grid outlines, play-time counter, Shift/Ctrl zoom shortcut control, and explainer fixes into one multi-entry quality mod.",
+  "reloadOnConfigChange": true,
+  "translations": {
+    "sch": {
+      "name": "优化和修复",
+      "description": "优化和修复游戏中的部分内容。",
+      "config": {
+        "enableEndingSkip": {
+          "label": "结局跳过",
+          "description": "新增在结局和致谢名单的跳过功能。"
+        },
+        "enableAccessibilityButtons": {
+          "label": "游戏内设置按钮",
+          "description": "鼠标移动到底部中间时会弹出设置按钮。"
+        },
+        "enableStabilizerSurgeFlashReduction": {
+          "label": "禁用稳定器触发浪涌时的闪烁",
+          "description": "在建造虚空祭坛之后，也禁用稳定器激活浪涌效果时产生的全频闪烁。"
+        },
+        "enableResourceGlowColors": {
+          "label": "资源发光颜色",
+          "description": "新增默认根据资源的颜色改变对应资源发光颜色，并支持自定义。"
+        },
+        "enablePlayTimeCounter": {
+          "label": "游戏时长显示",
+          "description": "在游戏里显示当前存档的游玩时长。"
+        },
+        "playTimeCounterPosition": {
+          "label": "游戏时长位置",
+          "description": "滑动选择右下角、顶部居中或左下角。",
+          "valueLabels": {
+            "0": "左下角",
+            "1": "顶部居中",
+            "2": "右下角"
+          }
+        },
+        "resourceGlowColors": {
+          "label": "资源发光颜色自定义",
+          "description": "可自定义设置每种资源的发光颜色。"
+        },
+        "enableViewDistance": {
+          "label": "禁用视野距离限制",
+          "description": "可修改原版游戏的视角的远近限制。"
+        },
+        "farthestZoom": {
+          "label": "最远视角距离",
+          "description": "数值越低，可看到的世界范围越大。原版最远限制为 0.3。"
+        },
+        "closestZoom": {
+          "label": "最近视角距离",
+          "description": "数值越高，镜头可以拉得越近。原版最近限制为 2。"
+        },
+        "fallbackZoom": {
+          "label": "默认缩放",
+          "description": "当保存的缩放值缺失或无效时使用。"
+        },
+        "enableChasmLineRenderer": {
+          "label": "逆裂缝绘线渲染模式切换",
+          "description": "新增并可切换WebGL逆裂缝绘线的渲染方式，以提升性能。"
+        },
+        "chasmLineRendererMode": {
+          "label": "渲染模式",
+          "description": "原版渲染方式为Canvas 2D。可切换至WebGL渲染模式，用GPU进行渲染以提升性能。",
+          "valueLabels": {
+            "0": "Canvas 2D",
+            "1": "WebGL"
+          }
+        },
+        "enableChasmLineDistanceOverride": {
+          "label": "无视距离渲染逆裂缝绘线",
+          "description": "无论距离多远，逆裂缝的绘线都会保持渲染。"
+        },
+        "enableFloorGridLines": {
+          "label": "地板方格边框显示",
+          "description": "新增地板方格边框，方便数格子。"
+        },
+        "floorGridLineRealityColor": {
+          "label": "现实维度地板方格边框颜色",
+          "description": "留空时现实世界使用默认深灰色边框。"
+        },
+        "floorGridLineVoidColor": {
+          "label": "虚空维度地板方格边框颜色",
+          "description": "留空时虚空世界使用默认白色边框。"
+        },
+        "enableVoidReturnFadeSkip": {
+          "label": "禁用回到现实白屏淡出效果",
+          "description": "从虚空维度返回现实维度时，移除长时间的白色淡出效果，直接显示清晰画面。"
+        },
+        "enableExplainerFix": {
+          "label": "提示句修复",
+          "description": "修复提示语在切换语言后不刷新，并让虚空世界里的提示文字变成亮色以便看清。"
+        },
+        "disableShiftCtrlZoomShortcut": {
+          "label": "禁用 Shift/Ctrl 单按缩放",
+          "description": "阻止单独按下 Shift 或 Ctrl 时重置镜头缩放，同时保留 Shift/Ctrl + 滚轮缩放。"
+        },
+        "enableDynamicCamera": {
+          "label": "动态镜头",
+          "description": "启用可用快捷键控制的镜头倾斜和旋转。"
+        },
+        "cameraPitch": {
+          "label": "镜头倾斜角度",
+          "description": "实时调整倾斜角度。0.50 等于原版；数值越大越接近俯视。"
+        },
+        "cameraYaw": {
+          "label": "镜头旋转角度",
+          "description": "实时调整旋转角度，单位为度。"
+        },
+        "disableGradientLightningFlash": {
+          "label": "禁用梯度矿井频闪",
+          "description": "阻止梯度矿井在虚空维度转化 Reality 时产生的全屏闪烁，但保留闪电路径、音效和资源产出。"
+        },
+        "disableIdleSplash": {
+          "label": "禁用离线收益模拟",
+          "description": "读取存档时跳过离线收益模拟。离开游戏期间不会获得任何离线资源，也不会产生其他模拟进度。"
+        }
+      }
+    },
+    "modsch": {
+      "name": "优化和修复",
+      "description": "优化和修复游戏中的部分内容。",
+      "config": {
+        "enableEndingSkip": {
+          "label": "结局跳过",
+          "description": "新增在结局和致谢名单的跳过功能。"
+        },
+        "enableAccessibilityButtons": {
+          "label": "辅助按钮",
+          "description": "鼠标移动到底部中间时会弹出设置按钮。"
+        },
+        "enableStabilizerSurgeFlashReduction": {
+          "label": "禁用稳定器触发浪涌时的闪烁",
+          "description": "在建造虚空祭坛之后，也禁用稳定器激活浪涌效果时产生的全频闪烁。"
+        },
+        "enableResourceGlowColors": {
+          "label": "资源发光颜色",
+          "description": "新增默认根据资源的颜色改变对应资源发光颜色，并支持自定义。"
+        },
+        "enablePlayTimeCounter": {
+          "label": "游戏时长显示",
+          "description": "在游戏里显示当前存档的游玩时长。"
+        },
+        "playTimeCounterPosition": {
+          "label": "游戏时长位置",
+          "description": "滑动选择右下角、顶部居中或左下角。",
+          "valueLabels": {
+            "0": "左下角",
+            "1": "顶部居中",
+            "2": "右下角"
+          }
+        },
+        "resourceGlowColors": {
+          "label": "资源发光颜色调色板",
+          "description": "可自定义设置每周资源的发光颜色。"
+        },
+        "enableViewDistance": {
+          "label": "禁用视野距离限制",
+          "description": "可修改原版游戏的视角的远近限制。"
+        },
+        "farthestZoom": {
+          "label": "最远视角距离",
+          "description": "数值越低，可看到的世界范围越大。原版最远限制为 0.3。"
+        },
+        "closestZoom": {
+          "label": "最近视角距离",
+          "description": "数值越高，镜头可以拉得越近。原版最近限制为 2。"
+        },
+        "fallbackZoom": {
+          "label": "默认缩放",
+          "description": "当保存的缩放值缺失或无效时使用。"
+        },
+        "enableChasmLineRenderer": {
+          "label": "逆裂缝绘线渲染模式切换",
+          "description": "新增并可切换WebGL逆裂缝绘线的渲染方式，以提升性能。"
+        },
+        "chasmLineRendererMode": {
+          "label": "渲染模式",
+          "description": "原版渲染方式为Canvas 2D。可切换至WebGL渲染模式，用GPU进行渲染以提升性能。",
+          "valueLabels": {
+            "0": "Canvas 2D",
+            "1": "WebGL"
+          }
+        },
+        "enableChasmLineDistanceOverride": {
+          "label": "无视距离渲染逆裂缝绘线",
+          "description": "无论距离多远，逆裂缝的绘线都会保持渲染。"
+        },
+        "enableFloorGridLines": {
+          "label": "显示地板方格边框",
+          "description": "新增地板方格边框，方便数格子。"
+        },
+        "floorGridLineRealityColor": {
+          "label": "现实维度地板方格边框颜色",
+          "description": "留空时现实世界使用默认深灰色边框。"
+        },
+        "floorGridLineVoidColor": {
+          "label": "虚空维度地板方格边框颜色",
+          "description": "留空时虚空世界使用默认白色边框。"
+        },
+        "enableVoidReturnFadeSkip": {
+          "label": "禁用回到现实白屏淡出效果",
+          "description": "从虚空维度返回现实维度时，移除长时间的白色淡出效果，直接显示清晰画面。"
+        },
+        "enableExplainerFix": {
+          "label": "提示句修复",
+          "description": "修复提示语在切换语言后不刷新，并让虚空世界里的提示文字变成亮色以便看清。"
+        },
+        "disableShiftCtrlZoomShortcut": {
+          "label": "禁用 Shift/Ctrl 单按缩放",
+          "description": "阻止单独按下 Shift 或 Ctrl 时重置镜头缩放，同时保留 Shift/Ctrl + 滚轮缩放。"
+        },
+        "enableDynamicCamera": {
+          "label": "动态镜头",
+          "description": "启用可用快捷键控制的镜头倾斜和旋转。"
+        },
+        "cameraPitch": {
+          "label": "镜头倾斜角度",
+          "description": "实时调整倾斜角度。0.50 等于原版；数值越大越接近俯视。"
+        },
+        "cameraYaw": {
+          "label": "镜头旋转角度",
+          "description": "实时调整旋转角度，单位为度。"
+        },
+        "disableGradientLightningFlash": {
+          "label": "禁用梯度矿井频闪",
+          "description": "阻止梯度矿井在虚空维度转化 Reality 时产生的全屏闪烁，但保留闪电路径、音效和资源产出。"
+        },
+        "disableIdleSplash": {
+          "label": "禁用离线收益模拟",
+          "description": "读取存档时跳过离线收益模拟。离开游戏期间不会获得任何离线资源，也不会产生其他模拟进度。"
+        }
+      }
+    },
+    "en": {
+      "name": "Tweaks",
+      "config": {
+        "enableEndingSkip": {
+          "label": "Ending skip",
+          "description": "Show a skip button during the pinhole ending and credits sequence."
+        },
+        "enableAccessibilityButtons": {
+          "label": "Accessibility buttons",
+          "description": "Show the bottom accessibility control bar and reality-floor color palette."
+        },
+        "enableStabilizerSurgeFlashReduction": {
+          "label": "Stabilizer surge flash reduction",
+          "description": "After the void altar exists, hide full-screen flashes caused by stabilizer-triggered surge effects."
+        },
+        "enableResourceGlowColors": {
+          "label": "Resource glow colors",
+          "description": "Color resource icon glows by resource, with optional per-resource overrides."
+        },
+        "enablePlayTimeCounter": {
+          "label": "Play time counter",
+          "description": "Show the active run play-time counter on the game canvas."
+        },
+        "playTimeCounterPosition": {
+          "label": "Play time counter position",
+          "description": "Slide between bottom-left, top-center, and bottom-right.",
+          "valueLabels": {
+            "0": "bottom-left",
+            "1": "top-center",
+            "2": "bottom-right"
+          }
+        },
+        "resourceGlowColors": {
+          "label": "Resource glow palette",
+          "description": "Per-resource glow color overrides. Empty rows use each resource's native color."
+        },
+        "enableViewDistance": {
+          "label": "View distance limits",
+          "description": "Use expanded camera zoom limits."
+        },
+        "farthestZoom": {
+          "label": "Farthest zoom",
+          "description": "Lower values show more of the world. Vanilla far limit is 0.3."
+        },
+        "closestZoom": {
+          "label": "Closest zoom",
+          "description": "Higher values zoom closer to the world. Vanilla near limit is 2."
+        },
+        "fallbackZoom": {
+          "label": "Fallback zoom",
+          "description": "Used when the saved zoom value is missing or invalid."
+        },
+        "enableChasmLineRenderer": {
+          "label": "Chasm line renderer",
+          "description": "Allow this mod to replace the chasm-to-resource lines with the selected renderer."
+        },
+        "chasmLineRendererMode": {
+          "label": "Chasm line rendering mode",
+          "description": "Canvas 2D uses the original game drawing. WebGL renders the same chasm-to-resource curves through a GPU-backed canvas.",
+          "valueLabels": {
+            "0": "Canvas 2D",
+            "1": "WebGL"
+          }
+        },
+        "enableChasmLineDistanceOverride": {
+          "label": "Chasm lines ignore distance",
+          "description": "Keep rendering chasm-to-resource lines even when the chasm is outside the normal visible range."
+        },
+        "enableFloorGridLines": {
+          "label": "Floor grid outlines",
+          "description": "Draw thin outlines around the in-game floor cells."
+        },
+        "floorGridLineRealityColor": {
+          "label": "Reality floor grid outline color",
+          "description": "Leave empty to use the default dark gray outline in reality."
+        },
+        "floorGridLineVoidColor": {
+          "label": "Void floor grid outline color",
+          "description": "Leave empty to use the default white outline in the void."
+        },
+        "enableVoidReturnFadeSkip": {
+          "label": "Skip void return fade",
+          "description": "When returning from the void to reality, remove the long white recovery fade and show the clear view immediately."
+        },
+        "enableExplainerFix": {
+          "label": "Explainer fix",
+          "description": "Refresh pulsing explainer hints after language changes and use readable light text in the void."
+        },
+        "disableShiftCtrlZoomShortcut": {
+          "label": "Disable Shift/Ctrl zoom shortcut",
+          "description": "Prevent pressing Shift or Ctrl alone from resetting the camera zoom, while keeping Shift/Ctrl + wheel zooming available."
+        },
+        "enableDynamicCamera": {
+          "label": "Dynamic camera",
+          "description": "Enable keyboard-controlled camera pitch and rotation."
+        },
+        "cameraPitch": {
+          "label": "Camera pitch",
+          "description": "Live pitch control. 0.50 matches vanilla; larger values look more top-down."
+        },
+        "cameraYaw": {
+          "label": "Camera rotation",
+          "description": "Live rotation control in degrees."
+        },
+        "disableGradientLightningFlash": {
+          "label": "Disable gradient mine flash",
+          "description": "Prevent Gradient mine Reality conversion lightning from filling the screen, while keeping the lightning path, sound, and resource production."
+        },
+        "disableIdleSplash": {
+          "label": "Disable offline earnings simulation",
+          "description": "Skip the offline earnings simulation when loading a save. Time spent away will grant no offline resources or other simulated progress."
+        }
+      },
+      "description": "Combines view distance limits, ending skip, accessibility buttons, stabilizer surge flash reduction, void return fade skip, resource glow colors, chasm line rendering, floor grid outlines, play-time counter, and explainer fixes into one multi-entry quality mod."
+    },
+    "ru": {
+      "name": "Настройки удобства",
+      "config": {
+        "enableEndingSkip": {
+          "label": "Пропуск концовки"
+        },
+        "enableAccessibilityButtons": {
+          "label": "Кнопки доступности"
+        },
+        "enableStabilizerSurgeFlashReduction": {
+          "label": "Снижение вспышек стабилизатора"
+        },
+        "enableResourceGlowColors": {
+          "label": "Цвета свечения ресурсов"
+        },
+        "enablePlayTimeCounter": {
+          "label": "Счетчик времени игры"
+        },
+        "playTimeCounterPosition": {
+          "label": "Позиция счетчика времени",
+          "description": "Slide between bottom-left, top-center, and bottom-right.",
+          "valueLabels": {
+            "0": "Внизу слева",
+            "1": "Вверху по центру",
+            "2": "Внизу справа"
+          }
+        },
+        "resourceGlowColors": {
+          "label": "Палитра свечения ресурсов"
+        },
+        "enableViewDistance": {
+          "label": "Пределы дальности обзора"
+        },
+        "farthestZoom": {
+          "label": "Самое дальнее отдаление"
+        },
+        "closestZoom": {
+          "label": "Самое близкое приближение"
+        },
+        "fallbackZoom": {
+          "label": "Запасной масштаб"
+        },
+        "enableChasmLineRenderer": {
+          "label": "Render lines chasm",
+          "description": "Allow the mod to replace chasm-to-resource lines with the selected renderer."
+        },
+        "chasmLineRendererMode": {
+          "label": "Chasm line render mode",
+          "description": "Canvas 2D uses original drawing. WebGL uses a GPU-backed canvas.",
+          "valueLabels": {
+            "0": "Canvas 2D",
+            "1": "WebGL"
+          }
+        },
+        "enableChasmLineDistanceOverride": {
+          "label": "Linii razloma bez distantsii",
+          "description": "Linii ot razloma k resursam risuyutsya, dazhe kogda razlom vne obychnoy vidimoy zony."
+        },
+        "enableFloorGridLines": {
+          "label": "Kontury kletok pola",
+          "description": "Risuet tonkie kontury vokrug kletok pola v igre."
+        },
+        "floorGridLineRealityColor": {
+          "label": "Tsvet setki pola realnosti",
+          "description": "Pustoe znachenie ispolzuet temno-seryy kontur v realnosti."
+        },
+        "floorGridLineVoidColor": {
+          "label": "Tsvet setki pola pustoty",
+          "description": "Pustoe znachenie ispolzuet belyy kontur v pustote."
+        },
+        "enableVoidReturnFadeSkip": {
+          "label": "Propusk belogo zatuhaniya iz pustoty",
+          "description": "Pri vozvrate iz pustoty v realnost ubiraet dolgoe beloe vosstanovlenie i srazu pokazyvaet chetkiy vid."
+        },
+        "enableExplainerFix": {
+          "label": "Ispravlenie podskazok",
+          "description": "Obnovlyaet pulsiruyushchie podskazki posle smeny yazyka i delaet tekst svetlym v pustote."
+        },
+        "disableShiftCtrlZoomShortcut": {
+          "label": "Otklyuchit Shift/Ctrl zoom",
+          "description": "Ne pozvolyaet odinochnomu Shift ili Ctrl sbrosit masshtab kamery, no ostavlyaet Shift/Ctrl + koleso."
+        },
+        "enableDynamicCamera": {
+          "label": "Dinamicheskaya kamera",
+          "description": "Vklyuchaet naklon i povorot kamery s upravleniem klavishami."
+        },
+        "cameraPitch": {
+          "label": "Naklon kamery",
+          "description": "Zhivaya nastroika naklona. 0.50 kak v originale; bolshe znachit vid sverkhu."
+        },
+        "cameraYaw": {
+          "label": "Povorot kamery",
+          "description": "Zhivaya nastroika povorota v gradusakh."
+        },
+        "disableGradientLightningFlash": {
+          "label": "Otklyuchit mertsanie gradientnoy shakhty",
+          "description": "Ubiraet polnoekrannuyu vspyshku molnii pri preobrazovanii Reality gradientnoy shakhtoy, sohranyaya liniyu molnii, zvuk i proizvodstvo resursov."
+        },
+        "disableIdleSplash": {
+          "label": "Otklyuchit simulyatsiyu oflayn-dokhoda",
+          "description": "Pri zagruzke sokhraneniya propuskaet simulyatsiyu oflayn-dokhoda. Za vremya vne igry ne budut nachisleny resursy ili drugoy smodelirovannyy progress."
+        }
+      }
+    },
+    "de": {
+      "name": "Komfortanpassungen",
+      "config": {
+        "enableEndingSkip": {
+          "label": "Ende überspringen"
+        },
+        "enableAccessibilityButtons": {
+          "label": "Bedienhilfen-Schaltflächen"
+        },
+        "enableStabilizerSurgeFlashReduction": {
+          "label": "Stabilisator-Blitzreduktion"
+        },
+        "enableResourceGlowColors": {
+          "label": "Ressourcen-Leuchtfarben"
+        },
+        "enablePlayTimeCounter": {
+          "label": "Spielzeitzähler"
+        },
+        "playTimeCounterPosition": {
+          "label": "Position des Spielzeitzählers",
+          "description": "Slide between bottom-left, top-center, and bottom-right.",
+          "valueLabels": {
+            "0": "Unten links",
+            "1": "Oben mittig",
+            "2": "Unten rechts"
+          }
+        },
+        "resourceGlowColors": {
+          "label": "Ressourcen-Leuchtpalette"
+        },
+        "enableViewDistance": {
+          "label": "Sichtweitenlimits"
+        },
+        "farthestZoom": {
+          "label": "Weitester Zoom"
+        },
+        "closestZoom": {
+          "label": "Nächster Zoom"
+        },
+        "fallbackZoom": {
+          "label": "Fallback-Zoom"
+        },
+        "enableChasmLineRenderer": {
+          "label": "Risslinien-Renderer",
+          "description": "Erlaubt dem Mod, die Linien zwischen Riss und Ressourcen mit dem gewaehlten Renderer zu ersetzen."
+        },
+        "chasmLineRendererMode": {
+          "label": "Risslinien-Renderingmodus",
+          "description": "Canvas 2D nutzt die originale Zeichnung. WebGL nutzt eine GPU-Canvas.",
+          "valueLabels": {
+            "0": "Canvas 2D",
+            "1": "WebGL"
+          }
+        },
+        "enableChasmLineDistanceOverride": {
+          "label": "Kluftlinien ohne Distanzlimit",
+          "description": "Zeichnet Linien von Kluft zu Ressourcen weiter, auch wenn die Kluft ausserhalb der normalen Sichtweite liegt."
+        },
+        "enableFloorGridLines": {
+          "label": "Bodenraster-Umrisse",
+          "description": "Zeichnet duenne Umrisse um die Bodenfelder im Spiel."
+        },
+        "floorGridLineRealityColor": {
+          "label": "Bodenrasterfarbe Realitaet",
+          "description": "Leer lassen fuer die dunkelgraue Standardlinie in der Realitaet."
+        },
+        "floorGridLineVoidColor": {
+          "label": "Bodenrasterfarbe Leere",
+          "description": "Leer lassen fuer die weisse Standardlinie in der Leere."
+        },
+        "enableVoidReturnFadeSkip": {
+          "label": "Rueckkehr-Fade aus der Leere ueberspringen",
+          "description": "Beim Zurueckkehren aus der Leere zur Realitaet wird die lange weisse Aufhellung entfernt."
+        },
+        "enableExplainerFix": {
+          "label": "Hinweis-Fix",
+          "description": "Aktualisiert pulsierende Hinweise nach Sprachwechseln und nutzt gut lesbaren hellen Text in der Leere."
+        },
+        "disableShiftCtrlZoomShortcut": {
+          "label": "Shift/Ctrl-Zoom deaktivieren",
+          "description": "Verhindert, dass Shift oder Ctrl allein den Kamerazoom zuruecksetzt, laesst aber Shift/Ctrl + Mausrad aktiv."
+        },
+        "enableDynamicCamera": {
+          "label": "Dynamische Kamera",
+          "description": "Aktiviert Kameraneigung und Drehung per Tastatur."
+        },
+        "cameraPitch": {
+          "label": "Kameraneigung",
+          "description": "Live-Neigung. 0.50 entspricht Vanilla; hoehere Werte wirken mehr von oben."
+        },
+        "cameraYaw": {
+          "label": "Kameradrehung",
+          "description": "Live-Drehung in Grad."
+        },
+        "disableGradientLightningFlash": {
+          "label": "Gradientminen-Blitz deaktivieren",
+          "description": "Verhindert den Vollbildblitz bei der Reality-Umwandlung der Gradientmine, behalt aber Blitzpfad, Ton und Ressourcenproduktion."
+        },
+        "disableIdleSplash": {
+          "label": "Offline-Ertragssimulation deaktivieren",
+          "description": "Überspringt beim Laden eines Spielstands die Offline-Ertragssimulation. Für die Zeit außerhalb des Spiels werden weder Ressourcen noch anderer simulierter Fortschritt gewährt."
+        }
+      }
+    },
+    "ptbr": {
+      "name": "Ajustes de qualidade",
+      "config": {
+        "enableEndingSkip": {
+          "label": "Pular final"
+        },
+        "enableAccessibilityButtons": {
+          "label": "Botões de acessibilidade"
+        },
+        "enableStabilizerSurgeFlashReduction": {
+          "label": "Redução de flashes do estabilizador"
+        },
+        "enableResourceGlowColors": {
+          "label": "Cores do brilho dos recursos"
+        },
+        "enablePlayTimeCounter": {
+          "label": "Contador de tempo de jogo"
+        },
+        "playTimeCounterPosition": {
+          "label": "Posição do contador de tempo",
+          "description": "Slide between bottom-left, top-center, and bottom-right.",
+          "valueLabels": {
+            "0": "Inferior esquerdo",
+            "1": "Superior central",
+            "2": "Inferior direito"
+          }
+        },
+        "resourceGlowColors": {
+          "label": "Paleta de brilho dos recursos"
+        },
+        "enableViewDistance": {
+          "label": "Limites de distância de visão"
+        },
+        "farthestZoom": {
+          "label": "Zoom mais distante"
+        },
+        "closestZoom": {
+          "label": "Zoom mais próximo"
+        },
+        "fallbackZoom": {
+          "label": "Zoom reserva"
+        },
+        "enableChasmLineRenderer": {
+          "label": "Renderizador das linhas da fenda",
+          "description": "Permite trocar as linhas entre a fenda e os recursos pelo renderizador escolhido."
+        },
+        "chasmLineRendererMode": {
+          "label": "Modo das linhas da fenda",
+          "description": "Canvas 2D usa o desenho original. WebGL usa uma tela acelerada por GPU.",
+          "valueLabels": {
+            "0": "Canvas 2D",
+            "1": "WebGL"
+          }
+        },
+        "enableChasmLineDistanceOverride": {
+          "label": "Linhas da fenda sem limite",
+          "description": "Mantem as linhas da fenda para os recursos mesmo quando a fenda esta fora do alcance visivel normal."
+        },
+        "enableFloorGridLines": {
+          "label": "Contornos da grade do piso",
+          "description": "Desenha contornos finos nas celulas do piso do jogo."
+        },
+        "floorGridLineRealityColor": {
+          "label": "Cor da grade do piso na realidade",
+          "description": "Vazio usa o contorno cinza escuro padrao na realidade."
+        },
+        "floorGridLineVoidColor": {
+          "label": "Cor da grade do piso no vazio",
+          "description": "Vazio usa o contorno branco padrao no vazio."
+        },
+        "enableVoidReturnFadeSkip": {
+          "label": "Pular fade ao voltar do vazio",
+          "description": "Ao voltar do vazio para a realidade, remove o longo fade branco e mostra a tela nitida imediatamente."
+        },
+        "enableExplainerFix": {
+          "label": "Correcao dos avisos",
+          "description": "Atualiza avisos pulsantes apos mudar o idioma e usa texto claro legivel no vazio."
+        },
+        "disableShiftCtrlZoomShortcut": {
+          "label": "Desativar zoom Shift/Ctrl",
+          "description": "Impede Shift ou Ctrl sozinho de redefinir o zoom da camera, mantendo Shift/Ctrl + roda."
+        },
+        "enableDynamicCamera": {
+          "label": "Camera dinamica",
+          "description": "Ativa inclinacao e rotacao da camera por teclado."
+        },
+        "cameraPitch": {
+          "label": "Inclinacao da camera",
+          "description": "Controle ao vivo. 0.50 equivale ao original; valores maiores ficam mais de cima."
+        },
+        "cameraYaw": {
+          "label": "Rotacao da camera",
+          "description": "Controle ao vivo em graus."
+        },
+        "disableGradientLightningFlash": {
+          "label": "Desativar flash da mina gradiente",
+          "description": "Impede que o raio de conversao de Reality da mina gradiente preencha a tela, mantendo caminho do raio, som e producao de recursos."
+        },
+        "disableIdleSplash": {
+          "label": "Desativar simulação de ganhos offline",
+          "description": "Ignora a simulação de ganhos offline ao carregar um jogo salvo. O tempo fora do jogo não concederá recursos nem outro progresso simulado."
+        }
+      }
+    },
+    "it": {
+      "name": "Migliorie",
+      "config": {
+        "enableEndingSkip": {
+          "label": "Salta finale"
+        },
+        "enableAccessibilityButtons": {
+          "label": "Pulsanti accessibilità"
+        },
+        "enableStabilizerSurgeFlashReduction": {
+          "label": "Riduzione lampeggi stabilizzatore"
+        },
+        "enableResourceGlowColors": {
+          "label": "Colori bagliore risorse"
+        },
+        "enablePlayTimeCounter": {
+          "label": "Contatore tempo di gioco"
+        },
+        "playTimeCounterPosition": {
+          "label": "Posizione contatore tempo",
+          "description": "Slide between bottom-left, top-center, and bottom-right.",
+          "valueLabels": {
+            "0": "In basso a sinistra",
+            "1": "In alto al centro",
+            "2": "In basso a destra"
+          }
+        },
+        "resourceGlowColors": {
+          "label": "Tavolozza bagliore risorse"
+        },
+        "enableViewDistance": {
+          "label": "Limiti distanza visuale"
+        },
+        "farthestZoom": {
+          "label": "Zoom più lontano"
+        },
+        "closestZoom": {
+          "label": "Zoom più vicino"
+        },
+        "fallbackZoom": {
+          "label": "Zoom di riserva"
+        },
+        "enableChasmLineRenderer": {
+          "label": "Renderer linee fenditura",
+          "description": "Permette al mod di sostituire le linee tra fenditura e risorse con il renderer scelto."
+        },
+        "chasmLineRendererMode": {
+          "label": "Modo rendering linee fenditura",
+          "description": "Canvas 2D usa il disegno originale. WebGL usa una canvas GPU.",
+          "valueLabels": {
+            "0": "Canvas 2D",
+            "1": "WebGL"
+          }
+        },
+        "enableChasmLineDistanceOverride": {
+          "label": "Linee frattura senza distanza",
+          "description": "Continua a disegnare le linee dalla frattura alle risorse anche fuori dal normale campo visibile."
+        },
+        "enableFloorGridLines": {
+          "label": "Contorni griglia pavimento",
+          "description": "Disegna contorni sottili attorno alle celle del pavimento."
+        },
+        "floorGridLineRealityColor": {
+          "label": "Colore griglia pavimento realta",
+          "description": "Vuoto usa il contorno grigio scuro predefinito nella realta."
+        },
+        "floorGridLineVoidColor": {
+          "label": "Colore griglia pavimento vuoto",
+          "description": "Vuoto usa il contorno bianco predefinito nel vuoto."
+        },
+        "enableVoidReturnFadeSkip": {
+          "label": "Salta dissolvenza ritorno dal vuoto",
+          "description": "Quando torni dal vuoto alla realta, rimuove la lunga dissolvenza bianca e mostra subito la vista chiara."
+        },
+        "enableExplainerFix": {
+          "label": "Correzione suggerimenti",
+          "description": "Aggiorna i suggerimenti pulsanti dopo il cambio lingua e usa testo chiaro leggibile nel vuoto."
+        },
+        "disableShiftCtrlZoomShortcut": {
+          "label": "Disattiva zoom Shift/Ctrl",
+          "description": "Evita che Shift o Ctrl da soli ripristinino lo zoom, mantenendo Shift/Ctrl + rotellina."
+        },
+        "enableDynamicCamera": {
+          "label": "Camera dinamica",
+          "description": "Abilita inclinazione e rotazione della camera da tastiera."
+        },
+        "cameraPitch": {
+          "label": "Inclinazione camera",
+          "description": "Controllo live. 0.50 corrisponde al vanilla; valori piu alti sono piu dall alto."
+        },
+        "cameraYaw": {
+          "label": "Rotazione camera",
+          "description": "Controllo live in gradi."
+        },
+        "disableGradientLightningFlash": {
+          "label": "Disattiva lampo miniera gradiente",
+          "description": "Evita il lampo a schermo intero della conversione Reality della miniera gradiente, mantenendo linea del fulmine, audio e produzione."
+        },
+        "disableIdleSplash": {
+          "label": "Disattiva simulazione guadagni offline",
+          "description": "Salta la simulazione dei guadagni offline quando carichi un salvataggio. Il tempo trascorso fuori dal gioco non fornirà risorse né altri progressi simulati."
+        }
+      }
+    },
+    "es": {
+      "name": "Ajustes de calidad",
+      "config": {
+        "enableEndingSkip": {
+          "label": "Saltar final"
+        },
+        "enableAccessibilityButtons": {
+          "label": "Botones de accesibilidad"
+        },
+        "enableStabilizerSurgeFlashReduction": {
+          "label": "Reducción de destellos del estabilizador"
+        },
+        "enableResourceGlowColors": {
+          "label": "Colores de brillo de recursos"
+        },
+        "enablePlayTimeCounter": {
+          "label": "Contador de tiempo de juego"
+        },
+        "playTimeCounterPosition": {
+          "label": "Posición del contador de tiempo",
+          "description": "Slide between bottom-left, top-center, and bottom-right.",
+          "valueLabels": {
+            "0": "Abajo izquierda",
+            "1": "Arriba centro",
+            "2": "Abajo derecha"
+          }
+        },
+        "resourceGlowColors": {
+          "label": "Paleta de brillo de recursos"
+        },
+        "enableViewDistance": {
+          "label": "Límites de distancia de vista"
+        },
+        "farthestZoom": {
+          "label": "Zoom más lejano"
+        },
+        "closestZoom": {
+          "label": "Zoom más cercano"
+        },
+        "fallbackZoom": {
+          "label": "Zoom de reserva"
+        },
+        "enableChasmLineRenderer": {
+          "label": "Renderizador de lineas de grieta",
+          "description": "Permite reemplazar las lineas entre la grieta y los recursos con el renderizador elegido."
+        },
+        "chasmLineRendererMode": {
+          "label": "Modo de lineas de grieta",
+          "description": "Canvas 2D usa el dibujo original. WebGL usa un lienzo con GPU.",
+          "valueLabels": {
+            "0": "Canvas 2D",
+            "1": "WebGL"
+          }
+        },
+        "enableChasmLineDistanceOverride": {
+          "label": "Lineas de grieta sin distancia",
+          "description": "Mantiene las lineas de la grieta a los recursos aunque la grieta este fuera del rango visible normal."
+        },
+        "enableFloorGridLines": {
+          "label": "Bordes de cuadricula del suelo",
+          "description": "Dibuja bordes finos alrededor de las celdas del suelo."
+        },
+        "floorGridLineRealityColor": {
+          "label": "Color de cuadricula en realidad",
+          "description": "Vacio usa el borde gris oscuro predeterminado en realidad."
+        },
+        "floorGridLineVoidColor": {
+          "label": "Color de cuadricula en vacio",
+          "description": "Vacio usa el borde blanco predeterminado en el vacio."
+        },
+        "enableVoidReturnFadeSkip": {
+          "label": "Omitir fundido al volver del vacio",
+          "description": "Al volver del vacio a la realidad, elimina el largo fundido blanco y muestra la vista clara de inmediato."
+        },
+        "enableExplainerFix": {
+          "label": "Correccion de avisos",
+          "description": "Actualiza los avisos pulsantes tras cambiar idioma y usa texto claro legible en el vacio."
+        },
+        "disableShiftCtrlZoomShortcut": {
+          "label": "Desactivar zoom Shift/Ctrl",
+          "description": "Evita que Shift o Ctrl solos reinicien el zoom, pero mantiene Shift/Ctrl + rueda."
+        },
+        "enableDynamicCamera": {
+          "label": "Camara dinamica",
+          "description": "Activa inclinacion y rotacion de la camara con teclado."
+        },
+        "cameraPitch": {
+          "label": "Inclinacion de camara",
+          "description": "Control en vivo. 0.50 coincide con vanilla; valores mayores se ven mas desde arriba."
+        },
+        "cameraYaw": {
+          "label": "Rotacion de camara",
+          "description": "Control en vivo en grados."
+        },
+        "disableGradientLightningFlash": {
+          "label": "Desactivar destello mina gradiente",
+          "description": "Evita que el rayo de conversion de Reality de la mina gradiente llene la pantalla, manteniendo trayectoria, sonido y produccion."
+        },
+        "disableIdleSplash": {
+          "label": "Desactivar simulación de ganancias offline",
+          "description": "Omite la simulación de ganancias offline al cargar una partida. El tiempo fuera del juego no otorgará recursos ni otros progresos simulados."
+        }
+      }
+    },
+    "fr": {
+      "name": "Ajustements pratiques",
+      "config": {
+        "enableEndingSkip": {
+          "label": "Sauter la fin"
+        },
+        "enableAccessibilityButtons": {
+          "label": "Boutons d’accessibilité"
+        },
+        "enableStabilizerSurgeFlashReduction": {
+          "label": "Réduction des flashs du stabilisateur"
+        },
+        "enableResourceGlowColors": {
+          "label": "Couleurs de halo des ressources"
+        },
+        "enablePlayTimeCounter": {
+          "label": "Compteur de temps de jeu"
+        },
+        "playTimeCounterPosition": {
+          "label": "Position du compteur de temps",
+          "description": "Slide between bottom-left, top-center, and bottom-right.",
+          "valueLabels": {
+            "0": "En bas a gauche",
+            "1": "En haut au centre",
+            "2": "En bas a droite"
+          }
+        },
+        "resourceGlowColors": {
+          "label": "Palette de halo des ressources"
+        },
+        "enableViewDistance": {
+          "label": "Limites de distance de vue"
+        },
+        "farthestZoom": {
+          "label": "Zoom le plus éloigné"
+        },
+        "closestZoom": {
+          "label": "Zoom le plus proche"
+        },
+        "fallbackZoom": {
+          "label": "Zoom de secours"
+        },
+        "enableChasmLineRenderer": {
+          "label": "Rendu des lignes de faille",
+          "description": "Permet de remplacer les lignes entre la faille et les ressources par le rendu choisi."
+        },
+        "chasmLineRendererMode": {
+          "label": "Mode de rendu des lignes de faille",
+          "description": "Canvas 2D utilise le dessin original. WebGL utilise un canvas GPU.",
+          "valueLabels": {
+            "0": "Canvas 2D",
+            "1": "WebGL"
+          }
+        },
+        "enableChasmLineDistanceOverride": {
+          "label": "Lignes de faille sans distance",
+          "description": "Continue a dessiner les lignes faille-ressources meme si la faille est hors de la portee visible normale."
+        },
+        "enableFloorGridLines": {
+          "label": "Contours de grille du sol",
+          "description": "Dessine de fins contours autour des cases du sol."
+        },
+        "floorGridLineRealityColor": {
+          "label": "Couleur de grille en realite",
+          "description": "Vide utilise le contour gris fonce par defaut en realite."
+        },
+        "floorGridLineVoidColor": {
+          "label": "Couleur de grille du vide",
+          "description": "Vide utilise le contour blanc par defaut dans le vide."
+        },
+        "enableVoidReturnFadeSkip": {
+          "label": "Ignorer le fondu de retour du vide",
+          "description": "Au retour du vide vers la realite, supprime le long fondu blanc et affiche tout de suite une vue nette."
+        },
+        "enableExplainerFix": {
+          "label": "Correctif des indices",
+          "description": "Actualise les indices pulses apres les changements de langue et utilise un texte clair lisible dans le vide."
+        },
+        "disableShiftCtrlZoomShortcut": {
+          "label": "Desactiver le zoom Shift/Ctrl",
+          "description": "Empeche Shift ou Ctrl seuls de reinitialiser le zoom, tout en gardant Shift/Ctrl + molette."
+        },
+        "enableDynamicCamera": {
+          "label": "Camera dynamique",
+          "description": "Active inclinaison et rotation de camera au clavier."
+        },
+        "cameraPitch": {
+          "label": "Inclinaison camera",
+          "description": "Controle en direct. 0.50 correspond au jeu original; plus haut donne une vue plus verticale."
+        },
+        "cameraYaw": {
+          "label": "Rotation camera",
+          "description": "Controle en direct en degres."
+        },
+        "disableGradientLightningFlash": {
+          "label": "Desactiver flash mine gradient",
+          "description": "Empeche l eclair de conversion de Reality de la mine gradient de remplir l ecran, tout en gardant le trajet, le son et la production."
+        },
+        "disableIdleSplash": {
+          "label": "Désactiver la simulation des gains hors ligne",
+          "description": "Ignore la simulation des gains hors ligne lors du chargement d'une sauvegarde. Le temps passé hors du jeu n'accordera aucune ressource ni autre progression simulée."
+        }
+      }
+    },
+    "nl": {
+      "name": "Kwaliteitsaanpassingen",
+      "config": {
+        "enableEndingSkip": {
+          "label": "Einde overslaan"
+        },
+        "enableAccessibilityButtons": {
+          "label": "Toegankelijkheidsknoppen"
+        },
+        "enableStabilizerSurgeFlashReduction": {
+          "label": "Flitsreductie stabilisator"
+        },
+        "enableResourceGlowColors": {
+          "label": "Gloedkleuren van grondstoffen"
+        },
+        "enablePlayTimeCounter": {
+          "label": "Speeltijdteller"
+        },
+        "playTimeCounterPosition": {
+          "label": "Positie speeltijdteller",
+          "description": "Slide between bottom-left, top-center, and bottom-right.",
+          "valueLabels": {
+            "0": "Linksonder",
+            "1": "Boven midden",
+            "2": "Rechtsonder"
+          }
+        },
+        "resourceGlowColors": {
+          "label": "Gloedpalet van grondstoffen"
+        },
+        "enableViewDistance": {
+          "label": "Kijkafstandslimieten"
+        },
+        "farthestZoom": {
+          "label": "Verste zoom"
+        },
+        "closestZoom": {
+          "label": "Dichtste zoom"
+        },
+        "fallbackZoom": {
+          "label": "Reservezoom"
+        },
+        "enableChasmLineRenderer": {
+          "label": "Klooflijnen-renderer",
+          "description": "Laat de mod de lijnen tussen kloof en grondstoffen vervangen door de gekozen renderer."
+        },
+        "chasmLineRendererMode": {
+          "label": "Renderstand klooflijnen",
+          "description": "Canvas 2D gebruikt de originele tekening. WebGL gebruikt een GPU-canvas.",
+          "valueLabels": {
+            "0": "Canvas 2D",
+            "1": "WebGL"
+          }
+        },
+        "enableChasmLineDistanceOverride": {
+          "label": "Klooflijnen negeren afstand",
+          "description": "Blijft lijnen van kloof naar grondstoffen tekenen, ook buiten het normale zichtbereik."
+        },
+        "enableFloorGridLines": {
+          "label": "Vloerraster-omtrekken",
+          "description": "Tekent dunne omtrekken rond vloercellen."
+        },
+        "floorGridLineRealityColor": {
+          "label": "Vloerrasterkleur realiteit",
+          "description": "Leeg gebruikt de standaard donkergrijze omtrek in realiteit."
+        },
+        "floorGridLineVoidColor": {
+          "label": "Vloerrasterkleur leegte",
+          "description": "Leeg gebruikt de standaard witte omtrek in de leegte."
+        },
+        "enableVoidReturnFadeSkip": {
+          "label": "Witte fade na leegte overslaan",
+          "description": "Bij terugkeer uit de leegte naar realiteit wordt de lange witte fade verwijderd."
+        },
+        "enableExplainerFix": {
+          "label": "Hint-fix",
+          "description": "Vernieuwt pulserende hints na taalwijzigingen en gebruikt leesbare lichte tekst in de leegte."
+        },
+        "disableShiftCtrlZoomShortcut": {
+          "label": "Shift/Ctrl-zoom uitschakelen",
+          "description": "Voorkomt dat Shift of Ctrl alleen de camerazoom reset, maar behoudt Shift/Ctrl + muiswiel."
+        },
+        "enableDynamicCamera": {
+          "label": "Dynamische camera",
+          "description": "Schakelt camerakanteling en rotatie via toetsenbord in."
+        },
+        "cameraPitch": {
+          "label": "Camerakanteling",
+          "description": "Live kanteling. 0.50 is vanilla; hogere waarden lijken meer van boven."
+        },
+        "cameraYaw": {
+          "label": "Camerarotatie",
+          "description": "Live rotatie in graden."
+        },
+        "disableGradientLightningFlash": {
+          "label": "Gradientmijnflits uitschakelen",
+          "description": "Voorkomt dat de Reality-omzettingsbliksem van de gradientmijn het scherm vult, met behoud van bliksempad, geluid en productie."
+        },
+        "disableIdleSplash": {
+          "label": "Offline-opbrengstsimulatie uitschakelen",
+          "description": "Slaat de offline-opbrengstsimulatie over bij het laden van een opgeslagen spel. Tijd buiten het spel levert geen grondstoffen of andere gesimuleerde voortgang op."
+        }
+      }
+    },
+    "cz": {
+      "name": "Vylepšení",
+      "config": {
+        "enableEndingSkip": {
+          "label": "Přeskočení konce"
+        },
+        "enableAccessibilityButtons": {
+          "label": "Tlačítka přístupnosti"
+        },
+        "enableStabilizerSurgeFlashReduction": {
+          "label": "Omezení záblesků stabilizátoru"
+        },
+        "enableResourceGlowColors": {
+          "label": "Barvy záře surovin"
+        },
+        "enablePlayTimeCounter": {
+          "label": "Počítadlo herního času"
+        },
+        "playTimeCounterPosition": {
+          "label": "Poloha počítadla času",
+          "description": "Slide between bottom-left, top-center, and bottom-right.",
+          "valueLabels": {
+            "0": "Vlevo dole",
+            "1": "Nahore uprostred",
+            "2": "Vpravo dole"
+          }
+        },
+        "resourceGlowColors": {
+          "label": "Paleta záře surovin"
+        },
+        "enableViewDistance": {
+          "label": "Limity vzdálenosti zobrazení"
+        },
+        "farthestZoom": {
+          "label": "Nejvzdálenější zoom"
+        },
+        "closestZoom": {
+          "label": "Nejbližší zoom"
+        },
+        "fallbackZoom": {
+          "label": "Záložní zoom"
+        },
+        "enableChasmLineRenderer": {
+          "label": "Vykreslovani car prurvy",
+          "description": "Umoznuje modu nahradit cary mezi prurvou a surovinami zvolenym rendererem."
+        },
+        "chasmLineRendererMode": {
+          "label": "Rezim vykreslovani car prurvy",
+          "description": "Canvas 2D pouziva puvodni kresleni. WebGL pouziva GPU canvas.",
+          "valueLabels": {
+            "0": "Canvas 2D",
+            "1": "WebGL"
+          }
+        },
+        "enableChasmLineDistanceOverride": {
+          "label": "Cary prurvy bez vzdalenosti",
+          "description": "Cary mezi prurvou a surovinami se kresli i mimo bezny viditelny dosah."
+        },
+        "enableFloorGridLines": {
+          "label": "Obrysy mrizky podlahy",
+          "description": "Kresli tenke obrysy okolo policek podlahy."
+        },
+        "floorGridLineRealityColor": {
+          "label": "Barva mrizky podlahy reality",
+          "description": "Prazdne pouzije vychozi tmave sedy obrys v realite."
+        },
+        "floorGridLineVoidColor": {
+          "label": "Barva mrizky podlahy prazdnoty",
+          "description": "Prazdne pouzije vychozi bily obrys v prazdnote."
+        },
+        "enableVoidReturnFadeSkip": {
+          "label": "Preskocit bile blednuti z prazdnoty",
+          "description": "Pri navratu z prazdnoty do reality odstrani dlouhe bile dozneni a hned ukaze cisty obraz."
+        },
+        "enableExplainerFix": {
+          "label": "Oprava napoved",
+          "description": "Obnovuje pulzujici napovedy po zmene jazyka a v prazdnote pouziva citelny svetly text."
+        },
+        "disableShiftCtrlZoomShortcut": {
+          "label": "Vypnout zoom Shift/Ctrl",
+          "description": "Zabrani samotnemu Shift nebo Ctrl resetovat zoom kamery, ale ponecha Shift/Ctrl + kolecko."
+        },
+        "enableDynamicCamera": {
+          "label": "Dynamicka kamera",
+          "description": "Zapne naklon a otaceni kamery ovladane klavesnici."
+        },
+        "cameraPitch": {
+          "label": "Naklon kamery",
+          "description": "Ziva zmena naklonu. 0.50 odpovida puvodni hre; vyssi je vice shora."
+        },
+        "cameraYaw": {
+          "label": "Otoceni kamery",
+          "description": "Ziva zmena otoceni ve stupnich."
+        },
+        "disableGradientLightningFlash": {
+          "label": "Vypnout zablesk gradientniho dolu",
+          "description": "Zabrani celoplosnemu zablesku pri Reality konverzi gradientniho dolu, ale ponecha drahu blesku, zvuk a produkci."
+        },
+        "disableIdleSplash": {
+          "label": "Vypnout simulaci offline výdělků",
+          "description": "Při načítání uložené hry přeskočí simulaci offline výdělků. Za čas mimo hru nezískáš žádné suroviny ani jiný simulovaný postup."
+        }
+      }
+    },
+    "pl": {
+      "name": "Usprawnienia",
+      "config": {
+        "enableEndingSkip": {
+          "label": "Pomijanie zakończenia"
+        },
+        "enableAccessibilityButtons": {
+          "label": "Przyciski dostępności"
+        },
+        "enableStabilizerSurgeFlashReduction": {
+          "label": "Redukcja błysków stabilizatora"
+        },
+        "enableResourceGlowColors": {
+          "label": "Kolory poświaty zasobów"
+        },
+        "enablePlayTimeCounter": {
+          "label": "Licznik czasu gry"
+        },
+        "playTimeCounterPosition": {
+          "label": "Pozycja licznika czasu",
+          "description": "Slide between bottom-left, top-center, and bottom-right.",
+          "valueLabels": {
+            "0": "Lewy dol",
+            "1": "Gora srodek",
+            "2": "Prawy dol"
+          }
+        },
+        "resourceGlowColors": {
+          "label": "Paleta poświaty zasobów"
+        },
+        "enableViewDistance": {
+          "label": "Limity zasięgu widoku"
+        },
+        "farthestZoom": {
+          "label": "Najdalszy zoom"
+        },
+        "closestZoom": {
+          "label": "Najbliższy zoom"
+        },
+        "fallbackZoom": {
+          "label": "Zapasowy zoom"
+        },
+        "enableChasmLineRenderer": {
+          "label": "Renderer linii szczeliny",
+          "description": "Pozwala modowi zastapic linie miedzy szczelina i zasobami wybranym rendererem."
+        },
+        "chasmLineRendererMode": {
+          "label": "Tryb renderowania linii szczeliny",
+          "description": "Canvas 2D uzywa oryginalnego rysowania. WebGL uzywa canvas GPU.",
+          "valueLabels": {
+            "0": "Canvas 2D",
+            "1": "WebGL"
+          }
+        },
+        "enableChasmLineDistanceOverride": {
+          "label": "Linie szczeliny bez dystansu",
+          "description": "Rysuje linie od szczeliny do zasobow nawet poza normalnym zasiegiem widoku."
+        },
+        "enableFloorGridLines": {
+          "label": "Obrysy siatki podlogi",
+          "description": "Rysuje cienkie obrysy wokol pol podlogi."
+        },
+        "floorGridLineRealityColor": {
+          "label": "Kolor siatki podlogi rzeczywistosci",
+          "description": "Puste uzywa domyslnego ciemnoszarego obrysu w rzeczywistosci."
+        },
+        "floorGridLineVoidColor": {
+          "label": "Kolor siatki podlogi pustki",
+          "description": "Puste uzywa domyslnego bialego obrysu w pustce."
+        },
+        "enableVoidReturnFadeSkip": {
+          "label": "Pomin biale zanikanie po pustce",
+          "description": "Po powrocie z pustki do rzeczywistosci usuwa dlugie biale zanikanie i od razu pokazuje czysty obraz."
+        },
+        "enableExplainerFix": {
+          "label": "Poprawka podpowiedzi",
+          "description": "Odswieza pulsujace podpowiedzi po zmianie jezyka i uzywa jasnego tekstu w pustce."
+        },
+        "disableShiftCtrlZoomShortcut": {
+          "label": "Wylacz zoom Shift/Ctrl",
+          "description": "Blokuje reset zoomu po samym Shift lub Ctrl, ale zostawia Shift/Ctrl + kolko."
+        },
+        "enableDynamicCamera": {
+          "label": "Dynamiczna kamera",
+          "description": "Wlacza pochylenie i obrot kamery sterowane klawiatura."
+        },
+        "cameraPitch": {
+          "label": "Pochylenie kamery",
+          "description": "Sterowanie na zywo. 0.50 jak w oryginale; wyzsze wartosci wygladaja bardziej z gory."
+        },
+        "cameraYaw": {
+          "label": "Obrot kamery",
+          "description": "Sterowanie na zywo w stopniach."
+        },
+        "disableGradientLightningFlash": {
+          "label": "Wylacz blysk kopalni gradientowej",
+          "description": "Usuwa pelnoekranowy blysk pioruna przy konwersji Reality w kopalni gradientowej, zachowujac linie, dzwiek i produkcje."
+        },
+        "disableIdleSplash": {
+          "label": "Wyłącz symulację zysków offline",
+          "description": "Pomija symulację zysków offline podczas wczytywania zapisu. Czas poza grą nie zapewni zasobów ani innych symulowanych postępów."
+        }
+      }
+    },
+    "jp": {
+      "name": "便利調整",
+      "config": {
+        "enableEndingSkip": {
+          "label": "エンディングスキップ"
+        },
+        "enableAccessibilityButtons": {
+          "label": "アクセシビリティボタン"
+        },
+        "enableStabilizerSurgeFlashReduction": {
+          "label": "安定器サージ点滅軽減"
+        },
+        "enableResourceGlowColors": {
+          "label": "資源の光輪色"
+        },
+        "enablePlayTimeCounter": {
+          "label": "プレイ時間カウンター"
+        },
+        "playTimeCounterPosition": {
+          "label": "プレイ時間カウンター位置",
+          "description": "Slide between bottom-left, top-center, and bottom-right.",
+          "valueLabels": {
+            "0": "左下",
+            "1": "上部中央",
+            "2": "右下"
+          }
+        },
+        "resourceGlowColors": {
+          "label": "資源の光輪パレット"
+        },
+        "enableViewDistance": {
+          "label": "表示距離制限"
+        },
+        "farthestZoom": {
+          "label": "最遠ズーム"
+        },
+        "closestZoom": {
+          "label": "最近ズーム"
+        },
+        "fallbackZoom": {
+          "label": "予備ズーム"
+        },
+        "enableChasmLineRenderer": {
+          "label": "Chasm line renderer",
+          "description": "Chasm to resource lines can use the selected renderer."
+        },
+        "chasmLineRendererMode": {
+          "label": "Chasm line render mode",
+          "description": "Canvas 2D uses original drawing. WebGL uses a GPU-backed canvas.",
+          "valueLabels": {
+            "0": "Canvas 2D",
+            "1": "WebGL"
+          }
+        },
+        "enableChasmLineDistanceOverride": {
+          "label": "Chasm lines ignore distance",
+          "description": "Keep chasm-to-resource lines visible outside the normal range."
+        },
+        "enableFloorGridLines": {
+          "label": "Floor grid outlines",
+          "description": "Draw thin outlines around floor cells."
+        },
+        "floorGridLineRealityColor": {
+          "label": "Reality floor grid outline color",
+          "description": "Empty uses the default dark gray outline in reality."
+        },
+        "floorGridLineVoidColor": {
+          "label": "Void floor grid outline color",
+          "description": "Empty uses the default white outline in the void."
+        },
+        "enableVoidReturnFadeSkip": {
+          "label": "Skip void return fade",
+          "description": "Remove the long white recovery fade when returning from the void to reality."
+        },
+        "enableExplainerFix": {
+          "label": "Explainer fix",
+          "description": "Refresh explainer hints after language changes and use light text in the void."
+        },
+        "disableShiftCtrlZoomShortcut": {
+          "label": "Disable Shift/Ctrl zoom shortcut",
+          "description": "Prevent Shift or Ctrl alone from resetting camera zoom; Shift/Ctrl + wheel still works."
+        },
+        "enableDynamicCamera": {
+          "label": "Dynamic camera",
+          "description": "Enable keyboard-controlled camera pitch and rotation."
+        },
+        "cameraPitch": {
+          "label": "Camera pitch",
+          "description": "Live pitch control. 0.50 matches vanilla; larger values look more top-down."
+        },
+        "cameraYaw": {
+          "label": "Camera rotation",
+          "description": "Live rotation control in degrees."
+        },
+        "disableGradientLightningFlash": {
+          "label": "勾配鉱山の点滅を無効化",
+          "description": "勾配鉱山の Reality 変換で発生する画面全体の点滅を防ぎ、雷の軌道、音、資源生産は維持します。"
+        },
+        "disableIdleSplash": {
+          "label": "オフライン収益シミュレーションを無効化",
+          "description": "セーブデータの読み込み時にオフライン収益シミュレーションをスキップします。ゲームを離れていた時間による資源やその他の進行は得られません。"
+        }
+      }
+    },
+    "kr": {
+      "name": "편의성 조정",
+      "config": {
+        "enableEndingSkip": {
+          "label": "엔딩 건너뛰기"
+        },
+        "enableAccessibilityButtons": {
+          "label": "접근성 버튼"
+        },
+        "enableStabilizerSurgeFlashReduction": {
+          "label": "안정기 서지 점멸 감소"
+        },
+        "enableResourceGlowColors": {
+          "label": "자원 발광 색상"
+        },
+        "enablePlayTimeCounter": {
+          "label": "플레이 시간 카운터"
+        },
+        "playTimeCounterPosition": {
+          "label": "플레이 시간 카운터 위치",
+          "description": "Slide between bottom-left, top-center, and bottom-right.",
+          "valueLabels": {
+            "0": "왼쪽 아래",
+            "1": "상단 중앙",
+            "2": "오른쪽 아래"
+          }
+        },
+        "resourceGlowColors": {
+          "label": "자원 발광 팔레트"
+        },
+        "enableViewDistance": {
+          "label": "시야 거리 제한"
+        },
+        "farthestZoom": {
+          "label": "가장 먼 줌"
+        },
+        "closestZoom": {
+          "label": "가장 가까운 줌"
+        },
+        "fallbackZoom": {
+          "label": "대체 줌"
+        },
+        "enableChasmLineRenderer": {
+          "label": "Chasm line renderer",
+          "description": "Chasm to resource lines can use the selected renderer."
+        },
+        "chasmLineRendererMode": {
+          "label": "Chasm line render mode",
+          "description": "Canvas 2D uses original drawing. WebGL uses a GPU-backed canvas.",
+          "valueLabels": {
+            "0": "Canvas 2D",
+            "1": "WebGL"
+          }
+        },
+        "enableChasmLineDistanceOverride": {
+          "label": "Chasm lines ignore distance",
+          "description": "Keep chasm-to-resource lines visible outside the normal range."
+        },
+        "enableFloorGridLines": {
+          "label": "Floor grid outlines",
+          "description": "Draw thin outlines around floor cells."
+        },
+        "floorGridLineRealityColor": {
+          "label": "Reality floor grid outline color",
+          "description": "Empty uses the default dark gray outline in reality."
+        },
+        "floorGridLineVoidColor": {
+          "label": "Void floor grid outline color",
+          "description": "Empty uses the default white outline in the void."
+        },
+        "enableVoidReturnFadeSkip": {
+          "label": "Skip void return fade",
+          "description": "Remove the long white recovery fade when returning from the void to reality."
+        },
+        "enableExplainerFix": {
+          "label": "Explainer fix",
+          "description": "Refresh explainer hints after language changes and use light text in the void."
+        },
+        "disableShiftCtrlZoomShortcut": {
+          "label": "Disable Shift/Ctrl zoom shortcut",
+          "description": "Prevent Shift or Ctrl alone from resetting camera zoom; Shift/Ctrl + wheel still works."
+        },
+        "enableDynamicCamera": {
+          "label": "Dynamic camera",
+          "description": "Enable keyboard-controlled camera pitch and rotation."
+        },
+        "cameraPitch": {
+          "label": "Camera pitch",
+          "description": "Live pitch control. 0.50 matches vanilla; larger values look more top-down."
+        },
+        "cameraYaw": {
+          "label": "Camera rotation",
+          "description": "Live rotation control in degrees."
+        },
+        "disableGradientLightningFlash": {
+          "label": "그라디언트 광산 섬광 비활성화",
+          "description": "그라디언트 광산의 Reality 변환 번개가 전체 화면을 채우는 섬광을 막고, 번개 경로와 소리, 자원 생산은 유지합니다."
+        },
+        "disableIdleSplash": {
+          "label": "오프라인 수익 시뮬레이션 비활성화",
+          "description": "저장 파일을 불러올 때 오프라인 수익 시뮬레이션을 건너뜁니다. 게임을 떠나 있던 시간 동안 자원이나 기타 진행도를 얻지 않습니다."
+        }
+      }
+    },
+    "tch": {
+      "name": "便利調整",
+      "config": {
+        "enableEndingSkip": {
+          "label": "結局跳過"
+        },
+        "enableAccessibilityButtons": {
+          "label": "輔助按鈕"
+        },
+        "enableStabilizerSurgeFlashReduction": {
+          "label": "穩定器浪湧閃爍削弱"
+        },
+        "enableResourceGlowColors": {
+          "label": "資源光圈顏色"
+        },
+        "enablePlayTimeCounter": {
+          "label": "遊戲時間計數器"
+        },
+        "playTimeCounterPosition": {
+          "label": "遊戲時間計數器位置",
+          "description": "滑動選擇右下角、頂部置中或左下角。",
+          "valueLabels": {
+            "0": "左下角",
+            "1": "頂部置中",
+            "2": "右下角"
+          }
+        },
+        "resourceGlowColors": {
+          "label": "資源光圈調色板"
+        },
+        "enableViewDistance": {
+          "label": "視野距離限制"
+        },
+        "farthestZoom": {
+          "label": "最遠縮放"
+        },
+        "closestZoom": {
+          "label": "最近縮放"
+        },
+        "fallbackZoom": {
+          "label": "預設縮放"
+        },
+        "enableChasmLineRenderer": {
+          "label": "逆裂縫連線渲染",
+          "description": "允許本 mod 用選擇的渲染器替換逆裂縫和資源之間的連線。"
+        },
+        "chasmLineRendererMode": {
+          "label": "逆裂縫連線渲染模式",
+          "description": "Canvas 2D 使用原版繪製。WebGL 使用 GPU 畫布渲染同樣的逆裂縫到資源曲線。",
+          "valueLabels": {
+            "0": "Canvas 2D",
+            "1": "WebGL"
+          }
+        },
+        "enableChasmLineDistanceOverride": {
+          "label": "逆裂縫連線無視距離",
+          "description": "開啟後，視角離逆裂縫較遠時仍繼續渲染逆裂縫與資源之間的連線。"
+        },
+        "enableFloorGridLines": {
+          "label": "顯示地板方格邊框",
+          "description": "在遊戲內地板方格周圍繪製細線邊框。"
+        },
+        "floorGridLineRealityColor": {
+          "label": "現實世界地板方格邊框顏色",
+          "description": "留空時現實世界使用預設深灰色邊框。"
+        },
+        "floorGridLineVoidColor": {
+          "label": "虛空世界地板方格邊框顏色",
+          "description": "留空時虛空世界使用預設白色邊框。"
+        },
+        "enableVoidReturnFadeSkip": {
+          "label": "跳過虛空返回白色恢復效果",
+          "description": "從虛空世界返回現實世界時，移除長時間白色恢復淡出，直接顯示清晰畫面。"
+        },
+        "enableExplainerFix": {
+          "label": "提示修復",
+          "description": "修復提示語在切換語言後不刷新，並讓虛空世界裡的提示文字變成亮色以便看清。"
+        },
+        "disableShiftCtrlZoomShortcut": {
+          "label": "停用 Shift/Ctrl 單按縮放",
+          "description": "阻止單獨按下 Shift 或 Ctrl 時重置鏡頭縮放，同時保留 Shift/Ctrl + 滾輪縮放。"
+        },
+        "enableDynamicCamera": {
+          "label": "動態鏡頭",
+          "description": "啟用可用快捷鍵控制的鏡頭傾斜和旋轉。"
+        },
+        "cameraPitch": {
+          "label": "鏡頭傾斜角度",
+          "description": "即時調整傾斜角度。0.50 等於原版；數值越大越接近俯視。"
+        },
+        "cameraYaw": {
+          "label": "鏡頭旋轉角度",
+          "description": "即時調整旋轉角度，單位為度。"
+        },
+        "disableGradientLightningFlash": {
+          "label": "停用梯度礦井頻閃",
+          "description": "防止梯度礦井在虛空維度轉化 Reality 時產生全螢幕閃爍，但保留閃電路徑、音效和資源產出。"
+        },
+        "disableIdleSplash": {
+          "label": "停用離線收益模擬",
+          "description": "讀取存檔時跳過離線收益模擬。離開遊戲期間不會獲得任何離線資源，也不會產生其他模擬進度。"
+        }
+      }
+    },
+    "thai": {
+      "name": "การปรับแต่งความสะดวก",
+      "config": {
+        "enableEndingSkip": {
+          "label": "ข้ามตอนจบ"
+        },
+        "enableAccessibilityButtons": {
+          "label": "ปุ่มช่วยใช้งาน"
+        },
+        "enableStabilizerSurgeFlashReduction": {
+          "label": "ลดแฟลชจากตัวเสถียร"
+        },
+        "enableResourceGlowColors": {
+          "label": "สีเรืองแสงทรัพยากร"
+        },
+        "enablePlayTimeCounter": {
+          "label": "ตัวนับเวลาเล่น"
+        },
+        "playTimeCounterPosition": {
+          "label": "ตำแหน่งตัวนับเวลาเล่น",
+          "description": "Slide between bottom-left, top-center, and bottom-right.",
+          "valueLabels": {
+            "0": "มุมซ้ายล่าง",
+            "1": "กึ่งกลางด้านบน",
+            "2": "มุมขวาล่าง"
+          }
+        },
+        "resourceGlowColors": {
+          "label": "พาเลตแสงทรัพยากร"
+        },
+        "enableViewDistance": {
+          "label": "ขีดจำกัดระยะมองเห็น"
+        },
+        "farthestZoom": {
+          "label": "ซูมไกลสุด"
+        },
+        "closestZoom": {
+          "label": "ซูมใกล้สุด"
+        },
+        "fallbackZoom": {
+          "label": "ซูมสำรอง"
+        },
+        "enableChasmLineRenderer": {
+          "label": "Chasm line renderer",
+          "description": "Chasm to resource lines can use the selected renderer."
+        },
+        "chasmLineRendererMode": {
+          "label": "Chasm line render mode",
+          "description": "Canvas 2D uses original drawing. WebGL uses a GPU-backed canvas.",
+          "valueLabels": {
+            "0": "Canvas 2D",
+            "1": "WebGL"
+          }
+        },
+        "enableChasmLineDistanceOverride": {
+          "label": "Chasm lines ignore distance",
+          "description": "Keep chasm-to-resource lines visible outside the normal range."
+        },
+        "enableFloorGridLines": {
+          "label": "Floor grid outlines",
+          "description": "Draw thin outlines around floor cells."
+        },
+        "floorGridLineRealityColor": {
+          "label": "Reality floor grid outline color",
+          "description": "Empty uses the default dark gray outline in reality."
+        },
+        "floorGridLineVoidColor": {
+          "label": "Void floor grid outline color",
+          "description": "Empty uses the default white outline in the void."
+        },
+        "enableVoidReturnFadeSkip": {
+          "label": "Skip void return fade",
+          "description": "Remove the long white recovery fade when returning from the void to reality."
+        },
+        "enableExplainerFix": {
+          "label": "Explainer fix",
+          "description": "Refresh explainer hints after language changes and use light text in the void."
+        },
+        "disableShiftCtrlZoomShortcut": {
+          "label": "Disable Shift/Ctrl zoom shortcut",
+          "description": "Prevent Shift or Ctrl alone from resetting camera zoom; Shift/Ctrl + wheel still works."
+        },
+        "enableDynamicCamera": {
+          "label": "Dynamic camera",
+          "description": "Enable keyboard-controlled camera pitch and rotation."
+        },
+        "cameraPitch": {
+          "label": "Camera pitch",
+          "description": "Live pitch control. 0.50 matches vanilla; larger values look more top-down."
+        },
+        "cameraYaw": {
+          "label": "Camera rotation",
+          "description": "Live rotation control in degrees."
+        },
+        "disableGradientLightningFlash": {
+          "label": "Disable gradient mine flash",
+          "description": "Prevents the Gradient mine Reality lightning from filling the screen while keeping its path, sound, and production."
+        },
+        "disableIdleSplash": {
+          "label": "ปิดการจำลองรายได้ออฟไลน์",
+          "description": "ข้ามการจำลองรายได้ออฟไลน์เมื่อโหลดเซฟ เวลาที่ไม่ได้เล่นจะไม่ให้ทรัพยากรหรือความคืบหน้าอื่นจากการจำลอง"
+        }
+      }
+    },
+    "hu": {
+      "name": "Kényelmi finomítások",
+      "config": {
+        "enableEndingSkip": {
+          "label": "Befejezés átugrása"
+        },
+        "enableAccessibilityButtons": {
+          "label": "Akadálymentes gombok"
+        },
+        "enableStabilizerSurgeFlashReduction": {
+          "label": "Stabilizátor villanáscsökkentés"
+        },
+        "enableResourceGlowColors": {
+          "label": "Erőforrás-fény színei"
+        },
+        "enablePlayTimeCounter": {
+          "label": "Játékidő-számláló"
+        },
+        "playTimeCounterPosition": {
+          "label": "Játékidő-számláló helye",
+          "description": "Slide between bottom-left, top-center, and bottom-right.",
+          "valueLabels": {
+            "0": "Bal also",
+            "1": "Felul kozepen",
+            "2": "Jobb also"
+          }
+        },
+        "resourceGlowColors": {
+          "label": "Erőforrás-fény paletta"
+        },
+        "enableViewDistance": {
+          "label": "Látótávolság-korlátok"
+        },
+        "farthestZoom": {
+          "label": "Legtávolabbi nagyítás"
+        },
+        "closestZoom": {
+          "label": "Legközelebbi nagyítás"
+        },
+        "fallbackZoom": {
+          "label": "Tartalék nagyítás"
+        },
+        "enableChasmLineRenderer": {
+          "label": "Hasadekvonal-renderelo",
+          "description": "A mod a hasadek es eroforrasok vonalait a valasztott renderelovel rajzolhatja."
+        },
+        "chasmLineRendererMode": {
+          "label": "Hasadekvonal renderelesi mod",
+          "description": "Canvas 2D az eredeti rajzolast hasznalja. WebGL GPU canvast hasznal.",
+          "valueLabels": {
+            "0": "Canvas 2D",
+            "1": "WebGL"
+          }
+        },
+        "enableChasmLineDistanceOverride": {
+          "label": "Hasadekvonalak tavolsag nelkul",
+          "description": "A hasadek es eroforrasok vonalai a normal lathato tartomanyon kivul is latszanak."
+        },
+        "enableFloorGridLines": {
+          "label": "Padloracs korvonalai",
+          "description": "Vekony korvonalakat rajzol a padlocellak kore."
+        },
+        "floorGridLineRealityColor": {
+          "label": "Valosag padloracs szine",
+          "description": "Uresen az alapertelmezett sotetszurke korvonalat hasznalja a valosagban."
+        },
+        "floorGridLineVoidColor": {
+          "label": "Ur padloracs szine",
+          "description": "Uresen az alapertelmezett feher korvonalat hasznalja az urben."
+        },
+        "enableVoidReturnFadeSkip": {
+          "label": "Urbeli visszateres feher fade kihagyasa",
+          "description": "Az urbol a valosagba visszaterve eltavolitja a hosszu feher atmenetet."
+        },
+        "enableExplainerFix": {
+          "label": "Tipp javitas",
+          "description": "Nyelvvaltas utan frissiti a pulzalo tippeket, es az urben vilagos, olvashato szoveget hasznal."
+        },
+        "disableShiftCtrlZoomShortcut": {
+          "label": "Shift/Ctrl zoom kikapcsolasa",
+          "description": "Megakadalyozza, hogy a Shift vagy Ctrl onmagaban visszaallitsa a kamera zoomot, de a Shift/Ctrl + gorgo mukodik."
+        },
+        "enableDynamicCamera": {
+          "label": "Dinamikus kamera",
+          "description": "Bekapcsolja a billentyuzettel vezerelt kamera dolest es forgatast."
+        },
+        "cameraPitch": {
+          "label": "Kamera doles",
+          "description": "Elo dolesvezerles. 0.50 az eredeti; nagyobb ertek felulnezetesebb."
+        },
+        "cameraYaw": {
+          "label": "Kamera forgatas",
+          "description": "Elo forgatas fokokban."
+        },
+        "disableGradientLightningFlash": {
+          "label": "Gradientbanya villanas kikapcsolasa",
+          "description": "Megakadalyozza a gradientbanya Reality atalakitasanak teljes kepernyos villanasat, de megtartja a villam utjat, hangjat es termeleset."
+        },
+        "disableIdleSplash": {
+          "label": "Offline bevételszimuláció kikapcsolása",
+          "description": "Mentés betöltésekor kihagyja az offline bevételszimulációt. A játékon kívül töltött időért nem jár erőforrás vagy más szimulált előrehaladás."
+        }
+      }
+    },
+    "lv": {
+      "name": "Ērtības uzlabojumi",
+      "config": {
+        "enableEndingSkip": {
+          "label": "Beigu izlaišana"
+        },
+        "enableAccessibilityButtons": {
+          "label": "Pieejamības pogas"
+        },
+        "enableStabilizerSurgeFlashReduction": {
+          "label": "Stabilizatora zibšņu mazināšana"
+        },
+        "enableResourceGlowColors": {
+          "label": "Resursu spīduma krāsas"
+        },
+        "enablePlayTimeCounter": {
+          "label": "Spēles laika skaitītājs"
+        },
+        "playTimeCounterPosition": {
+          "label": "Spēles laika skaitītāja vieta",
+          "description": "Slide between bottom-left, top-center, and bottom-right.",
+          "valueLabels": {
+            "0": "Apaksa pa kreisi",
+            "1": "Augsa centra",
+            "2": "Apaksa pa labi"
+          }
+        },
+        "resourceGlowColors": {
+          "label": "Resursu spīduma palete"
+        },
+        "enableViewDistance": {
+          "label": "Skata attāluma limiti"
+        },
+        "farthestZoom": {
+          "label": "Tālākais tālummaiņas līmenis"
+        },
+        "closestZoom": {
+          "label": "Tuvākais tālummaiņas līmenis"
+        },
+        "fallbackZoom": {
+          "label": "Rezerves tālummaiņa"
+        },
+        "enableChasmLineRenderer": {
+          "label": "Plaisas liniju renderetajs",
+          "description": "Mods var aizstat plaisas un resursu linijas ar izveleto renderetaju."
+        },
+        "chasmLineRendererMode": {
+          "label": "Plaisas liniju renderesanas rezims",
+          "description": "Canvas 2D izmanto originalo zimesanu. WebGL izmanto GPU canvas.",
+          "valueLabels": {
+            "0": "Canvas 2D",
+            "1": "WebGL"
+          }
+        },
+        "enableChasmLineDistanceOverride": {
+          "label": "Plaisas linijas bez distances",
+          "description": "Plaisas un resursu linijas paliek redzamas ari arpus parasta redzama attaluma."
+        },
+        "enableFloorGridLines": {
+          "label": "Gridas konturas",
+          "description": "Zime smalkas konturas ap gridas lauciniem."
+        },
+        "floorGridLineRealityColor": {
+          "label": "Realitates gridas konturu krasa",
+          "description": "Tukss izmanto noklusejuma tumsi peleku konturu realitate."
+        },
+        "floorGridLineVoidColor": {
+          "label": "Tuksuma gridas konturu krasa",
+          "description": "Tukss izmanto noklusejuma baltu konturu tuksumaa."
+        },
+        "enableVoidReturnFadeSkip": {
+          "label": "Izlaist balto atgriesanos no tuksuma",
+          "description": "Atgriezoties no tuksuma realitate, nonem ilgo balto parpludumu un uzreiz rada skaidru skatu."
+        },
+        "enableExplainerFix": {
+          "label": "Padomu labojums",
+          "description": "Atsvaidzina pulsojosus padomus pec valodas mainas un tuksumaa izmanto gaisu, salasamu tekstu."
+        },
+        "disableShiftCtrlZoomShortcut": {
+          "label": "Izslegt Shift/Ctrl talummainu",
+          "description": "Neatlauj Shift vai Ctrl vieniem pasiem atiestatit kameras talummainu, bet Shift/Ctrl + ritenis paliek."
+        },
+        "enableDynamicCamera": {
+          "label": "Dinamiska kamera",
+          "description": "Iesledz ar tastaturu vadamu kameras slipumu un rotaciju."
+        },
+        "cameraPitch": {
+          "label": "Kameras slipums",
+          "description": "Tiesraides slipuma kontrole. 0.50 atbilst originalam; lielakas vertibas ir tuvak skatam no augsas."
+        },
+        "cameraYaw": {
+          "label": "Kameras rotacija",
+          "description": "Tiesraides rotacija grados."
+        },
+        "disableGradientLightningFlash": {
+          "label": "Izslegt gradienta raktuves zibsnus",
+          "description": "Neatlauj gradienta raktuves Reality parveides zibenim aizpildit ekranu, bet saglaba zibens liniju, skanu un razosanu."
+        },
+        "disableIdleSplash": {
+          "label": "Atspējot bezsaistes ienākumu simulāciju",
+          "description": "Ielādējot saglabātu spēli, izlaiž bezsaistes ienākumu simulāciju. Par laiku ārpus spēles netiks piešķirti resursi vai cits simulēts progress."
+        }
+      }
+    },
+    "ro": {
+      "name": "Ajustări utile",
+      "config": {
+        "enableEndingSkip": {
+          "label": "Sari peste final"
+        },
+        "enableAccessibilityButtons": {
+          "label": "Butoane accesibilitate"
+        },
+        "enableStabilizerSurgeFlashReduction": {
+          "label": "Reducere flash stabilizator"
+        },
+        "enableResourceGlowColors": {
+          "label": "Culori halou resurse"
+        },
+        "enablePlayTimeCounter": {
+          "label": "Contor timp de joc"
+        },
+        "playTimeCounterPosition": {
+          "label": "Poziție contor timp",
+          "description": "Slide between bottom-left, top-center, and bottom-right.",
+          "valueLabels": {
+            "0": "Jos stanga",
+            "1": "Sus centru",
+            "2": "Jos dreapta"
+          }
+        },
+        "resourceGlowColors": {
+          "label": "Paletă halou resurse"
+        },
+        "enableViewDistance": {
+          "label": "Limite distanță vizuală"
+        },
+        "farthestZoom": {
+          "label": "Zoom cel mai îndepărtat"
+        },
+        "closestZoom": {
+          "label": "Zoom cel mai apropiat"
+        },
+        "fallbackZoom": {
+          "label": "Zoom de rezervă"
+        },
+        "enableChasmLineRenderer": {
+          "label": "Randare linii fisura",
+          "description": "Permite modului sa inlocuiasca liniile dintre fisura si resurse cu randarea aleasa."
+        },
+        "chasmLineRendererMode": {
+          "label": "Mod randare linii fisura",
+          "description": "Canvas 2D foloseste desenarea originala. WebGL foloseste un canvas GPU.",
+          "valueLabels": {
+            "0": "Canvas 2D",
+            "1": "WebGL"
+          }
+        },
+        "enableChasmLineDistanceOverride": {
+          "label": "Linii fisura fara distanta",
+          "description": "Pastreaza liniile dintre fisura si resurse chiar in afara razei vizibile normale."
+        },
+        "enableFloorGridLines": {
+          "label": "Contururi grila podea",
+          "description": "Deseneaza contururi subtiri in jurul celulelor podelei."
+        },
+        "floorGridLineRealityColor": {
+          "label": "Culoare grila podea realitate",
+          "description": "Gol foloseste conturul implicit gri inchis in realitate."
+        },
+        "floorGridLineVoidColor": {
+          "label": "Culoare grila podea vid",
+          "description": "Gol foloseste conturul implicit alb in vid."
+        },
+        "enableVoidReturnFadeSkip": {
+          "label": "Sari peste fade-ul din vid",
+          "description": "La revenirea din vid in realitate, elimina estomparea alba lunga si arata imediat imaginea clara."
+        },
+        "enableExplainerFix": {
+          "label": "Corectie indicii",
+          "description": "Actualizeaza indiciile pulsante dupa schimbarea limbii si foloseste text luminos in vid."
+        },
+        "disableShiftCtrlZoomShortcut": {
+          "label": "Dezactiveaza zoom Shift/Ctrl",
+          "description": "Impiedica Shift sau Ctrl singur sa reseteze zoomul camerei, dar pastreaza Shift/Ctrl + rotita."
+        },
+        "enableDynamicCamera": {
+          "label": "Camera dinamica",
+          "description": "Activeaza inclinarea si rotatia camerei controlate din tastatura."
+        },
+        "cameraPitch": {
+          "label": "Inclinare camera",
+          "description": "Control live. 0.50 este ca in jocul original; valori mai mari arata mai de sus."
+        },
+        "cameraYaw": {
+          "label": "Rotatie camera",
+          "description": "Control live in grade."
+        },
+        "disableGradientLightningFlash": {
+          "label": "Dezactiveaza flash mina gradient",
+          "description": "Impiedica fulgerul de conversie Reality al minei gradient sa umple ecranul, pastrand traseul, sunetul si productia."
+        },
+        "disableIdleSplash": {
+          "label": "Dezactivează simularea câștigurilor offline",
+          "description": "Omite simularea câștigurilor offline la încărcarea unei salvări. Timpul petrecut în afara jocului nu va acorda resurse sau alt progres simulat."
+        }
+      }
+    },
+    "no": {
+      "name": "Praktiske justeringer",
+      "config": {
+        "enableEndingSkip": {
+          "label": "Hopp over slutt"
+        },
+        "enableAccessibilityButtons": {
+          "label": "Tilgjengelighetsknapper"
+        },
+        "enableStabilizerSurgeFlashReduction": {
+          "label": "Reduser stabilisatorblink"
+        },
+        "enableResourceGlowColors": {
+          "label": "Glødefarger for ressurser"
+        },
+        "enablePlayTimeCounter": {
+          "label": "Spilletidteller"
+        },
+        "playTimeCounterPosition": {
+          "label": "Plassering av spilletidteller",
+          "description": "Slide between bottom-left, top-center, and bottom-right.",
+          "valueLabels": {
+            "0": "Nederst til venstre",
+            "1": "Overst i midten",
+            "2": "Nederst til hoyre"
+          }
+        },
+        "resourceGlowColors": {
+          "label": "Glødepalett for ressurser"
+        },
+        "enableViewDistance": {
+          "label": "Grenser for visningsavstand"
+        },
+        "farthestZoom": {
+          "label": "Fjerneste zoom"
+        },
+        "closestZoom": {
+          "label": "Nærmeste zoom"
+        },
+        "fallbackZoom": {
+          "label": "Reservezoom"
+        },
+        "enableChasmLineRenderer": {
+          "label": "Kløftlinje-renderer",
+          "description": "Lar modden erstatte linjene mellom kloften og ressursene med valgt renderer."
+        },
+        "chasmLineRendererMode": {
+          "label": "Renderingsmodus for kloftlinjer",
+          "description": "Canvas 2D bruker original tegning. WebGL bruker et GPU-canvas.",
+          "valueLabels": {
+            "0": "Canvas 2D",
+            "1": "WebGL"
+          }
+        },
+        "enableChasmLineDistanceOverride": {
+          "label": "Kloftlinjer uten avstand",
+          "description": "Tegner linjer fra kloft til ressurser selv utenfor vanlig synlig rekkevidde."
+        },
+        "enableFloorGridLines": {
+          "label": "Omriss for gulvrutenett",
+          "description": "Tegner tynne omriss rundt gulvceller."
+        },
+        "floorGridLineRealityColor": {
+          "label": "Gulvrutenettfarge i virkelighet",
+          "description": "Tomt bruker standard morkegratt omriss i virkeligheten."
+        },
+        "floorGridLineVoidColor": {
+          "label": "Gulvrutenettfarge i tomrom",
+          "description": "Tomt bruker standard hvitt omriss i tomrommet."
+        },
+        "enableVoidReturnFadeSkip": {
+          "label": "Hopp over hvit fade fra tomrom",
+          "description": "Nar du gar fra tomrommet tilbake til virkeligheten, fjernes den lange hvite faden."
+        },
+        "enableExplainerFix": {
+          "label": "Hint-fiks",
+          "description": "Oppdaterer pulserende hint etter sprakbytte og bruker lys, lesbar tekst i tomrommet."
+        },
+        "disableShiftCtrlZoomShortcut": {
+          "label": "Deaktiver Shift/Ctrl-zoom",
+          "description": "Hindrer Shift eller Ctrl alene i a nullstille kamerazoom, men beholder Shift/Ctrl + hjul."
+        },
+        "enableDynamicCamera": {
+          "label": "Dynamisk kamera",
+          "description": "Aktiver kameravinkel og rotasjon styrt med tastatur."
+        },
+        "cameraPitch": {
+          "label": "Kameravinkel",
+          "description": "Direkte vinkelkontroll. 0.50 er som originalt; hoyere verdier ser mer ovenfra."
+        },
+        "cameraYaw": {
+          "label": "Kamerarotasjon",
+          "description": "Direkte rotasjon i grader."
+        },
+        "disableGradientLightningFlash": {
+          "label": "Deaktiver gradientgruveblink",
+          "description": "Hindrer Reality-konverteringslyn fra gradientgruven i a fylle skjermen, men beholder lynbane, lyd og produksjon."
+        },
+        "disableIdleSplash": {
+          "label": "Deaktiver simulering av offline-inntekter",
+          "description": "Hopper over simuleringen av offline-inntekter når et lagret spill lastes. Tid borte fra spillet gir ingen ressurser eller annen simulert fremgang."
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,25 @@
+# Ignore the unpacked game by default. Track only public ModLoader files.
+*
+
+!.gitignore
+!README.md
+!LICENSE
+
+!modloader-installer/
+!modloader-installer/**
+
+!resources/
+!resources/app/
+!resources/app/game/
+!resources/app/game/modloader/
+!resources/app/game/modloader/**
+!resources/app/game/mods/
+!resources/app/game/mods/**
+
+dist/
+node_modules/
+*.log
+npm-debug.log*
+resources/app/game/modloader/backups/
+resources/app/game/modloader/state/
+resources/app/game/mods/*.zip
