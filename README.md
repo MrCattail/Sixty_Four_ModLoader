@@ -5,15 +5,12 @@
     <img src="https://img.shields.io/badge/LICENSE-MIT-55aa00?style=for-the-badge" alt="License MIT">
   </a>
   <img src="https://img.shields.io/badge/MODLOADER-0.1.4-008fd5?style=for-the-badge" alt="ModLoader 0.1.4">
-  <img src="https://img.shields.io/badge/GAME-SIXTY%20FOUR-555555?style=for-the-badge" alt="Sixty Four">
+  <img src="https://img.shields.io/badge/GAME%20VERSION-1.2.1-555555?style=for-the-badge" alt="Game version 1.2.1">
 </p>
 
 <p align="center">
   <a href="https://github.com/MrCattail/Sixty-Four-Mod/releases">
     <img src="https://img.shields.io/badge/DOWNLOAD-RELEASE-ff5f6d?style=for-the-badge&logo=github&logoColor=white" alt="Download release">
-  </a>
-  <a href="https://github.com/MrCattail">
-    <img src="https://img.shields.io/badge/SEE%20MORE-PROJECTS-008fd5?style=for-the-badge&logo=github&logoColor=white" alt="See more projects">
   </a>
 </p>
 
