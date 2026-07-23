@@ -1,7 +1,7 @@
 {
   "mods": [
-    "Cattail_TweaksQuality_Tweaks",
     "Cattail_TweaksQuality_Dynamic-Details",
+    "Cattail_TweaksQuality_Tweaks",
     "Cattail_TweaksX_Mechanic-Mods",
     "Cattail_TweaksQuality_Better-UIs",
     "Cattail_TweaksQuality_Resource-Watcher",
@@ -9,6 +9,6 @@
     "Cattail_Tweaks_Chat-Timestamps",
     "Cattail_TweaksQuality_Custom-Background-Color",
     "Cattail_TweaksFix_HyperX-12-Channel-Audio",
-    "SixtyFour_WorldEditer"
+    "Cattail_TweaksQuality_World-Editor"
   ]
 }

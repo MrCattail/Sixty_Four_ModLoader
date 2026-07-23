@@ -1,0 +1,237 @@
+{
+  "id": "Cattail_TweaksQuality_World-Editor",
+  "uniqueId": "Cattail_TweaksQuality_World-Editor",
+  "name": "World Editor",
+  "version": "0.2.5",
+  "loaderVersion": ">=0.1.0",
+  "languageSupport": {
+    "gameLanguage": true
+  },
+  "entry": [
+    "scripts/core/foundation.js",
+    "scripts/core/editor-state.js",
+    "scripts/core/selection-state.js",
+    "scripts/core/tool-state.js",
+    "scripts/core/selection-analysis.js",
+    "scripts/core/input-controller.js",
+    "scripts/render/resize-handles.js",
+    "scripts/input/selection-controller.js",
+    "scripts/render/hover-overlay.js",
+    "scripts/render/selected-overlay.js",
+    "scripts/i18n/editor-text.js",
+    "scripts/ui/editor-shell.js",
+    "scripts/ui/selection-card.js"
+  ],
+  "description": "A modular in-game world editor developed in small, independently validated stages without modifying vanilla scripts.",
+  "config": {
+    "enabled": {
+      "type": "boolean",
+      "label": "Enable World Editor",
+      "default": true,
+      "description": "Controls whether World Editor features are active.",
+      "reloadPolicy": "hot"
+    }
+  },
+  "translations": {
+    "en": {
+      "name": "World Editor",
+      "description": "A modular in-game world editor developed in small, independently validated stages without modifying vanilla scripts.",
+      "config": {
+        "enabled": {
+          "label": "Enable World Editor",
+          "description": "Controls whether World Editor features are active."
+        }
+      }
+    },
+    "sch": {
+      "name": "世界编辑器",
+      "description": "模块化的游戏内世界编辑器，按可独立验证的小阶段逐步开发，且不修改原版脚本。",
+      "config": {
+        "enabled": {
+          "label": "启用世界编辑器",
+          "description": "控制世界编辑器功能是否启用。"
+        }
+      }
+    },
+    "modsch": {
+      "name": "世界编辑器",
+      "description": "模块化的游戏内世界编辑器，按可独立验证的小阶段逐步开发，且不修改原版脚本。",
+      "config": {
+        "enabled": {
+          "label": "启用世界编辑器",
+          "description": "控制世界编辑器功能是否启用。"
+        }
+      }
+    },
+    "ru": {
+      "name": "Редактор мира",
+      "description": "Модульный внутриигровой редактор мира, разрабатываемый небольшими независимо проверяемыми этапами без изменения оригинальных скриптов.",
+      "config": {
+        "enabled": {
+          "label": "Включить редактор мира",
+          "description": "Определяет, активны ли функции редактора мира."
+        }
+      }
+    },
+    "de": {
+      "name": "Welteditor",
+      "description": "Ein modularer Welteditor im Spiel, der in kleinen, unabhängig geprüften Schritten entwickelt wird, ohne die Originalskripte zu verändern.",
+      "config": {
+        "enabled": {
+          "label": "Welteditor aktivieren",
+          "description": "Steuert, ob die Funktionen des Welteditors aktiv sind."
+        }
+      }
+    },
+    "ptbr": {
+      "name": "Editor de mundo",
+      "description": "Um editor de mundo modular dentro do jogo, desenvolvido em pequenas etapas validadas de forma independente, sem modificar os scripts originais.",
+      "config": {
+        "enabled": {
+          "label": "Ativar Editor de Mundo",
+          "description": "Controla se os recursos do Editor de Mundo estão ativos."
+        }
+      }
+    },
+    "it": {
+      "name": "Editor del mondo",
+      "description": "Un editor del mondo modulare all'interno del gioco, sviluppato in piccole fasi convalidate in modo indipendente senza modificare gli script originali.",
+      "config": {
+        "enabled": {
+          "label": "Abilita Editor del mondo",
+          "description": "Controlla se le funzioni dell'Editor del mondo sono attive."
+        }
+      }
+    },
+    "es": {
+      "name": "Editor del mundo",
+      "description": "Un editor de mundo modular dentro del juego, desarrollado en pequeñas fases validadas de forma independiente sin modificar los scripts originales.",
+      "config": {
+        "enabled": {
+          "label": "Activar Editor del mundo",
+          "description": "Controla si las funciones del Editor del mundo están activas."
+        }
+      }
+    },
+    "fr": {
+      "name": "Éditeur de monde",
+      "description": "Un éditeur de monde modulaire intégré au jeu, développé par petites étapes validées indépendamment sans modifier les scripts d'origine.",
+      "config": {
+        "enabled": {
+          "label": "Activer l'Éditeur de monde",
+          "description": "Détermine si les fonctions de l'Éditeur de monde sont actives."
+        }
+      }
+    },
+    "nl": {
+      "name": "Wereldeditor",
+      "description": "Een modulaire wereldeditor in het spel, ontwikkeld in kleine, afzonderlijk gevalideerde fasen zonder de originele scripts te wijzigen.",
+      "config": {
+        "enabled": {
+          "label": "Wereldeditor inschakelen",
+          "description": "Bepaalt of de functies van de Wereldeditor actief zijn."
+        }
+      }
+    },
+    "cz": {
+      "name": "Editor světa",
+      "description": "Modulární editor světa přímo ve hře, vyvíjený v malých samostatně ověřovaných etapách bez úprav původních skriptů.",
+      "config": {
+        "enabled": {
+          "label": "Zapnout Editor světa",
+          "description": "Určuje, zda jsou funkce Editoru světa aktivní."
+        }
+      }
+    },
+    "pl": {
+      "name": "Edytor świata",
+      "description": "Modułowy edytor świata w grze, rozwijany w małych, niezależnie weryfikowanych etapach bez modyfikowania oryginalnych skryptów.",
+      "config": {
+        "enabled": {
+          "label": "Włącz Edytor świata",
+          "description": "Określa, czy funkcje Edytora świata są aktywne."
+        }
+      }
+    },
+    "jp": {
+      "name": "ワールドエディター",
+      "description": "バニラスクリプトを変更せず、個別に検証できる小さな段階ごとに開発する、モジュール式のゲーム内ワールドエディターです。",
+      "config": {
+        "enabled": {
+          "label": "ワールドエディターを有効化",
+          "description": "ワールドエディター機能を有効にするかを制御します。"
+        }
+      }
+    },
+    "kr": {
+      "name": "월드 에디터",
+      "description": "원본 스크립트를 수정하지 않고 독립적으로 검증 가능한 작은 단계로 개발되는 모듈식 게임 내 월드 에디터입니다.",
+      "config": {
+        "enabled": {
+          "label": "월드 에디터 활성화",
+          "description": "월드 에디터 기능의 활성화 여부를 제어합니다."
+        }
+      }
+    },
+    "tch": {
+      "name": "世界編輯器",
+      "description": "模組化的遊戲內世界編輯器，以可獨立驗證的小階段逐步開發，且不修改原版腳本。",
+      "config": {
+        "enabled": {
+          "label": "啟用世界編輯器",
+          "description": "控制世界編輯器功能是否啟用。"
+        }
+      }
+    },
+    "thai": {
+      "name": "ตัวแก้ไขโลก",
+      "description": "เครื่องมือแก้ไขโลกแบบโมดูลภายในเกม พัฒนาเป็นขั้นตอนย่อยที่ตรวจสอบแยกกันได้ โดยไม่แก้ไขสคริปต์ดั้งเดิม",
+      "config": {
+        "enabled": {
+          "label": "เปิดใช้ตัวแก้ไขโลก",
+          "description": "ควบคุมว่าจะเปิดใช้ฟีเจอร์ของตัวแก้ไขโลกหรือไม่"
+        }
+      }
+    },
+    "hu": {
+      "name": "Világszerkesztő",
+      "description": "Moduláris, játékon belüli világszerkesztő, amely kis, önállóan ellenőrzött szakaszokban készül az eredeti szkriptek módosítása nélkül.",
+      "config": {
+        "enabled": {
+          "label": "Világszerkesztő engedélyezése",
+          "description": "A Világszerkesztő funkcióinak engedélyezését szabályozza."
+        }
+      }
+    },
+    "lv": {
+      "name": "Pasaules redaktors",
+      "description": "Modulārs spēles pasaules redaktors, kas tiek izstrādāts nelielos, neatkarīgi pārbaudāmos posmos, nemainot oriģinālos skriptus.",
+      "config": {
+        "enabled": {
+          "label": "Iespējot Pasaules redaktoru",
+          "description": "Nosaka, vai Pasaules redaktora funkcijas ir iespējotas."
+        }
+      }
+    },
+    "ro": {
+      "name": "Editor de lume",
+      "description": "Un editor de lume modular în joc, dezvoltat în etape mici și verificate independent, fără modificarea scripturilor originale.",
+      "config": {
+        "enabled": {
+          "label": "Activează Editorul de lume",
+          "description": "Controlează dacă funcțiile Editorului de lume sunt active."
+        }
+      }
+    },
+    "no": {
+      "name": "Verdensredigerer",
+      "description": "En modulær verdensredigerer i spillet, utviklet i små, uavhengig verifiserte trinn uten å endre originalskriptene.",
+      "config": {
+        "enabled": {
+          "label": "Aktiver Verdensredigerer",
+          "description": "Styrer om funksjonene i Verdensredigereren er aktive."
+        }
+      }
+    }
+  }
+}
