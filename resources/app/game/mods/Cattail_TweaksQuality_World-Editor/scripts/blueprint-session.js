@@ -164,7 +164,7 @@ ModLoader.register({
 
 				function snapshot() {
 					return Object.freeze({
-						version: '0.3.0',
+						version: '0.3.2',
 						mode,
 						includeBlocks: mode === 'full' && includeBlocks,
 						blueprint,
@@ -226,6 +226,7 @@ ModLoader.register({
 					try {
 						candidate = await buildBlueprint(
 							selectionSnapshot,
+							source,
 							mode,
 							mode === 'full' && includeBlocks,
 							function () {
@@ -300,9 +301,9 @@ ModLoader.register({
 				}
 
 				const session = Object.freeze({
-					version: '0.3.0',
+					version: '0.3.2',
 					game: sessionGame,
-					schemaVersion: 1,
+					schemaVersion: 2,
 					snapshot,
 					setMode(nextMode, reason) {
 						if (disposed || (nextMode !== 'structure' && nextMode !== 'full') || nextMode === mode) return false
@@ -365,8 +366,7 @@ ModLoader.register({
 				return session
 			}
 
-			async function buildBlueprint(selectionState, captureMode, captureBlocks, isCancelled) {
-				const source = captureSource(selectionState)
+			async function buildBlueprint(selectionState, source, captureMode, captureBlocks, isCancelled) {
 				const ranges = normalizeSelections(selectionState.selections, source.sourcePlane, source.anchor)
 				const uniqueCells = new Set()
 				const foundEntities = new Set()
@@ -517,12 +517,12 @@ ModLoader.register({
 				)
 				return {
 					blueprint: {
-						schemaVersion: 1,
+						schemaVersion: 2,
 						mode: captureMode,
 						sourcePlane: source.sourcePlane,
 						anchor: {
 							position: source.anchor,
-							selectionId: source.primaryId
+							selectionIds: source.selectionIds
 						},
 						selections: ranges.relative,
 						contentBounds: relativeBounds(contentBounds, source.anchor),
@@ -1501,11 +1501,65 @@ ModLoader.register({
 					return entry.id === state.primaryId
 				}) || selections[selections.length - 1]
 				if (!primary || !isRange(primary.range)) throw new Error('selection-unavailable')
-				return {
-					primaryId: primary.id,
-					sourcePlane: primary.plane ? 1 : 0,
-					anchor: [Number(primary.range.start[0]), Number(primary.range.start[1])]
+				let bounds = null
+				const selectionIds = []
+				for (const entry of selections) {
+					if (!isRange(entry?.range)) throw new Error('selection-unavailable')
+					bounds = includeBounds(bounds, entry.range)
+					selectionIds.push(Number(entry.id))
 				}
+				return {
+					sourcePlane: primary.plane ? 1 : 0,
+					anchor: visualRightAnchor(bounds),
+					selectionIds: Array.from(new Set(selectionIds)).sort(function (left, right) {
+						return left - right
+					})
+				}
+			}
+
+			function visualRightAnchor(bounds) {
+				const fallback = [Number(bounds.maxU), Number(bounds.maxV)]
+				if (typeof game.uvToXY !== 'function') return fallback
+				const corners = [
+					[Number(bounds.minU), Number(bounds.minV)],
+					[Number(bounds.maxU), Number(bounds.minV)],
+					[Number(bounds.maxU), Number(bounds.maxV)],
+					[Number(bounds.minU), Number(bounds.maxV)]
+				]
+				const projectedCorners = []
+				for (const position of corners) {
+					let projected
+					try {
+						projected = game.uvToXY(position)
+					} catch (error) {
+						return fallback
+					}
+					const x = Number(projected?.[0])
+					const y = Number(projected?.[1])
+					if (!Number.isFinite(x) || !Number.isFinite(y)) return fallback
+					projectedCorners.push({ position, x, y })
+				}
+				const edges = [[0, 1], [1, 2], [2, 3], [3, 0]]
+				let bestEdge = null
+				for (const indices of edges) {
+					const first = projectedCorners[indices[0]]
+					const second = projectedCorners[indices[1]]
+					const midpointX = (first.x + second.x) / 2
+					const midpointY = (first.y + second.y) / 2
+					if (
+						!bestEdge ||
+						midpointX > bestEdge.midpointX ||
+						(midpointX === bestEdge.midpointX && midpointY > bestEdge.midpointY)
+					) {
+						bestEdge = { first, second, midpointX, midpointY }
+					}
+				}
+				if (!bestEdge) return fallback
+				const lower = (
+					bestEdge.second.y > bestEdge.first.y ||
+					(bestEdge.second.y === bestEdge.first.y && bestEdge.second.x > bestEdge.first.x)
+				) ? bestEdge.second : bestEdge.first
+				return lower.position.slice()
 			}
 
 			function normalizeSelections(selections, sourcePlane, anchor) {

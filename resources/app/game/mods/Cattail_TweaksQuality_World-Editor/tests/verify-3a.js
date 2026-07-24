@@ -139,6 +139,9 @@ function createGame() {
 		entityAtCoordinates(position) {
 			return cells.get(position[0] + ':' + position[1]) || null
 		},
+		uvToXY(position) {
+			return [(position[0] - position[1]) * 10, (position[0] + position[1]) * 5]
+		},
 		getEntityString(entity) {
 			if (entity.throwSave) throw new Error('save failed')
 			return {
@@ -270,31 +273,38 @@ async function testStructureCaptureAndImmutability() {
 	assert.equal(result.status, 'captured')
 	assert.equal(result.clipboard, 'ready')
 	assert.equal(env.writes.length, 1)
-	assert.match(env.writes[0], /\n  "schemaVersion": 1,/)
+	assert.match(env.writes[0], /\n  "schemaVersion": 2,/)
 
 	const blueprint = env.session.snapshot().blueprint
-	assert.equal(blueprint.schemaVersion, 1)
+	assert.equal(env.session.version, '0.3.2')
+	assert.equal(env.session.schemaVersion, 2)
+	assert.equal(env.session.snapshot().version, '0.3.2')
+	assert.equal(blueprint.schemaVersion, 2)
 	assert.equal(blueprint.mode, 'structure')
 	assert.equal(blueprint.sourcePlane, 0)
-	assert.deepEqual(plain(blueprint.anchor), { position: [0, 0], selectionId: 1 })
+	assert.deepEqual(plain(blueprint.anchor), { position: [1, 1], selectionIds: [1, 2] })
 	assert.equal(blueprint.selections.length, 2)
+	assert.deepEqual(plain(blueprint.selections[0].min), [-1, -1])
+	assert.deepEqual(plain(blueprint.selections[0].max), [0, 0])
+	assert.deepEqual(plain(blueprint.selections[1].min), [0, 0])
 	assert.equal(blueprint.summary.selectedCellCount, 4)
 	assert.equal(blueprint.summary.entityCount, 2)
 	assert.equal(blueprint.summary.blockCount, 0)
 	assert.equal(blueprint.summary.crossBoundaryCount, 1)
 	assert.equal(blueprint.summary.skippedCount, 2)
 	assert.deepEqual(plain(blueprint.entities.map(entity => entity.name)), ['silo', 'strange1'])
-	assert.deepEqual(plain(blueprint.entities[1].position), [2, 2])
+	assert.deepEqual(plain(blueprint.entities[0].position), [-1, -1])
+	assert.deepEqual(plain(blueprint.entities[1].position), [1, 1])
 	assert.deepEqual(plain(blueprint.entities[1].footprint), {
 		span: 1,
-		min: [1, 1],
-		max: [3, 3]
+		min: [0, 0],
+		max: [2, 2]
 	})
 	assert.equal(blueprint.entities[1].restricted.onlyOne, true)
 	assert.equal(Object.hasOwn(blueprint.entities[0], 'state'), false)
 	assert.deepEqual(plain(blueprint.contentBounds), {
-		min: [0, 0],
-		max: [3, 3],
+		min: [-1, -1],
+		max: [2, 2],
 		width: 4,
 		height: 4
 	})
@@ -309,6 +319,63 @@ async function testStructureCaptureAndImmutability() {
 	assert.equal(Object.isFrozen(blueprint.entities), true)
 	assert.equal(Object.isFrozen(blueprint.entities[1].footprint), true)
 	assert.equal(env.session.exportJSON(), env.writes[0])
+}
+
+async function testVisualRightAnchorProjectionAndFallbacks() {
+	const disjointState = selectionState([
+		{ id: 9, primary: true, plane: 0, range: range([4, 0], [4, 0]) },
+		{ id: 3, primary: false, plane: 0, range: range([0, 4], [0, 4]) }
+	], 9)
+	const disjoint = createEnvironment({ selection: disjointState })
+	disjoint.game.setCell(4, 0, { name: 'silo', position: [4, 0], entitySpan: 0 })
+	disjoint.game.setCell(0, 4, { name: 'pump', position: [0, 4], entitySpan: 0 })
+	const disjointResult = await disjoint.session.capture('test-disjoint-visual-right')
+	assert.equal(disjointResult.status, 'captured')
+	const disjointBlueprint = disjoint.session.snapshot().blueprint
+	assert.deepEqual(plain(disjointBlueprint.anchor), {
+		position: [4, 4],
+		selectionIds: [3, 9]
+	})
+	assert.deepEqual(plain(disjointBlueprint.entities.map(entry => entry.position)), [
+		[0, -4],
+		[-4, 0]
+	])
+	disjoint.game.uvToXY = position => [position[1] * 100, position[0] * 100]
+	assert.deepEqual(plain(disjoint.session.snapshot().blueprint.anchor.position), [4, 4])
+
+	const tieGame = createGame()
+	tieGame.uvToXY = position => [position[0] - position[1] * 0.2, position[1]]
+	const tieState = selectionState([
+		{ id: 6, primary: true, plane: 0, range: range([1, 2], [4, 6]) }
+	], 6)
+	const tie = createEnvironment({ game: tieGame, selection: tieState })
+	tie.game.setCell(1, 2, { name: 'silo', position: [1, 2], entitySpan: 0 })
+	assert.equal((await tie.session.capture('test-projection-tie')).status, 'captured')
+	assert.deepEqual(plain(tie.session.snapshot().blueprint.anchor.position), [4, 6])
+
+	const fallbacks = [
+		game => {
+			delete game.uvToXY
+		},
+		game => {
+			game.uvToXY = function () {
+				throw new Error('projection failed')
+			}
+		},
+		game => {
+			game.uvToXY = function () {
+				return [Number.NaN, 0]
+			}
+		}
+	]
+	for (const configure of fallbacks) {
+		const fallbackGame = createGame()
+		configure(fallbackGame)
+		const fallback = createEnvironment({ game: fallbackGame, selection: tieState })
+		fallback.game.setCell(1, 2, { name: 'silo', position: [1, 2], entitySpan: 0 })
+		assert.equal((await fallback.session.capture('test-projection-fallback')).status, 'captured')
+		assert.deepEqual(plain(fallback.session.snapshot().blueprint.anchor.position), [4, 6])
+	}
 }
 
 async function testFullCaptureCubeRulesAndFailureRetention() {
@@ -449,9 +516,9 @@ function testLanguagesManifestUiAndReadOnlyBoundary() {
 	vm.runInContext(fs.readFileSync(i18nFilename, 'utf8'), i18nSandbox, { filename: i18nFilename })
 	i18nDefinitions[0].init()
 	const i18n = i18nSandbox[I18N_KEY]
-	assert.equal(i18n.version, '0.3.0')
+	assert.equal(i18n.version, '0.3.1')
 	assert.equal(i18n.languages.length, 20)
-	assert.equal(i18n.keys.length, 49)
+	assert.equal(i18n.keys.length, 70)
 	const blueprintKeys = [
 		'blueprintModeStructure',
 		'blueprintModeFull',
@@ -481,9 +548,9 @@ function testLanguagesManifestUiAndReadOnlyBoundary() {
 	}
 
 	const manifest = JSON.parse(fs.readFileSync(path.join(MOD_ROOT, 'mod.json'), 'utf8'))
-	assert.equal(manifest.version, '0.3.0')
+	assert.equal(manifest.version, '0.3.2')
 	assert.equal(manifest.languageSupport.gameLanguage, true)
-	assert.equal(manifest.entry.length, 14)
+	assert.equal(manifest.entry.length, 16)
 	assert.ok(manifest.entry.includes(BLUEPRINT_SOURCE))
 	assert.ok(
 		manifest.entry.indexOf('scripts/ui/editor-shell.js') <
@@ -491,7 +558,10 @@ function testLanguagesManifestUiAndReadOnlyBoundary() {
 	)
 
 	const source = fs.readFileSync(path.join(MOD_ROOT, BLUEPRINT_SOURCE), 'utf8')
-	assert.match(source, /schemaVersion:\s*1/)
+	assert.match(source, /schemaVersion:\s*2/)
+	assert.match(source, /version:\s*'0\.3\.2'/)
+	assert.match(source, /selectionIds:\s*source\.selectionIds/)
+	assert.match(source, /typeof game\.uvToXY !== 'function'/)
 	assert.match(source, /Object\.freeze/)
 	assert.match(source, /JSON\.stringify\(normalized,\s*null,\s*2\)/)
 	assert.match(source, /navigator\?\.clipboard\?\.writeText/)
@@ -514,10 +584,11 @@ function testLanguagesManifestUiAndReadOnlyBoundary() {
 
 async function run() {
 	await testStructureCaptureAndImmutability()
+	await testVisualRightAnchorProjectionAndFallbacks()
 	await testFullCaptureCubeRulesAndFailureRetention()
 	await testChunkCancellationHotkeyAndLifecycle()
 	testLanguagesManifestUiAndReadOnlyBoundary()
-	console.log('3A verification passed: immutable session schema, structure/full capture, multi-selection union, cross-boundary footprints, Mod and transient skips, stable Cube gating, clipboard success/failure, empty retention, chunk cancellation, lifecycle, 20-language UI, original-font card contract, manifest, and read-only boundary.')
+	console.log('3A/3C verification passed: immutable schema-2 session, projected outer-bounds visual-right anchor, sorted selection IDs, deterministic projection fallback, structure/full capture, multi-selection union, cross-boundary footprints, Mod and transient skips, stable Cube gating, clipboard success/failure, empty retention, chunk cancellation, lifecycle, 20-language UI, original-font card contract, manifest, and read-only boundary.')
 }
 
 run().catch(error => {

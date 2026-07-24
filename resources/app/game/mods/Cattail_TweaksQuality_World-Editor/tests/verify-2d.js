@@ -583,9 +583,9 @@ function testLocalizationManifestAndReadOnlyBoundary() {
 	const api = createApi()
 	for (const definition of definitions) definition.init(api)
 	const i18n = sandbox[I18N_KEY]
-	assert.equal(i18n.version, '0.3.0')
+	assert.equal(i18n.version, '0.3.1')
 	assert.equal(i18n.languages.length, 20)
-	assert.equal(i18n.keys.length, 49)
+	assert.equal(i18n.keys.length, 70)
 	for (const language of i18n.languages) {
 		for (const key of ['toolbarModeResize', 'toolResize', 'cardResizePreview', 'resizeHint']) {
 			assert.notEqual(i18n.t(language, key), key)
@@ -597,7 +597,7 @@ function testLocalizationManifestAndReadOnlyBoundary() {
 	assert.equal(i18n.t('en', 'resizeHint'), 'Release to resize / Esc Cancel')
 
 	const manifest = JSON.parse(fs.readFileSync(path.join(MOD_ROOT, 'mod.json'), 'utf8'))
-	assert.equal(manifest.version, '0.3.0')
+	assert.equal(manifest.version, '0.3.2')
 	assert.equal(manifest.languageSupport.gameLanguage, true)
 	assert.deepEqual(manifest.entry, [
 		'scripts/core/foundation.js',
@@ -605,6 +605,7 @@ function testLocalizationManifestAndReadOnlyBoundary() {
 		'scripts/core/selection-state.js',
 		'scripts/core/tool-state.js',
 		'scripts/core/selection-analysis.js',
+		'scripts/core/blueprint-preview-plan.js',
 		'scripts/core/input-controller.js',
 		'scripts/render/resize-handles.js',
 		'scripts/input/selection-controller.js',
@@ -613,6 +614,7 @@ function testLocalizationManifestAndReadOnlyBoundary() {
 		'scripts/i18n/editor-text.js',
 		'scripts/ui/editor-shell.js',
 		'scripts/blueprint-session.js',
+		'scripts/blueprint-preview.js',
 		'scripts/ui/selection-card.js'
 	])
 

@@ -6,6 +6,7 @@ ModLoader.register({
 		const TOOL_KEY = Symbol.for('cattail.world-editor.tool')
 		const RESIZE_HANDLES_KEY = Symbol.for('cattail.world-editor.resize-handles')
 		const INTERACTION_KEY = Symbol.for('cattail.world-editor.selection-interaction')
+		const PREVIEW_KEY = Symbol.for('cattail.world-editor.blueprint-preview')
 		const LONG_PRESS_MS = 220
 		const MOVE_SLOP_PX = 6
 		const WHEEL_COMMIT_MS = 1250
@@ -158,6 +159,15 @@ ModLoader.register({
 
 			function cancelInteraction(reason) {
 				if (disposed) return false
+				const preview = globalThis[PREVIEW_KEY]
+				if (
+					String(reason || '') === 'hotkey-escape' &&
+					preview?.snapshot?.().active &&
+					typeof preview.exit === 'function'
+				) {
+					preview.exit('hotkey-escape')
+					return true
+				}
 				const hadGesture = !!gesture
 				const hadWheelLatch = !!wheelLatch
 				clearGesture()
@@ -378,6 +388,7 @@ ModLoader.register({
 			const handleWheel = function (event) {
 				if (
 					disposed ||
+					previewOwnsSelectionInput() ||
 					!runtime.isActive() ||
 					game.halt ||
 					game.splash?.isShown ||
@@ -419,6 +430,7 @@ ModLoader.register({
 					if (runtime.isActive()) cancelInteraction('mouse-right')
 					return
 				}
+				if (previewOwnsSelectionInput()) return
 				if (!shouldCaptureLeft(runtime, game, event)) return
 				if (isWheelGesture(gesture)) {
 					settleWheel('wheel-left-click-commit')
@@ -475,6 +487,7 @@ ModLoader.register({
 			}
 
 			const handleMouseMove = function (event) {
+				if (previewOwnsSelectionInput()) return
 				if (!runtime.isActive() || game.halt || game.splash?.isShown) return
 				const buttons = Number(event?.buttons) || 0
 				if (buttons & 2) return
@@ -501,6 +514,7 @@ ModLoader.register({
 
 			const handleMouseUp = function (event) {
 				if (event?.button !== 0) return
+				if (previewOwnsSelectionInput()) return
 				if (!runtime.isActive() || game.halt || game.splash?.isShown) {
 					cancelInteraction('mouse-up-inactive')
 					return
@@ -520,6 +534,7 @@ ModLoader.register({
 			}
 
 			const handleClick = function (event) {
+				if (previewOwnsSelectionInput()) return
 				if (!shouldCaptureLeft(runtime, game, event)) return
 				consume(event)
 			}
@@ -574,6 +589,14 @@ ModLoader.register({
 			})
 
 			console.info('[Cattail World Editor] Unified selection input 2G ready.')
+
+			function previewOwnsSelectionInput() {
+				try {
+					return !!globalThis[PREVIEW_KEY]?.snapshot?.().active
+				} catch (error) {
+					return false
+				}
+			}
 		})
 
 		function shouldCaptureLeft(runtime, game, event) {
