@@ -44,6 +44,25 @@ ModLoader.register({
 					return
 				}
 
+				if (isBackspace(event, key) && runtime.isActive()) {
+					if (selection && typeof selection.hasPreview === 'function' && selection.hasPreview()) {
+						consume(event)
+						return
+					}
+					if (event.repeat) {
+						consume(event)
+						return
+					}
+					const interaction = globalThis[INTERACTION_KEY]
+					if (interaction && typeof interaction.cancelPending === 'function') {
+						interaction.cancelPending('hotkey-backspace')
+					}
+					if (selection && typeof selection.removePrimary === 'function' && selection.removePrimary('hotkey-backspace')) {
+						consume(event)
+						return
+					}
+				}
+
 				if (isEscape(event, key) && runtime.isActive()) {
 					consume(event)
 					const interaction = globalThis[INTERACTION_KEY]
@@ -63,7 +82,7 @@ ModLoader.register({
 				window.removeEventListener('keydown', handleKeydown, true)
 			})
 
-			console.info('[Cattail World Editor] Input 2A ready.')
+			console.info('[Cattail World Editor] Input 2G ready.')
 		})
 
 		function isEditableEvent(event) {
@@ -86,6 +105,10 @@ ModLoader.register({
 
 		function isEscape(event, key) {
 			return key === 'escape' || event.keyCode === 27
+		}
+
+		function isBackspace(event, key) {
+			return key === 'backspace' || event.keyCode === 8
 		}
 
 		function consume(event) {

@@ -147,10 +147,9 @@ ModLoader.register({
 				} catch (error) {
 					latched = false
 				}
-				const previewKind = currentSelection?.previewKind
-				const manipulating = previewKind === 'move' || previewKind === 'resize'
+				const previewing = isRange(currentSelection?.previewRange)
 				card.dataset.wheelLatched = latched ? 'true' : 'false'
-				card.dataset.inputPassThrough = latched || manipulating ? 'true' : 'false'
+				card.dataset.inputPassThrough = latched || previewing ? 'true' : 'false'
 			}
 
 			const refreshContent = function (languageGame) {

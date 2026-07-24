@@ -246,10 +246,10 @@ function testUnifiedInputGestures() {
 	const selection = sandbox[SELECTION_KEY]
 	const tool = sandbox[TOOL_KEY]
 	const interaction = sandbox[INTERACTION_KEY]
-	assert.equal(selection.version, '0.2.5')
-	assert.equal(tool.version, '0.2.5')
+	assert.equal(selection.version, '0.2.6')
+	assert.equal(tool.version, '0.2.6')
 	assert.deepEqual(plain(tool.modes), ['select'])
-	assert.equal(interaction.version, '0.2.5')
+	assert.equal(interaction.version, '0.2.6')
 	assert.equal(interaction.longPressMs, 220)
 	assert.equal(interaction.moveSlopPx, 6)
 
@@ -557,6 +557,13 @@ function testCardLockAndTemporaryWindow() {
 	selection.emit({
 		plane: 0,
 		selectedRange: selected,
+		previewRange: range([4, 4], [5, 5]),
+		previewKind: 'selection'
+	})
+	assert.equal(card.dataset.inputPassThrough, 'true')
+	selection.emit({
+		plane: 0,
+		selectedRange: selected,
 		previewRange: selected,
 		previewKind: 'move'
 	})
@@ -620,9 +627,9 @@ function testHoverLayerI18nManifestAndReadOnlyBoundary() {
 	const api = createApi()
 	for (const definition of definitions) definition.init(api)
 	const i18n = sandbox[I18N_KEY]
-	assert.equal(i18n.version, '0.2.5')
+	assert.equal(i18n.version, '0.2.6')
 	assert.equal(i18n.languages.length, 20)
-	assert.equal(i18n.keys.length, 30)
+	assert.equal(i18n.keys.length, 31)
 	for (const language of i18n.languages) {
 		for (const key of ['toolbarModeArea', 'toolSelect', 'cardPinAction', 'cardUnpinAction']) {
 			assert.notEqual(i18n.t(language, key), key)
@@ -633,7 +640,7 @@ function testHoverLayerI18nManifestAndReadOnlyBoundary() {
 	assert.equal(i18n.t('modsch', 'toolSelect'), '选择')
 
 	const manifest = JSON.parse(fs.readFileSync(path.join(MOD_ROOT, 'mod.json'), 'utf8'))
-	assert.equal(manifest.version, '0.2.5')
+	assert.equal(manifest.version, '0.2.6')
 	assert.equal(manifest.languageSupport.gameLanguage, true)
 	assert.equal(manifest.entry.length, 13)
 	assert.equal(manifest.entry.filter(entry => /selection-controller/.test(entry)).length, 1)
@@ -652,4 +659,4 @@ testUnifiedInputGestures()
 testCardLockAndTemporaryWindow()
 testHoverLayerI18nManifestAndReadOnlyBoundary()
 
-console.log('2E verification passed: unified click/long-press/drag/handle priority, operation locking, interior hover layer, card temporary/pinned/immediate manipulation pass-through states, switch-green styling, 20-language UI, manifest, and read-only boundary.')
+console.log('2E verification passed: unified click/long-press/drag/handle priority, operation locking, interior hover layer, card temporary/pinned/immediate selection-move-resize pass-through states, switch-green styling, 20-language UI, manifest, and read-only boundary.')

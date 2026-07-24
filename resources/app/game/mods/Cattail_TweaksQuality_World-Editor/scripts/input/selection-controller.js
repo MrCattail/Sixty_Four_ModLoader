@@ -15,7 +15,7 @@ ModLoader.register({
 		const WHEEL_EDGE_OPPOSITE_GUARD_PX = 4
 		const WHEEL_BOTTOM_TIE_PX = 1
 		const WHEEL_EDGE_SIDE_EPSILON_PX = .01
-		const WHEEL_UNLOCK_SLOP_PX = 2
+		const WHEEL_UNLOCK_SLOP_PX = 6
 
 		api.on('afterGameInit', function (payload, game) {
 			const runtime = globalThis[RUNTIME_KEY]
@@ -24,7 +24,7 @@ ModLoader.register({
 			const resizeHandles = globalThis[RESIZE_HANDLES_KEY]
 			const canvas = game?.canvas
 			if (!runtime || runtime.game !== game || typeof runtime.addCleanup !== 'function') {
-				console.warn('[Cattail World Editor] Selection input 2F could not find the editor runtime.')
+				console.warn('[Cattail World Editor] Selection input 2G could not find the editor runtime.')
 				return
 			}
 			if (
@@ -40,23 +40,25 @@ ModLoader.register({
 				typeof selection.commitMove !== 'function' ||
 				typeof selection.beginResize !== 'function' ||
 				typeof selection.updateResize !== 'function' ||
-				typeof selection.commitResize !== 'function' ||
-				typeof selection.cancelPreview !== 'function' ||
-				typeof selection.hasPreview !== 'function' ||
-				typeof selection.isSelected !== 'function'
-			) {
-				console.warn('[Cattail World Editor] Selection input 2F could not find the selection state.')
-				return
-			}
+					typeof selection.commitResize !== 'function' ||
+					typeof selection.cancelPreview !== 'function' ||
+					typeof selection.hasPreview !== 'function' ||
+					typeof selection.selectionAt !== 'function' ||
+					typeof selection.setPrimary !== 'function' ||
+					typeof selection.isPrimarySelected !== 'function'
+				) {
+					console.warn('[Cattail World Editor] Selection input 2G could not find the selection state.')
+					return
+				}
 			if (!tool || typeof tool.snapshot !== 'function' || tool.snapshot().mode !== 'select') {
-				console.warn('[Cattail World Editor] Selection input 2F requires the unified selection tool.')
+				console.warn('[Cattail World Editor] Selection input 2G requires the unified selection tool.')
 				return
 			}
 			if (!resizeHandles || typeof resizeHandles.hitTest !== 'function') {
-				console.warn('[Cattail World Editor] Selection input 2F could not find the resize handle service.')
+				console.warn('[Cattail World Editor] Selection input 2G could not find the resize handle service.')
 			}
 			if (!canvas || typeof canvas.addEventListener !== 'function') {
-				console.warn('[Cattail World Editor] Selection input 2F requires the game canvas.')
+				console.warn('[Cattail World Editor] Selection input 2G requires the game canvas.')
 				return
 			}
 
@@ -72,7 +74,7 @@ ModLoader.register({
 			let disposed = false
 
 			const interaction = Object.freeze({
-				version: '0.2.5',
+				version: '0.2.6',
 				longPressMs: LONG_PRESS_MS,
 				moveSlopPx: MOVE_SLOP_PX,
 				wheelCommitMs: WHEEL_COMMIT_MS,
@@ -85,9 +87,12 @@ ModLoader.register({
 				wheelUnlockSlopPx: WHEEL_UNLOCK_SLOP_PX,
 				snapshot() {
 					return {
-						version: '0.2.5',
+						version: '0.2.6',
 						gestureType: gesture?.type || null,
+						gestureSelectionId: gesture?.selectionId || null,
+						gestureAdditive: !!gesture?.additive,
 						wheelTarget: isWheelGesture(gesture) ? gesture.target : wheelLatch?.target || null,
+						wheelSelectionId: isWheelGesture(gesture) ? gesture.selectionId : wheelLatch?.selectionId || null,
 						wheelAxis: isWheelGesture(gesture) ? gesture.wheelAxis : null,
 						wheelLatched: !!wheelLatch,
 						wheelLatchHandle: wheelLatch?.target === 'resize' ? wheelLatch.handle : null,
@@ -227,14 +232,18 @@ ModLoader.register({
 				return true
 			}
 
-			function performClick(cell, plane) {
+			function performClick(cell, plane, completed) {
 				if (!isCell(cell) || plane !== (game.plane ? 1 : 0)) return false
 				const current = selection.snapshot()
 				if (current?.previewKind === 'selection') {
 					return selection.commit(cell, plane, 'mouse-second-click')
 				}
 				if (selection.hasPreview()) return false
-				return selection.begin(cell, plane, 'mouse-first-click')
+				if (completed?.activatedPrimary) return true
+				if (completed?.insideSelection && Number(current?.selectionCount) > 1) return true
+				return selection.begin(cell, plane, 'mouse-first-click', {
+					additive: !!completed?.additive
+				})
 			}
 
 			function releaseWheelLatchOnPointerMove(event) {
@@ -255,6 +264,7 @@ ModLoader.register({
 				const selected = current?.selectedRange
 				if (
 					!selected ||
+					current.primaryId !== wheelLatch.selectionId ||
 					current.plane !== wheelLatch.plane ||
 					wheelLatch.plane !== (game.plane ? 1 : 0)
 				) {
@@ -274,6 +284,7 @@ ModLoader.register({
 					outward: wheelLatch.target === 'resize' ? wheelLatch.outward.slice() : null,
 					cell,
 					currentCell: cell.slice(),
+					selectionId: wheelLatch.selectionId,
 					plane: wheelLatch.plane,
 					wheelAxis: null,
 					accumulator: 0
@@ -298,10 +309,13 @@ ModLoader.register({
 				const plane = game.plane ? 1 : 0
 				const pointer = pointerPosition(event)
 				if (!pointer) return null
+				const current = selection.snapshot()
+				if (!Number.isInteger(current?.primaryId)) return null
 				const handle = typeof resizeHandles?.hitTest === 'function' ? resizeHandles.hitTest(event) : null
 				if (handle) {
 					wheelLatch = {
 						target: 'resize',
+						selectionId: current.primaryId,
 						handle,
 						outward: handleOutwardVector(handle),
 						pointer,
@@ -310,12 +324,12 @@ ModLoader.register({
 					}
 					return createWheelGestureFromLatch()
 				}
-				if (!selection.isSelected(cell, plane)) return null
-				const current = selection.snapshot()
+				if (!selection.isPrimarySelected(cell, plane)) return null
 				const nearest = nearestSelectionDirection(game, current?.selectedRange, pointer)
 				if (!nearest) return null
 				wheelLatch = {
 					target: 'move',
+					selectionId: current.primaryId,
 					direction: nearest.direction,
 					edges: nearest.edges,
 					corner: nearest.corner,
@@ -391,7 +405,10 @@ ModLoader.register({
 				if (rawSteps) {
 					const appliedSteps = clampInteger(rawSteps, -WHEEL_MAX_STEPS, WHEEL_MAX_STEPS)
 					gesture.accumulator -= rawSteps * WHEEL_PIXEL_THRESHOLD
-					applyWheelSteps(appliedSteps)
+					if (applyWheelSteps(appliedSteps) && wheelLatch) {
+						const pointer = pointerPosition(event)
+						if (pointer) wheelLatch.pointer = pointer
+					}
 				}
 				if (isWheelGesture(gesture)) scheduleWheelCommit()
 				consume(event)
@@ -425,14 +442,35 @@ ModLoader.register({
 					return
 				}
 
-				if (cell && !selection.hasPreview() && selection.isSelected(cell, plane)) {
-					gesture = { type: 'pending-move', cell, plane, x, y }
+				const current = selection.snapshot()
+				if (cell && !selection.hasPreview() && event?.ctrlKey) {
+					gesture = { type: 'click', cell, plane, x, y, additive: true }
+					consume(event)
+					return
+				}
+
+				const hitId = cell && !selection.hasPreview()
+					? selection.selectionAt(cell, plane)
+					: null
+				if (Number.isInteger(hitId)) {
+					const activatedPrimary = current?.primaryId !== hitId
+					if (activatedPrimary) selection.setPrimary(hitId, 'mouse-primary-activated')
+					gesture = {
+						type: 'pending-move',
+						cell,
+						plane,
+						x,
+						y,
+						selectionId: hitId,
+						insideSelection: true,
+						activatedPrimary
+					}
 					scheduleLongPress()
 					consume(event)
 					return
 				}
 
-				if (cell) gesture = { type: 'click', cell, plane, x, y }
+				if (cell) gesture = { type: 'click', cell, plane, x, y, additive: false }
 				consume(event)
 			}
 
@@ -476,7 +514,7 @@ ModLoader.register({
 				} else if (completed?.type === 'move' && isCell(game.hoveredCell)) {
 					selection.commitMove(game.hoveredCell, game.plane, 'mouse-move-commit')
 				} else if (completed?.type === 'pending-move' || completed?.type === 'click') {
-					performClick(completed.cell, completed.plane)
+					performClick(completed.cell, completed.plane, completed)
 				}
 				consume(event)
 			}
@@ -501,7 +539,11 @@ ModLoader.register({
 				if (
 					wheelLatch &&
 					!state?.previewRange &&
-					(!state?.selectedRange || state.plane !== wheelLatch.plane)
+					(
+						!state?.selectedRange ||
+						state.primaryId !== wheelLatch.selectionId ||
+						state.plane !== wheelLatch.plane
+					)
 				) {
 					clearGesture()
 					clearWheelLatch()
@@ -531,7 +573,7 @@ ModLoader.register({
 				interaction.dispose('runtime-disposed')
 			})
 
-			console.info('[Cattail World Editor] Unified selection input 2F ready.')
+			console.info('[Cattail World Editor] Unified selection input 2G ready.')
 		})
 
 		function shouldCaptureLeft(runtime, game, event) {

@@ -241,8 +241,8 @@ function testResizeStateAndEndpointIdentity() {
 	const selection = sandbox[SELECTION_KEY]
 	const tool = sandbox[TOOL_KEY]
 
-	assert.equal(selection.version, '0.2.5')
-	assert.equal(tool.version, '0.2.5')
+	assert.equal(selection.version, '0.2.6')
+	assert.equal(tool.version, '0.2.6')
 	assert.deepEqual(plain(tool.modes), ['select'])
 	assert.deepEqual(plain(selection.resizeHandles), [
 		'minU-minV',
@@ -378,7 +378,7 @@ function testResizeHandlesRenderingInputAndCancellation() {
 	const tool = sandbox[TOOL_KEY]
 	const handles = sandbox[RESIZE_HANDLES_KEY]
 	assert.ok(handles)
-	assert.equal(handles.version, '0.2.5')
+	assert.equal(handles.version, '0.2.6')
 	assert.equal(handles.handles.length, 8)
 
 	const cssForUv = function (u, v) {
@@ -583,9 +583,9 @@ function testLocalizationManifestAndReadOnlyBoundary() {
 	const api = createApi()
 	for (const definition of definitions) definition.init(api)
 	const i18n = sandbox[I18N_KEY]
-	assert.equal(i18n.version, '0.2.5')
+	assert.equal(i18n.version, '0.2.6')
 	assert.equal(i18n.languages.length, 20)
-	assert.equal(i18n.keys.length, 30)
+	assert.equal(i18n.keys.length, 31)
 	for (const language of i18n.languages) {
 		for (const key of ['toolbarModeResize', 'toolResize', 'cardResizePreview', 'resizeHint']) {
 			assert.notEqual(i18n.t(language, key), key)
@@ -597,7 +597,7 @@ function testLocalizationManifestAndReadOnlyBoundary() {
 	assert.equal(i18n.t('en', 'resizeHint'), 'Release to resize / Esc Cancel')
 
 	const manifest = JSON.parse(fs.readFileSync(path.join(MOD_ROOT, 'mod.json'), 'utf8'))
-	assert.equal(manifest.version, '0.2.5')
+	assert.equal(manifest.version, '0.2.6')
 	assert.equal(manifest.languageSupport.gameLanguage, true)
 	assert.deepEqual(manifest.entry, [
 		'scripts/core/foundation.js',

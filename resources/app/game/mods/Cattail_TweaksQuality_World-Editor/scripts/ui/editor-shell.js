@@ -31,15 +31,19 @@ ModLoader.register({
 			const selection = globalThis[SELECTION_KEY]
 			const tool = globalThis[TOOL_KEY]
 			if (!runtime || runtime.game !== game || typeof runtime.addCleanup !== 'function') {
-				console.warn('[Cattail World Editor] Toolbar 2E could not find the editor runtime.')
+				console.warn('[Cattail World Editor] Toolbar 2G could not find the editor runtime.')
 				return
 			}
 			if (!i18n || typeof i18n.t !== 'function') {
-				console.warn('[Cattail World Editor] Toolbar 2E could not find the editor translations.')
+				console.warn('[Cattail World Editor] Toolbar 2G could not find the editor translations.')
 				return
 			}
-			if (!selection || selection.game !== game || typeof selection.subscribe !== 'function') {
-				console.warn('[Cattail World Editor] Toolbar 2E could not find the selection state.')
+			if (
+				!selection ||
+				selection.game !== game ||
+				typeof selection.subscribe !== 'function'
+			) {
+				console.warn('[Cattail World Editor] Toolbar 2G could not find the selection state.')
 				return
 			}
 			if (!tool || typeof tool.subscribe !== 'function' || typeof tool.setMode !== 'function') {
@@ -62,15 +66,23 @@ ModLoader.register({
 			let gameHudHidden = api.ui.hud.isHidden()
 			let vanillaHudHidden = api.ui.isVanillaGameHudHidden(game)
 			const selectButton = shell.querySelector('[data-world-editor-action="select"]')
+			const removeButton = shell.querySelector('[data-world-editor-action="remove-selection"]')
 			const accessibleText = {
 				brand: '',
 				mode: '',
 				count: '',
+				remove: '',
 				exitHint: ''
 			}
 
 			const refreshAccessibility = function () {
-				shell.setAttribute('aria-label', accessibleText.brand + '. ' + accessibleText.mode + '. ' + accessibleText.count + '. ' + accessibleText.exitHint + '.')
+				shell.setAttribute('aria-label', [
+					accessibleText.brand,
+					accessibleText.mode,
+					accessibleText.count,
+					accessibleText.remove,
+					accessibleText.exitHint
+				].filter(Boolean).join('. ') + '.')
 			}
 
 			const refreshText = function (languageGame) {
@@ -78,7 +90,11 @@ ModLoader.register({
 				const brand = i18n.t(source, 'brand')
 				shell.querySelector('[data-world-editor-text="brand"]').textContent = brand
 				shell.querySelector('[data-world-editor-text="tool-select"]').textContent = i18n.t(source, 'toolSelect')
+				const removeText = i18n.t(source, 'removeSelection')
+				removeButton.title = removeText
+				removeButton.setAttribute('aria-label', removeText)
 				accessibleText.brand = brand
+				accessibleText.remove = removeText
 				refreshTool(source)
 				refreshHint(source)
 				refreshSelectionCount(source)
@@ -106,9 +122,16 @@ ModLoader.register({
 
 			const refreshSelectionCount = function (languageGame) {
 				const source = languageGame || game
-				const count = isRange(currentSelection?.previewRange) || isRange(currentSelection?.selectedRange) ? 1 : 0
+				const count = Number.isInteger(Number(currentSelection?.selectionCount))
+					? Math.max(0, Number(currentSelection.selectionCount))
+					: isRange(currentSelection?.previewRange) || isRange(currentSelection?.selectedRange) ? 1 : 0
 				const countText = formatCount(i18n.t(source, 'selectionCount'), count)
 				shell.querySelector('[data-world-editor-text="selection-count"]').textContent = countText
+				removeButton.disabled = (
+					typeof selection.removePrimary !== 'function' ||
+					!Number.isInteger(currentSelection?.primaryId) ||
+					isRange(currentSelection?.previewRange)
+				)
 				accessibleText.count = countText
 				refreshAccessibility()
 			}
@@ -147,7 +170,17 @@ ModLoader.register({
 				tool.setMode('select', 'toolbar-select')
 			}
 
+			const handleRemoveClick = function (event) {
+				event?.preventDefault?.()
+				event?.stopPropagation?.()
+				if (selection.hasPreview()) return
+				if (typeof selection.removePrimary === 'function') {
+					selection.removePrimary('toolbar-remove-primary')
+				}
+			}
+
 			selectButton.addEventListener('click', handleSelectClick)
+			removeButton.addEventListener('click', handleRemoveClick)
 
 			const handleGameHud = function (event) {
 				if (event?.detail?.game && event.detail.game !== game) return
@@ -185,12 +218,13 @@ ModLoader.register({
 				if (typeof stopSelectionSubscription === 'function') stopSelectionSubscription()
 				if (typeof stopToolSubscription === 'function') stopToolSubscription()
 				selectButton.removeEventListener('click', handleSelectClick)
+				removeButton.removeEventListener('click', handleRemoveClick)
 				if (typeof releaseHud === 'function') releaseHud()
 				shell.remove()
 				if (style.isConnected && !document.getElementById(SHELL_ID)) style.remove()
 			})
 
-			console.info('[Cattail World Editor] Unified toolbar 2E ready.')
+			console.info('[Cattail World Editor] Unified toolbar 2G ready.')
 		})
 
 		function createShell() {
@@ -236,7 +270,8 @@ ModLoader.register({
 			actions.className = 'cattail-world-editor-shell__actions'
 			actions.dataset.worldEditorSlot = 'actions'
 			const selectButton = createToolButton('select', 'tool-select')
-			actions.append(selectButton)
+			const removeButton = createIconButton('remove-selection', '×')
+			actions.append(selectButton, removeButton)
 
 			const hint = document.createElement('span')
 			hint.className = 'cattail-world-editor-shell__hint'
@@ -257,6 +292,19 @@ ModLoader.register({
 			const label = document.createElement('span')
 			label.dataset.worldEditorText = textKey
 			button.append(label)
+			return button
+		}
+
+		function createIconButton(action, symbol) {
+			const button = document.createElement('button')
+			button.type = 'button'
+			button.className = 'cattail-world-editor-shell__tool cattail-world-editor-shell__tool--icon'
+			button.dataset.worldEditorAction = action
+			button.disabled = true
+			const icon = document.createElement('span')
+			icon.setAttribute('aria-hidden', 'true')
+			icon.textContent = symbol
+			button.append(icon)
 			return button
 		}
 
@@ -389,6 +437,15 @@ ModLoader.register({
 					font: 600 12px/1.2 Montserrat, Arial, sans-serif;
 					cursor: pointer;
 					transition: background .12s ease, border-color .12s ease, color .12s ease, opacity .12s ease;
+				}
+				.cattail-world-editor-shell__tool--icon {
+					width: 30px;
+					min-width: 30px;
+					height: 30px;
+					min-height: 30px;
+					padding: 0;
+					font-size: 20px;
+					line-height: 1;
 				}
 				.cattail-world-editor-shell__tool:hover:not(:disabled) {
 					color: var(--world-editor-shell-text);

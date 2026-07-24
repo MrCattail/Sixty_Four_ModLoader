@@ -259,9 +259,9 @@ function testWheelInteraction() {
 	const selection = sandbox[SELECTION_KEY]
 	const tool = sandbox[TOOL_KEY]
 	const interaction = sandbox[INTERACTION_KEY]
-	assert.equal(selection.version, '0.2.5')
-	assert.equal(tool.version, '0.2.5')
-	assert.equal(interaction.version, '0.2.5')
+	assert.equal(selection.version, '0.2.6')
+	assert.equal(tool.version, '0.2.6')
+	assert.equal(interaction.version, '0.2.6')
 	assert.equal(interaction.wheelCommitMs, 1250)
 	assert.equal(interaction.wheelPixelThreshold, 100)
 	assert.equal(interaction.wheelMaxSteps, 4)
@@ -269,7 +269,7 @@ function testWheelInteraction() {
 	assert.equal(interaction.wheelEdgeOppositeGuardPx, 4)
 	assert.equal(interaction.wheelBottomTiePx, 1)
 	assert.equal(interaction.wheelEdgeSideEpsilonPx, .01)
-	assert.equal(interaction.wheelUnlockSlopPx, 2)
+	assert.equal(interaction.wheelUnlockSlopPx, 6)
 
 	let vanillaWheelCount = 0
 	canvas.addEventListener('wheel', () => {
@@ -339,9 +339,9 @@ function testWheelInteraction() {
 	assert.deepEqual(plain(selection.snapshot().selectedRange), range([12, 10], [14, 12]))
 	assert.equal(interaction.snapshot().wheelLatched, true)
 
-	dispatchCanvas('mousemove', { buttons: 0, offsetX: 125, offsetY: 110 }, [12, 11])
+	dispatchCanvas('mousemove', { buttons: 0, offsetX: 129, offsetY: 110 }, [12, 11])
 	assert.equal(interaction.snapshot().wheelLatched, true)
-	dispatchCanvas('mousemove', { buttons: 0, offsetX: 126, offsetY: 110 }, [12, 11])
+	dispatchCanvas('mousemove', { buttons: 0, offsetX: 130, offsetY: 110 }, [12, 11])
 	assert.equal(interaction.snapshot().wheelLatched, false)
 
 	reset([10, 10], [12, 12])
@@ -474,15 +474,20 @@ function testWheelInteraction() {
 
 	reset([10, 10], [12, 12])
 	wheel({ offsetX: 124, offsetY: 110, deltaY: -100 }, [12, 11])
-	dispatchCanvas('mousemove', { buttons: 0, offsetX: 125, offsetY: 110 }, [12, 11])
+	dispatchCanvas('mousemove', { buttons: 0, offsetX: 129, offsetY: 110 }, [12, 11])
 	assert.equal(selection.hasPreview(), true)
 	assert.equal(interaction.snapshot().wheelLatched, true)
-	dispatchCanvas('mousemove', { buttons: 0, offsetX: 126, offsetY: 110 }, [12, 11])
+	wheel({ offsetX: 129, offsetY: 110, deltaY: -100 }, [13, 11])
+	assert.deepEqual(plain(selection.snapshot().previewRange), range([12, 10], [14, 12]))
+	dispatchCanvas('mousemove', { buttons: 0, offsetX: 134, offsetY: 110 }, [13, 11])
+	assert.equal(selection.hasPreview(), true)
+	assert.equal(interaction.snapshot().wheelLatched, true)
+	dispatchCanvas('mousemove', { buttons: 0, offsetX: 135, offsetY: 110 }, [13, 11])
 	assert.equal(selection.hasPreview(), false)
-	assert.deepEqual(plain(selection.snapshot().selectedRange), range([11, 10], [13, 12]))
+	assert.deepEqual(plain(selection.snapshot().selectedRange), range([12, 10], [14, 12]))
 	assert.equal(interaction.snapshot().wheelLatched, false)
 	wheel({
-		offsetX: 126,
+		offsetX: 135,
 		offsetY: 110,
 		deltaY: -100,
 		handle: 'minU-midV'
@@ -510,12 +515,17 @@ function testWheelInteraction() {
 	timers.advance(1250)
 	assert.deepEqual(plain(selection.snapshot().selectedRange), range([-1, -1], [3, 3]))
 	wheel({ offsetX: 5, offsetY: 5, deltaY: -100, handle: 'maxU-maxV' }, [3, 3])
-	dispatchCanvas('mousemove', { buttons: 0, offsetX: 6, offsetY: 5 }, [0, 0])
+	dispatchCanvas('mousemove', { buttons: 0, offsetX: 10, offsetY: 5 }, [0, 0])
 	assert.equal(selection.hasPreview(), true)
 	assert.equal(interaction.snapshot().wheelLatched, true)
-	dispatchCanvas('mousemove', { buttons: 0, offsetX: 7, offsetY: 5 }, [0, 0])
+	wheel({ offsetX: 10, offsetY: 5, deltaY: -100, handle: 'maxU-maxV' }, [3, 3])
+	assert.deepEqual(plain(selection.snapshot().previewRange), range([-3, -3], [3, 3]))
+	dispatchCanvas('mousemove', { buttons: 0, offsetX: 15, offsetY: 5 }, [0, 0])
+	assert.equal(selection.hasPreview(), true)
+	assert.equal(interaction.snapshot().wheelLatched, true)
+	dispatchCanvas('mousemove', { buttons: 0, offsetX: 16, offsetY: 5 }, [0, 0])
 	assert.equal(selection.hasPreview(), false)
-	assert.deepEqual(plain(selection.snapshot().selectedRange), range([-2, -2], [3, 3]))
+	assert.deepEqual(plain(selection.snapshot().selectedRange), range([-3, -3], [3, 3]))
 	assert.equal(interaction.snapshot().wheelLatched, false)
 
 	reset([1, 1], [2, 2])
@@ -566,9 +576,9 @@ function testCardI18nManifestAndCompatibilityBoundary() {
 	const api = createApi()
 	for (const definition of definitions) definition.init(api)
 	const i18n = sandbox[I18N_KEY]
-	assert.equal(i18n.version, '0.2.5')
+	assert.equal(i18n.version, '0.2.6')
 	assert.equal(i18n.languages.length, 20)
-	assert.equal(i18n.keys.length, 30)
+	assert.equal(i18n.keys.length, 31)
 	assert.ok(i18n.keys.includes('wheelHint'))
 	for (const language of i18n.languages) {
 		assert.notEqual(i18n.t(language, 'wheelHint'), 'wheelHint')
@@ -598,7 +608,7 @@ function testCardI18nManifestAndCompatibilityBoundary() {
 	assert.match(controllerSource, /WHEEL_EDGE_OPPOSITE_GUARD_PX\s*=\s*4/)
 	assert.match(controllerSource, /WHEEL_BOTTOM_TIE_PX\s*=\s*1/)
 	assert.match(controllerSource, /WHEEL_EDGE_SIDE_EPSILON_PX\s*=\s*\.01/)
-	assert.match(controllerSource, /WHEEL_UNLOCK_SLOP_PX\s*=\s*2/)
+	assert.match(controllerSource, /WHEEL_UNLOCK_SLOP_PX\s*=\s*6/)
 	assert.match(controllerSource, /nearestSelectionDirection/)
 	assert.match(controllerSource, /visualEdgeSide/)
 	assert.match(controllerSource, /releaseWheelLatchOnPointerMove/)
@@ -615,7 +625,7 @@ function testCardI18nManifestAndCompatibilityBoundary() {
 	assert.match(dynamicCameraSource, /\},\s*true\)/)
 
 	const manifest = JSON.parse(fs.readFileSync(path.join(MOD_ROOT, 'mod.json'), 'utf8'))
-	assert.equal(manifest.version, '0.2.5')
+	assert.equal(manifest.version, '0.2.6')
 	assert.equal(manifest.languageSupport.gameLanguage, true)
 	assert.equal(manifest.entry.length, 13)
 
@@ -631,4 +641,4 @@ function testCardI18nManifestAndCompatibilityBoundary() {
 testWheelInteraction()
 testCardI18nManifestAndCompatibilityBoundary()
 
-console.log('2F verification passed: expanded corner targeting, visual-bottom corner/lower-edge reversal, upper-edge preservation, nearest-edge movement, persistent pointer-gated target lock, 1.25s settle, wheel accumulation, handle resize/crossing, 28px card clearance/pass-through, switch-green styling, cancellation, modifier priority, 20-language UI, manifest, and read-only boundary.')
+console.log('2F verification passed: expanded corner targeting, visual-bottom corner/lower-edge reversal, upper-edge preservation, nearest-edge movement, persistent per-adjustment 6px pointer-gated target lock, 1.25s settle, wheel accumulation, handle resize/crossing, 28px card clearance/pass-through, switch-green styling, cancellation, modifier priority, 20-language UI, manifest, and read-only boundary.')

@@ -10,11 +10,11 @@ ModLoader.register({
 			const runtime = globalThis[RUNTIME_KEY]
 			const selection = globalThis[SELECTION_KEY]
 			if (!runtime || runtime.game !== game || typeof runtime.addCleanup !== 'function') {
-				console.warn('[Cattail World Editor] Selection overlay 2A could not find the editor runtime.')
+				console.warn('[Cattail World Editor] Selection overlay 2G could not find the editor runtime.')
 				return
 			}
 			if (!selection || selection.game !== game || typeof selection.subscribe !== 'function') {
-				console.warn('[Cattail World Editor] Selection overlay 2A could not find the selection state.')
+				console.warn('[Cattail World Editor] Selection overlay 2G could not find the selection state.')
 				return
 			}
 			if (!api.render || typeof api.render.onLayer !== 'function') {
@@ -42,14 +42,19 @@ ModLoader.register({
 				if (typeof stopRendering === 'function') stopRendering()
 				if (typeof stopSelectionSubscription === 'function') stopSelectionSubscription()
 			})
-			console.info('[Cattail World Editor] Selection overlay 2A ready.')
+			console.info('[Cattail World Editor] Selection overlay 2G ready.')
 		})
 
 		function shouldRender(runtime, selection, game) {
 			if (!runtime || runtime.game !== game || !runtime.isActive()) return false
 			if (!game || game.halt || game.splash?.isShown || !game.canvas || typeof game.uvToXY !== 'function') return false
-			if (!selection || selection.plane !== (game.plane ? 1 : 0)) return false
-			if (!isRange(selection.previewRange) && !isRange(selection.selectedRange)) return false
+			if (!selection) return false
+			const plane = game.plane ? 1 : 0
+			const previewVisible = isRange(selection.previewRange) && selection.plane === plane
+			const committedVisible = getSelectionEntries(selection).some(function (entry) {
+				return entry.plane === plane && isRange(entry.range)
+			})
+			if (!previewVisible && !committedVisible) return false
 			return Number.isFinite(Number(game.unit)) && Number(game.unit) > 0
 		}
 
@@ -68,48 +73,94 @@ ModLoader.register({
 			const canvasHeight = Number(height) || Number(game.h) || 0
 			const screenOffsetX = finiteOr(game.w2, canvasWidth / 2)
 			const screenOffsetY = finiteOr(game.h2, canvasHeight / 2)
-			const preview = isRange(selection.previewRange) ? selection.previewRange : null
-			const range = preview || selection.selectedRange
-
-			let rangeCorners
-			let startCorners
-			let endCorners
-			try {
-				rangeCorners = projectRangeCorners(game, range, screenOffsetX, screenOffsetY)
-				startCorners = projectCellCorners(game, range.start, screenOffsetX, screenOffsetY)
-				if (!sameCell(range.start, range.end)) {
-					endCorners = projectCellCorners(game, range.end, screenOffsetX, screenOffsetY)
-				} else if (!preview) {
-					endCorners = projectCellCorners(game, range.end, screenOffsetX, screenOffsetY, .16)
-				}
-			} catch (error) {
-				return
-			}
-			if (!rangeCorners || !startCorners) return
+			const plane = game.plane ? 1 : 0
+			const preview = isRange(selection.previewRange) && selection.plane === plane
+				? selection.previewRange
+				: null
+			const targetId = preview ? selection.previewTargetId : null
+			const entries = getSelectionEntries(selection).filter(function (entry) {
+				return entry.plane === plane && isRange(entry.range) && entry.id !== targetId
+			})
+			const primaryId = Number.isInteger(selection.primaryId)
+				? selection.primaryId
+				: entries.length ? entries[entries.length - 1].id : null
+			const primary = entries.find(function (entry) {
+				return entry.id === primaryId
+			}) || null
+			const secondary = entries.filter(function (entry) {
+				return !primary || entry.id !== primary.id
+			})
 
 			ctx.save()
 			try {
 				ctx.setTransform(1, 0, 0, 1, 0, 0)
 				ctx.lineJoin = 'round'
-				drawPolygon(ctx, rangeCorners, getRangeColors(game, !!preview), outerWidth, innerWidth)
-				drawPolygon(ctx, startCorners, {
-					fill: game.plane ? 'rgba(93, 211, 255, .28)' : 'rgba(67, 180, 255, .24)',
-					outer: 'rgba(14, 22, 31, .72)',
-					inner: 'rgba(93, 211, 255, .98)'
-				}, outerWidth, innerWidth)
-				if (endCorners) {
-					const sameCommittedCell = !preview && sameCell(range.start, range.end)
-					drawPolygon(ctx, endCorners, {
-						fill: sameCommittedCell
-							? 'rgba(255, 168, 78, .08)'
-							: game.plane ? 'rgba(255, 174, 82, .30)' : 'rgba(255, 152, 61, .26)',
-						outer: sameCommittedCell ? 'rgba(35, 22, 12, .58)' : 'rgba(35, 22, 12, .74)',
-						inner: 'rgba(255, 168, 78, .98)'
-					}, sameCommittedCell ? outerWidth * .8 : outerWidth, sameCommittedCell ? innerWidth * .8 : innerWidth)
+				for (const entry of secondary) {
+					drawRange(ctx, game, entry.range, screenOffsetX, screenOffsetY, outerWidth, innerWidth, {
+						primary: false,
+						preview: false
+					})
+				}
+				if (primary) {
+					drawRange(ctx, game, primary.range, screenOffsetX, screenOffsetY, outerWidth, innerWidth, {
+						primary: !preview,
+						preview: false
+					})
+				}
+				if (preview) {
+					drawRange(ctx, game, preview, screenOffsetX, screenOffsetY, outerWidth, innerWidth, {
+						primary: true,
+						preview: true
+					})
 				}
 			} finally {
 				ctx.restore()
 			}
+		}
+
+		function drawRange(ctx, game, range, screenOffsetX, screenOffsetY, outerWidth, innerWidth, options) {
+			let rangeCorners
+			let startCorners
+			let endCorners
+			try {
+				rangeCorners = projectRangeCorners(game, range, screenOffsetX, screenOffsetY)
+				if (options.primary) {
+					startCorners = projectCellCorners(game, range.start, screenOffsetX, screenOffsetY)
+					if (!sameCell(range.start, range.end)) {
+						endCorners = projectCellCorners(game, range.end, screenOffsetX, screenOffsetY)
+					} else if (!options.preview) {
+						endCorners = projectCellCorners(game, range.end, screenOffsetX, screenOffsetY, .16)
+					}
+				}
+			} catch (error) {
+				return
+			}
+			if (!rangeCorners || (options.primary && !startCorners)) return
+
+			drawPolygon(
+				ctx,
+				rangeCorners,
+				options.primary ? getRangeColors(game, options.preview) : getSecondaryRangeColors(game),
+				outerWidth,
+				innerWidth
+			)
+			if (!options.primary) return
+
+			drawPolygon(ctx, startCorners, {
+				fill: game.plane ? 'rgba(93, 211, 255, .28)' : 'rgba(67, 180, 255, .24)',
+				outer: 'rgba(14, 22, 31, .72)',
+				inner: 'rgba(93, 211, 255, .98)'
+			}, outerWidth, innerWidth)
+			if (!endCorners) return
+
+			const sameCommittedCell = !options.preview && sameCell(range.start, range.end)
+			drawPolygon(ctx, endCorners, {
+				fill: sameCommittedCell
+					? 'rgba(255, 168, 78, .08)'
+					: game.plane ? 'rgba(255, 174, 82, .30)' : 'rgba(255, 152, 61, .26)',
+				outer: sameCommittedCell ? 'rgba(35, 22, 12, .58)' : 'rgba(35, 22, 12, .74)',
+				inner: 'rgba(255, 168, 78, .98)'
+			}, sameCommittedCell ? outerWidth * .8 : outerWidth, sameCommittedCell ? innerWidth * .8 : innerWidth)
 		}
 
 		function getRangeColors(game, preview) {
@@ -137,6 +188,38 @@ ModLoader.register({
 					outer: 'rgba(54, 40, 72, .74)',
 					inner: 'rgba(189, 159, 233, .95)'
 				}
+		}
+
+		function getSecondaryRangeColors(game) {
+			return game.plane
+				? {
+					fill: 'rgba(198, 175, 241, .08)',
+					outer: 'rgba(18, 12, 27, .48)',
+					inner: 'rgba(211, 190, 250, .68)'
+				}
+				: {
+					fill: 'rgba(170, 137, 220, .07)',
+					outer: 'rgba(54, 40, 72, .44)',
+					inner: 'rgba(183, 151, 229, .66)'
+				}
+		}
+
+		function getSelectionEntries(selection) {
+			if (Array.isArray(selection?.selections)) {
+				return selection.selections.map(function (entry) {
+					return {
+						id: entry?.id,
+						range: entry?.range,
+						plane: entry?.plane ? 1 : 0
+					}
+				})
+			}
+			if (!isRange(selection?.selectedRange)) return []
+			return [{
+				id: selection?.primaryId || 1,
+				range: selection.selectedRange,
+				plane: selection?.plane ? 1 : 0
+			}]
 		}
 
 		function drawPolygon(ctx, corners, colors, outerWidth, innerWidth) {

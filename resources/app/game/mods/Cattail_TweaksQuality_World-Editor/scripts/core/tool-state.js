@@ -48,7 +48,7 @@ ModLoader.register({
 
 			function snapshot() {
 				return {
-					version: '0.2.5',
+					version: '0.2.6',
 					mode,
 					revision,
 					lastReason,
@@ -68,7 +68,7 @@ ModLoader.register({
 			}
 
 			const tool = Object.freeze({
-				version: '0.2.5',
+				version: '0.2.6',
 				modes: MODES,
 				snapshot,
 				setMode(nextMode, reason) {

@@ -178,7 +178,7 @@ function testSelectionState() {
 	api.emit('afterGameInit', {}, game)
 	const selection = sandbox[SELECTION_KEY]
 
-	assert.equal(selection.version, '0.2.5')
+	assert.equal(selection.version, '0.2.6')
 	assert.equal(selection.begin([4, 6], 0, 'start'), true)
 	assert.deepEqual(plain(selection.snapshot().previewRange), {
 		start: [4, 6],
@@ -699,7 +699,7 @@ function testI18nAndUi() {
 
 	const i18n = sandbox[I18N_KEY]
 	const languages = ['en', 'sch', 'modsch', 'ru', 'de', 'ptbr', 'it', 'es', 'fr', 'nl', 'cz', 'pl', 'jp', 'kr', 'tch', 'thai', 'hu', 'lv', 'ro', 'no']
-	assert.equal(i18n.version, '0.2.5')
+	assert.equal(i18n.version, '0.2.6')
 	assert.equal(i18n.languages.length, 20)
 	assert.deepEqual(new Set(i18n.languages), new Set(languages))
 	for (const key of ['brand', 'modeArea', 'exitHint', 'cancelHint', 'toolbarModeArea', 'toolbarModeMove', 'toolSelect', 'toolMove', 'cardMovePreview', 'moveHint', 'selectionCount']) {

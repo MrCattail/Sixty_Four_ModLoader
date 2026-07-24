@@ -62,14 +62,16 @@ ModLoader.register({
 				selection.dispose('runtime-disposed')
 			})
 
-			console.info('[Cattail World Editor] Selection 2F ready.')
+			console.info('[Cattail World Editor] Selection 2G ready.')
 		})
 
 		function createSelection(game) {
-			let selectedRange = null
+			let selections = []
+			let primaryId = null
+			let nextSelectionId = 1
 			let previewRange = null
-			let selectedPlane = null
 			let previewPlane = null
+			let previewMode = null
 			let moveSession = null
 			let resizeSession = null
 			let revision = 0
@@ -77,17 +79,56 @@ ModLoader.register({
 			let disposed = false
 			const listeners = new Set()
 
-			function snapshot() {
+			function primaryEntry() {
+				return selections.find(function (entry) {
+					return entry.id === primaryId
+				}) || null
+			}
+
+			function createEntry(range, plane, id) {
+				return Object.freeze({
+					id: Number.isInteger(id) ? id : nextSelectionId++,
+					range: cloneRange(range),
+					plane: plane ? 1 : 0
+				})
+			}
+
+			function selectionSnapshot(entry) {
 				return {
-					version: '0.2.5',
-					selectedCell: selectedRange ? selectedRange.start.slice() : null,
-					selectedRange: cloneRange(selectedRange),
+					id: entry.id,
+					range: cloneRange(entry.range),
+					plane: entry.plane,
+					primary: entry.id === primaryId
+				}
+			}
+
+			function replaceEntryRange(id, range, plane) {
+				let replaced = false
+				selections = selections.map(function (entry) {
+					if (entry.id !== id) return entry
+					replaced = true
+					return createEntry(range, plane, entry.id)
+				})
+				return replaced
+			}
+
+			function snapshot() {
+				const primary = primaryEntry()
+				return {
+					version: '0.2.6',
+					selections: selections.map(selectionSnapshot),
+					primaryId,
+					selectionCount: selections.length,
+					selectedCell: primary ? primary.range.start.slice() : null,
+					selectedRange: primary ? cloneRange(primary.range) : null,
 					previewRange: cloneRange(previewRange),
 					previewKind: previewRange ? (moveSession ? 'move' : resizeSession ? 'resize' : 'selection') : null,
 					previewSource: previewRange ? (moveSession?.source || resizeSession?.source || 'pointer') : null,
-					resizeHandle: resizeSession ? currentResizeHandle(previewRange || selectedRange, resizeSession) : null,
+					previewMode: previewRange && !moveSession && !resizeSession ? previewMode : null,
+					previewTargetId: moveSession?.targetId || resizeSession?.targetId || null,
+					resizeHandle: resizeSession ? currentResizeHandle(previewRange || primary?.range, resizeSession) : null,
 					resizeOriginHandle: resizeSession ? resizeSession.handle : null,
-					plane: previewRange ? previewPlane : selectedRange ? selectedPlane : null,
+					plane: previewRange ? previewPlane : primary ? primary.plane : null,
 					revision,
 					lastReason,
 					disposed
@@ -111,11 +152,21 @@ ModLoader.register({
 				if (!normalized) return false
 				const normalizedPlane = plane ? 1 : 0
 				const nextRange = createRange(normalized, normalized)
-				if (!previewRange && selectedPlane === normalizedPlane && rangesEqual(selectedRange, nextRange)) return false
-				selectedRange = nextRange
-				selectedPlane = normalizedPlane
+				const primary = primaryEntry()
+				if (
+					!previewRange &&
+					selections.length === 1 &&
+					primary?.plane === normalizedPlane &&
+					rangesEqual(primary.range, nextRange)
+				) {
+					return false
+				}
+				const entry = createEntry(nextRange, normalizedPlane)
+				selections = [entry]
+				primaryId = entry.id
 				previewRange = null
 				previewPlane = null
+				previewMode = null
 				moveSession = null
 				resizeSession = null
 				revision += 1
@@ -124,17 +175,25 @@ ModLoader.register({
 				return true
 			}
 
-			function begin(cell, plane, reason) {
+			function begin(cell, plane, reason, options) {
 				if (disposed) return false
 				const normalized = normalizeCell(cell)
 				if (!normalized) return false
 				const normalizedPlane = plane ? 1 : 0
 				const nextRange = createRange(normalized, normalized)
-				if (previewPlane === normalizedPlane && rangesEqual(previewRange, nextRange)) return false
+				const nextMode = options === true || options?.additive ? 'append' : 'replace'
+				if (
+					previewPlane === normalizedPlane &&
+					previewMode === nextMode &&
+					rangesEqual(previewRange, nextRange)
+				) {
+					return false
+				}
 				moveSession = null
 				resizeSession = null
 				previewRange = nextRange
 				previewPlane = normalizedPlane
+				previewMode = nextMode
 				revision += 1
 				lastReason = String(reason || 'preview-started')
 				notify()
@@ -160,10 +219,15 @@ ModLoader.register({
 				const normalized = normalizeCell(cell)
 				const normalizedPlane = plane ? 1 : 0
 				if (!normalized || normalizedPlane !== previewPlane) return false
-				selectedRange = createRange(previewRange.start, normalized)
-				selectedPlane = normalizedPlane
+				const nextRange = createRange(previewRange.start, normalized)
+				const entry = createEntry(nextRange, normalizedPlane)
+				selections = previewMode === 'append'
+					? selections.concat(entry)
+					: [entry]
+				primaryId = entry.id
 				previewRange = null
 				previewPlane = null
+				previewMode = null
 				moveSession = null
 				resizeSession = null
 				revision += 1
@@ -173,18 +237,21 @@ ModLoader.register({
 			}
 
 			function beginMove(cell, plane, reason, source) {
-				if (disposed || previewRange || !selectedRange) return false
+				const primary = primaryEntry()
+				if (disposed || previewRange || !primary) return false
 				const normalized = normalizeCell(cell)
 				const normalizedPlane = plane ? 1 : 0
-				if (!normalized || normalizedPlane !== selectedPlane || !rangeContains(selectedRange, normalized)) return false
+				if (!normalized || normalizedPlane !== primary.plane || !rangeContains(primary.range, normalized)) return false
 				moveSession = {
+					targetId: primary.id,
 					anchor: normalized,
-					originRange: selectedRange,
+					originRange: primary.range,
 					source: normalizeSource(source)
 				}
 				resizeSession = null
-				previewRange = createRange(selectedRange.start, selectedRange.end)
-				previewPlane = selectedPlane
+				previewRange = createRange(primary.range.start, primary.range.end)
+				previewPlane = primary.plane
+				previewMode = null
 				revision += 1
 				lastReason = String(reason || 'move-started')
 				notify()
@@ -206,10 +273,10 @@ ModLoader.register({
 				if (disposed || !moveSession || !previewRange) return false
 				const nextRange = movedRange(cell, plane)
 				if (!nextRange) return false
-				selectedRange = nextRange
-				selectedPlane = previewPlane
+				if (!replaceEntryRange(moveSession.targetId, nextRange, previewPlane)) return false
 				previewRange = null
 				previewPlane = null
+				previewMode = null
 				moveSession = null
 				resizeSession = null
 				revision += 1
@@ -237,22 +304,25 @@ ModLoader.register({
 			}
 
 			function beginResize(handle, cell, plane, reason, source) {
-				if (disposed || previewRange || !selectedRange) return false
+				const primary = primaryEntry()
+				if (disposed || previewRange || !primary) return false
 				const definition = RESIZE_HANDLES[handle]
 				const normalized = normalizeCell(cell)
 				const normalizedPlane = plane ? 1 : 0
-				if (!definition || !normalized || normalizedPlane !== selectedPlane) return false
+				if (!definition || !normalized || normalizedPlane !== primary.plane) return false
 				resizeSession = {
+					targetId: primary.id,
 					handle,
 					anchor: normalized,
-					originRange: selectedRange,
+					originRange: primary.range,
 					source: normalizeSource(source),
-					uOwner: definition.u ? endpointOwner(selectedRange, 0, definition.u) : null,
-					vOwner: definition.v ? endpointOwner(selectedRange, 1, definition.v) : null
+					uOwner: definition.u ? endpointOwner(primary.range, 0, definition.u) : null,
+					vOwner: definition.v ? endpointOwner(primary.range, 1, definition.v) : null
 				}
 				moveSession = null
-				previewRange = createRange(selectedRange.start, selectedRange.end)
-				previewPlane = selectedPlane
+				previewRange = createRange(primary.range.start, primary.range.end)
+				previewPlane = primary.plane
+				previewMode = null
 				revision += 1
 				lastReason = String(reason || 'resize-started')
 				notify()
@@ -274,10 +344,10 @@ ModLoader.register({
 				if (disposed || !resizeSession || !previewRange) return false
 				const nextRange = resizedRange(cell, plane)
 				if (!nextRange) return false
-				selectedRange = nextRange
-				selectedPlane = previewPlane
+				if (!replaceEntryRange(resizeSession.targetId, nextRange, previewPlane)) return false
 				previewRange = null
 				previewPlane = null
+				previewMode = null
 				moveSession = null
 				resizeSession = null
 				revision += 1
@@ -321,6 +391,7 @@ ModLoader.register({
 				if (disposed || !previewRange) return false
 				previewRange = null
 				previewPlane = null
+				previewMode = null
 				moveSession = null
 				resizeSession = null
 				revision += 1
@@ -330,11 +401,12 @@ ModLoader.register({
 			}
 
 			function clear(reason) {
-				if (disposed || (!selectedRange && !previewRange)) return false
-				selectedRange = null
+				if (disposed || (!selections.length && !previewRange)) return false
+				selections = []
+				primaryId = null
 				previewRange = null
-				selectedPlane = null
 				previewPlane = null
+				previewMode = null
 				moveSession = null
 				resizeSession = null
 				revision += 1
@@ -344,7 +416,7 @@ ModLoader.register({
 			}
 
 			const selection = Object.freeze({
-				version: '0.2.5',
+				version: '0.2.6',
 				resizeHandles: Object.freeze(Object.keys(RESIZE_HANDLES)),
 				game,
 				snapshot,
@@ -360,6 +432,55 @@ ModLoader.register({
 				commitResize,
 				cancelPreview,
 				clear,
+				setPrimary(id, reason) {
+					if (disposed || previewRange || !Number.isInteger(Number(id))) return false
+					const normalizedId = Number(id)
+					const index = selections.findIndex(function (entry) {
+						return entry.id === normalizedId
+					})
+					if (index < 0) return false
+					if (primaryId === normalizedId && index === selections.length - 1) return false
+					const next = selections.slice()
+					const entry = next.splice(index, 1)[0]
+					next.push(entry)
+					selections = next
+					primaryId = normalizedId
+					revision += 1
+					lastReason = String(reason || 'primary-changed')
+					notify()
+					return true
+				},
+				remove(id, reason) {
+					if (disposed || previewRange || !Number.isInteger(Number(id))) return false
+					const normalizedId = Number(id)
+					const index = selections.findIndex(function (entry) {
+						return entry.id === normalizedId
+					})
+					if (index < 0) return false
+					selections = selections.slice(0, index).concat(selections.slice(index + 1))
+					if (primaryId === normalizedId) {
+						primaryId = selections.length ? selections[selections.length - 1].id : null
+					}
+					revision += 1
+					lastReason = String(reason || 'selection-removed')
+					notify()
+					return true
+				},
+				removePrimary(reason) {
+					return primaryId === null ? false : selection.remove(primaryId, reason || 'primary-removed')
+				},
+				selectionAt(cell, plane) {
+					const normalized = normalizeCell(cell)
+					const normalizedPlane = plane ? 1 : 0
+					if (!normalized) return null
+					const primary = primaryEntry()
+					if (primary?.plane === normalizedPlane && rangeContains(primary.range, normalized)) return primary.id
+					for (let index = selections.length - 1; index >= 0; index -= 1) {
+						const entry = selections[index]
+						if (entry.plane === normalizedPlane && rangeContains(entry.range, normalized)) return entry.id
+					}
+					return null
+				},
 				hasPreview() {
 					return !disposed && !!previewRange
 				},
@@ -370,15 +491,17 @@ ModLoader.register({
 					return !disposed && !!resizeSession
 				},
 				isSelected(cell, plane) {
+					return !disposed && selection.selectionAt(cell, plane) !== null
+				},
+				isPrimarySelected(cell, plane) {
 					const normalized = normalizeCell(cell)
+					const primary = primaryEntry()
 					return !!(
+						!disposed &&
 						normalized &&
-						selectedRange &&
-						selectedPlane === (plane ? 1 : 0) &&
-						normalized[0] >= selectedRange.minU &&
-						normalized[0] <= selectedRange.maxU &&
-						normalized[1] >= selectedRange.minV &&
-						normalized[1] <= selectedRange.maxV
+						primary &&
+						primary.plane === (plane ? 1 : 0) &&
+						rangeContains(primary.range, normalized)
 					)
 				},
 				subscribe(listener) {
@@ -396,7 +519,7 @@ ModLoader.register({
 				},
 				dispose(reason) {
 					if (disposed) return false
-					if (selectedRange || previewRange) clear(reason || 'disposed')
+					if (selections.length || previewRange) clear(reason || 'disposed')
 					disposed = true
 					listeners.clear()
 					if (globalThis[SELECTION_KEY] === selection) delete globalThis[SELECTION_KEY]

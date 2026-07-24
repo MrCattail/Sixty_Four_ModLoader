@@ -169,8 +169,8 @@ function testMoveStateAndToolLifecycle() {
 	const selection = sandbox[SELECTION_KEY]
 	const tool = sandbox[TOOL_KEY]
 
-	assert.equal(selection.version, '0.2.5')
-	assert.equal(tool.version, '0.2.5')
+	assert.equal(selection.version, '0.2.6')
+	assert.equal(tool.version, '0.2.6')
 	assert.deepEqual(plain(tool.modes), ['select'])
 	assert.equal(tool.snapshot().mode, 'select')
 
@@ -578,9 +578,9 @@ function testUnifiedToolbarAndLocalization() {
 	const selectButton = shell.querySelector('[data-world-editor-action="select"]')
 	const moveButton = shell.querySelector('[data-world-editor-action="move"]')
 	const resizeButton = shell.querySelector('[data-world-editor-action="resize"]')
-	assert.equal(i18n.version, '0.2.5')
+	assert.equal(i18n.version, '0.2.6')
 	assert.equal(i18n.languages.length, 20)
-	assert.equal(i18n.keys.length, 30)
+	assert.equal(i18n.keys.length, 31)
 	assert.equal(shell.getAttribute('role'), 'toolbar')
 	assert.equal(moveButton, null)
 	assert.equal(resizeButton, null)
@@ -613,7 +613,7 @@ function testUnifiedToolbarAndLocalization() {
 
 function testManifestAndReadOnlyBoundary() {
 	const manifest = JSON.parse(fs.readFileSync(path.join(MOD_ROOT, 'mod.json'), 'utf8'))
-	assert.equal(manifest.version, '0.2.5')
+	assert.equal(manifest.version, '0.2.6')
 	assert.equal(manifest.languageSupport.gameLanguage, true)
 	assert.deepEqual(manifest.entry, [
 		'scripts/core/foundation.js',

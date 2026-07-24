@@ -57,13 +57,13 @@ ModLoader.register({
 			let disposed = false
 
 			const service = Object.freeze({
-				version: '0.2.5',
+				version: '0.2.6',
 				handles: Object.freeze(HANDLE_DEFINITIONS.map(function (definition) {
 					return definition.id
 				})),
 				snapshot() {
 					return {
-						version: '0.2.5',
+						version: '0.2.6',
 						hoveredHandle,
 						activeHandle: currentSelection?.previewKind === 'resize' ? currentSelection.resizeHandle : null,
 						visible: shouldShowHandles()
