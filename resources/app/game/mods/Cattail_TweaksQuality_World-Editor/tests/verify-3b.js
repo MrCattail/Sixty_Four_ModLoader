@@ -346,23 +346,48 @@ async function testPlannerStatusesCostsAndGuards() {
 	assert.deepEqual(plain(plan.cost.overwrite.required), [57.5, 23.1])
 	assert.deepEqual(plain(plan.cost.overwrite.shortfall), [47.5, 0])
 	assert.equal(planner.verify(game, plan.guard), true)
+	assert.deepEqual(plain(planner.inspect(game, plan.guard)), { valid: true, reason: 'valid' })
+	assert.deepEqual(plain(planner.inspect(null, plan.guard)), { valid: false, reason: 'invalid' })
 
 	game.setCell(10, 10, entity('pump', [10, 10]))
 	assert.equal(planner.verify(game, plan.guard), false)
+	assert.deepEqual(plain(planner.inspect(game, plan.guard)), { valid: false, reason: 'cells' })
 	game.setCell(10, 10, null)
 	assert.equal(planner.verify(game, plan.guard), true)
 
 	game.entitiesInGame.silo += 1
 	assert.equal(planner.verify(game, plan.guard), false)
+	assert.deepEqual(plain(planner.inspect(game, plan.guard)), { valid: false, reason: 'counts' })
 	game.entitiesInGame.silo -= 1
 	game.onlyones.silo = true
 	assert.equal(planner.verify(game, plan.guard), false)
+	assert.deepEqual(plain(planner.inspect(game, plan.guard)), { valid: false, reason: 'onlyones' })
 	delete game.onlyones.silo
 	game.resources[0] += 1
 	assert.equal(planner.verify(game, plan.guard), false)
+	assert.deepEqual(plain(planner.inspect(game, plan.guard)), { valid: false, reason: 'resources' })
+	const refreshed = planner.refreshResources(game, plan)
+	assert.notEqual(refreshed, plan)
+	assert.equal(refreshed.records, plan.records)
+	assert.equal(refreshed.statusCounts, plan.statusCounts)
+	assert.equal(refreshed.bounds, plan.bounds)
+	assert.equal(refreshed.guard.cells, plan.guard.cells)
+	assert.equal(refreshed.guard.counts, plan.guard.counts)
+	assert.equal(refreshed.guard.onlyones, plan.guard.onlyones)
+	assert.equal(refreshed.cost.safe.required, plan.cost.safe.required)
+	assert.equal(refreshed.cost.safe.demand, plan.cost.safe.demand)
+	assert.equal(refreshed.cost.safe.refunds, plan.cost.safe.refunds)
+	assert.deepEqual(plain(refreshed.guard.resources), [11, 100])
+	assert.deepEqual(plain(refreshed.cost.safe.owned), [11, 100])
+	assert.deepEqual(plain(refreshed.cost.safe.shortfall), [9, 0])
+	assert.deepEqual(plain(refreshed.cost.overwrite.owned), [11, 100])
+	assert.deepEqual(plain(refreshed.cost.overwrite.shortfall), [46.5, 0])
+	assert.deepEqual(plain(plan.guard.resources), [10, 100])
+	assert.equal(planner.verify(game, refreshed.guard), true)
 	game.resources[0] -= 1
 	game.eraserType = 2
 	assert.equal(planner.verify(game, plan.guard), false)
+	assert.deepEqual(plain(planner.inspect(game, plan.guard)), { valid: false, reason: 'eraserType' })
 	game.eraserType = 1
 	assert.equal(planner.verify(game, plan.guard), true)
 
@@ -927,10 +952,11 @@ async function testFollowThrottleUiAndMetrics() {
 	assert.equal(current.performance.resourceRebuilds, baseline.resourceRebuilds)
 	assert.ok(current.performance.visualFollowUpdates >= baseline.visualFollowUpdates + 12)
 	assert.equal(env.context.canvas.style.transform, 'translate3d(252px, 0px, 0)')
-	assert.equal(env.context.canvas.style.filter, 'saturate(.7)')
+	assert.equal(env.context.canvas.style.filter, '')
 	assert.equal(env.context.canvas.style.opacity, '.85')
-	assert.equal(env.context.canvas.style.transition, 'filter 80ms linear, opacity 80ms linear')
+	assert.equal(env.context.canvas.style.transition, 'opacity 80ms linear')
 	assert.doesNotMatch(env.context.canvas.style.transition, /transform/)
+	assert.equal(env.context.canvas.style.willChange, 'transform')
 
 	env.advanceTime(99)
 	await flushMicrotasks()
@@ -951,7 +977,8 @@ async function testFollowThrottleUiAndMetrics() {
 	assert.equal(env.context.canvas.style.transform, '')
 	assert.equal(env.context.canvas.style.filter, '')
 	assert.equal(env.context.canvas.style.opacity, '')
-	assert.equal(env.context.canvas.style.transition, 'filter 80ms linear, opacity 80ms linear')
+	assert.equal(env.context.canvas.style.transition, 'opacity 80ms linear')
+	assert.equal(env.context.canvas.style.willChange, 'transform')
 	assert.equal(env.infoLogs.some(line => /planned \(mouse-follow\)|planned \(frame-follow\)/.test(line)), false)
 
 	env.game.hoveredCell = [50, 20]
@@ -975,13 +1002,15 @@ async function testFollowThrottleUiAndMetrics() {
 	assert.equal(env.context.canvas.style.transform, '')
 	assert.equal(env.context.canvas.style.filter, '')
 	assert.equal(env.context.canvas.style.opacity, '')
-	assert.equal(env.context.canvas.style.transition, 'filter 80ms linear, opacity 80ms linear')
+	assert.equal(env.context.canvas.style.transition, 'opacity 80ms linear')
+	assert.equal(env.context.canvas.style.willChange, 'transform')
 
 	env.runtime.runCleanups()
 	assert.equal(env.context.canvas.style.transform, '')
 	assert.equal(env.context.canvas.style.filter, '')
 	assert.equal(env.context.canvas.style.opacity, '')
 	assert.equal(env.context.canvas.style.transition, '')
+	assert.equal(env.context.canvas.style.willChange, '')
 }
 
 async function testPreviewCardDomLifecycle() {
@@ -1089,7 +1118,7 @@ function testManifestLocalizationAndStaticContracts() {
 	const i18n = loadI18n()
 	assert.equal(i18n.version, '0.3.1')
 	assert.equal(i18n.languages.length, 20)
-	assert.equal(i18n.keys.length, 70)
+	assert.equal(i18n.keys.length, 77)
 	for (const language of i18n.languages) {
 		for (const key of previewKeys) {
 			const translated = i18n.t(language, key)
@@ -1099,7 +1128,7 @@ function testManifestLocalizationAndStaticContracts() {
 	}
 
 	const manifest = JSON.parse(fs.readFileSync(path.join(MOD_ROOT, 'mod.json'), 'utf8'))
-	assert.equal(manifest.version, '0.3.2')
+	assert.equal(manifest.version, '0.3.3')
 	assert.equal(manifest.languageSupport.gameLanguage, true)
 	assert.deepEqual(manifest.entry, [
 		'scripts/core/foundation.js',
@@ -1107,6 +1136,7 @@ function testManifestLocalizationAndStaticContracts() {
 		'scripts/core/selection-state.js',
 		'scripts/core/tool-state.js',
 		'scripts/core/selection-analysis.js',
+		'scripts/core/blueprint-transform.js',
 		'scripts/core/blueprint-preview-plan.js',
 		'scripts/core/input-controller.js',
 		'scripts/render/resize-handles.js',
@@ -1134,9 +1164,10 @@ function testManifestLocalizationAndStaticContracts() {
 	assert.match(previewSource, /clearEachFrame:\s*false/)
 	assert.match(previewSource, /FOLLOW_PLAN_IDLE_MS\s*=\s*100/)
 	assert.match(previewSource, /style\.transform\s*=\s*offsetX\s*\|\|\s*offsetY\s*\?\s*'translate3d\('/)
-	assert.match(previewSource, /style\.filter\s*=\s*provisional\s*\?\s*PENDING_PREVIEW_FILTER/)
-	assert.match(previewSource, /style\.opacity\s*=\s*provisional\s*\?\s*PENDING_PREVIEW_OPACITY/)
-	assert.match(previewSource, /PENDING_PREVIEW_TRANSITION\s*=\s*'filter 80ms linear, opacity 80ms linear'/)
+	assert.match(previewSource, /setStyleValue\(style,\s*'filter',\s*''\)/)
+	assert.doesNotMatch(previewSource, /PENDING_PREVIEW_FILTER|saturate\(/)
+	assert.match(previewSource, /setStyleValue\(style,\s*'opacity',\s*provisional\s*\?\s*PENDING_PREVIEW_OPACITY\s*:\s*''\)/)
+	assert.match(previewSource, /PENDING_PREVIEW_TRANSITION\s*=\s*'opacity 80ms linear'/)
 	assert.doesNotMatch(previewSource.match(/PENDING_PREVIEW_TRANSITION\s*=\s*'([^']+)'/)?.[1] || '', /transform/)
 	assert.match(previewSource, /api\.render\.markDirty\(RENDER_LAYER_ID,\s*game\)/)
 	assert.match(plannerSource, /schemaVersion\s*!==\s*1\s*&&\s*schemaVersion\s*!==\s*2/)
@@ -1171,7 +1202,7 @@ async function run() {
 	await testFollowThrottleUiAndMetrics()
 	await testPreviewCardDomLifecycle()
 	testManifestLocalizationAndStaticContracts()
-	console.log('3B verification passed: four-state planning, only-one precedence, deterministic safe/overwrite costs, read-only guards, cancellation/retry contracts, structure/full lifecycle, pin/follow input ownership, cached dirty-only centered rendering, CSS visual following with provisional filtering, 100 ms idle/fixed final planning, frame-coalesced UI/resource caching, immediate first DOM card positioning plus frame movement/avoidance/interaction, 20-language UI, original-font card, manifest order, and 100/500/2000 synthetic benchmark.')
+	console.log('3B verification passed: four-state planning, only-one precedence, deterministic safe/overwrite costs, detailed read-only guards and resource-only cost refresh, cancellation/retry contracts, structure/full lifecycle, pin/follow input ownership, cached dirty-only centered rendering, CSS visual following with provisional opacity, 100 ms idle/fixed final planning, frame-coalesced UI/resource caching, immediate first DOM card positioning plus frame movement/avoidance/interaction, 20-language UI, original-font card, manifest order, and 100/500/2000 synthetic benchmark.')
 }
 
 run().catch(error => {

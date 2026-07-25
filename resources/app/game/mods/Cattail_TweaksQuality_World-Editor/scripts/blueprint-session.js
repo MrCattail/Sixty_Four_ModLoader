@@ -6,6 +6,8 @@ ModLoader.register({
 		const INTERACTION_KEY = Symbol.for('cattail.world-editor.selection-interaction')
 		const I18N_KEY = Symbol.for('cattail.world-editor.i18n')
 		const BLUEPRINT_KEY = Symbol.for('cattail.world-editor.blueprint')
+		const TRANSFORM_KEY = Symbol.for('cattail.world-editor.blueprint-transform')
+		const PREVIEW_KEY = Symbol.for('cattail.world-editor.blueprint-preview')
 		const SHELL_ID = 'cattail-world-editor-shell'
 		const SELECTION_CARD_ID = 'cattail-world-editor-selection-card'
 		const CARD_ID = 'cattail-world-editor-blueprint-card'
@@ -13,6 +15,7 @@ ModLoader.register({
 		const TEMPORARY_VISIBLE_MS = 3000
 		const SCAN_CHUNK_SIZE = 1024
 		const EDITABLE_SELECTOR = 'input, textarea, select, [contenteditable]:not([contenteditable="false"]), [role="textbox"]'
+		const ICON_ASSETS = Object.freeze({})
 		let refreshMountedText = null
 
 		api.on('afterWords', function (words, game) {
@@ -23,6 +26,19 @@ ModLoader.register({
 			const runtime = globalThis[RUNTIME_KEY]
 			const selection = globalThis[SELECTION_KEY]
 			const i18n = globalThis[I18N_KEY]
+			const transform = globalThis[TRANSFORM_KEY]
+			const transformAvailable = !!(
+				transform &&
+				typeof transform.bind === 'function' &&
+				typeof transform.clear === 'function' &&
+				typeof transform.rotateClockwise === 'function' &&
+				typeof transform.rotateCounterclockwise === 'function' &&
+				typeof transform.mirrorU === 'function' &&
+				typeof transform.mirrorV === 'function' &&
+				typeof transform.reset === 'function' &&
+				typeof transform.subscribe === 'function' &&
+				typeof transform.snapshot === 'function'
+			)
 			if (!runtime || runtime.game !== game || typeof runtime.addCleanup !== 'function') {
 				console.warn('[Cattail World Editor] Blueprint 3A could not find the editor runtime.')
 				return
@@ -49,6 +65,16 @@ ModLoader.register({
 			let currentRuntime = runtime.snapshot()
 			let currentSelection = selection.snapshot()
 			let currentSession = session.snapshot()
+			if (transformAvailable) transform.clear('session-initialized')
+			let currentTransform = transformAvailable
+				? transform.snapshot()
+				: Object.freeze({ source: null, blueprint: null, identity: true, revision: 0 })
+			let currentPreview = null
+			let previewController = null
+			let stopPreviewSubscription = null
+			let projectedDisplayResult = null
+			let projectedDisplayBlueprint = null
+			let projectedDisplayValue = null
 			let ui = null
 			let stopRenderFrame = null
 			let gameHudHidden = false
@@ -60,6 +86,7 @@ ModLoader.register({
 				ui = mountUi()
 				if (ui && api.render?.onFrame) {
 					stopRenderFrame = api.render.onFrame(function (context) {
+						connectPreviewController()
 						syncCardPosition(context?.game || game)
 					})
 				}
@@ -77,7 +104,12 @@ ModLoader.register({
 			const stopSessionSubscription = session.subscribe(function (state) {
 				const previousAttempt = currentSession?.attemptId || 0
 				const wasCapturing = !!currentSession?.capturing
+				const previousBlueprint = currentSession?.blueprint
 				currentSession = state
+				if (transformAvailable && state.blueprint !== previousBlueprint) {
+					if (state.blueprint) transform.bind(state.blueprint, 'session-blueprint')
+					else transform.clear('session-blueprint-cleared')
+				}
 				if (ui && state.attemptId > previousAttempt) restartTemporaryWindow()
 				if (ui && wasCapturing && !state.capturing) resumeTemporaryTimer()
 				if (ui && !state.blueprint && !state.lastResult) {
@@ -86,6 +118,10 @@ ModLoader.register({
 				}
 				refreshUi()
 			})
+			const stopTransformSubscription = transformAvailable ? transform.subscribe(function (state) {
+				currentTransform = state
+				refreshTransformUi()
+			}) : null
 
 			const handleKeydown = function (event) {
 				const key = String(event?.key || '').toLowerCase()
@@ -106,7 +142,7 @@ ModLoader.register({
 					return
 				}
 				consume(event)
-				session.capture('hotkey-copy')
+				captureFromUi('hotkey-copy')
 			}
 
 			const handleGameHud = function (event) {
@@ -143,12 +179,42 @@ ModLoader.register({
 				if (typeof stopRuntimeSubscription === 'function') stopRuntimeSubscription()
 				if (typeof stopSelectionSubscription === 'function') stopSelectionSubscription()
 				if (typeof stopSessionSubscription === 'function') stopSessionSubscription()
+				if (typeof stopTransformSubscription === 'function') stopTransformSubscription()
+				if (typeof stopPreviewSubscription === 'function') stopPreviewSubscription()
 				if (typeof stopRenderFrame === 'function') stopRenderFrame()
 				if (ui) unmountUi()
+				if (transformAvailable) transform.clear('runtime-disposed')
 				session.dispose('runtime-disposed')
 			})
 
 			console.info('[Cattail World Editor] Read-only blueprint session 3A ready.')
+
+			function connectPreviewController() {
+				const next = globalThis[PREVIEW_KEY]
+				if (next === previewController) return
+				if (typeof stopPreviewSubscription === 'function') stopPreviewSubscription()
+				stopPreviewSubscription = null
+				previewController = next && typeof next.snapshot === 'function' ? next : null
+				currentPreview = previewController ? previewController.snapshot() : null
+				if (previewController && typeof previewController.subscribe === 'function') {
+					stopPreviewSubscription = previewController.subscribe(function (state) {
+						const previousState = currentPreview
+						currentPreview = state
+						if (
+							!previousState ||
+							previousState.active !== state.active ||
+							previousState.pinned !== state.pinned ||
+							previousState.paused !== state.paused ||
+							previousState.blueprint !== state.blueprint
+						) {
+							refreshTransformUi()
+							syncCardPassThrough()
+						}
+					})
+				}
+				refreshTransformUi()
+				syncCardPassThrough()
+			}
 
 			function createBlueprintSession(sessionGame, selectionState) {
 				let mode = 'structure'
@@ -570,12 +636,14 @@ ModLoader.register({
 				controls.full.addEventListener('click', handleFullMode)
 				controls.blocks.addEventListener('click', handleBlocksToggle)
 				controls.copy.addEventListener('click', handleCopy)
+				controls.transforms.addEventListener('click', handleTransformAction)
 				card.addEventListener('mouseenter', handleCardMouseEnter)
 				card.addEventListener('mouseleave', handleCardMouseLeave)
 				card.addEventListener('mousedown', stopCardPointerDown)
 				card.addEventListener('click', toggleCardPinned)
 				card.addEventListener('keydown', handleCardKeydown)
 				card.querySelector('[data-world-editor-blueprint-action="clear"]').addEventListener('click', handleClear)
+				card.querySelector('[data-world-editor-transform-controls="card"]').addEventListener('click', handleTransformAction)
 
 				if (api.ui?.hud?.register) {
 					mounted.releaseHud = api.ui.hud.register({
@@ -597,12 +665,14 @@ ModLoader.register({
 				ui.controls.full.removeEventListener('click', handleFullMode)
 				ui.controls.blocks.removeEventListener('click', handleBlocksToggle)
 				ui.controls.copy.removeEventListener('click', handleCopy)
+				ui.controls.transforms.removeEventListener('click', handleTransformAction)
 				ui.card.removeEventListener('mouseenter', handleCardMouseEnter)
 				ui.card.removeEventListener('mouseleave', handleCardMouseLeave)
 				ui.card.removeEventListener('mousedown', stopCardPointerDown)
 				ui.card.removeEventListener('click', toggleCardPinned)
 				ui.card.removeEventListener('keydown', handleCardKeydown)
 				ui.card.querySelector('[data-world-editor-blueprint-action="clear"]')?.removeEventListener('click', handleClear)
+				ui.card.querySelector('[data-world-editor-transform-controls="card"]')?.removeEventListener('click', handleTransformAction)
 				if (typeof ui.releaseHud === 'function') ui.releaseHud()
 				ui.controls.root.remove()
 				ui.card.remove()
@@ -621,12 +691,16 @@ ModLoader.register({
 				const structure = createModeButton('structure')
 				const full = createModeButton('full')
 				modes.append(structure, full)
+				full.hidden = true
+				full.setAttribute('aria-hidden', 'true')
 
 				const blocks = document.createElement('button')
 				blocks.type = 'button'
 				blocks.className = 'cattail-world-editor-blueprint-icon-button'
 				blocks.dataset.worldEditorBlueprintAction = 'blocks'
 				blocks.setAttribute('aria-pressed', 'false')
+				blocks.hidden = true
+				blocks.setAttribute('aria-hidden', 'true')
 				const cubeCanvas = document.createElement('canvas')
 				cubeCanvas.width = 24
 				cubeCanvas.height = 24
@@ -643,8 +717,9 @@ ModLoader.register({
 				copyIcon.textContent = '⧉'
 				copy.append(copyIcon)
 
-				root.append(modes, blocks, copy)
-				return { root, modes, structure, full, blocks, copy }
+				const transforms = createTransformControls('toolbar')
+				root.append(modes, blocks, copy, transforms)
+				return { root, modes, structure, full, blocks, copy, transforms }
 			}
 
 			function createModeButton(mode) {
@@ -703,13 +778,67 @@ ModLoader.register({
 				status.className = 'cattail-world-editor-blueprint-card__status'
 				status.dataset.worldEditorBlueprintText = 'status'
 
+				const transformPanel = document.createElement('div')
+				transformPanel.className = 'cattail-world-editor-blueprint-card__transform'
+				transformPanel.dataset.worldEditorTransformPanel = ''
+				transformPanel.hidden = true
+				const transformState = document.createElement('span')
+				transformState.className = 'cattail-world-editor-blueprint-card__transform-state'
+				transformState.dataset.worldEditorBlueprintText = 'transform-state'
+				transformPanel.append(transformState, createTransformControls('card'))
+
 				const captured = createTypeSection('captured')
 				const skipped = createTypeSection('skipped')
 				const hint = document.createElement('div')
 				hint.className = 'cattail-world-editor-blueprint-card__hint'
 				hint.dataset.worldEditorBlueprintText = 'hint'
-				card.append(header, meta, status, captured.section, skipped.section, hint)
+				card.append(header, meta, status, transformPanel, captured.section, skipped.section, hint)
 				return card
+			}
+
+			function createTransformControls(location) {
+				const root = document.createElement('span')
+				root.className = 'cattail-world-editor-transform-controls'
+				root.dataset.worldEditorTransformControls = location
+				root.hidden = true
+				root.setAttribute('role', 'group')
+				for (const action of ['rotate-clockwise', 'rotate-counterclockwise', 'mirror-u', 'mirror-v', 'reset']) {
+					const button = document.createElement('button')
+					button.type = 'button'
+					button.className = 'cattail-world-editor-transform-button'
+					button.dataset.worldEditorTransformAction = action
+					button.append(createTransformIcon(action))
+					if (action === 'mirror-u' || action === 'mirror-v') button.setAttribute('aria-pressed', 'false')
+					root.append(button)
+				}
+				return root
+			}
+
+			function createTransformIcon(kind) {
+				const icon = document.createElement('span')
+				icon.className = 'cattail-world-editor-transform-icon'
+				icon.dataset.icon = kind
+				icon.setAttribute('aria-hidden', 'true')
+				const asset = ICON_ASSETS[kind]
+				if (asset) {
+					const image = document.createElement('img')
+					image.alt = ''
+					image.src = asset
+					image.addEventListener('error', function () {
+						image.remove()
+						delete icon.dataset.asset
+					}, { once: true })
+					icon.dataset.asset = 'true'
+					icon.append(image)
+				}
+				if (kind === 'mirror-u' || kind === 'mirror-v') {
+					const first = document.createElement('span')
+					const second = document.createElement('span')
+					first.className = 'cattail-world-editor-transform-icon__half cattail-world-editor-transform-icon__half--first'
+					second.className = 'cattail-world-editor-transform-icon__half cattail-world-editor-transform-icon__half--second'
+					icon.append(first, second)
+				}
+				return icon
 			}
 
 			function createTypeSection(kind) {
@@ -736,14 +865,17 @@ ModLoader.register({
 			function refreshToolbar() {
 				const state = currentSession
 				const captureAvailable = canCapture(currentSelection) && !!currentRuntime.active && !state.capturing
-				ui.controls.structure.dataset.active = state.mode === 'structure' ? 'true' : 'false'
-				ui.controls.full.dataset.active = state.mode === 'full' ? 'true' : 'false'
-				ui.controls.structure.setAttribute('aria-pressed', state.mode === 'structure' ? 'true' : 'false')
-				ui.controls.full.setAttribute('aria-pressed', state.mode === 'full' ? 'true' : 'false')
-				ui.controls.blocks.disabled = state.mode !== 'full' || state.capturing
+				ui.controls.structure.dataset.active = 'true'
+				ui.controls.full.dataset.active = 'false'
+				ui.controls.structure.setAttribute('aria-pressed', 'true')
+				ui.controls.full.setAttribute('aria-pressed', 'false')
+				ui.controls.full.hidden = true
+				ui.controls.blocks.hidden = true
+				ui.controls.blocks.disabled = true
 				ui.controls.blocks.dataset.active = state.includeBlocks ? 'true' : 'false'
 				ui.controls.blocks.setAttribute('aria-pressed', state.includeBlocks ? 'true' : 'false')
 				ui.controls.copy.disabled = !captureAvailable
+				refreshTransformUi()
 			}
 
 			function refreshText(languageGame) {
@@ -761,6 +893,7 @@ ModLoader.register({
 				ui.controls.blocks.setAttribute('aria-label', blocksText)
 				ui.controls.copy.title = copyText
 				ui.controls.copy.setAttribute('aria-label', copyText)
+				refreshTransformText(source)
 				const clear = ui.card.querySelector('[data-world-editor-blueprint-action="clear"]')
 				const clearText = i18n.t(source, 'blueprintClear')
 				clear.title = clearText
@@ -770,7 +903,7 @@ ModLoader.register({
 
 			function refreshCard() {
 				if (!ui) return
-				const result = currentSession.lastResult
+				const result = displayResult()
 				const hasDisplay = !!result
 				setCardText('title', i18n.t(game, 'blueprintCardTitle'))
 				if (!hasDisplay) {
@@ -797,7 +930,114 @@ ModLoader.register({
 				ui.card.querySelector('[data-world-editor-blueprint-action="clear"]').disabled = !currentSession.blueprint
 				ui.card.dataset.pinned = ui.pinned ? 'true' : 'false'
 				ui.card.setAttribute('aria-label', cardAriaLabel(result))
+				refreshTransformUi()
 				refreshCardVisibility()
+			}
+
+			function displayResult() {
+				const result = currentSession.lastResult
+				if (!result || result.mode !== 'full') return result
+				const projectedBlueprint = currentTransform?.source === currentSession.blueprint
+					? currentTransform.blueprint
+					: null
+				if (!projectedBlueprint || projectedBlueprint.mode !== 'structure') return null
+				if (
+					result === projectedDisplayResult &&
+					projectedBlueprint === projectedDisplayBlueprint
+				) {
+					return projectedDisplayValue
+				}
+				const summary = projectedBlueprint.summary || result.summary
+				projectedDisplayResult = result
+				projectedDisplayBlueprint = projectedBlueprint
+				projectedDisplayValue = Object.assign({}, result, {
+					mode: 'structure',
+					includeBlocks: false,
+					summary,
+					capturedTypes: summary?.capturedTypes || [],
+					skippedTypes: summary?.skippedTypes || []
+				})
+				return projectedDisplayValue
+			}
+
+			function refreshTransformText(languageGame) {
+				if (!ui) return
+				const source = languageGame || game
+				const labels = {
+					'rotate-clockwise': i18n.t(source, 'blueprintRotateClockwise'),
+					'rotate-counterclockwise': i18n.t(source, 'blueprintRotateCounterclockwise'),
+					'mirror-u': i18n.t(source, 'blueprintMirrorU'),
+					'mirror-v': i18n.t(source, 'blueprintMirrorV'),
+					reset: i18n.t(source, 'blueprintResetTransform')
+				}
+				for (const button of ui.controls.root.querySelectorAll('[data-world-editor-transform-action]')) {
+					const label = labels[button.dataset.worldEditorTransformAction] || ''
+					button.title = label
+					button.setAttribute('aria-label', label)
+				}
+				for (const button of ui.card.querySelectorAll('[data-world-editor-transform-action]')) {
+					const label = labels[button.dataset.worldEditorTransformAction] || ''
+					button.title = label
+					button.setAttribute('aria-label', label)
+				}
+				refreshTransformUi()
+			}
+
+			function refreshTransformUi() {
+				if (!ui) return
+				const previewState = previewSnapshot()
+				const available = !!(
+					transformAvailable &&
+					currentTransform?.blueprint?.mode === 'structure' &&
+					previewState?.active &&
+					!previewState.paused
+				)
+				const roots = [
+					ui.controls.transforms,
+					ui.card.querySelector('[data-world-editor-transform-controls="card"]')
+				].filter(Boolean)
+				for (const root of roots) {
+					root.hidden = !available
+					for (const button of root.querySelectorAll('[data-world-editor-transform-action]')) {
+						const action = button.dataset.worldEditorTransformAction
+						const active = action === 'mirror-u'
+							? !!currentTransform.mirrorU
+							: action === 'mirror-v'
+								? !!currentTransform.mirrorV
+								: false
+						button.dataset.active = active ? 'true' : 'false'
+						if (action === 'mirror-u' || action === 'mirror-v') {
+							button.setAttribute('aria-pressed', active ? 'true' : 'false')
+						}
+						button.disabled = !available || (action === 'reset' && !!currentTransform.identity)
+					}
+				}
+				const panel = ui.card.querySelector('[data-world-editor-transform-panel]')
+				if (panel) panel.hidden = !available
+				setCardText('transform-state', transformStateText())
+			}
+
+			function transformStateText() {
+				const mirror = currentTransform?.mirrorU && currentTransform?.mirrorV
+					? 'U + V'
+					: currentTransform?.mirrorU
+						? 'U'
+						: currentTransform?.mirrorV
+							? 'V'
+							: i18n.t(game, 'blueprintTransformNone')
+				return formatTemplate(i18n.t(game, 'blueprintTransformState'), {
+					degrees: Number(currentTransform?.rotation) || 0,
+					mirror
+				})
+			}
+
+			function previewSnapshot() {
+				if (currentPreview) return currentPreview
+				try {
+					return globalThis[PREVIEW_KEY]?.snapshot?.() || null
+				} catch (error) {
+					return null
+				}
 			}
 
 			function resultStatusText(result) {
@@ -915,7 +1155,7 @@ ModLoader.register({
 
 			function refreshCardVisibility() {
 				if (!ui) return
-				const result = currentSession.lastResult
+				const result = displayResult()
 				const onSourcePlane = !!result && Number(result.sourcePlane) === (game.plane ? 1 : 0)
 				const displayWindow = ui.pinned || ui.temporaryVisible || currentSession.capturing
 				const visible = (
@@ -940,6 +1180,8 @@ ModLoader.register({
 					const gestureType = globalThis[INTERACTION_KEY]?.snapshot?.().gestureType
 					interacting = interacting || !!gestureType
 				} catch (error) {}
+				const previewState = previewSnapshot()
+				interacting = interacting || !!(previewState?.active && !previewState.pinned)
 				ui.card.dataset.inputPassThrough = interacting ? 'true' : 'false'
 			}
 
@@ -952,7 +1194,7 @@ ModLoader.register({
 					refreshCardVisibility()
 					return
 				}
-				const result = currentSession.lastResult
+				const result = displayResult()
 				const bounds = result?.anchor ? projectAnchorBounds(game, result.anchor) : null
 				if (!bounds) {
 					ui.positionVisible = false
@@ -1033,7 +1275,24 @@ ModLoader.register({
 			function handleCopy(event) {
 				stopUiEvent(event)
 				if (!canCapture(currentSelection)) return
-				session.capture('toolbar-copy')
+				captureFromUi('toolbar-copy')
+			}
+
+			function captureFromUi(reason) {
+				if (currentSession.mode !== 'structure') session.setMode('structure', reason + '-structure')
+				return session.capture(reason)
+			}
+
+			function handleTransformAction(event) {
+				const button = event?.target?.closest?.('[data-world-editor-transform-action]')
+				if (!button || button.disabled || !transformAvailable) return
+				stopUiEvent(event)
+				const action = button.dataset.worldEditorTransformAction
+				if (action === 'rotate-clockwise') transform.rotateClockwise('ui-rotate-clockwise')
+				else if (action === 'rotate-counterclockwise') transform.rotateCounterclockwise('ui-rotate-counterclockwise')
+				else if (action === 'mirror-u') transform.mirrorU('ui-mirror-u')
+				else if (action === 'mirror-v') transform.mirrorV('ui-mirror-v')
+				else if (action === 'reset') transform.reset('ui-reset')
 			}
 
 			function handleClear(event) {
@@ -1147,19 +1406,26 @@ ModLoader.register({
 					.cattail-world-editor-blueprint-controls {
 						display: inline-flex;
 						align-items: center;
+						flex-wrap: nowrap;
 						gap: 6px;
 						font-family: Montserrat, Arial, sans-serif;
 					}
+					.cattail-world-editor-blueprint-controls [hidden],
+					.cattail-world-editor-transform-controls[hidden],
+					.cattail-world-editor-blueprint-card__transform[hidden] {
+						display: none !important;
+					}
 					.cattail-world-editor-blueprint-modes {
 						display: inline-grid;
-						grid-template-columns: repeat(2, minmax(0, 1fr));
+						grid-template-columns: minmax(0, 1fr);
 						height: 30px;
 						border: 1px solid var(--world-editor-shell-border);
 						border-radius: 6px;
 						overflow: hidden;
 					}
 					.cattail-world-editor-blueprint-mode,
-					.cattail-world-editor-blueprint-icon-button {
+					.cattail-world-editor-blueprint-icon-button,
+					.cattail-world-editor-transform-button {
 						box-sizing: border-box;
 						height: 30px;
 						min-height: 30px;
@@ -1199,17 +1465,145 @@ ModLoader.register({
 						font-size: 20px;
 						line-height: 1;
 					}
+					.cattail-world-editor-transform-controls {
+						display: inline-flex;
+						align-items: center;
+						flex: none;
+						flex-wrap: nowrap;
+						gap: 4px;
+					}
+					.cattail-world-editor-transform-button {
+						display: inline-grid;
+						width: 30px;
+						min-width: 30px;
+						padding: 0;
+						place-items: center;
+						border: 1px solid var(--world-editor-shell-border);
+						border-radius: 6px;
+					}
+					.cattail-world-editor-transform-button[data-active="true"] {
+						border-color: var(--world-editor-shell-active-border);
+						background: var(--world-editor-shell-active);
+						color: var(--world-editor-shell-text);
+					}
+					.cattail-world-editor-transform-icon {
+						position: relative;
+						display: block;
+						width: 18px;
+						height: 18px;
+						color: currentColor;
+					}
+					.cattail-world-editor-transform-icon img {
+						display: block;
+						width: 18px;
+						height: 18px;
+						object-fit: contain;
+					}
+					.cattail-world-editor-transform-icon[data-icon="rotate-clockwise"]::before,
+					.cattail-world-editor-transform-icon[data-icon="rotate-counterclockwise"]::before,
+					.cattail-world-editor-transform-icon[data-icon="reset"]::before {
+						content: "";
+						position: absolute;
+						inset: 2px;
+						box-sizing: border-box;
+						border: 2px solid currentColor;
+						border-left-color: transparent;
+						border-radius: 50%;
+					}
+					.cattail-world-editor-transform-icon[data-icon="rotate-clockwise"]::after,
+					.cattail-world-editor-transform-icon[data-icon="rotate-counterclockwise"]::after,
+					.cattail-world-editor-transform-icon[data-icon="reset"]::after {
+						content: "";
+						position: absolute;
+						right: 0;
+						top: 1px;
+						width: 0;
+						height: 0;
+						border-top: 4px solid transparent;
+						border-bottom: 4px solid transparent;
+						border-left: 5px solid currentColor;
+						transform: rotate(-25deg);
+					}
+					.cattail-world-editor-transform-icon[data-icon="rotate-counterclockwise"] {
+						transform: scaleX(-1);
+					}
+					.cattail-world-editor-transform-icon[data-icon="reset"]::before {
+						inset: 3px;
+						border-width: 2px;
+					}
+					.cattail-world-editor-transform-icon[data-icon="reset"]::after {
+						right: 1px;
+						top: 2px;
+					}
+					.cattail-world-editor-transform-icon[data-icon="mirror-u"]::before,
+					.cattail-world-editor-transform-icon[data-icon="mirror-v"]::before {
+						content: "";
+						position: absolute;
+						background: currentColor;
+						opacity: .72;
+					}
+					.cattail-world-editor-transform-icon[data-icon="mirror-u"]::before {
+						left: 1px;
+						right: 1px;
+						top: 8px;
+						height: 2px;
+					}
+					.cattail-world-editor-transform-icon[data-icon="mirror-v"]::before {
+						top: 1px;
+						bottom: 1px;
+						left: 8px;
+						width: 2px;
+					}
+					.cattail-world-editor-transform-icon__half {
+						position: absolute;
+						box-sizing: border-box;
+						width: 6px;
+						height: 6px;
+						border: solid currentColor;
+					}
+					.cattail-world-editor-transform-icon[data-icon="mirror-u"] .cattail-world-editor-transform-icon__half {
+						left: 6px;
+						border-width: 0 2px 2px 0;
+					}
+					.cattail-world-editor-transform-icon[data-icon="mirror-u"] .cattail-world-editor-transform-icon__half--first {
+						top: 1px;
+						transform: rotate(45deg);
+					}
+					.cattail-world-editor-transform-icon[data-icon="mirror-u"] .cattail-world-editor-transform-icon__half--second {
+						bottom: 1px;
+						transform: rotate(225deg);
+					}
+					.cattail-world-editor-transform-icon[data-icon="mirror-v"] .cattail-world-editor-transform-icon__half {
+						top: 6px;
+						border-width: 0 2px 2px 0;
+					}
+					.cattail-world-editor-transform-icon[data-icon="mirror-v"] .cattail-world-editor-transform-icon__half--first {
+						left: 1px;
+						transform: rotate(-45deg);
+					}
+					.cattail-world-editor-transform-icon[data-icon="mirror-v"] .cattail-world-editor-transform-icon__half--second {
+						right: 1px;
+						transform: rotate(135deg);
+					}
+					.cattail-world-editor-transform-icon[data-asset="true"]::before,
+					.cattail-world-editor-transform-icon[data-asset="true"]::after,
+					.cattail-world-editor-transform-icon[data-asset="true"] .cattail-world-editor-transform-icon__half {
+						display: none;
+					}
 					.cattail-world-editor-blueprint-mode:hover:not(:disabled),
-					.cattail-world-editor-blueprint-icon-button:hover:not(:disabled) {
+					.cattail-world-editor-blueprint-icon-button:hover:not(:disabled),
+					.cattail-world-editor-transform-button:hover:not(:disabled) {
 						color: var(--world-editor-shell-text);
 					}
 					.cattail-world-editor-blueprint-mode:focus-visible,
-					.cattail-world-editor-blueprint-icon-button:focus-visible {
+					.cattail-world-editor-blueprint-icon-button:focus-visible,
+					.cattail-world-editor-transform-button:focus-visible {
 						outline: 2px solid var(--world-editor-shell-active-border);
 						outline-offset: 2px;
 					}
 					.cattail-world-editor-blueprint-mode:disabled,
-					.cattail-world-editor-blueprint-icon-button:disabled {
+					.cattail-world-editor-blueprint-icon-button:disabled,
+					.cattail-world-editor-transform-button:disabled {
 						opacity: .36;
 						cursor: default;
 					}
@@ -1327,6 +1721,29 @@ ModLoader.register({
 						color: var(--blueprint-card-muted);
 						text-align: center;
 						font-size: 10px;
+					}
+					.cattail-world-editor-blueprint-card__transform {
+						display: flex;
+						align-items: center;
+						justify-content: space-between;
+						gap: 8px;
+						margin-top: 8px;
+					}
+					.cattail-world-editor-blueprint-card__transform-state {
+						min-width: 0;
+						color: var(--blueprint-card-muted);
+						font-size: 10px;
+						font-weight: 600;
+						overflow-wrap: anywhere;
+					}
+					.cattail-world-editor-blueprint-card .cattail-world-editor-transform-button {
+						border-color: var(--blueprint-card-border);
+						background: var(--blueprint-card-track);
+						color: var(--blueprint-card-muted);
+					}
+					.cattail-world-editor-blueprint-card .cattail-world-editor-transform-button[data-active="true"] {
+						border-color: var(--blueprint-card-accent);
+						color: var(--blueprint-card-text);
 					}
 					.cattail-world-editor-blueprint-card__section {
 						margin-top: 8px;

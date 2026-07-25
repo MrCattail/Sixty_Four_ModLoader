@@ -1528,11 +1528,194 @@ ModLoader.register({
 				previewNoCost: 'Ingen ressurser kreves'
 			}
 		}
+		const TRANSFORM_TEXT = {
+			en: {
+				blueprintRotateClockwise: 'Rotate clockwise (R)',
+				blueprintRotateCounterclockwise: 'Rotate counterclockwise (Shift+R)',
+				blueprintMirrorU: 'Mirror across U axis (M)',
+				blueprintMirrorV: 'Mirror across V axis (Shift+M)',
+				blueprintResetTransform: 'Reset transform',
+				blueprintTransformState: 'Rotation: {degrees}° · Mirror: {mirror}',
+				blueprintTransformNone: 'None'
+			},
+			ru: {
+				blueprintRotateClockwise: 'Повернуть по часовой стрелке (R)',
+				blueprintRotateCounterclockwise: 'Повернуть против часовой стрелки (Shift+R)',
+				blueprintMirrorU: 'Отразить по оси U (M)',
+				blueprintMirrorV: 'Отразить по оси V (Shift+M)',
+				blueprintResetTransform: 'Сбросить преобразование',
+				blueprintTransformState: 'Поворот: {degrees}° · Отражение: {mirror}',
+				blueprintTransformNone: 'Нет'
+			},
+			de: {
+				blueprintRotateClockwise: 'Im Uhrzeigersinn drehen (R)',
+				blueprintRotateCounterclockwise: 'Gegen den Uhrzeigersinn drehen (Shift+R)',
+				blueprintMirrorU: 'An der U-Achse spiegeln (M)',
+				blueprintMirrorV: 'An der V-Achse spiegeln (Shift+M)',
+				blueprintResetTransform: 'Transformation zurücksetzen',
+				blueprintTransformState: 'Drehung: {degrees}° · Spiegelung: {mirror}',
+				blueprintTransformNone: 'Keine'
+			},
+			ptbr: {
+				blueprintRotateClockwise: 'Girar no sentido horário (R)',
+				blueprintRotateCounterclockwise: 'Girar no sentido anti-horário (Shift+R)',
+				blueprintMirrorU: 'Espelhar no eixo U (M)',
+				blueprintMirrorV: 'Espelhar no eixo V (Shift+M)',
+				blueprintResetTransform: 'Redefinir transformação',
+				blueprintTransformState: 'Rotação: {degrees}° · Espelhamento: {mirror}',
+				blueprintTransformNone: 'Nenhum'
+			},
+			it: {
+				blueprintRotateClockwise: 'Ruota in senso orario (R)',
+				blueprintRotateCounterclockwise: 'Ruota in senso antiorario (Shift+R)',
+				blueprintMirrorU: 'Rifletti sull’asse U (M)',
+				blueprintMirrorV: 'Rifletti sull’asse V (Shift+M)',
+				blueprintResetTransform: 'Reimposta trasformazione',
+				blueprintTransformState: 'Rotazione: {degrees}° · Riflessione: {mirror}',
+				blueprintTransformNone: 'Nessuna'
+			},
+			es: {
+				blueprintRotateClockwise: 'Girar en sentido horario (R)',
+				blueprintRotateCounterclockwise: 'Girar en sentido antihorario (Shift+R)',
+				blueprintMirrorU: 'Reflejar sobre el eje U (M)',
+				blueprintMirrorV: 'Reflejar sobre el eje V (Shift+M)',
+				blueprintResetTransform: 'Restablecer transformación',
+				blueprintTransformState: 'Rotación: {degrees}° · Reflejo: {mirror}',
+				blueprintTransformNone: 'Ninguno'
+			},
+			fr: {
+				blueprintRotateClockwise: 'Faire pivoter dans le sens horaire (R)',
+				blueprintRotateCounterclockwise: 'Faire pivoter dans le sens antihoraire (Shift+R)',
+				blueprintMirrorU: 'Miroir sur l’axe U (M)',
+				blueprintMirrorV: 'Miroir sur l’axe V (Shift+M)',
+				blueprintResetTransform: 'Réinitialiser la transformation',
+				blueprintTransformState: 'Rotation : {degrees}° · Miroir : {mirror}',
+				blueprintTransformNone: 'Aucun'
+			},
+			nl: {
+				blueprintRotateClockwise: 'Rechtsom draaien (R)',
+				blueprintRotateCounterclockwise: 'Linksom draaien (Shift+R)',
+				blueprintMirrorU: 'Spiegelen over de U-as (M)',
+				blueprintMirrorV: 'Spiegelen over de V-as (Shift+M)',
+				blueprintResetTransform: 'Transformatie resetten',
+				blueprintTransformState: 'Rotatie: {degrees}° · Spiegeling: {mirror}',
+				blueprintTransformNone: 'Geen'
+			},
+			cz: {
+				blueprintRotateClockwise: 'Otočit po směru hodinových ručiček (R)',
+				blueprintRotateCounterclockwise: 'Otočit proti směru hodinových ručiček (Shift+R)',
+				blueprintMirrorU: 'Zrcadlit podle osy U (M)',
+				blueprintMirrorV: 'Zrcadlit podle osy V (Shift+M)',
+				blueprintResetTransform: 'Obnovit transformaci',
+				blueprintTransformState: 'Otočení: {degrees}° · Zrcadlení: {mirror}',
+				blueprintTransformNone: 'Žádné'
+			},
+			pl: {
+				blueprintRotateClockwise: 'Obróć zgodnie z ruchem wskazówek zegara (R)',
+				blueprintRotateCounterclockwise: 'Obróć przeciwnie do ruchu wskazówek zegara (Shift+R)',
+				blueprintMirrorU: 'Odbij względem osi U (M)',
+				blueprintMirrorV: 'Odbij względem osi V (Shift+M)',
+				blueprintResetTransform: 'Resetuj przekształcenie',
+				blueprintTransformState: 'Obrót: {degrees}° · Odbicie: {mirror}',
+				blueprintTransformNone: 'Brak'
+			},
+			jp: {
+				blueprintRotateClockwise: '時計回りに回転 (R)',
+				blueprintRotateCounterclockwise: '反時計回りに回転 (Shift+R)',
+				blueprintMirrorU: 'U軸で反転 (M)',
+				blueprintMirrorV: 'V軸で反転 (Shift+M)',
+				blueprintResetTransform: '変形をリセット',
+				blueprintTransformState: '回転: {degrees}° · 反転: {mirror}',
+				blueprintTransformNone: 'なし'
+			},
+			kr: {
+				blueprintRotateClockwise: '시계 방향으로 회전 (R)',
+				blueprintRotateCounterclockwise: '반시계 방향으로 회전 (Shift+R)',
+				blueprintMirrorU: 'U축 대칭 (M)',
+				blueprintMirrorV: 'V축 대칭 (Shift+M)',
+				blueprintResetTransform: '변환 초기화',
+				blueprintTransformState: '회전: {degrees}° · 대칭: {mirror}',
+				blueprintTransformNone: '없음'
+			},
+			sch: {
+				blueprintRotateClockwise: '顺时针旋转（R）',
+				blueprintRotateCounterclockwise: '逆时针旋转（Shift+R）',
+				blueprintMirrorU: '沿 U 轴镜像（M）',
+				blueprintMirrorV: '沿 V 轴镜像（Shift+M）',
+				blueprintResetTransform: '重置变换',
+				blueprintTransformState: '旋转：{degrees}° · 镜像：{mirror}',
+				blueprintTransformNone: '无'
+			},
+			tch: {
+				blueprintRotateClockwise: '順時針旋轉（R）',
+				blueprintRotateCounterclockwise: '逆時針旋轉（Shift+R）',
+				blueprintMirrorU: '沿 U 軸鏡像（M）',
+				blueprintMirrorV: '沿 V 軸鏡像（Shift+M）',
+				blueprintResetTransform: '重設變換',
+				blueprintTransformState: '旋轉：{degrees}° · 鏡像：{mirror}',
+				blueprintTransformNone: '無'
+			},
+			thai: {
+				blueprintRotateClockwise: 'หมุนตามเข็มนาฬิกา (R)',
+				blueprintRotateCounterclockwise: 'หมุนทวนเข็มนาฬิกา (Shift+R)',
+				blueprintMirrorU: 'สะท้อนตามแกน U (M)',
+				blueprintMirrorV: 'สะท้อนตามแกน V (Shift+M)',
+				blueprintResetTransform: 'รีเซ็ตการแปลง',
+				blueprintTransformState: 'การหมุน: {degrees}° · การสะท้อน: {mirror}',
+				blueprintTransformNone: 'ไม่มี'
+			},
+			hu: {
+				blueprintRotateClockwise: 'Forgatás az óramutató járásával megegyezően (R)',
+				blueprintRotateCounterclockwise: 'Forgatás az óramutató járásával ellentétesen (Shift+R)',
+				blueprintMirrorU: 'Tükrözés az U tengelyre (M)',
+				blueprintMirrorV: 'Tükrözés a V tengelyre (Shift+M)',
+				blueprintResetTransform: 'Átalakítás visszaállítása',
+				blueprintTransformState: 'Forgatás: {degrees}° · Tükrözés: {mirror}',
+				blueprintTransformNone: 'Nincs'
+			},
+			lv: {
+				blueprintRotateClockwise: 'Pagriezt pulksteņrādītāja virzienā (R)',
+				blueprintRotateCounterclockwise: 'Pagriezt pretēji pulksteņrādītāja virzienam (Shift+R)',
+				blueprintMirrorU: 'Spoguļot pret U asi (M)',
+				blueprintMirrorV: 'Spoguļot pret V asi (Shift+M)',
+				blueprintResetTransform: 'Atiestatīt transformāciju',
+				blueprintTransformState: 'Pagrieziens: {degrees}° · Spoguļojums: {mirror}',
+				blueprintTransformNone: 'Nav'
+			},
+			ro: {
+				blueprintRotateClockwise: 'Rotire în sensul acelor de ceasornic (R)',
+				blueprintRotateCounterclockwise: 'Rotire în sens invers acelor de ceasornic (Shift+R)',
+				blueprintMirrorU: 'Oglindire față de axa U (M)',
+				blueprintMirrorV: 'Oglindire față de axa V (Shift+M)',
+				blueprintResetTransform: 'Resetare transformare',
+				blueprintTransformState: 'Rotire: {degrees}° · Oglindire: {mirror}',
+				blueprintTransformNone: 'Niciuna'
+			},
+			no: {
+				blueprintRotateClockwise: 'Roter med klokken (R)',
+				blueprintRotateCounterclockwise: 'Roter mot klokken (Shift+R)',
+				blueprintMirrorU: 'Speil langs U-aksen (M)',
+				blueprintMirrorV: 'Speil langs V-aksen (Shift+M)',
+				blueprintResetTransform: 'Tilbakestill transformasjon',
+				blueprintTransformState: 'Rotasjon: {degrees}° · Speiling: {mirror}',
+				blueprintTransformNone: 'Ingen'
+			},
+			modsch: {
+				blueprintRotateClockwise: '顺时针旋转（R）',
+				blueprintRotateCounterclockwise: '逆时针旋转（Shift+R）',
+				blueprintMirrorU: '沿 U 轴镜像（M）',
+				blueprintMirrorV: '沿 V 轴镜像（Shift+M）',
+				blueprintResetTransform: '重置变换',
+				blueprintTransformState: '旋转：{degrees}° · 镜像：{mirror}',
+				blueprintTransformNone: '无'
+			}
+		}
 		for (const language of Object.keys(TEXT)) {
 			Object.assign(
 				TEXT[language],
 				BLUEPRINT_TEXT[language] || BLUEPRINT_TEXT.en,
-				PREVIEW_TEXT[language] || PREVIEW_TEXT.en
+				PREVIEW_TEXT[language] || PREVIEW_TEXT.en,
+				TRANSFORM_TEXT[language] || TRANSFORM_TEXT.en
 			)
 		}
 		const LANGUAGES = Object.freeze(Object.keys(TEXT))

@@ -629,7 +629,7 @@ function testHoverLayerI18nManifestAndReadOnlyBoundary() {
 	const i18n = sandbox[I18N_KEY]
 	assert.equal(i18n.version, '0.3.1')
 	assert.equal(i18n.languages.length, 20)
-	assert.equal(i18n.keys.length, 70)
+	assert.equal(i18n.keys.length, 77)
 	for (const language of i18n.languages) {
 		for (const key of ['toolbarModeArea', 'toolSelect', 'cardPinAction', 'cardUnpinAction']) {
 			assert.notEqual(i18n.t(language, key), key)
@@ -640,9 +640,9 @@ function testHoverLayerI18nManifestAndReadOnlyBoundary() {
 	assert.equal(i18n.t('modsch', 'toolSelect'), '选择')
 
 	const manifest = JSON.parse(fs.readFileSync(path.join(MOD_ROOT, 'mod.json'), 'utf8'))
-	assert.equal(manifest.version, '0.3.2')
+	assert.equal(manifest.version, '0.3.3')
 	assert.equal(manifest.languageSupport.gameLanguage, true)
-	assert.equal(manifest.entry.length, 16)
+	assert.equal(manifest.entry.length, 17)
 	assert.equal(manifest.entry.filter(entry => /selection-controller/.test(entry)).length, 1)
 	assert.equal(manifest.entry.filter(entry => /resize-handles/.test(entry)).length, 1)
 

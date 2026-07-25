@@ -31,6 +31,13 @@ ModLoader.register({
 			verify(game, guard) {
 				return verifyGuard(game, guard)
 			},
+			inspect(game, guard) {
+				return inspectGuard(game, guard)
+			},
+			refreshResources(game, plan) {
+				if (disposed) throw planError('planner-disposed')
+				return refreshPlanResources(game, plan)
+			},
 			async benchmark(options) {
 				if (disposed) throw planError('planner-disposed')
 				return runSyntheticBenchmark(options || {})
@@ -213,24 +220,58 @@ ModLoader.register({
 		}
 
 		function verifyGuard(game, guard) {
-			if (!game || !guard || !Array.isArray(guard.cells)) return false
+			return inspectGuard(game, guard).valid
+		}
+
+		function inspectGuard(game, guard) {
+			if (!game || !guard || !Array.isArray(guard.cells)) return guardResult('invalid')
 			for (const entry of guard.cells) {
-				if (safeEntityAt(game, entry.position) !== entry.entity) return false
+				if (safeEntityAt(game, entry.position) !== entry.entity) return guardResult('cells')
 			}
 			for (const name of Object.keys(guard.counts || {})) {
-				if (finiteOr(game.entitiesInGame?.[name], 0) !== guard.counts[name]) return false
+				if (finiteOr(game.entitiesInGame?.[name], 0) !== guard.counts[name]) return guardResult('counts')
 			}
 			for (const name of Object.keys(guard.onlyones || {})) {
-				if (!!game.onlyones?.[name] !== guard.onlyones[name]) return false
+				if (!!game.onlyones?.[name] !== guard.onlyones[name]) return guardResult('onlyones')
 			}
-			if (finiteOr(game.eraserType, 0) !== finiteOr(guard.eraserType, 0)) return false
+			if (finiteOr(game.eraserType, 0) !== finiteOr(guard.eraserType, 0)) return guardResult('eraserType')
 			const resources = numericArray(game.resources)
 			const expected = numericArray(guard.resources)
 			const length = Math.max(resources.length, expected.length)
 			for (let index = 0; index < length; index += 1) {
-				if (finiteOr(resources[index], 0) !== finiteOr(expected[index], 0)) return false
+				if (finiteOr(resources[index], 0) !== finiteOr(expected[index], 0)) return guardResult('resources')
 			}
-			return true
+			return guardResult('valid')
+		}
+
+		function guardResult(reason) {
+			return Object.freeze({
+				valid: reason === 'valid',
+				reason
+			})
+		}
+
+		function refreshPlanResources(game, plan) {
+			if (!game || !plan?.guard || !plan?.cost) throw planError('plan-unavailable')
+			const resources = numericArray(game.resources)
+			return Object.assign({}, plan, {
+				guard: Object.assign({}, plan.guard, {
+					resources
+				}),
+				cost: Object.assign({}, plan.cost, {
+					safe: refreshCostResources(plan.cost.safe, resources),
+					overwrite: refreshCostResources(plan.cost.overwrite, resources)
+				})
+			})
+		}
+
+		function refreshCostResources(cost, resources) {
+			if (!cost || !Array.isArray(cost.required)) return cost
+			const owned = normalizedTotals(resources)
+			return Object.assign({}, cost, {
+				owned,
+				shortfall: normalizedTotals(subtractFloorZero(cost.required, owned))
+			})
 		}
 
 		function simulateCost(game, records, guard, includeConflicts) {

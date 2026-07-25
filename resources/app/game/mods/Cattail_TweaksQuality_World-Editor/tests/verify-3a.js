@@ -518,7 +518,7 @@ function testLanguagesManifestUiAndReadOnlyBoundary() {
 	const i18n = i18nSandbox[I18N_KEY]
 	assert.equal(i18n.version, '0.3.1')
 	assert.equal(i18n.languages.length, 20)
-	assert.equal(i18n.keys.length, 70)
+	assert.equal(i18n.keys.length, 77)
 	const blueprintKeys = [
 		'blueprintModeStructure',
 		'blueprintModeFull',
@@ -548,9 +548,9 @@ function testLanguagesManifestUiAndReadOnlyBoundary() {
 	}
 
 	const manifest = JSON.parse(fs.readFileSync(path.join(MOD_ROOT, 'mod.json'), 'utf8'))
-	assert.equal(manifest.version, '0.3.2')
+	assert.equal(manifest.version, '0.3.3')
 	assert.equal(manifest.languageSupport.gameLanguage, true)
-	assert.equal(manifest.entry.length, 16)
+	assert.equal(manifest.entry.length, 17)
 	assert.ok(manifest.entry.includes(BLUEPRINT_SOURCE))
 	assert.ok(
 		manifest.entry.indexOf('scripts/ui/editor-shell.js') <
