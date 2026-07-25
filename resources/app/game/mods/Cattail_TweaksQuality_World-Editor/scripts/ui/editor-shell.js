@@ -7,6 +7,9 @@ ModLoader.register({
 		const TOOL_KEY = Symbol.for('cattail.world-editor.tool')
 		const SHELL_ID = 'cattail-world-editor-shell'
 		const STYLE_ID = 'cattail-world-editor-shell-style'
+		const UI_SCALE_BASE_WIDTH = 1600
+		const UI_SCALE_BASE_HEIGHT = 1000
+		const UI_SCALE_MIN = .5
 		let refreshMountedText = null
 		let refreshMountedTheme = null
 
@@ -59,6 +62,9 @@ ModLoader.register({
 			const style = ensureStyle()
 			const shell = createShell()
 			document.body.append(shell)
+			const rootStyle = document.documentElement?.style
+			const previousScale = readStyleProperty(rootStyle, '--world-editor-ui-scale')
+			const previousToolbarWidth = readStyleProperty(rootStyle, '--world-editor-toolbar-layout-width')
 
 			let currentState = runtime.snapshot()
 			let currentSelection = selection.snapshot()
@@ -147,6 +153,27 @@ ModLoader.register({
 				shell.setAttribute('aria-hidden', editorVisible && !gameHudHidden ? 'false' : 'true')
 			}
 
+			const refreshUiScale = function () {
+				const viewport = responsiveViewport(game)
+				const viewportWidth = viewport.width
+				const viewportHeight = viewport.height
+				const scale = Math.min(
+					1,
+					Math.max(
+						UI_SCALE_MIN,
+						Math.min(viewportWidth / UI_SCALE_BASE_WIDTH, viewportHeight / UI_SCALE_BASE_HEIGHT)
+					)
+				)
+				const roundedScale = Math.round(scale * 1000) / 1000
+				writeStyleProperty(rootStyle, '--world-editor-ui-scale', String(roundedScale))
+				writeStyleProperty(
+					rootStyle,
+					'--world-editor-toolbar-layout-width',
+					Math.max(0, (viewportWidth - 24) / scale) + 'px'
+				)
+				shell.dataset.uiScale = String(roundedScale)
+			}
+
 			const stopStateSubscription = runtime.subscribe(function (state) {
 				currentState = state
 				refreshVisibility()
@@ -196,6 +223,8 @@ ModLoader.register({
 
 			window.addEventListener('modloader:game-hud', handleGameHud)
 			window.addEventListener('modloader:vanilla-game-hud', handleVanillaGameHud)
+			window.addEventListener('resize', refreshUiScale)
+			const uiScaleObserver = createUiScaleObserver(game, refreshUiScale)
 			const releaseHud = api.ui.hud.register({
 				id: 'world-editor-shell',
 				element: shell,
@@ -207,6 +236,7 @@ ModLoader.register({
 			refreshText(game)
 			refreshSelectionCount(game)
 			refreshTheme(game)
+			refreshUiScale()
 			refreshVisibility()
 
 			runtime.addCleanup(function () {
@@ -214,12 +244,16 @@ ModLoader.register({
 				if (refreshMountedTheme === refreshTheme) refreshMountedTheme = null
 				window.removeEventListener('modloader:game-hud', handleGameHud)
 				window.removeEventListener('modloader:vanilla-game-hud', handleVanillaGameHud)
+				window.removeEventListener('resize', refreshUiScale)
+				uiScaleObserver?.disconnect?.()
 				if (typeof stopStateSubscription === 'function') stopStateSubscription()
 				if (typeof stopSelectionSubscription === 'function') stopSelectionSubscription()
 				if (typeof stopToolSubscription === 'function') stopToolSubscription()
 				selectButton.removeEventListener('click', handleSelectClick)
 				removeButton.removeEventListener('click', handleRemoveClick)
 				if (typeof releaseHud === 'function') releaseHud()
+				writeStyleProperty(rootStyle, '--world-editor-ui-scale', previousScale)
+				writeStyleProperty(rootStyle, '--world-editor-toolbar-layout-width', previousToolbarWidth)
 				shell.remove()
 				if (style.isConnected && !document.getElementById(SHELL_ID)) style.remove()
 			})
@@ -360,8 +394,9 @@ ModLoader.register({
 				.cattail-world-editor-shell__bar {
 					display: flex;
 					align-items: center;
+					flex-wrap: wrap;
 					gap: 14px;
-					max-width: calc(100vw - 24px);
+					max-width: var(--world-editor-toolbar-layout-width, calc(100vw - 24px));
 					min-height: 54px;
 					box-sizing: border-box;
 					padding: 10px 16px;
@@ -375,6 +410,8 @@ ModLoader.register({
 					font: 400 14px/1.4 Montserrat, Arial, sans-serif;
 					-webkit-font-smoothing: antialiased;
 					white-space: nowrap;
+					transform: scale(var(--world-editor-ui-scale, 1));
+					transform-origin: top center;
 					transition: background .18s ease, border-color .18s ease, color .18s ease, box-shadow .18s ease;
 				}
 				.cattail-world-editor-shell__identity {
@@ -423,6 +460,7 @@ ModLoader.register({
 				.cattail-world-editor-shell__actions {
 					display: inline-flex;
 					align-items: center;
+					flex-wrap: wrap;
 					gap: 6px;
 					pointer-events: auto;
 				}
@@ -470,6 +508,21 @@ ModLoader.register({
 					color: var(--world-editor-shell-muted);
 					font-size: 13px;
 				}
+				@media (max-width: 900px) {
+					.cattail-world-editor-shell__bar {
+						justify-content: center;
+						gap: 8px;
+						padding: 8px 10px;
+					}
+					.cattail-world-editor-shell__actions {
+						justify-content: center;
+					}
+					.cattail-world-editor-shell__hint {
+						margin-left: 0;
+						padding-left: 0;
+						border-left: 0;
+					}
+				}
 				@media (max-width: 520px) {
 					.cattail-world-editor-shell__bar { gap: 7px; }
 					.cattail-world-editor-shell__brand,
@@ -480,6 +533,81 @@ ModLoader.register({
 			`
 			document.head.append(style)
 			return style
+		}
+
+		function finitePositive(value, fallback) {
+			const number = Number(value)
+			return Number.isFinite(number) && number > 0 ? number : Number(fallback) || 0
+		}
+
+		function responsiveViewport(game) {
+			const fallbackWidth = finitePositive(
+				typeof window !== 'undefined' ? window.innerWidth : 0,
+				document.documentElement?.clientWidth || UI_SCALE_BASE_WIDTH
+			)
+			const fallbackHeight = finitePositive(
+				typeof window !== 'undefined' ? window.innerHeight : 0,
+				document.documentElement?.clientHeight || UI_SCALE_BASE_HEIGHT
+			)
+			const widths = [fallbackWidth]
+			const heights = [fallbackHeight]
+			for (const element of uiScaleTargets(game)) {
+				const rect = element?.getBoundingClientRect?.()
+				const width = finitePositive(rect?.width, 0)
+				const height = finitePositive(rect?.height, 0)
+				if (width) widths.push(width)
+				if (height) heights.push(height)
+			}
+			return {
+				width: Math.min(...widths),
+				height: Math.min(...heights)
+			}
+		}
+
+		function uiScaleTargets(game) {
+			const canvas = game?.canvas
+			const host = canvas?.parentElement
+			return Array.from(new Set([canvas, host])).filter(function (element) {
+				return !!(
+					element &&
+					element !== document.body &&
+					element !== document.documentElement &&
+					typeof element.getBoundingClientRect === 'function'
+				)
+			})
+		}
+
+		function createUiScaleObserver(game, refresh) {
+			const Observer = globalThis.ResizeObserver
+			if (typeof Observer !== 'function') return null
+			const observer = new Observer(function () {
+				refresh()
+			})
+			for (const target of uiScaleTargets(game)) {
+				try {
+					observer.observe(target)
+				} catch (error) {
+					console.warn('[Cattail World Editor] UI scale observer skipped an unsupported target.', error)
+				}
+			}
+			return observer
+		}
+
+		function readStyleProperty(style, property) {
+			if (!style) return ''
+			if (typeof style.getPropertyValue === 'function') return style.getPropertyValue(property)
+			return String(style[property] || '')
+		}
+
+		function writeStyleProperty(style, property, value) {
+			if (!style) return
+			if (value) {
+				if (typeof style.setProperty === 'function') style.setProperty(property, value)
+				else style[property] = value
+				return
+			}
+			if (typeof style.removeProperty === 'function') style.removeProperty(property)
+			else delete style[property]
 		}
 
 		function isRange(value) {

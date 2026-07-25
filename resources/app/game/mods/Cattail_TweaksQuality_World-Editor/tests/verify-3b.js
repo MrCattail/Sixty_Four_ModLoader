@@ -6,6 +6,7 @@ const vm = require('node:vm')
 const MOD_ROOT = path.resolve(__dirname, '..')
 const PLAN_SOURCE = 'scripts/core/blueprint-preview-plan.js'
 const PREVIEW_SOURCE = 'scripts/blueprint-preview.js'
+const SESSION_SOURCE = 'scripts/blueprint-session.js'
 const SELECTION_SOURCE = 'scripts/input/selection-controller.js'
 const I18N_SOURCE = 'scripts/i18n/editor-text.js'
 const PLAN_KEY = Symbol.for('cattail.world-editor.blueprint-preview-plan')
@@ -13,6 +14,7 @@ const PREVIEW_KEY = Symbol.for('cattail.world-editor.blueprint-preview')
 const RUNTIME_KEY = Symbol.for('cattail.world-editor.runtime')
 const SELECTION_KEY = Symbol.for('cattail.world-editor.selection')
 const BLUEPRINT_KEY = Symbol.for('cattail.world-editor.blueprint')
+const TRANSFORM_KEY = Symbol.for('cattail.world-editor.blueprint-transform')
 const I18N_KEY = Symbol.for('cattail.world-editor.i18n')
 
 function plain(value) {
@@ -206,6 +208,7 @@ function createGame() {
 			silo: 1,
 			pump: 1,
 			unique: 0,
+			'no-price': 0,
 			eraser: 0,
 			eraser2: 0,
 			eraser3: 0
@@ -221,6 +224,7 @@ function createGame() {
 				silo: { canPurchase: true, price: [10, 4], priceExponent: 2, class: EntityClass },
 				pump: { canPurchase: true, price: [5, 1], priceExponent: 1, class: EntityClass },
 				unique: { canPurchase: true, onlyone: true, price: [25, 0], priceExponent: 1, class: EntityClass },
+				'no-price': { canPurchase: true, class: EntityClass },
 				eraser: { canPurchase: true, price: [1, 0], priceExponent: 1, class: EntityClass },
 				eraser2: { canPurchase: true, price: [2, 0], priceExponent: 1, class: EntityClass },
 				eraser3: { canPurchase: true, price: [3, 0], priceExponent: 1, class: EntityClass }
@@ -321,7 +325,7 @@ async function testPlannerStatusesCostsAndGuards() {
 		record(4, 'silo', [3, 0], { config: { fill: 7 } })
 	])
 	const plan = await planner.build(game, source, [10, 10])
-	assert.equal(plan.version, '0.3.1')
+	assert.equal(plan.version, '0.3.4')
 	assert.deepEqual(plain(plan.records.map(entry => entry.status)), [
 		'buildable',
 		'satisfied',
@@ -334,17 +338,15 @@ async function testPlannerStatusesCostsAndGuards() {
 		conflict: 1,
 		blocked: 1
 	})
-	assert.equal(plan.cost.safe.buildCount, 1)
-	assert.equal(plan.cost.safe.removeCount, 0)
-	assert.deepEqual(plain(plan.cost.safe.demand), [20, 8])
-	assert.deepEqual(plain(plan.cost.safe.required), [20, 8])
-	assert.deepEqual(plain(plan.cost.safe.shortfall), [10, 0])
-	assert.equal(plan.cost.overwrite.buildCount, 2)
-	assert.equal(plan.cost.overwrite.removeCount, 1)
-	assert.deepEqual(plain(plan.cost.overwrite.demand), [62, 24])
-	assert.deepEqual(plain(plan.cost.overwrite.refunds), [4.5, 0.9])
-	assert.deepEqual(plain(plan.cost.overwrite.required), [57.5, 23.1])
-	assert.deepEqual(plain(plan.cost.overwrite.shortfall), [47.5, 0])
+	assert.equal(plan.cost.buildCount, 1)
+	assert.deepEqual(plain(plan.cost.demand), [20, 8])
+	assert.deepEqual(plain(plan.cost.required), [20, 8])
+	assert.deepEqual(plain(plan.cost.shortfall), [10, 0])
+	assert.deepEqual(plain(plan.cost.byType), [{
+		name: 'silo',
+		buildCount: 1,
+		demand: [20, 8]
+	}])
 	assert.equal(planner.verify(game, plan.guard), true)
 	assert.deepEqual(plain(planner.inspect(game, plan.guard)), { valid: true, reason: 'valid' })
 	assert.deepEqual(plain(planner.inspect(null, plan.guard)), { valid: false, reason: 'invalid' })
@@ -374,21 +376,15 @@ async function testPlannerStatusesCostsAndGuards() {
 	assert.equal(refreshed.guard.cells, plan.guard.cells)
 	assert.equal(refreshed.guard.counts, plan.guard.counts)
 	assert.equal(refreshed.guard.onlyones, plan.guard.onlyones)
-	assert.equal(refreshed.cost.safe.required, plan.cost.safe.required)
-	assert.equal(refreshed.cost.safe.demand, plan.cost.safe.demand)
-	assert.equal(refreshed.cost.safe.refunds, plan.cost.safe.refunds)
+	assert.equal(refreshed.cost.required, plan.cost.required)
+	assert.equal(refreshed.cost.demand, plan.cost.demand)
+	assert.equal(refreshed.cost.byType, plan.cost.byType)
 	assert.deepEqual(plain(refreshed.guard.resources), [11, 100])
-	assert.deepEqual(plain(refreshed.cost.safe.owned), [11, 100])
-	assert.deepEqual(plain(refreshed.cost.safe.shortfall), [9, 0])
-	assert.deepEqual(plain(refreshed.cost.overwrite.owned), [11, 100])
-	assert.deepEqual(plain(refreshed.cost.overwrite.shortfall), [46.5, 0])
+	assert.deepEqual(plain(refreshed.cost.owned), [11, 100])
+	assert.deepEqual(plain(refreshed.cost.shortfall), [9, 0])
 	assert.deepEqual(plain(plan.guard.resources), [10, 100])
 	assert.equal(planner.verify(game, refreshed.guard), true)
 	game.resources[0] -= 1
-	game.eraserType = 2
-	assert.equal(planner.verify(game, plan.guard), false)
-	assert.deepEqual(plain(planner.inspect(game, plan.guard)), { valid: false, reason: 'eraserType' })
-	game.eraserType = 1
 	assert.equal(planner.verify(game, plan.guard), true)
 
 	const schema2Plan = await planner.build(game, blueprint([
@@ -396,12 +392,36 @@ async function testPlannerStatusesCostsAndGuards() {
 	], { schemaVersion: 2 }), [30, 30])
 	assert.equal(schema2Plan.records[0].status, 'buildable')
 
+	game.setCell(31, 30, entity('surge', [31, 30], { indestructible: true }))
+	const surgePlan = await planner.build(game, blueprint([
+		record(7, 'silo', [0, 0])
+	], { schemaVersion: 2 }), [31, 30])
+	assert.equal(surgePlan.records[0].status, 'buildable')
+	assert.equal(surgePlan.cost.buildCount, 1)
+	assert.equal(surgePlan.guard.cells[0].entity, null)
+	game.setCell(31, 30, null)
+	assert.equal(planner.verify(game, surgePlan.guard), true)
+	game.setCell(31, 30, entity('surge', [31, 30], { indestructible: true }))
+	assert.equal(planner.verify(game, surgePlan.guard), true)
+	game.setCell(31, 30, null)
+
+	const incomplete = await planner.build(game, blueprint([
+		record(6, 'no-price', [0, 0])
+	]), [40, 40])
+	assert.equal(incomplete.cost.complete, false)
+	assert.equal(incomplete.cost.buildCount, 1)
+	assert.deepEqual(plain(incomplete.cost.byType), [{
+		name: 'no-price',
+		buildCount: 1,
+		demand: []
+	}])
+
 	const dedupe = await planner.build(game, blueprint([
 		record(1, 'silo', [0, 0]),
 		record(2, 'silo', [0, 0])
 	]), [12, 10])
-	assert.equal(dedupe.cost.overwrite.removeCount, 1)
-	assert.equal(dedupe.cost.overwrite.buildCount, 2)
+	assert.equal(dedupe.cost.buildCount, 0)
+	assert.deepEqual(plain(dedupe.cost.byType), [])
 }
 
 async function testOnlyOneCancellationAndBenchmark() {
@@ -474,6 +494,21 @@ function inputEvent(button) {
 		buttons: button === 2 ? 2 : 1,
 		offsetX: 10,
 		offsetY: 10,
+		prevented: false,
+		stopped: false,
+		preventDefault() {
+			this.prevented = true
+		},
+		stopImmediatePropagation() {
+			this.stopped = true
+		}
+	}
+}
+
+function keyEvent(code, key) {
+	return {
+		code,
+		key,
 		prevented: false,
 		stopped: false,
 		preventDefault() {
@@ -573,11 +608,19 @@ function createRuntimeEnvironment(options = {}) {
 	const document = options.document
 	window.innerWidth = 1000
 	window.innerHeight = 800
-	let layerCallback = null
-	let layerOptions = null
-	let layerDefinition = null
-	let layerDirty = false
-	let layerDirtyMarks = 0
+	const layers = new Map()
+	const ensureLayer = function (id) {
+		if (!layers.has(id)) {
+			layers.set(id, {
+				callback: null,
+				options: null,
+				definition: null,
+				dirty: false,
+				dirtyMarks: 0
+			})
+		}
+		return layers.get(id)
+	}
 	let frameCallback = null
 	let active = true
 	const cleanup = []
@@ -675,6 +718,7 @@ function createRuntimeEnvironment(options = {}) {
 		}
 	}
 	vm.createContext(sandbox)
+	if (options.transform) sandbox[TRANSFORM_KEY] = options.transform
 	for (const source of [PLAN_SOURCE, PREVIEW_SOURCE]) {
 		const filename = path.join(MOD_ROOT, source)
 		vm.runInContext(fs.readFileSync(filename, 'utf8'), sandbox, { filename })
@@ -691,18 +735,20 @@ function createRuntimeEnvironment(options = {}) {
 		},
 		render: {
 			registerLayer(layer, options) {
-				assert.equal(layer, 'world-editor-blueprint-preview')
-				layerDefinition = Object.assign({}, options)
+				assert.ok(['world-editor-blueprint-preview', 'world-editor-blueprint-transform-guide'].includes(layer))
+				const state = ensureLayer(layer)
+				state.definition = Object.assign({}, options)
 				return function () {
-					layerDefinition = null
+					state.definition = null
 				}
 			},
 			onLayer(layer, callback, options) {
-				assert.equal(layer, 'world-editor-blueprint-preview')
-				layerCallback = callback
-				layerOptions = options
+				assert.ok(['world-editor-blueprint-preview', 'world-editor-blueprint-transform-guide'].includes(layer))
+				const state = ensureLayer(layer)
+				state.callback = callback
+				state.options = options
 				return function () {
-					layerCallback = null
+					state.callback = null
 				}
 			},
 			onFrame(callback) {
@@ -712,10 +758,11 @@ function createRuntimeEnvironment(options = {}) {
 				}
 			},
 			markDirty(layer, renderGame) {
-				assert.equal(layer, 'world-editor-blueprint-preview')
+				assert.ok(['world-editor-blueprint-preview', 'world-editor-blueprint-transform-guide'].includes(layer))
 				assert.equal(renderGame, game)
-				layerDirty = true
-				layerDirtyMarks += 1
+				const state = ensureLayer(layer)
+				state.dirty = true
+				state.dirtyMarks += 1
 				return true
 			}
 		},
@@ -753,24 +800,20 @@ function createRuntimeEnvironment(options = {}) {
 		context,
 		infoLogs,
 		controller: sandbox[PREVIEW_KEY],
-		getLayer() {
-			return {
-				callback: layerCallback,
-				options: layerOptions,
-				definition: layerDefinition,
-				dirty: layerDirty,
-				dirtyMarks: layerDirtyMarks
-			}
+		getLayer(id = 'world-editor-blueprint-preview') {
+			return ensureLayer(id)
 		},
 		getFrame() {
 			return frameCallback
 		},
 		runFrame() {
 			let redrawn = false
-			if (layerCallback && layerDirty && layerOptions?.enabled?.({ game })) {
-				layerCallback({ game, ctx: context })
-				layerDirty = false
-				redrawn = true
+			for (const state of layers.values()) {
+				if (state.callback && state.dirty && state.options?.enabled?.({ game })) {
+					state.callback({ game, ctx: context })
+					state.dirty = false
+					redrawn = true
+				}
 			}
 			if (frameCallback) frameCallback({ game })
 			return redrawn
@@ -796,7 +839,7 @@ function createRuntimeEnvironment(options = {}) {
 async function testRuntimeLifecycleInputAndRendering() {
 	const env = createRuntimeEnvironment()
 	assert.ok(env.controller)
-	assert.equal(env.controller.version, '0.3.1')
+	assert.equal(env.controller.version, '0.3.4')
 	assert.deepEqual(env.getLayer().definition, {
 		order: 39,
 		zIndex: 39,
@@ -805,6 +848,12 @@ async function testRuntimeLifecycleInputAndRendering() {
 	})
 	assert.equal(env.getLayer().options.order, 0)
 	assert.equal(env.getLayer().options.space, 'screen')
+	assert.deepEqual(env.getLayer('world-editor-blueprint-transform-guide').definition, {
+		order: 41,
+		zIndex: 41,
+		cache: true,
+		clearEachFrame: false
+	})
 	assert.equal(env.canvas.listenerCount('wheel'), 0)
 
 	const structure = blueprint([record(1, 'silo', [0, 0], { config: { fill: 3 } })])
@@ -910,6 +959,8 @@ async function testRuntimeLifecycleInputAndRendering() {
 	assert.equal(env.window.listenerCount('blur'), 0)
 	assert.equal(env.getLayer().callback, null)
 	assert.equal(env.getLayer().definition, null)
+	assert.equal(env.getLayer('world-editor-blueprint-transform-guide').callback, null)
+	assert.equal(env.getLayer('world-editor-blueprint-transform-guide').definition, null)
 	assert.equal(env.getFrame(), null)
 }
 
@@ -948,7 +999,7 @@ async function testFollowThrottleUiAndMetrics() {
 	assert.equal(current.performance.planRequests, baseline.planRequests)
 	assert.equal(current.performance.layerRedraws, baseline.layerRedraws)
 	assert.equal(env.timerCount(100), 1)
-	assert.equal(current.performance.uiRefreshes, baseline.uiRefreshes + 1)
+	assert.equal(current.performance.uiRefreshes, baseline.uiRefreshes)
 	assert.equal(current.performance.resourceRebuilds, baseline.resourceRebuilds)
 	assert.ok(current.performance.visualFollowUpdates >= baseline.visualFollowUpdates + 12)
 	assert.equal(env.context.canvas.style.transform, 'translate3d(252px, 0px, 0)')
@@ -972,11 +1023,11 @@ async function testFollowThrottleUiAndMetrics() {
 	env.runFrame()
 	current = env.controller.snapshot()
 	assert.equal(current.performance.layerRedraws, baseline.layerRedraws + 1)
-	assert.equal(current.performance.resourceRebuilds, baseline.resourceRebuilds + 1)
+	assert.equal(current.performance.resourceRebuilds, baseline.resourceRebuilds)
 	assert.ok(current.performance.followSchedules >= 12)
 	assert.equal(env.context.canvas.style.transform, '')
 	assert.equal(env.context.canvas.style.filter, '')
-	assert.equal(env.context.canvas.style.opacity, '')
+	assert.equal(env.context.canvas.style.opacity, '1')
 	assert.equal(env.context.canvas.style.transition, 'opacity 80ms linear')
 	assert.equal(env.context.canvas.style.willChange, 'transform')
 	assert.equal(env.infoLogs.some(line => /planned \(mouse-follow\)|planned \(frame-follow\)/.test(line)), false)
@@ -1001,7 +1052,7 @@ async function testFollowThrottleUiAndMetrics() {
 	env.runFrame()
 	assert.equal(env.context.canvas.style.transform, '')
 	assert.equal(env.context.canvas.style.filter, '')
-	assert.equal(env.context.canvas.style.opacity, '')
+	assert.equal(env.context.canvas.style.opacity, '1')
 	assert.equal(env.context.canvas.style.transition, 'opacity 80ms linear')
 	assert.equal(env.context.canvas.style.willChange, 'transform')
 
@@ -1013,13 +1064,11 @@ async function testFollowThrottleUiAndMetrics() {
 	assert.equal(env.context.canvas.style.willChange, '')
 }
 
-async function testPreviewCardDomLifecycle() {
+async function testPreviewPublishesStateWithoutMountingCard() {
 	const document = createMiniDocument()
 	const env = createRuntimeEnvironment({ document })
-	const card = document.getElementById('cattail-world-editor-preview-card')
-	assert.ok(card)
-	assert.equal(card.dataset.visible, 'false')
-	assert.equal(card.dataset.positionVisible, 'false')
+	assert.equal(document.getElementById('cattail-world-editor-preview-card'), null)
+	assert.equal(document.getElementById('cattail-world-editor-preview-style'), null)
 
 	const structure = blueprint([record(1, 'silo', [0, 0], { config: { fill: 3 } })])
 	env.session.set({
@@ -1027,15 +1076,11 @@ async function testPreviewCardDomLifecycle() {
 		blueprint: structure,
 		lastResult: { attemptId: 1, status: 'captured' }
 	})
-	assert.equal(card.dataset.visible, 'true')
-	assert.equal(card.dataset.positionVisible, 'true')
-	assert.equal(card.dataset.interactive, 'false')
-	assert.equal(card.dataset.placement, 'below')
-	assert.ok(card.style.left.endsWith('px'))
-	assert.ok(card.style.top.endsWith('px'))
-
 	await flushMicrotasks()
-	const firstLeft = card.style.left
+	assert.equal(env.controller.snapshot().active, true)
+	assert.ok(env.controller.snapshot().plan)
+	assert.equal(document.getElementById('cattail-world-editor-preview-card'), null)
+
 	env.game.hoveredCell = [23, 20]
 	env.canvas.dispatch('mousemove', {
 		buttons: 0,
@@ -1044,35 +1089,66 @@ async function testPreviewCardDomLifecycle() {
 	})
 	await flushMicrotasks()
 	env.runFrame()
-	assert.notEqual(card.style.left, firstLeft)
-
-	const obstacle = document.createElement('section')
-	obstacle.id = 'cattail-world-editor-selection-card'
-	obstacle.dataset.visible = 'true'
-	obstacle.dataset.positionVisible = 'true'
-	obstacle.offsetWidth = card.offsetWidth
-	obstacle.offsetHeight = card.offsetHeight
-	obstacle.style.left = card.style.left
-	obstacle.style.top = card.style.top
-	document.body.append(obstacle)
-	env.runFrame()
-	assert.equal(card.dataset.placement, 'above')
+	assert.deepEqual(plain(env.controller.snapshot().target), [23, 20])
 
 	const pin = inputEvent(0)
 	env.canvas.dispatch('mousedown', pin)
-	assert.equal(card.dataset.interactive, 'true')
-	const overwriteTab = card.find(node => node.dataset.costMode === 'overwrite')
-	assert.ok(overwriteTab)
-	overwriteTab.dispatch('click', {
-		preventDefault() {},
-		stopPropagation() {},
-		stopImmediatePropagation() {}
-	})
-	assert.equal(overwriteTab.dataset.active, 'true')
+	assert.equal(env.controller.snapshot().pinned, true)
+	assert.equal(document.getElementById('cattail-world-editor-preview-card'), null)
 
 	env.runtime.runCleanups()
 	assert.equal(document.getElementById('cattail-world-editor-preview-card'), null)
 	assert.equal(document.getElementById('cattail-world-editor-preview-style'), null)
+}
+
+async function testTemporaryAltPinLifecycle() {
+	const env = createRuntimeEnvironment()
+	const structure = blueprint([record(1, 'silo', [0, 0], { config: { fill: 3 } })])
+	env.session.set({
+		attemptId: 1,
+		blueprint: structure,
+		lastResult: { attemptId: 1, status: 'captured' }
+	})
+	await flushMicrotasks()
+
+	const altLeftDown = keyEvent('AltLeft', 'Alt')
+	env.window.dispatch('keydown', altLeftDown)
+	let state = env.controller.snapshot()
+	assert.equal(altLeftDown.prevented, true)
+	assert.equal(altLeftDown.stopped, true)
+	assert.equal(state.temporaryPinned, true)
+	assert.equal(state.effectivePinned, true)
+	assert.equal(state.pinned, false)
+	assert.deepEqual(plain(state.target), [20, 20])
+
+	env.game.hoveredCell = [25, 20]
+	env.canvas.dispatch('mousemove', {
+		buttons: 0,
+		offsetX: 25,
+		offsetY: 20
+	})
+	assert.deepEqual(plain(env.controller.snapshot().target), [20, 20])
+
+	const altLeftUp = keyEvent('AltLeft', 'Alt')
+	env.window.dispatch('keyup', altLeftUp)
+	state = env.controller.snapshot()
+	assert.equal(altLeftUp.prevented, true)
+	assert.equal(state.temporaryPinned, false)
+	assert.equal(state.effectivePinned, false)
+	assert.deepEqual(plain(state.target), [25, 20])
+
+	const altRightDown = keyEvent('AltRight', 'Alt')
+	env.window.dispatch('keydown', altRightDown)
+	assert.equal(env.controller.snapshot().temporaryPinned, true)
+	const promote = inputEvent(0)
+	env.canvas.dispatch('mousedown', promote)
+	state = env.controller.snapshot()
+	assert.equal(state.temporaryPinned, false)
+	assert.equal(state.pinned, true)
+	assert.equal(state.effectivePinned, true)
+	assert.equal(promote.prevented, true)
+
+	env.runtime.runCleanups()
 }
 
 function loadI18n() {
@@ -1098,8 +1174,8 @@ function testManifestLocalizationAndStaticContracts() {
 		'previewSatisfied',
 		'previewConflict',
 		'previewBlocked',
-		'previewSafePlan',
-		'previewOverwritePlan',
+		'previewBuildPlan',
+		'previewTemporaryPinHint',
 		'previewFullUnavailable',
 		'previewPlanFailed',
 		'previewCalculating',
@@ -1111,14 +1187,13 @@ function testManifestLocalizationAndStaticContracts() {
 		'previewExitHint',
 		'previewRequired',
 		'previewOwned',
-		'previewRefund',
 		'previewShortfall',
 		'previewNoCost'
 	]
 	const i18n = loadI18n()
-	assert.equal(i18n.version, '0.3.1')
+	assert.equal(i18n.version, '0.3.4')
 	assert.equal(i18n.languages.length, 20)
-	assert.equal(i18n.keys.length, 77)
+	assert.equal(i18n.keys.length, 82)
 	for (const language of i18n.languages) {
 		for (const key of previewKeys) {
 			const translated = i18n.t(language, key)
@@ -1128,7 +1203,7 @@ function testManifestLocalizationAndStaticContracts() {
 	}
 
 	const manifest = JSON.parse(fs.readFileSync(path.join(MOD_ROOT, 'mod.json'), 'utf8'))
-	assert.equal(manifest.version, '0.3.3')
+	assert.equal(manifest.version, '0.3.4')
 	assert.equal(manifest.languageSupport.gameLanguage, true)
 	assert.deepEqual(manifest.entry, [
 		'scripts/core/foundation.js',
@@ -1144,6 +1219,7 @@ function testManifestLocalizationAndStaticContracts() {
 		'scripts/render/hover-overlay.js',
 		'scripts/render/selected-overlay.js',
 		'scripts/i18n/editor-text.js',
+		'scripts/ui/card-opacity.js',
 		'scripts/ui/editor-shell.js',
 		'scripts/blueprint-session.js',
 		'scripts/blueprint-preview.js',
@@ -1152,9 +1228,10 @@ function testManifestLocalizationAndStaticContracts() {
 
 	const previewSource = fs.readFileSync(path.join(MOD_ROOT, PREVIEW_SOURCE), 'utf8')
 	const plannerSource = fs.readFileSync(path.join(MOD_ROOT, PLAN_SOURCE), 'utf8')
+	const sessionSource = fs.readFileSync(path.join(MOD_ROOT, SESSION_SOURCE), 'utf8')
 	const selectionSource = fs.readFileSync(path.join(MOD_ROOT, SELECTION_SOURCE), 'utf8')
 	const readme = fs.readFileSync(path.join(MOD_ROOT, 'README.md'), 'utf8')
-	const implementation = plannerSource + '\n' + previewSource
+	const implementation = plannerSource + '\n' + previewSource + '\n' + sessionSource
 	assert.match(previewSource, /entity\.darkrenderColored\s*:\s*entity\.renderColored/)
 	assert.match(previewSource, /api\.render\.registerLayer\(RENDER_LAYER_ID/)
 	assert.match(previewSource, /api\.render\.onLayer\(RENDER_LAYER_ID/)
@@ -1166,7 +1243,7 @@ function testManifestLocalizationAndStaticContracts() {
 	assert.match(previewSource, /style\.transform\s*=\s*offsetX\s*\|\|\s*offsetY\s*\?\s*'translate3d\('/)
 	assert.match(previewSource, /setStyleValue\(style,\s*'filter',\s*''\)/)
 	assert.doesNotMatch(previewSource, /PENDING_PREVIEW_FILTER|saturate\(/)
-	assert.match(previewSource, /setStyleValue\(style,\s*'opacity',\s*provisional\s*\?\s*PENDING_PREVIEW_OPACITY\s*:\s*''\)/)
+	assert.match(previewSource, /setStyleValue\(style,\s*'opacity',\s*layerReady\s*\?\s*\(provisional\s*\?\s*PENDING_PREVIEW_OPACITY\s*:\s*'1'\)\s*:\s*''\)/)
 	assert.match(previewSource, /PENDING_PREVIEW_TRANSITION\s*=\s*'opacity 80ms linear'/)
 	assert.doesNotMatch(previewSource.match(/PENDING_PREVIEW_TRANSITION\s*=\s*'([^']+)'/)?.[1] || '', /transform/)
 	assert.match(previewSource, /api\.render\.markDirty\(RENDER_LAYER_ID,\s*game\)/)
@@ -1176,10 +1253,12 @@ function testManifestLocalizationAndStaticContracts() {
 	assert.match(previewSource, /ctx\.clearRect\?\.\(0,\s*0,\s*width,\s*height\)/)
 	assert.match(previewSource, /ctx\?\.save\?\.\(\)/)
 	assert.match(previewSource, /ctx\?\.restore\?\.\(\)/)
-	assert.match(previewSource, /pointer-events:\s*none/)
-	assert.match(previewSource, /\[data-interactive="true"\][^{]*\{[^}]*pointer-events:\s*auto/s)
-	assert.match(previewSource, /font-family:\s*Montserrat,\s*sans-serif/)
-	assert.match(previewSource, /api\.on\('afterWords'/)
+	assert.doesNotMatch(previewSource, /cattail-world-editor-preview-card/)
+	assert.doesNotMatch(previewSource, /function mountUi\(\)/)
+	assert.match(sessionSource, /pointer-events:\s*none/)
+	assert.match(sessionSource, /\[data-visible="true"\]\[data-position-visible="true"\][^{]*\{[^}]*pointer-events:\s*auto/s)
+	assert.match(sessionSource, /font:\s*400 12px\/1\.35 Montserrat,\s*Arial,\s*sans-serif/)
+	assert.match(sessionSource, /api\.on\('afterWords'/)
 	assert.match(previewSource, /sizes\)\s*&&\s*options\.sizes\.length\s*\?\s*options\.sizes\s*:\s*\[100,\s*500,\s*2000\]/)
 	assert.match(selectionSource, /PREVIEW_KEY/)
 	assert.match(selectionSource, /preview\.exit\('hotkey-escape'\)/)
@@ -1200,9 +1279,10 @@ async function run() {
 	await testOnlyOneCancellationAndBenchmark()
 	await testRuntimeLifecycleInputAndRendering()
 	await testFollowThrottleUiAndMetrics()
-	await testPreviewCardDomLifecycle()
+	await testPreviewPublishesStateWithoutMountingCard()
+	await testTemporaryAltPinLifecycle()
 	testManifestLocalizationAndStaticContracts()
-	console.log('3B verification passed: four-state planning, only-one precedence, deterministic safe/overwrite costs, detailed read-only guards and resource-only cost refresh, cancellation/retry contracts, structure/full lifecycle, pin/follow input ownership, cached dirty-only centered rendering, CSS visual following with provisional opacity, 100 ms idle/fixed final planning, frame-coalesced UI/resource caching, immediate first DOM card positioning plus frame movement/avoidance/interaction, 20-language UI, original-font card, manifest order, and 100/500/2000 synthetic benchmark.')
+	console.log('3B verification passed: four-state planning, only-one precedence, deterministic build-plan costs, detailed read-only guards and resource-only cost refresh, cancellation/retry contracts, structure/full lifecycle, pin/follow input ownership, cached dirty-only centered rendering, CSS visual following with provisional opacity, 100 ms idle/fixed final planning, no duplicate preview card, 20-language UI, manifest order, and 100/500/2000 synthetic benchmark.')
 }
 
 run().catch(error => {

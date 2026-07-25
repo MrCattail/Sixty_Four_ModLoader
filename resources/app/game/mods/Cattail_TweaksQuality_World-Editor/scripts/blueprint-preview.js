@@ -3,20 +3,20 @@ ModLoader.register({
 	init(api) {
 		const RUNTIME_KEY = Symbol.for('cattail.world-editor.runtime')
 		const SELECTION_KEY = Symbol.for('cattail.world-editor.selection')
-		const I18N_KEY = Symbol.for('cattail.world-editor.i18n')
 		const BLUEPRINT_KEY = Symbol.for('cattail.world-editor.blueprint')
 		const TRANSFORM_KEY = Symbol.for('cattail.world-editor.blueprint-transform')
 		const PLAN_KEY = Symbol.for('cattail.world-editor.blueprint-preview-plan')
 		const PREVIEW_KEY = Symbol.for('cattail.world-editor.blueprint-preview')
-		const CARD_ID = 'cattail-world-editor-preview-card'
-		const STYLE_ID = 'cattail-world-editor-preview-style'
-		const SELECTION_CARD_ID = 'cattail-world-editor-selection-card'
-		const BLUEPRINT_CARD_ID = 'cattail-world-editor-blueprint-card'
 		const RENDER_LAYER_ID = 'world-editor-blueprint-preview'
 		const RENDER_CALLBACK_ID = 'world-editor-blueprint-preview'
+		const GUIDE_LAYER_ID = 'world-editor-blueprint-transform-guide'
+		const GUIDE_CALLBACK_ID = 'world-editor-blueprint-transform-guide'
 		const FOLLOW_PLAN_IDLE_MS = 100
 		const PENDING_PREVIEW_OPACITY = '.85'
 		const PENDING_PREVIEW_TRANSITION = 'opacity 80ms linear'
+		const ROTATION_TRANSITION_MS = 160
+		const ROTATION_OVERLAY_ID = 'cattail-world-editor-blueprint-rotation-transition'
+		const GUIDE_TRANSITION_MS = 100
 		const INTEGRITY_INTERVAL_MS = 500
 		const WARNING_VISIBLE_MS = 3000
 		const EDITABLE_SELECTOR = 'input, textarea, select, [contenteditable]:not([contenteditable="false"]), [role="textbox"]'
@@ -46,16 +46,9 @@ ModLoader.register({
 				symbol: 'blocked'
 			}
 		})
-		let refreshMountedText = null
-
-		api.on('afterWords', function (words, game) {
-			if (typeof refreshMountedText === 'function') refreshMountedText(game)
-		})
-
 		api.on('afterGameInit', function (payload, game) {
 			const runtime = globalThis[RUNTIME_KEY]
 			const selection = globalThis[SELECTION_KEY]
-			const i18n = globalThis[I18N_KEY]
 			const session = globalThis[BLUEPRINT_KEY]
 			const transform = globalThis[TRANSFORM_KEY]
 			const planner = globalThis[PLAN_KEY]
@@ -71,10 +64,6 @@ ModLoader.register({
 			}
 			if (!selection || selection.game !== game || typeof selection.snapshot !== 'function') {
 				console.warn('[Cattail World Editor] Blueprint preview 3B could not find the selection state.')
-				return
-			}
-			if (!i18n || typeof i18n.t !== 'function') {
-				console.warn('[Cattail World Editor] Blueprint preview 3B could not find editor translations.')
 				return
 			}
 			if (!session || session.game !== game || typeof session.subscribe !== 'function') {
@@ -122,6 +111,8 @@ ModLoader.register({
 				})
 			let active = false
 			let pinned = false
+			let temporaryPinned = false
+			const temporaryAltKeys = new Set()
 			let paused = false
 			let target = null
 			let blueprint = null
@@ -129,30 +120,30 @@ ModLoader.register({
 			let calculating = false
 			let warning = null
 			let warningTimer = null
-			let selectedCost = 'safe'
 			let planToken = 0
 			let planRetry = 0
-			let planRevision = 0
 			let revision = 0
 			let disposed = false
 			let handledAttemptId = Number(currentSession?.attemptId) || 0
 			let integrityTimer = null
 			let followPlanTimer = null
 			let pendingFollowPlan = null
-			let ui = null
-			let uiRefreshPending = false
-			let textRevision = 0
-			let renderedResourceKey = null
-			let gameHudHidden = false
-			let vanillaHudHidden = false
 			let renderFallbacks = new Set()
 			let orderedRecords = []
 			let renderViewSignature = null
 			let renderLayerCanvas = null
 			let renderLayerScale = null
 			let renderedPlanPoint = null
+			let guideLayerCanvas = null
+			let guideLayerScale = null
+			let guideRenderedPlanPoint = null
+			let guideAction = null
 			let visualFollowSignature = null
 			let cameraDragging = false
+			let rotationOverlay = null
+			let rotationOverlayTimer = null
+			let rotationOverlayAnimation = null
+			let rotationOverlayKeyframes = null
 			const instances = new Map()
 			const listeners = new Set()
 			const metrics = {
@@ -178,7 +169,7 @@ ModLoader.register({
 			}
 
 			const controller = Object.freeze({
-				version: '0.3.1',
+				version: '0.3.4',
 				game,
 				snapshot,
 				exit,
@@ -200,12 +191,15 @@ ModLoader.register({
 				resetTransform(reason) {
 					return transformAvailable && transform.reset(reason || 'preview-api')
 				},
+				setTransformGuide(action, reason) {
+					return setTransformGuide(action, reason || 'preview-api')
+				},
 				async benchmark(options) {
 					const settings = options || {}
 					const planning = await planner.benchmark(settings)
 					const rendering = await benchmarkRendering(settings)
 					const result = {
-						version: '0.3.1',
+						version: '0.3.4',
 						planning,
 						rendering,
 						runtime: performanceSnapshot()
@@ -241,12 +235,6 @@ ModLoader.register({
 				writable: true
 			})
 
-			if (canMountUi()) {
-				gameHudHidden = !!api.ui?.hud?.isHidden?.()
-				vanillaHudHidden = !!api.ui?.isVanillaGameHudHidden?.(game)
-				ui = mountUi()
-			}
-
 			const stopRenderLayer = api.render.registerLayer(RENDER_LAYER_ID, {
 				order: 39,
 				zIndex: 39,
@@ -263,18 +251,32 @@ ModLoader.register({
 					return shouldRender(context?.game || game)
 				}
 			})
+			const stopGuideLayer = api.render.registerLayer(GUIDE_LAYER_ID, {
+				order: 41,
+				zIndex: 41,
+				cache: true,
+				clearEachFrame: false
+			})
+			const stopGuideRendering = api.render.onLayer(GUIDE_LAYER_ID, function (context) {
+				renderTransformGuide(context?.game || game, context?.ctx)
+			}, {
+				id: GUIDE_CALLBACK_ID,
+				order: 0,
+				space: 'screen',
+				enabled(context) {
+					return shouldRender(context?.game || game)
+				}
+			})
 			const stopRenderFrame = api.render.onFrame(function (context) {
 				syncPlane()
 				syncFollowingTarget()
 				syncRenderView(context?.game || game)
 				syncVisualFollow(context?.game || game)
-				if (!flushUiRefresh()) syncCardPosition(context?.game || game)
 			})
 
 			const stopRuntimeSubscription = runtime.subscribe(function (state) {
 				currentRuntime = state
 				if (!state.active) exit('editor-inactive')
-				requestUiRefresh(true)
 			})
 			const stopSessionSubscription = session.subscribe(function (state) {
 				const previousBlueprint = currentSession?.blueprint
@@ -301,7 +303,6 @@ ModLoader.register({
 				} else {
 					handledAttemptId = Math.max(handledAttemptId, attemptId)
 				}
-				requestUiRefresh(true)
 			})
 			const stopTransformSubscription = transformAvailable ? transform.subscribe(function (state) {
 				const previousTransform = currentTransform
@@ -321,13 +322,13 @@ ModLoader.register({
 					return
 				}
 				if (state.blueprint !== blueprint) {
+					if (shouldAnimateRotation(previousTransform, state)) prepareRotationTransition(previousTransform, state)
 					applyTransformedBlueprint(state.blueprint, state.lastCommand || 'transform-changed')
 				}
-				requestUiRefresh(true)
 			}) : null
 
 			const handleMouseMove = function (event) {
-				if (!active || pinned || paused || !shouldOwnInput()) return
+				if (!active || isTargetPinned() || paused || !shouldOwnInput()) return
 				if (Number(event?.buttons) & 2) return
 				refreshHoveredCell(event)
 				setTarget(game.hoveredCell, 'mouse-follow')
@@ -339,7 +340,9 @@ ModLoader.register({
 				}
 				if (event?.button !== 0 || !active || paused || !shouldOwnInput() || isEditableEvent(event)) return
 				refreshHoveredCell(event)
-				if (pinned) {
+				if (temporaryPinned) {
+					setPinned(true, 'map-alt-promote')
+				} else if (pinned) {
 					setPinned(false, 'map-unpin')
 					setTarget(game.hoveredCell, 'map-unpin-follow')
 				} else {
@@ -354,6 +357,8 @@ ModLoader.register({
 			}
 			const handleWindowBlur = function () {
 				finishCameraDrag()
+				setTransformGuide(null, 'window-blur')
+				releaseTemporaryPin('window-blur', false)
 				if (active && !pinned) exit('window-blur')
 			}
 			const handleWindowMouseUp = function (event) {
@@ -362,6 +367,7 @@ ModLoader.register({
 			const handleWindowResize = function () {
 				if (!active || !renderLayerCanvas) return
 				refreshRenderLayerScale()
+				refreshGuideLayerScale()
 				visualFollowSignature = null
 			}
 			const handleTransformKeydown = function (event) {
@@ -395,17 +401,37 @@ ModLoader.register({
 						: transform.mirrorU('hotkey-m')
 				if (changed) consume(event)
 			}
-			const handleGameHud = function (event) {
-				if (event?.detail?.game && event.detail.game !== game) return
-				gameHudHidden = !!event?.detail?.hidden
-				requestUiRefresh(true)
+			const handleTemporaryPinKeydown = function (event) {
+				const keyId = altKeyId(event)
+				if (
+					!keyId ||
+					pinned ||
+					!active ||
+					paused ||
+					!target ||
+					!shouldOwnInput() ||
+					isEditableEvent(event)
+				) {
+					return
+				}
+				temporaryAltKeys.add(keyId)
+				if (!temporaryPinned) {
+					temporaryPinned = true
+					if (!flushFollowPlan('alt-temporary-pin') && (!plan || !samePosition(plan.target, target))) {
+						requestPlan('alt-temporary-pin', 1)
+					}
+					notify()
+				}
+				consume(event)
 			}
-			const handleVanillaGameHud = function (event) {
-				if (event?.detail?.game && event.detail.game !== game) return
-				vanillaHudHidden = !!event?.detail?.hidden
-				requestUiRefresh(true)
+			const handleTemporaryPinKeyup = function (event) {
+				const keyId = altKeyId(event)
+				if (!keyId || !temporaryAltKeys.has(keyId)) return
+				temporaryAltKeys.delete(keyId)
+				if (temporaryAltKeys.size || !temporaryPinned) return
+				releaseTemporaryPin('alt-release', true)
+				consume(event)
 			}
-
 			canvas.addEventListener('mousemove', handleMouseMove, true)
 			canvas.addEventListener('mousedown', handleMouseDown, true)
 			canvas.addEventListener('mouseup', consumeLeft, true)
@@ -415,21 +441,14 @@ ModLoader.register({
 				window.addEventListener('blur', handleWindowBlur, true)
 				window.addEventListener('mouseup', handleWindowMouseUp, true)
 				window.addEventListener('resize', handleWindowResize)
+				window.addEventListener('keydown', handleTemporaryPinKeydown, true)
 				window.addEventListener('keydown', handleTransformKeydown, true)
-				window.addEventListener('modloader:game-hud', handleGameHud)
-				window.addEventListener('modloader:vanilla-game-hud', handleVanillaGameHud)
+				window.addEventListener('keyup', handleTemporaryPinKeyup, true)
 			}
 
-			refreshMountedText = function () {
-				refreshText()
-				requestUiRefresh(true)
-			}
-			refreshText()
-			requestUiRefresh(true)
 			scheduleIntegrityCheck()
 
 			runtime.addCleanup(function () {
-				if (refreshMountedText) refreshMountedText = null
 				canvas.removeEventListener('mousemove', handleMouseMove, true)
 				canvas.removeEventListener('mousedown', handleMouseDown, true)
 				canvas.removeEventListener('mouseup', consumeLeft, true)
@@ -439,17 +458,18 @@ ModLoader.register({
 					window.removeEventListener('blur', handleWindowBlur, true)
 					window.removeEventListener('mouseup', handleWindowMouseUp, true)
 					window.removeEventListener('resize', handleWindowResize)
+					window.removeEventListener('keydown', handleTemporaryPinKeydown, true)
 					window.removeEventListener('keydown', handleTransformKeydown, true)
-					window.removeEventListener('modloader:game-hud', handleGameHud)
-					window.removeEventListener('modloader:vanilla-game-hud', handleVanillaGameHud)
+					window.removeEventListener('keyup', handleTemporaryPinKeyup, true)
 				}
 				if (typeof stopRuntimeSubscription === 'function') stopRuntimeSubscription()
 				if (typeof stopSessionSubscription === 'function') stopSessionSubscription()
 				if (typeof stopTransformSubscription === 'function') stopTransformSubscription()
 				if (typeof stopRendering === 'function') stopRendering()
 				if (typeof stopRenderLayer === 'function') stopRenderLayer()
+				if (typeof stopGuideRendering === 'function') stopGuideRendering()
+				if (typeof stopGuideLayer === 'function') stopGuideLayer()
 				if (typeof stopRenderFrame === 'function') stopRenderFrame()
-				if (ui) unmountUi()
 				controller.dispose('runtime-disposed')
 			})
 
@@ -457,9 +477,11 @@ ModLoader.register({
 
 			function snapshot() {
 				return Object.freeze({
-					version: '0.3.1',
+					version: '0.3.4',
 					active,
 					pinned,
+					temporaryPinned,
+					effectivePinned: isTargetPinned(),
 					paused,
 					target: clonePosition(target),
 					blueprint,
@@ -467,8 +489,8 @@ ModLoader.register({
 					plan,
 					calculating,
 					warning: warning?.code || null,
-					selectedCost,
 					renderFallbackCount: renderFallbacks.size,
+					guideAction,
 					performance: performanceSnapshot(),
 					revision,
 					disposed
@@ -502,7 +524,7 @@ ModLoader.register({
 				})
 			}
 
-			function notify(immediateUi, refreshUiState) {
+			function notify() {
 				revision += 1
 				const state = snapshot()
 				for (const listener of Array.from(listeners)) {
@@ -512,58 +534,61 @@ ModLoader.register({
 						console.warn('[Cattail World Editor] Blueprint preview listener failed.', error)
 					}
 				}
-				if (refreshUiState !== false) requestUiRefresh(immediateUi === true)
 			}
 
 			function enter(nextBlueprint, reason) {
 				if (disposed || nextBlueprint?.mode !== 'structure' || !Array.isArray(nextBlueprint.entities)) return false
+				setTransformGuide(null, 'preview-entered')
 				clearWarning()
 				clearFollowPlan()
 				planToken += 1
 				active = true
 				pinned = false
+				temporaryPinned = false
+				temporaryAltKeys.clear()
 				paused = Number(nextBlueprint.sourcePlane) !== (game.plane ? 1 : 0)
 				target = null
 				blueprint = nextBlueprint
 				plan = null
-				planRevision += 1
 				calculating = false
-				selectedCost = 'safe'
 				renderFallbacks = new Set()
 				orderedRecords = []
 				renderViewSignature = null
 				renderedPlanPoint = null
+				guideRenderedPlanPoint = null
 				resetVisualFollow()
-				renderedResourceKey = null
+				clearRotationTransition()
 				instances.clear()
 				if (!paused) setTarget(game.hoveredCell, reason || 'preview-entered')
-				notify(true)
+				notify()
 				return true
 			}
 
 			function exit(reason) {
-				const changed = active || pinned || paused || target || plan || calculating
+				const changed = active || pinned || temporaryPinned || paused || target || plan || calculating
+				setTransformGuide(null, reason || 'preview-exited')
 				clearFollowPlan()
 				planToken += 1
 				active = false
 				pinned = false
+				temporaryPinned = false
+				temporaryAltKeys.clear()
 				paused = false
 				target = null
 				blueprint = null
 				plan = null
-				planRevision += 1
 				calculating = false
 				planRetry = 0
-				selectedCost = 'safe'
 				renderFallbacks = new Set()
 				orderedRecords = []
 				renderViewSignature = null
 				renderedPlanPoint = null
+				guideRenderedPlanPoint = null
 				resetVisualFollow()
-				renderedResourceKey = null
+				clearRotationTransition()
 				instances.clear()
 				if (changed) {
-					notify(true)
+					notify()
 					if (reason) console.info('[Cattail World Editor] Blueprint preview exited (' + reason + ').')
 				}
 				return changed
@@ -577,34 +602,65 @@ ModLoader.register({
 				metrics.transformChanges += 1
 				let scheduled = false
 				if (target) {
-					if (pinned) scheduled = requestPlan(reason || 'transform-pinned', 1)
+					if (isTargetPinned()) scheduled = requestPlan(reason || 'transform-pinned', 1)
 					else scheduled = scheduleFollowPlan(reason || 'transform-following', 1)
 				}
-				if (!scheduled) calculating = false
-				notify(true)
+				if (!scheduled) {
+					calculating = false
+					clearRotationTransition()
+				}
+				notify()
 				return true
 			}
 
 			function setPinned(next, reason) {
-				if (!active || paused || !target || pinned === next) return false
+				if (!active || paused || !target) return false
+				if (next && temporaryPinned) {
+					temporaryPinned = false
+					temporaryAltKeys.clear()
+				}
+				if (pinned === next) return false
 				if (next) flushFollowPlan('pin-target')
 				pinned = next
-				if (!pinned) syncFollowingTarget()
-				notify(true)
+				if (!isTargetPinned()) syncFollowingTarget()
+				notify()
 				if (reason) console.info('[Cattail World Editor] Blueprint preview ' + (next ? 'pinned' : 'following') + ' (' + reason + ').')
 				return true
 			}
 
+			function isTargetPinned() {
+				return pinned || temporaryPinned
+			}
+
+			function releaseTemporaryPin(reason, resumeFollowing) {
+				if (!temporaryPinned && !temporaryAltKeys.size) return false
+				temporaryPinned = false
+				temporaryAltKeys.clear()
+				let moved = false
+				if (resumeFollowing && active && !pinned && !paused) {
+					moved = setTarget(game.hoveredCell, reason || 'temporary-pin-released')
+				}
+				if (!moved) notify()
+				return true
+			}
+
+			function altKeyId(event) {
+				const code = String(event?.code || '')
+				if (code === 'AltLeft' || code === 'AltRight') return code
+				if (String(event?.key || '').toLowerCase() !== 'alt') return ''
+				return Number(event?.location) === 2 ? 'AltRight' : 'AltLeft'
+			}
+
 			function setTarget(value, reason) {
 				const next = normalizePosition(value)
-				if (!active || paused || pinned || !next || samePosition(next, target)) return false
+				if (!active || paused || isTargetPinned() || !next || samePosition(next, target)) return false
 				target = next
 				metrics.targetChanges += 1
 				planToken += 1
 				const planReason = reason || 'target-changed'
 				if (isFollowPlanReason(planReason)) scheduleFollowPlan(planReason, 1)
 				else requestPlan(planReason, 1)
-				notify(false, false)
+				notify()
 				return true
 			}
 
@@ -615,9 +671,10 @@ ModLoader.register({
 				const requestTarget = target.slice()
 				const requestBlueprint = blueprint
 				planRetry = Math.max(0, Number(retries) || 0)
+				const wasCalculating = calculating
 				calculating = true
 				metrics.planRequests += 1
-				requestUiRefresh()
+				if (!wasCalculating) notify()
 				Promise.resolve().then(async function () {
 					let candidate = await planner.build(game, requestBlueprint, requestTarget, {
 						chunkSize: 512,
@@ -639,7 +696,6 @@ ModLoader.register({
 						throw previewError('world-changed')
 					}
 					plan = candidate
-					planRevision += 1
 					calculating = false
 					planRetry = 0
 					renderFallbacks = new Set()
@@ -648,6 +704,7 @@ ModLoader.register({
 					rebuildInstances(candidate)
 					metrics.planCompletions += 1
 					markPreviewDirty()
+					if (guideAction) markGuideDirty()
 					notify()
 					if (reason && !isFollowPlanReason(reason)) {
 						console.info('[Cattail World Editor] Blueprint preview planned (' + reason + ').')
@@ -658,8 +715,8 @@ ModLoader.register({
 						return
 					}
 					calculating = false
+					clearRotationTransition()
 					showWarning('plan-failed', blueprint, error)
-					notify()
 				})
 				return true
 			}
@@ -673,7 +730,7 @@ ModLoader.register({
 				}
 				const wasCalculating = calculating
 				calculating = true
-				if (!wasCalculating) requestUiRefresh()
+				if (!wasCalculating) notify()
 				if (followPlanTimer !== null && typeof globalThis.clearTimeout === 'function') {
 					globalThis.clearTimeout(followPlanTimer)
 				}
@@ -714,22 +771,24 @@ ModLoader.register({
 				const shouldPause = Number(blueprint.sourcePlane) !== (game.plane ? 1 : 0)
 				if (shouldPause === paused) return
 				paused = shouldPause
+				if (paused) setTransformGuide(null, 'source-plane-paused')
 				clearFollowPlan()
 				planToken += 1
 				calculating = false
 				renderViewSignature = null
 				renderedPlanPoint = null
+				guideRenderedPlanPoint = null
 				resetVisualFollow()
-				if (!paused && !pinned) {
+				if (!paused && !isTargetPinned()) {
 					target = null
 					setTarget(game.hoveredCell, 'source-plane-restored')
 				} else {
-					notify(true)
+					notify()
 				}
 			}
 
 			function syncFollowingTarget() {
-				if (!active || paused || pinned || !currentRuntime.active || game.halt || game.splash?.isShown) return
+				if (!active || paused || isTargetPinned() || !currentRuntime.active || game.halt || game.splash?.isShown) return
 				setTarget(game.hoveredCell, 'frame-follow')
 			}
 
@@ -740,7 +799,7 @@ ModLoader.register({
 					integrityTimer = null
 					if (
 						active &&
-						pinned &&
+						isTargetPinned() &&
 						!paused &&
 						!calculating &&
 						plan
@@ -757,7 +816,6 @@ ModLoader.register({
 						metrics.lastIntegrityReason = verification.reason
 						if (!verification.valid && verification.reason === 'resources') {
 							plan = planner.refreshResources(game, plan)
-							planRevision += 1
 							metrics.resourceRefreshes += 1
 							notify()
 						} else if (!verification.valid) {
@@ -787,10 +845,10 @@ ModLoader.register({
 					warningTimer = globalThis.setTimeout(function () {
 						warningTimer = null
 						warning = null
-						requestUiRefresh(true)
+						notify()
 					}, WARNING_VISIBLE_MS)
 				}
-				requestUiRefresh(true)
+				notify()
 			}
 
 			function clearWarning() {
@@ -868,16 +926,468 @@ ModLoader.register({
 					for (const record of orderedRecords) drawRecordOverlay(ctx, record, newFallbacks.has(record.index))
 					if (newFallbacks.size !== renderFallbacks.size) {
 						renderFallbacks = newFallbacks
-						requestUiRefresh()
+						notify()
 					}
 				} finally {
 					ctx.restore()
 				}
+				startRotationTransition()
+			}
+
+			function shouldAnimateRotation(previousState, nextState) {
+				if (!active || !renderLayerCanvas || !previousState || !nextState) return false
+				if (Number(previousState.rotation) === Number(nextState.rotation)) return false
+				const command = String(nextState.lastCommand || '')
+				return command === 'rotate-clockwise' || command === 'rotate-counterclockwise' || command === 'reset'
+			}
+
+			function prepareRotationTransition(previousState, nextState) {
+				clearRotationTransition()
+				if (
+					typeof document === 'undefined' ||
+					!document.body ||
+					typeof document.createElement !== 'function' ||
+					!renderLayerCanvas
+				) {
+					return false
+				}
+				const overlay = document.createElement('canvas')
+				const context = overlay.getContext?.('2d')
+				if (!context) return false
+				const width = positive(renderLayerCanvas.width, 0)
+				const height = positive(renderLayerCanvas.height, 0)
+				if (!width || !height) return false
+				overlay.id = ROTATION_OVERLAY_ID
+				overlay.width = width
+				overlay.height = height
+				try {
+					context.drawImage(renderLayerCanvas, 0, 0)
+				} catch (error) {
+					return false
+				}
+				const rect = renderLayerCanvas.getBoundingClientRect?.() || {
+					left: 0,
+					top: 0,
+					width,
+					height
+				}
+				const style = overlay.style
+				style.position = 'fixed'
+				style.left = finiteOr(rect.left, 0) + 'px'
+				style.top = finiteOr(rect.top, 0) + 'px'
+				style.width = positive(rect.width, width) + 'px'
+				style.height = positive(rect.height, height) + 'px'
+				style.zIndex = '40'
+				style.opacity = String(renderLayerCanvas.style?.opacity || '1')
+				style.pointerEvents = 'none'
+				style.transition = 'none'
+				const transition = projectedRotationTransition(previousState, nextState, rect)
+				if (!transition) return false
+				style.transformOrigin = transition.originX + 'px ' + transition.originY + 'px'
+				style.transform = 'matrix(1, 0, 0, 1, 0, 0)'
+				style.willChange = 'transform, opacity'
+				overlay.dataset.targetTransform = transition.transform
+				document.body.append(overlay)
+				rotationOverlay = overlay
+				rotationOverlayKeyframes = transition.keyframes
+				return true
+			}
+
+			function startRotationTransition() {
+				const overlay = rotationOverlay
+				if (!overlay || overlay.dataset?.started === 'true') return false
+				if (overlay.dataset) overlay.dataset.started = 'true'
+				const begin = function () {
+					if (rotationOverlay !== overlay || !overlay.style) return
+					const initialOpacity = Math.max(0, Math.min(1, finiteOr(Number(overlay.style.opacity), 1)))
+					const keyframes = (rotationOverlayKeyframes || []).map(function (keyframe) {
+						return {
+							offset: keyframe.offset,
+							transform: keyframe.transform,
+							opacity: String(initialOpacity * (1 - keyframe.offset))
+						}
+					})
+					if (typeof overlay.animate === 'function' && keyframes.length > 1) {
+						rotationOverlayAnimation = overlay.animate(keyframes, {
+							duration: ROTATION_TRANSITION_MS,
+							easing: 'linear',
+							fill: 'forwards'
+						})
+					} else {
+						overlay.style.transition =
+							'transform ' + ROTATION_TRANSITION_MS + 'ms linear, ' +
+							'opacity ' + ROTATION_TRANSITION_MS + 'ms linear'
+						overlay.style.transform = overlay.dataset?.targetTransform || 'matrix(1, 0, 0, 1, 0, 0)'
+						overlay.style.opacity = '0'
+					}
+				}
+				if (typeof globalThis.requestAnimationFrame === 'function') globalThis.requestAnimationFrame(begin)
+				else globalThis.setTimeout?.(begin, 0)
+				if (typeof globalThis.setTimeout === 'function') {
+					rotationOverlayTimer = globalThis.setTimeout(function () {
+						if (rotationOverlay === overlay) clearRotationTransition()
+					}, ROTATION_TRANSITION_MS + 40)
+				}
+				return true
+			}
+
+			function projectedRotationTransition(previousState, nextState, rect) {
+				if (!plan || !previousState?.pivot) return null
+				const angle = logicalRotationAngle(previousState, nextState)
+				if (!angle) return null
+				const origin = projectPosition(game, plan.target)
+				const uPoint = projectPosition(game, [plan.target[0] + 1, plan.target[1]])
+				const vPoint = projectPosition(game, [plan.target[0], plan.target[1] + 1])
+				if (!origin || !uPoint || !vPoint) return null
+				const scaleX = positive(rect?.width, positive(renderLayerCanvas?.width, 1)) /
+					positive(renderLayerCanvas?.width, 1)
+				const scaleY = positive(rect?.height, positive(renderLayerCanvas?.height, 1)) /
+					positive(renderLayerCanvas?.height, 1)
+				const basis = [
+					(uPoint[0] - origin[0]) * scaleX,
+					(vPoint[0] - origin[0]) * scaleX,
+					(uPoint[1] - origin[1]) * scaleY,
+					(vPoint[1] - origin[1]) * scaleY
+				]
+				const inverseBasis = inverseMatrix(basis)
+				if (!inverseBasis) return null
+				const steps = Math.max(8, Math.round(Math.abs(angle) / (Math.PI / 2) * 8))
+				const keyframes = []
+				for (let index = 0; index <= steps; index += 1) {
+					const offset = index / steps
+					const logical = rotationMatrixAt(angle * offset)
+					const screen = multiplyMatrix(multiplyMatrix(basis, logical), inverseBasis)
+					keyframes.push({
+						offset,
+						transform: cssMatrix(screen)
+					})
+				}
+				const pivotWorld = [
+					plan.target[0] + finiteOr(previousState.pivot[0], 0),
+					plan.target[1] + finiteOr(previousState.pivot[1], 0)
+				]
+				const pivotPoint = projectPosition(game, pivotWorld)
+				if (!pivotPoint) return null
+				const width = positive(renderLayerCanvas?.width, 1)
+				const height = positive(renderLayerCanvas?.height, 1)
+				const centerX = finiteOr(game.w2, width / 2)
+				const centerY = finiteOr(game.h2, height / 2)
+				return {
+					originX: (centerX + pivotPoint[0]) * scaleX,
+					originY: (centerY + pivotPoint[1]) * scaleY,
+					transform: keyframes[keyframes.length - 1].transform,
+					keyframes
+				}
+			}
+
+			function logicalRotationAngle(previousState, nextState) {
+				const command = String(nextState?.lastCommand || '')
+				if (command === 'rotate-clockwise') return Math.PI / 2
+				if (command === 'rotate-counterclockwise') return -Math.PI / 2
+				if (command !== 'reset') return null
+				let turns = -Math.round(finiteOr(previousState?.quarterTurns, 0))
+				while (turns > 2) turns -= 4
+				while (turns < -2) turns += 4
+				return turns ? turns * Math.PI / 2 : null
+			}
+
+			function rotationMatrixAt(angle) {
+				const cosine = Math.cos(angle)
+				const sine = Math.sin(angle)
+				return [cosine, -sine, sine, cosine]
+			}
+
+			function cssMatrix(screen) {
+				return 'matrix(' + [
+					roundCss(screen[0]),
+					roundCss(screen[2]),
+					roundCss(screen[1]),
+					roundCss(screen[3]),
+					0,
+					0
+				].join(', ') + ')'
+			}
+
+			function multiplyMatrix(left, right) {
+				return [
+					left[0] * right[0] + left[1] * right[2],
+					left[0] * right[1] + left[1] * right[3],
+					left[2] * right[0] + left[3] * right[2],
+					left[2] * right[1] + left[3] * right[3]
+				]
+			}
+
+			function inverseMatrix(value) {
+				const determinant = value[0] * value[3] - value[1] * value[2]
+				if (!Number.isFinite(determinant) || Math.abs(determinant) < .000001) return null
+				return [
+					value[3] / determinant,
+					-value[1] / determinant,
+					-value[2] / determinant,
+					value[0] / determinant
+				]
+			}
+
+			function clearRotationTransition() {
+				if (rotationOverlayTimer !== null && typeof globalThis.clearTimeout === 'function') {
+					globalThis.clearTimeout(rotationOverlayTimer)
+				}
+				rotationOverlayTimer = null
+				rotationOverlayAnimation?.cancel?.()
+				rotationOverlayAnimation = null
+				rotationOverlay?.remove?.()
+				rotationOverlay = null
+				rotationOverlayKeyframes = null
+			}
+
+			function setTransformGuide(action, reason) {
+				const normalized = normalizeGuideAction(action)
+				if (normalized && (!active || paused || !plan || !shouldRender(game))) return false
+				if (guideAction === normalized) return false
+				guideAction = normalized
+				if (guideLayerCanvas?.style) {
+					setStyleValue(guideLayerCanvas.style, 'transition', 'opacity ' + GUIDE_TRANSITION_MS + 'ms ease-out')
+					setStyleValue(guideLayerCanvas.style, 'opacity', normalized ? '0' : '0')
+				}
+				markGuideDirty()
+				notify()
+				return true
+			}
+
+			function normalizeGuideAction(action) {
+				const value = String(action || '')
+				return [
+					'rotate-clockwise',
+					'rotate-counterclockwise',
+					'mirror-u',
+					'mirror-v',
+					'reset'
+				].includes(value) ? value : null
+			}
+
+			function renderTransformGuide(renderGame, ctx) {
+				if (!ctx) return
+				setGuideLayerCanvas(ctx.canvas || guideLayerCanvas)
+				refreshGuideLayerScale()
+				const width = positive(ctx.canvas?.width, positive(game.w, 0))
+				const height = positive(ctx.canvas?.height, positive(game.h, 0))
+				const centerX = finiteOr(game.w2, width / 2)
+				const centerY = finiteOr(game.h2, height / 2)
+				if (typeof ctx.setTransform === 'function') ctx.setTransform(1, 0, 0, 1, 0, 0)
+				ctx.clearRect?.(0, 0, width, height)
+				if (!guideAction || !plan || !shouldRender(renderGame)) {
+					guideRenderedPlanPoint = null
+					return
+				}
+				guideRenderedPlanPoint = projectPosition(renderGame, plan.target)
+				const points = projectedBoundsPoints(renderGame, plan.bounds)
+				if (points.length !== 4) return
+				ctx.save()
+				try {
+					if (typeof ctx.setTransform === 'function') ctx.setTransform(1, 0, 0, 1, centerX, centerY)
+					else ctx.translate?.(centerX, centerY)
+					const scale = (positive(guideLayerScale?.x, 1) + positive(guideLayerScale?.y, 1)) / 2
+					const visual = guideVisualStyle(renderGame, scale)
+					const direction = resolvedGuideAction(guideAction)
+					if (direction === 'rotate-clockwise' || direction === 'rotate-counterclockwise') {
+						drawRotationGuide(ctx, points, direction === 'rotate-clockwise' ? 1 : -1, visual)
+					} else if (direction === 'mirror-u' || direction === 'mirror-v') {
+						drawMirrorGuide(ctx, renderGame, points, direction === 'mirror-u' ? 'v' : 'u', visual)
+					} else if (direction === 'mirror-both') {
+						drawMirrorGuide(ctx, renderGame, points, 'v', visual)
+						drawMirrorGuide(ctx, renderGame, points, 'u', visual)
+					}
+				} finally {
+					ctx.restore()
+				}
+				showGuideLayer()
+			}
+
+			function projectedBoundsPoints(renderGame, bounds) {
+				if (!bounds) return []
+				return [
+					[bounds.minU - .5, bounds.minV - .5],
+					[bounds.maxU + .5, bounds.minV - .5],
+					[bounds.maxU + .5, bounds.maxV + .5],
+					[bounds.minU - .5, bounds.maxV + .5]
+				].map(function (position) {
+					return projectPosition(renderGame, position)
+				}).filter(Boolean)
+			}
+
+			function resolvedGuideAction(action) {
+				if (action !== 'reset') return action
+				const turns = Math.round(finiteOr(currentTransform?.quarterTurns, 0))
+				if (turns === 1 || turns === 2) return 'rotate-counterclockwise'
+				if (turns === 3) return 'rotate-clockwise'
+				if (currentTransform?.mirrorU && currentTransform?.mirrorV) return 'mirror-both'
+				if (currentTransform?.mirrorU) return 'mirror-u'
+				if (currentTransform?.mirrorV) return 'mirror-v'
+				return null
+			}
+
+			function guideVisualStyle(renderGame, scale) {
+				return {
+					main: '#889',
+					outline: renderGame?.plane ? 'rgba(5, 7, 10, .64)' : 'rgba(255, 255, 255, .72)',
+					lineWidth: 1.25 / positive(scale, 1),
+					outlineWidth: 3.25 / positive(scale, 1),
+					arrowSize: 6 / positive(scale, 1),
+					offset: 12 / positive(scale, 1)
+				}
+			}
+
+			function drawRotationGuide(ctx, points, direction, visual) {
+				const bounds = pointBounds(points)
+				const centerX = (bounds.minX + bounds.maxX) / 2
+				const centerY = (bounds.minY + bounds.maxY) / 2
+				const radiusX = Math.max(18, (bounds.maxX - bounds.minX) / 2 + visual.offset)
+				const radiusY = Math.max(18, (bounds.maxY - bounds.minY) / 2 + visual.offset)
+				drawRotationGuidePass(ctx, centerX, centerY, radiusX, radiusY, direction, visual.outline, visual.outlineWidth, visual.arrowSize + visual.outlineWidth)
+				drawRotationGuidePass(ctx, centerX, centerY, radiusX, radiusY, direction, visual.main, visual.lineWidth, visual.arrowSize)
+			}
+
+			function drawRotationGuidePass(ctx, centerX, centerY, radiusX, radiusY, direction, color, lineWidth, arrowSize) {
+				const sweep = direction * Math.PI * 5 / 6
+				for (const start of [-Math.PI * 5 / 12, Math.PI * 7 / 12]) {
+					const end = start + sweep
+					ctx.beginPath?.()
+					if (typeof ctx.ellipse === 'function') {
+						ctx.ellipse(centerX, centerY, radiusX, radiusY, 0, start, end, direction < 0)
+					} else {
+						ctx.arc?.(centerX, centerY, Math.max(radiusX, radiusY), start, end, direction < 0)
+					}
+					ctx.strokeStyle = color
+					ctx.lineWidth = lineWidth
+					ctx.lineCap = 'round'
+					ctx.stroke?.()
+					const point = [
+						centerX + radiusX * Math.cos(end),
+						centerY + radiusY * Math.sin(end)
+					]
+					const tangent = normalizeVector([
+						-radiusX * Math.sin(end) * direction,
+						radiusY * Math.cos(end) * direction
+					])
+					drawArrowhead(ctx, point, tangent, arrowSize, color)
+				}
+			}
+
+			function drawMirrorGuide(ctx, renderGame, points, axis, visual) {
+				const origin = projectPosition(renderGame, plan.target)
+				const basisPoint = projectPosition(
+					renderGame,
+					axis === 'u'
+						? [plan.target[0] + 1, plan.target[1]]
+						: [plan.target[0], plan.target[1] + 1]
+				)
+				if (!origin || !basisPoint) return
+				const direction = normalizeVector([basisPoint[0] - origin[0], basisPoint[1] - origin[1]])
+				const normal = [-direction[1], direction[0]]
+				const center = points.reduce(function (value, point) {
+					value[0] += point[0] / points.length
+					value[1] += point[1] / points.length
+					return value
+				}, [0, 0])
+				const extents = projectedExtents(points, center, direction, normal)
+				for (const side of [extents.minNormal - visual.offset, extents.maxNormal + visual.offset]) {
+					const start = addVectors(center, scaleVector(direction, extents.minDirection), scaleVector(normal, side))
+					const end = addVectors(center, scaleVector(direction, extents.maxDirection), scaleVector(normal, side))
+					drawDoubleArrowPass(ctx, start, end, visual.outline, visual.outlineWidth, visual.arrowSize + visual.outlineWidth)
+					drawDoubleArrowPass(ctx, start, end, visual.main, visual.lineWidth, visual.arrowSize)
+				}
+			}
+
+			function drawDoubleArrowPass(ctx, start, end, color, lineWidth, arrowSize) {
+				const direction = normalizeVector([end[0] - start[0], end[1] - start[1]])
+				ctx.beginPath?.()
+				ctx.moveTo?.(start[0], start[1])
+				ctx.lineTo?.(end[0], end[1])
+				ctx.strokeStyle = color
+				ctx.lineWidth = lineWidth
+				ctx.lineCap = 'round'
+				ctx.stroke?.()
+				drawArrowhead(ctx, end, direction, arrowSize, color)
+				drawArrowhead(ctx, start, [-direction[0], -direction[1]], arrowSize, color)
+			}
+
+			function drawArrowhead(ctx, point, direction, size, color) {
+				const normal = [-direction[1], direction[0]]
+				const base = [point[0] - direction[0] * size, point[1] - direction[1] * size]
+				ctx.beginPath?.()
+				ctx.moveTo?.(point[0], point[1])
+				ctx.lineTo?.(base[0] + normal[0] * size * .55, base[1] + normal[1] * size * .55)
+				ctx.lineTo?.(base[0] - normal[0] * size * .55, base[1] - normal[1] * size * .55)
+				ctx.closePath?.()
+				ctx.fillStyle = color
+				ctx.fill?.()
+			}
+
+			function pointBounds(points) {
+				return points.reduce(function (bounds, point) {
+					bounds.minX = Math.min(bounds.minX, point[0])
+					bounds.maxX = Math.max(bounds.maxX, point[0])
+					bounds.minY = Math.min(bounds.minY, point[1])
+					bounds.maxY = Math.max(bounds.maxY, point[1])
+					return bounds
+				}, { minX: Infinity, maxX: -Infinity, minY: Infinity, maxY: -Infinity })
+			}
+
+			function projectedExtents(points, center, direction, normal) {
+				const result = {
+					minDirection: Infinity,
+					maxDirection: -Infinity,
+					minNormal: Infinity,
+					maxNormal: -Infinity
+				}
+				for (const point of points) {
+					const relative = [point[0] - center[0], point[1] - center[1]]
+					const along = relative[0] * direction[0] + relative[1] * direction[1]
+					const across = relative[0] * normal[0] + relative[1] * normal[1]
+					result.minDirection = Math.min(result.minDirection, along)
+					result.maxDirection = Math.max(result.maxDirection, along)
+					result.minNormal = Math.min(result.minNormal, across)
+					result.maxNormal = Math.max(result.maxNormal, across)
+				}
+				return result
+			}
+
+			function normalizeVector(value) {
+				const length = Math.hypot(value[0], value[1]) || 1
+				return [value[0] / length, value[1] / length]
+			}
+
+			function scaleVector(value, scale) {
+				return [value[0] * scale, value[1] * scale]
+			}
+
+			function addVectors() {
+				const result = [0, 0]
+				for (const value of arguments) {
+					result[0] += value[0]
+					result[1] += value[1]
+				}
+				return result
+			}
+
+			function showGuideLayer() {
+				const canvas = guideLayerCanvas
+				if (!canvas?.style || !guideAction) return
+				setStyleValue(canvas.style, 'transition', 'opacity ' + GUIDE_TRANSITION_MS + 'ms ease-out')
+				const show = function () {
+					if (guideLayerCanvas === canvas && guideAction) setStyleValue(canvas.style, 'opacity', '1')
+				}
+				if (typeof globalThis.requestAnimationFrame === 'function') globalThis.requestAnimationFrame(show)
+				else globalThis.setTimeout?.(show, 0)
 			}
 
 			function markPreviewDirty() {
 				metrics.layerDirtyMarks += 1
 				api.render.markDirty(RENDER_LAYER_ID, game)
+			}
+
+			function markGuideDirty() {
+				api.render.markDirty(GUIDE_LAYER_ID, game)
 			}
 
 			function syncRenderView(renderGame) {
@@ -886,8 +1396,10 @@ ModLoader.register({
 				if (next === renderViewSignature) return
 				renderViewSignature = next
 				renderedPlanPoint = null
+				guideRenderedPlanPoint = null
 				resetVisualFollow()
 				markPreviewDirty()
+				if (guideAction) markGuideDirty()
 			}
 
 			function syncVisualFollow(renderGame) {
@@ -906,6 +1418,7 @@ ModLoader.register({
 				const offsetY = roundCss((targetPoint[1] - renderedPlanPoint[1]) * scaleY)
 				const provisional = calculating || !!pendingFollowPlan || !samePosition(plan.target, target)
 				const signature = [offsetX, offsetY, provisional ? 1 : 0].join(':')
+				syncGuideVisualFollow(renderGame, targetPoint)
 				if (signature === visualFollowSignature) return
 				visualFollowSignature = signature
 				const style = renderLayerCanvas.style
@@ -919,10 +1432,12 @@ ModLoader.register({
 
 			function resetVisualFollow(preserveTransition) {
 				visualFollowSignature = null
-				if (!renderLayerCanvas?.style) return
-				const layerReady = active && !paused && !!blueprint
-				setStyleValue(renderLayerCanvas.style, 'transform', '')
-				applyVisualFollowStyles(false, layerReady || preserveTransition === true)
+				if (renderLayerCanvas?.style) {
+					const layerReady = active && !paused && !!blueprint
+					setStyleValue(renderLayerCanvas.style, 'transform', '')
+					applyVisualFollowStyles(false, layerReady || preserveTransition === true)
+				}
+				if (guideLayerCanvas?.style) setStyleValue(guideLayerCanvas.style, 'transform', '')
 			}
 
 			function setRenderLayerCanvas(nextCanvas) {
@@ -931,6 +1446,21 @@ ModLoader.register({
 				renderLayerCanvas = nextCanvas
 				renderLayerScale = null
 				visualFollowSignature = null
+			}
+
+			function setGuideLayerCanvas(nextCanvas) {
+				if (!nextCanvas || nextCanvas === guideLayerCanvas) return
+				clearGuideLayerStyles(guideLayerCanvas)
+				guideLayerCanvas = nextCanvas
+				guideLayerScale = null
+				const style = guideLayerCanvas.style
+				if (style) {
+					setStyleValue(style, 'pointerEvents', 'none')
+					setStyleValue(style, 'transformOrigin', '0 0')
+					setStyleValue(style, 'opacity', '0')
+					setStyleValue(style, 'transition', 'opacity ' + GUIDE_TRANSITION_MS + 'ms ease-out')
+					setStyleValue(style, 'willChange', 'transform, opacity')
+				}
 			}
 
 			function refreshRenderLayerScale() {
@@ -947,12 +1477,42 @@ ModLoader.register({
 				})
 			}
 
+			function refreshGuideLayerScale() {
+				if (!guideLayerCanvas) {
+					guideLayerScale = null
+					return
+				}
+				const width = positive(guideLayerCanvas.width, 1)
+				const height = positive(guideLayerCanvas.height, 1)
+				const rect = guideLayerCanvas.getBoundingClientRect?.()
+				guideLayerScale = Object.freeze({
+					x: positive(rect?.width, width) / width,
+					y: positive(rect?.height, height) / height
+				})
+			}
+
+			function syncGuideVisualFollow(renderGame, targetPoint) {
+				if (!guideAction || !guideLayerCanvas?.style || !guideRenderedPlanPoint || !targetPoint) {
+					if (guideLayerCanvas?.style) setStyleValue(guideLayerCanvas.style, 'transform', '')
+					return
+				}
+				const scaleX = positive(guideLayerScale?.x, 1)
+				const scaleY = positive(guideLayerScale?.y, 1)
+				const offsetX = roundCss((targetPoint[0] - guideRenderedPlanPoint[0]) * scaleX)
+				const offsetY = roundCss((targetPoint[1] - guideRenderedPlanPoint[1]) * scaleY)
+				setStyleValue(
+					guideLayerCanvas.style,
+					'transform',
+					offsetX || offsetY ? 'translate3d(' + offsetX + 'px, ' + offsetY + 'px, 0)' : ''
+				)
+			}
+
 			function applyVisualFollowStyles(provisional, layerReady) {
 				const style = renderLayerCanvas?.style
 				if (!style) return
 				setStyleValue(style, 'transformOrigin', layerReady ? '0 0' : '')
 				setStyleValue(style, 'filter', '')
-				setStyleValue(style, 'opacity', provisional ? PENDING_PREVIEW_OPACITY : '')
+				setStyleValue(style, 'opacity', layerReady ? (provisional ? PENDING_PREVIEW_OPACITY : '1') : '')
 				setStyleValue(style, 'transition', layerReady ? PENDING_PREVIEW_TRANSITION : '')
 				setStyleValue(style, 'willChange', layerReady ? 'transform' : '')
 			}
@@ -966,6 +1526,17 @@ ModLoader.register({
 				setStyleValue(style, 'opacity', '')
 				setStyleValue(style, 'transition', '')
 				setStyleValue(style, 'willChange', '')
+			}
+
+			function clearGuideLayerStyles(layerCanvas) {
+				const style = layerCanvas?.style
+				if (!style) return
+				setStyleValue(style, 'transformOrigin', '')
+				setStyleValue(style, 'transform', '')
+				setStyleValue(style, 'opacity', '')
+				setStyleValue(style, 'transition', '')
+				setStyleValue(style, 'willChange', '')
+				setStyleValue(style, 'pointerEvents', '')
 			}
 
 			function setStyleValue(style, property, value) {
@@ -1020,6 +1591,7 @@ ModLoader.register({
 				}
 				renderViewSignature = createRenderViewSignature(game)
 				markPreviewDirty()
+				if (guideAction) markGuideDirty()
 				return true
 			}
 
@@ -1144,585 +1716,6 @@ ModLoader.register({
 				ctx.stroke()
 			}
 
-			function mountUi() {
-				document.getElementById(CARD_ID)?.remove()
-				const style = ensureStyle()
-				const card = document.createElement('section')
-				card.id = CARD_ID
-				card.dataset.visible = 'false'
-				card.dataset.positionVisible = 'false'
-				card.dataset.interactive = 'false'
-				card.dataset.theme = game.plane ? 'void' : 'reality'
-				card.setAttribute('aria-live', 'polite')
-				card.setAttribute('aria-hidden', 'true')
-
-				const header = document.createElement('div')
-				header.className = 'cattail-world-editor-preview-card__header'
-				const title = document.createElement('strong')
-				const state = document.createElement('span')
-				state.className = 'cattail-world-editor-preview-card__state'
-				header.append(title, state)
-
-				const warningText = document.createElement('div')
-				warningText.className = 'cattail-world-editor-preview-card__warning'
-
-				const statuses = document.createElement('div')
-				statuses.className = 'cattail-world-editor-preview-card__statuses'
-				const statusItems = {}
-				for (const status of ['buildable', 'satisfied', 'conflict', 'blocked']) {
-					const item = document.createElement('div')
-					item.className = 'cattail-world-editor-preview-card__status'
-					item.dataset.status = status
-					const symbol = document.createElement('span')
-					symbol.className = 'cattail-world-editor-preview-card__symbol'
-					symbol.textContent = statusSymbol(status)
-					const label = document.createElement('span')
-					const count = document.createElement('strong')
-					item.append(symbol, label, count)
-					statuses.append(item)
-					statusItems[status] = { item, label, count }
-				}
-
-				const tabs = document.createElement('div')
-				tabs.className = 'cattail-world-editor-preview-card__tabs'
-				tabs.setAttribute('role', 'tablist')
-				const safeTab = createTab('safe')
-				const overwriteTab = createTab('overwrite')
-				tabs.append(safeTab, overwriteTab)
-
-				const resourceList = document.createElement('div')
-				resourceList.className = 'cattail-world-editor-preview-card__resources'
-				const hint = document.createElement('div')
-				hint.className = 'cattail-world-editor-preview-card__hint'
-
-				card.append(header, warningText, statuses, tabs, resourceList, hint)
-				document.body.append(card)
-
-				function createTab(mode) {
-					const button = document.createElement('button')
-					button.type = 'button'
-					button.dataset.costMode = mode
-					button.setAttribute('role', 'tab')
-					button.addEventListener('mousedown', stopUiEvent)
-					button.addEventListener('click', function (event) {
-						stopUiEvent(event)
-						if (!pinned || selectedCost === mode) return
-						selectedCost = mode
-						notify(true)
-					})
-					return button
-				}
-
-				card.addEventListener('mousedown', function (event) {
-					if (pinned) stopUiEvent(event)
-				})
-				card.addEventListener('click', function (event) {
-					if (pinned) event.stopPropagation()
-				})
-
-				return {
-					style,
-					card,
-					title,
-					state,
-					warningText,
-					statuses,
-					statusItems,
-					tabs,
-					safeTab,
-					overwriteTab,
-					resourceList,
-					hint,
-					positionVisible: false
-				}
-			}
-
-			function unmountUi() {
-				if (!ui) return
-				ui.card.remove()
-				ui.style?.remove()
-				ui = null
-			}
-
-			function requestUiRefresh(immediate) {
-				uiRefreshPending = true
-				if (immediate === true) flushUiRefresh()
-			}
-
-			function flushUiRefresh() {
-				if (!uiRefreshPending) return false
-				uiRefreshPending = false
-				refreshUi()
-				return true
-			}
-
-			function refreshText() {
-				if (!ui) return
-				textRevision += 1
-				renderedResourceKey = null
-				ui.title.textContent = i18n.t(game, 'previewCardTitle')
-				ui.statusItems.buildable.label.textContent = i18n.t(game, 'previewBuildable')
-				ui.statusItems.satisfied.label.textContent = i18n.t(game, 'previewSatisfied')
-				ui.statusItems.conflict.label.textContent = i18n.t(game, 'previewConflict')
-				ui.statusItems.blocked.label.textContent = i18n.t(game, 'previewBlocked')
-				ui.safeTab.textContent = i18n.t(game, 'previewSafePlan')
-				ui.overwriteTab.textContent = i18n.t(game, 'previewOverwritePlan')
-				ui.safeTab.setAttribute('aria-label', i18n.t(game, 'previewSafePlan'))
-				ui.overwriteTab.setAttribute('aria-label', i18n.t(game, 'previewOverwritePlan'))
-				ui.card.setAttribute('aria-label', i18n.t(game, 'previewCardTitle'))
-			}
-
-			function refreshUi() {
-				if (!ui) return
-				metrics.uiRefreshes += 1
-				ui.card.dataset.theme = game.plane ? 'void' : 'reality'
-				ui.card.dataset.interactive = active && pinned && !paused ? 'true' : 'false'
-				const warningCode = warning?.code
-				const warningMessage = warningCode === 'full-unavailable'
-					? i18n.t(game, 'previewFullUnavailable')
-					: warningCode === 'plan-failed'
-						? i18n.t(game, 'previewPlanFailed')
-						: ''
-				ui.warningText.textContent = warningMessage
-				ui.warningText.dataset.visible = warningMessage ? 'true' : 'false'
-				ui.state.textContent = calculating
-					? i18n.t(game, 'previewCalculating')
-					: active
-						? pinned
-							? i18n.t(game, 'previewPinned')
-							: target
-								? i18n.t(game, 'previewFollowing')
-								: i18n.t(game, 'previewWaitingTarget')
-						: warningMessage
-				const counts = plan?.statusCounts || {}
-				for (const status of Object.keys(ui.statusItems)) {
-					ui.statusItems[status].count.textContent = String(Number(counts[status]) || 0)
-				}
-				ui.statuses.hidden = !plan
-				ui.tabs.hidden = !plan
-				ui.resourceList.hidden = !plan
-				ui.safeTab.dataset.active = selectedCost === 'safe' ? 'true' : 'false'
-				ui.overwriteTab.dataset.active = selectedCost === 'overwrite' ? 'true' : 'false'
-				ui.safeTab.setAttribute('aria-selected', selectedCost === 'safe' ? 'true' : 'false')
-				ui.overwriteTab.setAttribute('aria-selected', selectedCost === 'overwrite' ? 'true' : 'false')
-				renderResources()
-				const hints = []
-				if (renderFallbacks.size) hints.push(i18n.t(game, 'previewRenderFallback'))
-				const cost = plan?.cost?.[selectedCost]
-				if (cost && !cost.complete) hints.push(i18n.t(game, 'previewCostIncomplete'))
-				if (active) hints.push(i18n.t(game, 'previewExitHint'))
-				ui.hint.textContent = hints.join(' · ')
-				syncCardPosition(game)
-			}
-
-			function renderResources() {
-				if (!ui) return
-				const resourceKey = plan ? planRevision + ':' + selectedCost + ':' + textRevision : 'none:' + textRevision
-				if (renderedResourceKey === resourceKey) return
-				renderedResourceKey = resourceKey
-				metrics.resourceRebuilds += 1
-				ui.resourceList.replaceChildren()
-				const cost = plan?.cost?.[selectedCost]
-				if (!cost) return
-				const length = Math.max(
-					cost.required?.length || 0,
-					cost.owned?.length || 0,
-					cost.refunds?.length || 0,
-					cost.shortfall?.length || 0
-				)
-				let rows = 0
-				for (let index = 0; index < length; index += 1) {
-					const required = finiteOr(cost.required?.[index], 0)
-					const owned = finiteOr(cost.owned?.[index], 0)
-					const refund = finiteOr(cost.refunds?.[index], 0)
-					const shortfall = finiteOr(cost.shortfall?.[index], 0)
-					if (!required && !refund && !shortfall) continue
-					const row = document.createElement('div')
-					row.className = 'cattail-world-editor-preview-card__resource'
-					const swatch = document.createElement('span')
-					swatch.className = 'cattail-world-editor-preview-card__resource-swatch'
-					swatch.style.background = resourceColor(index)
-					const name = document.createElement('span')
-					name.className = 'cattail-world-editor-preview-card__resource-name'
-					name.textContent = localizedResourceName(index)
-					const values = document.createElement('span')
-					values.className = 'cattail-world-editor-preview-card__resource-values'
-					values.textContent = [
-						i18n.t(game, 'previewRequired') + ' ' + formatNumber(required),
-						i18n.t(game, 'previewOwned') + ' ' + formatNumber(owned),
-						refund ? i18n.t(game, 'previewRefund') + ' ' + formatNumber(refund) : '',
-						shortfall ? i18n.t(game, 'previewShortfall') + ' ' + formatNumber(shortfall) : ''
-					].filter(Boolean).join(' · ')
-					if (shortfall) row.dataset.shortfall = 'true'
-					row.append(swatch, name, values)
-					ui.resourceList.append(row)
-					rows += 1
-				}
-				if (!rows) {
-					const empty = document.createElement('div')
-					empty.className = 'cattail-world-editor-preview-card__empty'
-					empty.textContent = i18n.t(game, 'previewNoCost')
-					ui.resourceList.append(empty)
-				}
-			}
-
-			function refreshCardVisibility() {
-				if (!ui) return
-				const warningVisible = !!warning && Number(warning.sourcePlane) === (game.plane ? 1 : 0)
-				const visible = !!(
-					currentRuntime.active &&
-					!game.halt &&
-					!game.splash?.isShown &&
-					!vanillaHudHidden &&
-					((active && !paused && (plan || calculating || target)) || warningVisible)
-				)
-				ui.card.dataset.visible = visible ? 'true' : 'false'
-				ui.card.dataset.positionVisible = ui.positionVisible ? 'true' : 'false'
-				ui.card.setAttribute('aria-hidden', visible && ui.positionVisible && !gameHudHidden ? 'false' : 'true')
-			}
-
-			function syncCardPosition(frameGame) {
-				if (!ui || frameGame !== game) return
-				const bounds = plan?.bounds
-					? projectBounds(translatePlanBounds(plan.bounds, plan.target, target))
-					: warning?.anchor
-						? projectBounds({
-							minU: warning.anchor[0],
-							maxU: warning.anchor[0],
-							minV: warning.anchor[1],
-							maxV: warning.anchor[1]
-						})
-						: target
-							? projectBounds({
-								minU: target[0],
-								maxU: target[0],
-								minV: target[1],
-								maxV: target[1]
-							})
-							: null
-				if (!bounds) {
-					ui.positionVisible = false
-					refreshCardVisibility()
-					return
-				}
-				const viewportWidth = finiteOr(window.innerWidth, document.documentElement?.clientWidth || 0)
-				const viewportHeight = finiteOr(window.innerHeight, document.documentElement?.clientHeight || 0)
-				if (
-					viewportWidth <= 0 ||
-					viewportHeight <= 0 ||
-					bounds.maxX < 0 ||
-					bounds.minX > viewportWidth ||
-					bounds.maxY < 0 ||
-					bounds.minY > viewportHeight
-				) {
-					ui.positionVisible = false
-					refreshCardVisibility()
-					return
-				}
-				const rect = ui.card.getBoundingClientRect()
-				const width = positive(rect.width, positive(ui.card.offsetWidth, 360))
-				const height = positive(rect.height, positive(ui.card.offsetHeight, 260))
-				const margin = 10
-				const gap = 28
-				const centerX = (bounds.minX + bounds.maxX) / 2
-				const candidates = [
-					{ left: centerX - width / 2, top: bounds.maxY + gap, placement: 'below' },
-					{ left: centerX - width / 2, top: bounds.minY - gap - height, placement: 'above' },
-					{ left: bounds.maxX + gap, top: (bounds.minY + bounds.maxY - height) / 2, placement: 'right' },
-					{ left: bounds.minX - gap - width, top: (bounds.minY + bounds.maxY - height) / 2, placement: 'left' }
-				]
-				const obstacles = [
-					visibleRect(document.getElementById(SELECTION_CARD_ID)),
-					visibleRect(document.getElementById(BLUEPRINT_CARD_ID))
-				].filter(Boolean)
-				let chosen = null
-				for (const candidate of candidates) {
-					const normalized = normalizeCardCandidate(candidate, width, height, viewportWidth, viewportHeight, margin)
-					if (!obstacles.some(function (obstacle) { return rectanglesOverlap(normalized, obstacle, 8) })) {
-						chosen = normalized
-						break
-					}
-				}
-				chosen = chosen || normalizeCardCandidate(candidates[0], width, height, viewportWidth, viewportHeight, margin)
-				ui.card.style.left = chosen.left + 'px'
-				ui.card.style.top = chosen.top + 'px'
-				ui.card.dataset.placement = chosen.placement
-				ui.positionVisible = true
-				refreshCardVisibility()
-			}
-
-			function translatePlanBounds(bounds, sourceTarget, nextTarget) {
-				const source = normalizePosition(sourceTarget)
-				const next = normalizePosition(nextTarget)
-				if (!bounds || !source || !next) return bounds
-				const du = next[0] - source[0]
-				const dv = next[1] - source[1]
-				if (!du && !dv) return bounds
-				return {
-					minU: finiteOr(bounds.minU, 0) + du,
-					maxU: finiteOr(bounds.maxU, 0) + du,
-					minV: finiteOr(bounds.minV, 0) + dv,
-					maxV: finiteOr(bounds.maxV, 0) + dv
-				}
-			}
-
-			function projectBounds(bounds) {
-				if (!game.canvas || typeof game.uvToXY !== 'function') return null
-				const points = []
-				try {
-					for (const point of [
-						[bounds.minU - .5, bounds.minV - .5],
-						[bounds.maxU + .5, bounds.minV - .5],
-						[bounds.maxU + .5, bounds.maxV + .5],
-						[bounds.minU - .5, bounds.maxV + .5]
-					]) {
-						const projected = game.uvToXY(point)
-						points.push(projectedCanvasToClient(projected))
-					}
-				} catch (error) {
-					return null
-				}
-				if (points.some(function (point) { return !point })) return null
-				return {
-					minX: Math.min(...points.map(function (point) { return point[0] })),
-					maxX: Math.max(...points.map(function (point) { return point[0] })),
-					minY: Math.min(...points.map(function (point) { return point[1] })),
-					maxY: Math.max(...points.map(function (point) { return point[1] }))
-				}
-			}
-
-			function projectedCanvasToClient(point) {
-				if (!Array.isArray(point) || point.length < 2) return null
-				const rect = game.canvas.getBoundingClientRect?.() || { left: 0, top: 0, width: 0, height: 0 }
-				const internalWidth = positive(game.canvas.width, positive(game.w, 1))
-				const internalHeight = positive(game.canvas.height, positive(game.h, 1))
-				const scaleX = positive(rect.width, 0) ? rect.width / internalWidth : 1
-				const scaleY = positive(rect.height, 0) ? rect.height / internalHeight : 1
-				return [
-					finiteOr(rect.left, 0) + (finiteOr(game.w2, internalWidth / 2) + Number(point[0])) * scaleX,
-					finiteOr(rect.top, 0) + (finiteOr(game.h2, internalHeight / 2) + Number(point[1])) * scaleY
-				]
-			}
-
-			function ensureStyle() {
-				document.getElementById(STYLE_ID)?.remove()
-				const style = document.createElement('style')
-				style.id = STYLE_ID
-				style.textContent = `
-					#${CARD_ID} {
-						position: fixed;
-						z-index: 2147483624;
-						display: grid;
-						grid-template-columns: minmax(0, 1fr);
-						gap: 8px;
-						width: min(372px, calc(100vw - 20px));
-						max-height: min(430px, calc(100vh - 20px));
-						overflow: hidden;
-						padding: 12px;
-						border: 1px solid rgba(38, 48, 59, .30);
-						border-radius: 6px;
-						box-sizing: border-box;
-						background: rgba(250, 252, 255, .94);
-						box-shadow: 0 10px 28px rgba(18, 24, 31, .22);
-						color: #18212a;
-						font-family: Montserrat, sans-serif;
-						font-size: 12px;
-						line-height: 1.4;
-						letter-spacing: 0;
-						opacity: 0;
-						visibility: hidden;
-						pointer-events: none;
-						transition: opacity 100ms linear;
-					}
-					#${CARD_ID}[data-theme="void"] {
-						border-color: rgba(221, 229, 242, .24);
-						background: rgba(22, 27, 36, .94);
-						box-shadow: 0 10px 28px rgba(0, 0, 0, .38);
-						color: #f2f5fa;
-					}
-					#${CARD_ID}[data-visible="true"][data-position-visible="true"] {
-						opacity: 1;
-						visibility: visible;
-					}
-					#${CARD_ID}[data-interactive="true"] {
-						pointer-events: auto;
-					}
-					.cattail-world-editor-preview-card__header {
-						display: flex;
-						align-items: baseline;
-						justify-content: space-between;
-						gap: 12px;
-						min-width: 0;
-					}
-					.cattail-world-editor-preview-card__header strong {
-						min-width: 0;
-						font-size: 13px;
-						font-weight: 700;
-					}
-					.cattail-world-editor-preview-card__state {
-						flex: 0 1 auto;
-						color: #5c6975;
-						font-size: 11px;
-						text-align: right;
-					}
-					#${CARD_ID}[data-theme="void"] .cattail-world-editor-preview-card__state {
-						color: #b9c4d2;
-					}
-					.cattail-world-editor-preview-card__warning {
-						display: none;
-						padding: 7px 8px;
-						border-left: 3px solid #b38cff;
-						background: rgba(155, 108, 255, .10);
-					}
-					.cattail-world-editor-preview-card__warning[data-visible="true"] {
-						display: block;
-					}
-					.cattail-world-editor-preview-card__statuses {
-						display: grid;
-						grid-template-columns: repeat(2, minmax(0, 1fr));
-						gap: 4px 10px;
-					}
-					.cattail-world-editor-preview-card__status {
-						display: grid;
-						grid-template-columns: 16px minmax(0, 1fr) auto;
-						align-items: center;
-						gap: 5px;
-						min-width: 0;
-					}
-					.cattail-world-editor-preview-card__symbol {
-						font-size: 14px;
-						font-weight: 700;
-						text-align: center;
-					}
-					.cattail-world-editor-preview-card__status[data-status="buildable"] .cattail-world-editor-preview-card__symbol { color: #09a943; }
-					.cattail-world-editor-preview-card__status[data-status="satisfied"] .cattail-world-editor-preview-card__symbol { color: #bd8c00; }
-					.cattail-world-editor-preview-card__status[data-status="conflict"] .cattail-world-editor-preview-card__symbol { color: #d63d3d; }
-					.cattail-world-editor-preview-card__status[data-status="blocked"] .cattail-world-editor-preview-card__symbol { color: #8554e8; }
-					.cattail-world-editor-preview-card__tabs {
-						display: grid;
-						grid-template-columns: repeat(2, minmax(0, 1fr));
-						min-height: 30px;
-						border: 1px solid rgba(50, 61, 72, .24);
-						border-radius: 5px;
-						overflow: hidden;
-					}
-					.cattail-world-editor-preview-card__tabs button {
-						min-width: 0;
-						border: 0;
-						border-right: 1px solid rgba(50, 61, 72, .18);
-						border-radius: 0;
-						background: transparent;
-						color: inherit;
-						font: inherit;
-						font-weight: 600;
-						cursor: pointer;
-					}
-					.cattail-world-editor-preview-card__tabs button:last-child { border-right: 0; }
-					.cattail-world-editor-preview-card__tabs button[data-active="true"] {
-						background: rgba(34, 185, 99, .16);
-						box-shadow: inset 0 -2px #22b963;
-					}
-					.cattail-world-editor-preview-card__resources {
-						display: grid;
-						gap: 5px;
-						max-height: 190px;
-						overflow-y: auto;
-						overscroll-behavior: contain;
-					}
-					.cattail-world-editor-preview-card__resource {
-						display: grid;
-						grid-template-columns: 12px minmax(68px, auto) minmax(0, 1fr);
-						align-items: center;
-						gap: 6px;
-						min-width: 0;
-					}
-					.cattail-world-editor-preview-card__resource[data-shortfall="true"] {
-						color: #cf3838;
-					}
-					.cattail-world-editor-preview-card__resource-swatch {
-						width: 10px;
-						height: 10px;
-						border: 1px solid rgba(20, 26, 32, .35);
-						border-radius: 2px;
-					}
-					.cattail-world-editor-preview-card__resource-name {
-						overflow: hidden;
-						font-weight: 600;
-						text-overflow: ellipsis;
-						white-space: nowrap;
-					}
-					.cattail-world-editor-preview-card__resource-values {
-						min-width: 0;
-						color: #5c6975;
-						font-size: 10px;
-						text-align: right;
-						overflow-wrap: anywhere;
-					}
-					#${CARD_ID}[data-theme="void"] .cattail-world-editor-preview-card__resource-values {
-						color: #b9c4d2;
-					}
-					.cattail-world-editor-preview-card__empty,
-					.cattail-world-editor-preview-card__hint {
-						color: #687581;
-						font-size: 10px;
-					}
-					#${CARD_ID}[data-theme="void"] .cattail-world-editor-preview-card__empty,
-					#${CARD_ID}[data-theme="void"] .cattail-world-editor-preview-card__hint {
-						color: #aeb9c7;
-					}
-				`
-				document.head.append(style)
-				return style
-			}
-
-			function normalizeCardCandidate(candidate, width, height, viewportWidth, viewportHeight, margin) {
-				return {
-					left: clamp(candidate.left, margin, Math.max(margin, viewportWidth - margin - width)),
-					top: clamp(candidate.top, margin, Math.max(margin, viewportHeight - margin - height)),
-					width,
-					height,
-					placement: candidate.placement
-				}
-			}
-
-			function visibleRect(element) {
-				if (!element || element.dataset?.visible !== 'true' || element.dataset?.positionVisible !== 'true') return null
-				const rect = element.getBoundingClientRect?.()
-				if (!rect || !positive(rect.width, 0) || !positive(rect.height, 0)) return null
-				return { left: rect.left, top: rect.top, width: rect.width, height: rect.height }
-			}
-
-			function rectanglesOverlap(left, right, gap) {
-				return !(
-					left.left + left.width + gap <= right.left ||
-					right.left + right.width + gap <= left.left ||
-					left.top + left.height + gap <= right.top ||
-					right.top + right.height + gap <= left.top
-				)
-			}
-
-			function localizedResourceName(index) {
-				const resource = game.codex?.resources?.[index]
-				const name = resource?.name || resource?.id || String(index)
-				try {
-					const pronounced = game.pronounce?.('resources', name, 'name')
-					if (pronounced && pronounced !== name) return String(pronounced)
-				} catch (error) {}
-				return String(name)
-			}
-
-			function resourceColor(index) {
-				const triplet = game.codex?.resources?.[index]?.triplet
-				return Array.isArray(triplet) && triplet.length ? String(triplet[1] || triplet[0]) : '#8a96a3'
-			}
-
-			function formatNumber(value) {
-				try {
-					if (typeof game.makeReadable === 'function') return String(game.makeReadable(value))
-				} catch (error) {}
-				return Math.round(finiteOr(value, 0) * 100) / 100 + ''
-			}
-
 			function refreshHoveredCell(event) {
 				const x = Number(event?.offsetX)
 				const y = Number(event?.offsetY)
@@ -1831,10 +1824,6 @@ ModLoader.register({
 				return record.index + ':' + record.name
 			}
 
-			function statusSymbol(status) {
-				return status === 'buildable' ? '✓' : status === 'satisfied' ? '=' : status === 'conflict' ? '!' : '×'
-			}
-
 			function normalizePosition(value) {
 				if (!Array.isArray(value) || value.length < 2) return null
 				const u = Number(value[0])
@@ -1850,23 +1839,8 @@ ModLoader.register({
 				return !!left && !!right && left[0] === right[0] && left[1] === right[1]
 			}
 
-			function canMountUi() {
-				return !!(
-					typeof document !== 'undefined' &&
-					document.body &&
-					document.head &&
-					typeof document.createElement === 'function'
-				)
-			}
-
 			function consume(event) {
 				event?.preventDefault?.()
-				event?.stopImmediatePropagation?.()
-			}
-
-			function stopUiEvent(event) {
-				event?.preventDefault?.()
-				event?.stopPropagation?.()
 				event?.stopImmediatePropagation?.()
 			}
 

@@ -8,6 +8,7 @@ ModLoader.register({
 		const BLUEPRINT_KEY = Symbol.for('cattail.world-editor.blueprint')
 		const TRANSFORM_KEY = Symbol.for('cattail.world-editor.blueprint-transform')
 		const PREVIEW_KEY = Symbol.for('cattail.world-editor.blueprint-preview')
+		const CARD_OPACITY_KEY = Symbol.for('cattail.world-editor.card-opacity')
 		const SHELL_ID = 'cattail-world-editor-shell'
 		const SELECTION_CARD_ID = 'cattail-world-editor-selection-card'
 		const CARD_ID = 'cattail-world-editor-blueprint-card'
@@ -94,7 +95,10 @@ ModLoader.register({
 
 			const stopRuntimeSubscription = runtime.subscribe(function (state) {
 				currentRuntime = state
-				if (!state.active) session.cancelCapture('editor-inactive')
+				if (!state.active) {
+					resetCardDisplayState('editor-inactive')
+					session.cancelCapture('editor-inactive')
+				}
 				refreshUi()
 			})
 			const stopSelectionSubscription = selection.subscribe(function (state) {
@@ -119,11 +123,30 @@ ModLoader.register({
 				refreshUi()
 			})
 			const stopTransformSubscription = transformAvailable ? transform.subscribe(function (state) {
+				const previousState = currentTransform
 				currentTransform = state
+				if (
+					ui &&
+					previousState &&
+					previousState.revision !== state.revision &&
+					[
+						'rotate-clockwise',
+						'rotate-counterclockwise',
+						'mirror-u',
+						'mirror-v',
+						'reset'
+					].includes(state.lastCommand)
+				) {
+					restartTemporaryWindow()
+				}
 				refreshTransformUi()
 			}) : null
 
 			const handleKeydown = function (event) {
+				if (event?.key === 'Escape' && cancelSectionResize('escape', true)) {
+					consume(event)
+					return
+				}
 				const key = String(event?.key || '').toLowerCase()
 				if (
 					!(event?.ctrlKey || event?.metaKey) ||
@@ -155,9 +178,32 @@ ModLoader.register({
 				vanillaHudHidden = !!event?.detail?.hidden
 				refreshUi()
 			}
+			const handleWindowPointerMove = function (event) {
+				updateSectionResize(event)
+			}
+			const handleWindowPointerUp = function (event) {
+				finishSectionResize(event, 'pointerup')
+			}
+			const handleWindowPointerCancel = function (event) {
+				finishSectionResize(event, 'pointercancel')
+			}
+			const handleWindowBlur = function () {
+				cancelSectionResize('window-blur', true)
+				previewController?.setTransformGuide?.(null, 'window-blur')
+			}
+			const handleWindowResize = function () {
+				if (!ui) return
+				applyAllSectionStates()
+				syncCardPosition(game)
+			}
 
 			if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
 				window.addEventListener('keydown', handleKeydown, true)
+				window.addEventListener('pointermove', handleWindowPointerMove, true)
+				window.addEventListener('pointerup', handleWindowPointerUp, true)
+				window.addEventListener('pointercancel', handleWindowPointerCancel, true)
+				window.addEventListener('blur', handleWindowBlur, true)
+				window.addEventListener('resize', handleWindowResize)
 				window.addEventListener('modloader:game-hud', handleGameHud)
 				window.addEventListener('modloader:vanilla-game-hud', handleVanillaGameHud)
 			}
@@ -173,6 +219,11 @@ ModLoader.register({
 				if (refreshMountedText) refreshMountedText = null
 				if (typeof window !== 'undefined' && typeof window.removeEventListener === 'function') {
 					window.removeEventListener('keydown', handleKeydown, true)
+					window.removeEventListener('pointermove', handleWindowPointerMove, true)
+					window.removeEventListener('pointerup', handleWindowPointerUp, true)
+					window.removeEventListener('pointercancel', handleWindowPointerCancel, true)
+					window.removeEventListener('blur', handleWindowBlur, true)
+					window.removeEventListener('resize', handleWindowResize)
 					window.removeEventListener('modloader:game-hud', handleGameHud)
 					window.removeEventListener('modloader:vanilla-game-hud', handleVanillaGameHud)
 				}
@@ -200,20 +251,34 @@ ModLoader.register({
 					stopPreviewSubscription = previewController.subscribe(function (state) {
 						const previousState = currentPreview
 						currentPreview = state
-						if (
+						syncTemporaryWindowFromPreview(previousState, state)
+						const interactionChanged = (
 							!previousState ||
 							previousState.active !== state.active ||
 							previousState.pinned !== state.pinned ||
+							previousState.temporaryPinned !== state.temporaryPinned ||
 							previousState.paused !== state.paused ||
 							previousState.blueprint !== state.blueprint
-						) {
+						)
+						if (interactionChanged) {
 							refreshTransformUi()
 							syncCardPassThrough()
+						}
+						if (
+							interactionChanged ||
+							!previousState ||
+							previousState.plan !== state.plan ||
+							previousState.calculating !== state.calculating ||
+							previousState.warning !== state.warning ||
+							previousState.renderFallbackCount !== state.renderFallbackCount
+						) {
+							refreshCard()
 						}
 					})
 				}
 				refreshTransformUi()
 				syncCardPassThrough()
+				refreshCard()
 			}
 
 			function createBlueprintSession(sessionGame, selectionState) {
@@ -230,7 +295,7 @@ ModLoader.register({
 
 				function snapshot() {
 					return Object.freeze({
-						version: '0.3.2',
+						version: '0.3.4',
 						mode,
 						includeBlocks: mode === 'full' && includeBlocks,
 						blueprint,
@@ -367,7 +432,7 @@ ModLoader.register({
 				}
 
 				const session = Object.freeze({
-					version: '0.3.2',
+					version: '0.3.4',
 					game: sessionGame,
 					schemaVersion: 2,
 					snapshot,
@@ -629,6 +694,16 @@ ModLoader.register({
 					temporaryDeadline: 0,
 					temporaryTimer: null,
 					pointerPaused: false,
+					capturedTypesSource: null,
+					capturedTypeCosts: null,
+					skippedTypesSource: null,
+					renderedCost: null,
+					sectionStates: {
+						costs: { expanded: true, preferredHeight: null, minHeight: 44, maxViewportRatio: .35 },
+						captured: { expanded: true, preferredHeight: null, minHeight: 60, maxViewportRatio: .45 }
+					},
+					sectionResize: null,
+					opacityControls: null,
 					releaseHud: null
 				}
 
@@ -637,13 +712,24 @@ ModLoader.register({
 				controls.blocks.addEventListener('click', handleBlocksToggle)
 				controls.copy.addEventListener('click', handleCopy)
 				controls.transforms.addEventListener('click', handleTransformAction)
+				controls.transforms.addEventListener('pointerover', handleTransformGuidePointerOver)
+				controls.transforms.addEventListener('pointerout', handleTransformGuidePointerOut)
+				controls.transforms.addEventListener('focusin', handleTransformGuideFocusIn)
+				controls.transforms.addEventListener('focusout', handleTransformGuideFocusOut)
 				card.addEventListener('mouseenter', handleCardMouseEnter)
 				card.addEventListener('mouseleave', handleCardMouseLeave)
 				card.addEventListener('mousedown', stopCardPointerDown)
 				card.addEventListener('click', toggleCardPinned)
+				card.addEventListener('click', handleSectionToggle)
+				card.addEventListener('pointerdown', handleSectionResizeStart)
 				card.addEventListener('keydown', handleCardKeydown)
 				card.querySelector('[data-world-editor-blueprint-action="clear"]').addEventListener('click', handleClear)
-				card.querySelector('[data-world-editor-transform-controls="card"]').addEventListener('click', handleTransformAction)
+				const cardTransforms = card.querySelector('[data-world-editor-transform-controls="card"]')
+				cardTransforms.addEventListener('click', handleTransformAction)
+				cardTransforms.addEventListener('pointerover', handleTransformGuidePointerOver)
+				cardTransforms.addEventListener('pointerout', handleTransformGuidePointerOut)
+				cardTransforms.addEventListener('focusin', handleTransformGuideFocusIn)
+				cardTransforms.addEventListener('focusout', handleTransformGuideFocusOut)
 
 				if (api.ui?.hud?.register) {
 					mounted.releaseHud = api.ui.hud.register({
@@ -653,6 +739,22 @@ ModLoader.register({
 					})
 				}
 				ui = mounted
+				mounted.opacityControls = globalThis[CARD_OPACITY_KEY]?.register?.({
+					id: 'blueprint',
+					element: card,
+					hint: card.querySelector('.cattail-world-editor-card-opacity-hint'),
+					priority: 48,
+					getText(state) {
+						return {
+							instruction: i18n.t(game, 'cardOpacityControls'),
+							mode: i18n.t(game, state.contentIndependent ? 'cardOpacityContentIndependent' : 'cardOpacityContentLinked')
+						}
+					},
+					onChange() {
+						refreshCard()
+					}
+				}) || null
+				applyAllSectionStates()
 				refreshText(game)
 				drawNeutralCube(controls.blocks.querySelector('canvas'))
 				return mounted
@@ -660,19 +762,32 @@ ModLoader.register({
 
 			function unmountUi() {
 				if (!ui) return
+				cancelSectionResize('ui-unmounted')
 				clearTemporaryTimer()
 				ui.controls.structure.removeEventListener('click', handleStructureMode)
 				ui.controls.full.removeEventListener('click', handleFullMode)
 				ui.controls.blocks.removeEventListener('click', handleBlocksToggle)
 				ui.controls.copy.removeEventListener('click', handleCopy)
 				ui.controls.transforms.removeEventListener('click', handleTransformAction)
+				ui.controls.transforms.removeEventListener('pointerover', handleTransformGuidePointerOver)
+				ui.controls.transforms.removeEventListener('pointerout', handleTransformGuidePointerOut)
+				ui.controls.transforms.removeEventListener('focusin', handleTransformGuideFocusIn)
+				ui.controls.transforms.removeEventListener('focusout', handleTransformGuideFocusOut)
 				ui.card.removeEventListener('mouseenter', handleCardMouseEnter)
 				ui.card.removeEventListener('mouseleave', handleCardMouseLeave)
 				ui.card.removeEventListener('mousedown', stopCardPointerDown)
 				ui.card.removeEventListener('click', toggleCardPinned)
+				ui.card.removeEventListener('click', handleSectionToggle)
+				ui.card.removeEventListener('pointerdown', handleSectionResizeStart)
 				ui.card.removeEventListener('keydown', handleCardKeydown)
 				ui.card.querySelector('[data-world-editor-blueprint-action="clear"]')?.removeEventListener('click', handleClear)
-				ui.card.querySelector('[data-world-editor-transform-controls="card"]')?.removeEventListener('click', handleTransformAction)
+				const cardTransforms = ui.card.querySelector('[data-world-editor-transform-controls="card"]')
+				cardTransforms?.removeEventListener('click', handleTransformAction)
+				cardTransforms?.removeEventListener('pointerover', handleTransformGuidePointerOver)
+				cardTransforms?.removeEventListener('pointerout', handleTransformGuidePointerOut)
+				cardTransforms?.removeEventListener('focusin', handleTransformGuideFocusIn)
+				cardTransforms?.removeEventListener('focusout', handleTransformGuideFocusOut)
+				ui.opacityControls?.release?.()
 				if (typeof ui.releaseHud === 'function') ui.releaseHud()
 				ui.controls.root.remove()
 				ui.card.remove()
@@ -748,9 +863,21 @@ ModLoader.register({
 
 				const header = document.createElement('div')
 				header.className = 'cattail-world-editor-blueprint-card__header'
+				const headerPrimary = document.createElement('div')
+				headerPrimary.className = 'cattail-world-editor-blueprint-card__header-primary'
 				const heading = document.createElement('span')
 				heading.className = 'cattail-world-editor-blueprint-card__title'
 				heading.dataset.worldEditorBlueprintText = 'title'
+				const mode = document.createElement('span')
+				mode.className = 'cattail-world-editor-blueprint-card__chip'
+				mode.dataset.worldEditorBlueprintText = 'mode'
+				const selections = document.createElement('span')
+				selections.className = 'cattail-world-editor-blueprint-card__chip'
+				selections.dataset.worldEditorBlueprintText = 'selections'
+				const opacityHint = document.createElement('span')
+				opacityHint.className = 'cattail-world-editor-card-opacity-hint'
+				opacityHint.setAttribute('role', 'img')
+				headerPrimary.append(heading, mode, selections, opacityHint)
 				const source = document.createElement('span')
 				source.className = 'cattail-world-editor-blueprint-card__source'
 				source.dataset.worldEditorBlueprintText = 'source'
@@ -762,21 +889,19 @@ ModLoader.register({
 				clearIcon.setAttribute('aria-hidden', 'true')
 				clearIcon.textContent = '×'
 				clear.append(clearIcon)
-				header.append(heading, source, clear)
-
-				const meta = document.createElement('div')
-				meta.className = 'cattail-world-editor-blueprint-card__meta'
-				const mode = document.createElement('span')
-				mode.dataset.worldEditorBlueprintText = 'mode'
-				const selections = document.createElement('span')
-				selections.dataset.worldEditorBlueprintText = 'selections'
-				const crossing = document.createElement('span')
-				crossing.dataset.worldEditorBlueprintText = 'crossing'
-				meta.append(mode, selections, crossing)
+				header.append(headerPrimary, source, clear)
 
 				const status = document.createElement('div')
 				status.className = 'cattail-world-editor-blueprint-card__status'
 				status.dataset.worldEditorBlueprintText = 'status'
+
+				const previewState = document.createElement('div')
+				previewState.className = 'cattail-world-editor-blueprint-card__preview-state'
+				previewState.dataset.worldEditorBlueprintText = 'preview-state'
+				const previewWarning = document.createElement('div')
+				previewWarning.className = 'cattail-world-editor-blueprint-card__preview-warning'
+				previewWarning.dataset.worldEditorBlueprintText = 'preview-warning'
+				previewWarning.hidden = true
 
 				const transformPanel = document.createElement('div')
 				transformPanel.className = 'cattail-world-editor-blueprint-card__transform'
@@ -787,12 +912,61 @@ ModLoader.register({
 				transformState.dataset.worldEditorBlueprintText = 'transform-state'
 				transformPanel.append(transformState, createTransformControls('card'))
 
+				const previewStatuses = document.createElement('div')
+				previewStatuses.className = 'cattail-world-editor-blueprint-card__preview-statuses'
+				previewStatuses.dataset.worldEditorPreviewStatuses = ''
+				for (const previewStatus of ['buildable', 'satisfied', 'conflict', 'blocked']) {
+					const item = document.createElement('div')
+					item.className = 'cattail-world-editor-blueprint-card__preview-status'
+					item.dataset.status = previewStatus
+					const symbol = document.createElement('span')
+					symbol.className = 'cattail-world-editor-blueprint-card__preview-symbol'
+					symbol.textContent = previewStatusSymbol(previewStatus)
+					const label = document.createElement('span')
+					label.dataset.worldEditorPreviewStatusLabel = previewStatus
+					const count = document.createElement('strong')
+					count.dataset.worldEditorPreviewStatusCount = previewStatus
+					item.append(symbol, label, count)
+					previewStatuses.append(item)
+				}
+				const crossing = document.createElement('div')
+				crossing.className = 'cattail-world-editor-blueprint-card__preview-status'
+				crossing.dataset.status = 'cross-boundary'
+				const crossingSymbol = document.createElement('span')
+				crossingSymbol.className = 'cattail-world-editor-blueprint-card__preview-symbol'
+				crossingSymbol.textContent = '↔'
+				const crossingLabel = document.createElement('span')
+				crossingLabel.dataset.worldEditorBlueprintText = 'crossing-label'
+				const crossingCount = document.createElement('strong')
+				crossingCount.dataset.worldEditorBlueprintText = 'crossing-count'
+				crossing.append(crossingSymbol, crossingLabel, crossingCount)
+				previewStatuses.append(crossing)
+
+				const costs = createAdjustableSection('costs')
+				costs.section.classList.add('cattail-world-editor-blueprint-card__costs')
+				costs.section.dataset.worldEditorPreviewCosts = ''
+				const resourceList = document.createElement('div')
+				resourceList.className = 'cattail-world-editor-blueprint-card__resources'
+				resourceList.dataset.worldEditorPreviewResources = ''
+				costs.body.append(resourceList)
+
 				const captured = createTypeSection('captured')
 				const skipped = createTypeSection('skipped')
 				const hint = document.createElement('div')
 				hint.className = 'cattail-world-editor-blueprint-card__hint'
 				hint.dataset.worldEditorBlueprintText = 'hint'
-				card.append(header, meta, status, transformPanel, captured.section, skipped.section, hint)
+				card.append(
+					header,
+					status,
+					previewState,
+					previewWarning,
+					transformPanel,
+					previewStatuses,
+					costs.section,
+					captured.section,
+					skipped.section,
+					hint
+				)
 				return card
 			}
 
@@ -842,6 +1016,14 @@ ModLoader.register({
 			}
 
 			function createTypeSection(kind) {
+				if (kind === 'captured') {
+					const adjustable = createAdjustableSection(kind)
+					const list = document.createElement('div')
+					list.className = 'cattail-world-editor-blueprint-card__types'
+					list.dataset.worldEditorBlueprintTypes = kind
+					adjustable.body.append(list)
+					return { section: adjustable.section, title: adjustable.title, list }
+				}
 				const section = document.createElement('div')
 				section.className = 'cattail-world-editor-blueprint-card__section'
 				section.dataset.worldEditorBlueprintSection = kind
@@ -853,6 +1035,45 @@ ModLoader.register({
 				list.dataset.worldEditorBlueprintTypes = kind
 				section.append(title, list)
 				return { section, title, list }
+			}
+
+			function createAdjustableSection(kind) {
+				const section = document.createElement('div')
+				section.className = 'cattail-world-editor-blueprint-card__section cattail-world-editor-blueprint-card__section--adjustable'
+				section.dataset.worldEditorBlueprintSection = kind
+				section.dataset.expanded = 'true'
+
+				const topHandle = createSectionResizeHandle(kind, 'top')
+				const title = document.createElement('button')
+				title.type = 'button'
+				title.className = 'cattail-world-editor-blueprint-card__section-title cattail-world-editor-blueprint-card__section-toggle'
+				title.dataset.worldEditorSectionToggle = kind
+				title.setAttribute('aria-expanded', 'true')
+				const titleText = document.createElement('span')
+				titleText.dataset.worldEditorBlueprintText = kind + '-title'
+				const chevron = document.createElement('span')
+				chevron.className = 'cattail-world-editor-blueprint-card__section-chevron'
+				chevron.setAttribute('aria-hidden', 'true')
+				title.append(titleText, chevron)
+
+				const body = document.createElement('div')
+				body.id = CARD_ID + '-' + kind + '-body'
+				body.className = 'cattail-world-editor-blueprint-card__section-body'
+				body.dataset.worldEditorSectionBody = kind
+				title.setAttribute('aria-controls', body.id)
+
+				const bottomHandle = createSectionResizeHandle(kind, 'bottom')
+				section.append(topHandle, title, body, bottomHandle)
+				return { section, title, body }
+			}
+
+			function createSectionResizeHandle(kind, edge) {
+				const handle = document.createElement('span')
+				handle.className = 'cattail-world-editor-blueprint-card__section-resize cattail-world-editor-blueprint-card__section-resize--' + edge
+				handle.dataset.worldEditorSectionResize = kind
+				handle.dataset.edge = edge
+				handle.setAttribute('aria-hidden', 'true')
+				return handle
 			}
 
 			function refreshUi() {
@@ -881,6 +1102,11 @@ ModLoader.register({
 			function refreshText(languageGame) {
 				if (!ui) return
 				const source = languageGame || game
+				ui.opacityControls?.refresh?.()
+				ui.capturedTypesSource = null
+				ui.capturedTypeCosts = null
+				ui.skippedTypesSource = null
+				ui.renderedCost = null
 				const structureText = i18n.t(source, 'blueprintModeStructure')
 				const fullText = i18n.t(source, 'blueprintModeFull')
 				const blocksText = i18n.t(source, 'blueprintIncludeBlocks')
@@ -898,6 +1124,7 @@ ModLoader.register({
 				const clearText = i18n.t(source, 'blueprintClear')
 				clear.title = clearText
 				clear.setAttribute('aria-label', clearText)
+				refreshSectionText(source)
 				refreshCard()
 			}
 
@@ -909,6 +1136,7 @@ ModLoader.register({
 				if (!hasDisplay) {
 					renderTypeList('captured', [])
 					renderTypeList('skipped', [])
+					renderPreviewDetails()
 					refreshCardVisibility()
 					return
 				}
@@ -918,20 +1146,35 @@ ModLoader.register({
 				setCardText('selections', formatTemplate(i18n.t(game, 'blueprintSelectionCount'), {
 					count: result.summary?.selectionCount || 0
 				}))
-				setCardText('crossing', formatTemplate(i18n.t(game, 'blueprintCrossBoundaryCount'), {
-					count: result.summary?.crossBoundaryCount || 0
-				}))
+				setCardText('crossing-label', i18n.t(game, 'blueprintCrossBoundary'))
+				setCardText('crossing-count', result.summary?.crossBoundaryCount || 0)
 				setCardText('captured-title', i18n.t(game, 'blueprintCapturedTypes'))
 				setCardText('skipped-title', i18n.t(game, 'blueprintSkippedTypes'))
-				setCardText('hint', i18n.t(game, ui.pinned ? 'cardUnpinAction' : 'cardPinAction'))
 				setCardText('status', resultStatusText(result))
-				renderTypeList('captured', result.capturedTypes || [])
+				renderPreviewDetails()
+				renderTypeList('captured', result.capturedTypes || [], currentPreview?.plan?.cost?.byType)
 				renderTypeList('skipped', result.skippedTypes || [])
 				ui.card.querySelector('[data-world-editor-blueprint-action="clear"]').disabled = !currentSession.blueprint
-				ui.card.dataset.pinned = ui.pinned ? 'true' : 'false'
+				ui.card.dataset.pinned = cardPinnedState() ? 'true' : 'false'
+				ui.card.dataset.targetPinned = previewSnapshot()?.effectivePinned ? 'true' : 'false'
+				setCardText('hint', cardHintText())
 				ui.card.setAttribute('aria-label', cardAriaLabel(result))
 				refreshTransformUi()
+				applyAllSectionStates()
 				refreshCardVisibility()
+			}
+
+			function refreshSectionText(languageGame) {
+				if (!ui) return
+				const source = languageGame || game
+				for (const kind of ['costs', 'captured']) {
+					const state = ui.sectionStates[kind]
+					const toggle = ui.card.querySelector('[data-world-editor-section-toggle="' + kind + '"]')
+					if (!state || !toggle) continue
+					const action = i18n.t(source, state.expanded ? 'blueprintCollapseSection' : 'blueprintExpandSection')
+					toggle.title = action
+					toggle.setAttribute('aria-label', action)
+				}
 			}
 
 			function displayResult() {
@@ -1040,6 +1283,135 @@ ModLoader.register({
 				}
 			}
 
+			function renderPreviewDetails() {
+				if (!ui) return
+				const state = previewSnapshot()
+				const previewState = ui.card.querySelector('[data-world-editor-blueprint-text="preview-state"]')
+				const previewWarning = ui.card.querySelector('[data-world-editor-blueprint-text="preview-warning"]')
+				const statuses = ui.card.querySelector('[data-world-editor-preview-statuses]')
+				const costs = ui.card.querySelector('[data-world-editor-preview-costs]')
+				const activePreview = !!state?.active
+				const warningCode = state?.warning
+				const warningText = warningCode === 'full-unavailable'
+					? i18n.t(game, 'previewFullUnavailable')
+					: warningCode === 'plan-failed'
+						? i18n.t(game, 'previewPlanFailed')
+						: ''
+				const stateText = state?.calculating
+					? i18n.t(game, 'previewCalculating')
+					: activePreview
+						? state.effectivePinned
+							? i18n.t(game, 'previewPinned')
+							: state.target
+								? i18n.t(game, 'previewFollowing')
+								: i18n.t(game, 'previewWaitingTarget')
+						: warningText
+				if (previewState) {
+					previewState.textContent = stateText
+					previewState.hidden = !stateText
+				}
+				if (previewWarning) {
+					previewWarning.textContent = warningText
+					previewWarning.hidden = !warningText
+				}
+				const counts = state?.plan?.statusCounts || {}
+				for (const status of ['buildable', 'satisfied', 'conflict', 'blocked']) {
+					const item = ui.card.querySelector('[data-status="' + status + '"]')
+					const label = ui.card.querySelector('[data-world-editor-preview-status-label="' + status + '"]')
+					const count = ui.card.querySelector('[data-world-editor-preview-status-count="' + status + '"]')
+					if (item) item.hidden = !state?.plan
+					if (label) label.textContent = i18n.t(game, previewStatusTextKey(status))
+					if (count) count.textContent = String(Math.max(0, Number(counts[status]) || 0))
+				}
+				if (statuses) statuses.hidden = !displayResult()
+				if (costs) costs.hidden = !state?.plan
+				setCardText('costs-title', i18n.t(game, 'previewBuildPlan'))
+				renderPreviewResources(state?.plan?.cost || null)
+			}
+
+			function renderPreviewResources(cost) {
+				if (!ui || ui.renderedCost === cost) return
+				ui.renderedCost = cost
+				const list = ui.card.querySelector('[data-world-editor-preview-resources]')
+				if (!list) return
+				list.replaceChildren()
+				if (!cost) return
+				const length = Math.max(
+					cost.required?.length || 0,
+					cost.owned?.length || 0,
+					cost.shortfall?.length || 0
+				)
+				let rows = 0
+				for (let index = 0; index < length; index += 1) {
+					const required = finiteOr(cost.required?.[index], 0)
+					const owned = finiteOr(cost.owned?.[index], 0)
+					const shortfall = finiteOr(cost.shortfall?.[index], 0)
+					if (!required && !shortfall) continue
+					const row = document.createElement('div')
+					row.className = 'cattail-world-editor-blueprint-card__resource'
+					if (shortfall) row.dataset.shortfall = 'true'
+					row.append(createResourceIcon(index, 18, 20))
+					const name = document.createElement('span')
+					name.className = 'cattail-world-editor-blueprint-card__resource-name'
+					name.textContent = localizedResourceName(index)
+					const values = document.createElement('span')
+					values.className = 'cattail-world-editor-blueprint-card__resource-values'
+					values.textContent = formatNumber(required) + '/' + formatNumber(owned) +
+						(shortfall ? ' -' + formatNumber(shortfall) : '')
+					row.setAttribute('aria-label', [
+						name.textContent,
+						i18n.t(game, 'previewRequired') + ' ' + formatNumber(required),
+						i18n.t(game, 'previewOwned') + ' ' + formatNumber(owned),
+						shortfall ? i18n.t(game, 'previewShortfall') + ' ' + formatNumber(shortfall) : ''
+					].filter(Boolean).join('. '))
+					row.append(name, values)
+					list.append(row)
+					rows += 1
+				}
+				if (!rows) {
+					const empty = document.createElement('div')
+					empty.className = 'cattail-world-editor-blueprint-card__empty'
+					empty.textContent = i18n.t(game, 'previewNoCost')
+					list.append(empty)
+				}
+			}
+
+			function cardPinnedState() {
+				return !!ui?.pinned
+			}
+
+			function cardInteractionEnabled() {
+				const state = previewSnapshot()
+				return state?.active ? !!state.effectivePinned : !!ui?.pinned
+			}
+
+			function cardHintText() {
+				const state = previewSnapshot()
+				const hints = []
+				if (state?.renderFallbackCount) hints.push(i18n.t(game, 'previewRenderFallback'))
+				if (state?.plan?.cost && !state.plan.cost.complete) hints.push(i18n.t(game, 'previewCostIncomplete'))
+				if (state?.active) {
+					hints.push(i18n.t(game, 'previewExitHint'))
+					if (!state.pinned) hints.push(i18n.t(game, 'previewTemporaryPinHint'))
+				}
+				hints.push(i18n.t(game, cardPinnedState() ? 'cardUnpinAction' : 'cardPinAction'))
+				return hints.join(' · ')
+			}
+
+			function previewStatusTextKey(status) {
+				return status === 'buildable'
+					? 'previewBuildable'
+					: status === 'satisfied'
+						? 'previewSatisfied'
+						: status === 'conflict'
+							? 'previewConflict'
+							: 'previewBlocked'
+			}
+
+			function previewStatusSymbol(status) {
+				return status === 'buildable' ? '✓' : status === 'satisfied' ? '=' : status === 'conflict' ? '!' : '×'
+			}
+
 			function resultStatusText(result) {
 				if (result.status === 'capturing') return i18n.t(game, 'blueprintCapturing')
 				if (result.status === 'empty') return i18n.t(game, 'blueprintNothingCaptured')
@@ -1061,17 +1433,33 @@ ModLoader.register({
 					i18n.t(game, result.mode === 'full' ? 'blueprintModeFull' : 'blueprintModeStructure'),
 					captured.join(', '),
 					skipped.length ? i18n.t(game, 'blueprintSkippedTypes') + ' ' + skipped.join(', ') : '',
-					i18n.t(game, ui.pinned ? 'cardUnpinAction' : 'cardPinAction')
+					i18n.t(game, cardPinnedState() ? 'cardUnpinAction' : 'cardPinAction'),
+					i18n.t(game, 'cardOpacityControls'),
+					i18n.t(game, ui?.opacityControls?.snapshot?.().contentIndependent
+						? 'cardOpacityContentIndependent'
+						: 'cardOpacityContentLinked')
 				].filter(Boolean).join('. ')
 			}
 
-			function renderTypeList(kind, types) {
+			function renderTypeList(kind, types, typeCosts) {
 				const section = ui.card.querySelector('[data-world-editor-blueprint-section="' + kind + '"]')
 				const list = ui.card.querySelector('[data-world-editor-blueprint-types="' + kind + '"]')
+				if (kind === 'captured') {
+					if (ui.capturedTypesSource === types && ui.capturedTypeCosts === typeCosts) return
+					ui.capturedTypesSource = types
+					ui.capturedTypeCosts = typeCosts || null
+				} else {
+					if (ui.skippedTypesSource === types) return
+					ui.skippedTypesSource = types
+				}
 				const grouped = groupTypeRows(types)
 				list.replaceChildren()
 				section.hidden = !grouped.length
-				for (const type of grouped) list.append(createTypeRow(type))
+				const costs = new Map((typeCosts || []).map(function (entry) {
+					return [String(entry?.name || ''), entry]
+				}))
+				const statuses = plannedTypeStatuses()
+				for (const type of grouped) list.append(createTypeRow(type, kind, costs.get(type.name), statuses.get(type.name)))
 			}
 
 			function groupTypeRows(types) {
@@ -1085,7 +1473,7 @@ ModLoader.register({
 				})
 			}
 
-			function createTypeRow(type) {
+			function createTypeRow(type, kind, typeCost, typeStatuses) {
 				const row = document.createElement('div')
 				row.className = 'cattail-world-editor-blueprint-card__type'
 				const icon = document.createElement('span')
@@ -1106,11 +1494,56 @@ ModLoader.register({
 				const name = document.createElement('span')
 				name.className = 'cattail-world-editor-blueprint-card__type-name'
 				name.textContent = localizedEntityName(type.name)
+				const content = document.createElement('span')
+				content.className = 'cattail-world-editor-blueprint-card__type-content'
+				content.append(name)
+				if (kind === 'captured' && currentPreview?.plan) {
+					const detail = document.createElement('span')
+					detail.className = 'cattail-world-editor-blueprint-card__type-detail'
+					const buildCount = Math.max(0, Number(typeCost?.buildCount) || 0)
+					const satisfiedCount = Math.max(0, Number(typeStatuses?.satisfied) || 0)
+					detail.textContent = buildCount
+						? i18n.t(game, 'previewBuildable') + ' ×' + buildCount
+						: satisfiedCount
+							? i18n.t(game, 'previewSatisfied') + ' · ' + i18n.t(game, 'previewNoCost')
+							: i18n.t(game, 'previewNoCost')
+					content.append(detail)
+					if (buildCount && Array.isArray(typeCost?.demand)) {
+						const resources = document.createElement('span')
+						resources.className = 'cattail-world-editor-blueprint-card__type-resources'
+						let resourceCount = 0
+						for (let index = 0; index < typeCost.demand.length; index += 1) {
+							const value = finiteOr(typeCost.demand[index], 0)
+							if (!value) continue
+							const item = document.createElement('span')
+							item.className = 'cattail-world-editor-blueprint-card__type-resource'
+							item.append(createResourceIcon(index, 12, 14))
+							const amount = document.createElement('span')
+							amount.textContent = formatNumber(value)
+							item.append(amount)
+							item.setAttribute('aria-label', localizedResourceName(index) + ' ' + formatNumber(value))
+							resources.append(item)
+							resourceCount += 1
+						}
+						if (resourceCount) content.append(resources)
+					}
+				}
 				const count = document.createElement('span')
 				count.className = 'cattail-world-editor-blueprint-card__type-count'
 				count.textContent = '×' + String(type.count)
-				row.append(icon, name, count)
+				row.append(icon, content, count)
 				return row
+			}
+
+			function plannedTypeStatuses() {
+				const grouped = new Map()
+				for (const record of currentPreview?.plan?.records || []) {
+					const name = String(record?.name || '')
+					if (!grouped.has(name)) grouped.set(name, { buildable: 0, satisfied: 0, conflict: 0, blocked: 0 })
+					const entry = grouped.get(name)
+					if (Object.prototype.hasOwnProperty.call(entry, record?.status)) entry[record.status] += 1
+				}
+				return grouped
 			}
 
 			function createEntityIcon(name) {
@@ -1153,11 +1586,88 @@ ModLoader.register({
 				return String(shopItem?.html?.querySelector?.('.itemHeader')?.textContent || name || 'unknown')
 			}
 
+			function createResourceIcon(index, width, height) {
+				const canvas = document.createElement('canvas')
+				canvas.className = 'cattail-world-editor-blueprint-card__resource-icon'
+				canvas.width = Math.max(1, Number(width) || 18)
+				canvas.height = Math.max(1, Number(height) || 20)
+				canvas.setAttribute('aria-hidden', 'true')
+				if (drawResourceSprite(canvas, index)) return canvas
+				const fallback = document.createElement('span')
+				fallback.className = 'cattail-world-editor-blueprint-card__resource-fallback'
+				fallback.style.background = resourceColor(index)
+				fallback.setAttribute('aria-hidden', 'true')
+				return fallback
+			}
+
+			function drawResourceSprite(canvas, index) {
+				const context = canvas?.getContext?.('2d')
+				const sprite = game.resourcesSprites?.[index]
+				const image = sprite?.img
+				if (!context || !sprite || !image) return false
+				const sequence = sprite.sequences?.[sprite.currentSequence]
+				const frameId = Array.isArray(sequence)
+					? sequence[sprite.currentFrame] ?? sequence[0]
+					: 0
+				const mask = sprite.frames?.[frameId] || [index * 108, 0, 104, 120]
+				if (!Array.isArray(mask) || mask.length < 4) return false
+				try {
+					context.clearRect(0, 0, canvas.width, canvas.height)
+					context.drawImage(
+						image,
+						finiteOr(mask[0], index * 108),
+						finiteOr(mask[1], 0),
+						Math.max(1, finiteOr(mask[2], 104)),
+						Math.max(1, finiteOr(mask[3], 120)),
+						0,
+						0,
+						canvas.width,
+						canvas.height
+					)
+					return true
+				} catch (error) {
+					return false
+				}
+			}
+
+			function localizedResourceName(index) {
+				const resource = game.codex?.resources?.[index]
+				const name = resource?.name || resource?.id || String(index)
+				try {
+					const pronounced = game.pronounce?.('resources', name, 'name')
+					if (pronounced && pronounced !== name) return String(pronounced)
+				} catch (error) {}
+				return String(name)
+			}
+
+			function resourceColor(index) {
+				const triplet = game.codex?.resources?.[index]?.triplet
+				return Array.isArray(triplet) && triplet.length ? String(triplet[1] || triplet[0]) : '#8a96a3'
+			}
+
+			function formatNumber(value) {
+				try {
+					if (typeof game.makeReadable === 'function') return String(game.makeReadable(value))
+				} catch (error) {}
+				return String(Math.round(finiteOr(value, 0) * 100) / 100)
+			}
+
 			function refreshCardVisibility() {
 				if (!ui) return
 				const result = displayResult()
 				const onSourcePlane = !!result && Number(result.sourcePlane) === (game.plane ? 1 : 0)
-				const displayWindow = ui.pinned || ui.temporaryVisible || currentSession.capturing
+				const previewState = previewSnapshot()
+				const previewTemporaryPinnedVisible = !!(
+					previewState?.active &&
+					!previewState.paused &&
+					previewState.temporaryPinned
+				)
+				const displayWindow = (
+					ui.pinned ||
+					ui.temporaryVisible ||
+					currentSession.capturing ||
+					previewTemporaryPinnedVisible
+				)
 				const visible = (
 					!!currentRuntime.active &&
 					!!result &&
@@ -1181,7 +1691,7 @@ ModLoader.register({
 					interacting = interacting || !!gestureType
 				} catch (error) {}
 				const previewState = previewSnapshot()
-				interacting = interacting || !!(previewState?.active && !previewState.pinned)
+				interacting = interacting || !!(previewState?.active && !previewState.effectivePinned)
 				ui.card.dataset.inputPassThrough = interacting ? 'true' : 'false'
 			}
 
@@ -1189,13 +1699,26 @@ ModLoader.register({
 				if (!ui || (frameGame && frameGame !== game)) return
 				syncCardPassThrough()
 				ui.card.dataset.theme = game.plane ? 'void' : 'reality'
+				if (!currentRuntime.active) {
+					ui.positionVisible = false
+					refreshCardVisibility()
+					return
+				}
 				if (typeof api.render?.isEnabled === 'function' && !api.render.isEnabled()) {
 					ui.positionVisible = false
 					refreshCardVisibility()
 					return
 				}
 				const result = displayResult()
-				const bounds = result?.anchor ? projectAnchorBounds(game, result.anchor) : null
+				const previewState = previewSnapshot()
+				const previewBounds = previewState?.active && !previewState.paused
+					? previewWorldBounds(previewState)
+					: null
+				const bounds = previewBounds
+					? projectWorldBounds(game, previewBounds)
+					: result?.anchor
+						? projectAnchorBounds(game, result.anchor)
+						: null
 				if (!bounds) {
 					ui.positionVisible = false
 					refreshCardVisibility()
@@ -1222,34 +1745,26 @@ ModLoader.register({
 				const width = finitePositive(cardRect.width, finitePositive(ui.card.offsetWidth, 324))
 				const height = finitePositive(cardRect.height, finitePositive(ui.card.offsetHeight, 280))
 				const centerX = (bounds.minX + bounds.maxX) / 2
+				const centerY = (bounds.minY + bounds.maxY) / 2
 				const candidates = [
-					{ left: centerX - width / 2, top: bounds.maxY + gap, placement: 'below' },
-					{ left: centerX - width / 2, top: bounds.minY - gap - height, placement: 'above' },
-					{ left: bounds.maxX + gap, top: (bounds.minY + bounds.maxY - height) / 2, placement: 'right' },
-					{ left: bounds.minX - gap - width, top: (bounds.minY + bounds.maxY - height) / 2, placement: 'left' }
+					{ left: bounds.maxX + gap, top: centerY - height / 2, width, height, placement: 'right' },
+					{ left: bounds.minX - gap - width, top: centerY - height / 2, width, height, placement: 'left' },
+					{ left: centerX - width / 2, top: bounds.maxY + gap, width, height, placement: 'below' },
+					{ left: centerX - width / 2, top: bounds.minY - gap - height, width, height, placement: 'above' }
 				]
 				const selectionRect = visibleRect(document.getElementById(SELECTION_CARD_ID))
-				let chosen = null
-				for (const candidate of candidates) {
-					const normalized = {
-						left: clamp(candidate.left, margin, Math.max(margin, viewportWidth - margin - width)),
-						top: clamp(candidate.top, margin, Math.max(margin, viewportHeight - margin - height)),
-						width,
-						height,
-						placement: candidate.placement
+				const chosen = chooseCardCandidate(candidates, {
+					margin,
+					viewportWidth,
+					viewportHeight,
+					selectionRect,
+					previewRect: {
+						left: bounds.minX,
+						top: bounds.minY,
+						width: bounds.maxX - bounds.minX,
+						height: bounds.maxY - bounds.minY
 					}
-					if (!selectionRect || !rectanglesOverlap(normalized, selectionRect, 8)) {
-						chosen = normalized
-						break
-					}
-				}
-				chosen = chosen || {
-					left: clamp(candidates[0].left, margin, Math.max(margin, viewportWidth - margin - width)),
-					top: clamp(candidates[0].top, margin, Math.max(margin, viewportHeight - margin - height)),
-					width,
-					height,
-					placement: 'below'
-				}
+				})
 				ui.card.style.left = chosen.left + 'px'
 				ui.card.style.top = chosen.top + 'px'
 				ui.card.dataset.placement = chosen.placement
@@ -1288,11 +1803,38 @@ ModLoader.register({
 				if (!button || button.disabled || !transformAvailable) return
 				stopUiEvent(event)
 				const action = button.dataset.worldEditorTransformAction
+				previewController?.setTransformGuide?.(null, 'ui-transform-click')
 				if (action === 'rotate-clockwise') transform.rotateClockwise('ui-rotate-clockwise')
 				else if (action === 'rotate-counterclockwise') transform.rotateCounterclockwise('ui-rotate-counterclockwise')
 				else if (action === 'mirror-u') transform.mirrorU('ui-mirror-u')
 				else if (action === 'mirror-v') transform.mirrorV('ui-mirror-v')
 				else if (action === 'reset') transform.reset('ui-reset')
+			}
+
+			function handleTransformGuidePointerOver(event) {
+				const button = event?.target?.closest?.('[data-world-editor-transform-action]')
+				if (!button || button.disabled) return
+				previewController?.setTransformGuide?.(button.dataset.worldEditorTransformAction, 'ui-pointer-hover')
+			}
+
+			function handleTransformGuidePointerOut(event) {
+				const button = event?.target?.closest?.('[data-world-editor-transform-action]')
+				if (!button) return
+				if (event?.relatedTarget && button.contains?.(event.relatedTarget)) return
+				previewController?.setTransformGuide?.(null, 'ui-pointer-leave')
+			}
+
+			function handleTransformGuideFocusIn(event) {
+				const button = event?.target?.closest?.('[data-world-editor-transform-action]')
+				if (!button || button.disabled) return
+				previewController?.setTransformGuide?.(button.dataset.worldEditorTransformAction, 'ui-keyboard-focus')
+			}
+
+			function handleTransformGuideFocusOut(event) {
+				const button = event?.target?.closest?.('[data-world-editor-transform-action]')
+				if (!button) return
+				if (event?.relatedTarget && button.contains?.(event.relatedTarget)) return
+				previewController?.setTransformGuide?.(null, 'ui-keyboard-blur')
 			}
 
 			function handleClear(event) {
@@ -1314,7 +1856,13 @@ ModLoader.register({
 			}
 
 			function toggleCardPinned(event) {
-				if (!ui || event?.target?.closest?.('button')) return
+				if (
+					!ui ||
+					event?.target?.closest?.('button') ||
+					event?.target?.closest?.('[data-world-editor-section-resize]')
+				) {
+					return
+				}
 				stopUiEvent(event)
 				ui.pinned = !ui.pinned
 				if (ui.pinned) pauseTemporaryTimer()
@@ -1332,6 +1880,144 @@ ModLoader.register({
 				event?.stopImmediatePropagation?.()
 			}
 
+			function handleSectionToggle(event) {
+				const toggle = event?.target?.closest?.('[data-world-editor-section-toggle]')
+				if (!ui || !toggle || !cardInteractionEnabled()) return
+				const kind = toggle.dataset.worldEditorSectionToggle
+				const state = ui.sectionStates[kind]
+				if (!state) return
+				stopUiEvent(event)
+				cancelSectionResize('section-toggle')
+				state.expanded = !state.expanded
+				applySectionState(kind)
+				refreshSectionText(game)
+				syncCardPosition(game)
+			}
+
+			function handleSectionResizeStart(event) {
+				const handle = event?.target?.closest?.('[data-world-editor-section-resize]')
+				if (!ui || !handle || event?.button !== 0 || !cardInteractionEnabled()) return
+				const kind = handle.dataset.worldEditorSectionResize
+				const edge = handle.dataset.edge
+				const state = ui.sectionStates[kind]
+				const body = ui.card.querySelector('[data-world-editor-section-body="' + kind + '"]')
+				if (!state?.expanded || !body || (edge !== 'top' && edge !== 'bottom')) return
+				cancelSectionResize('new-resize')
+				event?.preventDefault?.()
+				event?.stopPropagation?.()
+				event?.stopImmediatePropagation?.()
+				const bodyRect = body.getBoundingClientRect?.()
+				const scale = currentUiScale()
+				const startHeight = finitePositive(
+					body.offsetHeight,
+					finitePositive(bodyRect?.height, state.minHeight * scale) / scale
+				)
+				const resize = {
+					pointerId: event.pointerId,
+					handle,
+					body,
+					kind,
+					edge,
+					startY: finiteOr(event.clientY, 0),
+					startHeight,
+					originalPreferredHeight: state.preferredHeight,
+					scale
+				}
+				ui.sectionResize = resize
+				ui.card.dataset.sectionResizing = 'true'
+				handle.dataset.active = 'true'
+				body.dataset.resizing = 'true'
+				handle.setPointerCapture?.(resize.pointerId)
+			}
+
+			function updateSectionResize(event) {
+				const resize = ui?.sectionResize
+				if (!resize || (event?.pointerId !== undefined && resize.pointerId !== undefined && event.pointerId !== resize.pointerId)) {
+					return false
+				}
+				const deltaY = finiteOr(event?.clientY, resize.startY) - resize.startY
+				event?.preventDefault?.()
+				event?.stopPropagation?.()
+				const state = ui.sectionStates[resize.kind]
+				const direction = resize.edge === 'top' ? -1 : 1
+				const maximum = sectionMaximumHeight(state)
+				state.preferredHeight = clamp(
+					resize.startHeight + deltaY * direction / resize.scale,
+					state.minHeight,
+					maximum
+				)
+				applySectionState(resize.kind)
+				syncCardPosition(game)
+				return true
+			}
+
+			function finishSectionResize(event, reason) {
+				const resize = ui?.sectionResize
+				if (!resize || (event?.pointerId !== undefined && resize.pointerId !== undefined && event.pointerId !== resize.pointerId)) {
+					return false
+				}
+				event?.preventDefault?.()
+				event?.stopPropagation?.()
+				return cancelSectionResize(reason, reason === 'pointercancel')
+			}
+
+			function cancelSectionResize(reason, restore) {
+				const resize = ui?.sectionResize
+				if (!resize) return false
+				resize.handle?.releasePointerCapture?.(resize.pointerId)
+				delete resize.handle?.dataset?.active
+				delete resize.body?.dataset?.resizing
+				delete ui.card.dataset.sectionResizing
+				ui.sectionResize = null
+				if (restore) {
+					ui.sectionStates[resize.kind].preferredHeight = resize.originalPreferredHeight
+					applySectionState(resize.kind)
+					syncCardPosition(game)
+				}
+				return true
+			}
+
+			function applyAllSectionStates() {
+				if (!ui) return
+				for (const kind of Object.keys(ui.sectionStates)) applySectionState(kind)
+				refreshSectionText(game)
+			}
+
+			function applySectionState(kind) {
+				const state = ui?.sectionStates?.[kind]
+				const section = ui?.card?.querySelector?.('[data-world-editor-blueprint-section="' + kind + '"]')
+				const body = ui?.card?.querySelector?.('[data-world-editor-section-body="' + kind + '"]')
+				const toggle = ui?.card?.querySelector?.('[data-world-editor-section-toggle="' + kind + '"]')
+				if (!state || !section || !body || !toggle) return
+				const maximum = sectionMaximumHeight(state)
+				const effectiveHeight = state.preferredHeight === null
+					? maximum
+					: clamp(state.preferredHeight, state.minHeight, maximum)
+				section.dataset.expanded = state.expanded ? 'true' : 'false'
+				section.dataset.resizable = state.expanded && cardInteractionEnabled() ? 'true' : 'false'
+				body.style.setProperty('--blueprint-section-max-height', effectiveHeight + 'px')
+				body.style.height = state.preferredHeight === null ? '' : effectiveHeight + 'px'
+				body.dataset.sized = state.preferredHeight === null ? 'false' : 'true'
+				toggle.setAttribute('aria-expanded', state.expanded ? 'true' : 'false')
+			}
+
+			function sectionMaximumHeight(state) {
+				const viewportHeight = finitePositive(
+					typeof window !== 'undefined' ? window.innerHeight : 0,
+					document.documentElement?.clientHeight || 0
+				)
+				return Math.max(state?.minHeight || 0, viewportHeight * finiteOr(state?.maxViewportRatio, .35))
+			}
+
+			function currentUiScale() {
+				const root = document.documentElement
+				const inlineValue = root?.style?.getPropertyValue?.('--world-editor-ui-scale')
+				const computedValue = typeof globalThis.getComputedStyle === 'function'
+					? globalThis.getComputedStyle(root)?.getPropertyValue?.('--world-editor-ui-scale')
+					: ''
+				return clamp(finiteOr(Number(inlineValue || computedValue), 1), .01, 1)
+			}
+
 			function restartTemporaryWindow() {
 				if (!ui) return
 				clearTemporaryTimer()
@@ -1339,6 +2025,58 @@ ModLoader.register({
 				ui.temporaryRemaining = TEMPORARY_VISIBLE_MS
 				refreshCardVisibility()
 				resumeTemporaryTimer()
+			}
+
+			function syncTemporaryWindowFromPreview(previousState, state) {
+				if (!ui || !state) return
+				const exited = !!previousState?.active && !state.active
+				if (exited) {
+					resetCardDisplayState('preview-exited')
+					return
+				}
+				if (state.temporaryPinned) {
+					pauseTemporaryTimer()
+					return
+				}
+				const entered = !!state.active && !previousState?.active
+				const resumed = !!state.active && !!previousState?.paused && !state.paused
+				const permanentPinned = !!state.active && !previousState?.pinned && !!state.pinned
+				const permanentReleased = !!state.active && !!previousState?.pinned && !state.pinned
+				const temporaryReleased = !!state.active && !!previousState?.temporaryPinned
+				const warningAppeared = !!state.warning && state.warning !== previousState?.warning
+				const fallbackChanged = (
+					Number(state.renderFallbackCount) > 0 &&
+					state.renderFallbackCount !== previousState?.renderFallbackCount
+				)
+				if (
+					entered ||
+					resumed ||
+					permanentPinned ||
+					permanentReleased ||
+					temporaryReleased ||
+					warningAppeared ||
+					fallbackChanged
+				) {
+					restartTemporaryWindow()
+				}
+			}
+
+			function resetCardDisplayState(reason) {
+				if (!ui) return false
+				cancelSectionResize(reason || 'card-display-reset', true)
+				clearTemporaryTimer()
+				ui.pinned = false
+				ui.pointerPaused = false
+				ui.temporaryVisible = false
+				ui.temporaryRemaining = TEMPORARY_VISIBLE_MS
+				ui.temporaryDeadline = 0
+				ui.positionVisible = false
+				ui.card.dataset.pinned = 'false'
+				ui.card.dataset.visible = 'false'
+				ui.card.dataset.positionVisible = 'false'
+				ui.card.setAttribute('aria-hidden', 'true')
+				ui.card.blur?.()
+				return true
 			}
 
 			function clearTemporaryWindow() {
@@ -1369,6 +2107,7 @@ ModLoader.register({
 					!ui ||
 					!ui.temporaryVisible ||
 					ui.pinned ||
+					previewSnapshot()?.temporaryPinned ||
 					ui.pointerPaused ||
 					currentSession.capturing ||
 					currentSelection?.previewRange
@@ -1406,7 +2145,7 @@ ModLoader.register({
 					.cattail-world-editor-blueprint-controls {
 						display: inline-flex;
 						align-items: center;
-						flex-wrap: nowrap;
+						flex-wrap: wrap;
 						gap: 6px;
 						font-family: Montserrat, Arial, sans-serif;
 					}
@@ -1469,7 +2208,7 @@ ModLoader.register({
 						display: inline-flex;
 						align-items: center;
 						flex: none;
-						flex-wrap: nowrap;
+						flex-wrap: wrap;
 						gap: 4px;
 					}
 					.cattail-world-editor-transform-button {
@@ -1526,6 +2265,10 @@ ModLoader.register({
 					}
 					.cattail-world-editor-transform-icon[data-icon="rotate-counterclockwise"] {
 						transform: scaleX(-1);
+					}
+					.cattail-world-editor-transform-icon[data-icon="mirror-u"],
+					.cattail-world-editor-transform-icon[data-icon="mirror-v"] {
+						transform: rotate(45deg);
 					}
 					.cattail-world-editor-transform-icon[data-icon="reset"]::before {
 						inset: 3px;
@@ -1608,55 +2351,78 @@ ModLoader.register({
 						cursor: default;
 					}
 					.cattail-world-editor-blueprint-card {
-						--blueprint-card-bg: rgba(248, 248, 246, .94);
+						--world-editor-card-opacity: 1;
+						--world-editor-card-shell-opacity: 1;
+						--world-editor-card-shell-percent: 100%;
+						--world-editor-card-shell-blur-14: 14px;
+						--world-editor-card-shell-saturate: 1.1;
+						--blueprint-card-bg: color-mix(in srgb, rgba(248, 248, 246, .94) var(--world-editor-card-shell-percent), transparent);
 						--blueprint-card-text: rgba(18, 20, 22, .94);
 						--blueprint-card-muted: rgba(18, 20, 22, .58);
-						--blueprint-card-border: rgba(92, 65, 132, .24);
-						--blueprint-card-track: rgba(92, 65, 132, .09);
-						--blueprint-card-accent: rgba(113, 79, 163, .88);
+						--blueprint-card-border: color-mix(in srgb, rgba(92, 65, 132, .24) var(--world-editor-card-shell-percent), transparent);
+						--blueprint-card-track: color-mix(in srgb, rgba(92, 65, 132, .09) var(--world-editor-card-shell-percent), transparent);
+						--blueprint-card-accent: color-mix(in srgb, rgba(113, 79, 163, .88) var(--world-editor-card-shell-percent), transparent);
 						position: fixed;
 						z-index: 49;
-						width: min(324px, calc(100vw - 20px));
-						max-height: min(520px, calc(100vh - 20px));
+						width: min(clamp(270px, 34vw, 372px), calc(100vw - 20px));
+						max-height: min(68vh, calc(100vh - 20px));
 						box-sizing: border-box;
 						padding: 12px;
-						overflow: hidden;
+						overflow-x: hidden;
+						overflow-y: auto;
+						overscroll-behavior: contain;
+						scrollbar-width: thin;
+						scrollbar-color: rgba(185,185,185,.48) transparent;
 						border: 1px solid var(--blueprint-card-border);
 						border-radius: 8px;
 						background: var(--blueprint-card-bg);
-						box-shadow: 0 10px 28px rgba(0, 0, 0, .22);
-						backdrop-filter: blur(14px) saturate(1.1);
-						-webkit-backdrop-filter: blur(14px) saturate(1.1);
+						box-shadow: 0 10px 28px color-mix(in srgb, rgba(0, 0, 0, .22) var(--world-editor-card-shell-percent), transparent);
+						backdrop-filter: blur(var(--world-editor-card-shell-blur-14)) saturate(var(--world-editor-card-shell-saturate));
+						-webkit-backdrop-filter: blur(var(--world-editor-card-shell-blur-14)) saturate(var(--world-editor-card-shell-saturate));
 						color: var(--blueprint-card-text);
 						font: 400 12px/1.35 Montserrat, Arial, sans-serif;
 						letter-spacing: 0;
 						visibility: hidden;
 						opacity: 0;
-						transform: translateY(4px);
+						transform: translateY(4px) scale(var(--world-editor-ui-scale, 1));
+						transform-origin: top left;
 						pointer-events: none;
 						transition: opacity .16s ease, transform .16s ease, visibility 0s linear .16s;
 					}
+					.cattail-world-editor-blueprint-card::-webkit-scrollbar {
+						width: 4px;
+					}
+					.cattail-world-editor-blueprint-card::-webkit-scrollbar-track {
+						background: transparent;
+					}
+					.cattail-world-editor-blueprint-card::-webkit-scrollbar-thumb {
+						border-radius: 999px;
+						background: rgba(185,185,185,.48);
+					}
 					.cattail-world-editor-blueprint-card[data-theme="void"] {
-						--blueprint-card-bg: rgba(8, 10, 12, .94);
+						--blueprint-card-bg: color-mix(in srgb, rgba(8, 10, 12, .94) var(--world-editor-card-shell-percent), transparent);
 						--blueprint-card-text: rgba(255, 255, 255, .92);
 						--blueprint-card-muted: rgba(255, 255, 255, .62);
-						--blueprint-card-border: rgba(210, 188, 250, .28);
-						--blueprint-card-track: rgba(255, 255, 255, .08);
-						--blueprint-card-accent: rgba(210, 188, 250, .9);
+						--blueprint-card-border: color-mix(in srgb, rgba(210, 188, 250, .28) var(--world-editor-card-shell-percent), transparent);
+						--blueprint-card-track: color-mix(in srgb, rgba(255, 255, 255, .08) var(--world-editor-card-shell-percent), transparent);
+						--blueprint-card-accent: color-mix(in srgb, rgba(210, 188, 250, .9) var(--world-editor-card-shell-percent), transparent);
 					}
 					.cattail-world-editor-blueprint-card[data-visible="true"][data-position-visible="true"] {
 						visibility: visible;
-						opacity: 1;
-						transform: translateY(0);
+						opacity: var(--world-editor-card-opacity);
+						transform: translateY(0) scale(var(--world-editor-ui-scale, 1));
 						pointer-events: auto;
 						transition-delay: 0s;
+					}
+					.cattail-world-editor-blueprint-card[data-visible="true"][data-position-visible="true"][data-opacity-content-independent="true"] {
+						opacity: 1;
 					}
 					.cattail-world-editor-blueprint-card[data-visible="true"][data-position-visible="true"][data-input-pass-through="true"] {
 						pointer-events: none;
 					}
 					.cattail-world-editor-blueprint-card[data-pinned="true"] {
-						border-color: rgba(166, 242, 70, .82);
-						box-shadow: 0 10px 28px rgba(0, 0, 0, .24), 0 0 16px rgba(166, 242, 70, .36);
+						border-color: color-mix(in srgb, rgba(166, 242, 70, .82) var(--world-editor-card-shell-percent), transparent);
+						box-shadow: 0 10px 28px color-mix(in srgb, rgba(0, 0, 0, .24) var(--world-editor-card-shell-percent), transparent), 0 0 16px color-mix(in srgb, rgba(166, 242, 70, .36) var(--world-editor-card-shell-percent), transparent);
 					}
 					.cattail-world-editor-blueprint-card:focus-visible {
 						outline: 2px solid var(--blueprint-card-accent);
@@ -1668,12 +2434,35 @@ ModLoader.register({
 						align-items: center;
 						gap: 8px;
 					}
+					.cattail-world-editor-blueprint-card__header-primary {
+						display: flex;
+						align-items: center;
+						min-width: 0;
+						gap: 5px;
+					}
+					.cattail-world-editor-blueprint-card__header-primary .cattail-world-editor-card-opacity-hint {
+						margin-left: auto;
+					}
 					.cattail-world-editor-blueprint-card__title {
+						flex: 0 1 auto;
+						min-width: 0;
 						overflow: hidden;
 						text-overflow: ellipsis;
 						white-space: nowrap;
 						font-size: 14px;
 						font-weight: 700;
+					}
+					.cattail-world-editor-blueprint-card__chip {
+						flex: 0 1 auto;
+						min-width: 0;
+						padding: 3px 5px;
+						overflow: hidden;
+						border-radius: 5px;
+						background: var(--blueprint-card-track);
+						text-overflow: ellipsis;
+						white-space: nowrap;
+						font-size: 10px;
+						font-weight: 600;
 					}
 					.cattail-world-editor-blueprint-card__source {
 						color: var(--blueprint-card-muted);
@@ -1697,24 +2486,6 @@ ModLoader.register({
 						opacity: .35;
 						cursor: default;
 					}
-					.cattail-world-editor-blueprint-card__meta {
-						display: grid;
-						grid-template-columns: repeat(3, minmax(0, 1fr));
-						gap: 5px;
-						margin-top: 8px;
-					}
-					.cattail-world-editor-blueprint-card__meta span {
-						min-width: 0;
-						padding: 4px 5px;
-						overflow: hidden;
-						border-radius: 5px;
-						background: var(--blueprint-card-track);
-						text-align: center;
-						text-overflow: ellipsis;
-						white-space: nowrap;
-						font-size: 10px;
-						font-weight: 600;
-					}
 					.cattail-world-editor-blueprint-card__status {
 						min-height: 16px;
 						margin-top: 7px;
@@ -1722,6 +2493,58 @@ ModLoader.register({
 						text-align: center;
 						font-size: 10px;
 					}
+					.cattail-world-editor-blueprint-card__preview-state {
+						min-height: 15px;
+						margin-top: 5px;
+						color: var(--blueprint-card-muted);
+						text-align: center;
+						font-size: 10px;
+						font-weight: 600;
+					}
+					.cattail-world-editor-blueprint-card__preview-state[hidden],
+					.cattail-world-editor-blueprint-card__preview-warning[hidden],
+					.cattail-world-editor-blueprint-card__preview-statuses[hidden],
+					.cattail-world-editor-blueprint-card__costs[hidden] {
+						display: none;
+					}
+					.cattail-world-editor-blueprint-card__preview-warning {
+						margin-top: 6px;
+						padding: 6px 7px;
+						border-left: 3px solid #9b6cff;
+						background: color-mix(in srgb, rgba(155, 108, 255, .10) var(--world-editor-card-shell-percent), transparent);
+						color: var(--blueprint-card-text);
+						font-size: 10px;
+					}
+					.cattail-world-editor-blueprint-card__preview-statuses {
+						display: grid;
+						grid-template-columns: repeat(2, minmax(0, 1fr));
+						gap: 4px 10px;
+						margin-top: 8px;
+					}
+					.cattail-world-editor-blueprint-card__preview-status {
+						display: grid;
+						grid-template-columns: 15px minmax(0, 1fr) auto;
+						align-items: center;
+						gap: 4px;
+						min-width: 0;
+						font-size: 10px;
+					}
+					.cattail-world-editor-blueprint-card__preview-status[hidden] {
+						display: none;
+					}
+					.cattail-world-editor-blueprint-card__preview-status strong {
+						font-weight: 400;
+					}
+					.cattail-world-editor-blueprint-card__preview-symbol {
+						font-size: 13px;
+						font-weight: 700;
+						text-align: center;
+					}
+					.cattail-world-editor-blueprint-card__preview-status[data-status="buildable"] .cattail-world-editor-blueprint-card__preview-symbol { color: #09a943; }
+					.cattail-world-editor-blueprint-card__preview-status[data-status="satisfied"] .cattail-world-editor-blueprint-card__preview-symbol { color: #bd8c00; }
+					.cattail-world-editor-blueprint-card__preview-status[data-status="conflict"] .cattail-world-editor-blueprint-card__preview-symbol { color: #d63d3d; }
+					.cattail-world-editor-blueprint-card__preview-status[data-status="blocked"] .cattail-world-editor-blueprint-card__preview-symbol { color: #8554e8; }
+					.cattail-world-editor-blueprint-card__preview-status[data-status="cross-boundary"] .cattail-world-editor-blueprint-card__preview-symbol { color: #889; }
 					.cattail-world-editor-blueprint-card__transform {
 						display: flex;
 						align-items: center;
@@ -1746,6 +2569,7 @@ ModLoader.register({
 						color: var(--blueprint-card-text);
 					}
 					.cattail-world-editor-blueprint-card__section {
+						position: relative;
 						margin-top: 8px;
 					}
 					.cattail-world-editor-blueprint-card__section[hidden] {
@@ -1757,12 +2581,136 @@ ModLoader.register({
 						font-size: 10px;
 						font-weight: 700;
 					}
+					.cattail-world-editor-blueprint-card__section-toggle {
+						display: flex;
+						width: 100%;
+						align-items: center;
+						justify-content: space-between;
+						box-sizing: border-box;
+						margin: 0 0 4px;
+						padding: 2px 1px;
+						border: 0;
+						background: transparent;
+						color: var(--blueprint-card-muted);
+						font: 700 10px/1.35 Montserrat, Arial, sans-serif;
+						text-align: left;
+						cursor: pointer;
+					}
+					.cattail-world-editor-blueprint-card__section-toggle:focus-visible {
+						outline: 2px solid var(--blueprint-card-accent);
+						outline-offset: 2px;
+					}
+					.cattail-world-editor-blueprint-card__section-chevron {
+						position: relative;
+						width: 12px;
+						height: 12px;
+						flex: 0 0 12px;
+						transform: rotate(0deg);
+						transition: transform .16s ease-out;
+					}
+					.cattail-world-editor-blueprint-card__section-chevron::before,
+					.cattail-world-editor-blueprint-card__section-chevron::after {
+						content: "";
+						position: absolute;
+						top: 6px;
+						width: 7px;
+						height: 1px;
+						background: currentColor;
+					}
+					.cattail-world-editor-blueprint-card__section-chevron::before {
+						left: 0;
+						transform: rotate(38deg);
+					}
+					.cattail-world-editor-blueprint-card__section-chevron::after {
+						right: 0;
+						transform: rotate(-38deg);
+					}
+					.cattail-world-editor-blueprint-card__section[data-expanded="false"] .cattail-world-editor-blueprint-card__section-chevron {
+						transform: rotate(-90deg);
+					}
+					.cattail-world-editor-blueprint-card__section-body {
+						max-height: var(--blueprint-section-max-height, 35vh);
+						overflow: hidden;
+						opacity: 1;
+						transition: max-height .16s ease-out, opacity .16s ease-out;
+					}
+					.cattail-world-editor-blueprint-card__section[data-expanded="false"] .cattail-world-editor-blueprint-card__section-body {
+						max-height: 0;
+						opacity: 0;
+						pointer-events: none;
+					}
+					.cattail-world-editor-blueprint-card__section-body[data-resizing="true"] {
+						transition: none;
+					}
+					.cattail-world-editor-blueprint-card__section-body[data-sized="true"] > .cattail-world-editor-blueprint-card__types,
+					.cattail-world-editor-blueprint-card__section-body[data-sized="true"] > .cattail-world-editor-blueprint-card__resources {
+						height: 100%;
+						max-height: none;
+						box-sizing: border-box;
+					}
+					.cattail-world-editor-blueprint-card__section-resize {
+						position: absolute;
+						z-index: 2;
+						left: 0;
+						right: 0;
+						height: 10px;
+						opacity: 0;
+						pointer-events: none;
+						cursor: ns-resize;
+						transition: opacity .12s ease;
+					}
+					.cattail-world-editor-blueprint-card__section-resize::after {
+						content: "";
+						position: absolute;
+						left: 18%;
+						right: 18%;
+						top: 4px;
+						height: 1px;
+						background: var(--blueprint-card-accent);
+					}
+					.cattail-world-editor-blueprint-card__section-resize--top {
+						top: -5px;
+					}
+					.cattail-world-editor-blueprint-card__section-resize--bottom {
+						bottom: -5px;
+					}
+					.cattail-world-editor-blueprint-card__section[data-resizable="true"] .cattail-world-editor-blueprint-card__section-resize {
+						pointer-events: auto;
+					}
+					.cattail-world-editor-blueprint-card__section[data-resizable="true"] .cattail-world-editor-blueprint-card__section-resize:hover,
+					.cattail-world-editor-blueprint-card__section-resize[data-active="true"] {
+						opacity: .72;
+					}
+					.cattail-world-editor-blueprint-card[data-section-resizing="true"] {
+						user-select: none;
+						cursor: ns-resize;
+					}
 					.cattail-world-editor-blueprint-card__types {
-						max-height: 240px;
+						max-height: min(200px, 30vh);
 						overflow-x: hidden;
 						overflow-y: auto;
 						overscroll-behavior: contain;
+						padding-right: 5px;
+						scrollbar-gutter: stable;
 						scrollbar-width: thin;
+						scrollbar-color: rgba(185,185,185,.48) transparent;
+					}
+					.cattail-world-editor-blueprint-card__types::-webkit-scrollbar,
+					.cattail-world-editor-blueprint-card__resources::-webkit-scrollbar {
+						width: 4px;
+					}
+					.cattail-world-editor-blueprint-card__types::-webkit-scrollbar-track,
+					.cattail-world-editor-blueprint-card__resources::-webkit-scrollbar-track {
+						background: transparent;
+					}
+					.cattail-world-editor-blueprint-card__types::-webkit-scrollbar-thumb,
+					.cattail-world-editor-blueprint-card__resources::-webkit-scrollbar-thumb {
+						border-radius: 999px;
+						background: rgba(185,185,185,.48);
+					}
+					.cattail-world-editor-blueprint-card__types::-webkit-scrollbar-thumb:hover,
+					.cattail-world-editor-blueprint-card__resources::-webkit-scrollbar-thumb:hover {
+						background: rgba(210,210,210,.62);
 					}
 					.cattail-world-editor-blueprint-card__type {
 						display: grid;
@@ -1796,10 +2744,92 @@ ModLoader.register({
 						font-size: 11px;
 						font-weight: 600;
 					}
+					.cattail-world-editor-blueprint-card__type-content {
+						display: flex;
+						min-width: 0;
+						flex-direction: column;
+						gap: 2px;
+					}
+					.cattail-world-editor-blueprint-card__type-detail {
+						color: var(--blueprint-card-muted);
+						font-size: 9px;
+						font-weight: 600;
+					}
+					.cattail-world-editor-blueprint-card__type-resources {
+						display: flex;
+						align-items: center;
+						flex-wrap: wrap;
+						gap: 3px 7px;
+					}
+					.cattail-world-editor-blueprint-card__type-resource {
+						display: inline-flex;
+						align-items: center;
+						gap: 2px;
+						color: var(--blueprint-card-muted);
+						font-size: 9px;
+						font-variant-numeric: tabular-nums;
+						font-weight: 400;
+					}
 					.cattail-world-editor-blueprint-card__type-count {
 						color: var(--blueprint-card-muted);
 						font-variant-numeric: tabular-nums;
 						font-weight: 700;
+					}
+					.cattail-world-editor-blueprint-card__resources {
+						display: grid;
+						gap: 4px;
+						max-height: min(132px, 22vh);
+						overflow-x: hidden;
+						overflow-y: auto;
+						overscroll-behavior: contain;
+						padding-right: 5px;
+						scrollbar-gutter: stable;
+						scrollbar-width: thin;
+						scrollbar-color: rgba(185,185,185,.48) transparent;
+					}
+					.cattail-world-editor-blueprint-card__resource {
+						display: grid;
+						grid-template-columns: 20px minmax(74px, auto) minmax(0, 1fr);
+						align-items: center;
+						gap: 5px;
+						min-width: 0;
+						font-size: 10px;
+					}
+					.cattail-world-editor-blueprint-card__resource[data-shortfall="true"] {
+						color: #cf3838;
+					}
+					.cattail-world-editor-blueprint-card__resource-icon {
+						display: block;
+						object-fit: contain;
+					}
+					.cattail-world-editor-blueprint-card__type-resource .cattail-world-editor-blueprint-card__resource-icon {
+						width: 12px;
+						height: 14px;
+					}
+					.cattail-world-editor-blueprint-card__resource-fallback {
+						display: block;
+						width: 10px;
+						height: 10px;
+						border: 1px solid rgba(20, 26, 32, .35);
+						border-radius: 2px;
+					}
+					.cattail-world-editor-blueprint-card__resource-name {
+						overflow: hidden;
+						font-weight: 600;
+						text-overflow: ellipsis;
+						white-space: nowrap;
+					}
+					.cattail-world-editor-blueprint-card__resource-values {
+						min-width: 0;
+						color: var(--blueprint-card-muted);
+						text-align: right;
+						overflow-wrap: anywhere;
+						font-variant-numeric: tabular-nums;
+						font-weight: 400;
+					}
+					.cattail-world-editor-blueprint-card__empty {
+						color: var(--blueprint-card-muted);
+						font-size: 10px;
 					}
 					.cattail-world-editor-blueprint-card__hint {
 						margin-top: 7px;
@@ -1814,10 +2844,28 @@ ModLoader.register({
 						}
 						.cattail-world-editor-blueprint-controls {
 							order: 3;
+							justify-content: center;
 						}
 						.cattail-world-editor-blueprint-mode {
 							min-width: 48px;
 							padding-inline: 6px;
+						}
+					}
+					@media (max-width: 520px) {
+						.cattail-world-editor-blueprint-card__header {
+							grid-template-columns: minmax(0, 1fr) 24px;
+						}
+						.cattail-world-editor-blueprint-card__header-primary {
+							grid-column: 1;
+							grid-row: 1;
+						}
+						.cattail-world-editor-blueprint-card__source {
+							grid-column: 1;
+							grid-row: 2;
+						}
+						.cattail-world-editor-blueprint-card__clear {
+							grid-column: 2;
+							grid-row: 1 / span 2;
 						}
 					}
 				`
@@ -2266,11 +3314,39 @@ ModLoader.register({
 
 			function projectAnchorBounds(projectGame, anchor) {
 				if (!projectGame?.canvas || typeof projectGame.uvToXY !== 'function' || !normalizePosition(anchor)) return null
-				const range = {
+				return projectWorldBounds(projectGame, {
 					minU: anchor[0],
 					maxU: anchor[0],
 					minV: anchor[1],
 					maxV: anchor[1]
+				})
+			}
+
+			function previewWorldBounds(state) {
+				const target = normalizePosition(state?.target)
+				const planTarget = normalizePosition(state?.plan?.target)
+				const bounds = state?.plan?.bounds
+				if (bounds && target && planTarget) {
+					const du = target[0] - planTarget[0]
+					const dv = target[1] - planTarget[1]
+					return {
+						minU: finiteOr(bounds.minU, target[0]) + du,
+						maxU: finiteOr(bounds.maxU, target[0]) + du,
+						minV: finiteOr(bounds.minV, target[1]) + dv,
+						maxV: finiteOr(bounds.maxV, target[1]) + dv
+					}
+				}
+				return target ? { minU: target[0], maxU: target[0], minV: target[1], maxV: target[1] } : null
+			}
+
+			function projectWorldBounds(projectGame, range) {
+				if (
+					!projectGame?.canvas ||
+					typeof projectGame.uvToXY !== 'function' ||
+					!range ||
+					![range.minU, range.maxU, range.minV, range.maxV].every(Number.isFinite)
+				) {
+					return null
 				}
 				const corners = [
 					[range.minU - .5, range.minV - .5],
@@ -2326,6 +3402,66 @@ ModLoader.register({
 					left.top + left.height + gap <= right.top ||
 					right.top + right.height + gap <= left.top
 				)
+			}
+
+			function chooseCardCandidate(candidates, options) {
+				const settings = options || {}
+				const fitting = candidates.filter(function (candidate) {
+					return cardCandidateFits(candidate, settings)
+				})
+				const clear = fitting.find(function (candidate) {
+					return !settings.selectionRect || !rectanglesOverlap(candidate, settings.selectionRect, 8)
+				})
+				if (clear) return clear
+				if (fitting.length) return fitting[0]
+				const normalized = candidates.map(function (candidate) {
+					return {
+						left: clamp(
+							candidate.left,
+							settings.margin,
+							Math.max(settings.margin, settings.viewportWidth - settings.margin - candidate.width)
+						),
+						top: clamp(
+							candidate.top,
+							settings.margin,
+							Math.max(settings.margin, settings.viewportHeight - settings.margin - candidate.height)
+						),
+						width: candidate.width,
+						height: candidate.height,
+						placement: candidate.placement
+					}
+				})
+				return normalized.reduce(function (best, candidate, index) {
+					const score = (
+						rectangleOverlapArea(candidate, settings.previewRect) * 4 +
+						rectangleOverlapArea(candidate, settings.selectionRect) * 2 +
+						index / 1000
+					)
+					return !best || score < best.score ? { candidate, score } : best
+				}, null).candidate
+			}
+
+			function cardCandidateFits(candidate, options) {
+				return !!(
+					candidate &&
+					candidate.left >= options.margin &&
+					candidate.top >= options.margin &&
+					candidate.left + candidate.width <= options.viewportWidth - options.margin &&
+					candidate.top + candidate.height <= options.viewportHeight - options.margin
+				)
+			}
+
+			function rectangleOverlapArea(left, right) {
+				if (!left || !right) return 0
+				const width = Math.max(
+					0,
+					Math.min(left.left + left.width, right.left + right.width) - Math.max(left.left, right.left)
+				)
+				const height = Math.max(
+					0,
+					Math.min(left.top + left.height, right.top + right.height) - Math.max(left.top, right.top)
+				)
+				return width * height
 			}
 
 			function canMountUi() {

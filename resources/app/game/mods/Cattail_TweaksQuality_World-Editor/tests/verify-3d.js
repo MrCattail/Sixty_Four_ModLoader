@@ -9,6 +9,9 @@ const TRANSFORM_SOURCE = 'scripts/core/blueprint-transform.js'
 const PLAN_SOURCE = 'scripts/core/blueprint-preview-plan.js'
 const PREVIEW_SOURCE = 'scripts/blueprint-preview.js'
 const SESSION_SOURCE = 'scripts/blueprint-session.js'
+const CARD_OPACITY_SOURCE = 'scripts/ui/card-opacity.js'
+const SELECTION_CARD_SOURCE = 'scripts/ui/selection-card.js'
+const SHELL_SOURCE = 'scripts/ui/editor-shell.js'
 const I18N_SOURCE = 'scripts/i18n/editor-text.js'
 const VERIFY_3B_SOURCE = 'tests/verify-3b.js'
 const TRANSFORM_KEY = Symbol.for('cattail.world-editor.blueprint-transform')
@@ -61,6 +64,7 @@ function loadPreviewHarness() {
 	const instrumented = source.slice(0, runIndex) + `
 module.exports = {
 	blueprint,
+	createMiniDocument,
 	createRuntimeEnvironment,
 	flushMicrotasks,
 	inputEvent,
@@ -434,7 +438,7 @@ async function testCameraTranslationCache() {
 	assert.equal(env.runFrame(), true)
 	assert.equal(layerRectReads, 1)
 	assert.equal(env.context.canvas.style.filter, '')
-	assert.equal(env.context.canvas.style.opacity, '')
+	assert.equal(env.context.canvas.style.opacity, '1')
 	assert.equal(env.context.canvas.style.transition, 'opacity 80ms linear')
 	assert.equal(env.context.canvas.style.willChange, 'transform')
 	assert.equal(env.window.listenerCount('resize'), 1)
@@ -465,7 +469,7 @@ async function testCameraTranslationCache() {
 	assert.equal(env.getLayer().dirtyMarks, dirtyBeforePan)
 	assert.equal(env.context.canvas.style.transform, 'translate3d(96px, -48px, 0)')
 	assert.equal(env.context.canvas.style.filter, '')
-	assert.equal(env.context.canvas.style.opacity, '')
+	assert.equal(env.context.canvas.style.opacity, '1')
 	assert.equal(env.context.canvas.style.transition, 'opacity 80ms linear')
 	assert.equal(env.context.canvas.style.willChange, 'transform')
 	assert.equal(layerRectReads, 1)
@@ -571,7 +575,7 @@ async function testIntegrityMetrics() {
 	assert.notEqual(current.plan, planBeforeResources)
 	assert.equal(current.plan.records, planBeforeResources.records)
 	assert.deepEqual(plain(current.plan.guard.resources), [1005, 1000])
-	assert.deepEqual(plain(current.plan.cost.safe.owned), [1005, 1000])
+	assert.deepEqual(plain(current.plan.cost.owned), [1005, 1000])
 	assert.equal(env.runFrame(), false)
 
 	const guardedPosition = current.plan.guard.cells[0].position
@@ -595,11 +599,332 @@ async function testIntegrityMetrics() {
 	env.runtime.runCleanups()
 }
 
+async function testRotationTransitionOverlay() {
+	const harness = loadPreviewHarness()
+	const document = harness.createMiniDocument()
+	let copiedFrames = 0
+	let animationRecord = null
+	const createElement = document.createElement
+	document.createElement = function (tagName) {
+		const element = createElement(tagName)
+		if (String(tagName).toLowerCase() === 'canvas') {
+			element.getContext = function () {
+				return {
+					drawImage() {
+						copiedFrames += 1
+					}
+				}
+			}
+			element.animate = function (keyframes, options) {
+				animationRecord = { keyframes, options, cancelled: false }
+				return {
+					cancel() {
+						animationRecord.cancelled = true
+					}
+				}
+			}
+		}
+		return element
+	}
+	let transformState = {
+		source: null,
+		blueprint: null,
+		sourceRevision: 0,
+		revision: 0,
+		rotation: 0,
+		quarterTurns: 0,
+		pivot: [0, 0],
+		lastCommand: 'initial'
+	}
+	const transformListeners = new Set()
+	const transform = {
+		snapshot() {
+			return transformState
+		},
+		subscribe(listener) {
+			transformListeners.add(listener)
+			listener(transformState)
+			return function () {
+				transformListeners.delete(listener)
+			}
+		},
+		set(next) {
+			transformState = next
+			for (const listener of Array.from(transformListeners)) listener(transformState)
+		}
+	}
+	const env = harness.createRuntimeEnvironment({ document, transform })
+	const source = harness.blueprint([harness.record(1, 'silo', [0, 0])], { schemaVersion: 2 })
+	env.session.set({
+		attemptId: 1,
+		blueprint: source,
+		lastResult: { attemptId: 1, status: 'captured' }
+	})
+	transform.set({
+		source,
+		blueprint: source,
+		sourceRevision: 1,
+		revision: 1,
+		rotation: 0,
+		quarterTurns: 0,
+		pivot: [0, 0],
+		lastCommand: 'bind'
+	})
+	await harness.flushMicrotasks()
+	assert.equal(env.runFrame(), true)
+	assert.equal(env.controller.setPinned(true, 'rotation-transition-test'), true)
+
+	const rotated = harness.blueprint([harness.record(1, 'silo', [0, 0])], { schemaVersion: 2 })
+	transform.set({
+		source,
+		blueprint: rotated,
+		sourceRevision: 1,
+		revision: 2,
+		rotation: 90,
+		quarterTurns: 1,
+		pivot: [0, 0],
+		lastCommand: 'rotate-clockwise'
+	})
+	const overlayId = 'cattail-world-editor-blueprint-rotation-transition'
+	let overlay = document.getElementById(overlayId)
+	assert.ok(overlay)
+	assert.equal(copiedFrames, 1)
+	assert.equal(overlay.style.zIndex, '40')
+	assert.equal(overlay.style.opacity, '1')
+	assert.equal(overlay.dataset.targetTransform, 'matrix(0, 0.5, -2, 0, 0, 0)')
+
+	await harness.flushMicrotasks()
+	assert.equal(env.runFrame(), true)
+	env.advanceTime(0)
+	overlay = document.getElementById(overlayId)
+	assert.ok(overlay)
+	assert.ok(animationRecord)
+	assert.equal(animationRecord.options.duration, 160)
+	assert.equal(animationRecord.options.easing, 'linear')
+	assert.equal(animationRecord.options.fill, 'forwards')
+	assert.equal(animationRecord.keyframes.length, 9)
+	assert.equal(animationRecord.keyframes[0].transform, 'matrix(1, 0, 0, 1, 0, 0)')
+	assert.equal(animationRecord.keyframes[4].transform, 'matrix(0.707, 0.354, -1.414, 0.707, 0, 0)')
+	assert.equal(animationRecord.keyframes[8].transform, 'matrix(0, 0.5, -2, 0, 0, 0)')
+	assert.equal(animationRecord.keyframes[8].opacity, '0')
+	env.advanceTime(200)
+	assert.equal(document.getElementById(overlayId), null)
+	assert.equal(animationRecord.cancelled, true)
+
+	env.runtime.runCleanups()
+}
+
+async function testTransformGuideLayerIsolation() {
+	const harness = loadPreviewHarness()
+	const env = harness.createRuntimeEnvironment()
+	const source = harness.blueprint([harness.record(1, 'silo', [0, 0])], { schemaVersion: 2 })
+	env.session.set({
+		attemptId: 1,
+		blueprint: source,
+		lastResult: { attemptId: 1, status: 'captured' }
+	})
+	await harness.flushMicrotasks()
+	assert.equal(env.runFrame(), true)
+	const previewRedraws = env.controller.snapshot().performance.layerRedraws
+	const renderCalls = env.game.renderCalls
+	const previewDirtyMarks = env.getLayer().dirtyMarks
+	const guide = env.getLayer('world-editor-blueprint-transform-guide')
+	assert.equal(env.controller.setTransformGuide('mirror-u', 'guide-test'), true)
+	assert.equal(env.controller.snapshot().guideAction, 'mirror-u')
+	assert.equal(guide.dirty, true)
+	assert.equal(env.getLayer().dirtyMarks, previewDirtyMarks)
+	assert.equal(env.runFrame(), true)
+	assert.equal(env.game.renderCalls, renderCalls)
+	assert.equal(env.controller.snapshot().performance.layerRedraws, previewRedraws)
+	env.advanceTime(0)
+	assert.equal(env.context.canvas.style.opacity, '1')
+	assert.equal(env.controller.setTransformGuide(null, 'guide-test-hide'), true)
+	assert.equal(env.context.canvas.style.opacity, '0')
+	assert.equal(guide.dirty, true)
+	env.runtime.runCleanups()
+}
+
+function testCardOpacityController() {
+	const listeners = new Map()
+	const window = {
+		addEventListener(type, listener) {
+			if (!listeners.has(type)) listeners.set(type, new Set())
+			listeners.get(type).add(listener)
+		},
+		removeEventListener(type, listener) {
+			listeners.get(type)?.delete(listener)
+		},
+		dispatch(type, event) {
+			for (const listener of Array.from(listeners.get(type) || [])) listener(event)
+		}
+	}
+	const elements = new Map()
+	const document = {
+		head: {
+			append(element) {
+				if (element.id) elements.set(element.id, element)
+				element.isConnected = true
+			}
+		},
+		getElementById(id) {
+			return elements.get(id) || null
+		},
+		createElement() {
+			return { id: '', textContent: '', isConnected: false }
+		}
+	}
+	const sandbox = {
+		console,
+		document,
+		window,
+		ModLoader: {
+			register(definition) {
+				definition.init()
+			}
+		}
+	}
+	sandbox.globalThis = sandbox
+	vm.createContext(sandbox)
+	vm.runInContext(
+		fs.readFileSync(path.join(MOD_ROOT, CARD_OPACITY_SOURCE), 'utf8'),
+		sandbox,
+		{ filename: CARD_OPACITY_SOURCE }
+	)
+	const controller = vm.runInContext(
+		"globalThis[Symbol.for('cattail.world-editor.card-opacity')]",
+		sandbox
+	)
+	assert.ok(controller)
+	assert.equal(controller.min, .25)
+	assert.equal(controller.max, 1)
+	assert.equal(controller.step, .1)
+
+	function card(id, left, right) {
+		const style = {
+			setProperty(name, value) {
+				this[name] = String(value)
+			},
+			removeProperty(name) {
+				delete this[name]
+			}
+		}
+		return {
+			id,
+			isConnected: true,
+			dataset: { visible: 'true', positionVisible: 'true' },
+			style,
+			getAttribute(name) {
+				return name === 'aria-hidden' ? 'false' : null
+			},
+			getBoundingClientRect() {
+				return { left, right, top: 0, bottom: 100, width: right - left, height: 100 }
+			}
+		}
+	}
+
+	function hint() {
+		return {
+			dataset: {},
+			attributes: {},
+			setAttribute(name, value) {
+				this.attributes[name] = String(value)
+			}
+		}
+	}
+
+	function event(overrides) {
+		return Object.assign({
+			clientX: 75,
+			clientY: 50,
+			defaultPrevented: false,
+			propagationStopped: false,
+			immediatePropagationStopped: false,
+			preventDefault() {
+				this.defaultPrevented = true
+			},
+			stopPropagation() {
+				this.propagationStopped = true
+			},
+			stopImmediatePropagation() {
+				this.immediatePropagationStopped = true
+			}
+		}, overrides)
+	}
+
+	const selection = card('selection', 0, 100)
+	const blueprint = card('blueprint', 50, 150)
+	const selectionHint = hint()
+	const blueprintHint = hint()
+	const selectionControls = controller.register({
+		id: 'selection',
+		element: selection,
+		hint: selectionHint,
+		priority: 47,
+		getText(state) {
+			return {
+				instruction: 'adjust',
+				mode: state.contentIndependent ? 'visible' : 'linked'
+			}
+		}
+	})
+	const blueprintControls = controller.register({
+		id: 'blueprint',
+		element: blueprint,
+		hint: blueprintHint,
+		priority: 48,
+		getText(state) {
+			return {
+				instruction: 'adjust',
+				mode: state.contentIndependent ? 'visible' : 'linked'
+			}
+		}
+	})
+
+	window.dispatch('keydown', event({ key: 'z' }))
+	const firstWheel = event({ deltaY: 100 })
+	window.dispatch('wheel', firstWheel)
+	assert.equal(firstWheel.defaultPrevented, true)
+	assert.equal(blueprintControls.snapshot().opacity, .9)
+	assert.equal(selectionControls.snapshot().opacity, 1)
+
+	for (let index = 0; index < 10; index++) window.dispatch('wheel', event({ deltaY: 100 }))
+	assert.equal(blueprintControls.snapshot().opacity, .25)
+	const middle = event({ button: 1 })
+	window.dispatch('mousedown', middle)
+	assert.equal(middle.defaultPrevented, true)
+	assert.equal(blueprintControls.snapshot().contentIndependent, true)
+	assert.equal(blueprint.style['--world-editor-card-shell-opacity'], '0')
+	assert.equal(blueprint.style['--world-editor-card-shell-percent'], '0%')
+	assert.equal(blueprint.style['--world-editor-card-shell-blur-14'], '0px')
+	assert.equal(blueprint.style['--world-editor-card-shell-saturate'], '1')
+	assert.equal(blueprintHint.dataset.contentIndependent, 'true')
+	assert.match(blueprintHint.attributes['aria-label'], /adjust visible/)
+	window.dispatch('auxclick', event({ button: 1 }))
+	assert.equal(blueprintControls.snapshot().contentIndependent, true)
+
+	window.dispatch('mousedown', event({ button: 1, clientX: 25 }))
+	assert.equal(selectionControls.snapshot().contentIndependent, true)
+	assert.equal(blueprintControls.snapshot().contentIndependent, true)
+	window.dispatch('keyup', event({ key: 'z' }))
+	const releasedWheel = event({ deltaY: -100, clientX: 25 })
+	window.dispatch('wheel', releasedWheel)
+	assert.equal(releasedWheel.defaultPrevented, false)
+	assert.equal(selectionControls.snapshot().opacity, 1)
+
+	selectionControls.release()
+	blueprintControls.release()
+	assert.equal(controller.snapshot().length, 0)
+	controller.dispose()
+}
+
 function testLocalizationAndIntegrationContract() {
 	const transformSource = fs.readFileSync(path.join(MOD_ROOT, TRANSFORM_SOURCE), 'utf8')
 	const planSource = fs.readFileSync(path.join(MOD_ROOT, PLAN_SOURCE), 'utf8')
 	const previewSource = fs.readFileSync(path.join(MOD_ROOT, PREVIEW_SOURCE), 'utf8')
 	const sessionSource = fs.readFileSync(path.join(MOD_ROOT, SESSION_SOURCE), 'utf8')
+	const cardOpacitySource = fs.readFileSync(path.join(MOD_ROOT, CARD_OPACITY_SOURCE), 'utf8')
+	const selectionCardSource = fs.readFileSync(path.join(MOD_ROOT, SELECTION_CARD_SOURCE), 'utf8')
+	const shellSource = fs.readFileSync(path.join(MOD_ROOT, SHELL_SOURCE), 'utf8')
 	const readme = fs.readFileSync(path.join(MOD_ROOT, 'README.md'), 'utf8')
 	const manifest = JSON.parse(fs.readFileSync(path.join(MOD_ROOT, 'mod.json'), 'utf8'))
 	const i18n = loadI18n()
@@ -610,11 +935,16 @@ function testLocalizationAndIntegrationContract() {
 		'blueprintMirrorV',
 		'blueprintResetTransform',
 		'blueprintTransformState',
-		'blueprintTransformNone'
+		'blueprintTransformNone',
+		'blueprintCollapseSection',
+		'blueprintExpandSection',
+		'cardOpacityControls',
+		'cardOpacityContentLinked',
+		'cardOpacityContentIndependent'
 	]
 
 	assert.equal(i18n.languages.length, 20)
-	assert.equal(i18n.keys.length, 77)
+	assert.equal(i18n.keys.length, 82)
 	for (const language of i18n.languages) {
 		for (const key of transformKeys) {
 			const translated = i18n.t(language, key)
@@ -623,9 +953,13 @@ function testLocalizationAndIntegrationContract() {
 		}
 	}
 
-	assert.equal(manifest.version, '0.3.3')
+	assert.equal(manifest.version, '0.3.4')
 	assert.equal(manifest.languageSupport.gameLanguage, true)
-	assert.equal(manifest.entry.length, 17)
+	assert.equal(manifest.entry.length, 18)
+	assert.equal(
+		manifest.entry.indexOf(CARD_OPACITY_SOURCE),
+		manifest.entry.indexOf(I18N_SOURCE) + 1
+	)
 	assert.equal(
 		manifest.entry.indexOf(TRANSFORM_SOURCE),
 		manifest.entry.indexOf('scripts/core/selection-analysis.js') + 1
@@ -664,8 +998,24 @@ function testLocalizationAndIntegrationContract() {
 	assert.match(previewSource, /finishCameraDrag\(\)/)
 	assert.doesNotMatch(previewSource, /projectedX,\s*projectedY/)
 	assert.match(previewSource, /transform\.subscribe\(function \(state\)/)
-	assert.match(previewSource, /if \(pinned\) scheduled = requestPlan/)
+	assert.match(previewSource, /if \(isTargetPinned\(\)\) scheduled = requestPlan/)
 	assert.match(previewSource, /else scheduled = scheduleFollowPlan/)
+	assert.match(previewSource, /ROTATION_TRANSITION_MS\s*=\s*160/)
+	assert.match(previewSource, /context\.drawImage\(renderLayerCanvas,\s*0,\s*0\)/)
+	assert.match(previewSource, /projectedRotationTransition\(previousState,\s*nextState,\s*rect\)/)
+	assert.match(previewSource, /rotationMatrixAt\(angle \* offset\)/)
+	assert.match(previewSource, /Math\.max\(8,\s*Math\.round\(Math\.abs\(angle\)/)
+	assert.match(previewSource, /rotationOverlayAnimation = overlay\.animate\(keyframes/)
+	assert.match(previewSource, /easing:\s*'linear'/)
+	assert.match(previewSource, /GUIDE_LAYER_ID\s*=\s*'world-editor-blueprint-transform-guide'/)
+	assert.match(previewSource, /GUIDE_TRANSITION_MS\s*=\s*100/)
+	assert.match(previewSource, /drawRotationGuide\(/)
+	assert.match(previewSource, /drawMirrorGuide\(/)
+	assert.match(previewSource, /setTransformGuide\(action,\s*reason\)/)
+	assert.match(previewSource, /window\.addEventListener\('keydown',\s*handleTemporaryPinKeydown,\s*true\)/)
+	assert.match(previewSource, /window\.addEventListener\('keyup',\s*handleTemporaryPinKeyup,\s*true\)/)
+	assert.match(previewSource, /releaseTemporaryPin\('window-blur',\s*false\)/)
+	assert.match(previewSource, /temporaryPinned,\s*\n\s*effectivePinned:\s*isTargetPinned\(\)/)
 	assert.match(previewSource, /code === 'KeyR'/)
 	assert.match(previewSource, /code === 'KeyM'/)
 	assert.match(previewSource, /event\?\.repeat/)
@@ -682,12 +1032,127 @@ function testLocalizationAndIntegrationContract() {
 	assert.match(sessionSource, /session\.setMode\('structure', reason \+ '-structure'\)/)
 	assert.match(sessionSource, /data-world-editor-transform-controls="card"/)
 	assert.match(sessionSource, /data-world-editor-transform-action/)
-	assert.match(sessionSource, /previewState\?\.active && !previewState\.pinned/)
+	assert.match(sessionSource, /previewState\?\.active && !previewState\.effectivePinned/)
 	assert.match(sessionSource, /data-input-pass-through="true"/)
 	assert.match(sessionSource, /font-family:\s*Montserrat/)
 	assert.match(sessionSource, /width:\s*30px/)
+	assert.ok((sessionSource.match(/transform:\s*rotate\(45deg\)/g) || []).length >= 2)
+	assert.match(sessionSource, /game\.resourcesSprites\?\.\[index\]/)
+	assert.match(sessionSource, /game\.makeReadable/)
+	assert.match(sessionSource, /::-webkit-scrollbar\s*\{[^}]*width:\s*4px/s)
+	assert.match(sessionSource, /previewTemporaryPinHint/)
+	assert.match(sessionSource, /previewBuildPlan/)
+	assert.match(sessionSource, /return !!ui\?\.pinned/)
+	assert.match(sessionSource, /function cardInteractionEnabled\(\)/)
+	assert.doesNotMatch(sessionSource, /previewController\.setPinned\(next,\s*previewState\.temporaryPinned/)
+	assert.match(sessionSource, /crossingSymbol\.textContent = '↔'/)
+	assert.match(sessionSource, /i18n\.t\(game,\s*'blueprintCrossBoundary'\)/)
+	assert.match(previewSource, /main:\s*'#889'/)
+	assert.match(previewSource, /direction === 'mirror-u' \? 'v' : 'u'/)
+	assert.doesNotMatch(previewSource, /extents\.minDirection - visual\.offset \/ 2/)
+	assert.doesNotMatch(previewSource, /extents\.maxDirection \+ visual\.offset \/ 2/)
+	assert.match(previewSource, /layerReady \? \(provisional \? PENDING_PREVIEW_OPACITY : '1'\) : ''/)
+	assert.match(shellSource, /UI_SCALE_BASE_WIDTH = 1600/)
+	assert.match(shellSource, /UI_SCALE_BASE_HEIGHT = 1000/)
+	assert.match(shellSource, /UI_SCALE_MIN = \.5/)
+	assert.match(shellSource, /Math\.min\(viewportWidth \/ UI_SCALE_BASE_WIDTH,\s*viewportHeight \/ UI_SCALE_BASE_HEIGHT\)/)
+	assert.match(shellSource, /function responsiveViewport\(game\)/)
+	assert.match(shellSource, /game\?\.canvas/)
+	assert.match(shellSource, /element\?\.getBoundingClientRect\?\.\(\)/)
+	assert.match(shellSource, /width:\s*Math\.min\(\.\.\.widths\)/)
+	assert.match(shellSource, /globalThis\.ResizeObserver/)
+	assert.match(shellSource, /observer\.observe\(target\)/)
+	assert.match(shellSource, /uiScaleObserver\?\.disconnect\?\.\(\)/)
+	assert.match(shellSource, /--world-editor-ui-scale/)
+	assert.match(sessionSource, /scale\(var\(--world-editor-ui-scale,\s*1\)\)/)
+	assert.doesNotMatch(sessionSource, /SECTION_LONG_PRESS_MS|SECTION_PREACTIVATION_PX/)
+	assert.match(sessionSource, /height:\s*10px/)
+	assert.match(sessionSource, /handle\.setPointerCapture\?\.\(resize\.pointerId\)/)
+	assert.match(sessionSource, /body\.offsetHeight/)
+	assert.match(sessionSource, /deltaY \* direction \/ resize\.scale/)
+	assert.doesNotMatch(sessionSource, /preactivation-move/)
+	const rightPlacement = sessionSource.indexOf("placement: 'right'")
+	const leftPlacement = sessionSource.indexOf("placement: 'left'", rightPlacement)
+	const belowPlacement = sessionSource.indexOf("placement: 'below'", leftPlacement)
+	const abovePlacement = sessionSource.indexOf("placement: 'above'", belowPlacement)
+	assert.ok(rightPlacement >= 0 && rightPlacement < leftPlacement)
+	assert.ok(leftPlacement < belowPlacement)
+	assert.ok(belowPlacement < abovePlacement)
+	assert.match(sessionSource, /const gap = 28/)
+	assert.match(sessionSource, /function chooseCardCandidate\(candidates,\s*options\)/)
+	assert.match(sessionSource, /function cardCandidateFits\(candidate,\s*options\)/)
+	assert.match(sessionSource, /candidate\.left \+ candidate\.width <= options\.viewportWidth - options\.margin/)
+	assert.match(sessionSource, /rectangleOverlapArea\(candidate,\s*settings\.previewRect\) \* 4/)
+	assert.match(sessionSource, /const previewTemporaryPinnedVisible = !!\([\s\S]*previewState\.temporaryPinned[\s\S]*\)/)
+	assert.match(sessionSource, /ui\.pinned \|\|[\s\S]*ui\.temporaryVisible \|\|[\s\S]*currentSession\.capturing \|\|[\s\S]*previewTemporaryPinnedVisible/)
+	assert.doesNotMatch(sessionSource, /previewPinnedVisible/)
+	assert.doesNotMatch(sessionSource, /currentSession\.capturing \|\| previewVisible/)
+	assert.match(sessionSource, /function syncTemporaryWindowFromPreview\(previousState,\s*state\)/)
+	assert.match(sessionSource, /if \(state\.temporaryPinned\) \{\s*pauseTemporaryTimer\(\)\s*return/)
+	assert.match(sessionSource, /const permanentPinned = !!state\.active && !previousState\?\.pinned && !!state\.pinned/)
+	assert.match(sessionSource, /const permanentReleased = !!state\.active && !!previousState\?\.pinned && !state\.pinned/)
+	assert.match(sessionSource, /const temporaryReleased = !!state\.active && !!previousState\?\.temporaryPinned/)
+	assert.match(sessionSource, /permanentPinned \|\|[\s\S]*permanentReleased \|\|[\s\S]*temporaryReleased \|\|/)
+	assert.match(sessionSource, /warningAppeared \|\|[\s\S]*fallbackChanged/)
+	assert.match(sessionSource, /previewSnapshot\(\)\?\.temporaryPinned/)
+	const temporarySyncStart = sessionSource.indexOf('function syncTemporaryWindowFromPreview(')
+	const temporarySyncEnd = sessionSource.indexOf('function resetCardDisplayState(', temporarySyncStart)
+	const temporarySyncContract = sessionSource.slice(temporarySyncStart, temporarySyncEnd)
+	assert.match(temporarySyncContract, /if \([\s\S]*permanentPinned \|\|[\s\S]*\) \{\s*restartTemporaryWindow\(\)/)
+	assert.doesNotMatch(temporarySyncContract, /if \(state\.pinned\) \{\s*pauseTemporaryTimer\(\)/)
+	const visibilityStart = sessionSource.indexOf('function refreshCardVisibility()')
+	const visibilityEnd = sessionSource.indexOf('function syncCardPassThrough()', visibilityStart)
+	const visibilityContract = sessionSource.slice(visibilityStart, visibilityEnd)
+	assert.doesNotMatch(visibilityContract, /effectivePinned/)
+	const timerStart = sessionSource.indexOf('function resumeTemporaryTimer()')
+	const timerEnd = sessionSource.indexOf('function setCardText(', timerStart)
+	const timerContract = sessionSource.slice(timerStart, timerEnd)
+	assert.doesNotMatch(timerContract, /effectivePinned/)
+	assert.match(sessionSource, /if \(!state\.active\) \{\s*resetCardDisplayState\('editor-inactive'\)/)
+	assert.match(sessionSource, /if \(exited\) \{\s*resetCardDisplayState\('preview-exited'\)\s*return/)
+	assert.match(sessionSource, /function resetCardDisplayState\(reason\)/)
+	const resetStart = sessionSource.indexOf('function resetCardDisplayState(reason)')
+	const resetEnd = sessionSource.indexOf('function clearTemporaryWindow()', resetStart)
+	const resetContract = sessionSource.slice(resetStart, resetEnd)
+	assert.match(resetContract, /cancelSectionResize\(reason \|\| 'card-display-reset',\s*true\)/)
+	assert.match(resetContract, /ui\.pinned = false/)
+	assert.match(resetContract, /ui\.temporaryVisible = false/)
+	assert.match(resetContract, /ui\.positionVisible = false/)
+	assert.match(resetContract, /ui\.card\.dataset\.visible = 'false'/)
+	assert.doesNotMatch(resetContract, /session\.clear/)
+	assert.match(sessionSource, /if \(!currentRuntime\.active\) \{\s*ui\.positionVisible = false\s*refreshCardVisibility\(\)\s*return/)
+	assert.match(sessionSource, /maxViewportRatio:\s*\.35/)
+	assert.match(sessionSource, /maxViewportRatio:\s*\.45/)
+	assert.match(sessionSource, /blueprintCollapseSection/)
+	assert.match(sessionSource, /blueprintExpandSection/)
+	assert.match(sessionSource, /crossing\.className = 'cattail-world-editor-blueprint-card__preview-status'/)
+	assert.match(sessionSource, /crossing\.dataset\.status = 'cross-boundary'/)
+	assert.match(sessionSource, /worldEditorBlueprintText = 'crossing-count'/)
+	assert.match(sessionSource, /font-weight:\s*400/)
+	assert.match(planSource, /function planningEntityAt\(game,\s*position\)/)
+	assert.match(planSource, /safeName\(entity\?\.name\)\s*===\s*'surge'\s*\?\s*null\s*:\s*entity/)
+	assert.doesNotMatch(planSource + '\n' + previewSource + '\n' + sessionSource, /cost\.overwrite|previewOverwritePlan|data-cost-mode/)
+	assert.match(cardOpacitySource, /OPACITY_MIN = \.25/)
+	assert.match(cardOpacitySource, /OPACITY_MAX = 1/)
+	assert.match(cardOpacitySource, /OPACITY_STEP = \.1/)
+	assert.match(cardOpacitySource, /window\.addEventListener\('wheel',\s*handleWheel,\s*\{\s*capture:\s*true,\s*passive:\s*false\s*\}\)/)
+	assert.match(cardOpacitySource, /event\?\.button !== 1/)
+	assert.match(cardOpacitySource, /cardContainsPoint\(state\.element,\s*x,\s*y\)/)
+	assert.doesNotMatch(cardOpacitySource, /localStorage|sessionStorage/)
+	assert.match(sessionSource, /CARD_OPACITY_KEY/)
+	assert.match(sessionSource, /id:\s*'blueprint',[\s\S]*priority:\s*48/)
+	assert.match(selectionCardSource, /id:\s*'selection',[\s\S]*priority:\s*47/)
+	assert.match(sessionSource, /--world-editor-card-opacity/)
+	assert.match(selectionCardSource, /--world-editor-card-opacity/)
+	assert.match(sessionSource, /color-mix\(in srgb/)
+	assert.match(selectionCardSource, /color-mix\(in srgb/)
+	assert.doesNotMatch(
+		sessionSource + '\n' + selectionCardSource,
+		/calc\([^)]*\*\s*var\(--world-editor-card-shell/
+	)
 	assert.match(readme, /3D/)
 	assert.equal(fs.existsSync(path.join(MOD_ROOT, 'assets', 'icons', '.gitkeep')), true)
+	assert.equal(fs.existsSync(path.join(MOD_ROOT, 'assets', 'icons', 'z-opacity-hint.svg')), true)
 
 	const implementation = transformSource + '\n' + planSource + '\n' + previewSource + '\n' + sessionSource
 	assert.doesNotMatch(implementation, /\bgame\.(?:addEntity|clearCell|deleteEntity|removeEntity|placeEntity)\b/)
@@ -702,6 +1167,9 @@ async function run() {
 	testCommandScaleAndSingleNotification()
 	await testCameraTranslationCache()
 	await testIntegrityMetrics()
+	await testRotationTransitionOverlay()
+	await testTransformGuideLayerIsolation()
+	testCardOpacityController()
 	testLocalizationAndIntegrationContract()
 	console.log('3D verification passed: fixed pivot, ordered D4 normalization, exact restoration, 256-entity command scaling, cached camera translation and compositor geometry, pinned integrity timing with resource-only refresh and structural invalidation, immutable projection, 20-language UI, hidden noncreative controls, hotkeys, card pass-through, and manifest integration.')
 }

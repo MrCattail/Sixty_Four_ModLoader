@@ -578,9 +578,9 @@ function testUnifiedToolbarAndLocalization() {
 	const selectButton = shell.querySelector('[data-world-editor-action="select"]')
 	const moveButton = shell.querySelector('[data-world-editor-action="move"]')
 	const resizeButton = shell.querySelector('[data-world-editor-action="resize"]')
-	assert.equal(i18n.version, '0.3.1')
+	assert.equal(i18n.version, '0.3.4')
 	assert.equal(i18n.languages.length, 20)
-	assert.equal(i18n.keys.length, 77)
+	assert.equal(i18n.keys.length, 82)
 	assert.equal(shell.getAttribute('role'), 'toolbar')
 	assert.equal(moveButton, null)
 	assert.equal(resizeButton, null)
@@ -613,7 +613,7 @@ function testUnifiedToolbarAndLocalization() {
 
 function testManifestAndReadOnlyBoundary() {
 	const manifest = JSON.parse(fs.readFileSync(path.join(MOD_ROOT, 'mod.json'), 'utf8'))
-	assert.equal(manifest.version, '0.3.3')
+	assert.equal(manifest.version, '0.3.4')
 	assert.equal(manifest.languageSupport.gameLanguage, true)
 	assert.deepEqual(manifest.entry, [
 		'scripts/core/foundation.js',
@@ -629,6 +629,7 @@ function testManifestAndReadOnlyBoundary() {
 		'scripts/render/hover-overlay.js',
 		'scripts/render/selected-overlay.js',
 		'scripts/i18n/editor-text.js',
+		'scripts/ui/card-opacity.js',
 		'scripts/ui/editor-shell.js',
 		'scripts/blueprint-session.js',
 		'scripts/blueprint-preview.js',

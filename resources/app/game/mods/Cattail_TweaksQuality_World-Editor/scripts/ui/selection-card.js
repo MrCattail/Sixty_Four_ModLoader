@@ -6,6 +6,7 @@ ModLoader.register({
 		const ANALYSIS_KEY = Symbol.for('cattail.world-editor.analysis')
 		const I18N_KEY = Symbol.for('cattail.world-editor.i18n')
 		const INTERACTION_KEY = Symbol.for('cattail.world-editor.selection-interaction')
+		const CARD_OPACITY_KEY = Symbol.for('cattail.world-editor.card-opacity')
 		const CARD_ID = 'cattail-world-editor-selection-card'
 		const STYLE_ID = 'cattail-world-editor-selection-card-style'
 		const TEMPORARY_VISIBLE_MS = 3000
@@ -62,6 +63,21 @@ ModLoader.register({
 			let temporaryDeadline = 0
 			let temporaryTimer = null
 			let pointerPaused = false
+			let opacityControls = globalThis[CARD_OPACITY_KEY]?.register?.({
+				id: 'selection',
+				element: card,
+				hint: card.querySelector('.cattail-world-editor-card-opacity-hint'),
+				priority: 47,
+				getText(state) {
+					return {
+						instruction: i18n.t(game, 'cardOpacityControls'),
+						mode: i18n.t(game, state.contentIndependent ? 'cardOpacityContentIndependent' : 'cardOpacityContentLinked')
+					}
+				},
+				onChange() {
+					refreshContent(game)
+				}
+			}) || null
 
 			const activeRange = function () {
 				const preview = currentSelection?.previewRange
@@ -154,6 +170,7 @@ ModLoader.register({
 
 			const refreshContent = function (languageGame) {
 				const source = languageGame || game
+				opacityControls?.refresh?.()
 				const range = activeRange()
 				const preview = isRange(currentSelection?.previewRange)
 				const moving = preview && currentSelection?.previewKind === 'move'
@@ -220,7 +237,11 @@ ModLoader.register({
 					i18n.t(source, 'labelSize') + ' ' + range.width + '×' + range.height,
 					i18n.t(source, 'labelTiles') + ' ' + range.width * range.height,
 					card.querySelector('[data-world-editor-text="analysis-status"]').textContent,
-					i18n.t(source, pinned ? 'cardUnpinAction' : 'cardPinAction')
+					i18n.t(source, pinned ? 'cardUnpinAction' : 'cardPinAction'),
+					i18n.t(source, 'cardOpacityControls'),
+					i18n.t(source, opacityControls?.snapshot?.().contentIndependent
+						? 'cardOpacityContentIndependent'
+						: 'cardOpacityContentLinked')
 				].filter(Boolean).join('. '))
 				refreshVisibility()
 			}
@@ -375,6 +396,8 @@ ModLoader.register({
 				if (typeof stopSelectionSubscription === 'function') stopSelectionSubscription()
 				if (typeof stopAnalysisSubscription === 'function') stopAnalysisSubscription()
 				if (typeof stopRenderFrame === 'function') stopRenderFrame()
+				opacityControls?.release?.()
+				opacityControls = null
 				if (typeof releaseHud === 'function') releaseHud()
 				card.remove()
 				if (style.isConnected && !document.getElementById(CARD_ID)) style.remove()
@@ -405,7 +428,13 @@ ModLoader.register({
 			header.className = 'cattail-world-editor-selection-card__header'
 			const title = textElement('span', 'cattail-world-editor-selection-card__title', 'title')
 			const coordinates = textElement('span', 'cattail-world-editor-selection-card__coordinates', 'coordinates')
-			header.append(title, coordinates)
+			const headerMeta = document.createElement('span')
+			headerMeta.className = 'cattail-world-editor-selection-card__header-meta'
+			const opacityHint = document.createElement('span')
+			opacityHint.className = 'cattail-world-editor-card-opacity-hint'
+			opacityHint.setAttribute('role', 'img')
+			headerMeta.append(coordinates, opacityHint)
+			header.append(title, headerMeta)
 
 			const metrics = document.createElement('div')
 			metrics.className = 'cattail-world-editor-selection-card__metrics'
@@ -449,29 +478,40 @@ ModLoader.register({
 			style.id = STYLE_ID
 			style.textContent = `
 				.cattail-world-editor-selection-card {
-					--world-editor-card-bg: rgba(248, 248, 246, .92);
+					--world-editor-card-opacity: 1;
+					--world-editor-card-shell-opacity: 1;
+					--world-editor-card-shell-percent: 100%;
+					--world-editor-card-shell-blur-12: 12px;
+					--world-editor-card-shell-saturate: 1.1;
+					--world-editor-card-bg: color-mix(in srgb, rgba(248, 248, 246, .92) var(--world-editor-card-shell-percent), transparent);
 					--world-editor-card-text: rgba(18, 20, 22, .94);
 					--world-editor-card-muted: rgba(18, 20, 22, .58);
-					--world-editor-card-border: rgba(92, 65, 132, .22);
-					--world-editor-card-accent: rgba(170, 137, 220, .92);
-					--world-editor-card-track: rgba(92, 65, 132, .12);
-					--world-editor-card-pin-start: rgba(227, 253, 67, .98);
-					--world-editor-card-pin-middle: rgba(166, 242, 70, .96);
-					--world-editor-card-pin-end: rgba(76, 185, 107, .98);
-					--world-editor-card-pin-glow-start: rgba(227, 253, 67, .58);
-					--world-editor-card-pin-glow-middle: rgba(166, 242, 70, .38);
-					--world-editor-card-pin-glow-end: rgba(76, 185, 107, .20);
+					--world-editor-card-border: color-mix(in srgb, rgba(92, 65, 132, .22) var(--world-editor-card-shell-percent), transparent);
+					--world-editor-card-accent: color-mix(in srgb, rgba(170, 137, 220, .92) var(--world-editor-card-shell-percent), transparent);
+					--world-editor-card-track: color-mix(in srgb, rgba(92, 65, 132, .12) var(--world-editor-card-shell-percent), transparent);
+					--world-editor-card-pin-start: color-mix(in srgb, rgba(227, 253, 67, .98) var(--world-editor-card-shell-percent), transparent);
+					--world-editor-card-pin-middle: color-mix(in srgb, rgba(166, 242, 70, .96) var(--world-editor-card-shell-percent), transparent);
+					--world-editor-card-pin-end: color-mix(in srgb, rgba(76, 185, 107, .98) var(--world-editor-card-shell-percent), transparent);
+					--world-editor-card-pin-glow-start: color-mix(in srgb, rgba(227, 253, 67, .58) var(--world-editor-card-shell-percent), transparent);
+					--world-editor-card-pin-glow-middle: color-mix(in srgb, rgba(166, 242, 70, .38) var(--world-editor-card-shell-percent), transparent);
+					--world-editor-card-pin-glow-end: color-mix(in srgb, rgba(76, 185, 107, .20) var(--world-editor-card-shell-percent), transparent);
 					position: fixed;
 					z-index: 47;
-					width: min(288px, calc(100vw - 20px));
+					width: min(clamp(230px, 28vw, 320px), calc(100vw - 20px));
+					max-height: min(68vh, calc(100vh - 20px));
 					box-sizing: border-box;
 					padding: 10px 11px 9px;
+					overflow-x: hidden;
+					overflow-y: auto;
+					overscroll-behavior: contain;
+					scrollbar-width: thin;
+					scrollbar-color: rgba(185,185,185,.48) transparent;
 					border: 1px solid var(--world-editor-card-border);
 					border-radius: 8px;
 					background: var(--world-editor-card-bg);
-					box-shadow: 0 10px 28px rgba(0, 0, 0, .18);
-					backdrop-filter: blur(12px) saturate(1.1);
-					-webkit-backdrop-filter: blur(12px) saturate(1.1);
+					box-shadow: 0 10px 28px color-mix(in srgb, rgba(0, 0, 0, .18) var(--world-editor-card-shell-percent), transparent);
+					backdrop-filter: blur(var(--world-editor-card-shell-blur-12)) saturate(var(--world-editor-card-shell-saturate));
+					-webkit-backdrop-filter: blur(var(--world-editor-card-shell-blur-12)) saturate(var(--world-editor-card-shell-saturate));
 					color: var(--world-editor-card-text);
 					font: 400 12px/1.35 Montserrat, Arial, sans-serif;
 					-webkit-font-smoothing: antialiased;
@@ -482,14 +522,24 @@ ModLoader.register({
 					cursor: pointer;
 					transition: opacity .12s ease, transform .12s ease, visibility 0s linear .12s, border-color .16s ease, box-shadow .16s ease;
 				}
+				.cattail-world-editor-selection-card::-webkit-scrollbar {
+					width: 4px;
+				}
+				.cattail-world-editor-selection-card::-webkit-scrollbar-track {
+					background: transparent;
+				}
+				.cattail-world-editor-selection-card::-webkit-scrollbar-thumb {
+					border-radius: 999px;
+					background: rgba(185,185,185,.48);
+				}
 				.cattail-world-editor-selection-card[data-theme="void"] {
-					--world-editor-card-bg: rgba(8, 10, 12, .92);
+					--world-editor-card-bg: color-mix(in srgb, rgba(8, 10, 12, .92) var(--world-editor-card-shell-percent), transparent);
 					--world-editor-card-text: rgba(255, 255, 255, .92);
 					--world-editor-card-muted: rgba(255, 255, 255, .62);
-					--world-editor-card-border: rgba(210, 188, 250, .24);
-					--world-editor-card-accent: rgba(211, 190, 250, .94);
-					--world-editor-card-track: rgba(211, 190, 250, .14);
-					box-shadow: 0 10px 28px rgba(0, 0, 0, .36);
+					--world-editor-card-border: color-mix(in srgb, rgba(210, 188, 250, .24) var(--world-editor-card-shell-percent), transparent);
+					--world-editor-card-accent: color-mix(in srgb, rgba(211, 190, 250, .94) var(--world-editor-card-shell-percent), transparent);
+					--world-editor-card-track: color-mix(in srgb, rgba(211, 190, 250, .14) var(--world-editor-card-shell-percent), transparent);
+					box-shadow: 0 10px 28px color-mix(in srgb, rgba(0, 0, 0, .36) var(--world-editor-card-shell-percent), transparent);
 				}
 				.cattail-world-editor-selection-card::before {
 					content: '';
@@ -507,23 +557,26 @@ ModLoader.register({
 				}
 				.cattail-world-editor-selection-card[data-visible="true"][data-position-visible="true"] {
 					visibility: visible;
-					opacity: 1;
+					opacity: var(--world-editor-card-opacity);
 					transform: translateX(-50%) translateY(0);
 					pointer-events: auto;
 					transition-delay: 0s;
+				}
+				.cattail-world-editor-selection-card[data-visible="true"][data-position-visible="true"][data-opacity-content-independent="true"] {
+					opacity: 1;
 				}
 				.cattail-world-editor-selection-card[data-visible="true"][data-position-visible="true"][data-input-pass-through="true"] {
 					pointer-events: none;
 				}
 				.cattail-world-editor-selection-card[data-pinned="true"] {
 					border-color: transparent;
-					box-shadow: 0 10px 28px rgba(0, 0, 0, .20), 0 0 10px var(--world-editor-card-pin-glow-start), 0 0 24px var(--world-editor-card-pin-glow-middle), 0 0 46px var(--world-editor-card-pin-glow-end);
+					box-shadow: 0 10px 28px color-mix(in srgb, rgba(0, 0, 0, .20) var(--world-editor-card-shell-percent), transparent), 0 0 10px var(--world-editor-card-pin-glow-start), 0 0 24px var(--world-editor-card-pin-glow-middle), 0 0 46px var(--world-editor-card-pin-glow-end);
 				}
 				.cattail-world-editor-selection-card[data-pinned="true"]::before {
 					opacity: 1;
 				}
 				.cattail-world-editor-selection-card[data-theme="void"][data-pinned="true"] {
-					box-shadow: 0 10px 28px rgba(0, 0, 0, .38), 0 0 10px var(--world-editor-card-pin-glow-start), 0 0 24px var(--world-editor-card-pin-glow-middle), 0 0 46px var(--world-editor-card-pin-glow-end);
+					box-shadow: 0 10px 28px color-mix(in srgb, rgba(0, 0, 0, .38) var(--world-editor-card-shell-percent), transparent), 0 0 10px var(--world-editor-card-pin-glow-start), 0 0 24px var(--world-editor-card-pin-glow-middle), 0 0 46px var(--world-editor-card-pin-glow-end);
 				}
 				.cattail-world-editor-selection-card:focus-visible {
 					outline: 2px solid var(--world-editor-card-pin-middle);
@@ -537,10 +590,17 @@ ModLoader.register({
 				}
 				.cattail-world-editor-selection-card__header {
 					display: flex;
-					align-items: baseline;
+					align-items: center;
 					justify-content: space-between;
 					gap: 12px;
 					margin-bottom: 8px;
+				}
+				.cattail-world-editor-selection-card__header-meta {
+					display: inline-flex;
+					align-items: center;
+					flex: 0 1 auto;
+					min-width: 0;
+					gap: 6px;
 				}
 				.cattail-world-editor-selection-card__title {
 					font-size: 14px;

@@ -21,7 +21,7 @@ ModLoader.register({
 
 		let disposed = false
 		const planner = Object.freeze({
-			version: '0.3.1',
+			version: '0.3.4',
 			status: STATUS,
 			statusPriority: STATUS_PRIORITY,
 			async build(game, blueprint, target, options) {
@@ -63,7 +63,7 @@ ModLoader.register({
 			const normalizedTarget = normalizePosition(target)
 			const records = []
 			const guardCells = new Map()
-			const relevantNames = new Set(['eraser', 'eraser2', 'eraser3'])
+			const relevantNames = new Set()
 			let processedCells = 0
 
 			for (let index = 0; index < blueprint.entities.length; index += 1) {
@@ -81,7 +81,7 @@ ModLoader.register({
 					for (let u = footprint.minU; u <= footprint.maxU; u += 1) {
 						if (isCancelled()) throw planError('plan-cancelled')
 						const cell = [u, v]
-						const entity = safeEntityAt(game, cell)
+						const entity = planningEntityAt(game, cell)
 						guardCells.set(cellKey(cell), { position: cell, entity })
 						if (entity) {
 							conflicts.add(entity)
@@ -111,16 +111,15 @@ ModLoader.register({
 
 			const guard = createGuard(game, guardCells, relevantNames)
 			const statusCounts = countStatuses(records)
-			const safe = simulateCost(game, records, guard, false)
-			const overwrite = simulateCost(game, records, guard, true)
+			const cost = simulateCost(game, records, guard)
 			return {
-				version: '0.3.1',
+				version: '0.3.4',
 				sourcePlane: Number(blueprint.sourcePlane) ? 1 : 0,
 				target: normalizedTarget,
 				bounds: targetBounds(blueprint.contentBounds, normalizedTarget, records),
 				records,
 				statusCounts,
-				cost: { safe, overwrite },
+				cost,
 				guard
 			}
 		}
@@ -214,8 +213,7 @@ ModLoader.register({
 				cells: Array.from(cells.values()),
 				counts,
 				onlyones,
-				resources: numericArray(game.resources),
-				eraserType: finiteOr(game.eraserType, 0)
+				resources: numericArray(game.resources)
 			}
 		}
 
@@ -226,7 +224,7 @@ ModLoader.register({
 		function inspectGuard(game, guard) {
 			if (!game || !guard || !Array.isArray(guard.cells)) return guardResult('invalid')
 			for (const entry of guard.cells) {
-				if (safeEntityAt(game, entry.position) !== entry.entity) return guardResult('cells')
+				if (planningEntityAt(game, entry.position) !== entry.entity) return guardResult('cells')
 			}
 			for (const name of Object.keys(guard.counts || {})) {
 				if (finiteOr(game.entitiesInGame?.[name], 0) !== guard.counts[name]) return guardResult('counts')
@@ -234,7 +232,6 @@ ModLoader.register({
 			for (const name of Object.keys(guard.onlyones || {})) {
 				if (!!game.onlyones?.[name] !== guard.onlyones[name]) return guardResult('onlyones')
 			}
-			if (finiteOr(game.eraserType, 0) !== finiteOr(guard.eraserType, 0)) return guardResult('eraserType')
 			const resources = numericArray(game.resources)
 			const expected = numericArray(guard.resources)
 			const length = Math.max(resources.length, expected.length)
@@ -258,10 +255,7 @@ ModLoader.register({
 				guard: Object.assign({}, plan.guard, {
 					resources
 				}),
-				cost: Object.assign({}, plan.cost, {
-					safe: refreshCostResources(plan.cost.safe, resources),
-					overwrite: refreshCostResources(plan.cost.overwrite, resources)
-				})
+				cost: refreshCostResources(plan.cost, resources)
 			})
 		}
 
@@ -274,81 +268,63 @@ ModLoader.register({
 			})
 		}
 
-		function simulateCost(game, records, guard, includeConflicts) {
+		function simulateCost(game, records, guard) {
 			const counts = Object.assign({}, guard.counts || {})
 			const demand = []
-			const refunds = []
 			const errors = []
-			const removals = []
-			const seenEntities = new Set()
-
-			if (includeConflicts) {
-				for (const record of records) {
-					if (record.status !== STATUS.CONFLICT) continue
-					for (const entity of record.conflicts) {
-						if (!entity || seenEntities.has(entity)) continue
-						seenEntities.add(entity)
-						removals.push(entity)
-					}
-				}
-				removals.sort(compareEntities)
-				for (const entity of removals) {
-					const name = safeName(entity.name)
-					const refund = simulatedPrice(game, counts, name, true)
-					if (refund) addArray(refunds, refund)
-					else errors.push({ kind: 'refund', name })
-					const eraserName = eraserNameForType(guard.eraserType)
-					const eraserPrice = simulatedPrice(game, counts, eraserName, false)
-					if (eraserPrice) addArray(demand, eraserPrice)
-					else errors.push({ kind: 'eraser', name: eraserName })
-					counts[name] = Math.max(0, finiteOr(counts[name], 0) - 1)
-				}
-			}
-
+			const typeCosts = new Map()
 			const builds = records.filter(function (record) {
-				return record.status === STATUS.BUILDABLE || (includeConflicts && record.status === STATUS.CONFLICT)
+				return record.status === STATUS.BUILDABLE
 			}).sort(compareRecords)
 			for (const record of builds) {
-				const price = simulatedPrice(game, counts, record.name, false)
-				if (price) addArray(demand, price)
-				else errors.push({ kind: 'build', name: record.name })
+				let typeCost = typeCosts.get(record.name)
+				if (!typeCost) {
+					typeCost = { name: record.name, buildCount: 0, demand: [] }
+					typeCosts.set(record.name, typeCost)
+				}
+				typeCost.buildCount += 1
+				const price = simulatedPrice(game, counts, record.name)
+				if (price) {
+					addArray(demand, price)
+					addArray(typeCost.demand, price)
+				} else {
+					errors.push({ kind: 'build', name: record.name })
+				}
 				counts[record.name] = finiteOr(counts[record.name], 0) + 1
 			}
 
-			const required = subtractFloorZero(demand, refunds)
+			const required = normalizedTotals(demand)
 			const owned = numericArray(guard.resources)
 			const shortfall = subtractFloorZero(required, owned)
 			return {
 				complete: errors.length === 0,
 				buildCount: builds.length,
-				removeCount: removals.length,
-				demand: normalizedTotals(demand),
-				refunds: normalizedTotals(refunds),
-				required: normalizedTotals(required),
+				demand: required,
+				required,
 				owned: normalizedTotals(owned),
 				shortfall: normalizedTotals(shortfall),
+				byType: Array.from(typeCosts.values(), function (entry) {
+					return {
+						name: entry.name,
+						buildCount: entry.buildCount,
+						demand: normalizedTotals(entry.demand)
+					}
+				}),
 				errors
 			}
 		}
 
-		function simulatedPrice(game, counts, name, sale) {
+		function simulatedPrice(game, counts, name) {
 			const definition = game.codex?.entities?.[name]
 			if (!definition || !Array.isArray(definition.price)) return null
 			const currentCount = Math.max(0, finiteOr(counts[name], 0))
 			const exponent = finiteOr(definition.priceExponent, 1)
 			const multiplier = exponent
-				? exponent ** Math.max(0, currentCount - (sale ? 1 : 0))
-				: 1
-			const sellMultiplier = sale
-				? finiteOr(game.eraserType, 0) === 2 ? 1 : finiteOr(game.eraserType, 0) === 1 ? .9 : .5
+				? exponent ** currentCount
 				: 1
 			return definition.price.map(function (value) {
-				return finiteOr(value, 0) * multiplier * sellMultiplier
+				return finiteOr(value, 0) * multiplier
 			})
-		}
-
-		function eraserNameForType(type) {
-			return Number(type) === 2 ? 'eraser3' : Number(type) === 1 ? 'eraser2' : 'eraser'
 		}
 
 		function targetFootprint(source, target, position) {
@@ -429,12 +405,9 @@ ModLoader.register({
 			}
 		}
 
-		function compareEntities(left, right) {
-			const leftPosition = normalizePosition(left?.position) || [0, 0]
-			const rightPosition = normalizePosition(right?.position) || [0, 0]
-			return leftPosition[1] - rightPosition[1] ||
-				leftPosition[0] - rightPosition[0] ||
-				safeName(left?.name).localeCompare(safeName(right?.name))
+		function planningEntityAt(game, position) {
+			const entity = safeEntityAt(game, position)
+			return safeName(entity?.name) === 'surge' ? null : entity
 		}
 
 		function compareRecords(left, right) {
@@ -566,7 +539,7 @@ ModLoader.register({
 				})
 			}
 			return {
-				version: '0.3.1',
+				version: '0.3.4',
 				kind: 'synthetic-plan',
 				results
 			}
@@ -596,16 +569,12 @@ ModLoader.register({
 								canPurchase: true,
 								price: [1],
 								priceExponent: 1.01
-							},
-							eraser: { price: [1] },
-							eraser2: { price: [1] },
-							eraser3: { price: [1] }
+							}
 						}
 					},
 					entitiesInGame: {},
 					onlyones: {},
 					resources: [1000000000],
-					eraserType: 0,
 					entityAtCoordinates() {
 						return null
 					}

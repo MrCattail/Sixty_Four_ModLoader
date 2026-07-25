@@ -1073,8 +1073,8 @@ ModLoader.register({
 				previewSatisfied: 'Already satisfied',
 				previewConflict: 'Replaceable conflict',
 				previewBlocked: 'Blocked',
-				previewSafePlan: 'Safe plan',
-				previewOverwritePlan: 'Overwrite plan',
+				previewBuildPlan: 'Build plan',
+				previewTemporaryPinHint: 'Hold Alt to pin temporarily',
 				previewFullUnavailable: 'Full blueprints cannot be previewed in this version',
 				previewPlanFailed: 'Preview calculation failed; the last complete result was kept',
 				previewCalculating: 'Calculating…',
@@ -1086,7 +1086,6 @@ ModLoader.register({
 				previewExitHint: 'Click to pin or unpin / Esc to exit',
 				previewRequired: 'Need',
 				previewOwned: 'Have',
-				previewRefund: 'Refund',
 				previewShortfall: 'Missing',
 				previewNoCost: 'No resources required'
 			},
@@ -1096,8 +1095,8 @@ ModLoader.register({
 				previewSatisfied: '已经满足',
 				previewConflict: '可替换冲突',
 				previewBlocked: '绝对阻止',
-				previewSafePlan: '安全方案',
-				previewOverwritePlan: '覆盖方案',
+				previewBuildPlan: '建造方案',
+				previewTemporaryPinHint: '按住 Alt 临时固定',
 				previewFullUnavailable: '当前版本不能预览完整蓝图',
 				previewPlanFailed: '预览计算失败，已保留上一次完整结果',
 				previewCalculating: '正在计算…',
@@ -1109,7 +1108,6 @@ ModLoader.register({
 				previewExitHint: '点击固定或解除固定 / Esc 退出',
 				previewRequired: '需要',
 				previewOwned: '持有',
-				previewRefund: '退款',
 				previewShortfall: '缺少',
 				previewNoCost: '不需要资源'
 			},
@@ -1119,8 +1117,8 @@ ModLoader.register({
 				previewSatisfied: '已经满足',
 				previewConflict: '可替换冲突',
 				previewBlocked: '绝对阻止',
-				previewSafePlan: '安全方案',
-				previewOverwritePlan: '覆盖方案',
+				previewBuildPlan: '建造方案',
+				previewTemporaryPinHint: '按住 Alt 临时固定',
 				previewFullUnavailable: '当前版本不能预览完整蓝图',
 				previewPlanFailed: '预览计算失败，已保留上一次完整结果',
 				previewCalculating: '正在计算…',
@@ -1132,7 +1130,6 @@ ModLoader.register({
 				previewExitHint: '点击固定或解除固定 / Esc 退出',
 				previewRequired: '需要',
 				previewOwned: '持有',
-				previewRefund: '退款',
 				previewShortfall: '缺少',
 				previewNoCost: '不需要资源'
 			},
@@ -1142,8 +1139,8 @@ ModLoader.register({
 				previewSatisfied: 'Уже выполнено',
 				previewConflict: 'Заменяемый конфликт',
 				previewBlocked: 'Заблокировано',
-				previewSafePlan: 'Безопасный план',
-				previewOverwritePlan: 'План замены',
+				previewBuildPlan: 'План строительства',
+				previewTemporaryPinHint: 'Удерживайте Alt для временного закрепления',
 				previewFullUnavailable: 'Полные чертежи нельзя просматривать в этой версии',
 				previewPlanFailed: 'Расчёт не удался; сохранён последний полный результат',
 				previewCalculating: 'Расчёт…',
@@ -1155,7 +1152,6 @@ ModLoader.register({
 				previewExitHint: 'Щёлкните для закрепления / Esc — выход',
 				previewRequired: 'Нужно',
 				previewOwned: 'Есть',
-				previewRefund: 'Возврат',
 				previewShortfall: 'Не хватает',
 				previewNoCost: 'Ресурсы не требуются'
 			},
@@ -1165,8 +1161,8 @@ ModLoader.register({
 				previewSatisfied: 'Bereits erfüllt',
 				previewConflict: 'Ersetzbarer Konflikt',
 				previewBlocked: 'Blockiert',
-				previewSafePlan: 'Sicherer Plan',
-				previewOverwritePlan: 'Überschreibplan',
+				previewBuildPlan: 'Bauplan',
+				previewTemporaryPinHint: 'Alt gedrückt halten, um vorübergehend zu fixieren',
 				previewFullUnavailable: 'Vollständige Blaupausen können in dieser Version nicht angezeigt werden',
 				previewPlanFailed: 'Vorschauberechnung fehlgeschlagen; letztes vollständiges Ergebnis bleibt erhalten',
 				previewCalculating: 'Berechnung…',
@@ -1178,7 +1174,6 @@ ModLoader.register({
 				previewExitHint: 'Klicken zum Fixieren oder Lösen / Esc Beenden',
 				previewRequired: 'Bedarf',
 				previewOwned: 'Vorhanden',
-				previewRefund: 'Erstattung',
 				previewShortfall: 'Fehlt',
 				previewNoCost: 'Keine Ressourcen erforderlich'
 			},
@@ -1188,8 +1183,8 @@ ModLoader.register({
 				previewSatisfied: 'Já atendido',
 				previewConflict: 'Conflito substituível',
 				previewBlocked: 'Bloqueado',
-				previewSafePlan: 'Plano seguro',
-				previewOverwritePlan: 'Plano de substituição',
+				previewBuildPlan: 'Plano de construção',
+				previewTemporaryPinHint: 'Segure Alt para fixar temporariamente',
 				previewFullUnavailable: 'Projetos completos não podem ser visualizados nesta versão',
 				previewPlanFailed: 'O cálculo falhou; o último resultado completo foi mantido',
 				previewCalculating: 'Calculando…',
@@ -1201,7 +1196,6 @@ ModLoader.register({
 				previewExitHint: 'Clique para fixar ou soltar / Esc Sair',
 				previewRequired: 'Necessário',
 				previewOwned: 'Disponível',
-				previewRefund: 'Reembolso',
 				previewShortfall: 'Falta',
 				previewNoCost: 'Nenhum recurso necessário'
 			},
@@ -1211,8 +1205,8 @@ ModLoader.register({
 				previewSatisfied: 'Già soddisfatto',
 				previewConflict: 'Conflitto sostituibile',
 				previewBlocked: 'Bloccato',
-				previewSafePlan: 'Piano sicuro',
-				previewOverwritePlan: 'Piano di sostituzione',
+				previewBuildPlan: 'Piano di costruzione',
+				previewTemporaryPinHint: 'Tieni premuto Alt per fissare temporaneamente',
 				previewFullUnavailable: 'I progetti completi non sono visualizzabili in questa versione',
 				previewPlanFailed: 'Calcolo fallito; è stato mantenuto l’ultimo risultato completo',
 				previewCalculating: 'Calcolo…',
@@ -1224,7 +1218,6 @@ ModLoader.register({
 				previewExitHint: 'Fai clic per fissare o liberare / Esc Esci',
 				previewRequired: 'Serve',
 				previewOwned: 'Disponibile',
-				previewRefund: 'Rimborso',
 				previewShortfall: 'Manca',
 				previewNoCost: 'Nessuna risorsa richiesta'
 			},
@@ -1234,8 +1227,8 @@ ModLoader.register({
 				previewSatisfied: 'Ya satisfecho',
 				previewConflict: 'Conflicto reemplazable',
 				previewBlocked: 'Bloqueado',
-				previewSafePlan: 'Plan seguro',
-				previewOverwritePlan: 'Plan de reemplazo',
+				previewBuildPlan: 'Plan de construcción',
+				previewTemporaryPinHint: 'Mantén Alt para fijar temporalmente',
 				previewFullUnavailable: 'Los planos completos no pueden previsualizarse en esta versión',
 				previewPlanFailed: 'El cálculo falló; se conservó el último resultado completo',
 				previewCalculating: 'Calculando…',
@@ -1247,7 +1240,6 @@ ModLoader.register({
 				previewExitHint: 'Haz clic para fijar o liberar / Esc Salir',
 				previewRequired: 'Necesario',
 				previewOwned: 'Disponible',
-				previewRefund: 'Reembolso',
 				previewShortfall: 'Falta',
 				previewNoCost: 'No se requieren recursos'
 			},
@@ -1257,8 +1249,8 @@ ModLoader.register({
 				previewSatisfied: 'Déjà satisfait',
 				previewConflict: 'Conflit remplaçable',
 				previewBlocked: 'Bloqué',
-				previewSafePlan: 'Plan sûr',
-				previewOverwritePlan: 'Plan de remplacement',
+				previewBuildPlan: 'Plan de construction',
+				previewTemporaryPinHint: 'Maintenez Alt pour épingler temporairement',
 				previewFullUnavailable: 'Les plans complets ne peuvent pas être prévisualisés dans cette version',
 				previewPlanFailed: 'Le calcul a échoué ; le dernier résultat complet est conservé',
 				previewCalculating: 'Calcul…',
@@ -1270,7 +1262,6 @@ ModLoader.register({
 				previewExitHint: 'Cliquez pour épingler ou libérer / Esc Quitter',
 				previewRequired: 'Requis',
 				previewOwned: 'Disponible',
-				previewRefund: 'Remboursement',
 				previewShortfall: 'Manque',
 				previewNoCost: 'Aucune ressource requise'
 			},
@@ -1280,8 +1271,8 @@ ModLoader.register({
 				previewSatisfied: 'Al voldaan',
 				previewConflict: 'Vervangbaar conflict',
 				previewBlocked: 'Geblokkeerd',
-				previewSafePlan: 'Veilig plan',
-				previewOverwritePlan: 'Vervangingsplan',
+				previewBuildPlan: 'Bouwplan',
+				previewTemporaryPinHint: 'Houd Alt ingedrukt om tijdelijk vast te zetten',
 				previewFullUnavailable: 'Volledige blauwdrukken kunnen in deze versie niet worden bekeken',
 				previewPlanFailed: 'Berekening mislukt; het laatste volledige resultaat blijft behouden',
 				previewCalculating: 'Berekenen…',
@@ -1293,7 +1284,6 @@ ModLoader.register({
 				previewExitHint: 'Klik om vast te zetten of los te maken / Esc Afsluiten',
 				previewRequired: 'Nodig',
 				previewOwned: 'Beschikbaar',
-				previewRefund: 'Teruggave',
 				previewShortfall: 'Tekort',
 				previewNoCost: 'Geen grondstoffen nodig'
 			},
@@ -1303,8 +1293,8 @@ ModLoader.register({
 				previewSatisfied: 'Již splněno',
 				previewConflict: 'Nahraditelný konflikt',
 				previewBlocked: 'Blokováno',
-				previewSafePlan: 'Bezpečný plán',
-				previewOverwritePlan: 'Plán nahrazení',
+				previewBuildPlan: 'Plán výstavby',
+				previewTemporaryPinHint: 'Podržte Alt pro dočasné připnutí',
 				previewFullUnavailable: 'Úplné plány nelze v této verzi zobrazit',
 				previewPlanFailed: 'Výpočet selhal; poslední úplný výsledek byl zachován',
 				previewCalculating: 'Výpočet…',
@@ -1316,7 +1306,6 @@ ModLoader.register({
 				previewExitHint: 'Kliknutím připnout nebo uvolnit / Esc Ukončit',
 				previewRequired: 'Potřeba',
 				previewOwned: 'K dispozici',
-				previewRefund: 'Vrácení',
 				previewShortfall: 'Chybí',
 				previewNoCost: 'Nejsou potřeba žádné zdroje'
 			},
@@ -1326,8 +1315,8 @@ ModLoader.register({
 				previewSatisfied: 'Już spełnione',
 				previewConflict: 'Konflikt do zastąpienia',
 				previewBlocked: 'Zablokowane',
-				previewSafePlan: 'Bezpieczny plan',
-				previewOverwritePlan: 'Plan zastąpienia',
+				previewBuildPlan: 'Plan budowy',
+				previewTemporaryPinHint: 'Przytrzymaj Alt, aby przypiąć tymczasowo',
 				previewFullUnavailable: 'Pełnych planów nie można podejrzeć w tej wersji',
 				previewPlanFailed: 'Obliczenie nie powiodło się; zachowano ostatni pełny wynik',
 				previewCalculating: 'Obliczanie…',
@@ -1339,7 +1328,6 @@ ModLoader.register({
 				previewExitHint: 'Kliknij, aby przypiąć lub zwolnić / Esc Wyjdź',
 				previewRequired: 'Potrzeba',
 				previewOwned: 'Posiadane',
-				previewRefund: 'Zwrot',
 				previewShortfall: 'Brakuje',
 				previewNoCost: 'Nie potrzeba zasobów'
 			},
@@ -1349,8 +1337,8 @@ ModLoader.register({
 				previewSatisfied: '配置済み',
 				previewConflict: '置換可能な競合',
 				previewBlocked: '配置不可',
-				previewSafePlan: '安全プラン',
-				previewOverwritePlan: '置換プラン',
+				previewBuildPlan: '建設プラン',
+				previewTemporaryPinHint: 'Altを押している間、一時固定',
 				previewFullUnavailable: 'このバージョンでは完全ブループリントをプレビューできません',
 				previewPlanFailed: '計算に失敗したため、直前の完全な結果を保持しました',
 				previewCalculating: '計算中…',
@@ -1362,7 +1350,6 @@ ModLoader.register({
 				previewExitHint: 'クリックで固定または解除 / Esc で終了',
 				previewRequired: '必要',
 				previewOwned: '所持',
-				previewRefund: '返却',
 				previewShortfall: '不足',
 				previewNoCost: '資源は不要です'
 			},
@@ -1372,8 +1359,8 @@ ModLoader.register({
 				previewSatisfied: '이미 충족',
 				previewConflict: '교체 가능한 충돌',
 				previewBlocked: '차단됨',
-				previewSafePlan: '안전 계획',
-				previewOverwritePlan: '교체 계획',
+				previewBuildPlan: '건설 계획',
+				previewTemporaryPinHint: 'Alt를 누르는 동안 임시 고정',
 				previewFullUnavailable: '이 버전에서는 전체 청사진을 미리 볼 수 없습니다',
 				previewPlanFailed: '계산에 실패하여 마지막 전체 결과를 유지했습니다',
 				previewCalculating: '계산 중…',
@@ -1385,7 +1372,6 @@ ModLoader.register({
 				previewExitHint: '클릭하여 고정 또는 해제 / Esc 종료',
 				previewRequired: '필요',
 				previewOwned: '보유',
-				previewRefund: '환급',
 				previewShortfall: '부족',
 				previewNoCost: '필요한 자원이 없습니다'
 			},
@@ -1395,8 +1381,8 @@ ModLoader.register({
 				previewSatisfied: '已經滿足',
 				previewConflict: '可替換衝突',
 				previewBlocked: '絕對阻止',
-				previewSafePlan: '安全方案',
-				previewOverwritePlan: '覆蓋方案',
+				previewBuildPlan: '建造方案',
+				previewTemporaryPinHint: '按住 Alt 暫時固定',
 				previewFullUnavailable: '目前版本無法預覽完整藍圖',
 				previewPlanFailed: '預覽計算失敗，已保留上一次完整結果',
 				previewCalculating: '正在計算…',
@@ -1408,7 +1394,6 @@ ModLoader.register({
 				previewExitHint: '點擊固定或解除固定 / Esc 退出',
 				previewRequired: '需要',
 				previewOwned: '持有',
-				previewRefund: '退款',
 				previewShortfall: '缺少',
 				previewNoCost: '不需要資源'
 			},
@@ -1418,8 +1403,8 @@ ModLoader.register({
 				previewSatisfied: 'มีอยู่แล้ว',
 				previewConflict: 'ความขัดแย้งที่แทนที่ได้',
 				previewBlocked: 'ถูกบล็อก',
-				previewSafePlan: 'แผนปลอดภัย',
-				previewOverwritePlan: 'แผนแทนที่',
+				previewBuildPlan: 'แผนการก่อสร้าง',
+				previewTemporaryPinHint: 'กด Alt ค้างเพื่อตรึงชั่วคราว',
 				previewFullUnavailable: 'เวอร์ชันนี้ไม่สามารถแสดงตัวอย่างพิมพ์เขียวแบบเต็มได้',
 				previewPlanFailed: 'คำนวณล้มเหลว จึงเก็บผลลัพธ์ที่สมบูรณ์ล่าสุดไว้',
 				previewCalculating: 'กำลังคำนวณ…',
@@ -1431,7 +1416,6 @@ ModLoader.register({
 				previewExitHint: 'คลิกเพื่อตรึงหรือปล่อย / Esc ออก',
 				previewRequired: 'ต้องใช้',
 				previewOwned: 'มี',
-				previewRefund: 'คืน',
 				previewShortfall: 'ขาด',
 				previewNoCost: 'ไม่ต้องใช้ทรัพยากร'
 			},
@@ -1441,8 +1425,8 @@ ModLoader.register({
 				previewSatisfied: 'Már teljesült',
 				previewConflict: 'Cserélhető ütközés',
 				previewBlocked: 'Blokkolva',
-				previewSafePlan: 'Biztonságos terv',
-				previewOverwritePlan: 'Csere terv',
+				previewBuildPlan: 'Építési terv',
+				previewTemporaryPinHint: 'Tartsd lenyomva az Alt billentyűt az ideiglenes rögzítéshez',
 				previewFullUnavailable: 'A teljes tervrajzok ebben a verzióban nem tekinthetők meg',
 				previewPlanFailed: 'A számítás sikertelen; az utolsó teljes eredmény megmaradt',
 				previewCalculating: 'Számítás…',
@@ -1454,7 +1438,6 @@ ModLoader.register({
 				previewExitHint: 'Kattintás rögzítéshez vagy feloldáshoz / Esc Kilépés',
 				previewRequired: 'Szükséges',
 				previewOwned: 'Meglévő',
-				previewRefund: 'Visszatérítés',
 				previewShortfall: 'Hiány',
 				previewNoCost: 'Nincs szükség erőforrásra'
 			},
@@ -1464,8 +1447,8 @@ ModLoader.register({
 				previewSatisfied: 'Jau izpildīts',
 				previewConflict: 'Aizstājams konflikts',
 				previewBlocked: 'Bloķēts',
-				previewSafePlan: 'Drošais plāns',
-				previewOverwritePlan: 'Aizstāšanas plāns',
+				previewBuildPlan: 'Būvniecības plāns',
+				previewTemporaryPinHint: 'Turi Alt, lai īslaicīgi piespraustu',
 				previewFullUnavailable: 'Pilnos rasējumus šajā versijā nevar priekšskatīt',
 				previewPlanFailed: 'Aprēķins neizdevās; saglabāts pēdējais pilnais rezultāts',
 				previewCalculating: 'Aprēķina…',
@@ -1477,7 +1460,6 @@ ModLoader.register({
 				previewExitHint: 'Klikšķini, lai piespraustu vai atbrīvotu / Esc Iziet',
 				previewRequired: 'Vajag',
 				previewOwned: 'Pieejams',
-				previewRefund: 'Atmaksa',
 				previewShortfall: 'Trūkst',
 				previewNoCost: 'Resursi nav vajadzīgi'
 			},
@@ -1487,8 +1469,8 @@ ModLoader.register({
 				previewSatisfied: 'Deja îndeplinit',
 				previewConflict: 'Conflict înlocuibil',
 				previewBlocked: 'Blocat',
-				previewSafePlan: 'Plan sigur',
-				previewOverwritePlan: 'Plan de înlocuire',
+				previewBuildPlan: 'Plan de construcție',
+				previewTemporaryPinHint: 'Ține Alt apăsat pentru fixare temporară',
 				previewFullUnavailable: 'Planurile complete nu pot fi previzualizate în această versiune',
 				previewPlanFailed: 'Calculul a eșuat; ultimul rezultat complet a fost păstrat',
 				previewCalculating: 'Se calculează…',
@@ -1500,7 +1482,6 @@ ModLoader.register({
 				previewExitHint: 'Clic pentru fixare sau eliberare / Esc Ieșire',
 				previewRequired: 'Necesar',
 				previewOwned: 'Disponibil',
-				previewRefund: 'Rambursare',
 				previewShortfall: 'Lipsește',
 				previewNoCost: 'Nu sunt necesare resurse'
 			},
@@ -1510,8 +1491,8 @@ ModLoader.register({
 				previewSatisfied: 'Allerede oppfylt',
 				previewConflict: 'Konflikt som kan erstattes',
 				previewBlocked: 'Blokkert',
-				previewSafePlan: 'Sikker plan',
-				previewOverwritePlan: 'Erstatningsplan',
+				previewBuildPlan: 'Byggeplan',
+				previewTemporaryPinHint: 'Hold Alt for å feste midlertidig',
 				previewFullUnavailable: 'Fullstendige blåkopier kan ikke forhåndsvises i denne versjonen',
 				previewPlanFailed: 'Beregningen mislyktes; siste fullstendige resultat ble beholdt',
 				previewCalculating: 'Beregner…',
@@ -1523,7 +1504,6 @@ ModLoader.register({
 				previewExitHint: 'Klikk for å feste eller løsne / Esc Avslutt',
 				previewRequired: 'Trenger',
 				previewOwned: 'Har',
-				previewRefund: 'Refusjon',
 				previewShortfall: 'Mangler',
 				previewNoCost: 'Ingen ressurser kreves'
 			}
@@ -1710,12 +1690,218 @@ ModLoader.register({
 				blueprintTransformNone: '无'
 			}
 		}
+		const SECTION_TEXT = {
+			en: {
+				blueprintCollapseSection: 'Collapse section',
+				blueprintExpandSection: 'Expand section',
+				blueprintCrossBoundary: 'Cross-boundary'
+			},
+			ru: {
+				blueprintCollapseSection: 'Свернуть раздел',
+				blueprintExpandSection: 'Развернуть раздел',
+				blueprintCrossBoundary: 'За границей'
+			},
+			de: {
+				blueprintCollapseSection: 'Abschnitt einklappen',
+				blueprintExpandSection: 'Abschnitt ausklappen',
+				blueprintCrossBoundary: 'Grenzübertritt'
+			},
+			ptbr: {
+				blueprintCollapseSection: 'Recolher seção',
+				blueprintExpandSection: 'Expandir seção',
+				blueprintCrossBoundary: 'Além do limite'
+			},
+			it: {
+				blueprintCollapseSection: 'Comprimi sezione',
+				blueprintExpandSection: 'Espandi sezione',
+				blueprintCrossBoundary: 'Oltre il confine'
+			},
+			es: {
+				blueprintCollapseSection: 'Contraer sección',
+				blueprintExpandSection: 'Expandir sección',
+				blueprintCrossBoundary: 'Fuera del límite'
+			},
+			fr: {
+				blueprintCollapseSection: 'Réduire la section',
+				blueprintExpandSection: 'Développer la section',
+				blueprintCrossBoundary: 'Hors limite'
+			},
+			nl: {
+				blueprintCollapseSection: 'Sectie inklappen',
+				blueprintExpandSection: 'Sectie uitklappen',
+				blueprintCrossBoundary: 'Over de grens'
+			},
+			cz: {
+				blueprintCollapseSection: 'Sbalit sekci',
+				blueprintExpandSection: 'Rozbalit sekci',
+				blueprintCrossBoundary: 'Přes hranici'
+			},
+			pl: {
+				blueprintCollapseSection: 'Zwiń sekcję',
+				blueprintExpandSection: 'Rozwiń sekcję',
+				blueprintCrossBoundary: 'Poza granicą'
+			},
+			jp: {
+				blueprintCollapseSection: 'セクションを折りたたむ',
+				blueprintExpandSection: 'セクションを展開',
+				blueprintCrossBoundary: '境界越え'
+			},
+			kr: {
+				blueprintCollapseSection: '섹션 접기',
+				blueprintExpandSection: '섹션 펼치기',
+				blueprintCrossBoundary: '경계 넘음'
+			},
+			sch: {
+				blueprintCollapseSection: '收起区域',
+				blueprintExpandSection: '展开区域',
+				blueprintCrossBoundary: '跨边界'
+			},
+			tch: {
+				blueprintCollapseSection: '收起區域',
+				blueprintExpandSection: '展開區域',
+				blueprintCrossBoundary: '跨邊界'
+			},
+			thai: {
+				blueprintCollapseSection: 'ยุบส่วน',
+				blueprintExpandSection: 'ขยายส่วน',
+				blueprintCrossBoundary: 'ข้ามขอบเขต'
+			},
+			hu: {
+				blueprintCollapseSection: 'Szakasz összecsukása',
+				blueprintExpandSection: 'Szakasz kibontása',
+				blueprintCrossBoundary: 'Határon túl'
+			},
+			lv: {
+				blueprintCollapseSection: 'Sakļaut sadaļu',
+				blueprintExpandSection: 'Izvērst sadaļu',
+				blueprintCrossBoundary: 'Pāri robežai'
+			},
+			ro: {
+				blueprintCollapseSection: 'Restrânge secțiunea',
+				blueprintExpandSection: 'Extinde secțiunea',
+				blueprintCrossBoundary: 'Peste limită'
+			},
+			no: {
+				blueprintCollapseSection: 'Skjul del',
+				blueprintExpandSection: 'Vis del',
+				blueprintCrossBoundary: 'Over grensen'
+			},
+			modsch: {
+				blueprintCollapseSection: '收起区域',
+				blueprintExpandSection: '展开区域',
+				blueprintCrossBoundary: '跨边界'
+			}
+		}
+		const CARD_OPACITY_TEXT = {
+			en: {
+				cardOpacityControls: 'Hold Z and scroll to adjust opacity. Middle-click to toggle content fading.',
+				cardOpacityContentLinked: 'Content fades with the background.',
+				cardOpacityContentIndependent: 'Content remains visible.'
+			},
+			ru: {
+				cardOpacityControls: 'Удерживайте Z и прокручивайте для изменения прозрачности. Средняя кнопка переключает затухание содержимого.',
+				cardOpacityContentLinked: 'Содержимое исчезает вместе с фоном.',
+				cardOpacityContentIndependent: 'Содержимое остаётся видимым.'
+			},
+			de: {
+				cardOpacityControls: 'Z halten und scrollen, um die Deckkraft anzupassen. Mittelklick schaltet das Ausblenden des Inhalts um.',
+				cardOpacityContentLinked: 'Inhalt blendet mit dem Hintergrund aus.',
+				cardOpacityContentIndependent: 'Inhalt bleibt sichtbar.'
+			},
+			ptbr: {
+				cardOpacityControls: 'Segure Z e role para ajustar a opacidade. Clique com o botão do meio para alternar o desvanecimento do conteúdo.',
+				cardOpacityContentLinked: 'O conteúdo desaparece com o fundo.',
+				cardOpacityContentIndependent: 'O conteúdo permanece visível.'
+			},
+			it: {
+				cardOpacityControls: 'Tieni premuto Z e scorri per regolare l’opacità. Fai clic con il tasto centrale per cambiare la dissolvenza del contenuto.',
+				cardOpacityContentLinked: 'Il contenuto sfuma con lo sfondo.',
+				cardOpacityContentIndependent: 'Il contenuto resta visibile.'
+			},
+			es: {
+				cardOpacityControls: 'Mantén Z y desplaza la rueda para ajustar la opacidad. El clic central alterna el desvanecimiento del contenido.',
+				cardOpacityContentLinked: 'El contenido se desvanece con el fondo.',
+				cardOpacityContentIndependent: 'El contenido permanece visible.'
+			},
+			fr: {
+				cardOpacityControls: 'Maintenez Z et faites défiler pour régler l’opacité. Le clic central active ou désactive l’estompage du contenu.',
+				cardOpacityContentLinked: 'Le contenu s’estompe avec l’arrière-plan.',
+				cardOpacityContentIndependent: 'Le contenu reste visible.'
+			},
+			nl: {
+				cardOpacityControls: 'Houd Z ingedrukt en scrol om de dekking aan te passen. Middelklik schakelt het vervagen van inhoud.',
+				cardOpacityContentLinked: 'Inhoud vervaagt met de achtergrond.',
+				cardOpacityContentIndependent: 'Inhoud blijft zichtbaar.'
+			},
+			cz: {
+				cardOpacityControls: 'Podržte Z a kolečkem upravte průhlednost. Prostřední tlačítko přepíná blednutí obsahu.',
+				cardOpacityContentLinked: 'Obsah bledne společně s pozadím.',
+				cardOpacityContentIndependent: 'Obsah zůstává viditelný.'
+			},
+			pl: {
+				cardOpacityControls: 'Przytrzymaj Z i przewijaj, aby zmienić przezroczystość. Środkowy przycisk przełącza zanikanie treści.',
+				cardOpacityContentLinked: 'Treść zanika razem z tłem.',
+				cardOpacityContentIndependent: 'Treść pozostaje widoczna.'
+			},
+			jp: {
+				cardOpacityControls: 'Zを押しながらスクロールして透明度を調整します。中クリックで内容も一緒に薄くするか切り替えます。',
+				cardOpacityContentLinked: '内容は背景と一緒に薄くなります。',
+				cardOpacityContentIndependent: '内容は表示されたままです。'
+			},
+			kr: {
+				cardOpacityControls: 'Z를 누른 채 스크롤하여 투명도를 조절합니다. 가운데 클릭으로 내용 흐림을 전환합니다.',
+				cardOpacityContentLinked: '내용이 배경과 함께 흐려집니다.',
+				cardOpacityContentIndependent: '내용은 계속 표시됩니다.'
+			},
+			sch: {
+				cardOpacityControls: '按住 Z 并滚动以调整透明度。按鼠标中键切换内容是否一起淡出。',
+				cardOpacityContentLinked: '内容跟随背景一起淡出。',
+				cardOpacityContentIndependent: '内容保持可见。'
+			},
+			tch: {
+				cardOpacityControls: '按住 Z 並滾動以調整透明度。按滑鼠中鍵切換內容是否一起淡出。',
+				cardOpacityContentLinked: '內容跟隨背景一起淡出。',
+				cardOpacityContentIndependent: '內容保持可見。'
+			},
+			thai: {
+				cardOpacityControls: 'กด Z ค้างแล้วเลื่อนล้อเพื่อปรับความโปร่งใส คลิกกลางเพื่อสลับการจางของเนื้อหา',
+				cardOpacityContentLinked: 'เนื้อหาจางไปพร้อมพื้นหลัง',
+				cardOpacityContentIndependent: 'เนื้อหายังคงมองเห็นได้'
+			},
+			hu: {
+				cardOpacityControls: 'Tartsd lenyomva a Z-t és görgess az átlátszóság állításához. A középső kattintás váltja a tartalom halványítását.',
+				cardOpacityContentLinked: 'A tartalom a háttérrel együtt halványul.',
+				cardOpacityContentIndependent: 'A tartalom látható marad.'
+			},
+			lv: {
+				cardOpacityControls: 'Turiet Z un ritiniet, lai mainītu caurspīdīgumu. Vidējais klikšķis pārslēdz satura izbalēšanu.',
+				cardOpacityContentLinked: 'Saturs izbalē kopā ar fonu.',
+				cardOpacityContentIndependent: 'Saturs paliek redzams.'
+			},
+			ro: {
+				cardOpacityControls: 'Țineți apăsat Z și derulați pentru a regla opacitatea. Clicul din mijloc comută estomparea conținutului.',
+				cardOpacityContentLinked: 'Conținutul se estompează împreună cu fundalul.',
+				cardOpacityContentIndependent: 'Conținutul rămâne vizibil.'
+			},
+			no: {
+				cardOpacityControls: 'Hold Z og rull for å justere gjennomsiktigheten. Midtklikk veksler toning av innholdet.',
+				cardOpacityContentLinked: 'Innholdet tones sammen med bakgrunnen.',
+				cardOpacityContentIndependent: 'Innholdet forblir synlig.'
+			},
+			modsch: {
+				cardOpacityControls: '按住 Z 并滚动以调整透明度。按鼠标中键切换内容是否一起淡出。',
+				cardOpacityContentLinked: '内容跟随背景一起淡出。',
+				cardOpacityContentIndependent: '内容保持可见。'
+			}
+		}
 		for (const language of Object.keys(TEXT)) {
 			Object.assign(
 				TEXT[language],
 				BLUEPRINT_TEXT[language] || BLUEPRINT_TEXT.en,
 				PREVIEW_TEXT[language] || PREVIEW_TEXT.en,
-				TRANSFORM_TEXT[language] || TRANSFORM_TEXT.en
+				TRANSFORM_TEXT[language] || TRANSFORM_TEXT.en,
+				SECTION_TEXT[language] || SECTION_TEXT.en,
+				CARD_OPACITY_TEXT[language] || CARD_OPACITY_TEXT.en
 			)
 		}
 		const LANGUAGES = Object.freeze(Object.keys(TEXT))
@@ -1725,7 +1911,7 @@ ModLoader.register({
 		Object.freeze(TEXT)
 
 		const i18n = Object.freeze({
-			version: '0.3.1',
+			version: '0.3.4',
 			languages: LANGUAGES,
 			keys: KEYS,
 			t(languageOrGame, key) {
