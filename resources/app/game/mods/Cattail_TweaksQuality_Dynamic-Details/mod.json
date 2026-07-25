@@ -2,7 +2,7 @@
   "id": "Cattail_TweaksQuality_Dynamic-Details",
   "uniqueId": "Cattail_TweaksQuality_Dynamic-Details",
   "name": "Dynamic Details",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "previousVersion": {
     "name": "Dynamic Building Details",
     "version": "0.1.0"
@@ -367,6 +367,7 @@
   },
   "entries": [
     "scripts/core.js",
+    "scripts/production-telemetry.js",
     "scripts/building-details.js",
     "scripts/resource-source.js",
     "scripts/coordinate-overlay.js",
