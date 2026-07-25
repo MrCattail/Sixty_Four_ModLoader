@@ -46,7 +46,10 @@ ModLoader.register({
 				return
 			}
 
-			document.getElementById(CARD_ID)?.remove()
+			const mountedCards = typeof document.querySelectorAll === 'function'
+				? document.querySelectorAll('#' + CARD_ID)
+				: [document.getElementById(CARD_ID)].filter(Boolean)
+			mountedCards.forEach(element => element.remove())
 			const style = ensureStyle()
 			const card = createCard()
 			document.body.append(card)
@@ -541,20 +544,6 @@ ModLoader.register({
 					--world-editor-card-track: color-mix(in srgb, rgba(211, 190, 250, .14) var(--world-editor-card-shell-percent), transparent);
 					box-shadow: 0 10px 28px color-mix(in srgb, rgba(0, 0, 0, .36) var(--world-editor-card-shell-percent), transparent);
 				}
-				.cattail-world-editor-selection-card::before {
-					content: '';
-					position: absolute;
-					inset: -1px;
-					border-radius: inherit;
-					padding: 1px;
-					background: linear-gradient(135deg, var(--world-editor-card-pin-start), var(--world-editor-card-pin-middle) 42%, var(--world-editor-card-pin-end));
-					-webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-					-webkit-mask-composite: xor;
-					mask-composite: exclude;
-					opacity: 0;
-					pointer-events: none;
-					transition: opacity .16s ease;
-				}
 				.cattail-world-editor-selection-card[data-visible="true"][data-position-visible="true"] {
 					visibility: visible;
 					opacity: var(--world-editor-card-opacity);
@@ -570,10 +559,10 @@ ModLoader.register({
 				}
 				.cattail-world-editor-selection-card[data-pinned="true"] {
 					border-color: transparent;
+					background:
+						linear-gradient(var(--world-editor-card-bg), var(--world-editor-card-bg)) padding-box,
+						linear-gradient(135deg, var(--world-editor-card-pin-start), var(--world-editor-card-pin-middle) 42%, var(--world-editor-card-pin-end)) border-box;
 					box-shadow: 0 10px 28px color-mix(in srgb, rgba(0, 0, 0, .20) var(--world-editor-card-shell-percent), transparent), 0 0 10px var(--world-editor-card-pin-glow-start), 0 0 24px var(--world-editor-card-pin-glow-middle), 0 0 46px var(--world-editor-card-pin-glow-end);
-				}
-				.cattail-world-editor-selection-card[data-pinned="true"]::before {
-					opacity: 1;
 				}
 				.cattail-world-editor-selection-card[data-theme="void"][data-pinned="true"] {
 					box-shadow: 0 10px 28px color-mix(in srgb, rgba(0, 0, 0, .38) var(--world-editor-card-shell-percent), transparent), 0 0 10px var(--world-editor-card-pin-glow-start), 0 0 24px var(--world-editor-card-pin-glow-middle), 0 0 46px var(--world-editor-card-pin-glow-end);

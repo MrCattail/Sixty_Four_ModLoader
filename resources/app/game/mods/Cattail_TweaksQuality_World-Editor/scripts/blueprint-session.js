@@ -689,6 +689,11 @@ ModLoader.register({
 					card,
 					pinned: false,
 					positionVisible: false,
+					positionPreviewTarget: null,
+					positionPreviewWorldBounds: null,
+					positionPreviewScreenBounds: null,
+					positionPreviewViewportWidth: 0,
+					positionPreviewViewportHeight: 0,
 					temporaryVisible: false,
 					temporaryRemaining: TEMPORARY_VISIBLE_MS,
 					temporaryDeadline: 0,
@@ -1700,20 +1705,24 @@ ModLoader.register({
 				syncCardPassThrough()
 				ui.card.dataset.theme = game.plane ? 'void' : 'reality'
 				if (!currentRuntime.active) {
+					resetPreviewCardPosition()
 					ui.positionVisible = false
 					refreshCardVisibility()
 					return
 				}
 				if (typeof api.render?.isEnabled === 'function' && !api.render.isEnabled()) {
+					resetPreviewCardPosition()
 					ui.positionVisible = false
 					refreshCardVisibility()
 					return
 				}
 				const result = displayResult()
 				const previewState = previewSnapshot()
-				const previewBounds = previewState?.active && !previewState.paused
-					? previewWorldBounds(previewState)
+				const previewGeometry = previewState?.active && !previewState.paused
+					? previewCardPositionGeometry(previewState)
 					: null
+				const previewBounds = previewGeometry?.bounds || null
+				if (!previewGeometry) resetPreviewCardPosition()
 				const bounds = previewBounds
 					? projectWorldBounds(game, previewBounds)
 					: result?.anchor
@@ -1726,6 +1735,20 @@ ModLoader.register({
 				}
 				const viewportWidth = finiteOr(window.innerWidth, document.documentElement?.clientWidth || 0)
 				const viewportHeight = finiteOr(window.innerHeight, document.documentElement?.clientHeight || 0)
+				if (previewGeometry) {
+					const projectionChanged = !screenBoundsEqual(ui.positionPreviewScreenBounds, bounds)
+					const viewportChanged = (
+						ui.positionPreviewViewportWidth !== viewportWidth ||
+						ui.positionPreviewViewportHeight !== viewportHeight
+					)
+					if (!previewGeometry.snapshotChanged && !projectionChanged && !viewportChanged) {
+						refreshCardVisibility()
+						return
+					}
+					ui.positionPreviewScreenBounds = copyScreenBounds(bounds)
+					ui.positionPreviewViewportWidth = viewportWidth
+					ui.positionPreviewViewportHeight = viewportHeight
+				}
 				if (
 					viewportWidth <= 0 ||
 					viewportHeight <= 0 ||
@@ -2065,6 +2088,7 @@ ModLoader.register({
 				if (!ui) return false
 				cancelSectionResize(reason || 'card-display-reset', true)
 				clearTemporaryTimer()
+				resetPreviewCardPosition()
 				ui.pinned = false
 				ui.pointerPaused = false
 				ui.temporaryVisible = false
@@ -3337,6 +3361,73 @@ ModLoader.register({
 					}
 				}
 				return target ? { minU: target[0], maxU: target[0], minV: target[1], maxV: target[1] } : null
+			}
+
+			function previewCardPositionGeometry(state) {
+				if (!ui) return null
+				const target = normalizePosition(state?.target)
+				if (!target) {
+					resetPreviewCardPosition()
+					return null
+				}
+				const snapshotChanged = (
+					!samePosition(target, ui.positionPreviewTarget) ||
+					!ui.positionPreviewWorldBounds
+				)
+				if (snapshotChanged) {
+					const contentMin = normalizePosition(state?.blueprint?.contentBounds?.min)
+					const contentMax = normalizePosition(state?.blueprint?.contentBounds?.max)
+					ui.positionPreviewTarget = target.slice()
+					ui.positionPreviewWorldBounds = contentMin && contentMax
+						? {
+							minU: target[0] + Math.min(contentMin[0], contentMax[0]),
+							maxU: target[0] + Math.max(contentMin[0], contentMax[0]),
+							minV: target[1] + Math.min(contentMin[1], contentMax[1]),
+							maxV: target[1] + Math.max(contentMin[1], contentMax[1])
+						}
+						: previewWorldBounds(state)
+				}
+				return ui.positionPreviewWorldBounds
+					? { bounds: ui.positionPreviewWorldBounds, snapshotChanged }
+					: null
+			}
+
+			function resetPreviewCardPosition() {
+				if (!ui) return
+				ui.positionPreviewTarget = null
+				ui.positionPreviewWorldBounds = null
+				ui.positionPreviewScreenBounds = null
+				ui.positionPreviewViewportWidth = 0
+				ui.positionPreviewViewportHeight = 0
+			}
+
+			function samePosition(left, right) {
+				return !!(
+					Array.isArray(left) &&
+					Array.isArray(right) &&
+					left[0] === right[0] &&
+					left[1] === right[1]
+				)
+			}
+
+			function screenBoundsEqual(left, right) {
+				if (!left || !right) return false
+				const tolerance = .25
+				return (
+					Math.abs(left.minX - right.minX) <= tolerance &&
+					Math.abs(left.maxX - right.maxX) <= tolerance &&
+					Math.abs(left.minY - right.minY) <= tolerance &&
+					Math.abs(left.maxY - right.maxY) <= tolerance
+				)
+			}
+
+			function copyScreenBounds(bounds) {
+				return bounds ? {
+					minX: bounds.minX,
+					maxX: bounds.maxX,
+					minY: bounds.minY,
+					maxY: bounds.maxY
+				} : null
 			}
 
 			function projectWorldBounds(projectGame, range) {

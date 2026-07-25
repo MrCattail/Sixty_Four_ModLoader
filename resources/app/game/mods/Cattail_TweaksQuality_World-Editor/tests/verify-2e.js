@@ -408,6 +408,20 @@ function createMiniDocument() {
 		},
 		getElementById(id) {
 			return document.body.find(node => node.id === id) || document.head.find(node => node.id === id)
+		},
+		querySelectorAll(selector) {
+			const idMatch = String(selector).match(/^#(.+)$/)
+			if (!idMatch) return []
+			const matches = []
+			const visit = function (node) {
+				for (const child of node.children) {
+					if (child.id === idMatch[1]) matches.push(child)
+					visit(child)
+				}
+			}
+			visit(document.body)
+			visit(document.head)
+			return matches
 		}
 	}
 	document.body = new MiniElement('body', document)
@@ -523,12 +537,19 @@ function testCardLockAndTemporaryWindow() {
 			return { wheelLatched }
 		}
 	}
+	const staleCards = [document.createElement('div'), document.createElement('div')]
+	for (const staleCard of staleCards) {
+		staleCard.id = 'cattail-world-editor-selection-card'
+		document.body.append(staleCard)
+	}
 	api.emit('afterGameInit', {}, game)
 
 	const card = document.getElementById('cattail-world-editor-selection-card')
 	const style = document.getElementById('cattail-world-editor-selection-card-style')
 	assert.ok(card)
 	assert.ok(style)
+	assert.equal(document.querySelectorAll('#cattail-world-editor-selection-card').length, 1)
+	assert.equal(staleCards.every(staleCard => staleCard.parentNode === null), true)
 	assert.equal(card.getAttribute('role'), 'button')
 	assert.equal(card.getAttribute('tabindex'), '0')
 	assert.equal(card.dataset.pinned, 'false')
@@ -542,6 +563,11 @@ function testCardLockAndTemporaryWindow() {
 	assert.match(style.textContent, /rgba\(227,\s*253,\s*67,\s*\.98\)/)
 	assert.match(style.textContent, /rgba\(166,\s*242,\s*70,\s*\.96\)/)
 	assert.match(style.textContent, /rgba\(76,\s*185,\s*107,\s*\.98\)/)
+	assert.match(style.textContent, /overflow-y:\s*auto/)
+	assert.match(style.textContent, /linear-gradient\(var\(--world-editor-card-bg\),\s*var\(--world-editor-card-bg\)\)\s*padding-box/)
+	assert.match(style.textContent, /linear-gradient\(135deg,[^;]+border-box/)
+	assert.doesNotMatch(style.textContent, /\.cattail-world-editor-selection-card::before/)
+	assert.doesNotMatch(style.textContent, /inset:\s*-1px/)
 	assert.equal(card.dataset.wheelLatched, 'false')
 	assert.equal(card.dataset.inputPassThrough, 'false')
 
