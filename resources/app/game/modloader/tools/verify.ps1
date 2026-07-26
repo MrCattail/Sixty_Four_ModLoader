@@ -11,6 +11,7 @@ $checks = @(
 	[ordered]@{ file = 'scripts\ui.js'; pattern = 'ModLoader?.resolveAsset'; description = 'shop icon asset hook' },
 	[ordered]@{ file = '..\main.js'; pattern = 'ModLoaderMainProcess.attachWindow(win)'; description = 'main process bridge support' },
 	[ordered]@{ file = '..\main.js'; pattern = 'toggleDevTools'; description = 'DevTools shortcut/menu support' },
+	[ordered]@{ file = '..\main.js'; pattern = 'modloader:toggle-devtools'; description = 'DevTools menu button IPC support' },
 	[ordered]@{ file = 'modloader\main-process.js'; pattern = 'module.exports'; description = 'main process window module' },
 	[ordered]@{ file = 'modloader\main-process.js'; pattern = 'applyModloaderMainProcessManifests'; description = 'main process manifest support' },
 	[ordered]@{ file = 'modloader\loader.js'; pattern = 'window.ModLoader = api'; description = 'loader exports API' }
@@ -48,20 +49,39 @@ $results += [ordered]@{
     ok = $languageChangeHookOk
 }
 
-$renderApiContractTestPath = Join-Path $PSScriptRoot 'render-api-v1-contract.test.js'
-$renderApiContractOk = $false
-if (Test-Path -LiteralPath $renderApiContractTestPath) {
-	& node $renderApiContractTestPath
-	$renderApiContractOk = $LASTEXITCODE -eq 0
-}
-$results += [ordered]@{
-	description = 'Render API v1 runtime contract'
-	file = 'modloader\tools\render-api-v1-contract.test.js'
-	pattern = 'version, capabilities, ownership, conflicts, scope restore, master switch'
-	ok = $renderApiContractOk
+$warnings = @()
+$nodeCommand = Get-Command node -ErrorAction SilentlyContinue
+
+$mainJsPath = Join-Path $GameRoot '..\main.js'
+if (Test-Path -LiteralPath $mainJsPath) {
+	if ($nodeCommand) {
+		& $nodeCommand.Source --check $mainJsPath
+		$results += [ordered]@{
+			description = 'main process JavaScript syntax'
+			file = '..\main.js'
+			pattern = 'node --check'
+			ok = $LASTEXITCODE -eq 0
+		}
+	} else {
+		$warnings += 'Node.js is not available; skipped main process JavaScript syntax check.'
+	}
 }
 
-$warnings = @()
+$renderApiContractTestPath = Join-Path $PSScriptRoot 'render-api-v1-contract.test.js'
+if (Test-Path -LiteralPath $renderApiContractTestPath) {
+	if ($nodeCommand) {
+		& $nodeCommand.Source $renderApiContractTestPath
+		$results += [ordered]@{
+			description = 'Render API v1 runtime contract'
+			file = 'modloader\tools\render-api-v1-contract.test.js'
+			pattern = 'version, capabilities, ownership, conflicts, scope restore, master switch'
+			ok = $LASTEXITCODE -eq 0
+		}
+	} else {
+		$warnings += 'Node.js is not available; skipped Render API v1 runtime contract check.'
+	}
+}
+
 $enabledNames = @()
 $enabledPath = Join-Path $GameRoot 'mods\enabled.json'
 try {

@@ -127,7 +127,7 @@ ModLoader.register({
 		function validateRoot(game, blueprint, target) {
 			if (!game || typeof game !== 'object') throw planError('game-unavailable')
 			const schemaVersion = Number(blueprint?.schemaVersion)
-			if (!blueprint || (schemaVersion !== 1 && schemaVersion !== 2) || blueprint.mode !== 'structure') {
+			if (!blueprint || (schemaVersion !== 1 && schemaVersion !== 2 && schemaVersion !== 3) || blueprint.mode !== 'structure') {
 				throw planError('structure-blueprint-required')
 			}
 			if (!Array.isArray(blueprint.entities) || !blueprint.entities.length) {

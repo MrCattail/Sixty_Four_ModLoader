@@ -273,13 +273,13 @@ async function testStructureCaptureAndImmutability() {
 	assert.equal(result.status, 'captured')
 	assert.equal(result.clipboard, 'ready')
 	assert.equal(env.writes.length, 1)
-	assert.match(env.writes[0], /\n  "schemaVersion": 2,/)
+	assert.match(env.writes[0], /\n  "schemaVersion": 3,/)
 
 	const blueprint = env.session.snapshot().blueprint
-	assert.equal(env.session.version, '0.3.4')
-	assert.equal(env.session.schemaVersion, 2)
-	assert.equal(env.session.snapshot().version, '0.3.4')
-	assert.equal(blueprint.schemaVersion, 2)
+	assert.equal(env.session.version, '0.3.5')
+	assert.equal(env.session.schemaVersion, 3)
+	assert.equal(env.session.snapshot().version, '0.3.5')
+	assert.equal(blueprint.schemaVersion, 3)
 	assert.equal(blueprint.mode, 'structure')
 	assert.equal(blueprint.sourcePlane, 0)
 	assert.deepEqual(plain(blueprint.anchor), { position: [1, 1], selectionIds: [1, 2] })
@@ -516,9 +516,9 @@ function testLanguagesManifestUiAndReadOnlyBoundary() {
 	vm.runInContext(fs.readFileSync(i18nFilename, 'utf8'), i18nSandbox, { filename: i18nFilename })
 	i18nDefinitions[0].init()
 	const i18n = i18nSandbox[I18N_KEY]
-	assert.equal(i18n.version, '0.3.4')
+	assert.equal(i18n.version, '0.3.5')
 	assert.equal(i18n.languages.length, 20)
-	assert.equal(i18n.keys.length, 82)
+	assert.equal(i18n.keys.length, 98)
 	const blueprintKeys = [
 		'blueprintModeStructure',
 		'blueprintModeFull',
@@ -549,9 +549,9 @@ function testLanguagesManifestUiAndReadOnlyBoundary() {
 	}
 
 	const manifest = JSON.parse(fs.readFileSync(path.join(MOD_ROOT, 'mod.json'), 'utf8'))
-	assert.equal(manifest.version, '0.3.4')
+	assert.equal(manifest.version, '0.3.5')
 	assert.equal(manifest.languageSupport.gameLanguage, true)
-	assert.equal(manifest.entry.length, 18)
+	assert.equal(manifest.entry.length, 20)
 	assert.ok(manifest.entry.includes(BLUEPRINT_SOURCE))
 	assert.ok(
 		manifest.entry.indexOf('scripts/ui/editor-shell.js') <
@@ -559,8 +559,8 @@ function testLanguagesManifestUiAndReadOnlyBoundary() {
 	)
 
 	const source = fs.readFileSync(path.join(MOD_ROOT, BLUEPRINT_SOURCE), 'utf8')
-	assert.match(source, /schemaVersion:\s*2/)
-	assert.match(source, /version:\s*'0\.3\.4'/)
+	assert.match(source, /schemaVersion:\s*3/)
+	assert.match(source, /version:\s*'0\.3\.5'/)
 	assert.match(source, /selectionIds:\s*source\.selectionIds/)
 	assert.match(source, /typeof game\.uvToXY !== 'function'/)
 	assert.match(source, /Object\.freeze/)
@@ -589,7 +589,7 @@ async function run() {
 	await testFullCaptureCubeRulesAndFailureRetention()
 	await testChunkCancellationHotkeyAndLifecycle()
 	testLanguagesManifestUiAndReadOnlyBoundary()
-	console.log('3A/3C verification passed: immutable schema-2 session, projected outer-bounds visual-right anchor, sorted selection IDs, deterministic projection fallback, structure/full capture, multi-selection union, cross-boundary footprints, Mod and transient skips, stable Cube gating, clipboard success/failure, empty retention, chunk cancellation, lifecycle, 20-language UI, original-font card contract, manifest, and read-only boundary.')
+	console.log('3A/3C verification passed: immutable schema-3 session, projected outer-bounds visual-right anchor, sorted selection IDs, deterministic projection fallback, structure/full capture, multi-selection union, cross-boundary footprints, Mod and transient skips, stable Cube gating, clipboard success/failure, empty retention, chunk cancellation, lifecycle, 20-language UI, original-font card contract, manifest, and read-only boundary.')
 }
 
 run().catch(error => {

@@ -295,7 +295,7 @@ function blueprint(records, options = {}) {
 		schemaVersion,
 		mode: options.mode || 'structure',
 		sourcePlane: options.sourcePlane || 0,
-		anchor: schemaVersion === 2
+		anchor: schemaVersion === 2 || schemaVersion === 3
 			? { position: [0, 0], selectionIds: [1] }
 			: { position: [0, 0], selectionId: 1 },
 		contentBounds: {
@@ -447,10 +447,8 @@ async function testOnlyOneCancellationAndBenchmark() {
 		planner.build(game, blueprint(source.entities, { mode: 'full' }), [6, 5]),
 		error => error?.code === 'structure-blueprint-required'
 	)
-	await assert.rejects(
-		planner.build(game, blueprint(source.entities, { schemaVersion: 3 }), [6, 5]),
-		error => error?.code === 'structure-blueprint-required'
-	)
+	const schema3 = await planner.build(game, blueprint(source.entities, { schemaVersion: 3 }), [6, 5])
+	assert.equal(schema3.records[0].status, 'blocked')
 
 	let tick = 0
 	const benchmark = await planner.benchmark({
@@ -1191,9 +1189,9 @@ function testManifestLocalizationAndStaticContracts() {
 		'previewNoCost'
 	]
 	const i18n = loadI18n()
-	assert.equal(i18n.version, '0.3.4')
+	assert.equal(i18n.version, '0.3.5')
 	assert.equal(i18n.languages.length, 20)
-	assert.equal(i18n.keys.length, 82)
+	assert.equal(i18n.keys.length, 98)
 	for (const language of i18n.languages) {
 		for (const key of previewKeys) {
 			const translated = i18n.t(language, key)
@@ -1203,7 +1201,7 @@ function testManifestLocalizationAndStaticContracts() {
 	}
 
 	const manifest = JSON.parse(fs.readFileSync(path.join(MOD_ROOT, 'mod.json'), 'utf8'))
-	assert.equal(manifest.version, '0.3.4')
+	assert.equal(manifest.version, '0.3.5')
 	assert.equal(manifest.languageSupport.gameLanguage, true)
 	assert.deepEqual(manifest.entry, [
 		'scripts/core/foundation.js',
@@ -1211,6 +1209,7 @@ function testManifestLocalizationAndStaticContracts() {
 		'scripts/core/selection-state.js',
 		'scripts/core/tool-state.js',
 		'scripts/core/selection-analysis.js',
+		'scripts/core/production-state.js',
 		'scripts/core/blueprint-transform.js',
 		'scripts/core/blueprint-preview-plan.js',
 		'scripts/core/input-controller.js',
@@ -1223,7 +1222,8 @@ function testManifestLocalizationAndStaticContracts() {
 		'scripts/ui/editor-shell.js',
 		'scripts/blueprint-session.js',
 		'scripts/blueprint-preview.js',
-		'scripts/ui/selection-card.js'
+		'scripts/ui/selection-card.js',
+		'scripts/ui/production-cards.js'
 	])
 
 	const previewSource = fs.readFileSync(path.join(MOD_ROOT, PREVIEW_SOURCE), 'utf8')
@@ -1247,7 +1247,7 @@ function testManifestLocalizationAndStaticContracts() {
 	assert.match(previewSource, /PENDING_PREVIEW_TRANSITION\s*=\s*'opacity 80ms linear'/)
 	assert.doesNotMatch(previewSource.match(/PENDING_PREVIEW_TRANSITION\s*=\s*'([^']+)'/)?.[1] || '', /transform/)
 	assert.match(previewSource, /api\.render\.markDirty\(RENDER_LAYER_ID,\s*game\)/)
-	assert.match(plannerSource, /schemaVersion\s*!==\s*1\s*&&\s*schemaVersion\s*!==\s*2/)
+	assert.match(plannerSource, /schemaVersion\s*!==\s*1\s*&&\s*schemaVersion\s*!==\s*2\s*&&\s*schemaVersion\s*!==\s*3/)
 	assert.match(previewSource, /space:\s*'screen'/)
 	assert.match(previewSource, /ctx\.setTransform\(1,\s*0,\s*0,\s*1,\s*centerX,\s*centerY\)/)
 	assert.match(previewSource, /ctx\.clearRect\?\.\(0,\s*0,\s*width,\s*height\)/)

@@ -853,8 +853,10 @@ function testCardOpacityController() {
 
 	const selection = card('selection', 0, 100)
 	const blueprint = card('blueprint', 50, 150)
+	const blueprintProduction = card('blueprint-production', 150, 250)
 	const selectionHint = hint()
 	const blueprintHint = hint()
+	const blueprintProductionHint = hint()
 	const selectionControls = controller.register({
 		id: 'selection',
 		element: selection,
@@ -869,9 +871,23 @@ function testCardOpacityController() {
 	})
 	const blueprintControls = controller.register({
 		id: 'blueprint',
+		group: 'blueprint-production',
 		element: blueprint,
 		hint: blueprintHint,
 		priority: 48,
+		getText(state) {
+			return {
+				instruction: 'adjust',
+				mode: state.contentIndependent ? 'visible' : 'linked'
+			}
+		}
+	})
+	const blueprintProductionControls = controller.register({
+		id: 'blueprint-production',
+		group: 'blueprint-production',
+		element: blueprintProduction,
+		hint: blueprintProductionHint,
+		priority: 49,
 		getText(state) {
 			return {
 				instruction: 'adjust',
@@ -885,19 +901,24 @@ function testCardOpacityController() {
 	window.dispatch('wheel', firstWheel)
 	assert.equal(firstWheel.defaultPrevented, true)
 	assert.equal(blueprintControls.snapshot().opacity, .9)
+	assert.equal(blueprintProductionControls.snapshot().opacity, .9)
 	assert.equal(selectionControls.snapshot().opacity, 1)
 
 	for (let index = 0; index < 10; index++) window.dispatch('wheel', event({ deltaY: 100 }))
 	assert.equal(blueprintControls.snapshot().opacity, .25)
+	assert.equal(blueprintProductionControls.snapshot().opacity, .25)
 	const middle = event({ button: 1 })
 	window.dispatch('mousedown', middle)
 	assert.equal(middle.defaultPrevented, true)
 	assert.equal(blueprintControls.snapshot().contentIndependent, true)
+	assert.equal(blueprintProductionControls.snapshot().contentIndependent, true)
 	assert.equal(blueprint.style['--world-editor-card-shell-opacity'], '0')
 	assert.equal(blueprint.style['--world-editor-card-shell-percent'], '0%')
 	assert.equal(blueprint.style['--world-editor-card-shell-blur-14'], '0px')
 	assert.equal(blueprint.style['--world-editor-card-shell-saturate'], '1')
+	assert.equal(blueprintProduction.style['--world-editor-card-shell-opacity'], '0')
 	assert.equal(blueprintHint.dataset.contentIndependent, 'true')
+	assert.equal(blueprintProductionHint.dataset.contentIndependent, 'true')
 	assert.match(blueprintHint.attributes['aria-label'], /adjust visible/)
 	window.dispatch('auxclick', event({ button: 1 }))
 	assert.equal(blueprintControls.snapshot().contentIndependent, true)
@@ -905,6 +926,7 @@ function testCardOpacityController() {
 	window.dispatch('mousedown', event({ button: 1, clientX: 25 }))
 	assert.equal(selectionControls.snapshot().contentIndependent, true)
 	assert.equal(blueprintControls.snapshot().contentIndependent, true)
+	assert.equal(blueprintProductionControls.snapshot().contentIndependent, true)
 	window.dispatch('keyup', event({ key: 'z' }))
 	const releasedWheel = event({ deltaY: -100, clientX: 25 })
 	window.dispatch('wheel', releasedWheel)
@@ -913,6 +935,7 @@ function testCardOpacityController() {
 
 	selectionControls.release()
 	blueprintControls.release()
+	blueprintProductionControls.release()
 	assert.equal(controller.snapshot().length, 0)
 	controller.dispose()
 }
@@ -944,7 +967,7 @@ function testLocalizationAndIntegrationContract() {
 	]
 
 	assert.equal(i18n.languages.length, 20)
-	assert.equal(i18n.keys.length, 82)
+	assert.equal(i18n.keys.length, 98)
 	for (const language of i18n.languages) {
 		for (const key of transformKeys) {
 			const translated = i18n.t(language, key)
@@ -953,16 +976,16 @@ function testLocalizationAndIntegrationContract() {
 		}
 	}
 
-	assert.equal(manifest.version, '0.3.4')
+	assert.equal(manifest.version, '0.3.5')
 	assert.equal(manifest.languageSupport.gameLanguage, true)
-	assert.equal(manifest.entry.length, 18)
+	assert.equal(manifest.entry.length, 20)
 	assert.equal(
 		manifest.entry.indexOf(CARD_OPACITY_SOURCE),
 		manifest.entry.indexOf(I18N_SOURCE) + 1
 	)
 	assert.equal(
 		manifest.entry.indexOf(TRANSFORM_SOURCE),
-		manifest.entry.indexOf('scripts/core/selection-analysis.js') + 1
+		manifest.entry.indexOf('scripts/core/selection-analysis.js') + 2
 	)
 	assert.equal(
 		manifest.entry.indexOf('scripts/core/blueprint-preview-plan.js'),

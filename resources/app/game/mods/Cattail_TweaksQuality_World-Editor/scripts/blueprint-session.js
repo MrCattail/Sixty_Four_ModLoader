@@ -6,14 +6,17 @@ ModLoader.register({
 		const INTERACTION_KEY = Symbol.for('cattail.world-editor.selection-interaction')
 		const I18N_KEY = Symbol.for('cattail.world-editor.i18n')
 		const BLUEPRINT_KEY = Symbol.for('cattail.world-editor.blueprint')
+		const PRODUCTION_KEY = Symbol.for('cattail.world-editor.production')
 		const TRANSFORM_KEY = Symbol.for('cattail.world-editor.blueprint-transform')
 		const PREVIEW_KEY = Symbol.for('cattail.world-editor.blueprint-preview')
 		const CARD_OPACITY_KEY = Symbol.for('cattail.world-editor.card-opacity')
 		const SHELL_ID = 'cattail-world-editor-shell'
 		const SELECTION_CARD_ID = 'cattail-world-editor-selection-card'
 		const CARD_ID = 'cattail-world-editor-blueprint-card'
+		const BLUEPRINT_PRODUCTION_CARD_ID = 'cattail-world-editor-blueprint-production-card'
 		const STYLE_ID = 'cattail-world-editor-blueprint-style'
 		const TEMPORARY_VISIBLE_MS = 3000
+		const AUTO_HIDE_TRANSITION_MS = 160
 		const SCAN_CHUNK_SIZE = 1024
 		const EDITABLE_SELECTOR = 'input, textarea, select, [contenteditable]:not([contenteditable="false"]), [role="textbox"]'
 		const ICON_ASSETS = Object.freeze({})
@@ -295,7 +298,7 @@ ModLoader.register({
 
 				function snapshot() {
 					return Object.freeze({
-						version: '0.3.4',
+						version: '0.3.5',
 						mode,
 						includeBlocks: mode === 'full' && includeBlocks,
 						blueprint,
@@ -432,9 +435,9 @@ ModLoader.register({
 				}
 
 				const session = Object.freeze({
-					version: '0.3.4',
+					version: '0.3.5',
 					game: sessionGame,
-					schemaVersion: 2,
+					schemaVersion: 3,
 					snapshot,
 					setMode(nextMode, reason) {
 						if (disposed || (nextMode !== 'structure' && nextMode !== 'full') || nextMode === mode) return false
@@ -526,6 +529,7 @@ ModLoader.register({
 				}
 
 				const entityRecords = []
+				const capturedEntities = []
 				const blockRecords = []
 				const skipped = new Map()
 				let crossBoundaryCount = 0
@@ -616,6 +620,7 @@ ModLoader.register({
 						record.state = saved.par
 					}
 					entityRecords.push(record)
+					capturedEntities.push(entity)
 					if (crossed) crossBoundaryCount += 1
 					contentBounds = includeBounds(contentBounds, footprint)
 				}
@@ -646,9 +651,13 @@ ModLoader.register({
 					crossBoundaryCount,
 					skipped
 				)
+				const productionState = globalThis[PRODUCTION_KEY]
+				const production = typeof productionState?.captureEntities === 'function'
+					? productionState.captureEntities(capturedEntities)
+					: null
 				return {
 					blueprint: {
-						schemaVersion: 2,
+						schemaVersion: 3,
 						mode: captureMode,
 						sourcePlane: source.sourcePlane,
 						anchor: {
@@ -660,6 +669,7 @@ ModLoader.register({
 						includeBlocks: captureMode === 'full' && captureBlocks,
 						entities: entityRecords,
 						blocks: blockRecords,
+						production,
 						summary
 					},
 					summary,
@@ -699,6 +709,8 @@ ModLoader.register({
 					temporaryDeadline: 0,
 					temporaryTimer: null,
 					pointerPaused: false,
+					autoHiding: false,
+					autoHideTimer: null,
 					capturedTypesSource: null,
 					capturedTypeCosts: null,
 					skippedTypesSource: null,
@@ -746,6 +758,7 @@ ModLoader.register({
 				ui = mounted
 				mounted.opacityControls = globalThis[CARD_OPACITY_KEY]?.register?.({
 					id: 'blueprint',
+					group: 'blueprint-production',
 					element: card,
 					hint: card.querySelector('.cattail-world-editor-card-opacity-hint'),
 					priority: 48,
@@ -769,6 +782,7 @@ ModLoader.register({
 				if (!ui) return
 				cancelSectionResize('ui-unmounted')
 				clearTemporaryTimer()
+				cancelCardAutoHide()
 				ui.controls.structure.removeEventListener('click', handleStructureMode)
 				ui.controls.full.removeEventListener('click', handleFullMode)
 				ui.controls.blocks.removeEventListener('click', handleBlocksToggle)
@@ -860,6 +874,7 @@ ModLoader.register({
 				card.dataset.theme = 'reality'
 				card.dataset.pinned = 'false'
 				card.dataset.inputPassThrough = 'false'
+				card.dataset.autoHiding = 'false'
 				card.setAttribute('role', 'region')
 				card.setAttribute('tabindex', '0')
 				card.setAttribute('aria-live', 'polite')
@@ -1680,8 +1695,20 @@ ModLoader.register({
 					displayWindow &&
 					!game.halt &&
 					!game.splash?.isShown &&
-					!vanillaHudHidden
+					!vanillaHudHidden &&
+					!gameHudHidden
 				)
+				const immediateHidden = !visible && (
+					!currentRuntime.active ||
+					!result ||
+					!onSourcePlane ||
+					!!game.halt ||
+					!!game.splash?.isShown ||
+					vanillaHudHidden ||
+					gameHudHidden ||
+					!ui.positionVisible
+				)
+				if (ui.autoHiding && immediateHidden) cancelCardAutoHide()
 				ui.card.dataset.visible = visible ? 'true' : 'false'
 				ui.card.dataset.positionVisible = ui.positionVisible ? 'true' : 'false'
 				ui.card.setAttribute('aria-hidden', visible && ui.positionVisible && !gameHudHidden ? 'false' : 'true')
@@ -1713,6 +1740,10 @@ ModLoader.register({
 				if (typeof api.render?.isEnabled === 'function' && !api.render.isEnabled()) {
 					resetPreviewCardPosition()
 					ui.positionVisible = false
+					refreshCardVisibility()
+					return
+				}
+				if (ui.autoHiding) {
 					refreshCardVisibility()
 					return
 				}
@@ -2044,6 +2075,7 @@ ModLoader.register({
 			function restartTemporaryWindow() {
 				if (!ui) return
 				clearTemporaryTimer()
+				cancelCardAutoHide()
 				ui.temporaryVisible = !!currentSession.lastResult
 				ui.temporaryRemaining = TEMPORARY_VISIBLE_MS
 				refreshCardVisibility()
@@ -2086,16 +2118,28 @@ ModLoader.register({
 
 			function resetCardDisplayState(reason) {
 				if (!ui) return false
+				const animate = reason === 'preview-exited' && cardCurrentlyVisible()
 				cancelSectionResize(reason || 'card-display-reset', true)
 				clearTemporaryTimer()
-				resetPreviewCardPosition()
 				ui.pinned = false
 				ui.pointerPaused = false
 				ui.temporaryVisible = false
 				ui.temporaryRemaining = TEMPORARY_VISIBLE_MS
 				ui.temporaryDeadline = 0
-				ui.positionVisible = false
 				ui.card.dataset.pinned = 'false'
+				if (animate) {
+					startCardAutoHide(function () {
+						resetPreviewCardPosition()
+						ui.positionVisible = false
+						ui.card.dataset.positionVisible = 'false'
+						ui.card.setAttribute('aria-hidden', 'true')
+					})
+					ui.card.blur?.()
+					return true
+				}
+				cancelCardAutoHide()
+				resetPreviewCardPosition()
+				ui.positionVisible = false
 				ui.card.dataset.visible = 'false'
 				ui.card.dataset.positionVisible = 'false'
 				ui.card.setAttribute('aria-hidden', 'true')
@@ -2106,6 +2150,7 @@ ModLoader.register({
 			function clearTemporaryWindow() {
 				if (!ui) return
 				clearTemporaryTimer()
+				cancelCardAutoHide()
 				ui.temporaryVisible = false
 				ui.temporaryRemaining = TEMPORARY_VISIBLE_MS
 				refreshCardVisibility()
@@ -2116,6 +2161,56 @@ ModLoader.register({
 				globalThis.clearTimeout?.(ui.temporaryTimer)
 				ui.temporaryTimer = null
 				ui.temporaryDeadline = 0
+			}
+
+			function cardCurrentlyVisible() {
+				return !!(
+					ui?.card?.dataset?.visible === 'true' &&
+					ui?.card?.dataset?.positionVisible === 'true' &&
+					ui?.card?.getAttribute?.('aria-hidden') !== 'true'
+				)
+			}
+
+			function setCardAutoHiding(active) {
+				if (!ui) return
+				ui.autoHiding = !!active
+				ui.card.dataset.autoHiding = ui.autoHiding ? 'true' : 'false'
+				const companion = document.getElementById(BLUEPRINT_PRODUCTION_CARD_ID)
+				if (companion) {
+					companion.dataset.autoHiding = ui.autoHiding ? 'true' : 'false'
+					if (ui.autoHiding) {
+						companion.dataset.visible = 'false'
+						companion.setAttribute('aria-hidden', 'true')
+					}
+				}
+			}
+
+			function cancelCardAutoHide() {
+				if (!ui) return
+				if (ui.autoHideTimer !== null) {
+					globalThis.clearTimeout?.(ui.autoHideTimer)
+					ui.autoHideTimer = null
+				}
+				setCardAutoHiding(false)
+			}
+
+			function startCardAutoHide(onComplete) {
+				if (!ui) return
+				cancelCardAutoHide()
+				if (!cardCurrentlyVisible()) {
+					onComplete?.()
+					refreshCardVisibility()
+					return
+				}
+				setCardAutoHiding(true)
+				refreshCardVisibility()
+				ui.autoHideTimer = globalThis.setTimeout?.(function () {
+					if (!ui) return
+					ui.autoHideTimer = null
+					setCardAutoHiding(false)
+					onComplete?.()
+					refreshCardVisibility()
+				}, AUTO_HIDE_TRANSITION_MS) ?? null
 			}
 
 			function pauseTemporaryTimer() {
@@ -2141,7 +2236,7 @@ ModLoader.register({
 				clearTemporaryTimer()
 				if (ui.temporaryRemaining <= 0) {
 					ui.temporaryVisible = false
-					refreshCardVisibility()
+					startCardAutoHide()
 					return
 				}
 				ui.temporaryDeadline = Date.now() + ui.temporaryRemaining
@@ -2151,7 +2246,7 @@ ModLoader.register({
 					ui.temporaryDeadline = 0
 					ui.temporaryRemaining = 0
 					ui.temporaryVisible = false
-					refreshCardVisibility()
+					startCardAutoHide()
 				}, ui.temporaryRemaining) ?? null
 			}
 
@@ -2441,6 +2536,17 @@ ModLoader.register({
 					.cattail-world-editor-blueprint-card[data-visible="true"][data-position-visible="true"][data-opacity-content-independent="true"] {
 						opacity: 1;
 					}
+					.cattail-world-editor-blueprint-card[data-visible="false"][data-auto-hiding="false"],
+					.cattail-world-editor-blueprint-card[data-position-visible="false"][data-auto-hiding="false"] {
+						transition: none;
+					}
+					.cattail-world-editor-blueprint-card[data-visible="false"][data-auto-hiding="true"] {
+						visibility: visible;
+						opacity: 0;
+						transform: translateY(4px) scale(var(--world-editor-ui-scale, 1));
+						pointer-events: none;
+						transition: opacity .16s ease-out, transform .16s ease-out;
+					}
 					.cattail-world-editor-blueprint-card[data-visible="true"][data-position-visible="true"][data-input-pass-through="true"] {
 						pointer-events: none;
 					}
@@ -2449,12 +2555,11 @@ ModLoader.register({
 						box-shadow: 0 10px 28px color-mix(in srgb, rgba(0, 0, 0, .24) var(--world-editor-card-shell-percent), transparent), 0 0 16px color-mix(in srgb, rgba(166, 242, 70, .36) var(--world-editor-card-shell-percent), transparent);
 					}
 					.cattail-world-editor-blueprint-card:focus-visible {
-						outline: 2px solid var(--blueprint-card-accent);
-						outline-offset: 3px;
+						outline: none;
 					}
 					.cattail-world-editor-blueprint-card__header {
 						display: grid;
-						grid-template-columns: minmax(0, 1fr) auto 24px;
+						grid-template-columns: minmax(0, 1fr) auto 24px 24px;
 						align-items: center;
 						gap: 8px;
 					}

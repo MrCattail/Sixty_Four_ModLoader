@@ -3453,6 +3453,11 @@
 		}
 	}
 	Object.assign(PANEL_TEXT.en, {
+		devTools: 'DevTools',
+		devToolsTitle: 'Open DevTools',
+		devToolsOpened: 'DevTools opened.',
+		devToolsFailed: 'Could not open DevTools: {value}',
+		devToolsUnavailable: 'DevTools IPC is unavailable. Use Ctrl+Shift+I or F12.',
 		translationImportWriteModsTitle: 'Write translations to mod.json?',
 		translationImportWriteModsMessage: 'The imported file will replace ModLoader translations.json either way. Do you also want to write matching mod translation fields into installed mod.json files? This overwrites existing matching translation fields.',
 		translationImportWriteModsConfirm: 'Write to mod',
@@ -3462,6 +3467,11 @@
 		translationImportModFailures: 'Failures: {failures}'
 	})
 	Object.assign(PANEL_TEXT.sch, {
+		devTools: 'DevTools',
+		devToolsTitle: '\u6253\u5f00 DevTools',
+		devToolsOpened: 'DevTools \u5df2\u6253\u5f00\u3002',
+		devToolsFailed: '\u65e0\u6cd5\u6253\u5f00 DevTools\uff1a{value}',
+		devToolsUnavailable: 'DevTools \u901a\u9053\u4e0d\u53ef\u7528\uff0c\u8bf7\u4f7f\u7528 Ctrl+Shift+I \u6216 F12\u3002',
 		translationExport: '\u5bfc\u51fa',
 		translationExportTitle: '\u5bfc\u51fa\u7ffb\u8bd1\u5907\u4efd',
 		translationExported: '\u7ffb\u8bd1\u5907\u4efd\u5df2\u5bfc\u51fa\uff1a{path}',
@@ -3812,6 +3822,8 @@
 			#modloader-panel .modloader-action-icon-export:before, #modloader-panel .modloader-action-icon-import:before { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -55%); font: 700 13px/1 Montserrat, Arial, sans-serif; }
 			#modloader-panel .modloader-action-icon-export:before { content: '\\2191'; }
 			#modloader-panel .modloader-action-icon-import:before { content: '\\2193'; }
+			#modloader-panel .modloader-action-icon-devtools:before { content: ''; position: absolute; left: 1px; top: 2px; width: 13px; height: 10px; border: 1.6px solid currentColor; border-radius: 2px; box-sizing: border-box; }
+			#modloader-panel .modloader-action-icon-devtools:after { content: ''; position: absolute; left: 4px; top: 13px; width: 7px; height: 1.6px; border-radius: 999px; background: currentColor; box-shadow: 2px -5px 0 -1px currentColor; }
 			#modloader-panel .modloader-panel-error { margin: 8px 0; padding: 8px; border-radius: 6px; background: rgba(255, 96, 96, .14); color: var(--modloader-error-text); }
 			#modloader-panel .modloader-import-zone { display: grid; place-items: center; min-height: 0; max-height: 0; opacity: 0; overflow: hidden; border: 1px solid transparent; border-radius: 7px; background: var(--modloader-surface); box-shadow: inset 0 1px 18px rgba(0,0,0,.28); transform: translateY(-8px); transition: max-height .22s ease, min-height .22s ease, opacity .16s ease, transform .22s ease, border-color .16s ease; }
 			#modloader-panel .modloader-import-zone.active { min-height: 220px; max-height: 320px; opacity: 1; transform: translateY(0); border-color: var(--modloader-border); }
@@ -4029,6 +4041,13 @@
 			state.modFileTools = null
 		}
 		return state.modFileTools
+	}
+
+	const openDevToolsFromPanel = function () {
+		const tools = getModFileTools()
+		if (!tools?.ipcRenderer?.send) throw new Error(t('devToolsUnavailable'))
+		tools.ipcRenderer.send('modloader:toggle-devtools')
+		return { message: t('devToolsOpened') }
 	}
 
 	const getTranslationCatalogPath = function () {
@@ -7099,7 +7118,7 @@
 						const result = await options.action()
 						if (result?.message) state.panelMessage = result.message
 					} catch (error) {
-						state.panelMessage = t('translationFileFailed', { value: error.message })
+						state.panelMessage = t(options.errorKey || 'translationFileFailed', { value: error.message })
 					}
 					renderPanel()
 				}
@@ -7127,6 +7146,15 @@
 			{ value: true, label: t('renderApiOn') },
 			{ value: false, label: t('renderApiOff') }
 		], isRenderApiEnabled(), function (value) { setRenderApiEnabled(value !== false) })
+		addSettingsButtonRow(t('devTools'), [
+			{
+				icon: 'devtools',
+				label: t('devTools'),
+				title: t('devToolsTitle'),
+				errorKey: 'devToolsFailed',
+				action: openDevToolsFromPanel
+			}
+		])
 		addSettingsButtonRow(t('translationFile'), [
 			{
 				icon: 'translation',

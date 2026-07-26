@@ -576,9 +576,9 @@ function testCardI18nManifestAndCompatibilityBoundary() {
 	const api = createApi()
 	for (const definition of definitions) definition.init(api)
 	const i18n = sandbox[I18N_KEY]
-	assert.equal(i18n.version, '0.3.4')
+	assert.equal(i18n.version, '0.3.5')
 	assert.equal(i18n.languages.length, 20)
-	assert.equal(i18n.keys.length, 82)
+	assert.equal(i18n.keys.length, 98)
 	assert.ok(i18n.keys.includes('wheelHint'))
 	for (const language of i18n.languages) {
 		assert.notEqual(i18n.t(language, 'wheelHint'), 'wheelHint')
@@ -595,9 +595,9 @@ function testCardI18nManifestAndCompatibilityBoundary() {
 	assert.match(cardSource, /wheelLatched/)
 	assert.match(cardSource, /data-input-pass-through="true"/)
 	assert.match(cardSource, /const gap = 28/)
-	assert.match(cardSource, /rgba\(227,\s*253,\s*67,\s*\.98\)/)
-	assert.match(cardSource, /rgba\(166,\s*242,\s*70,\s*\.96\)/)
-	assert.match(cardSource, /rgba\(76,\s*185,\s*107,\s*\.98\)/)
+	assert.match(cardSource, /border-color:\s*color-mix\(in srgb,\s*rgba\(166,\s*242,\s*70,\s*\.82\)/)
+	assert.match(cardSource, /0 0 16px color-mix\(in srgb,\s*rgba\(166,\s*242,\s*70,\s*\.36\)/)
+	assert.doesNotMatch(cardSource, /rgba\(227,\s*253,\s*67,\s*\.98\)|rgba\(76,\s*185,\s*107,\s*\.98\)/)
 	assert.match(cardSource, /pointer-events:\s*none/)
 
 	const controllerSource = fs.readFileSync(path.join(MOD_ROOT, 'scripts/input/selection-controller.js'), 'utf8')
@@ -625,9 +625,9 @@ function testCardI18nManifestAndCompatibilityBoundary() {
 	assert.match(dynamicCameraSource, /\},\s*true\)/)
 
 	const manifest = JSON.parse(fs.readFileSync(path.join(MOD_ROOT, 'mod.json'), 'utf8'))
-	assert.equal(manifest.version, '0.3.4')
+	assert.equal(manifest.version, '0.3.5')
 	assert.equal(manifest.languageSupport.gameLanguage, true)
-	assert.equal(manifest.entry.length, 18)
+	assert.equal(manifest.entry.length, 20)
 
 	const scriptText = manifest.entry
 		.map(relativePath => fs.readFileSync(path.join(MOD_ROOT, relativePath), 'utf8'))

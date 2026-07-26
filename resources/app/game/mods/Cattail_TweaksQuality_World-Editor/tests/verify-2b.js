@@ -480,7 +480,7 @@ function testSelectionCard() {
 	sandbox[RUNTIME_KEY] = runtime
 	sandbox[SELECTION_KEY] = selection
 	sandbox[ANALYSIS_KEY] = analysis
-	assert.equal(sandbox[I18N_KEY].keys.length, 82)
+	assert.equal(sandbox[I18N_KEY].keys.length, 98)
 	api.emit('afterGameInit', {}, game)
 
 	const card = document.getElementById('cattail-world-editor-selection-card')
@@ -489,9 +489,23 @@ function testSelectionCard() {
 	frameCallback({ game })
 	assert.equal(card.dataset.visible, 'true')
 	assert.equal(card.dataset.positionVisible, 'true')
-	assert.equal(card.dataset.placement, 'below')
-	assert.equal(card.style.left, '510px')
-	assert.equal(card.style.top, '393px')
+	assert.equal(card.dataset.placement, 'right')
+	assert.equal(card.style.left, '558px')
+	assert.equal(card.style.top, '266px')
+	const blueprintObstacle = document.createElement('div')
+	blueprintObstacle.id = 'cattail-world-editor-blueprint-card'
+	blueprintObstacle.dataset.visible = 'true'
+	blueprintObstacle.dataset.positionVisible = 'true'
+	blueprintObstacle.setAttribute('aria-hidden', 'false')
+	blueprintObstacle.style.left = '558px'
+	blueprintObstacle.style.top = '266px'
+	document.body.append(blueprintObstacle)
+	frameCallback({ game })
+	assert.equal(card.dataset.placement, 'left')
+	assert.equal(card.style.left, '174px')
+	blueprintObstacle.remove()
+	frameCallback({ game })
+	assert.equal(card.dataset.placement, 'right')
 	assert.equal(card.querySelector('[data-world-editor-text="title"]').textContent, '选区预览')
 	assert.equal(card.querySelector('[data-world-editor-text="coordinates"]').textContent, 'u 0→1  v 0→1')
 	assert.equal(card.querySelector('[data-world-editor-text="size-value"]').textContent, '2×2')
@@ -537,11 +551,24 @@ function testSelectionCard() {
 	assert.equal(card.querySelector('[data-world-editor-text="title"]').textContent, 'Selection')
 	assert.equal(card.querySelector('[data-world-editor-text="occupied-label"]').textContent, 'Occupied')
 
-	game.uvToXY = uv => [uv[0] * 20, 300 + uv[1] * 10]
+	game.uvToXY = uv => [400 + uv[0] * 20, uv[1] * 10]
+	frameCallback({ game })
+	assert.equal(card.dataset.placement, 'left')
+	assert.equal(card.style.left, '574px')
+
+	windowHub.innerWidth = 600
+	game.uvToXY = uv => [-200 + uv[0] * 20, uv[1] * 10]
+	frameCallback({ game })
+	assert.equal(card.dataset.placement, 'below')
+	assert.equal(card.style.left, '166px')
+	assert.equal(card.style.top, '393px')
+
+	game.uvToXY = uv => [-200 + uv[0] * 20, 300 + uv[1] * 10]
 	frameCallback({ game })
 	assert.equal(card.dataset.placement, 'above')
 	assert.equal(card.style.top, '439px')
 
+	windowHub.innerWidth = 1000
 	game.uvToXY = uv => [1000 + uv[0], 1000 + uv[1]]
 	frameCallback({ game })
 	assert.equal(card.dataset.positionVisible, 'false')
@@ -565,7 +592,7 @@ function testSelectionCard() {
 
 function testManifest() {
 	const manifest = JSON.parse(fs.readFileSync(path.join(MOD_ROOT, 'mod.json'), 'utf8'))
-	assert.equal(manifest.version, '0.3.4')
+	assert.equal(manifest.version, '0.3.5')
 	assert.equal(manifest.languageSupport.gameLanguage, true)
 	assert.deepEqual(manifest.entry, [
 		'scripts/core/foundation.js',
@@ -573,6 +600,7 @@ function testManifest() {
 		'scripts/core/selection-state.js',
 		'scripts/core/tool-state.js',
 		'scripts/core/selection-analysis.js',
+		'scripts/core/production-state.js',
 		'scripts/core/blueprint-transform.js',
 		'scripts/core/blueprint-preview-plan.js',
 		'scripts/core/input-controller.js',
@@ -585,7 +613,8 @@ function testManifest() {
 		'scripts/ui/editor-shell.js',
 		'scripts/blueprint-session.js',
 		'scripts/blueprint-preview.js',
-		'scripts/ui/selection-card.js'
+		'scripts/ui/selection-card.js',
+		'scripts/ui/production-cards.js'
 	])
 }
 

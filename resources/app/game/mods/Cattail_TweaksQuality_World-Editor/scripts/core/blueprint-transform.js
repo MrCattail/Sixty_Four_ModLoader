@@ -245,6 +245,7 @@ ModLoader.register({
 				includeBlocks: false,
 				entities: Object.freeze(entities),
 				blocks: Object.freeze([]),
+				production: value.production || null,
 				summary
 			})
 		}
@@ -424,7 +425,7 @@ ModLoader.register({
 		function validSource(value) {
 			const schemaVersion = Number(value?.schemaVersion)
 			return !!value &&
-				(schemaVersion === 1 || schemaVersion === 2) &&
+				(schemaVersion === 1 || schemaVersion === 2 || schemaVersion === 3) &&
 				(value.mode === 'structure' || value.mode === 'full') &&
 				Array.isArray(value.entities)
 		}

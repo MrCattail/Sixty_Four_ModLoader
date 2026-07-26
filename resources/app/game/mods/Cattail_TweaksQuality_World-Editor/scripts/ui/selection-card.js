@@ -8,8 +8,12 @@ ModLoader.register({
 		const INTERACTION_KEY = Symbol.for('cattail.world-editor.selection-interaction')
 		const CARD_OPACITY_KEY = Symbol.for('cattail.world-editor.card-opacity')
 		const CARD_ID = 'cattail-world-editor-selection-card'
+		const SELECTION_PRODUCTION_CARD_ID = 'cattail-world-editor-selection-production-card'
+		const BLUEPRINT_CARD_ID = 'cattail-world-editor-blueprint-card'
+		const BLUEPRINT_PRODUCTION_CARD_ID = 'cattail-world-editor-blueprint-production-card'
 		const STYLE_ID = 'cattail-world-editor-selection-card-style'
 		const TEMPORARY_VISIBLE_MS = 3000
+		const AUTO_HIDE_TRANSITION_MS = 160
 		let refreshMountedText = null
 
 		api.on('afterWords', function (words, game) {
@@ -66,8 +70,11 @@ ModLoader.register({
 			let temporaryDeadline = 0
 			let temporaryTimer = null
 			let pointerPaused = false
+			let autoHiding = false
+			let autoHideTimer = null
 			let opacityControls = globalThis[CARD_OPACITY_KEY]?.register?.({
 				id: 'selection',
+				group: 'selection-production',
 				element: card,
 				hint: card.querySelector('.cattail-world-editor-card-opacity-hint'),
 				priority: 47,
@@ -93,7 +100,17 @@ ModLoader.register({
 				const hasRange = !!activeRange()
 				const interactionVisible = isRange(currentSelection?.previewRange)
 				const displayWindow = pinned || temporaryVisible || interactionVisible
-				const visible = !!currentRuntime.active && hasRange && displayWindow && !game.halt && !game.splash?.isShown && !vanillaHudHidden
+				const visible = !!currentRuntime.active && hasRange && displayWindow && !game.halt && !game.splash?.isShown && !vanillaHudHidden && !gameHudHidden
+				const immediateHidden = !visible && (
+					!currentRuntime.active ||
+					!hasRange ||
+					!!game.halt ||
+					!!game.splash?.isShown ||
+					vanillaHudHidden ||
+					gameHudHidden ||
+					!positionVisible
+				)
+				if (autoHiding && immediateHidden) clearAutoHideTransition()
 				card.dataset.visible = visible ? 'true' : 'false'
 				card.dataset.positionVisible = positionVisible ? 'true' : 'false'
 				card.dataset.pinned = pinned ? 'true' : 'false'
@@ -112,8 +129,39 @@ ModLoader.register({
 			const hideTemporary = function () {
 				clearTemporaryTimer()
 				temporaryRemaining = 0
+				startAutoHideTransition()
+			}
+
+			const setAutoHiding = function (active) {
+				autoHiding = !!active
+				card.dataset.autoHiding = autoHiding ? 'true' : 'false'
+				const companion = document.getElementById(SELECTION_PRODUCTION_CARD_ID)
+				if (companion) {
+					companion.dataset.autoHiding = autoHiding ? 'true' : 'false'
+					if (autoHiding) {
+						companion.dataset.visible = 'false'
+						companion.setAttribute('aria-hidden', 'true')
+					}
+				}
+			}
+
+			const clearAutoHideTransition = function () {
+				if (autoHideTimer !== null) {
+					globalThis.clearTimeout?.(autoHideTimer)
+					autoHideTimer = null
+				}
+				setAutoHiding(false)
+			}
+
+			const startAutoHideTransition = function () {
+				clearAutoHideTransition()
+				setAutoHiding(true)
 				temporaryVisible = false
 				refreshVisibility()
+				autoHideTimer = globalThis.setTimeout?.(function () {
+					autoHideTimer = null
+					setAutoHiding(false)
+				}, AUTO_HIDE_TRANSITION_MS) ?? null
 			}
 
 			const pauseTemporaryTimer = function () {
@@ -145,6 +193,7 @@ ModLoader.register({
 
 			const restartTemporaryWindow = function () {
 				clearTemporaryTimer()
+				clearAutoHideTransition()
 				temporaryVisible = !!activeRange()
 				temporaryRemaining = TEMPORARY_VISIBLE_MS
 				refreshVisibility()
@@ -153,6 +202,7 @@ ModLoader.register({
 
 			const clearTemporaryWindow = function () {
 				clearTemporaryTimer()
+				clearAutoHideTransition()
 				temporaryVisible = false
 				temporaryRemaining = TEMPORARY_VISIBLE_MS
 				refreshVisibility()
@@ -286,28 +336,41 @@ ModLoader.register({
 				const cardRect = card.getBoundingClientRect()
 				const cardWidth = finitePositive(cardRect.width, finitePositive(card.offsetWidth, 288))
 				const cardHeight = finitePositive(cardRect.height, finitePositive(card.offsetHeight, 178))
-				const halfWidth = cardWidth / 2
 				const centerX = (bounds.minX + bounds.maxX) / 2
-				let left = clamp(centerX, margin + halfWidth, Math.max(margin + halfWidth, viewportWidth - margin - halfWidth))
-				let top = bounds.maxY + gap
-				let placement = 'below'
-
-				if (top + cardHeight > viewportHeight - margin && bounds.minY - gap - cardHeight >= margin) {
-					top = bounds.minY - gap - cardHeight
-					placement = 'above'
-				}
-				top = clamp(top, margin, Math.max(margin, viewportHeight - margin - cardHeight))
-				left = Number.isFinite(left) ? left : viewportWidth / 2
+				const centerY = (bounds.minY + bounds.maxY) / 2
+				const candidates = [
+					{ left: bounds.maxX + gap, top: centerY - cardHeight / 2, width: cardWidth, height: cardHeight, placement: 'right' },
+					{ left: bounds.minX - gap - cardWidth, top: centerY - cardHeight / 2, width: cardWidth, height: cardHeight, placement: 'left' },
+					{ left: centerX - cardWidth / 2, top: bounds.maxY + gap, width: cardWidth, height: cardHeight, placement: 'below' },
+					{ left: centerX - cardWidth / 2, top: bounds.minY - gap - cardHeight, width: cardWidth, height: cardHeight, placement: 'above' }
+				]
+				const occupiedRects = [
+					visibleRect(document.getElementById(BLUEPRINT_CARD_ID)),
+					visibleRect(document.getElementById(BLUEPRINT_PRODUCTION_CARD_ID))
+				].filter(Boolean)
+				const fitting = candidates.filter(function (candidate) {
+					return cardCandidateFits(candidate, margin, viewportWidth, viewportHeight)
+				})
+				const chosen = fitting.find(function (candidate) {
+					return occupiedRects.every(function (rect) {
+						return !rectanglesOverlap(candidate, rect, 8)
+					})
+				}) || (fitting.length ? fitting : candidates).slice().sort(function (left, right) {
+					return candidatePenalty(left, occupiedRects, bounds) - candidatePenalty(right, occupiedRects, bounds)
+				})[0]
+				const left = clamp(chosen.left, margin, Math.max(margin, viewportWidth - margin - cardWidth))
+				const top = clamp(chosen.top, margin, Math.max(margin, viewportHeight - margin - cardHeight))
 
 				card.style.left = left + 'px'
 				card.style.top = top + 'px'
-				card.dataset.placement = placement
+				card.dataset.placement = chosen.placement
 				positionVisible = true
 				refreshVisibility()
 			}
 
 			const stopRuntimeSubscription = runtime.subscribe(function (state) {
 				currentRuntime = state
+				if (!state?.active) clearAutoHideTransition()
 				refreshVisibility()
 			})
 			const stopSelectionSubscription = selection.subscribe(function (state) {
@@ -328,11 +391,13 @@ ModLoader.register({
 			const handleGameHud = function (event) {
 				if (event?.detail?.game && event.detail.game !== game) return
 				gameHudHidden = !!event?.detail?.hidden
+				if (gameHudHidden) clearAutoHideTransition()
 				refreshVisibility()
 			}
 			const handleVanillaGameHud = function (event) {
 				if (event?.detail?.game && event.detail.game !== game) return
 				vanillaHudHidden = !!event?.detail?.hidden
+				if (vanillaHudHidden) clearAutoHideTransition()
 				refreshVisibility()
 			}
 			const handleCardMouseEnter = function () {
@@ -344,6 +409,7 @@ ModLoader.register({
 				resumeTemporaryTimer()
 			}
 			const togglePinned = function (event) {
+				if (event?.target?.closest?.('button, input, select, textarea, [data-world-editor-card-control]')) return
 				event?.preventDefault?.()
 				event?.stopPropagation?.()
 				event?.stopImmediatePropagation?.()
@@ -395,6 +461,7 @@ ModLoader.register({
 				card.removeEventListener('keydown', handleCardKeydown)
 				window.clearInterval(renderAvailabilityTimer)
 				clearTemporaryTimer()
+				clearAutoHideTransition()
 				if (typeof stopRuntimeSubscription === 'function') stopRuntimeSubscription()
 				if (typeof stopSelectionSubscription === 'function') stopSelectionSubscription()
 				if (typeof stopAnalysisSubscription === 'function') stopAnalysisSubscription()
@@ -420,6 +487,7 @@ ModLoader.register({
 			card.dataset.pinned = 'false'
 			card.dataset.wheelLatched = 'false'
 			card.dataset.inputPassThrough = 'false'
+			card.dataset.autoHiding = 'false'
 			card.setAttribute('role', 'button')
 			card.setAttribute('tabindex', '0')
 			card.setAttribute('aria-pressed', 'false')
@@ -492,12 +560,6 @@ ModLoader.register({
 					--world-editor-card-border: color-mix(in srgb, rgba(92, 65, 132, .22) var(--world-editor-card-shell-percent), transparent);
 					--world-editor-card-accent: color-mix(in srgb, rgba(170, 137, 220, .92) var(--world-editor-card-shell-percent), transparent);
 					--world-editor-card-track: color-mix(in srgb, rgba(92, 65, 132, .12) var(--world-editor-card-shell-percent), transparent);
-					--world-editor-card-pin-start: color-mix(in srgb, rgba(227, 253, 67, .98) var(--world-editor-card-shell-percent), transparent);
-					--world-editor-card-pin-middle: color-mix(in srgb, rgba(166, 242, 70, .96) var(--world-editor-card-shell-percent), transparent);
-					--world-editor-card-pin-end: color-mix(in srgb, rgba(76, 185, 107, .98) var(--world-editor-card-shell-percent), transparent);
-					--world-editor-card-pin-glow-start: color-mix(in srgb, rgba(227, 253, 67, .58) var(--world-editor-card-shell-percent), transparent);
-					--world-editor-card-pin-glow-middle: color-mix(in srgb, rgba(166, 242, 70, .38) var(--world-editor-card-shell-percent), transparent);
-					--world-editor-card-pin-glow-end: color-mix(in srgb, rgba(76, 185, 107, .20) var(--world-editor-card-shell-percent), transparent);
 					position: fixed;
 					z-index: 47;
 					width: min(clamp(230px, 28vw, 320px), calc(100vw - 20px));
@@ -520,10 +582,10 @@ ModLoader.register({
 					-webkit-font-smoothing: antialiased;
 					visibility: hidden;
 					opacity: 0;
-					transform: translateX(-50%) translateY(4px);
+					transform: translateY(4px);
 					pointer-events: none;
 					cursor: pointer;
-					transition: opacity .12s ease, transform .12s ease, visibility 0s linear .12s, border-color .16s ease, box-shadow .16s ease;
+					transition: opacity .16s ease-out, transform .16s ease-out, visibility 0s linear .16s, border-color .16s ease, box-shadow .16s ease;
 				}
 				.cattail-world-editor-selection-card::-webkit-scrollbar {
 					width: 4px;
@@ -547,35 +609,42 @@ ModLoader.register({
 				.cattail-world-editor-selection-card[data-visible="true"][data-position-visible="true"] {
 					visibility: visible;
 					opacity: var(--world-editor-card-opacity);
-					transform: translateX(-50%) translateY(0);
+					transform: translateY(0);
 					pointer-events: auto;
 					transition-delay: 0s;
 				}
 				.cattail-world-editor-selection-card[data-visible="true"][data-position-visible="true"][data-opacity-content-independent="true"] {
 					opacity: 1;
 				}
+				.cattail-world-editor-selection-card[data-visible="false"][data-auto-hiding="false"],
+				.cattail-world-editor-selection-card[data-position-visible="false"][data-auto-hiding="false"] {
+					transition: none;
+				}
+				.cattail-world-editor-selection-card[data-visible="false"][data-auto-hiding="true"] {
+					visibility: visible;
+					opacity: 0;
+					transform: translateY(4px);
+					pointer-events: none;
+					transition: opacity .16s ease-out, transform .16s ease-out;
+				}
 				.cattail-world-editor-selection-card[data-visible="true"][data-position-visible="true"][data-input-pass-through="true"] {
 					pointer-events: none;
 				}
 				.cattail-world-editor-selection-card[data-pinned="true"] {
-					border-color: transparent;
-					background:
-						linear-gradient(var(--world-editor-card-bg), var(--world-editor-card-bg)) padding-box,
-						linear-gradient(135deg, var(--world-editor-card-pin-start), var(--world-editor-card-pin-middle) 42%, var(--world-editor-card-pin-end)) border-box;
-					box-shadow: 0 10px 28px color-mix(in srgb, rgba(0, 0, 0, .20) var(--world-editor-card-shell-percent), transparent), 0 0 10px var(--world-editor-card-pin-glow-start), 0 0 24px var(--world-editor-card-pin-glow-middle), 0 0 46px var(--world-editor-card-pin-glow-end);
+					border-color: color-mix(in srgb, rgba(166, 242, 70, .82) var(--world-editor-card-shell-percent), transparent);
+					box-shadow: 0 10px 28px color-mix(in srgb, rgba(0, 0, 0, .20) var(--world-editor-card-shell-percent), transparent), 0 0 16px color-mix(in srgb, rgba(166, 242, 70, .36) var(--world-editor-card-shell-percent), transparent);
 				}
 				.cattail-world-editor-selection-card[data-theme="void"][data-pinned="true"] {
-					box-shadow: 0 10px 28px color-mix(in srgb, rgba(0, 0, 0, .38) var(--world-editor-card-shell-percent), transparent), 0 0 10px var(--world-editor-card-pin-glow-start), 0 0 24px var(--world-editor-card-pin-glow-middle), 0 0 46px var(--world-editor-card-pin-glow-end);
+					box-shadow: 0 10px 28px color-mix(in srgb, rgba(0, 0, 0, .38) var(--world-editor-card-shell-percent), transparent), 0 0 16px color-mix(in srgb, rgba(166, 242, 70, .36) var(--world-editor-card-shell-percent), transparent);
 				}
 				.cattail-world-editor-selection-card:focus-visible {
-					outline: 2px solid var(--world-editor-card-pin-middle);
-					outline-offset: 3px;
+					outline: none;
 				}
 				.cattail-world-editor-selection-card[data-placement="above"] {
-					transform: translateX(-50%) translateY(-4px);
+					transform: translateY(-4px);
 				}
 				.cattail-world-editor-selection-card[data-visible="true"][data-position-visible="true"][data-placement="above"] {
-					transform: translateX(-50%) translateY(0);
+					transform: translateY(0);
 				}
 				.cattail-world-editor-selection-card__header {
 					display: flex;
@@ -707,6 +776,61 @@ ModLoader.register({
 				minY: Math.min(...points.map(point => point[1])),
 				maxY: Math.max(...points.map(point => point[1]))
 			}
+		}
+
+		function visibleRect(element) {
+			if (!element || element.dataset?.visible !== 'true' || element.dataset?.positionVisible !== 'true') return null
+			if (element.getAttribute?.('aria-hidden') === 'true') return null
+			const rect = element.getBoundingClientRect?.()
+			if (!rect) return null
+			return {
+				left: finiteOr(rect.left, 0),
+				top: finiteOr(rect.top, 0),
+				width: finitePositive(rect.width, 0),
+				height: finitePositive(rect.height, 0)
+			}
+		}
+
+		function cardCandidateFits(candidate, margin, viewportWidth, viewportHeight) {
+			return (
+				candidate.left >= margin &&
+				candidate.top >= margin &&
+				candidate.left + candidate.width <= viewportWidth - margin &&
+				candidate.top + candidate.height <= viewportHeight - margin
+			)
+		}
+
+		function rectanglesOverlap(left, right, gap) {
+			return !(
+				left.left + left.width + gap <= right.left ||
+				right.left + right.width + gap <= left.left ||
+				left.top + left.height + gap <= right.top ||
+				right.top + right.height + gap <= left.top
+			)
+		}
+
+		function candidatePenalty(candidate, occupiedRects, bounds) {
+			const previewRect = {
+				left: bounds.minX,
+				top: bounds.minY,
+				width: Math.max(0, bounds.maxX - bounds.minX),
+				height: Math.max(0, bounds.maxY - bounds.minY)
+			}
+			let penalty = rectangleOverlapArea(candidate, previewRect) * 2
+			for (const rect of occupiedRects) penalty += rectangleOverlapArea(candidate, rect) * 4
+			return penalty
+		}
+
+		function rectangleOverlapArea(left, right) {
+			const width = Math.max(
+				0,
+				Math.min(left.left + left.width, right.left + right.width) - Math.max(left.left, right.left)
+			)
+			const height = Math.max(
+				0,
+				Math.min(left.top + left.height, right.top + right.height) - Math.max(left.top, right.top)
+			)
+			return width * height
 		}
 
 		function scanKey(range, plane) {

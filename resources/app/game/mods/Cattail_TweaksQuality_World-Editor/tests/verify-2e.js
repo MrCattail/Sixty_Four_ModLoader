@@ -557,15 +557,19 @@ function testCardLockAndTemporaryWindow() {
 	assert.equal(card.dataset.visible, 'true')
 	assert.match(card.getAttribute('aria-label'), /点击以长期显示/)
 	assert.match(style.textContent, /data-pinned="true"/)
-	assert.match(style.textContent, /world-editor-card-pin-glow/)
 	assert.match(style.textContent, /pointer-events: auto/)
 	assert.match(style.textContent, /data-input-pass-through="true"/)
-	assert.match(style.textContent, /rgba\(227,\s*253,\s*67,\s*\.98\)/)
-	assert.match(style.textContent, /rgba\(166,\s*242,\s*70,\s*\.96\)/)
-	assert.match(style.textContent, /rgba\(76,\s*185,\s*107,\s*\.98\)/)
 	assert.match(style.textContent, /overflow-y:\s*auto/)
-	assert.match(style.textContent, /linear-gradient\(var\(--world-editor-card-bg\),\s*var\(--world-editor-card-bg\)\)\s*padding-box/)
-	assert.match(style.textContent, /linear-gradient\(135deg,[^;]+border-box/)
+	const pinnedStyle = style.textContent.match(
+		/\.cattail-world-editor-selection-card\[data-pinned="true"\]\s*\{([\s\S]*?)\n\s*\}/
+	)
+	assert.ok(pinnedStyle)
+	assert.match(pinnedStyle[1], /border-color:\s*color-mix/)
+	assert.match(pinnedStyle[1], /rgba\(166,\s*242,\s*70,\s*\.82\)/)
+	assert.match(pinnedStyle[1], /0 0 16px/)
+	assert.match(pinnedStyle[1], /rgba\(166,\s*242,\s*70,\s*\.36\)/)
+	assert.doesNotMatch(pinnedStyle[1], /\bbackground\s*:/)
+	assert.doesNotMatch(style.textContent, /linear-gradient\(135deg,[^;]+border-box/)
 	assert.doesNotMatch(style.textContent, /\.cattail-world-editor-selection-card::before/)
 	assert.doesNotMatch(style.textContent, /inset:\s*-1px/)
 	assert.equal(card.dataset.wheelLatched, 'false')
@@ -653,9 +657,9 @@ function testHoverLayerI18nManifestAndReadOnlyBoundary() {
 	const api = createApi()
 	for (const definition of definitions) definition.init(api)
 	const i18n = sandbox[I18N_KEY]
-	assert.equal(i18n.version, '0.3.4')
+	assert.equal(i18n.version, '0.3.5')
 	assert.equal(i18n.languages.length, 20)
-	assert.equal(i18n.keys.length, 82)
+	assert.equal(i18n.keys.length, 98)
 	for (const language of i18n.languages) {
 		for (const key of ['toolbarModeArea', 'toolSelect', 'cardPinAction', 'cardUnpinAction']) {
 			assert.notEqual(i18n.t(language, key), key)
@@ -666,9 +670,9 @@ function testHoverLayerI18nManifestAndReadOnlyBoundary() {
 	assert.equal(i18n.t('modsch', 'toolSelect'), '选择')
 
 	const manifest = JSON.parse(fs.readFileSync(path.join(MOD_ROOT, 'mod.json'), 'utf8'))
-	assert.equal(manifest.version, '0.3.4')
+	assert.equal(manifest.version, '0.3.5')
 	assert.equal(manifest.languageSupport.gameLanguage, true)
-	assert.equal(manifest.entry.length, 18)
+	assert.equal(manifest.entry.length, 20)
 	assert.equal(manifest.entry.filter(entry => /selection-controller/.test(entry)).length, 1)
 	assert.equal(manifest.entry.filter(entry => /resize-handles/.test(entry)).length, 1)
 

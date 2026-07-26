@@ -50,6 +50,7 @@ ModLoader.register({
 			let disposed = false
 			let job = null
 			let suspendedCommitted = null
+			let currentEntities = []
 			const listeners = new Set()
 
 			function snapshot() {
@@ -67,12 +68,14 @@ ModLoader.register({
 				}
 			}
 
-			function publish(next, reason) {
+			function publish(next, reason, entities) {
 				if (disposed) return false
 				revision += 1
 				current = Object.assign({}, next, {
 					lastReason: String(reason || next.lastReason || 'updated')
 				})
+				if (Array.isArray(entities)) currentEntities = entities.slice()
+				else if (current.status !== 'ready') currentEntities = []
 				notify()
 				return true
 			}
@@ -98,7 +101,12 @@ ModLoader.register({
 					selectedRange
 				) {
 					const selectedKey = scanKey(selectedRange, selectionState?.plane ? 1 : 0)
-					if (current.key === selectedKey) suspendedCommitted = snapshot()
+					if (current.key === selectedKey) {
+						suspendedCommitted = {
+							state: snapshot(),
+							entities: currentEntities.slice()
+						}
+					}
 				}
 
 				if (job && job.key === key) {
@@ -121,15 +129,16 @@ ModLoader.register({
 					}), 'selection-phase-changed')
 				}
 
-				if (phase === 'selected' && suspendedCommitted && suspendedCommitted.key === key) {
+				if (phase === 'selected' && suspendedCommitted?.state?.key === key) {
 					cancelJob()
-					const restored = Object.assign({}, suspendedCommitted, {
+					const restored = Object.assign({}, suspendedCommitted.state, {
 						phase: 'selected',
 						range,
 						lastReason: 'preview-cancelled'
 					})
+					const restoredEntities = suspendedCommitted.entities
 					suspendedCommitted = null
-					return publish(restored, 'preview-cancelled')
+					return publish(restored, 'preview-cancelled', restoredEntities)
 				}
 
 				startScan(range, plane, phase)
@@ -199,7 +208,11 @@ ModLoader.register({
 					}
 
 					if (targetJob.processed >= targetJob.total) {
-						publish(jobSnapshot(targetJob, true), targetJob.phase === 'preview' ? 'preview-scan-ready' : 'selection-scan-ready')
+						publish(
+							jobSnapshot(targetJob, true),
+							targetJob.phase === 'preview' ? 'preview-scan-ready' : 'selection-scan-ready',
+							Array.from(targetJob.buildings)
+						)
 						job = null
 						return
 					}
@@ -245,6 +258,9 @@ ModLoader.register({
 				version: '0.2.1',
 				game,
 				snapshot,
+				entities() {
+					return current.status === 'ready' ? currentEntities.slice() : []
+				},
 				updateSelection,
 				clear,
 				subscribe(listener) {
@@ -265,6 +281,7 @@ ModLoader.register({
 					cancelJob()
 					disposed = true
 					current = emptySnapshot(reason || 'disposed')
+					currentEntities = []
 					listeners.clear()
 					if (globalThis[ANALYSIS_KEY] === analysis) delete globalThis[ANALYSIS_KEY]
 					return true

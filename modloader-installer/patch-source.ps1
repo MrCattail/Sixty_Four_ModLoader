@@ -66,6 +66,22 @@ function Apply-Optional {
 	return $Text
 }
 
+function Insert-BeforeStandaloneLine {
+	param(
+		[string]$Text,
+		[string]$Line,
+		[string]$Insertion,
+		[string]$Description
+	)
+
+	$pattern = '(?m)^' + [regex]::Escape($Line) + '$'
+	$match = [regex]::Match($Text, $pattern)
+	if (-not $match.Success) {
+		throw "Could not patch $Description. The game file may have changed or was edited by another tool."
+	}
+	return $Text.Insert($match.Index, $Insertion)
+}
+
 function Update-TextFile {
 	param(
 		[string]$RelativePath,
@@ -354,6 +370,27 @@ ipcMain.on(`gameError`, (e,d)=>{
 		$oldAttach = '  if (!options.fullscreen) win.setFullScreen(false)'
 		$newAttach = "  if (!options.fullscreen) win.setFullScreen(false)`n  ModLoaderMainProcess.attachWindow(win)"
 		$Text = Apply-Required $Text $oldAttach $newAttach 'main window attachment'
+	}
+
+	$badDevToolsInlineBlock = @'
+  // win.webContents.openDevTools()ipcMain.on(`modloader:toggle-devtools`, ()=>{
+  win?.webContents?.toggleDevTools()
+})
+//1111111111111111
+'@
+	$fixedDevToolsInlineBlock = @'
+  // win.webContents.openDevTools()//1111111111111111
+'@
+	$Text = $Text.Replace($badDevToolsInlineBlock, $fixedDevToolsInlineBlock)
+
+	if (-not [regex]::IsMatch($Text, '(?m)^ipcMain\.on\(`modloader:toggle-devtools`,')) {
+		$devToolsIpcBlock = @'
+ipcMain.on(`modloader:toggle-devtools`, ()=>{
+  if (win && win.webContents) win.webContents.toggleDevTools()
+})
+
+'@
+		$Text = Insert-BeforeStandaloneLine $Text '//1111111111111111' $devToolsIpcBlock 'DevTools renderer IPC'
 	}
 
 	if (-not $Text.Contains('toggleDevTools')) {

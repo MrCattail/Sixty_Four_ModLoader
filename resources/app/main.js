@@ -126,6 +126,9 @@ ipcMain.on(`toggleFullscreen`, (e,d)=>{
 ipcMain.on(`openDiscord`, (e,d)=>{
   shell.openExternal(`https://discord.gg/7YXd3tScqS`)
 })
+ipcMain.on(`modloader:toggle-devtools`, ()=>{
+  if (win && win.webContents) win.webContents.toggleDevTools()
+})
 
 //1111111111111111
 // ipcMain.on(`getDebugInfo`, (e,d)=>{

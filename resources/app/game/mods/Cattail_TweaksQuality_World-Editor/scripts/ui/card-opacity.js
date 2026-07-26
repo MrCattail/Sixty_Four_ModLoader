@@ -10,6 +10,7 @@ ModLoader.register({
 		previous?.dispose?.()
 
 		const registrations = new Map()
+		const groups = new Map()
 		let sequence = 0
 		let zPressed = false
 		let listening = false
@@ -21,14 +22,23 @@ ModLoader.register({
 			ensureStyle()
 			const existing = registrations.get(element)
 			existing?.release?.()
+			const group = options?.group ? String(options.group) : null
+			let shared = group ? groups.get(group) : null
+			if (!shared) {
+				shared = {
+					opacity: OPACITY_MAX,
+					contentIndependent: false
+				}
+				if (group) groups.set(group, shared)
+			}
 			const state = {
 				id: String(options.id || element.id || 'card'),
+				group,
+				shared,
 				element,
 				hint: options.hint || null,
 				priority: finiteOr(options.priority, 0),
 				order: ++sequence,
-				opacity: OPACITY_MAX,
-				contentIndependent: false,
 				getText: typeof options.getText === 'function' ? options.getText : null,
 				onChange: typeof options.onChange === 'function' ? options.onChange : null,
 				released: false,
@@ -46,6 +56,11 @@ ModLoader.register({
 				element.style.removeProperty('--world-editor-card-shell-saturate')
 				delete element.dataset.opacityContentIndependent
 				delete element.dataset.cardOpacity
+				if (state.group && !Array.from(registrations.values()).some(function (entry) {
+					return entry.group === state.group
+				})) {
+					groups.delete(state.group)
+				}
 				if (!registrations.size) removeListeners()
 			}
 			state.release = release
@@ -106,20 +121,18 @@ ModLoader.register({
 			consume(event)
 			if (!delta) return
 			const direction = delta < 0 ? 1 : -1
-			const next = clampOpacity(state.opacity + direction * OPACITY_STEP)
-			if (next === state.opacity) return
-			state.opacity = next
-			applyState(state)
-			state.onChange?.(stateSnapshot(state))
+			const next = clampOpacity(state.shared.opacity + direction * OPACITY_STEP)
+			if (next === state.shared.opacity) return
+			state.shared.opacity = next
+			applySharedState(state.shared)
 		}
 
 		function handleMouseDown(event) {
 			if (event?.button !== 1) return
 			const state = cardAtEvent(event)
 			if (!state) return
-			state.contentIndependent = !state.contentIndependent
-			applyState(state)
-			state.onChange?.(stateSnapshot(state))
+			state.shared.contentIndependent = !state.shared.contentIndependent
+			applySharedState(state.shared)
 			consume(event)
 		}
 
@@ -163,31 +176,40 @@ ModLoader.register({
 		}
 
 		function applyState(state) {
-			const shellOpacity = state.contentIndependent
-				? clampUnit((state.opacity - OPACITY_MIN) / (OPACITY_MAX - OPACITY_MIN))
+			const shellOpacity = state.shared.contentIndependent
+				? clampUnit((state.shared.opacity - OPACITY_MIN) / (OPACITY_MAX - OPACITY_MIN))
 				: 1
-			state.element.style.setProperty('--world-editor-card-opacity', String(state.opacity))
+			state.element.style.setProperty('--world-editor-card-opacity', String(state.shared.opacity))
 			state.element.style.setProperty('--world-editor-card-shell-opacity', String(round(shellOpacity)))
 			state.element.style.setProperty('--world-editor-card-shell-percent', String(round(shellOpacity * 100)) + '%')
 			state.element.style.setProperty('--world-editor-card-shell-blur-12', String(round(shellOpacity * 12)) + 'px')
 			state.element.style.setProperty('--world-editor-card-shell-blur-14', String(round(shellOpacity * 14)) + 'px')
 			state.element.style.setProperty('--world-editor-card-shell-saturate', String(round(1 + shellOpacity * .1)))
-			state.element.dataset.opacityContentIndependent = state.contentIndependent ? 'true' : 'false'
-			state.element.dataset.cardOpacity = String(state.opacity)
+			state.element.dataset.opacityContentIndependent = state.shared.contentIndependent ? 'true' : 'false'
+			state.element.dataset.cardOpacity = String(state.shared.opacity)
 			const text = state.getText?.(stateSnapshot(state)) || {}
 			const tooltip = [text.instruction, text.mode].filter(Boolean).join(' ')
 			if (state.hint) {
 				state.hint.dataset.tooltip = tooltip
-				state.hint.dataset.contentIndependent = state.contentIndependent ? 'true' : 'false'
+				state.hint.dataset.contentIndependent = state.shared.contentIndependent ? 'true' : 'false'
 				state.hint.setAttribute('aria-label', tooltip)
+			}
+		}
+
+		function applySharedState(shared) {
+			for (const state of registrations.values()) {
+				if (state.shared !== shared || state.released) continue
+				applyState(state)
+				state.onChange?.(stateSnapshot(state))
 			}
 		}
 
 		function stateSnapshot(state) {
 			return Object.freeze({
 				id: state.id,
-				opacity: state.opacity,
-				contentIndependent: state.contentIndependent
+				group: state.group,
+				opacity: state.shared.opacity,
+				contentIndependent: state.shared.contentIndependent
 			})
 		}
 
@@ -279,12 +301,13 @@ ModLoader.register({
 
 		function dispose() {
 			for (const state of Array.from(registrations.values())) state.release()
+			groups.clear()
 			removeListeners()
 			if (globalThis[CONTROLLER_KEY] === controller) delete globalThis[CONTROLLER_KEY]
 		}
 
 		controller = Object.freeze({
-			version: '0.3.4',
+			version: '0.3.5',
 			min: OPACITY_MIN,
 			max: OPACITY_MAX,
 			step: OPACITY_STEP,
