@@ -247,7 +247,10 @@ ModLoader.register({
 					capturedProduction?.status === 'ready' ? capturedProduction?.byType : null,
 					mode,
 					unit,
-					viewKey
+					viewKey,
+					function (nestedSection, nestedExpanded) {
+						projectNestedProductionSectionHeight(section, nestedSection, nestedExpanded)
+					}
 				)
 				syncProductionSectionState(section, expanded)
 			}
@@ -309,7 +312,7 @@ ModLoader.register({
 				for (const row of rows) target.append(createResourceRow(row, unit))
 			}
 
-			function renderTypes(target, types, mode, unit, viewKey) {
+			function renderTypes(target, types, mode, unit, viewKey, onNestedLayoutChange) {
 				target.replaceChildren()
 				const supportedTypes = (Array.isArray(types) ? types : []).filter(function (type) {
 					if (mode === 'theoretical') return type?.support?.theoretical?.supported || type?.support?.theoretical?.partial
@@ -339,7 +342,7 @@ ModLoader.register({
 				target.append(heading)
 				if (active.length) target.append(createTypeLayout(active, unit, true))
 				if (noFlow.length) {
-					const noFlowSection = createNoFlowSection(noFlow, unit, viewKey)
+					const noFlowSection = createNoFlowSection(noFlow, unit, viewKey, onNestedLayoutChange)
 					target.append(noFlowSection.section)
 					syncProductionSectionState(noFlowSection, noFlowExpanded[viewKey] === true)
 				}
@@ -393,7 +396,7 @@ ModLoader.register({
 				return group
 			}
 
-			function createNoFlowSection(entries, unit, viewKey) {
+			function createNoFlowSection(entries, unit, viewKey, onNestedLayoutChange) {
 				const section = document.createElement('section')
 				section.className = 'cattail-world-editor-production cattail-world-editor-production--no-flow'
 				section.dataset.expanded = noFlowExpanded[viewKey] ? 'true' : 'false'
@@ -408,13 +411,17 @@ ModLoader.register({
 				toggle.addEventListener('click', function (event) {
 					stopUiEvent(event)
 					noFlowExpanded[viewKey] = !noFlowExpanded[viewKey]
-					syncProductionSectionState(mounted, noFlowExpanded[viewKey])
+					const nextExpanded = noFlowExpanded[viewKey]
+					syncProductionSectionState(mounted, nextExpanded)
 					refreshNoFlowSectionText(mounted, entries.length, viewKey)
 					const card = targetProductionCard(section)
 					if (card) {
 						markCompanionLayoutDirty(card)
 						if (card === selectionProductionCard.card) syncSelectionCompanion()
 						else syncBlueprintCompanion()
+					}
+					if (typeof onNestedLayoutChange === 'function') {
+						onNestedLayoutChange(mounted, nextExpanded)
 					}
 				})
 				return mounted
@@ -461,8 +468,34 @@ ModLoader.register({
 					finitePositive(body.scrollHeight, 0),
 					childHeight + gapHeight
 				)
-				body.style.setProperty('--world-editor-production-section-height', height + 'px')
-				return height
+				return setProductionSectionHeight(section, height)
+			}
+
+			function projectNestedProductionSectionHeight(section, nestedSection, expanded) {
+				const outerBody = section?.body
+				const nestedBody = nestedSection?.body
+				if (!outerBody || !nestedBody) return 1
+				const currentOuterHeight = finitePositive(outerBody.scrollHeight, 0)
+				const nestedRect = nestedBody.getBoundingClientRect?.()
+				const currentNestedHeight = finitePositive(
+					nestedRect?.height,
+					finitePositive(nestedBody.clientHeight, 0)
+				)
+				const baseHeight = Math.max(1, currentOuterHeight - currentNestedHeight)
+				const targetNestedHeight = expanded ? measureProductionSection(nestedSection) : 0
+				return setProductionSectionHeight(
+					section,
+					Math.ceil(baseHeight + targetNestedHeight)
+				)
+			}
+
+			function setProductionSectionHeight(section, height) {
+				const targetHeight = Math.max(1, finitePositive(height, 1))
+				section?.body?.style?.setProperty(
+					'--world-editor-production-section-height',
+					targetHeight + 'px'
+				)
+				return targetHeight
 			}
 
 			function estimateTypeLayoutHeight(layout) {
