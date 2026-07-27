@@ -57,10 +57,12 @@
 			const game = getActiveGame()
 			if (!shouldHandleShiftCtrl(api, game, event)) return
 			const guard = game[guardKey]
+			suppressVanillaShiftCtrlKeyup(event)
 			game.thereWasZoomAction = true
-			setTimeout(function () {
-				restoreZoomIfVanillaReset(api, game, guard)
-			}, 0)
+			game.shiftPressed = false
+			delete game.zoomWhenShiftPressed
+			delete game[guardKey]
+			restoreZoomAfterSinglePress(api, game, guard)
 		}, true)
 	}
 
@@ -79,13 +81,18 @@
 		return activeGame || null
 	}
 
-	function restoreZoomIfVanillaReset(api, game, guard) {
+	function suppressVanillaShiftCtrlKeyup(event) {
+		try {
+			event.preventDefault?.()
+			event.stopImmediatePropagation?.()
+			event.stopPropagation?.()
+		} catch (error) {}
+	}
+
+	function restoreZoomAfterSinglePress(api, game, guard) {
 		if (!game || !guard || !isEnabled(api)) return
-		if (game[guardKey] !== guard) return
-		delete game[guardKey]
 		if (guard.hadWheelAction) return
 		if (!Number.isFinite(guard.zoom)) return
-		if (Math.abs(Number(game.zoom) - 1) > 0.0001) return
 		if (Math.abs(guard.zoom - 1) <= 0.0001) return
 		game.zoom = guard.zoom
 		game.processMousemove2?.()

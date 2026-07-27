@@ -10,7 +10,10 @@ ModLoader.register({
 		let pendingBinding = null
 		let pendingCodes = []
 		let bindingNotice = ''
+		let shiftCtrlZoomDisablePreview = null
 		const pressedByAction = {}
+		const tweaksModId = 'Cattail_TweaksQuality_Tweaks'
+		const shiftCtrlZoomDisableKey = 'disableShiftCtrlZoomShortcut'
 
 		const tabs = ['game', 'video', 'sound', 'keyboard', 'controller', 'mod']
 		const storagePrefix = 'cattailBetterUisSettingsBindings'
@@ -100,6 +103,7 @@ ModLoader.register({
 		api.on('afterVanillaScripts', function () {
 			if (typeof Game === 'undefined') return
 			installStyles()
+			installConfigPreviewListener()
 			window.addEventListener('keydown', handleKeyDown, true)
 			window.addEventListener('keyup', handleKeyUp, true)
 		})
@@ -364,6 +368,12 @@ ModLoader.register({
 			}
 			if (action.kind === 'zoomReset') {
 				pressedSet(action.id).add(event.code)
+				if (isShiftCtrlZoomResetDisabled()) {
+					if (!game.zoomWhenShiftPressed) game.zoomWhenShiftPressed = game.zoom
+					game.thereWasZoomAction = true
+					game.shiftPressed = true
+					return
+				}
 				if (!game.zoomWhenShiftPressed) {
 					game.zoomWhenShiftPressed = game.zoom
 					delete game.thereWasZoomAction
@@ -384,9 +394,32 @@ ModLoader.register({
 				pressedSet(action.id).delete(event.code)
 				if (pressedSet(action.id).size) return
 				game.shiftPressed = false
+				if (isShiftCtrlZoomResetDisabled()) {
+					game.thereWasZoomAction = true
+					delete game.zoomWhenShiftPressed
+					return
+				}
 				if (!game.thereWasZoomAction) game.zoom = 1
 				delete game.zoomWhenShiftPressed
 			}
+		}
+
+		function installConfigPreviewListener() {
+			window.__cattailBetterUisShiftCtrlZoomBridgeVersion = 1
+			if (window.__cattailBetterUisShiftCtrlZoomPreviewInstalled) return
+			window.__cattailBetterUisShiftCtrlZoomPreviewInstalled = true
+			window.addEventListener('modloader:config-preview', function (event) {
+				const detail = event?.detail || {}
+				if (detail.modId === tweaksModId && detail.key === shiftCtrlZoomDisableKey) {
+					shiftCtrlZoomDisablePreview = detail.value !== false
+				}
+			})
+		}
+
+		function isShiftCtrlZoomResetDisabled() {
+			if (!api.state?.modById?.[tweaksModId]) return false
+			if (shiftCtrlZoomDisablePreview !== null) return shiftCtrlZoomDisablePreview !== false
+			return window.ModLoader?.getConfigValue?.(tweaksModId, shiftCtrlZoomDisableKey, true) !== false
 		}
 
 		function pressedSet(actionId) {
