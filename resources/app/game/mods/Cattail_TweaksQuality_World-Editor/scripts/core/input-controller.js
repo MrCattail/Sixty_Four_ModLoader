@@ -4,13 +4,18 @@ ModLoader.register({
 		const RUNTIME_KEY = Symbol.for('cattail.world-editor.runtime')
 		const SELECTION_KEY = Symbol.for('cattail.world-editor.selection')
 		const INTERACTION_KEY = Symbol.for('cattail.world-editor.selection-interaction')
-		const EDITABLE_SELECTOR = 'input, textarea, select, [contenteditable]:not([contenteditable="false"]), [role="textbox"]'
+		const SHARED_KEY = Symbol.for('cattail.world-editor.shared')
 
 		api.on('afterGameInit', function (payload, game) {
 			const runtime = globalThis[RUNTIME_KEY]
 			const selection = globalThis[SELECTION_KEY]
+			const shared = globalThis[SHARED_KEY]
 			if (!runtime || runtime.game !== game || typeof runtime.addCleanup !== 'function') {
 				console.warn('[Cattail World Editor] Input 1B could not find the editor runtime.')
+				return
+			}
+			if (!shared || typeof shared.isEditableEvent !== 'function' || typeof shared.isModLoaderPanelBlocking !== 'function') {
+				console.warn('[Cattail World Editor] Input 2G could not find shared guards.')
 				return
 			}
 
@@ -22,14 +27,14 @@ ModLoader.register({
 					return
 				}
 
-				if (event.isComposing || event.keyCode === 229 || isEditableEvent(event)) return
+				if (event.isComposing || event.keyCode === 229 || shared.isEditableEvent(event)) return
 
 				if (game.splash?.isShown) {
 					runtime.deactivate('splash-visible')
 					return
 				}
 
-				if (isModLoaderPanelBlocking()) {
+				if (shared.isModLoaderPanelBlocking()) {
 					runtime.deactivate('modloader-panel-visible')
 					return
 				}
@@ -84,19 +89,6 @@ ModLoader.register({
 
 			console.info('[Cattail World Editor] Input 2G ready.')
 		})
-
-		function isEditableEvent(event) {
-			const nodes = typeof event.composedPath === 'function' ? event.composedPath() : [event.target]
-			if (typeof document !== 'undefined') nodes.push(document.activeElement)
-			return nodes.some(function (node) {
-				return !!(node && node.nodeType === 1 && typeof node.closest === 'function' && node.closest(EDITABLE_SELECTOR))
-			})
-		}
-
-		function isModLoaderPanelBlocking() {
-			const panel = document.getElementById('modloader-panel')
-			return !!(panel && !panel.classList.contains('modloader-panel-autohidden'))
-		}
 
 		function isPlainV(event, key) {
 			const isV = event.code === 'KeyV' || key === 'v'

@@ -4,6 +4,7 @@ const path = require('node:path')
 const vm = require('node:vm')
 
 const MOD_ROOT = path.resolve(__dirname, '..')
+const SHARED_SOURCE = 'scripts/core/shared.js'
 const BLUEPRINT_SOURCE = 'scripts/blueprint-session.js'
 const RUNTIME_KEY = Symbol.for('cattail.world-editor.runtime')
 const SELECTION_KEY = Symbol.for('cattail.world-editor.selection')
@@ -199,9 +200,11 @@ function createEnvironment(options = {}) {
 		}
 	}
 	vm.createContext(sandbox)
-	const filename = path.join(MOD_ROOT, BLUEPRINT_SOURCE)
-	vm.runInContext(fs.readFileSync(filename, 'utf8'), sandbox, { filename })
-	assert.equal(definitions.length, 1)
+	for (const source of [SHARED_SOURCE, BLUEPRINT_SOURCE]) {
+		const filename = path.join(MOD_ROOT, source)
+		vm.runInContext(fs.readFileSync(filename, 'utf8'), sandbox, { filename })
+	}
+	assert.equal(definitions.length, 2)
 
 	const api = {
 		state: {
@@ -218,6 +221,7 @@ function createEnvironment(options = {}) {
 		}
 	}
 	definitions[0].init(api)
+	definitions[1].init(api)
 	sandbox[RUNTIME_KEY] = runtime
 	sandbox[SELECTION_KEY] = selection
 	sandbox[INTERACTION_KEY] = {
@@ -518,7 +522,7 @@ function testLanguagesManifestUiAndReadOnlyBoundary() {
 	const i18n = i18nSandbox[I18N_KEY]
 	assert.equal(i18n.version, '0.3.5')
 	assert.equal(i18n.languages.length, 20)
-	assert.equal(i18n.keys.length, 98)
+	assert.equal(i18n.keys.length, 99)
 	const blueprintKeys = [
 		'blueprintModeStructure',
 		'blueprintModeFull',
@@ -551,7 +555,7 @@ function testLanguagesManifestUiAndReadOnlyBoundary() {
 	const manifest = JSON.parse(fs.readFileSync(path.join(MOD_ROOT, 'mod.json'), 'utf8'))
 	assert.equal(manifest.version, '0.3.5')
 	assert.equal(manifest.languageSupport.gameLanguage, true)
-	assert.equal(manifest.entry.length, 20)
+	assert.equal(manifest.entry.length, 21)
 	assert.ok(manifest.entry.includes(BLUEPRINT_SOURCE))
 	assert.ok(
 		manifest.entry.indexOf('scripts/ui/editor-shell.js') <

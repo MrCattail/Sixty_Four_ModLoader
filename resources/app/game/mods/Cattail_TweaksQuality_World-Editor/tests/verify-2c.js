@@ -580,7 +580,7 @@ function testUnifiedToolbarAndLocalization() {
 	const resizeButton = shell.querySelector('[data-world-editor-action="resize"]')
 	assert.equal(i18n.version, '0.3.5')
 	assert.equal(i18n.languages.length, 20)
-	assert.equal(i18n.keys.length, 98)
+	assert.equal(i18n.keys.length, 99)
 	assert.equal(shell.getAttribute('role'), 'toolbar')
 	assert.equal(moveButton, null)
 	assert.equal(resizeButton, null)
@@ -617,6 +617,7 @@ function testManifestAndReadOnlyBoundary() {
 	assert.equal(manifest.languageSupport.gameLanguage, true)
 	assert.deepEqual(manifest.entry, [
 		'scripts/core/foundation.js',
+		'scripts/core/shared.js',
 		'scripts/core/editor-state.js',
 		'scripts/core/selection-state.js',
 		'scripts/core/tool-state.js',
@@ -639,9 +640,13 @@ function testManifestAndReadOnlyBoundary() {
 	])
 
 	const scriptRoot = path.join(MOD_ROOT, 'scripts')
-	const sources = readScriptSources(scriptRoot).join('\n')
+	const cardOpacitySource = fs.readFileSync(path.join(scriptRoot, 'ui', 'card-opacity.js'), 'utf8')
+	const scriptSources = readScriptSources(scriptRoot)
+	const sources = scriptSources.join('\n')
+	const stateFreeSources = scriptSources.filter(source => source !== cardOpacitySource).join('\n')
 	assert.doesNotMatch(sources, /\bgame\.(?:addEntity|clearCell|deleteEntity|removeEntity|placeEntity)\b/)
-	assert.doesNotMatch(sources, /\b(?:localStorage|sessionStorage)\.setItem\b/)
+	assert.doesNotMatch(stateFreeSources, /\b(?:localStorage|sessionStorage)\b/)
+	assert.doesNotMatch(cardOpacitySource, /\bsessionStorage\b/)
 	assert.doesNotMatch(sources, /\b(?:writeFile|writeFileSync|appendFile|appendFileSync)\b/)
 }
 

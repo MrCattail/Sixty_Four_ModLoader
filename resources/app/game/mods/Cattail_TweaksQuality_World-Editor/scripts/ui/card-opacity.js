@@ -6,6 +6,16 @@ ModLoader.register({
 		const OPACITY_MIN = .25
 		const OPACITY_MAX = 1
 		const OPACITY_STEP = .1
+		const STORAGE_KEYS = Object.freeze({
+			'selection-production': Object.freeze({
+				opacity: 'cattailWorldEditorSelectionCardOpacity',
+				contentIndependent: 'cattailWorldEditorSelectionCardOpaqueInfo'
+			}),
+			'blueprint-production': Object.freeze({
+				opacity: 'cattailWorldEditorBlueprintCardOpacity',
+				contentIndependent: 'cattailWorldEditorBlueprintCardOpaqueInfo'
+			})
+		})
 		const previous = globalThis[CONTROLLER_KEY]
 		previous?.dispose?.()
 
@@ -25,10 +35,7 @@ ModLoader.register({
 			const group = options?.group ? String(options.group) : null
 			let shared = group ? groups.get(group) : null
 			if (!shared) {
-				shared = {
-					opacity: OPACITY_MAX,
-					contentIndependent: false
-				}
+				shared = loadSharedState(group)
 				if (group) groups.set(group, shared)
 			}
 			const state = {
@@ -124,6 +131,7 @@ ModLoader.register({
 			const next = clampOpacity(state.shared.opacity + direction * OPACITY_STEP)
 			if (next === state.shared.opacity) return
 			state.shared.opacity = next
+			saveOpacity(state.group, next)
 			applySharedState(state.shared)
 		}
 
@@ -132,6 +140,7 @@ ModLoader.register({
 			const state = cardAtEvent(event)
 			if (!state) return
 			state.shared.contentIndependent = !state.shared.contentIndependent
+			saveContentIndependent(state.group, state.shared.contentIndependent)
 			applySharedState(state.shared)
 			consume(event)
 		}
@@ -142,6 +151,10 @@ ModLoader.register({
 		}
 
 		function cardAtEvent(event) {
+			for (const node of eventPath(event)) {
+				const state = registrations.get(node)
+				if (state && !state.released && cardIsInteractive(state.element)) return state
+			}
 			const x = Number(event?.clientX)
 			const y = Number(event?.clientY)
 			if (!Number.isFinite(x) || !Number.isFinite(y)) return null
@@ -154,15 +167,31 @@ ModLoader.register({
 				})[0] || null
 		}
 
-		function cardContainsPoint(element, x, y) {
-			if (
-				!element?.isConnected ||
-				element.dataset.visible !== 'true' ||
-				element.dataset.positionVisible !== 'true' ||
-				element.getAttribute('aria-hidden') === 'true'
-			) {
-				return false
+		function eventPath(event) {
+			if (typeof event?.composedPath === 'function') {
+				const path = event.composedPath()
+				if (Array.isArray(path)) return path
 			}
+			const path = []
+			let node = event?.target || null
+			while (node) {
+				path.push(node)
+				node = node.parentNode || node.host || null
+			}
+			return path
+		}
+
+		function cardIsInteractive(element) {
+			return !!(
+				element?.isConnected &&
+				element.dataset.visible === 'true' &&
+				element.dataset.positionVisible === 'true' &&
+				element.getAttribute('aria-hidden') !== 'true'
+			)
+		}
+
+		function cardContainsPoint(element, x, y) {
+			if (!cardIsInteractive(element)) return false
 			const rect = element.getBoundingClientRect()
 			return !!(
 				rect &&
@@ -220,6 +249,55 @@ ModLoader.register({
 
 		function clampOpacity(value) {
 			return Math.max(OPACITY_MIN, Math.min(OPACITY_MAX, Math.round(Number(value) * 100) / 100))
+		}
+
+		function loadSharedState(group) {
+			const keys = storageKeys(group)
+			return {
+				opacity: loadOpacity(keys?.opacity),
+				contentIndependent: loadContentIndependent(keys?.contentIndependent)
+			}
+		}
+
+		function storageKeys(group) {
+			return group ? STORAGE_KEYS[group] || null : null
+		}
+
+		function loadOpacity(key) {
+			if (!key) return OPACITY_MAX
+			try {
+				const raw = globalThis.localStorage?.getItem?.(key)
+				if (raw === null || raw === undefined || raw === '') return OPACITY_MAX
+				const value = Number(raw)
+				if (Number.isFinite(value)) return clampOpacity(value)
+			} catch (error) {}
+			return OPACITY_MAX
+		}
+
+		function saveOpacity(group, value) {
+			const key = storageKeys(group)?.opacity
+			if (!key) return
+			try {
+				globalThis.localStorage?.setItem?.(key, String(clampOpacity(value)))
+			} catch (error) {}
+		}
+
+		function loadContentIndependent(key) {
+			if (!key) return false
+			try {
+				const value = globalThis.localStorage?.getItem?.(key)
+				if (value === '1') return true
+				if (value === '0') return false
+			} catch (error) {}
+			return false
+		}
+
+		function saveContentIndependent(group, value) {
+			const key = storageKeys(group)?.contentIndependent
+			if (!key) return
+			try {
+				globalThis.localStorage?.setItem?.(key, value ? '1' : '0')
+			} catch (error) {}
 		}
 
 		function clampUnit(value) {

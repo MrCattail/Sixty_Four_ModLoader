@@ -4,6 +4,7 @@ const path = require('node:path')
 const vm = require('node:vm')
 
 const MOD_ROOT = path.resolve(__dirname, '..')
+const SHARED_SOURCE = 'scripts/core/shared.js'
 const PLAN_SOURCE = 'scripts/core/blueprint-preview-plan.js'
 const PREVIEW_SOURCE = 'scripts/blueprint-preview.js'
 const SESSION_SOURCE = 'scripts/blueprint-session.js'
@@ -717,11 +718,11 @@ function createRuntimeEnvironment(options = {}) {
 	}
 	vm.createContext(sandbox)
 	if (options.transform) sandbox[TRANSFORM_KEY] = options.transform
-	for (const source of [PLAN_SOURCE, PREVIEW_SOURCE]) {
+	for (const source of [SHARED_SOURCE, PLAN_SOURCE, PREVIEW_SOURCE]) {
 		const filename = path.join(MOD_ROOT, source)
 		vm.runInContext(fs.readFileSync(filename, 'utf8'), sandbox, { filename })
 	}
-	assert.equal(definitions.length, 2)
+	assert.equal(definitions.length, 3)
 
 	const api = {
 		on(name, listener) {
@@ -776,6 +777,7 @@ function createRuntimeEnvironment(options = {}) {
 		}
 	}
 	definitions[0].init(api)
+	definitions[1].init(api)
 	sandbox[RUNTIME_KEY] = runtime
 	sandbox[SELECTION_KEY] = selection
 	sandbox[BLUEPRINT_KEY] = session
@@ -784,7 +786,7 @@ function createRuntimeEnvironment(options = {}) {
 			return key
 		}
 	}
-	definitions[1].init(api)
+	definitions[2].init(api)
 	api.emit('afterGameInit', {}, game)
 	return {
 		api,
@@ -1191,7 +1193,7 @@ function testManifestLocalizationAndStaticContracts() {
 	const i18n = loadI18n()
 	assert.equal(i18n.version, '0.3.5')
 	assert.equal(i18n.languages.length, 20)
-	assert.equal(i18n.keys.length, 98)
+	assert.equal(i18n.keys.length, 99)
 	for (const language of i18n.languages) {
 		for (const key of previewKeys) {
 			const translated = i18n.t(language, key)
@@ -1205,6 +1207,7 @@ function testManifestLocalizationAndStaticContracts() {
 	assert.equal(manifest.languageSupport.gameLanguage, true)
 	assert.deepEqual(manifest.entry, [
 		'scripts/core/foundation.js',
+		'scripts/core/shared.js',
 		'scripts/core/editor-state.js',
 		'scripts/core/selection-state.js',
 		'scripts/core/tool-state.js',

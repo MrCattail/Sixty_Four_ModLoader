@@ -7,6 +7,7 @@ ModLoader.register({
 		const I18N_KEY = Symbol.for('cattail.world-editor.i18n')
 		const INTERACTION_KEY = Symbol.for('cattail.world-editor.selection-interaction')
 		const CARD_OPACITY_KEY = Symbol.for('cattail.world-editor.card-opacity')
+		const SHARED_KEY = Symbol.for('cattail.world-editor.shared')
 		const CARD_ID = 'cattail-world-editor-selection-card'
 		const SELECTION_PRODUCTION_CARD_ID = 'cattail-world-editor-selection-production-card'
 		const BLUEPRINT_CARD_ID = 'cattail-world-editor-blueprint-card'
@@ -25,6 +26,7 @@ ModLoader.register({
 			const selection = globalThis[SELECTION_KEY]
 			const analysis = globalThis[ANALYSIS_KEY]
 			const i18n = globalThis[I18N_KEY]
+			const shared = globalThis[SHARED_KEY]
 			if (!runtime || runtime.game !== game || typeof runtime.addCleanup !== 'function') {
 				console.warn('[Cattail World Editor] Selection card 2F could not find the editor runtime.')
 				return
@@ -39,6 +41,18 @@ ModLoader.register({
 			}
 			if (!i18n || typeof i18n.t !== 'function') {
 				console.warn('[Cattail World Editor] Selection card 2F could not find the editor translations.')
+				return
+			}
+			if (
+				!shared ||
+				typeof shared.isCardControlEvent !== 'function' ||
+				typeof shared.visibleCardRect !== 'function' ||
+				typeof shared.cardCandidateFits !== 'function' ||
+				typeof shared.rectanglesOverlap !== 'function' ||
+				typeof shared.rectangleOverlapArea !== 'function' ||
+				typeof shared.registerWorldDragCard !== 'function'
+			) {
+				console.warn('[Cattail World Editor] Selection card 2F could not find shared editor services.')
 				return
 			}
 			if (!api.ui?.hud || typeof api.ui.hud.register !== 'function') {
@@ -57,6 +71,7 @@ ModLoader.register({
 			const style = ensureStyle()
 			const card = createCard()
 			document.body.append(card)
+			const worldDragControls = shared.registerWorldDragCard(game, card)
 
 			let currentRuntime = runtime.snapshot()
 			let currentSelection = selection.snapshot()
@@ -235,6 +250,8 @@ ModLoader.register({
 				if (!range) {
 					setText(card, 'coordinates', 'u —  v —')
 					setText(card, 'size-value', '—')
+					setText(card, 'u-length-value', '—')
+					setText(card, 'v-length-value', '—')
 					setText(card, 'tiles-value', '—')
 					setText(card, 'occupied-value', '—')
 					setText(card, 'empty-value', '—')
@@ -248,12 +265,16 @@ ModLoader.register({
 
 				setText(card, 'coordinates', 'u ' + range.start[0] + '→' + range.end[0] + '  v ' + range.start[1] + '→' + range.end[1])
 				setText(card, 'size-label', i18n.t(source, 'labelSize'))
+				setText(card, 'u-length-label', 'U ' + i18n.t(source, 'labelLength'))
+				setText(card, 'v-length-label', 'V ' + i18n.t(source, 'labelLength'))
 				setText(card, 'tiles-label', i18n.t(source, 'labelTiles'))
 				setText(card, 'occupied-label', i18n.t(source, 'labelOccupied'))
 				setText(card, 'empty-label', i18n.t(source, 'labelEmpty'))
 				setText(card, 'buildings-label', i18n.t(source, 'labelBuildings'))
 				setText(card, 'cubes-label', i18n.t(source, 'labelCubes'))
 				setText(card, 'size-value', range.width + '×' + range.height)
+				setText(card, 'u-length-value', String(range.width))
+				setText(card, 'v-length-value', String(range.height))
 				setText(card, 'tiles-value', String(range.width * range.height))
 				setText(card, 'hint', wheel ? i18n.t(source, 'wheelHint') : resizing ? i18n.t(source, 'resizeHint') : moving ? i18n.t(source, 'moveHint') : preview ? i18n.t(source, 'cancelHint') : '')
 
@@ -288,6 +309,8 @@ ModLoader.register({
 					title,
 					card.querySelector('[data-world-editor-text="coordinates"]').textContent,
 					i18n.t(source, 'labelSize') + ' ' + range.width + '×' + range.height,
+					'U ' + i18n.t(source, 'labelLength') + ' ' + range.width,
+					'V ' + i18n.t(source, 'labelLength') + ' ' + range.height,
 					i18n.t(source, 'labelTiles') + ' ' + range.width * range.height,
 					card.querySelector('[data-world-editor-text="analysis-status"]').textContent,
 					i18n.t(source, pinned ? 'cardUnpinAction' : 'cardPinAction'),
@@ -345,18 +368,23 @@ ModLoader.register({
 					{ left: centerX - cardWidth / 2, top: bounds.minY - gap - cardHeight, width: cardWidth, height: cardHeight, placement: 'above' }
 				]
 				const occupiedRects = [
-					visibleRect(document.getElementById(BLUEPRINT_CARD_ID)),
-					visibleRect(document.getElementById(BLUEPRINT_PRODUCTION_CARD_ID))
+					shared.visibleCardRect(document.getElementById(BLUEPRINT_CARD_ID)),
+					shared.visibleCardRect(document.getElementById(BLUEPRINT_PRODUCTION_CARD_ID))
 				].filter(Boolean)
 				const fitting = candidates.filter(function (candidate) {
-					return cardCandidateFits(candidate, margin, viewportWidth, viewportHeight)
+					return shared.cardCandidateFits(candidate, {
+						margin,
+						viewportWidth,
+						viewportHeight
+					})
 				})
 				const chosen = fitting.find(function (candidate) {
 					return occupiedRects.every(function (rect) {
-						return !rectanglesOverlap(candidate, rect, 8)
+						return !shared.rectanglesOverlap(candidate, rect, 8)
 					})
 				}) || (fitting.length ? fitting : candidates).slice().sort(function (left, right) {
-					return candidatePenalty(left, occupiedRects, bounds) - candidatePenalty(right, occupiedRects, bounds)
+					return candidatePenalty(left, occupiedRects, bounds, shared) -
+						candidatePenalty(right, occupiedRects, bounds, shared)
 				})[0]
 				const left = clamp(chosen.left, margin, Math.max(margin, viewportWidth - margin - cardWidth))
 				const top = clamp(chosen.top, margin, Math.max(margin, viewportHeight - margin - cardHeight))
@@ -409,7 +437,7 @@ ModLoader.register({
 				resumeTemporaryTimer()
 			}
 			const togglePinned = function (event) {
-				if (event?.target?.closest?.('button, input, select, textarea, [data-world-editor-card-control]')) return
+				if (shared.isCardControlEvent(event)) return
 				event?.preventDefault?.()
 				event?.stopPropagation?.()
 				event?.stopImmediatePropagation?.()
@@ -468,6 +496,7 @@ ModLoader.register({
 				if (typeof stopRenderFrame === 'function') stopRenderFrame()
 				opacityControls?.release?.()
 				opacityControls = null
+				worldDragControls?.release?.()
 				if (typeof releaseHud === 'function') releaseHud()
 				card.remove()
 				if (style.isConnected && !document.getElementById(CARD_ID)) style.remove()
@@ -485,6 +514,8 @@ ModLoader.register({
 			card.dataset.theme = 'reality'
 			card.dataset.analysisStatus = 'scanning'
 			card.dataset.pinned = 'false'
+			card.dataset.worldEditorPinnable = 'true'
+			card.dataset.worldEditorScrollbar = ''
 			card.dataset.wheelLatched = 'false'
 			card.dataset.inputPassThrough = 'false'
 			card.dataset.autoHiding = 'false'
@@ -509,7 +540,7 @@ ModLoader.register({
 
 			const metrics = document.createElement('div')
 			metrics.className = 'cattail-world-editor-selection-card__metrics'
-			for (const key of ['size', 'tiles', 'occupied', 'empty', 'buildings', 'cubes']) {
+			for (const key of ['size', 'u-length', 'v-length', 'tiles', 'occupied', 'empty', 'buildings', 'cubes']) {
 				const metric = document.createElement('div')
 				metric.className = 'cattail-world-editor-selection-card__metric'
 				metric.append(
@@ -554,6 +585,8 @@ ModLoader.register({
 					--world-editor-card-shell-percent: 100%;
 					--world-editor-card-shell-blur-12: 12px;
 					--world-editor-card-shell-saturate: 1.1;
+					--world-editor-card-base-shadow: rgba(0, 0, 0, .18);
+					--world-editor-card-pinned-base-shadow: rgba(0, 0, 0, .20);
 					--world-editor-card-bg: color-mix(in srgb, rgba(248, 248, 246, .92) var(--world-editor-card-shell-percent), transparent);
 					--world-editor-card-text: rgba(18, 20, 22, .94);
 					--world-editor-card-muted: rgba(18, 20, 22, .58);
@@ -569,12 +602,10 @@ ModLoader.register({
 					overflow-x: hidden;
 					overflow-y: auto;
 					overscroll-behavior: contain;
-					scrollbar-width: thin;
-					scrollbar-color: rgba(185,185,185,.48) transparent;
 					border: 1px solid var(--world-editor-card-border);
 					border-radius: 8px;
 					background: var(--world-editor-card-bg);
-					box-shadow: 0 10px 28px color-mix(in srgb, rgba(0, 0, 0, .18) var(--world-editor-card-shell-percent), transparent);
+					box-shadow: 0 10px 28px color-mix(in srgb, var(--world-editor-card-base-shadow) var(--world-editor-card-shell-percent), transparent);
 					backdrop-filter: blur(var(--world-editor-card-shell-blur-12)) saturate(var(--world-editor-card-shell-saturate));
 					-webkit-backdrop-filter: blur(var(--world-editor-card-shell-blur-12)) saturate(var(--world-editor-card-shell-saturate));
 					color: var(--world-editor-card-text);
@@ -587,16 +618,6 @@ ModLoader.register({
 					cursor: pointer;
 					transition: opacity .16s ease-out, transform .16s ease-out, visibility 0s linear .16s, border-color .16s ease, box-shadow .16s ease;
 				}
-				.cattail-world-editor-selection-card::-webkit-scrollbar {
-					width: 4px;
-				}
-				.cattail-world-editor-selection-card::-webkit-scrollbar-track {
-					background: transparent;
-				}
-				.cattail-world-editor-selection-card::-webkit-scrollbar-thumb {
-					border-radius: 999px;
-					background: rgba(185,185,185,.48);
-				}
 				.cattail-world-editor-selection-card[data-theme="void"] {
 					--world-editor-card-bg: color-mix(in srgb, rgba(8, 10, 12, .92) var(--world-editor-card-shell-percent), transparent);
 					--world-editor-card-text: rgba(255, 255, 255, .92);
@@ -604,7 +625,8 @@ ModLoader.register({
 					--world-editor-card-border: color-mix(in srgb, rgba(210, 188, 250, .24) var(--world-editor-card-shell-percent), transparent);
 					--world-editor-card-accent: color-mix(in srgb, rgba(211, 190, 250, .94) var(--world-editor-card-shell-percent), transparent);
 					--world-editor-card-track: color-mix(in srgb, rgba(211, 190, 250, .14) var(--world-editor-card-shell-percent), transparent);
-					box-shadow: 0 10px 28px color-mix(in srgb, rgba(0, 0, 0, .36) var(--world-editor-card-shell-percent), transparent);
+					--world-editor-card-base-shadow: rgba(0, 0, 0, .36);
+					--world-editor-card-pinned-base-shadow: rgba(0, 0, 0, .38);
 				}
 				.cattail-world-editor-selection-card[data-visible="true"][data-position-visible="true"] {
 					visibility: visible;
@@ -629,16 +651,6 @@ ModLoader.register({
 				}
 				.cattail-world-editor-selection-card[data-visible="true"][data-position-visible="true"][data-input-pass-through="true"] {
 					pointer-events: none;
-				}
-				.cattail-world-editor-selection-card[data-pinned="true"] {
-					border-color: color-mix(in srgb, rgba(166, 242, 70, .82) var(--world-editor-card-shell-percent), transparent);
-					box-shadow: 0 10px 28px color-mix(in srgb, rgba(0, 0, 0, .20) var(--world-editor-card-shell-percent), transparent), 0 0 16px color-mix(in srgb, rgba(166, 242, 70, .36) var(--world-editor-card-shell-percent), transparent);
-				}
-				.cattail-world-editor-selection-card[data-theme="void"][data-pinned="true"] {
-					box-shadow: 0 10px 28px color-mix(in srgb, rgba(0, 0, 0, .38) var(--world-editor-card-shell-percent), transparent), 0 0 16px color-mix(in srgb, rgba(166, 242, 70, .36) var(--world-editor-card-shell-percent), transparent);
-				}
-				.cattail-world-editor-selection-card:focus-visible {
-					outline: none;
 				}
 				.cattail-world-editor-selection-card[data-placement="above"] {
 					transform: translateY(-4px);
@@ -778,59 +790,16 @@ ModLoader.register({
 			}
 		}
 
-		function visibleRect(element) {
-			if (!element || element.dataset?.visible !== 'true' || element.dataset?.positionVisible !== 'true') return null
-			if (element.getAttribute?.('aria-hidden') === 'true') return null
-			const rect = element.getBoundingClientRect?.()
-			if (!rect) return null
-			return {
-				left: finiteOr(rect.left, 0),
-				top: finiteOr(rect.top, 0),
-				width: finitePositive(rect.width, 0),
-				height: finitePositive(rect.height, 0)
-			}
-		}
-
-		function cardCandidateFits(candidate, margin, viewportWidth, viewportHeight) {
-			return (
-				candidate.left >= margin &&
-				candidate.top >= margin &&
-				candidate.left + candidate.width <= viewportWidth - margin &&
-				candidate.top + candidate.height <= viewportHeight - margin
-			)
-		}
-
-		function rectanglesOverlap(left, right, gap) {
-			return !(
-				left.left + left.width + gap <= right.left ||
-				right.left + right.width + gap <= left.left ||
-				left.top + left.height + gap <= right.top ||
-				right.top + right.height + gap <= left.top
-			)
-		}
-
-		function candidatePenalty(candidate, occupiedRects, bounds) {
+		function candidatePenalty(candidate, occupiedRects, bounds, shared) {
 			const previewRect = {
 				left: bounds.minX,
 				top: bounds.minY,
 				width: Math.max(0, bounds.maxX - bounds.minX),
 				height: Math.max(0, bounds.maxY - bounds.minY)
 			}
-			let penalty = rectangleOverlapArea(candidate, previewRect) * 2
-			for (const rect of occupiedRects) penalty += rectangleOverlapArea(candidate, rect) * 4
+			let penalty = shared.rectangleOverlapArea(candidate, previewRect) * 2
+			for (const rect of occupiedRects) penalty += shared.rectangleOverlapArea(candidate, rect) * 4
 			return penalty
-		}
-
-		function rectangleOverlapArea(left, right) {
-			const width = Math.max(
-				0,
-				Math.min(left.left + left.width, right.left + right.width) - Math.max(left.left, right.left)
-			)
-			const height = Math.max(
-				0,
-				Math.min(left.top + left.height, right.top + right.height) - Math.max(left.top, right.top)
-			)
-			return width * height
 		}
 
 		function scanKey(range, plane) {

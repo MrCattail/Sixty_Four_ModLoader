@@ -396,6 +396,7 @@ function testSelectionCard() {
 	windowHub.clearInterval = () => {}
 
 	const { definitions, sandbox } = loadModules([
+		'scripts/core/shared.js',
 		'scripts/i18n/editor-text.js',
 		'scripts/ui/selection-card.js'
 	], {
@@ -480,11 +481,12 @@ function testSelectionCard() {
 	sandbox[RUNTIME_KEY] = runtime
 	sandbox[SELECTION_KEY] = selection
 	sandbox[ANALYSIS_KEY] = analysis
-	assert.equal(sandbox[I18N_KEY].keys.length, 98)
+	assert.equal(sandbox[I18N_KEY].keys.length, 99)
 	api.emit('afterGameInit', {}, game)
 
 	const card = document.getElementById('cattail-world-editor-selection-card')
 	assert.ok(card)
+	assert.equal(card.dataset.worldEditorScrollbar, '')
 	assert.ok(frameCallback)
 	frameCallback({ game })
 	assert.equal(card.dataset.visible, 'true')
@@ -509,11 +511,21 @@ function testSelectionCard() {
 	assert.equal(card.querySelector('[data-world-editor-text="title"]').textContent, '选区预览')
 	assert.equal(card.querySelector('[data-world-editor-text="coordinates"]').textContent, 'u 0→1  v 0→1')
 	assert.equal(card.querySelector('[data-world-editor-text="size-value"]').textContent, '2×2')
+	assert.equal(card.querySelector('[data-world-editor-text="u-length-label"]').textContent, 'U 长度')
+	assert.equal(card.querySelector('[data-world-editor-text="u-length-value"]').textContent, '2')
+	assert.equal(card.querySelector('[data-world-editor-text="v-length-label"]').textContent, 'V 长度')
+	assert.equal(card.querySelector('[data-world-editor-text="v-length-value"]').textContent, '2')
 	assert.equal(card.querySelector('[data-world-editor-text="tiles-value"]').textContent, '4')
 	assert.equal(card.querySelector('[data-world-editor-text="occupied-value"]').textContent, '≥1')
 	assert.equal(card.querySelector('[data-world-editor-text="analysis-status"]').textContent, '正在统计 50%')
 	assert.equal(card.querySelector('[data-world-editor-text="hint"]').textContent, '点击终点 / Esc 取消')
 	assert.equal(card.querySelector('[data-world-editor-progress-fill]').style.width, '50%')
+
+	const nonSquareRange = range([0, 0], [2, 4])
+	selection.emit({ plane: 0, previewRange: nonSquareRange, selectedRange: selectionRange })
+	assert.equal(card.querySelector('[data-world-editor-text="size-value"]').textContent, '3×5')
+	assert.equal(card.querySelector('[data-world-editor-text="u-length-value"]').textContent, '3')
+	assert.equal(card.querySelector('[data-world-editor-text="v-length-value"]').textContent, '5')
 
 	selection.emit({ plane: 0, previewRange: selectionRange, selectedRange: selectionRange, previewKind: 'move' })
 	assert.equal(card.querySelector('[data-world-editor-text="title"]').textContent, '移动预览')
@@ -596,6 +608,7 @@ function testManifest() {
 	assert.equal(manifest.languageSupport.gameLanguage, true)
 	assert.deepEqual(manifest.entry, [
 		'scripts/core/foundation.js',
+		'scripts/core/shared.js',
 		'scripts/core/editor-state.js',
 		'scripts/core/selection-state.js',
 		'scripts/core/tool-state.js',

@@ -7,6 +7,7 @@ ModLoader.register({
 		const TRANSFORM_KEY = Symbol.for('cattail.world-editor.blueprint-transform')
 		const PLAN_KEY = Symbol.for('cattail.world-editor.blueprint-preview-plan')
 		const PREVIEW_KEY = Symbol.for('cattail.world-editor.blueprint-preview')
+		const SHARED_KEY = Symbol.for('cattail.world-editor.shared')
 		const RENDER_LAYER_ID = 'world-editor-blueprint-preview'
 		const RENDER_CALLBACK_ID = 'world-editor-blueprint-preview'
 		const GUIDE_LAYER_ID = 'world-editor-blueprint-transform-guide'
@@ -19,7 +20,6 @@ ModLoader.register({
 		const GUIDE_TRANSITION_MS = 100
 		const INTEGRITY_INTERVAL_MS = 500
 		const WARNING_VISIBLE_MS = 3000
-		const EDITABLE_SELECTOR = 'input, textarea, select, [contenteditable]:not([contenteditable="false"]), [role="textbox"]'
 		const COLORS = Object.freeze({
 			buildable: {
 				tint: '#09D35066',
@@ -52,6 +52,7 @@ ModLoader.register({
 			const session = globalThis[BLUEPRINT_KEY]
 			const transform = globalThis[TRANSFORM_KEY]
 			const planner = globalThis[PLAN_KEY]
+			const shared = globalThis[SHARED_KEY]
 			const transformAvailable = !!(
 				transform &&
 				typeof transform.subscribe === 'function' &&
@@ -82,6 +83,10 @@ ModLoader.register({
 			}
 			if (!canvas || typeof canvas.addEventListener !== 'function') {
 				console.warn('[Cattail World Editor] Blueprint preview 3B requires the game canvas.')
+				return
+			}
+			if (!shared || typeof shared.isEditableEvent !== 'function' || typeof shared.isModLoaderPanelBlocking !== 'function') {
+				console.warn('[Cattail World Editor] Blueprint preview 3B could not find shared guards.')
 				return
 			}
 			if (
@@ -338,7 +343,7 @@ ModLoader.register({
 					cameraDragging = true
 					return
 				}
-				if (event?.button !== 0 || !active || paused || !shouldOwnInput() || isEditableEvent(event)) return
+				if (event?.button !== 0 || !active || paused || !shouldOwnInput() || shared.isEditableEvent(event)) return
 				refreshHoveredCell(event)
 				if (temporaryPinned) {
 					setPinned(true, 'map-alt-promote')
@@ -383,7 +388,7 @@ ModLoader.register({
 					event?.repeat ||
 					event?.isComposing ||
 					event?.keyCode === 229 ||
-					isEditableEvent(event) ||
+					shared.isEditableEvent(event) ||
 					!active ||
 					paused ||
 					blueprint?.mode !== 'structure' ||
@@ -410,7 +415,7 @@ ModLoader.register({
 					paused ||
 					!target ||
 					!shouldOwnInput() ||
-					isEditableEvent(event)
+					shared.isEditableEvent(event)
 				) {
 					return
 				}
@@ -1729,22 +1734,8 @@ ModLoader.register({
 					currentRuntime.active &&
 					!game.halt &&
 					!game.splash?.isShown &&
-					!isModLoaderPanelBlocking()
+					!shared.isModLoaderPanelBlocking()
 				)
-			}
-
-			function isEditableEvent(event) {
-				const nodes = typeof event?.composedPath === 'function' ? event.composedPath() : [event?.target]
-				if (typeof document !== 'undefined') nodes.push(document.activeElement)
-				return nodes.some(function (node) {
-					return !!(node && node.nodeType === 1 && typeof node.closest === 'function' && node.closest(EDITABLE_SELECTOR))
-				})
-			}
-
-			function isModLoaderPanelBlocking() {
-				if (typeof document === 'undefined') return false
-				const panel = document.getElementById('modloader-panel')
-				return !!(panel && !panel.classList.contains('modloader-panel-autohidden'))
 			}
 
 			async function benchmarkRendering(options) {

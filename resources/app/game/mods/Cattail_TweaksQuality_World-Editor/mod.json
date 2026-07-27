@@ -9,6 +9,7 @@
   },
   "entry": [
     "scripts/core/foundation.js",
+    "scripts/core/shared.js",
     "scripts/core/editor-state.js",
     "scripts/core/selection-state.js",
     "scripts/core/tool-state.js",

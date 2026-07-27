@@ -4,6 +4,7 @@ const path = require('node:path')
 const vm = require('node:vm')
 
 const MOD_ROOT = path.resolve(__dirname, '..')
+const SHARED_SOURCE = 'scripts/core/shared.js'
 const PRODUCTION_SOURCE = 'scripts/core/production-state.js'
 const ANALYSIS_SOURCE = 'scripts/core/selection-analysis.js'
 const TRANSFORM_SOURCE = 'scripts/core/blueprint-transform.js'
@@ -12,6 +13,7 @@ const SESSION_SOURCE = 'scripts/blueprint-session.js'
 const CARDS_SOURCE = 'scripts/ui/production-cards.js'
 const OPACITY_SOURCE = 'scripts/ui/card-opacity.js'
 const SELECTION_CARD_SOURCE = 'scripts/ui/selection-card.js'
+const SHELL_SOURCE = 'scripts/ui/editor-shell.js'
 const I18N_SOURCE = 'scripts/i18n/editor-text.js'
 const PRODUCTION_KEY = Symbol.for('cattail.world-editor.production')
 const TELEMETRY_KEY = Symbol.for('cattail.dynamic-details.production-telemetry')
@@ -455,7 +457,11 @@ function testManifestLocalizationUiAndReadOnlyContracts() {
 	const manifest = JSON.parse(fs.readFileSync(path.join(MOD_ROOT, 'mod.json'), 'utf8'))
 	assert.equal(manifest.version, '0.3.5')
 	assert.equal(manifest.languageSupport.gameLanguage, true)
-	assert.equal(manifest.entry.length, 20)
+	assert.equal(manifest.entry.length, 21)
+	assert.equal(
+		manifest.entry.indexOf(SHARED_SOURCE),
+		manifest.entry.indexOf('scripts/core/foundation.js') + 1
+	)
 	assert.equal(
 		manifest.entry.indexOf(PRODUCTION_SOURCE),
 		manifest.entry.indexOf(ANALYSIS_SOURCE) + 1
@@ -486,7 +492,7 @@ function testManifestLocalizationUiAndReadOnlyContracts() {
 	]
 	assert.equal(i18n.version, '0.3.5')
 	assert.equal(i18n.languages.length, 20)
-	assert.equal(i18n.keys.length, 98)
+	assert.equal(i18n.keys.length, 99)
 	for (const language of i18n.languages) {
 		for (const key of productionKeys) {
 			const translated = i18n.t(language, key)
@@ -496,6 +502,7 @@ function testManifestLocalizationUiAndReadOnlyContracts() {
 	}
 
 	const productionSource = fs.readFileSync(path.join(MOD_ROOT, PRODUCTION_SOURCE), 'utf8')
+	const sharedSource = fs.readFileSync(path.join(MOD_ROOT, SHARED_SOURCE), 'utf8')
 	const analysisSource = fs.readFileSync(path.join(MOD_ROOT, ANALYSIS_SOURCE), 'utf8')
 	const transformSource = fs.readFileSync(path.join(MOD_ROOT, TRANSFORM_SOURCE), 'utf8')
 	const plannerSource = fs.readFileSync(path.join(MOD_ROOT, PLAN_SOURCE), 'utf8')
@@ -503,6 +510,7 @@ function testManifestLocalizationUiAndReadOnlyContracts() {
 	const cardsSource = fs.readFileSync(path.join(MOD_ROOT, CARDS_SOURCE), 'utf8')
 	const opacitySource = fs.readFileSync(path.join(MOD_ROOT, OPACITY_SOURCE), 'utf8')
 	const selectionCardSource = fs.readFileSync(path.join(MOD_ROOT, SELECTION_CARD_SOURCE), 'utf8')
+	const shellSource = fs.readFileSync(path.join(MOD_ROOT, SHELL_SOURCE), 'utf8')
 
 	assert.match(productionSource, /\{\s*theoretical:\s*false,\s*supplemental:\s*true\s*\}/)
 	assert.match(productionSource, /entry\?\.id === 'pumpMining' && entry\?\.basis === 'instantaneous'/)
@@ -537,14 +545,14 @@ function testManifestLocalizationUiAndReadOnlyContracts() {
 	assert.match(cardsSource, /right\.output !== left\.output/)
 	assert.match(cardsSource, /right\.consume !== left\.consume/)
 	assert.match(cardsSource, /localizedName\.localeCompare/)
-	assert.match(cardsSource, /const noFlowExpanded = \{[\s\S]*selectionActual:\s*false/)
+	assert.match(cardsSource, /const noFlowStates = \{[\s\S]*selectionActual:\s*disclosureState\(false,\s*44,\s*\.35\)/)
 	assert.match(cardsSource, /productionNoFlow'\) \+ ' \(' \+ count \+ '\)'/)
-	assert.match(cardsSource, /syncProductionSectionState\(noFlowSection, noFlowExpanded\[viewKey\] === true\)/)
+	assert.match(cardsSource, /syncProductionSectionState\(noFlowSection, noFlowStates\[viewKey\]\.expanded\)/)
 	assert.match(cardsSource, /function renderTypes\(target, types, mode, unit, viewKey, onNestedLayoutChange\)/)
 	assert.match(cardsSource, /createNoFlowSection\(noFlow, unit, viewKey, onNestedLayoutChange\)/)
 	assert.match(cardsSource, /function createNoFlowSection\(entries, unit, viewKey, onNestedLayoutChange\)/)
-	assert.match(cardsSource, /const nextExpanded = noFlowExpanded\[viewKey\][\s\S]*syncProductionSectionState\(mounted, nextExpanded\)/)
-	assert.match(cardsSource, /markCompanionLayoutDirty\(card\)[\s\S]*syncBlueprintCompanion\(\)[\s\S]*onNestedLayoutChange\(mounted, nextExpanded\)/)
+	assert.match(cardsSource, /mounted\.disclosure = mountProductionDisclosure\([\s\S]*noFlowStates\[viewKey\]/)
+	assert.match(cardsSource, /markCompanionLayoutDirty\(card\)[\s\S]*syncBlueprintCompanion\(\)[\s\S]*onNestedLayoutChange\(mounted, detail\.state\.expanded\)/)
 	assert.match(cardsSource, /function renderTypesSection\([\s\S]*viewKey,\s*function \(nestedSection, nestedExpanded\) \{\s*projectNestedProductionSectionHeight\(section, nestedSection, nestedExpanded\)\s*\}/)
 	assert.doesNotMatch(cardsSource, /'selectionActual',\s*function \(\)/)
 	assert.match(cardsSource, /function measureProductionSection\(section\)/)
@@ -552,7 +560,8 @@ function testManifestLocalizationUiAndReadOnlyContracts() {
 	assert.match(cardsSource, /const currentOuterHeight = finitePositive\(outerBody\.scrollHeight, 0\)/)
 	assert.match(cardsSource, /const currentNestedHeight = finitePositive\([\s\S]*nestedRect\?\.height,[\s\S]*nestedBody\.clientHeight/)
 	assert.match(cardsSource, /const baseHeight = Math\.max\(1, currentOuterHeight - currentNestedHeight\)/)
-	assert.match(cardsSource, /const targetNestedHeight = expanded \? measureProductionSection\(nestedSection\) : 0/)
+	assert.match(sharedSource, /state\.effectiveHeight = effectiveHeight/)
+	assert.match(cardsSource, /const targetNestedHeight = expanded[\s\S]*nestedSection\?\.disclosure\?\.state\?\.effectiveHeight,[\s\S]*measureProductionSectionHeight\(nestedSection\)/)
 	assert.match(cardsSource, /Math\.ceil\(baseHeight \+ targetNestedHeight\)/)
 	assert.match(cardsSource, /function setProductionSectionHeight\(section, height\)/)
 	assert.match(cardsSource, /function estimateTypeLayoutHeight\(layout\)/)
@@ -562,19 +571,41 @@ function testManifestLocalizationUiAndReadOnlyContracts() {
 	assert.match(cardsSource, /max-height:\s*var\(--world-editor-production-section-height/)
 	assert.match(cardsSource, /transition:\s*max-height \.16s ease-out,\s*opacity \.16s ease-out/)
 	assert.doesNotMatch(cardsSource, /data-expanded="false"] > \.cattail-world-editor-production__body \{\s*display:\s*none/)
-	assert.match(cardsSource, /\.cattail-world-editor-production__chevron[\s\S]*flex:\s*0 0 12px[\s\S]*transition:\s*transform \.16s ease-out/)
-	assert.match(cardsSource, /\.cattail-world-editor-production__chevron::before[\s\S]*top:\s*6px/)
-	assert.ok((cardsSource.match(/transform:\s*rotate\((?:-)?38deg\)/g) || []).length >= 2)
-	assert.match(cardsSource, /const host = blueprintTheorySummaryExpanded[\s\S]*blueprintSummary\.captured\.body/)
+	assert.match(sharedSource, /\[data-world-editor-disclosure-toggle\][\s\S]*grid-template-columns:\s*minmax\(0,\s*1fr\) 14px[\s\S]*min-height:\s*24px[\s\S]*color:\s*inherit/)
+	assert.match(sharedSource, /\[data-world-editor-disclosure-chevron\][\s\S]*flex:\s*0 0 12px[\s\S]*transition:\s*transform \.16s ease-out/)
+	assert.match(sharedSource, /\[data-world-editor-disclosure-chevron\]::before[\s\S]*top:\s*6px/)
+	assert.ok((sharedSource.match(/transform:\s*rotate\((?:-)?38deg\)/g) || []).length >= 2)
+	assert.doesNotMatch(cardsSource, /\.cattail-world-editor-production__section-toggle\s*\{[\s\S]*display:/)
+	assert.doesNotMatch(sessionSource, /\.cattail-world-editor-blueprint-card__section-toggle\s*\{[\s\S]*display:/)
+	assert.match(cardsSource, /const host = blueprintTheorySummaryState\.expanded[\s\S]*blueprintSummary\.captured\.body/)
 	assert.match(cardsSource, /host\.insertBefore\(blueprintSummary\.unit\.root/)
 	assert.match(cardsSource, /insertBefore\(blueprintSummary\.section, blueprintCosts\)/)
 	assert.match(cardsSource, /insertBefore\(blueprintCaptured, blueprintCosts\)/)
 	assert.match(cardsSource, /const blueprintClear = blueprintCard\.querySelector\('\[data-world-editor-blueprint-action="clear"\]'\)/)
 	assert.match(cardsSource, /if \(blueprintClear\) blueprintClear\.before\(blueprintToggle\)/)
-	assert.match(cardsSource, /function handleWorldRightMouseDown\(event\)/)
-	assert.match(cardsSource, /event\?\.button !== 2 \|\| event\?\.target !== game\.canvas/)
-	assert.match(cardsSource, /dataset\.worldDragPassThrough/)
-	assert.match(cardsSource, /data-world-drag-pass-through="true"/)
+	assert.match(sharedSource, /function handleWorldRightMouseDown\(event\)/)
+	assert.match(sharedSource, /event\?\.button !== 2/)
+	assert.match(sharedSource, /event\.target === group\.game\?\.canvas/)
+	assert.match(sharedSource, /dataset\.worldDragPassThrough/)
+	assert.match(sharedSource, /data-world-drag-pass-through="true"/)
+	assert.match(sharedSource, /function createDisclosureController\(options\)/)
+	assert.match(sharedSource, /state\.expanded = state\.expanded !== false/)
+	assert.match(sharedSource, /state\.preferredHeight = clamp\(/)
+	assert.match(sharedSource, /window\.addEventListener\('pointermove', handleResizeMove, true\)/)
+	assert.match(sharedSource, /window\.addEventListener\('pointercancel', handleResizeCancel, true\)/)
+	assert.match(cardsSource, /mountProductionDisclosure\(selectionSummary,\s*selectionSummaryState/)
+	assert.match(cardsSource, /mountProductionDisclosure\(blueprintSummary\.theory,\s*blueprintTheorySummaryState/)
+	assert.match(cardsSource, /mountProductionDisclosure\(blueprintProductionCard\.captured,\s*blueprintCapturedTypesState/)
+	assert.match(cardsSource, /heightProperty:\s*'--world-editor-production-section-height'/)
+	assert.match(sessionSource, /heightProperty:\s*'--blueprint-section-max-height'/)
+	assert.doesNotMatch(cardsSource, /function handleSelectionSummaryToggle\(|function handleBlueprintTheoryTypesToggle\(/)
+	assert.doesNotMatch(sessionSource, /function handleSectionToggle\(|function handleSectionResizeStart\(/)
+	assert.match(cardsSource, /shared\.registerWorldDragCard\(game,\s*selectionProductionCard\.card\)/)
+	assert.match(cardsSource, /shared\.registerWorldDragCard\(game,\s*blueprintProductionCard\.card\)/)
+	assert.match(selectionCardSource, /shared\.registerWorldDragCard\(game,\s*card\)/)
+	assert.match(sessionSource, /shared\.registerWorldDragCard\(game,\s*card\)/)
+	assert.doesNotMatch(cardsSource, /function handleWorldRightMouseDown\(|setWorldRightDragPassThrough/)
+	assert.match(sessionSource, /shared\.isCardControlEvent\(event,\s*'\[data-world-editor-disclosure-resize\]'\)/)
 	assert.match(cardsSource, /createSelectionSummary/)
 	assert.match(cardsSource, /createBlueprintSummary/)
 	assert.match(cardsSource, /createSelectionProductionCard/)
@@ -598,21 +629,64 @@ function testManifestLocalizationUiAndReadOnlyContracts() {
 	assert.match(sessionSource, /data-auto-hiding="true"/)
 	assert.match(cardsSource, /card\.dataset\.autoHiding = mainCard\.dataset\.autoHiding \|\| 'false'/)
 	assert.match(cardsSource, /data-visible="false"]\[data-auto-hiding="true"\]/)
-	assert.match(selectionCardSource, /\.cattail-world-editor-selection-card:focus-visible\s*\{\s*outline:\s*none/)
-	assert.match(sessionSource, /\.cattail-world-editor-blueprint-card:focus-visible\s*\{\s*outline:\s*none/)
-	assert.match(cardsSource, /\.cattail-world-editor-blueprint-production-card:focus-visible\s*\{\s*outline:\s*none/)
+	const focusStyle = sharedSource.match(
+		/button\[class\*="cattail-world-editor-"\]:focus,([\s\S]*?)\n\s*\}/
+	)
+	assert.ok(focusStyle)
+	assert.match(focusStyle[0], /input\[class\*="cattail-world-editor-"\]:focus/)
+	assert.match(focusStyle[0], /\[tabindex\]\[class\*="cattail-world-editor-"\]:focus/)
+	assert.match(focusStyle[0], /\[data-world-editor-card-control\]:focus/)
+	assert.match(focusStyle[0], /\[data-world-editor-disclosure-toggle\]:focus/)
+	assert.match(focusStyle[1], /outline:\s*none !important/)
+	assert.match(focusStyle[1], /outline-offset:\s*0 !important/)
+	for (const source of [sharedSource, shellSource, sessionSource, selectionCardSource, cardsSource]) {
+		assert.doesNotMatch(source, /:focus-visible\s*\{[\s\S]*?outline:/)
+	}
+	const scrollbarStyle = sharedSource.match(
+		/\[data-world-editor-scrollbar\]\s*\{([\s\S]*?)\n\s*\}/
+	)
+	assert.ok(scrollbarStyle)
+	assert.match(scrollbarStyle[1], /--world-editor-scrollbar-size:\s*4px/)
+	assert.match(scrollbarStyle[1], /--world-editor-scrollbar-thumb:\s*rgba\(185,\s*185,\s*185,\s*\.48\)/)
+	assert.match(scrollbarStyle[1], /scrollbar-width:\s*thin/)
+	assert.match(sharedSource, /\[data-world-editor-scrollbar\]::-webkit-scrollbar-thumb:hover/)
+	assert.match(sharedSource, /body\.dataset\.worldEditorScrollbar = ''/)
+	assert.match(selectionCardSource, /card\.dataset\.worldEditorScrollbar = ''/)
+	assert.match(sessionSource, /card\.dataset\.worldEditorScrollbar = ''/)
+	assert.ok((sessionSource.match(/\.dataset\.worldEditorScrollbar = ''/g) || []).length >= 4)
+	assert.match(cardsSource, /card\.dataset\.worldEditorScrollbar = ''/)
+	for (const source of [sessionSource, selectionCardSource, cardsSource]) {
+		assert.doesNotMatch(source, /scrollbar-width:\s*thin|scrollbar-color:|::-webkit-scrollbar/)
+	}
 	assert.match(opacitySource, /const groups = new Map\(\)/)
 	assert.match(opacitySource, /applySharedState/)
 	assert.doesNotMatch(cardsSource, /\blocalStorage\b|\bsessionStorage\b/)
-	const pinnedStyle = selectionCardSource.match(
-		/\.cattail-world-editor-selection-card\[data-pinned="true"\]\s*\{([\s\S]*?)\n\s*\}/
+	const pinnedStyle = sharedSource.match(
+		/\[data-world-editor-pinnable="true"\]\[data-pinned="true"\]\s*\{([\s\S]*?)\n\s*\}/
 	)
 	assert.ok(pinnedStyle)
 	assert.match(pinnedStyle[1], /border-color:\s*color-mix/)
 	assert.match(pinnedStyle[1], /0 0 16px/)
 	assert.doesNotMatch(pinnedStyle[1], /\bbackground\s*:/)
+	assert.match(selectionCardSource, /card\.dataset\.worldEditorPinnable = 'true'/)
+	assert.match(sessionSource, /card\.dataset\.worldEditorPinnable = 'true'/)
+	assert.match(sharedSource, /--world-editor-card-pinned-border-color:\s*rgba\(166,\s*242,\s*70,\s*\.82\)/)
+	assert.match(sharedSource, /--world-editor-card-pinned-glow-color:\s*rgba\(166,\s*242,\s*70,\s*\.36\)/)
+	assert.match(sharedSource, /--world-editor-card-pinned-base-shadow:\s*rgba\(0,\s*0,\s*0,\s*\.24\)/)
+	assert.match(selectionCardSource, /--world-editor-card-pinned-base-shadow:\s*rgba\(0,\s*0,\s*0,\s*\.20\)/)
+	assert.match(selectionCardSource, /data-theme="void"[\s\S]*--world-editor-card-pinned-base-shadow:\s*rgba\(0,\s*0,\s*0,\s*\.38\)/)
+	assert.match(selectionCardSource, /--world-editor-card-base-shadow:\s*rgba\(0,\s*0,\s*0,\s*\.18\)/)
+	const voidSelectionThemeStyle = selectionCardSource.match(
+		/\.cattail-world-editor-selection-card\[data-theme="void"\]\s*\{([\s\S]*?)\n\s*\}/
+	)
+	assert.ok(voidSelectionThemeStyle)
+	assert.match(voidSelectionThemeStyle[1], /--world-editor-card-base-shadow:\s*rgba\(0,\s*0,\s*0,\s*\.36\)/)
+	assert.doesNotMatch(voidSelectionThemeStyle[1], /\bbox-shadow\s*:/)
+	assert.doesNotMatch(sessionSource, /--world-editor-card-pinned-(?:border-color|glow-color|base-shadow)\s*:/)
+	assert.doesNotMatch(selectionCardSource, /\.cattail-world-editor-selection-card\[data-pinned="true"\]/)
+	assert.doesNotMatch(sessionSource, /\.cattail-world-editor-blueprint-card\[data-pinned="true"\]/)
 
-	const readOnlySources = [productionSource, analysisSource, transformSource, plannerSource, sessionSource, cardsSource, selectionCardSource]
+	const readOnlySources = [sharedSource, productionSource, analysisSource, transformSource, plannerSource, sessionSource, cardsSource, selectionCardSource]
 	for (const source of readOnlySources) {
 		assert.doesNotMatch(source, /\bgame\.(?:addEntity|clearCell|deleteEntity|removeEntity|placeEntity)\s*\(/)
 		assert.doesNotMatch(source, /\brequestResources\s*\(/)

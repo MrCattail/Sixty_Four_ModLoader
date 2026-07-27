@@ -1,37 +1,23 @@
 const assert = require('node:assert/strict')
 const fs = require('node:fs')
 const path = require('node:path')
-const vm = require('node:vm')
+const {
+	createModuleLoader,
+	createRuntime,
+	EventHub,
+	createTimers,
+	plain,
+	range
+} = require('./helpers/runtime-harness')
 
 const MOD_ROOT = path.resolve(__dirname, '..')
+const loadModules = createModuleLoader(MOD_ROOT)
 const RUNTIME_KEY = Symbol.for('cattail.world-editor.runtime')
 const SELECTION_KEY = Symbol.for('cattail.world-editor.selection')
 const TOOL_KEY = Symbol.for('cattail.world-editor.tool')
 const I18N_KEY = Symbol.for('cattail.world-editor.i18n')
 const RESIZE_HANDLES_KEY = Symbol.for('cattail.world-editor.resize-handles')
 const INTERACTION_KEY = Symbol.for('cattail.world-editor.selection-interaction')
-
-function loadModules(relativePaths, extras = {}) {
-	const definitions = []
-	const sandbox = Object.assign({
-		console: {
-			info() {},
-			warn() {},
-			error() {}
-		},
-		ModLoader: {
-			register(definition) {
-				definitions.push(definition)
-			}
-		}
-	}, extras)
-	vm.createContext(sandbox)
-	for (const relativePath of relativePaths) {
-		const filename = path.join(MOD_ROOT, relativePath)
-		vm.runInContext(fs.readFileSync(filename, 'utf8'), sandbox, { filename })
-	}
-	return { definitions, sandbox }
-}
 
 function createApi(render) {
 	const handlers = new Map()
@@ -47,70 +33,6 @@ function createApi(render) {
 		emit(name, ...args) {
 			for (const listener of handlers.get(name) || []) listener(...args)
 		}
-	}
-}
-
-function createRuntime(game) {
-	const listeners = new Set()
-	const cleanups = []
-	let active = true
-	return {
-		game,
-		snapshot() {
-			return { active }
-		},
-		isActive() {
-			return active
-		},
-		isEnabled() {
-			return true
-		},
-		toggle() {
-			active = !active
-			for (const listener of listeners) listener({ active })
-		},
-		deactivate(reason) {
-			if (!active) return false
-			active = false
-			for (const listener of listeners) listener({ active, lastReason: reason })
-			return true
-		},
-		subscribe(listener) {
-			listeners.add(listener)
-			listener({ active })
-			return () => listeners.delete(listener)
-		},
-		addCleanup(cleanup) {
-			cleanups.push(cleanup)
-		},
-		runCleanups() {
-			while (cleanups.length) cleanups.pop()()
-		}
-	}
-}
-
-class EventHub {
-	constructor() {
-		this.listeners = new Map()
-	}
-
-	addEventListener(type, listener, capture = false) {
-		if (!this.listeners.has(type)) this.listeners.set(type, [])
-		this.listeners.get(type).push({ listener, capture })
-	}
-
-	removeEventListener(type, listener, capture = false) {
-		const entries = this.listeners.get(type) || []
-		this.listeners.set(type, entries.filter(entry => entry.listener !== listener || entry.capture !== capture))
-	}
-
-	dispatch(type, dispatched = {}) {
-		dispatched.type = type
-		for (const entry of (this.listeners.get(type) || []).slice()) {
-			entry.listener(dispatched)
-			if (dispatched.immediatePropagationStopped) break
-		}
-		return dispatched
 	}
 }
 
@@ -135,56 +57,6 @@ function createEvent(values = {}) {
 			return []
 		}
 	}, values)
-}
-
-function createTimers() {
-	let now = 0
-	let nextId = 1
-	const tasks = new Map()
-	return {
-		setTimeout(callback, delay) {
-			const id = nextId++
-			tasks.set(id, { callback, at: now + Math.max(0, Number(delay) || 0) })
-			return id
-		},
-		clearTimeout(id) {
-			tasks.delete(id)
-		},
-		advance(milliseconds) {
-			now += milliseconds
-			let progressed = true
-			while (progressed) {
-				progressed = false
-				for (const [id, task] of Array.from(tasks)) {
-					if (task.at > now) continue
-					tasks.delete(id)
-					task.callback()
-					progressed = true
-				}
-			}
-		}
-	}
-}
-
-function plain(value) {
-	return JSON.parse(JSON.stringify(value))
-}
-
-function range(start, end) {
-	const minU = Math.min(start[0], end[0])
-	const maxU = Math.max(start[0], end[0])
-	const minV = Math.min(start[1], end[1])
-	const maxV = Math.max(start[1], end[1])
-	return {
-		start,
-		end,
-		minU,
-		maxU,
-		minV,
-		maxV,
-		width: maxU - minU + 1,
-		height: maxV - minV + 1
-	}
 }
 
 function selectRange(selection, start, end, options) {
@@ -291,6 +163,7 @@ function setupInput() {
 		}
 	}
 	const { definitions, sandbox } = loadModules([
+		'scripts/core/shared.js',
 		'scripts/core/selection-state.js',
 		'scripts/core/tool-state.js',
 		'scripts/core/input-controller.js',
@@ -538,7 +411,7 @@ function testI18nManifestAndReadOnlyBoundary() {
 	const i18n = sandbox[I18N_KEY]
 	assert.equal(i18n.version, '0.3.5')
 	assert.equal(i18n.languages.length, 20)
-	assert.equal(i18n.keys.length, 98)
+	assert.equal(i18n.keys.length, 99)
 	assert.ok(i18n.keys.includes('removeSelection'))
 	for (const language of i18n.languages) {
 		const translated = i18n.t(language, 'removeSelection')
@@ -562,14 +435,20 @@ function testI18nManifestAndReadOnlyBoundary() {
 	const manifest = JSON.parse(fs.readFileSync(path.join(MOD_ROOT, 'mod.json'), 'utf8'))
 	assert.equal(manifest.version, '0.3.5')
 	assert.equal(manifest.languageSupport.gameLanguage, true)
-	assert.equal(manifest.entry.length, 20)
+	assert.equal(manifest.entry.length, 21)
 
 	const scriptText = manifest.entry
 		.map(relativePath => fs.readFileSync(path.join(MOD_ROOT, relativePath), 'utf8'))
 		.join('\n')
+	const stateFreeScriptText = manifest.entry
+		.filter(relativePath => relativePath !== 'scripts/ui/card-opacity.js')
+		.map(relativePath => fs.readFileSync(path.join(MOD_ROOT, relativePath), 'utf8'))
+		.join('\n')
+	const cardOpacityText = fs.readFileSync(path.join(MOD_ROOT, 'scripts/ui/card-opacity.js'), 'utf8')
 	assert.doesNotMatch(scriptText, /\baddEntity\s*\(/)
 	assert.doesNotMatch(scriptText, /\bclearCell\s*\(/)
-	assert.doesNotMatch(scriptText, /\blocalStorage\b|\bsessionStorage\b/)
+	assert.doesNotMatch(stateFreeScriptText, /\blocalStorage\b|\bsessionStorage\b/)
+	assert.doesNotMatch(cardOpacityText, /\bsessionStorage\b/)
 	assert.doesNotMatch(scriptText, /\brequire\s*\(\s*['"](?:fs|node:fs)['"]\s*\)/)
 }
 

@@ -329,6 +329,7 @@ function testResizeHandlesRenderingInputAndCancellation() {
 	canvas.width = 400
 	canvas.height = 300
 	const { definitions, sandbox } = loadModules([
+		'scripts/core/shared.js',
 		'scripts/core/selection-state.js',
 		'scripts/core/tool-state.js',
 		'scripts/core/input-controller.js',
@@ -585,7 +586,7 @@ function testLocalizationManifestAndReadOnlyBoundary() {
 	const i18n = sandbox[I18N_KEY]
 	assert.equal(i18n.version, '0.3.5')
 	assert.equal(i18n.languages.length, 20)
-	assert.equal(i18n.keys.length, 98)
+	assert.equal(i18n.keys.length, 99)
 	for (const language of i18n.languages) {
 		for (const key of ['toolbarModeResize', 'toolResize', 'cardResizePreview', 'resizeHint']) {
 			assert.notEqual(i18n.t(language, key), key)
@@ -601,6 +602,7 @@ function testLocalizationManifestAndReadOnlyBoundary() {
 	assert.equal(manifest.languageSupport.gameLanguage, true)
 	assert.deepEqual(manifest.entry, [
 		'scripts/core/foundation.js',
+		'scripts/core/shared.js',
 		'scripts/core/editor-state.js',
 		'scripts/core/selection-state.js',
 		'scripts/core/tool-state.js',
@@ -622,9 +624,14 @@ function testLocalizationManifestAndReadOnlyBoundary() {
 		'scripts/ui/production-cards.js'
 	])
 
-	const sources = readScriptSources(path.join(MOD_ROOT, 'scripts')).join('\n')
+	const scriptRoot = path.join(MOD_ROOT, 'scripts')
+	const cardOpacitySource = fs.readFileSync(path.join(scriptRoot, 'ui', 'card-opacity.js'), 'utf8')
+	const scriptSources = readScriptSources(scriptRoot)
+	const sources = scriptSources.join('\n')
+	const stateFreeSources = scriptSources.filter(source => source !== cardOpacitySource).join('\n')
 	assert.doesNotMatch(sources, /\bgame\.(?:addEntity|clearCell|deleteEntity|removeEntity|placeEntity)\b/)
-	assert.doesNotMatch(sources, /\b(?:localStorage|sessionStorage)\.setItem\b/)
+	assert.doesNotMatch(stateFreeSources, /\b(?:localStorage|sessionStorage)\b/)
+	assert.doesNotMatch(cardOpacitySource, /\bsessionStorage\b/)
 	assert.doesNotMatch(sources, /\b(?:writeFile|writeFileSync|appendFile|appendFileSync)\b/)
 	assert.match(sources, /api\.render\.onLayer\(RENDER_LAYER_ID/)
 	assert.match(sources, /previewKind: previewRange \? \(moveSession \? 'move' : resizeSession \? 'resize'/)

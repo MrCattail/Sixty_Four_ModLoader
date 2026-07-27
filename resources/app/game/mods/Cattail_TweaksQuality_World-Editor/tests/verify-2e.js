@@ -1,9 +1,17 @@
 const assert = require('node:assert/strict')
 const fs = require('node:fs')
 const path = require('node:path')
-const vm = require('node:vm')
+const {
+	createModuleLoader,
+	createRuntime,
+	EventHub,
+	createTimers,
+	plain,
+	range
+} = require('./helpers/runtime-harness')
 
 const MOD_ROOT = path.resolve(__dirname, '..')
+const loadModules = createModuleLoader(MOD_ROOT)
 const RUNTIME_KEY = Symbol.for('cattail.world-editor.runtime')
 const SELECTION_KEY = Symbol.for('cattail.world-editor.selection')
 const TOOL_KEY = Symbol.for('cattail.world-editor.tool')
@@ -11,28 +19,6 @@ const ANALYSIS_KEY = Symbol.for('cattail.world-editor.analysis')
 const I18N_KEY = Symbol.for('cattail.world-editor.i18n')
 const RESIZE_HANDLES_KEY = Symbol.for('cattail.world-editor.resize-handles')
 const INTERACTION_KEY = Symbol.for('cattail.world-editor.selection-interaction')
-
-function loadModules(relativePaths, extras = {}) {
-	const definitions = []
-	const sandbox = Object.assign({
-		console: {
-			info() {},
-			warn() {},
-			error() {}
-		},
-		ModLoader: {
-			register(definition) {
-				definitions.push(definition)
-			}
-		}
-	}, extras)
-	vm.createContext(sandbox)
-	for (const relativePath of relativePaths) {
-		const filename = path.join(MOD_ROOT, relativePath)
-		vm.runInContext(fs.readFileSync(filename, 'utf8'), sandbox, { filename })
-	}
-	return { definitions, sandbox }
-}
 
 function createApi() {
 	const handlers = new Map()
@@ -47,70 +33,6 @@ function createApi() {
 		emit(name, ...args) {
 			for (const listener of handlers.get(name) || []) listener(...args)
 		}
-	}
-}
-
-function createRuntime(game) {
-	const listeners = new Set()
-	const cleanups = []
-	let active = true
-	return {
-		game,
-		snapshot() {
-			return { active }
-		},
-		isActive() {
-			return active
-		},
-		isEnabled() {
-			return true
-		},
-		toggle() {
-			active = !active
-			for (const listener of listeners) listener({ active })
-		},
-		deactivate(reason) {
-			if (!active) return false
-			active = false
-			for (const listener of listeners) listener({ active, lastReason: reason })
-			return true
-		},
-		subscribe(listener) {
-			listeners.add(listener)
-			listener({ active })
-			return () => listeners.delete(listener)
-		},
-		addCleanup(cleanup) {
-			cleanups.push(cleanup)
-		},
-		runCleanups() {
-			while (cleanups.length) cleanups.pop()()
-		}
-	}
-}
-
-class EventHub {
-	constructor() {
-		this.listeners = new Map()
-	}
-
-	addEventListener(type, listener, capture = false) {
-		if (!this.listeners.has(type)) this.listeners.set(type, [])
-		this.listeners.get(type).push({ listener, capture })
-	}
-
-	removeEventListener(type, listener, capture = false) {
-		const entries = this.listeners.get(type) || []
-		this.listeners.set(type, entries.filter(entry => entry.listener !== listener || entry.capture !== capture))
-	}
-
-	dispatch(type, event = {}) {
-		event.type = type
-		for (const entry of (this.listeners.get(type) || []).slice()) {
-			entry.listener(event)
-			if (event.immediatePropagationStopped) break
-		}
-		return event
 	}
 }
 
@@ -137,59 +59,6 @@ function event(values = {}) {
 	}, values)
 }
 
-function createTimers() {
-	let now = 0
-	let nextId = 1
-	const tasks = new Map()
-	return {
-		setTimeout(callback, delay) {
-			const id = nextId++
-			tasks.set(id, { callback, at: now + Math.max(0, Number(delay) || 0) })
-			return id
-		},
-		clearTimeout(id) {
-			tasks.delete(id)
-		},
-		advance(milliseconds) {
-			now += milliseconds
-			let progressed = true
-			while (progressed) {
-				progressed = false
-				for (const [id, task] of Array.from(tasks)) {
-					if (task.at > now) continue
-					tasks.delete(id)
-					task.callback()
-					progressed = true
-				}
-			}
-		},
-		get size() {
-			return tasks.size
-		}
-	}
-}
-
-function plain(value) {
-	return JSON.parse(JSON.stringify(value))
-}
-
-function range(start, end) {
-	const minU = Math.min(start[0], end[0])
-	const maxU = Math.max(start[0], end[0])
-	const minV = Math.min(start[1], end[1])
-	const maxV = Math.max(start[1], end[1])
-	return {
-		start,
-		end,
-		minU,
-		maxU,
-		minV,
-		maxV,
-		width: maxU - minU + 1,
-		height: maxV - minV + 1
-	}
-}
-
 function selectRange(selection, start, end, plane = 0) {
 	selection.begin(start, plane, 'test-start')
 	selection.commit(end, plane, 'test-commit')
@@ -210,6 +79,7 @@ function testUnifiedInputGestures() {
 		}
 	}
 	const { definitions, sandbox } = loadModules([
+		'scripts/core/shared.js',
 		'scripts/core/selection-state.js',
 		'scripts/core/tool-state.js',
 		'scripts/core/input-controller.js',
@@ -464,6 +334,7 @@ function testCardLockAndTemporaryWindow() {
 	}
 	windowHub.clearInterval = function () {}
 	const { definitions, sandbox } = loadModules([
+		'scripts/core/shared.js',
 		'scripts/i18n/editor-text.js',
 		'scripts/ui/selection-card.js'
 	], {
@@ -546,29 +417,46 @@ function testCardLockAndTemporaryWindow() {
 
 	const card = document.getElementById('cattail-world-editor-selection-card')
 	const style = document.getElementById('cattail-world-editor-selection-card-style')
+	const sharedStyle = document.getElementById('cattail-world-editor-shared-style')
 	assert.ok(card)
 	assert.ok(style)
+	assert.ok(sharedStyle)
 	assert.equal(document.querySelectorAll('#cattail-world-editor-selection-card').length, 1)
 	assert.equal(staleCards.every(staleCard => staleCard.parentNode === null), true)
 	assert.equal(card.getAttribute('role'), 'button')
 	assert.equal(card.getAttribute('tabindex'), '0')
 	assert.equal(card.dataset.pinned, 'false')
+	assert.equal(card.dataset.worldEditorPinnable, 'true')
 	assert.equal(card.getAttribute('aria-pressed'), 'false')
 	assert.equal(card.dataset.visible, 'true')
 	assert.match(card.getAttribute('aria-label'), /点击以长期显示/)
-	assert.match(style.textContent, /data-pinned="true"/)
+	assert.doesNotMatch(style.textContent, /data-pinned="true"/)
 	assert.match(style.textContent, /pointer-events: auto/)
 	assert.match(style.textContent, /data-input-pass-through="true"/)
 	assert.match(style.textContent, /overflow-y:\s*auto/)
-	const pinnedStyle = style.textContent.match(
-		/\.cattail-world-editor-selection-card\[data-pinned="true"\]\s*\{([\s\S]*?)\n\s*\}/
+	const pinnedStyle = sharedStyle.textContent.match(
+		/\[data-world-editor-pinnable="true"\]\[data-pinned="true"\]\s*\{([\s\S]*?)\n\s*\}/
 	)
 	assert.ok(pinnedStyle)
 	assert.match(pinnedStyle[1], /border-color:\s*color-mix/)
-	assert.match(pinnedStyle[1], /rgba\(166,\s*242,\s*70,\s*\.82\)/)
+	assert.match(pinnedStyle[1], /var\(--world-editor-card-pinned-border-color\)/)
 	assert.match(pinnedStyle[1], /0 0 16px/)
-	assert.match(pinnedStyle[1], /rgba\(166,\s*242,\s*70,\s*\.36\)/)
+	assert.match(pinnedStyle[1], /var\(--world-editor-card-pinned-glow-color\)/)
+	assert.match(pinnedStyle[1], /var\(--world-editor-card-pinned-base-shadow\)/)
 	assert.doesNotMatch(pinnedStyle[1], /\bbackground\s*:/)
+	assert.match(sharedStyle.textContent, /--world-editor-card-pinned-border-color:\s*rgba\(166,\s*242,\s*70,\s*\.82\)/)
+	assert.match(sharedStyle.textContent, /--world-editor-card-pinned-glow-color:\s*rgba\(166,\s*242,\s*70,\s*\.36\)/)
+	assert.match(sharedStyle.textContent, /--world-editor-card-pinned-base-shadow:\s*rgba\(0,\s*0,\s*0,\s*\.24\)/)
+	assert.match(style.textContent, /--world-editor-card-base-shadow:\s*rgba\(0,\s*0,\s*0,\s*\.18\)/)
+	assert.match(style.textContent, /box-shadow:\s*0 10px 28px color-mix\(in srgb,\s*var\(--world-editor-card-base-shadow\)/)
+	assert.match(style.textContent, /--world-editor-card-pinned-base-shadow:\s*rgba\(0,\s*0,\s*0,\s*\.20\)/)
+	const voidThemeStyle = style.textContent.match(
+		/\.cattail-world-editor-selection-card\[data-theme="void"\]\s*\{([\s\S]*?)\n\s*\}/
+	)
+	assert.ok(voidThemeStyle)
+	assert.match(voidThemeStyle[1], /--world-editor-card-base-shadow:\s*rgba\(0,\s*0,\s*0,\s*\.36\)/)
+	assert.doesNotMatch(voidThemeStyle[1], /\bbox-shadow\s*:/)
+	assert.match(style.textContent, /data-theme="void"[\s\S]*--world-editor-card-pinned-base-shadow:\s*rgba\(0,\s*0,\s*0,\s*\.38\)/)
 	assert.doesNotMatch(style.textContent, /linear-gradient\(135deg,[^;]+border-box/)
 	assert.doesNotMatch(style.textContent, /\.cattail-world-editor-selection-card::before/)
 	assert.doesNotMatch(style.textContent, /inset:\s*-1px/)
@@ -659,7 +547,7 @@ function testHoverLayerI18nManifestAndReadOnlyBoundary() {
 	const i18n = sandbox[I18N_KEY]
 	assert.equal(i18n.version, '0.3.5')
 	assert.equal(i18n.languages.length, 20)
-	assert.equal(i18n.keys.length, 98)
+	assert.equal(i18n.keys.length, 99)
 	for (const language of i18n.languages) {
 		for (const key of ['toolbarModeArea', 'toolSelect', 'cardPinAction', 'cardUnpinAction']) {
 			assert.notEqual(i18n.t(language, key), key)
@@ -672,16 +560,22 @@ function testHoverLayerI18nManifestAndReadOnlyBoundary() {
 	const manifest = JSON.parse(fs.readFileSync(path.join(MOD_ROOT, 'mod.json'), 'utf8'))
 	assert.equal(manifest.version, '0.3.5')
 	assert.equal(manifest.languageSupport.gameLanguage, true)
-	assert.equal(manifest.entry.length, 20)
+	assert.equal(manifest.entry.length, 21)
 	assert.equal(manifest.entry.filter(entry => /selection-controller/.test(entry)).length, 1)
 	assert.equal(manifest.entry.filter(entry => /resize-handles/.test(entry)).length, 1)
 
 	const scriptText = manifest.entry
 		.map(relativePath => fs.readFileSync(path.join(MOD_ROOT, relativePath), 'utf8'))
 		.join('\n')
+	const stateFreeScriptText = manifest.entry
+		.filter(relativePath => relativePath !== 'scripts/ui/card-opacity.js')
+		.map(relativePath => fs.readFileSync(path.join(MOD_ROOT, relativePath), 'utf8'))
+		.join('\n')
+	const cardOpacityText = fs.readFileSync(path.join(MOD_ROOT, 'scripts/ui/card-opacity.js'), 'utf8')
 	assert.doesNotMatch(scriptText, /\baddEntity\s*\(/)
 	assert.doesNotMatch(scriptText, /\bclearCell\s*\(/)
-	assert.doesNotMatch(scriptText, /\blocalStorage\b|\bsessionStorage\b/)
+	assert.doesNotMatch(stateFreeScriptText, /\blocalStorage\b|\bsessionStorage\b/)
+	assert.doesNotMatch(cardOpacityText, /\bsessionStorage\b/)
 	assert.doesNotMatch(scriptText, /\brequire\s*\(\s*['"](?:fs|node:fs)['"]\s*\)/)
 }
 

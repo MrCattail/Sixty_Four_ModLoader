@@ -6,6 +6,7 @@ ModLoader.register({
 		const BLUEPRINT_KEY = Symbol.for('cattail.world-editor.blueprint')
 		const I18N_KEY = Symbol.for('cattail.world-editor.i18n')
 		const CARD_OPACITY_KEY = Symbol.for('cattail.world-editor.card-opacity')
+		const SHARED_KEY = Symbol.for('cattail.world-editor.shared')
 		const SELECTION_CARD_ID = 'cattail-world-editor-selection-card'
 		const BLUEPRINT_CARD_ID = 'cattail-world-editor-blueprint-card'
 		const SELECTION_PRODUCTION_CARD_ID = 'cattail-world-editor-selection-production-card'
@@ -24,6 +25,7 @@ ModLoader.register({
 			const production = globalThis[PRODUCTION_KEY]
 			const blueprint = globalThis[BLUEPRINT_KEY]
 			const i18n = globalThis[I18N_KEY]
+			const shared = globalThis[SHARED_KEY]
 			const selectionCard = document.getElementById(SELECTION_CARD_ID)
 			const blueprintCard = document.getElementById(BLUEPRINT_CARD_ID)
 			if (!runtime || runtime.game !== game || typeof runtime.addCleanup !== 'function') {
@@ -40,6 +42,18 @@ ModLoader.register({
 			}
 			if (!i18n || typeof i18n.t !== 'function' || !selectionCard || !blueprintCard) {
 				console.warn('[Cattail World Editor] Production cards 3F could not mount card surfaces.')
+				return
+			}
+			if (
+				!shared ||
+				typeof shared.cardIsVisible !== 'function' ||
+				typeof shared.visibleCardRect !== 'function' ||
+				typeof shared.cardCandidateFits !== 'function' ||
+				typeof shared.rectanglesOverlap !== 'function' ||
+				typeof shared.createDisclosureController !== 'function' ||
+				typeof shared.registerWorldDragCard !== 'function'
+			) {
+				console.warn('[Cattail World Editor] Production cards 3F could not find shared editor services.')
 				return
 			}
 
@@ -75,24 +89,31 @@ ModLoader.register({
 			const blueprintProductionCard = createBlueprintProductionCard()
 			document.body.append(selectionProductionCard.card)
 			document.body.append(blueprintProductionCard.card)
+			const selectionWorldDragControls = shared.registerWorldDragCard(game, selectionProductionCard.card)
+			const blueprintWorldDragControls = shared.registerWorldDragCard(game, blueprintProductionCard.card)
 
 			let currentProduction = production.snapshot()
 			let currentBlueprint = blueprint.snapshot()
 			let selectionUnit = 0
 			let blueprintUnit = 0
-			let selectionSummaryExpanded = true
 			let selectionVisible = false
 			let blueprintVisible = false
-			let blueprintTheorySummaryExpanded = true
-			let blueprintCapturedSummaryExpanded = true
-			let blueprintTheoryTypesExpanded = true
-			let blueprintCapturedTypesExpanded = true
-			const noFlowExpanded = {
-				selectionActual: false,
-				blueprintTheoretical: false,
-				blueprintActual: false
+			const disclosureControllers = new Set()
+			const selectionSummaryState = disclosureState(true, 44, .35)
+			const blueprintTheorySummaryState = disclosureState(true, 44, .35)
+			const blueprintCapturedSummaryState = disclosureState(true, 44, .35)
+			const blueprintTheoryTypesState = disclosureState(true, 60, .45)
+			const blueprintCapturedTypesState = disclosureState(true, 60, .45)
+			const noFlowStates = {
+				selectionActual: disclosureState(false, 44, .35),
+				blueprintTheoretical: disclosureState(false, 44, .35),
+				blueprintActual: disclosureState(false, 44, .35)
 			}
-			let worldRightDragActive = false
+			mountProductionDisclosure(selectionSummary, selectionSummaryState, handleSummaryDisclosureChange)
+			mountProductionDisclosure(blueprintSummary.theory, blueprintTheorySummaryState, handleSummaryDisclosureChange)
+			mountProductionDisclosure(blueprintSummary.captured, blueprintCapturedSummaryState, handleSummaryDisclosureChange)
+			mountProductionDisclosure(blueprintProductionCard.theory, blueprintTheoryTypesState, handleTypesDisclosureChange)
+			mountProductionDisclosure(blueprintProductionCard.captured, blueprintCapturedTypesState, handleTypesDisclosureChange)
 			let gameHudHidden = api.ui?.hud?.isHidden?.() === true
 			let vanillaHudHidden = api.ui?.isVanillaGameHudHidden?.(game) === true
 
@@ -126,21 +147,21 @@ ModLoader.register({
 			function refreshText(languageGame) {
 				const source = languageGame || game
 				selectionSummary.title.textContent = i18n.t(source, 'productionActual')
-				selectionSummary.toggle.title = i18n.t(source, selectionSummaryExpanded ? 'blueprintCollapseSection' : 'blueprintExpandSection')
+				selectionSummary.toggle.title = i18n.t(source, selectionSummaryState.expanded ? 'blueprintCollapseSection' : 'blueprintExpandSection')
 				selectionSummary.toggle.setAttribute('aria-label', selectionSummary.toggle.title)
 				selectionProductionCard.title.textContent = i18n.t(source, 'productionActual')
 				blueprintSummary.title.textContent = i18n.t(source, 'productionTitle')
 				blueprintSummary.theory.title.textContent = i18n.t(source, 'productionTheoretical')
 				blueprintSummary.captured.title.textContent = i18n.t(source, 'productionCapturedActual')
-				blueprintSummary.theory.toggle.title = i18n.t(source, blueprintTheorySummaryExpanded ? 'blueprintCollapseSection' : 'blueprintExpandSection')
-				blueprintSummary.captured.toggle.title = i18n.t(source, blueprintCapturedSummaryExpanded ? 'blueprintCollapseSection' : 'blueprintExpandSection')
+				blueprintSummary.theory.toggle.title = i18n.t(source, blueprintTheorySummaryState.expanded ? 'blueprintCollapseSection' : 'blueprintExpandSection')
+				blueprintSummary.captured.toggle.title = i18n.t(source, blueprintCapturedSummaryState.expanded ? 'blueprintCollapseSection' : 'blueprintExpandSection')
 				blueprintSummary.theory.toggle.setAttribute('aria-label', blueprintSummary.theory.toggle.title)
 				blueprintSummary.captured.toggle.setAttribute('aria-label', blueprintSummary.captured.toggle.title)
 				blueprintProductionCard.title.textContent = i18n.t(source, 'productionTitle')
 				blueprintProductionCard.theory.title.textContent = i18n.t(source, 'productionTheoretical')
 				blueprintProductionCard.captured.title.textContent = i18n.t(source, 'productionCapturedActual')
-				blueprintProductionCard.theory.toggle.title = i18n.t(source, blueprintTheoryTypesExpanded ? 'blueprintCollapseSection' : 'blueprintExpandSection')
-				blueprintProductionCard.captured.toggle.title = i18n.t(source, blueprintCapturedTypesExpanded ? 'blueprintCollapseSection' : 'blueprintExpandSection')
+				blueprintProductionCard.theory.toggle.title = i18n.t(source, blueprintTheoryTypesState.expanded ? 'blueprintCollapseSection' : 'blueprintExpandSection')
+				blueprintProductionCard.captured.toggle.title = i18n.t(source, blueprintCapturedTypesState.expanded ? 'blueprintCollapseSection' : 'blueprintExpandSection')
 				blueprintProductionCard.theory.toggle.setAttribute('aria-label', blueprintProductionCard.theory.toggle.title)
 				blueprintProductionCard.captured.toggle.setAttribute('aria-label', blueprintProductionCard.captured.toggle.title)
 				selectionOpacityControls?.refresh?.()
@@ -175,7 +196,7 @@ ModLoader.register({
 				renderFlow(selectionSummary.resources, telemetry?.totals?.actual, selectionUnit)
 				const unsupported = finiteNonNegative(telemetry?.entities?.unsupported?.actualOutput)
 				renderUnsupported(selectionSummary.unsupported, unsupported)
-				syncProductionSectionState(selectionSummary, selectionSummaryExpanded)
+				syncProductionSectionState(selectionSummary, selectionSummaryState.expanded)
 				renderTypes(
 					selectionProductionCard.types,
 					telemetry?.byType,
@@ -200,14 +221,14 @@ ModLoader.register({
 					capturedProduction,
 					'theoretical',
 					blueprintUnit,
-					blueprintTheorySummaryExpanded
+					blueprintTheorySummaryState.expanded
 				)
 				renderSummarySection(
 					blueprintSummary.captured,
 					capturedProduction,
 					'actual',
 					blueprintUnit,
-					blueprintCapturedSummaryExpanded
+					blueprintCapturedSummaryState.expanded
 				)
 				syncBlueprintUnitPlacement()
 				renderTypesSection(
@@ -215,7 +236,7 @@ ModLoader.register({
 					capturedProduction,
 					'theoretical',
 					blueprintUnit,
-					blueprintTheoryTypesExpanded,
+					blueprintTheoryTypesState.expanded,
 					'blueprintTheoretical'
 				)
 				renderTypesSection(
@@ -223,7 +244,7 @@ ModLoader.register({
 					capturedProduction,
 					'actual',
 					blueprintUnit,
-					blueprintCapturedTypesExpanded,
+					blueprintCapturedTypesState.expanded,
 					'blueprintActual'
 				)
 				markCompanionLayoutDirty(blueprintProductionCard.card)
@@ -256,9 +277,9 @@ ModLoader.register({
 			}
 
 			function syncBlueprintUnitPlacement() {
-				const host = blueprintTheorySummaryExpanded
+				const host = blueprintTheorySummaryState.expanded
 					? blueprintSummary.theory.body
-					: blueprintCapturedSummaryExpanded ? blueprintSummary.captured.body : null
+					: blueprintCapturedSummaryState.expanded ? blueprintSummary.captured.body : null
 				if (!host) {
 					blueprintSummary.unit.root.remove()
 					syncProductionSectionState(blueprintSummary.theory, false)
@@ -268,8 +289,8 @@ ModLoader.register({
 				if (host.firstChild !== blueprintSummary.unit.root) {
 					host.insertBefore(blueprintSummary.unit.root, host.firstChild || null)
 				}
-				syncProductionSectionState(blueprintSummary.theory, blueprintTheorySummaryExpanded)
-				syncProductionSectionState(blueprintSummary.captured, blueprintCapturedSummaryExpanded)
+				syncProductionSectionState(blueprintSummary.theory, blueprintTheorySummaryState.expanded)
+				syncProductionSectionState(blueprintSummary.captured, blueprintCapturedSummaryState.expanded)
 			}
 
 			function renderQuality(target, value) {
@@ -313,6 +334,8 @@ ModLoader.register({
 			}
 
 			function renderTypes(target, types, mode, unit, viewKey, onNestedLayoutChange) {
+				releaseProductionDisclosure(target._worldEditorNoFlowDisclosure)
+				target._worldEditorNoFlowDisclosure = null
 				target.replaceChildren()
 				const supportedTypes = (Array.isArray(types) ? types : []).filter(function (type) {
 					if (mode === 'theoretical') return type?.support?.theoretical?.supported || type?.support?.theoretical?.partial
@@ -344,7 +367,8 @@ ModLoader.register({
 				if (noFlow.length) {
 					const noFlowSection = createNoFlowSection(noFlow, unit, viewKey, onNestedLayoutChange)
 					target.append(noFlowSection.section)
-					syncProductionSectionState(noFlowSection, noFlowExpanded[viewKey] === true)
+					target._worldEditorNoFlowDisclosure = noFlowSection.disclosure
+					syncProductionSectionState(noFlowSection, noFlowStates[viewKey].expanded)
 				}
 			}
 
@@ -399,7 +423,6 @@ ModLoader.register({
 			function createNoFlowSection(entries, unit, viewKey, onNestedLayoutChange) {
 				const section = document.createElement('section')
 				section.className = 'cattail-world-editor-production cattail-world-editor-production--no-flow'
-				section.dataset.expanded = noFlowExpanded[viewKey] ? 'true' : 'false'
 				const toggle = createSectionToggle()
 				const title = toggle.querySelector('[data-production-title]')
 				const body = document.createElement('div')
@@ -407,29 +430,29 @@ ModLoader.register({
 				body.append(createTypeLayout(entries, unit, false))
 				section.append(toggle, body)
 				const mounted = { section, toggle, title, body }
+				mounted.disclosure = mountProductionDisclosure(
+					mounted,
+					noFlowStates[viewKey],
+					function (detail) {
+						refreshNoFlowSectionText(mounted, entries.length, viewKey)
+						const card = targetProductionCard(section)
+						if (card) {
+							markCompanionLayoutDirty(card)
+							if (card === selectionProductionCard.card) syncSelectionCompanion()
+							else syncBlueprintCompanion()
+						}
+						if (typeof onNestedLayoutChange === 'function') {
+							onNestedLayoutChange(mounted, detail.state.expanded)
+						}
+					}
+				)
 				refreshNoFlowSectionText(mounted, entries.length, viewKey)
-				toggle.addEventListener('click', function (event) {
-					stopUiEvent(event)
-					noFlowExpanded[viewKey] = !noFlowExpanded[viewKey]
-					const nextExpanded = noFlowExpanded[viewKey]
-					syncProductionSectionState(mounted, nextExpanded)
-					refreshNoFlowSectionText(mounted, entries.length, viewKey)
-					const card = targetProductionCard(section)
-					if (card) {
-						markCompanionLayoutDirty(card)
-						if (card === selectionProductionCard.card) syncSelectionCompanion()
-						else syncBlueprintCompanion()
-					}
-					if (typeof onNestedLayoutChange === 'function') {
-						onNestedLayoutChange(mounted, nextExpanded)
-					}
-				})
 				return mounted
 			}
 
 			function refreshNoFlowSectionText(section, count, viewKey) {
 				section.title.textContent = i18n.t(game, 'productionNoFlow') + ' (' + count + ')'
-				const action = i18n.t(game, noFlowExpanded[viewKey] ? 'blueprintCollapseSection' : 'blueprintExpandSection')
+				const action = i18n.t(game, noFlowStates[viewKey].expanded ? 'blueprintCollapseSection' : 'blueprintExpandSection')
 				section.toggle.title = action
 				section.toggle.setAttribute('aria-label', action)
 			}
@@ -438,9 +461,67 @@ ModLoader.register({
 				return element?.closest?.('.cattail-world-editor-production-card') || null
 			}
 
+			function disclosureState(expanded, minHeight, maxViewportRatio) {
+				return {
+					expanded: expanded !== false,
+					preferredHeight: null,
+					minHeight,
+					maxViewportRatio
+				}
+			}
+
+			function mountProductionDisclosure(section, state, onChange) {
+				const controller = shared.createDisclosureController({
+					section: section.section,
+					toggle: section.toggle,
+					body: section.body,
+					state,
+					minHeight: state.minHeight,
+					maxViewportRatio: state.maxViewportRatio,
+					heightProperty: '--world-editor-production-section-height',
+					resizeOverflow: 'body',
+					defaultHeight() {
+						return measureProductionSectionHeight(section)
+					},
+					onChange
+				})
+				section.disclosure = controller
+				disclosureControllers.add(controller)
+				return controller
+			}
+
+			function releaseProductionDisclosure(controller) {
+				if (!controller) return
+				controller.release?.()
+				disclosureControllers.delete(controller)
+			}
+
+			function handleSummaryDisclosureChange(detail) {
+				if (detail.reason === 'toggle') {
+					refreshText(game)
+					return
+				}
+				if (detail.section === selectionSummary.section) {
+					syncSelectionCompanion()
+				} else {
+					syncBlueprintCompanion()
+				}
+			}
+
+			function handleTypesDisclosureChange(detail) {
+				markCompanionLayoutDirty(blueprintProductionCard.card)
+				if (detail.reason === 'toggle') refreshText(game)
+				else syncBlueprintCompanion()
+			}
+
 			function syncProductionSectionState(section, expanded) {
 				const body = section?.body
 				if (!section?.section || !body) return
+				if (section.disclosure) {
+					section.disclosure.setExpanded(expanded, 'production-sync', false)
+					queueProductionSectionMeasurement(section)
+					return
+				}
 				measureProductionSection(section)
 				section.section.dataset.expanded = expanded ? 'true' : 'false'
 				section.toggle?.setAttribute('aria-expanded', expanded ? 'true' : 'false')
@@ -448,6 +529,15 @@ ModLoader.register({
 			}
 
 			function measureProductionSection(section) {
+				const height = measureProductionSectionHeight(section)
+				if (section?.disclosure) {
+					section.disclosure.refresh('production-measure')
+					return height
+				}
+				return setProductionSectionHeight(section, height)
+			}
+
+			function measureProductionSectionHeight(section) {
 				const body = section?.body
 				if (!body) return 1
 				const children = Array.from(body.children || [])
@@ -468,7 +558,7 @@ ModLoader.register({
 					finitePositive(body.scrollHeight, 0),
 					childHeight + gapHeight
 				)
-				return setProductionSectionHeight(section, height)
+				return height
 			}
 
 			function projectNestedProductionSectionHeight(section, nestedSection, expanded) {
@@ -482,7 +572,16 @@ ModLoader.register({
 					finitePositive(nestedBody.clientHeight, 0)
 				)
 				const baseHeight = Math.max(1, currentOuterHeight - currentNestedHeight)
-				const targetNestedHeight = expanded ? measureProductionSection(nestedSection) : 0
+				if (section?.disclosure?.state?.preferredHeight !== null) {
+					section.disclosure.refresh('nested-layout-fixed')
+					return section.disclosure.state.preferredHeight
+				}
+				const targetNestedHeight = expanded
+					? finitePositive(
+						nestedSection?.disclosure?.state?.effectiveHeight,
+						measureProductionSectionHeight(nestedSection)
+					)
+					: 0
 				return setProductionSectionHeight(
 					section,
 					Math.ceil(baseHeight + targetNestedHeight)
@@ -678,12 +777,6 @@ ModLoader.register({
 				return null
 			}
 
-			function handleSelectionSummaryToggle(event) {
-				stopUiEvent(event)
-				selectionSummaryExpanded = !selectionSummaryExpanded
-				refreshText(game)
-			}
-
 			function handleSelectionCardToggle(event) {
 				stopUiEvent(event)
 				if (!currentProduction?.selectionKey) return
@@ -740,66 +833,8 @@ ModLoader.register({
 				refreshBlueprint()
 			}
 
-			function handleBlueprintTheorySummaryToggle(event) {
-				stopUiEvent(event)
-				blueprintTheorySummaryExpanded = !blueprintTheorySummaryExpanded
-				refreshText(game)
-			}
-
-			function handleBlueprintCapturedSummaryToggle(event) {
-				stopUiEvent(event)
-				blueprintCapturedSummaryExpanded = !blueprintCapturedSummaryExpanded
-				refreshText(game)
-			}
-
-			function handleBlueprintTheoryTypesToggle(event) {
-				stopUiEvent(event)
-				blueprintTheoryTypesExpanded = !blueprintTheoryTypesExpanded
-				markCompanionLayoutDirty(blueprintProductionCard.card)
-				refreshText(game)
-				syncBlueprintCompanion()
-			}
-
-			function handleBlueprintCapturedTypesToggle(event) {
-				stopUiEvent(event)
-				blueprintCapturedTypesExpanded = !blueprintCapturedTypesExpanded
-				markCompanionLayoutDirty(blueprintProductionCard.card)
-				refreshText(game)
-				syncBlueprintCompanion()
-			}
-
 			function stopCompanionEvent(event) {
 				event.stopPropagation?.()
-			}
-
-			function editorCards() {
-				return [
-					selectionCard,
-					blueprintCard,
-					selectionProductionCard.card,
-					blueprintProductionCard.card
-				]
-			}
-
-			function setWorldRightDragPassThrough(active) {
-				worldRightDragActive = !!active
-				for (const card of editorCards()) {
-					card.dataset.worldDragPassThrough = worldRightDragActive ? 'true' : 'false'
-				}
-			}
-
-			function handleWorldRightMouseDown(event) {
-				if (event?.button !== 2 || event?.target !== game.canvas) return
-				setWorldRightDragPassThrough(true)
-			}
-
-			function handleWorldRightMouseUp(event) {
-				if (!worldRightDragActive || event?.button !== 2) return
-				setWorldRightDragPassThrough(false)
-			}
-
-			function handleWorldRightDragBlur() {
-				if (worldRightDragActive) setWorldRightDragPassThrough(false)
 			}
 
 			function handleSelectionCompanionMouseEnter() {
@@ -834,7 +869,7 @@ ModLoader.register({
 			function syncSelectionCompanion(frameValue) {
 				if (!frameMatchesGame(frameValue)) return
 				const hasSelection = !!currentProduction?.selectionKey
-				const mainVisible = cardIsVisible(selectionCard)
+				const mainVisible = shared.cardIsVisible(selectionCard)
 				const visible = selectionVisible && hasSelection && mainVisible && !gameHudHidden && !vanillaHudHidden
 				syncCompanionCard(selectionCard, selectionProductionCard.card, selectionToggle, visible, [
 					blueprintCard,
@@ -845,7 +880,7 @@ ModLoader.register({
 			function syncBlueprintCompanion(frameGame) {
 				if (!frameMatchesGame(frameGame)) return
 				const hasBlueprint = !!currentBlueprint?.blueprint
-				const mainVisible = cardIsVisible(blueprintCard)
+				const mainVisible = shared.cardIsVisible(blueprintCard)
 				const visible = blueprintVisible && hasBlueprint && mainVisible && !gameHudHidden && !vanillaHudHidden
 				syncCompanionCard(blueprintCard, blueprintProductionCard.card, blueprintToggle, visible, [
 					selectionCard,
@@ -876,14 +911,6 @@ ModLoader.register({
 			function frameMatchesGame(frameValue) {
 				const frameGame = frameValue?.game || frameValue
 				return !frameGame || frameGame === game
-			}
-
-			function cardIsVisible(card) {
-				return (
-					card?.dataset?.visible === 'true' &&
-					card?.dataset?.positionVisible === 'true' &&
-					card?.getAttribute?.('aria-hidden') !== 'true'
-				)
 			}
 
 			function markCompanionLayoutDirty(card) {
@@ -990,19 +1017,19 @@ ModLoader.register({
 				} else {
 					candidates = [right, below, above, left]
 				}
-				const occupiedRects = (occupiedCards || []).map(visibleCardRect).filter(Boolean)
+				const occupiedRects = (occupiedCards || []).map(function (occupiedCard) {
+					return shared.visibleCardRect(occupiedCard)
+				}).filter(Boolean)
 				const fitting = candidates.filter(function (candidate) {
-					return (
-						candidate.left >= margin &&
-						candidate.top >= margin &&
-						candidate.left + width <= viewportWidth - margin &&
-						candidate.top + height <= viewportHeight - margin
+					return shared.cardCandidateFits(
+						{ left: candidate.left, top: candidate.top, width, height },
+						{ margin, viewportWidth, viewportHeight }
 					)
 				})
 				const chosen = fitting.find(function (candidate) {
 					const rect = { left: candidate.left, top: candidate.top, width, height }
 					return occupiedRects.every(function (occupied) {
-						return !rectanglesOverlap(rect, occupied, 8)
+						return !shared.rectanglesOverlap(rect, occupied, 8)
 					})
 				}) || fitting[0] || candidates[0]
 				const clampedLeft = clamp(chosen.left, margin, Math.max(margin, viewportWidth - margin - width))
@@ -1014,28 +1041,7 @@ ModLoader.register({
 				card.dataset.placement = chosen.placement
 			}
 
-			function visibleCardRect(card) {
-				if (!cardIsVisible(card)) return null
-				const rect = card.getBoundingClientRect()
-				return {
-					left: finiteSigned(rect.left),
-					top: finiteSigned(rect.top),
-					width: finitePositive(rect.width, 0),
-					height: finitePositive(rect.height, 0)
-				}
-			}
-
-			function rectanglesOverlap(left, right, gap) {
-				return !(
-					left.left + left.width + gap <= right.left ||
-					right.left + right.width + gap <= left.left ||
-					left.top + left.height + gap <= right.top ||
-					right.top + right.height + gap <= left.top
-				)
-			}
-
 			selectionToggle.addEventListener('click', handleSelectionCardToggle)
-			selectionSummary.toggle.addEventListener('click', handleSelectionSummaryToggle)
 			selectionSummary.unit.input.addEventListener('input', handleSelectionUnitInput)
 			selectionSummary.unit.input.addEventListener('change', handleSelectionUnitChange)
 			selectionSummary.unit.input.addEventListener('keydown', handleSelectionUnitKeydown)
@@ -1045,10 +1051,6 @@ ModLoader.register({
 			blueprintSummary.unit.input.addEventListener('input', handleBlueprintUnitInput)
 			blueprintSummary.unit.input.addEventListener('change', handleBlueprintUnitChange)
 			blueprintSummary.unit.input.addEventListener('keydown', handleBlueprintUnitKeydown)
-			blueprintSummary.theory.toggle.addEventListener('click', handleBlueprintTheorySummaryToggle)
-			blueprintSummary.captured.toggle.addEventListener('click', handleBlueprintCapturedSummaryToggle)
-			blueprintProductionCard.theory.toggle.addEventListener('click', handleBlueprintTheoryTypesToggle)
-			blueprintProductionCard.captured.toggle.addEventListener('click', handleBlueprintCapturedTypesToggle)
 			selectionProductionCard.card.addEventListener('mousedown', stopCompanionEvent)
 			selectionProductionCard.card.addEventListener('click', stopCompanionEvent)
 			selectionProductionCard.card.addEventListener('mouseenter', handleSelectionCompanionMouseEnter)
@@ -1059,9 +1061,6 @@ ModLoader.register({
 			blueprintProductionCard.card.addEventListener('mouseleave', handleBlueprintCompanionMouseLeave)
 			window.addEventListener('modloader:game-hud', handleGameHud)
 			window.addEventListener('modloader:vanilla-game-hud', handleVanillaGameHud)
-			window.addEventListener('mousedown', handleWorldRightMouseDown, true)
-			window.addEventListener('mouseup', handleWorldRightMouseUp, true)
-			window.addEventListener('blur', handleWorldRightDragBlur, true)
 
 			const stopProductionSubscription = production.subscribe(function (state) {
 				currentProduction = state
@@ -1097,15 +1096,12 @@ ModLoader.register({
 				releaseBlueprintHud?.()
 				selectionOpacityControls?.release?.()
 				blueprintOpacityControls?.release?.()
+				selectionWorldDragControls?.release?.()
+				blueprintWorldDragControls?.release?.()
 				window.removeEventListener('modloader:game-hud', handleGameHud)
 				window.removeEventListener('modloader:vanilla-game-hud', handleVanillaGameHud)
-				window.removeEventListener('mousedown', handleWorldRightMouseDown, true)
-				window.removeEventListener('mouseup', handleWorldRightMouseUp, true)
-				window.removeEventListener('blur', handleWorldRightDragBlur, true)
-				setWorldRightDragPassThrough(false)
 				selectionToggle.removeEventListener('click', handleSelectionCardToggle)
 				selectionToggle.remove()
-				selectionSummary.toggle.removeEventListener('click', handleSelectionSummaryToggle)
 				selectionSummary.unit.input.removeEventListener('input', handleSelectionUnitInput)
 				selectionSummary.unit.input.removeEventListener('change', handleSelectionUnitChange)
 				selectionSummary.unit.input.removeEventListener('keydown', handleSelectionUnitKeydown)
@@ -1118,6 +1114,9 @@ ModLoader.register({
 				blueprintSummary.unit.input.removeEventListener('change', handleBlueprintUnitChange)
 				blueprintSummary.unit.input.removeEventListener('keydown', handleBlueprintUnitKeydown)
 				cancelUnitAnimation(blueprintSummary.unit)
+				for (const controller of Array.from(disclosureControllers)) {
+					releaseProductionDisclosure(controller)
+				}
 				blueprintSummary.section.remove()
 				blueprintProductionCard.card.remove()
 			})
@@ -1287,6 +1286,7 @@ ModLoader.register({
 			card.dataset.autoHiding = 'false'
 			card.dataset.theme = 'reality'
 			card.dataset.columns = '1'
+			card.dataset.worldEditorScrollbar = ''
 			card.setAttribute('role', 'region')
 			card.setAttribute('aria-hidden', 'true')
 			const header = document.createElement('header')
@@ -1404,54 +1404,6 @@ ModLoader.register({
 				.cattail-world-editor-production-summary__title {
 					margin-bottom: 3px;
 					font: 500 10px/1.3 Montserrat, Arial, sans-serif;
-				}
-				.cattail-world-editor-production__section-toggle {
-					display: grid;
-					grid-template-columns: minmax(0, 1fr) 14px;
-					align-items: center;
-					width: 100%;
-					min-height: 24px;
-					border: 0;
-					padding: 2px 1px;
-					background: transparent;
-					color: inherit;
-					font: 500 10px/1.3 Montserrat, Arial, sans-serif;
-					letter-spacing: 0;
-					text-align: left;
-					cursor: pointer;
-				}
-				.cattail-world-editor-production__chevron {
-					position: relative;
-					width: 12px;
-					height: 12px;
-					flex: 0 0 12px;
-					transform: rotate(0deg);
-					transition: transform .16s ease-out;
-				}
-				.cattail-world-editor-production__chevron::before,
-				.cattail-world-editor-production__chevron::after {
-					content: '';
-					position: absolute;
-					top: 6px;
-					width: 7px;
-					height: 1px;
-					background: currentColor;
-				}
-				.cattail-world-editor-production__chevron::before {
-					left: 0;
-					transform: rotate(38deg);
-				}
-				.cattail-world-editor-production__chevron::after {
-					right: 0;
-					transform: rotate(-38deg);
-				}
-				.cattail-world-editor-production[data-expanded="false"] .cattail-world-editor-production__chevron {
-					transform: rotate(-90deg);
-				}
-				.cattail-world-editor-production[data-expanded="false"] > .cattail-world-editor-production__body {
-					max-height: 0;
-					opacity: 0;
-					pointer-events: none;
 				}
 				.cattail-world-editor-production__body {
 					display: grid;
@@ -1617,7 +1569,6 @@ ModLoader.register({
 					height: 24px;
 					margin: 0;
 					background: transparent;
-					outline: none;
 					cursor: grab;
 				}
 				.cattail-world-editor-production-unit__range:active {
@@ -1719,8 +1670,6 @@ ModLoader.register({
 					padding: 10px;
 					overflow-x: hidden;
 					overflow-y: auto;
-					scrollbar-width: thin;
-					scrollbar-color: rgba(185,185,185,.48) transparent;
 					border: 1px solid var(--blueprint-production-border);
 					border-radius: 6px;
 					background: var(--blueprint-production-bg);
@@ -1736,16 +1685,6 @@ ModLoader.register({
 					transform-origin: top left;
 					pointer-events: none;
 					transition: opacity .16s ease, transform .16s ease, visibility 0s linear .16s;
-				}
-				.cattail-world-editor-blueprint-production-card::-webkit-scrollbar {
-					width: 4px;
-				}
-				.cattail-world-editor-blueprint-production-card::-webkit-scrollbar-track {
-					background: transparent;
-				}
-				.cattail-world-editor-blueprint-production-card::-webkit-scrollbar-thumb {
-					border-radius: 999px;
-					background: rgba(185,185,185,.48);
 				}
 				.cattail-world-editor-blueprint-production-card[data-theme="void"] {
 					--blueprint-production-bg: color-mix(in srgb, rgba(8, 10, 12, .94) var(--world-editor-card-shell-percent), transparent);
@@ -1777,15 +1716,6 @@ ModLoader.register({
 				}
 				.cattail-world-editor-blueprint-production-card[data-input-pass-through="true"] {
 					pointer-events: none;
-				}
-				.cattail-world-editor-blueprint-production-card:focus-visible {
-					outline: none;
-				}
-				#cattail-world-editor-selection-card[data-world-drag-pass-through="true"],
-				#cattail-world-editor-blueprint-card[data-world-drag-pass-through="true"],
-				#cattail-world-editor-selection-production-card[data-world-drag-pass-through="true"],
-				#cattail-world-editor-blueprint-production-card[data-world-drag-pass-through="true"] {
-					pointer-events: none !important;
 				}
 				.cattail-world-editor-blueprint-production-card__header {
 					display: flex;

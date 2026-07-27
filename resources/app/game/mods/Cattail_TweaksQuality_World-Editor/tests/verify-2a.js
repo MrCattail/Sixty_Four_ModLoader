@@ -244,6 +244,7 @@ function testTwoClickInput() {
 		}
 	}
 	const { definitions, sandbox } = loadModules([
+		'scripts/core/shared.js',
 		'scripts/core/selection-state.js',
 		'scripts/core/tool-state.js',
 		'scripts/core/input-controller.js',

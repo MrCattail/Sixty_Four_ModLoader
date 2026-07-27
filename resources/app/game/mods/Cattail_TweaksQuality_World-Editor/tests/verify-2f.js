@@ -1,38 +1,24 @@
 const assert = require('node:assert/strict')
 const fs = require('node:fs')
 const path = require('node:path')
-const vm = require('node:vm')
+const {
+	createModuleLoader,
+	createRuntime,
+	EventHub,
+	createTimers,
+	plain,
+	range
+} = require('./helpers/runtime-harness')
 
 const MOD_ROOT = path.resolve(__dirname, '..')
 const GAME_ROOT = path.resolve(MOD_ROOT, '..', '..')
+const loadModules = createModuleLoader(MOD_ROOT)
 const RUNTIME_KEY = Symbol.for('cattail.world-editor.runtime')
 const SELECTION_KEY = Symbol.for('cattail.world-editor.selection')
 const TOOL_KEY = Symbol.for('cattail.world-editor.tool')
 const I18N_KEY = Symbol.for('cattail.world-editor.i18n')
 const RESIZE_HANDLES_KEY = Symbol.for('cattail.world-editor.resize-handles')
 const INTERACTION_KEY = Symbol.for('cattail.world-editor.selection-interaction')
-
-function loadModules(relativePaths, extras = {}) {
-	const definitions = []
-	const sandbox = Object.assign({
-		console: {
-			info() {},
-			warn() {},
-			error() {}
-		},
-		ModLoader: {
-			register(definition) {
-				definitions.push(definition)
-			}
-		}
-	}, extras)
-	vm.createContext(sandbox)
-	for (const relativePath of relativePaths) {
-		const filename = path.join(MOD_ROOT, relativePath)
-		vm.runInContext(fs.readFileSync(filename, 'utf8'), sandbox, { filename })
-	}
-	return { definitions, sandbox }
-}
 
 function createApi() {
 	const handlers = new Map()
@@ -47,66 +33,6 @@ function createApi() {
 		emit(name, ...args) {
 			for (const listener of handlers.get(name) || []) listener(...args)
 		}
-	}
-}
-
-function createRuntime(game) {
-	const listeners = new Set()
-	const cleanups = []
-	let active = true
-	return {
-		game,
-		snapshot() {
-			return { active }
-		},
-		isActive() {
-			return active
-		},
-		subscribe(listener) {
-			listeners.add(listener)
-			listener({ active })
-			return () => listeners.delete(listener)
-		},
-		addCleanup(cleanup) {
-			cleanups.push(cleanup)
-		},
-		runCleanups() {
-			while (cleanups.length) cleanups.pop()()
-		}
-	}
-}
-
-function captureValue(value) {
-	return typeof value === 'object' && value !== null ? !!value.capture : !!value
-}
-
-class EventHub {
-	constructor() {
-		this.listeners = new Map()
-	}
-
-	addEventListener(type, listener, options = false) {
-		if (!this.listeners.has(type)) this.listeners.set(type, [])
-		this.listeners.get(type).push({ listener, capture: captureValue(options) })
-	}
-
-	removeEventListener(type, listener, options = false) {
-		const capture = captureValue(options)
-		const entries = this.listeners.get(type) || []
-		this.listeners.set(type, entries.filter(entry => entry.listener !== listener || entry.capture !== capture))
-	}
-
-	dispatch(type, input = {}) {
-		input.type = type
-		for (const entry of (this.listeners.get(type) || []).slice()) {
-			entry.listener(input)
-			if (input.immediatePropagationStopped) break
-		}
-		return input
-	}
-
-	count(type) {
-		return (this.listeners.get(type) || []).length
 	}
 }
 
@@ -140,59 +66,6 @@ function createEvent(values = {}) {
 	}, values)
 }
 
-function createTimers() {
-	let now = 0
-	let nextId = 1
-	const tasks = new Map()
-	return {
-		setTimeout(callback, delay) {
-			const id = nextId++
-			tasks.set(id, { callback, at: now + Math.max(0, Number(delay) || 0) })
-			return id
-		},
-		clearTimeout(id) {
-			tasks.delete(id)
-		},
-		advance(milliseconds) {
-			now += milliseconds
-			let progressed = true
-			while (progressed) {
-				progressed = false
-				for (const [id, task] of Array.from(tasks)) {
-					if (task.at > now) continue
-					tasks.delete(id)
-					task.callback()
-					progressed = true
-				}
-			}
-		},
-		get size() {
-			return tasks.size
-		}
-	}
-}
-
-function plain(value) {
-	return JSON.parse(JSON.stringify(value))
-}
-
-function range(start, end) {
-	const minU = Math.min(start[0], end[0])
-	const maxU = Math.max(start[0], end[0])
-	const minV = Math.min(start[1], end[1])
-	const maxV = Math.max(start[1], end[1])
-	return {
-		start,
-		end,
-		minU,
-		maxU,
-		minV,
-		maxV,
-		width: maxU - minU + 1,
-		height: maxV - minV + 1
-	}
-}
-
 function selectRange(selection, start, end, plane = 0) {
 	selection.begin(start, plane, 'test-start')
 	selection.commit(end, plane, 'test-commit')
@@ -217,6 +90,7 @@ function testWheelInteraction() {
 		}
 	}
 	const { definitions, sandbox } = loadModules([
+		'scripts/core/shared.js',
 		'scripts/core/selection-state.js',
 		'scripts/core/tool-state.js',
 		'scripts/core/input-controller.js',
@@ -578,7 +452,7 @@ function testCardI18nManifestAndCompatibilityBoundary() {
 	const i18n = sandbox[I18N_KEY]
 	assert.equal(i18n.version, '0.3.5')
 	assert.equal(i18n.languages.length, 20)
-	assert.equal(i18n.keys.length, 98)
+	assert.equal(i18n.keys.length, 99)
 	assert.ok(i18n.keys.includes('wheelHint'))
 	for (const language of i18n.languages) {
 		assert.notEqual(i18n.t(language, 'wheelHint'), 'wheelHint')
@@ -590,13 +464,21 @@ function testCardI18nManifestAndCompatibilityBoundary() {
 	assert.equal(i18n.t('tch', 'wheelHint'), '滾動調整 / 停止後套用 / Esc 取消')
 
 	const cardSource = fs.readFileSync(path.join(MOD_ROOT, 'scripts/ui/selection-card.js'), 'utf8')
+	const sharedSource = fs.readFileSync(path.join(MOD_ROOT, 'scripts/core/shared.js'), 'utf8')
 	assert.match(cardSource, /previewSource\s*===\s*'wheel'/)
 	assert.match(cardSource, /wheel\s*\?\s*i18n\.t\(source,\s*'wheelHint'\)/)
 	assert.match(cardSource, /wheelLatched/)
 	assert.match(cardSource, /data-input-pass-through="true"/)
 	assert.match(cardSource, /const gap = 28/)
-	assert.match(cardSource, /border-color:\s*color-mix\(in srgb,\s*rgba\(166,\s*242,\s*70,\s*\.82\)/)
-	assert.match(cardSource, /0 0 16px color-mix\(in srgb,\s*rgba\(166,\s*242,\s*70,\s*\.36\)/)
+	assert.match(sharedSource, /--world-editor-card-pinned-border-color:\s*rgba\(166,\s*242,\s*70,\s*\.82\)/)
+	assert.match(sharedSource, /--world-editor-card-pinned-glow-color:\s*rgba\(166,\s*242,\s*70,\s*\.36\)/)
+	assert.match(sharedSource, /border-color:\s*color-mix\(in srgb,\s*var\(--world-editor-card-pinned-border-color\)/)
+	assert.match(sharedSource, /0 0 16px color-mix\(in srgb,\s*var\(--world-editor-card-pinned-glow-color\)/)
+	assert.match(cardSource, /card\.dataset\.worldEditorPinnable = 'true'/)
+	assert.match(cardSource, /--world-editor-card-base-shadow:\s*rgba\(0,\s*0,\s*0,\s*\.18\)/)
+	assert.match(cardSource, /data-theme="void"[\s\S]*--world-editor-card-base-shadow:\s*rgba\(0,\s*0,\s*0,\s*\.36\)/)
+	assert.match(cardSource, /box-shadow:\s*0 10px 28px color-mix\(in srgb,\s*var\(--world-editor-card-base-shadow\)/)
+	assert.doesNotMatch(cardSource, /\.cattail-world-editor-selection-card\[data-pinned="true"\]/)
 	assert.doesNotMatch(cardSource, /rgba\(227,\s*253,\s*67,\s*\.98\)|rgba\(76,\s*185,\s*107,\s*\.98\)/)
 	assert.match(cardSource, /pointer-events:\s*none/)
 
@@ -627,14 +509,20 @@ function testCardI18nManifestAndCompatibilityBoundary() {
 	const manifest = JSON.parse(fs.readFileSync(path.join(MOD_ROOT, 'mod.json'), 'utf8'))
 	assert.equal(manifest.version, '0.3.5')
 	assert.equal(manifest.languageSupport.gameLanguage, true)
-	assert.equal(manifest.entry.length, 20)
+	assert.equal(manifest.entry.length, 21)
 
 	const scriptText = manifest.entry
 		.map(relativePath => fs.readFileSync(path.join(MOD_ROOT, relativePath), 'utf8'))
 		.join('\n')
+	const stateFreeScriptText = manifest.entry
+		.filter(relativePath => relativePath !== 'scripts/ui/card-opacity.js')
+		.map(relativePath => fs.readFileSync(path.join(MOD_ROOT, relativePath), 'utf8'))
+		.join('\n')
+	const cardOpacityText = fs.readFileSync(path.join(MOD_ROOT, 'scripts/ui/card-opacity.js'), 'utf8')
 	assert.doesNotMatch(scriptText, /\baddEntity\s*\(/)
 	assert.doesNotMatch(scriptText, /\bclearCell\s*\(/)
-	assert.doesNotMatch(scriptText, /\blocalStorage\b|\bsessionStorage\b/)
+	assert.doesNotMatch(stateFreeScriptText, /\blocalStorage\b|\bsessionStorage\b/)
+	assert.doesNotMatch(cardOpacityText, /\bsessionStorage\b/)
 	assert.doesNotMatch(scriptText, /\brequire\s*\(\s*['"](?:fs|node:fs)['"]\s*\)/)
 }
 

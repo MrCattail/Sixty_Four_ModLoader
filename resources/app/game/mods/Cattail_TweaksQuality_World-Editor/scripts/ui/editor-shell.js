@@ -493,10 +493,6 @@ ModLoader.register({
 					background: var(--world-editor-shell-active);
 					color: var(--world-editor-shell-text);
 				}
-				.cattail-world-editor-shell__tool:focus-visible {
-					outline: 2px solid var(--world-editor-shell-active-border);
-					outline-offset: 2px;
-				}
 				.cattail-world-editor-shell__tool:disabled {
 					opacity: .38;
 					cursor: default;

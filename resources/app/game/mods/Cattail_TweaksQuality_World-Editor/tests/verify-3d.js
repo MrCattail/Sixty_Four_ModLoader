@@ -5,6 +5,7 @@ const vm = require('node:vm')
 const { performance } = require('node:perf_hooks')
 
 const MOD_ROOT = path.resolve(__dirname, '..')
+const SHARED_SOURCE = 'scripts/core/shared.js'
 const TRANSFORM_SOURCE = 'scripts/core/blueprint-transform.js'
 const PLAN_SOURCE = 'scripts/core/blueprint-preview-plan.js'
 const PREVIEW_SOURCE = 'scripts/blueprint-preview.js'
@@ -773,9 +774,22 @@ function testCardOpacityController() {
 			return { id: '', textContent: '', isConnected: false }
 		}
 	}
+	const storedValues = new Map()
+	const localStorage = {
+		throwing: false,
+		getItem(key) {
+			if (this.throwing) throw new Error('storage unavailable')
+			return storedValues.has(String(key)) ? storedValues.get(String(key)) : null
+		},
+		setItem(key, value) {
+			if (this.throwing) throw new Error('storage unavailable')
+			storedValues.set(String(key), String(value))
+		}
+	}
 	const sandbox = {
 		console,
 		document,
+		localStorage,
 		window,
 		ModLoader: {
 			register(definition) {
@@ -785,15 +799,15 @@ function testCardOpacityController() {
 	}
 	sandbox.globalThis = sandbox
 	vm.createContext(sandbox)
-	vm.runInContext(
-		fs.readFileSync(path.join(MOD_ROOT, CARD_OPACITY_SOURCE), 'utf8'),
-		sandbox,
-		{ filename: CARD_OPACITY_SOURCE }
-	)
-	const controller = vm.runInContext(
-		"globalThis[Symbol.for('cattail.world-editor.card-opacity')]",
-		sandbox
-	)
+	const opacitySource = fs.readFileSync(path.join(MOD_ROOT, CARD_OPACITY_SOURCE), 'utf8')
+	const loadController = function () {
+		vm.runInContext(opacitySource, sandbox, { filename: CARD_OPACITY_SOURCE })
+		return vm.runInContext(
+			"globalThis[Symbol.for('cattail.world-editor.card-opacity')]",
+			sandbox
+		)
+	}
+	const controller = loadController()
 	assert.ok(controller)
 	assert.equal(controller.min, .25)
 	assert.equal(controller.max, 1)
@@ -859,6 +873,7 @@ function testCardOpacityController() {
 	const blueprintProductionHint = hint()
 	const selectionControls = controller.register({
 		id: 'selection',
+		group: 'selection-production',
 		element: selection,
 		hint: selectionHint,
 		priority: 47,
@@ -897,21 +912,47 @@ function testCardOpacityController() {
 	})
 
 	window.dispatch('keydown', event({ key: 'z' }))
+	const pathTarget = {}
+	const pathWheel = event({
+		deltaY: 100,
+		target: pathTarget,
+		composedPath() {
+			return [pathTarget, selection, window]
+		}
+	})
+	window.dispatch('wheel', pathWheel)
+	assert.equal(pathWheel.defaultPrevented, true)
+	assert.equal(selectionControls.snapshot().opacity, .9)
+	assert.equal(storedValues.get('cattailWorldEditorSelectionCardOpacity'), '0.9')
+	assert.equal(blueprintControls.snapshot().opacity, 1)
+	window.dispatch('wheel', event({
+		deltaY: -100,
+		target: pathTarget,
+		composedPath() {
+			return [pathTarget, selection, window]
+		}
+	}))
+	assert.equal(selectionControls.snapshot().opacity, 1)
+	assert.equal(storedValues.get('cattailWorldEditorSelectionCardOpacity'), '1')
+
 	const firstWheel = event({ deltaY: 100 })
 	window.dispatch('wheel', firstWheel)
 	assert.equal(firstWheel.defaultPrevented, true)
 	assert.equal(blueprintControls.snapshot().opacity, .9)
 	assert.equal(blueprintProductionControls.snapshot().opacity, .9)
 	assert.equal(selectionControls.snapshot().opacity, 1)
+	assert.equal(storedValues.get('cattailWorldEditorBlueprintCardOpacity'), '0.9')
 
 	for (let index = 0; index < 10; index++) window.dispatch('wheel', event({ deltaY: 100 }))
 	assert.equal(blueprintControls.snapshot().opacity, .25)
 	assert.equal(blueprintProductionControls.snapshot().opacity, .25)
+	assert.equal(storedValues.get('cattailWorldEditorBlueprintCardOpacity'), '0.25')
 	const middle = event({ button: 1 })
 	window.dispatch('mousedown', middle)
 	assert.equal(middle.defaultPrevented, true)
 	assert.equal(blueprintControls.snapshot().contentIndependent, true)
 	assert.equal(blueprintProductionControls.snapshot().contentIndependent, true)
+	assert.equal(storedValues.get('cattailWorldEditorBlueprintCardOpaqueInfo'), '1')
 	assert.equal(blueprint.style['--world-editor-card-shell-opacity'], '0')
 	assert.equal(blueprint.style['--world-editor-card-shell-percent'], '0%')
 	assert.equal(blueprint.style['--world-editor-card-shell-blur-14'], '0px')
@@ -925,6 +966,7 @@ function testCardOpacityController() {
 
 	window.dispatch('mousedown', event({ button: 1, clientX: 25 }))
 	assert.equal(selectionControls.snapshot().contentIndependent, true)
+	assert.equal(storedValues.get('cattailWorldEditorSelectionCardOpaqueInfo'), '1')
 	assert.equal(blueprintControls.snapshot().contentIndependent, true)
 	assert.equal(blueprintProductionControls.snapshot().contentIndependent, true)
 	window.dispatch('keyup', event({ key: 'z' }))
@@ -938,9 +980,297 @@ function testCardOpacityController() {
 	blueprintProductionControls.release()
 	assert.equal(controller.snapshot().length, 0)
 	controller.dispose()
+
+	const restoredController = loadController()
+	const restoredSelectionControls = restoredController.register({
+		id: 'selection-restored',
+		group: 'selection-production',
+		element: card('selection-restored', 0, 100),
+		hint: hint()
+	})
+	const restoredBlueprintControls = restoredController.register({
+		id: 'blueprint-restored',
+		group: 'blueprint-production',
+		element: card('blueprint-restored', 100, 200),
+		hint: hint()
+	})
+	assert.equal(restoredSelectionControls.snapshot().opacity, 1)
+	assert.equal(restoredSelectionControls.snapshot().contentIndependent, true)
+	assert.equal(restoredBlueprintControls.snapshot().opacity, .25)
+	assert.equal(restoredBlueprintControls.snapshot().contentIndependent, true)
+	restoredSelectionControls.release()
+	restoredBlueprintControls.release()
+	restoredController.dispose()
+
+	storedValues.set('cattailWorldEditorSelectionCardOpacity', 'broken')
+	storedValues.set('cattailWorldEditorSelectionCardOpaqueInfo', 'unexpected')
+	storedValues.set('cattailWorldEditorBlueprintCardOpacity', '-7')
+	storedValues.set('cattailWorldEditorBlueprintCardOpaqueInfo', '0')
+	const fallbackController = loadController()
+	const fallbackSelectionControls = fallbackController.register({
+		id: 'selection-fallback',
+		group: 'selection-production',
+		element: card('selection-fallback', 0, 100),
+		hint: hint()
+	})
+	const fallbackBlueprintControls = fallbackController.register({
+		id: 'blueprint-fallback',
+		group: 'blueprint-production',
+		element: card('blueprint-fallback', 100, 200),
+		hint: hint()
+	})
+	assert.equal(fallbackSelectionControls.snapshot().opacity, 1)
+	assert.equal(fallbackSelectionControls.snapshot().contentIndependent, false)
+	assert.equal(fallbackBlueprintControls.snapshot().opacity, .25)
+	assert.equal(fallbackBlueprintControls.snapshot().contentIndependent, false)
+	fallbackSelectionControls.release()
+	fallbackBlueprintControls.release()
+	fallbackController.dispose()
+
+	localStorage.throwing = true
+	const unavailableController = loadController()
+	const unavailableControls = unavailableController.register({
+		id: 'selection-unavailable',
+		group: 'selection-production',
+		element: card('selection-unavailable', 0, 100),
+		hint: hint()
+	})
+	assert.equal(unavailableControls.snapshot().opacity, 1)
+	assert.equal(unavailableControls.snapshot().contentIndependent, false)
+	unavailableControls.release()
+	unavailableController.dispose()
+	localStorage.throwing = false
+}
+
+function testSharedEditorServices() {
+	const listeners = new Map()
+	const window = {
+		innerHeight: 1000,
+		addEventListener(type, listener) {
+			if (!listeners.has(type)) listeners.set(type, new Set())
+			listeners.get(type).add(listener)
+		},
+		removeEventListener(type, listener) {
+			listeners.get(type)?.delete(listener)
+		},
+		dispatch(type, event) {
+			for (const listener of Array.from(listeners.get(type) || [])) listener(event)
+		}
+	}
+	const elements = new Map()
+	const document = {
+		activeElement: null,
+		head: {
+			append(element) {
+				if (element.id) elements.set(element.id, element)
+				element.isConnected = true
+			}
+		},
+		createElement() {
+			return {
+				id: '',
+				textContent: '',
+				isConnected: false,
+				remove() {
+					elements.delete(this.id)
+					this.isConnected = false
+				}
+			}
+		},
+		getElementById(id) {
+			return elements.get(id) || null
+		}
+	}
+	const sandbox = {
+		console,
+		document,
+		window,
+		ModLoader: {
+			register(definition) {
+				definition.init()
+			}
+		}
+	}
+	sandbox.globalThis = sandbox
+	vm.createContext(sandbox)
+	vm.runInContext(
+		fs.readFileSync(path.join(MOD_ROOT, SHARED_SOURCE), 'utf8'),
+		sandbox,
+		{ filename: SHARED_SOURCE }
+	)
+	const shared = vm.runInContext(
+		"globalThis[Symbol.for('cattail.world-editor.shared')]",
+		sandbox
+	)
+	assert.ok(shared)
+
+	const unitControl = {
+		nodeType: 1,
+		closest(selector) {
+			return selector.includes('[data-world-editor-card-control]') ? this : null
+		}
+	}
+	assert.equal(shared.isCardControlEvent({
+		target: unitControl,
+		composedPath() {
+			return [unitControl]
+		}
+	}), true)
+	assert.equal(shared.isCardControlEvent({
+		target: {
+			nodeType: 1,
+			closest() {
+				return null
+			}
+		}
+	}), false)
+
+	const canvas = {}
+	const game = { canvas }
+	const firstCard = { dataset: {} }
+	const secondCard = { dataset: {} }
+	const firstControls = shared.registerWorldDragCard(game, firstCard)
+	const secondControls = shared.registerWorldDragCard(game, secondCard)
+	window.dispatch('mousedown', { button: 2, target: canvas })
+	assert.equal(firstCard.dataset.worldDragPassThrough, 'true')
+	assert.equal(secondCard.dataset.worldDragPassThrough, 'true')
+	window.dispatch('mouseup', { button: 2 })
+	assert.equal(firstCard.dataset.worldDragPassThrough, 'false')
+	assert.equal(secondCard.dataset.worldDragPassThrough, 'false')
+	firstControls.release()
+	secondControls.release()
+	assert.equal('worldDragPassThrough' in firstCard.dataset, false)
+	assert.equal('worldDragPassThrough' in secondCard.dataset, false)
+
+	function interactiveElement(edge) {
+		const eventListeners = new Map()
+		return {
+			dataset: edge ? { edge } : {},
+			attributes: {},
+			style: {
+				setProperty(name, value) {
+					this[name] = value
+				}
+			},
+			addEventListener(type, listener) {
+				if (!eventListeners.has(type)) eventListeners.set(type, new Set())
+				eventListeners.get(type).add(listener)
+			},
+			removeEventListener(type, listener) {
+				eventListeners.get(type)?.delete(listener)
+			},
+			dispatch(type, event = {}) {
+				event.currentTarget = this
+				event.target = event.target || this
+				for (const listener of Array.from(eventListeners.get(type) || [])) listener(event)
+			},
+			setAttribute(name, value) {
+				this.attributes[name] = String(value)
+			},
+			setPointerCapture(pointerId) {
+				this.capturedPointer = pointerId
+			},
+			releasePointerCapture(pointerId) {
+				if (this.capturedPointer === pointerId) this.capturedPointer = null
+			}
+		}
+	}
+
+	const disclosureSection = interactiveElement()
+	const disclosureToggle = interactiveElement()
+	const disclosureBody = interactiveElement()
+	const disclosureChevron = interactiveElement()
+	const topHandle = interactiveElement('top')
+	const bottomHandle = interactiveElement('bottom')
+	disclosureBody.offsetHeight = 100
+	disclosureBody.scrollHeight = 180
+	disclosureBody.getBoundingClientRect = () => ({ height: 100 })
+	const disclosureChanges = []
+	const disclosure = shared.createDisclosureController({
+		section: disclosureSection,
+		toggle: disclosureToggle,
+		body: disclosureBody,
+		chevron: disclosureChevron,
+		handles: [topHandle, bottomHandle],
+		state: { expanded: true, preferredHeight: null },
+		minHeight: 44,
+		maxViewportRatio: .45,
+		defaultHeight: 180,
+		onChange(detail) {
+			disclosureChanges.push(detail.reason)
+		}
+	})
+	assert.equal(disclosure.state.expanded, true)
+	assert.equal(disclosureSection.dataset.worldEditorDisclosure, '')
+	assert.equal(disclosureToggle.dataset.worldEditorDisclosureToggle, '')
+	assert.equal(disclosureChevron.dataset.worldEditorDisclosureChevron, '')
+	assert.equal(disclosureBody.dataset.worldEditorScrollbar, '')
+	assert.equal(disclosureToggle.attributes['aria-expanded'], 'true')
+	assert.equal(disclosureBody.style['--world-editor-disclosure-height'], '180px')
+	disclosureToggle.dispatch('click', {
+		preventDefault() {},
+		stopPropagation() {},
+		stopImmediatePropagation() {}
+	})
+	assert.equal(disclosure.state.expanded, false)
+	assert.equal(disclosureSection.dataset.expanded, 'false')
+	disclosure.setExpanded(true, 'test-expand')
+	bottomHandle.dispatch('pointerdown', {
+		button: 0,
+		pointerId: 7,
+		clientY: 100,
+		preventDefault() {},
+		stopPropagation() {},
+		stopImmediatePropagation() {}
+	})
+	window.dispatch('pointermove', {
+		pointerId: 7,
+		clientY: 150,
+		preventDefault() {},
+		stopPropagation() {}
+	})
+	assert.equal(disclosure.state.preferredHeight, 150)
+	assert.equal(disclosureBody.style.height, '150px')
+	window.dispatch('pointerup', {
+		pointerId: 7,
+		preventDefault() {},
+		stopPropagation() {},
+		stopImmediatePropagation() {}
+	})
+	assert.equal(bottomHandle.capturedPointer, null)
+	disclosureBody.offsetHeight = 150
+	topHandle.dispatch('pointerdown', {
+		button: 0,
+		pointerId: 8,
+		clientY: 100,
+		preventDefault() {},
+		stopPropagation() {},
+		stopImmediatePropagation() {}
+	})
+	window.dispatch('pointermove', {
+		pointerId: 8,
+		clientY: 120,
+		preventDefault() {},
+		stopPropagation() {}
+	})
+	assert.equal(disclosure.state.preferredHeight, 130)
+	window.dispatch('pointercancel', {
+		pointerId: 8,
+		preventDefault() {},
+		stopPropagation() {},
+		stopImmediatePropagation() {}
+	})
+	assert.equal(disclosure.state.preferredHeight, 150)
+	assert.equal(disclosureBody.style.height, '150px')
+	assert.ok(disclosureChanges.includes('toggle'))
+	assert.ok(disclosureChanges.includes('resize'))
+	assert.ok(disclosureChanges.includes('pointercancel'))
+	disclosure.release()
+	shared.dispose()
 }
 
 function testLocalizationAndIntegrationContract() {
+	const sharedSource = fs.readFileSync(path.join(MOD_ROOT, SHARED_SOURCE), 'utf8')
 	const transformSource = fs.readFileSync(path.join(MOD_ROOT, TRANSFORM_SOURCE), 'utf8')
 	const planSource = fs.readFileSync(path.join(MOD_ROOT, PLAN_SOURCE), 'utf8')
 	const previewSource = fs.readFileSync(path.join(MOD_ROOT, PREVIEW_SOURCE), 'utf8')
@@ -967,7 +1297,7 @@ function testLocalizationAndIntegrationContract() {
 	]
 
 	assert.equal(i18n.languages.length, 20)
-	assert.equal(i18n.keys.length, 98)
+	assert.equal(i18n.keys.length, 99)
 	for (const language of i18n.languages) {
 		for (const key of transformKeys) {
 			const translated = i18n.t(language, key)
@@ -978,7 +1308,11 @@ function testLocalizationAndIntegrationContract() {
 
 	assert.equal(manifest.version, '0.3.5')
 	assert.equal(manifest.languageSupport.gameLanguage, true)
-	assert.equal(manifest.entry.length, 20)
+	assert.equal(manifest.entry.length, 21)
+	assert.equal(
+		manifest.entry.indexOf(SHARED_SOURCE),
+		manifest.entry.indexOf('scripts/core/foundation.js') + 1
+	)
 	assert.equal(
 		manifest.entry.indexOf(CARD_OPACITY_SOURCE),
 		manifest.entry.indexOf(I18N_SOURCE) + 1
@@ -1059,10 +1393,19 @@ function testLocalizationAndIntegrationContract() {
 	assert.match(sessionSource, /data-input-pass-through="true"/)
 	assert.match(sessionSource, /font-family:\s*Montserrat/)
 	assert.match(sessionSource, /width:\s*30px/)
+	assert.match(sessionSource, /border-left-color:\s*transparent/)
+	assert.match(sessionSource, /left:\s*0;\s*\n\s*bottom:\s*1px/)
+	assert.match(sessionSource, /border-right:\s*5px solid currentColor;\s*\n\s*transform:\s*rotate\(25deg\)/)
+	assert.doesNotMatch(sessionSource, /border-left:\s*5px solid currentColor/)
+	assert.match(sessionSource, /data-icon="reset"\]::after\s*\{\s*left:\s*1px;\s*\n\s*bottom:\s*2px/)
+	assert.doesNotMatch(sessionSource, /left:\s*0;\s*\n\s*top:\s*1px/)
+	assert.doesNotMatch(sessionSource, /right:\s*0;\s*\n\s*top:\s*1px/)
 	assert.ok((sessionSource.match(/transform:\s*rotate\(45deg\)/g) || []).length >= 2)
 	assert.match(sessionSource, /game\.resourcesSprites\?\.\[index\]/)
 	assert.match(sessionSource, /game\.makeReadable/)
-	assert.match(sessionSource, /::-webkit-scrollbar\s*\{[^}]*width:\s*4px/s)
+	assert.match(sharedSource, /\[data-world-editor-scrollbar\]\s*\{[\s\S]*--world-editor-scrollbar-size:\s*4px/)
+	assert.match(sharedSource, /\[data-world-editor-scrollbar\]::-webkit-scrollbar\s*\{[\s\S]*width:\s*var\(--world-editor-scrollbar-size\)/)
+	assert.doesNotMatch(sessionSource, /scrollbar-width:\s*thin|scrollbar-color:|::-webkit-scrollbar/)
 	assert.match(sessionSource, /previewTemporaryPinHint/)
 	assert.match(sessionSource, /previewBuildPlan/)
 	assert.match(sessionSource, /return !!ui\?\.pinned/)
@@ -1089,10 +1432,12 @@ function testLocalizationAndIntegrationContract() {
 	assert.match(shellSource, /--world-editor-ui-scale/)
 	assert.match(sessionSource, /scale\(var\(--world-editor-ui-scale,\s*1\)\)/)
 	assert.doesNotMatch(sessionSource, /SECTION_LONG_PRESS_MS|SECTION_PREACTIVATION_PX/)
-	assert.match(sessionSource, /height:\s*10px/)
-	assert.match(sessionSource, /handle\.setPointerCapture\?\.\(resize\.pointerId\)/)
-	assert.match(sessionSource, /body\.offsetHeight/)
-	assert.match(sessionSource, /deltaY \* direction \/ resize\.scale/)
+	assert.match(sharedSource, /\[data-world-editor-disclosure-resize\]\s*\{[\s\S]*height:\s*10px/)
+	assert.match(sharedSource, /handle\.setPointerCapture\?\.\(activeResize\.pointerId\)/)
+	assert.match(sharedSource, /body\.offsetHeight/)
+	assert.match(sharedSource, /deltaY \* direction \/ activeResize\.scale/)
+	assert.match(sessionSource, /shared\.createDisclosureController\(\{/)
+	assert.doesNotMatch(sessionSource, /function handleSectionToggle\(|function handleSectionResizeStart\(/)
 	assert.doesNotMatch(sessionSource, /preactivation-move/)
 	const rightPlacement = sessionSource.indexOf("placement: 'right'")
 	const leftPlacement = sessionSource.indexOf("placement: 'left'", rightPlacement)
@@ -1103,9 +1448,11 @@ function testLocalizationAndIntegrationContract() {
 	assert.ok(belowPlacement < abovePlacement)
 	assert.match(sessionSource, /const gap = 28/)
 	assert.match(sessionSource, /function chooseCardCandidate\(candidates,\s*options\)/)
-	assert.match(sessionSource, /function cardCandidateFits\(candidate,\s*options\)/)
-	assert.match(sessionSource, /candidate\.left \+ candidate\.width <= options\.viewportWidth - options\.margin/)
-	assert.match(sessionSource, /rectangleOverlapArea\(candidate,\s*settings\.previewRect\) \* 4/)
+	assert.match(sessionSource, /shared\.cardCandidateFits\(candidate,\s*settings\)/)
+	assert.match(sessionSource, /shared\.rectangleOverlapArea\(candidate,\s*settings\.previewRect\) \* 4/)
+	assert.doesNotMatch(sessionSource, /function cardCandidateFits\(|function rectangleOverlapArea\(/)
+	assert.match(sharedSource, /function cardCandidateFits\(candidate,\s*options\)/)
+	assert.match(sharedSource, /candidate\.left \+ candidate\.width <= settings\.viewportWidth - settings\.margin/)
 	assert.match(sessionSource, /positionPreviewTarget:\s*null/)
 	assert.match(sessionSource, /positionPreviewWorldBounds:\s*null/)
 	assert.match(sessionSource, /positionPreviewScreenBounds:\s*null/)
@@ -1152,7 +1499,7 @@ function testLocalizationAndIntegrationContract() {
 	const resetStart = sessionSource.indexOf('function resetCardDisplayState(reason)')
 	const resetEnd = sessionSource.indexOf('function clearTemporaryWindow()', resetStart)
 	const resetContract = sessionSource.slice(resetStart, resetEnd)
-	assert.match(resetContract, /cancelSectionResize\(reason \|\| 'card-display-reset',\s*true\)/)
+	assert.match(resetContract, /cancelAllSectionResizes\(reason \|\| 'card-display-reset',\s*true\)/)
 	assert.match(resetContract, /resetPreviewCardPosition\(\)/)
 	assert.match(resetContract, /ui\.pinned = false/)
 	assert.match(resetContract, /ui\.temporaryVisible = false/)
@@ -1176,9 +1523,20 @@ function testLocalizationAndIntegrationContract() {
 	assert.match(cardOpacitySource, /OPACITY_STEP = \.1/)
 	assert.match(cardOpacitySource, /window\.addEventListener\('wheel',\s*handleWheel,\s*\{\s*capture:\s*true,\s*passive:\s*false\s*\}\)/)
 	assert.match(cardOpacitySource, /event\?\.button !== 1/)
+	assert.match(cardOpacitySource, /for \(const node of eventPath\(event\)\)/)
 	assert.match(cardOpacitySource, /cardContainsPoint\(state\.element,\s*x,\s*y\)/)
-	assert.doesNotMatch(cardOpacitySource, /localStorage|sessionStorage/)
+	assert.match(cardOpacitySource, /cattailWorldEditorSelectionCardOpacity/)
+	assert.match(cardOpacitySource, /cattailWorldEditorSelectionCardOpaqueInfo/)
+	assert.match(cardOpacitySource, /cattailWorldEditorBlueprintCardOpacity/)
+	assert.match(cardOpacitySource, /cattailWorldEditorBlueprintCardOpaqueInfo/)
+	assert.match(cardOpacitySource, /function loadSharedState\(group\)/)
+	assert.match(cardOpacitySource, /function saveOpacity\(group,\s*value\)/)
+	assert.match(cardOpacitySource, /function saveContentIndependent\(group,\s*value\)/)
+	assert.match(cardOpacitySource, /raw === null \|\| raw === undefined \|\| raw === ''/)
+	assert.doesNotMatch(cardOpacitySource, /sessionStorage/)
 	assert.match(sessionSource, /CARD_OPACITY_KEY/)
+	assert.match(sessionSource, /shared\.isCardControlEvent\(event,\s*'\[data-world-editor-disclosure-resize\]'\)/)
+	assert.match(selectionCardSource, /shared\.isCardControlEvent\(event\)/)
 	assert.match(sessionSource, /id:\s*'blueprint',[\s\S]*priority:\s*48/)
 	assert.match(selectionCardSource, /id:\s*'selection',[\s\S]*priority:\s*47/)
 	assert.match(sessionSource, /--world-editor-card-opacity/)
@@ -1193,7 +1551,7 @@ function testLocalizationAndIntegrationContract() {
 	assert.equal(fs.existsSync(path.join(MOD_ROOT, 'assets', 'icons', '.gitkeep')), true)
 	assert.equal(fs.existsSync(path.join(MOD_ROOT, 'assets', 'icons', 'z-opacity-hint.svg')), true)
 
-	const implementation = transformSource + '\n' + planSource + '\n' + previewSource + '\n' + sessionSource
+	const implementation = sharedSource + '\n' + transformSource + '\n' + planSource + '\n' + previewSource + '\n' + sessionSource
 	assert.doesNotMatch(implementation, /\bgame\.(?:addEntity|clearCell|deleteEntity|removeEntity|placeEntity)\b/)
 }
 
@@ -1209,6 +1567,7 @@ async function run() {
 	await testRotationTransitionOverlay()
 	await testTransformGuideLayerIsolation()
 	testCardOpacityController()
+	testSharedEditorServices()
 	testLocalizationAndIntegrationContract()
 	console.log('3D verification passed: fixed pivot, ordered D4 normalization, exact restoration, 256-entity command scaling, cached camera translation and compositor geometry, pinned integrity timing with resource-only refresh and structural invalidation, immutable projection, 20-language UI, hidden noncreative controls, hotkeys, card pass-through, and manifest integration.')
 }
