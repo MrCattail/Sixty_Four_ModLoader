@@ -6,8 +6,10 @@ ModLoader.register({
 		const SELECTION_KEY = Symbol.for('cattail.world-editor.selection')
 		const TOOL_KEY = Symbol.for('cattail.world-editor.tool')
 		const CREATIVE_KEY = Symbol.for('cattail.world-editor.creative-mode')
+		const CREATIVE_ECONOMY_KEY = Symbol.for('cattail.world-editor.creative-economy')
 		const SAVE_SLOTS_KEY = Symbol.for('cattail.better-uis.save-slots')
 		const SHELL_ID = 'cattail-world-editor-shell'
+		const ECONOMY_STATUS_ID = 'cattail-world-editor-economy-status'
 		const STYLE_ID = 'cattail-world-editor-shell-style'
 		const DIALOG_ID = 'cattail-world-editor-creative-dialog'
 		const UI_SCALE_BASE_WIDTH = 1600
@@ -37,6 +39,7 @@ ModLoader.register({
 			const selection = globalThis[SELECTION_KEY]
 			const tool = globalThis[TOOL_KEY]
 			let creative = globalThis[CREATIVE_KEY]
+			let creativeEconomy = globalThis[CREATIVE_ECONOMY_KEY]
 			if (!runtime || runtime.game !== game || typeof runtime.addCleanup !== 'function') {
 				console.warn('[Cattail World Editor] Toolbar 2G could not find the editor runtime.')
 				return
@@ -61,15 +64,21 @@ ModLoader.register({
 				console.warn('[Cattail World Editor] Toolbar 4A-2a could not find creative mode state.')
 				creative = unavailableCreativeController(game)
 			}
+			if (!creativeEconomy || creativeEconomy.game !== game || typeof creativeEconomy.subscribe !== 'function') {
+				console.warn('[Cattail World Editor] Toolbar 4A-2b could not find creative economy state.')
+				creativeEconomy = unavailableCreativeEconomy(game)
+			}
 			if (!api.ui?.hud || typeof api.ui.hud.register !== 'function') {
 				console.warn('[Cattail World Editor] Toolbar 2E requires the ModLoader game HUD API.')
 				return
 			}
 
 			document.getElementById(SHELL_ID)?.remove()
+			document.getElementById(ECONOMY_STATUS_ID)?.remove()
 			const style = ensureStyle()
 			const shell = createShell()
-			document.body.append(shell)
+			const economyStatus = createEconomyStatus()
+			document.body.append(shell, economyStatus)
 			const rootStyle = document.documentElement?.style
 			const previousScale = readStyleProperty(rootStyle, '--world-editor-ui-scale')
 			const previousToolbarWidth = readStyleProperty(rootStyle, '--world-editor-toolbar-layout-width')
@@ -78,6 +87,7 @@ ModLoader.register({
 			let currentSelection = selection.snapshot()
 			let currentTool = tool.snapshot()
 			let currentCreative = creative.snapshot()
+			let currentCreativeEconomy = creativeEconomy.snapshot()
 			let gameHudHidden = api.ui.hud.isHidden()
 			let vanillaHudHidden = api.ui.isVanillaGameHudHidden(game)
 			let creativeDialog = null
@@ -115,6 +125,7 @@ ModLoader.register({
 				accessibleText.brand = brand
 				accessibleText.remove = removeText
 				refreshCreative(source)
+				refreshEconomyStatus(source)
 				refreshTool(source)
 				refreshHint(source)
 				refreshSelectionCount(source)
@@ -159,13 +170,18 @@ ModLoader.register({
 			const refreshTheme = function (themeGame) {
 				if (themeGame && themeGame !== game) return
 				shell.dataset.theme = game.plane ? 'void' : 'reality'
+				economyStatus.dataset.theme = shell.dataset.theme
 				if (creativeDialog?.element) creativeDialog.element.dataset.theme = shell.dataset.theme
 			}
 
 			const refreshCreative = function (languageGame) {
 				const source = languageGame || game
 				const active = !!currentCreative?.ready && !!currentCreative?.creativeMode
-				const busy = !!currentCreative?.busy || !!currentCreative?.pendingForkFinalization
+				const busy = (
+					!!currentCreative?.busy ||
+					!!currentCreative?.pendingForkFinalization ||
+					!!currentCreativeEconomy?.busy
+				)
 				const label = i18n.t(source, active ? 'creativeModeOn' : 'creativeModeOff')
 				creativeButton.querySelector('[data-world-editor-text="creative-mode"]').textContent = label
 				creativeButton.dataset.active = active ? 'true' : 'false'
@@ -179,10 +195,42 @@ ModLoader.register({
 				refreshAccessibility()
 			}
 
+			const refreshEconomyStatus = function (languageGame) {
+				const source = languageGame || game
+				const phase = String(currentCreativeEconomy?.phase || 'idle')
+				let key = {
+					snapshotting: 'creativeEconomySnapshotting',
+					revalidating: 'creativeEconomyRevalidating',
+					executing: 'creativeEconomyExecuting',
+					success: 'creativeEconomySuccess',
+					cancelled: 'creativeEconomyCancelled',
+					failed: 'creativeEconomyFailed'
+				}[phase]
+				if (phase === 'failed' && currentCreativeEconomy?.error?.code === 'EXECUTION_FAILED') {
+					key = 'creativeEconomyExecutionFailed'
+				}
+				const text = key ? i18n.t(source, key) : ''
+				economyStatus.dataset.phase = phase
+				economyStatus.dataset.active = key ? 'true' : 'false'
+				economyStatus.textContent = text
+				economyStatus.title = currentCreativeEconomy?.error?.message || text
+				economyStatus.setAttribute('role', phase === 'failed' ? 'alert' : 'status')
+				economyStatus.setAttribute('aria-live', phase === 'failed' ? 'assertive' : 'polite')
+				refreshVisibility()
+			}
+
 			const refreshVisibility = function () {
 				const editorVisible = !!currentState.active && !game.halt && !game.splash?.isShown && !vanillaHudHidden
+				const economyVisible = (
+					economyStatus.dataset.active === 'true' &&
+					!game.halt &&
+					!game.splash?.isShown &&
+					!vanillaHudHidden
+				)
 				shell.dataset.visible = editorVisible ? 'true' : 'false'
 				shell.setAttribute('aria-hidden', editorVisible && !gameHudHidden ? 'false' : 'true')
+				economyStatus.dataset.visible = economyVisible ? 'true' : 'false'
+				economyStatus.setAttribute('aria-hidden', economyVisible && !gameHudHidden ? 'false' : 'true')
 			}
 
 			const refreshUiScale = function () {
@@ -226,6 +274,11 @@ ModLoader.register({
 				currentCreative = state
 				refreshCreative(game)
 			})
+			const stopCreativeEconomySubscription = creativeEconomy.subscribe(function (state) {
+				currentCreativeEconomy = state
+				refreshCreative(game)
+				refreshEconomyStatus(game)
+			})
 
 			const handleSelectClick = function (event) {
 				event?.preventDefault?.()
@@ -246,7 +299,7 @@ ModLoader.register({
 			const handleCreativeClick = function (event) {
 				event?.preventDefault?.()
 				event?.stopPropagation?.()
-				if (!currentCreative?.ready || currentCreative.busy) return
+				if (!currentCreative?.ready || currentCreative.busy || currentCreativeEconomy?.busy) return
 				if (currentCreative.creativeMode) openDisableCreativeDialog()
 				else openEnableCreativeDialog()
 			}
@@ -538,6 +591,11 @@ ModLoader.register({
 				element: shell,
 				side: 'top'
 			})
+			const releaseEconomyHud = api.ui.hud.register({
+				id: 'world-editor-creative-economy-status',
+				element: economyStatus,
+				side: 'top'
+			})
 
 			refreshMountedText = refreshText
 			refreshMountedTheme = refreshTheme
@@ -559,13 +617,16 @@ ModLoader.register({
 				if (typeof stopSelectionSubscription === 'function') stopSelectionSubscription()
 				if (typeof stopToolSubscription === 'function') stopToolSubscription()
 				if (typeof stopCreativeSubscription === 'function') stopCreativeSubscription()
+				if (typeof stopCreativeEconomySubscription === 'function') stopCreativeEconomySubscription()
 				selectButton.removeEventListener('click', handleSelectClick)
 				removeButton.removeEventListener('click', handleRemoveClick)
 				creativeButton.removeEventListener('click', handleCreativeClick)
 				if (typeof releaseHud === 'function') releaseHud()
+				if (typeof releaseEconomyHud === 'function') releaseEconomyHud()
 				writeStyleProperty(rootStyle, '--world-editor-ui-scale', previousScale)
 				writeStyleProperty(rootStyle, '--world-editor-toolbar-layout-width', previousToolbarWidth)
 				shell.remove()
+				economyStatus.remove()
 				if (style.isConnected && !document.getElementById(SHELL_ID)) style.remove()
 			})
 
@@ -657,6 +718,21 @@ ModLoader.register({
 			return button
 		}
 
+		function createEconomyStatus() {
+			const status = document.createElement('div')
+			status.id = ECONOMY_STATUS_ID
+			status.className = 'cattail-world-editor-economy-status'
+			status.dataset.theme = 'reality'
+			status.dataset.phase = 'idle'
+			status.dataset.active = 'false'
+			status.dataset.visible = 'false'
+			status.setAttribute('role', 'status')
+			status.setAttribute('aria-live', 'polite')
+			status.setAttribute('aria-atomic', 'true')
+			status.setAttribute('aria-hidden', 'true')
+			return status
+		}
+
 		function unavailableCreativeController(game) {
 			const state = Object.freeze({
 				version: '1.0.0',
@@ -680,6 +756,32 @@ ModLoader.register({
 					return function () {}
 				},
 				setDialogOpen() { return false },
+				isInputBlocked() { return false }
+			})
+		}
+
+		function unavailableCreativeEconomy(game) {
+			const state = Object.freeze({
+				version: '1.0.0',
+				ready: false,
+				active: false,
+				busy: false,
+				phase: 'idle',
+				operation: null,
+				input: null,
+				revision: 0,
+				lastReason: 'creative-economy-unavailable',
+				lastSnapshotId: null,
+				error: Object.freeze({ code: 'NOT_READY', message: 'Creative economy is unavailable.' }),
+				disposed: false
+			})
+			return Object.freeze({
+				game,
+				snapshot() { return state },
+				subscribe(listener) {
+					listener(state)
+					return function () {}
+				},
 				isInputBlocked() { return false }
 			})
 		}
@@ -856,6 +958,54 @@ ModLoader.register({
 					border-left: 1px solid var(--world-editor-shell-border);
 					color: var(--world-editor-shell-muted);
 					font-size: 13px;
+				}
+				.cattail-world-editor-economy-status {
+					--world-editor-economy-bg: rgba(248, 248, 246, .94);
+					--world-editor-economy-text: rgba(18, 20, 22, .92);
+					--world-editor-economy-border: rgba(181, 125, 34, .5);
+					position: fixed;
+					top: max(70px, calc(env(safe-area-inset-top) + 58px));
+					left: 50%;
+					z-index: 49;
+					max-width: min(520px, calc(100vw - 24px));
+					box-sizing: border-box;
+					padding: 8px 13px;
+					border: 1px solid var(--world-editor-economy-border);
+					border-radius: 999px;
+					background: var(--world-editor-economy-bg);
+					box-shadow: 0 10px 28px rgba(0, 0, 0, .2);
+					backdrop-filter: blur(12px) saturate(1.08);
+					-webkit-backdrop-filter: blur(12px) saturate(1.08);
+					color: var(--world-editor-economy-text);
+					font: 600 12px/1.35 Montserrat, Arial, sans-serif;
+					text-align: center;
+					white-space: normal;
+					visibility: hidden;
+					opacity: 0;
+					transform: translate(-50%, -6px);
+					pointer-events: none;
+					transition: opacity .16s ease-out, transform .16s ease-out, visibility 0s linear .16s;
+				}
+				.cattail-world-editor-economy-status[data-theme="void"] {
+					--world-editor-economy-bg: rgba(8, 10, 12, .94);
+					--world-editor-economy-text: rgba(255, 255, 255, .94);
+					--world-editor-economy-border: rgba(240, 201, 106, .58);
+					box-shadow: 0 10px 30px rgba(0, 0, 0, .42);
+				}
+				.cattail-world-editor-economy-status[data-phase="success"] {
+					--world-editor-economy-border: rgba(91, 170, 91, .62);
+				}
+				.cattail-world-editor-economy-status[data-phase="cancelled"] {
+					--world-editor-economy-border: rgba(205, 142, 44, .68);
+				}
+				.cattail-world-editor-economy-status[data-phase="failed"] {
+					--world-editor-economy-border: rgba(198, 71, 71, .72);
+				}
+				.cattail-world-editor-economy-status[data-visible="true"] {
+					visibility: visible;
+					opacity: 1;
+					transform: translate(-50%, 0);
+					transition-delay: 0s;
 				}
 				.cattail-world-editor-creative-dialog {
 					--world-editor-dialog-bg: rgba(248, 248, 246, .97);

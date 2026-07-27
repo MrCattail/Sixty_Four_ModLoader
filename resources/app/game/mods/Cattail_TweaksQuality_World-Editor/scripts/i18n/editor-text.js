@@ -2699,6 +2699,188 @@ ModLoader.register({
 				creativeOperationFailed: 'Operasjonen i kreativ modus mislyktes.'
 			}
 		}
+		const CREATIVE_ECONOMY_TEXT = {
+			en: {
+				creativeEconomySnapshotting: 'Creating safety snapshot…',
+				creativeEconomyRevalidating: 'Checking creative action target…',
+				creativeEconomyExecuting: 'Applying creative action…',
+				creativeEconomySuccess: 'Creative action completed.',
+				creativeEconomyCancelled: 'Target changed. The action was cancelled.',
+				creativeEconomyFailed: 'Safety snapshot failed. No changes were made.',
+				creativeEconomyExecutionFailed: 'Creative action failed. The safety snapshot was kept.'
+			},
+			sch: {
+				creativeEconomySnapshotting: '正在创建安全快照……',
+				creativeEconomyRevalidating: '正在复核创造操作目标……',
+				creativeEconomyExecuting: '正在执行创造操作……',
+				creativeEconomySuccess: '创造操作已完成。',
+				creativeEconomyCancelled: '目标已变化，操作已取消。',
+				creativeEconomyFailed: '安全快照失败，未进行任何更改。',
+				creativeEconomyExecutionFailed: '创造操作执行失败，安全快照已保留。'
+			},
+			modsch: {
+				creativeEconomySnapshotting: '正在创建安全快照……',
+				creativeEconomyRevalidating: '正在复核创造操作目标……',
+				creativeEconomyExecuting: '正在执行创造操作……',
+				creativeEconomySuccess: '创造操作已完成。',
+				creativeEconomyCancelled: '目标已变化，操作已取消。',
+				creativeEconomyFailed: '安全快照失败，未进行任何更改。',
+				creativeEconomyExecutionFailed: '创造操作执行失败，安全快照已保留。'
+			},
+			ru: {
+				creativeEconomySnapshotting: 'Создание защитного снимка…',
+				creativeEconomyRevalidating: 'Проверка цели творческого действия…',
+				creativeEconomyExecuting: 'Выполнение творческого действия…',
+				creativeEconomySuccess: 'Творческое действие выполнено.',
+				creativeEconomyCancelled: 'Цель изменилась. Действие отменено.',
+				creativeEconomyFailed: 'Не удалось создать защитный снимок. Изменений нет.',
+				creativeEconomyExecutionFailed: 'Творческое действие не выполнено. Защитный снимок сохранён.'
+			},
+			de: {
+				creativeEconomySnapshotting: 'Sicherheitssnapshot wird erstellt…',
+				creativeEconomyRevalidating: 'Ziel der Kreativaktion wird geprüft…',
+				creativeEconomyExecuting: 'Kreativaktion wird ausgeführt…',
+				creativeEconomySuccess: 'Kreativaktion abgeschlossen.',
+				creativeEconomyCancelled: 'Ziel geändert. Aktion abgebrochen.',
+				creativeEconomyFailed: 'Sicherheitssnapshot fehlgeschlagen. Keine Änderungen.',
+				creativeEconomyExecutionFailed: 'Kreativaktion fehlgeschlagen. Der Sicherheitssnapshot wurde behalten.'
+			},
+			ptbr: {
+				creativeEconomySnapshotting: 'Criando snapshot de segurança…',
+				creativeEconomyRevalidating: 'Verificando o alvo da ação criativa…',
+				creativeEconomyExecuting: 'Aplicando ação criativa…',
+				creativeEconomySuccess: 'Ação criativa concluída.',
+				creativeEconomyCancelled: 'O alvo mudou. A ação foi cancelada.',
+				creativeEconomyFailed: 'Falha no snapshot de segurança. Nada foi alterado.',
+				creativeEconomyExecutionFailed: 'A ação criativa falhou. O snapshot de segurança foi mantido.'
+			},
+			it: {
+				creativeEconomySnapshotting: 'Creazione snapshot di sicurezza…',
+				creativeEconomyRevalidating: 'Verifica del bersaglio creativo…',
+				creativeEconomyExecuting: 'Applicazione azione creativa…',
+				creativeEconomySuccess: 'Azione creativa completata.',
+				creativeEconomyCancelled: 'Il bersaglio è cambiato. Azione annullata.',
+				creativeEconomyFailed: 'Snapshot di sicurezza non riuscito. Nessuna modifica.',
+				creativeEconomyExecutionFailed: 'Azione creativa non riuscita. Lo snapshot di sicurezza è stato conservato.'
+			},
+			es: {
+				creativeEconomySnapshotting: 'Creando instantánea de seguridad…',
+				creativeEconomyRevalidating: 'Comprobando el objetivo creativo…',
+				creativeEconomyExecuting: 'Aplicando acción creativa…',
+				creativeEconomySuccess: 'Acción creativa completada.',
+				creativeEconomyCancelled: 'El objetivo cambió. Se canceló la acción.',
+				creativeEconomyFailed: 'Falló la instantánea de seguridad. No hubo cambios.',
+				creativeEconomyExecutionFailed: 'La acción creativa falló. Se conservó la instantánea de seguridad.'
+			},
+			fr: {
+				creativeEconomySnapshotting: 'Création de l’instantané de sécurité…',
+				creativeEconomyRevalidating: 'Vérification de la cible créative…',
+				creativeEconomyExecuting: 'Application de l’action créative…',
+				creativeEconomySuccess: 'Action créative terminée.',
+				creativeEconomyCancelled: 'La cible a changé. Action annulée.',
+				creativeEconomyFailed: 'Échec de l’instantané de sécurité. Aucun changement.',
+				creativeEconomyExecutionFailed: 'Échec de l’action créative. L’instantané de sécurité a été conservé.'
+			},
+			nl: {
+				creativeEconomySnapshotting: 'Veiligheidsmomentopname maken…',
+				creativeEconomyRevalidating: 'Doel van creatieve actie controleren…',
+				creativeEconomyExecuting: 'Creatieve actie uitvoeren…',
+				creativeEconomySuccess: 'Creatieve actie voltooid.',
+				creativeEconomyCancelled: 'Doel gewijzigd. Actie geannuleerd.',
+				creativeEconomyFailed: 'Veiligheidsmomentopname mislukt. Niets gewijzigd.',
+				creativeEconomyExecutionFailed: 'Creatieve actie mislukt. De veiligheidsmomentopname is bewaard.'
+			},
+			cz: {
+				creativeEconomySnapshotting: 'Vytváření bezpečnostního snímku…',
+				creativeEconomyRevalidating: 'Kontrola cíle kreativní akce…',
+				creativeEconomyExecuting: 'Provádění kreativní akce…',
+				creativeEconomySuccess: 'Kreativní akce dokončena.',
+				creativeEconomyCancelled: 'Cíl se změnil. Akce byla zrušena.',
+				creativeEconomyFailed: 'Bezpečnostní snímek selhal. Nic se nezměnilo.',
+				creativeEconomyExecutionFailed: 'Kreativní akce selhala. Bezpečnostní snímek byl zachován.'
+			},
+			pl: {
+				creativeEconomySnapshotting: 'Tworzenie migawki bezpieczeństwa…',
+				creativeEconomyRevalidating: 'Sprawdzanie celu akcji kreatywnej…',
+				creativeEconomyExecuting: 'Wykonywanie akcji kreatywnej…',
+				creativeEconomySuccess: 'Akcja kreatywna zakończona.',
+				creativeEconomyCancelled: 'Cel się zmienił. Akcja została anulowana.',
+				creativeEconomyFailed: 'Migawka bezpieczeństwa nie powiodła się. Brak zmian.',
+				creativeEconomyExecutionFailed: 'Akcja kreatywna nie powiodła się. Migawka bezpieczeństwa została zachowana.'
+			},
+			jp: {
+				creativeEconomySnapshotting: '安全スナップショットを作成中…',
+				creativeEconomyRevalidating: 'クリエイティブ操作の対象を確認中…',
+				creativeEconomyExecuting: 'クリエイティブ操作を実行中…',
+				creativeEconomySuccess: 'クリエイティブ操作が完了しました。',
+				creativeEconomyCancelled: '対象が変わったため操作をキャンセルしました。',
+				creativeEconomyFailed: '安全スナップショットに失敗しました。変更はありません。',
+				creativeEconomyExecutionFailed: 'クリエイティブ操作に失敗しました。安全スナップショットは保持されています。'
+			},
+			kr: {
+				creativeEconomySnapshotting: '안전 스냅샷 생성 중…',
+				creativeEconomyRevalidating: '크리에이티브 작업 대상 확인 중…',
+				creativeEconomyExecuting: '크리에이티브 작업 적용 중…',
+				creativeEconomySuccess: '크리에이티브 작업이 완료되었습니다.',
+				creativeEconomyCancelled: '대상이 변경되어 작업을 취소했습니다.',
+				creativeEconomyFailed: '안전 스냅샷에 실패했습니다. 변경 사항이 없습니다.',
+				creativeEconomyExecutionFailed: '크리에이티브 작업에 실패했습니다. 안전 스냅샷은 보관되었습니다.'
+			},
+			tch: {
+				creativeEconomySnapshotting: '正在建立安全快照……',
+				creativeEconomyRevalidating: '正在複核創造操作目標……',
+				creativeEconomyExecuting: '正在執行創造操作……',
+				creativeEconomySuccess: '創造操作已完成。',
+				creativeEconomyCancelled: '目標已變更，操作已取消。',
+				creativeEconomyFailed: '安全快照失敗，未進行任何變更。',
+				creativeEconomyExecutionFailed: '創造操作執行失敗，安全快照已保留。'
+			},
+			thai: {
+				creativeEconomySnapshotting: 'กำลังสร้างสแนปช็อตความปลอดภัย…',
+				creativeEconomyRevalidating: 'กำลังตรวจสอบเป้าหมายโหมดสร้างสรรค์…',
+				creativeEconomyExecuting: 'กำลังใช้การทำงานโหมดสร้างสรรค์…',
+				creativeEconomySuccess: 'การทำงานโหมดสร้างสรรค์เสร็จสิ้น',
+				creativeEconomyCancelled: 'เป้าหมายเปลี่ยนไป จึงยกเลิกการทำงาน',
+				creativeEconomyFailed: 'สแนปช็อตความปลอดภัยล้มเหลว ไม่มีการเปลี่ยนแปลง',
+				creativeEconomyExecutionFailed: 'การทำงานโหมดสร้างสรรค์ล้มเหลว และเก็บสแนปช็อตความปลอดภัยไว้แล้ว'
+			},
+			hu: {
+				creativeEconomySnapshotting: 'Biztonsági pillanatkép készítése…',
+				creativeEconomyRevalidating: 'A kreatív művelet céljának ellenőrzése…',
+				creativeEconomyExecuting: 'Kreatív művelet végrehajtása…',
+				creativeEconomySuccess: 'A kreatív művelet befejeződött.',
+				creativeEconomyCancelled: 'A cél megváltozott. A művelet megszakadt.',
+				creativeEconomyFailed: 'A biztonsági pillanatkép sikertelen. Nincs változás.',
+				creativeEconomyExecutionFailed: 'A kreatív művelet sikertelen. A biztonsági pillanatkép megmaradt.'
+			},
+			lv: {
+				creativeEconomySnapshotting: 'Drošības momentuzņēmuma izveide…',
+				creativeEconomyRevalidating: 'Radošās darbības mērķa pārbaude…',
+				creativeEconomyExecuting: 'Radošās darbības izpilde…',
+				creativeEconomySuccess: 'Radošā darbība pabeigta.',
+				creativeEconomyCancelled: 'Mērķis mainījās. Darbība atcelta.',
+				creativeEconomyFailed: 'Drošības momentuzņēmums neizdevās. Izmaiņu nav.',
+				creativeEconomyExecutionFailed: 'Radošā darbība neizdevās. Drošības momentuzņēmums tika saglabāts.'
+			},
+			ro: {
+				creativeEconomySnapshotting: 'Se creează instantaneul de siguranță…',
+				creativeEconomyRevalidating: 'Se verifică ținta acțiunii creative…',
+				creativeEconomyExecuting: 'Se aplică acțiunea creativă…',
+				creativeEconomySuccess: 'Acțiunea creativă s-a încheiat.',
+				creativeEconomyCancelled: 'Ținta s-a schimbat. Acțiunea a fost anulată.',
+				creativeEconomyFailed: 'Instantaneul de siguranță a eșuat. Nicio modificare.',
+				creativeEconomyExecutionFailed: 'Acțiunea creativă a eșuat. Instantaneul de siguranță a fost păstrat.'
+			},
+			no: {
+				creativeEconomySnapshotting: 'Oppretter sikkerhetsøyeblikksbilde…',
+				creativeEconomyRevalidating: 'Kontrollerer målet for kreativ handling…',
+				creativeEconomyExecuting: 'Utfører kreativ handling…',
+				creativeEconomySuccess: 'Kreativ handling fullført.',
+				creativeEconomyCancelled: 'Målet ble endret. Handlingen ble avbrutt.',
+				creativeEconomyFailed: 'Sikkerhetsøyeblikksbildet mislyktes. Ingen endringer.',
+				creativeEconomyExecutionFailed: 'Kreativ handling mislyktes. Sikkerhetsøyeblikksbildet ble beholdt.'
+			}
+		}
 		for (const language of Object.keys(TEXT)) {
 			Object.assign(
 				TEXT[language],
@@ -2723,6 +2905,8 @@ ModLoader.register({
 			keys: KEYS,
 			t(languageOrGame, key) {
 				const language = typeof languageOrGame === 'string' ? languageOrGame : languageOrGame?.language
+				const economyTable = CREATIVE_ECONOMY_TEXT[language] || CREATIVE_ECONOMY_TEXT.en
+				if (Object.prototype.hasOwnProperty.call(economyTable, key)) return economyTable[key]
 				const table = TEXT[language] || TEXT.en
 				return table[key] || TEXT.en[key] || String(key)
 			}

@@ -605,6 +605,7 @@ function testLocalizationManifestAndReadOnlyBoundary() {
 		'scripts/core/shared.js',
 		'scripts/core/editor-state.js',
 		'scripts/core/creative-mode.js',
+		'scripts/core/creative-economy.js',
 		'scripts/core/selection-state.js',
 		'scripts/core/tool-state.js',
 		'scripts/core/selection-analysis.js',

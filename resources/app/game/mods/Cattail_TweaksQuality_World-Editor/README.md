@@ -390,3 +390,26 @@ globalThis[Symbol.for('cattail.world-editor.blueprint')].snapshot().blueprint?.p
 globalThis[Symbol.for('cattail.world-editor.creative-mode')].snapshot()
 globalThis[Symbol.for('cattail.better-uis.save-slots')]?.snapshot()
 ```
+
+## 4A-2b 创造模式免费商店经济
+
+- 创造模式下，原版商店的普通建造、升级、橡皮擦删除和搬迁均不消耗资源；升级与删除也不发放退款。普通模式继续使用原版同步结算。
+- 免费经济只存在于一次已经完成写前快照和目标重验的商店事务中。机器运行、资源补充、生产、Cube 操作、自动世界事件和其他非商店价格消费者保持原样。
+- 每次有效世界写入先用 `game.assembleSave(true)` 创建一份物理安全快照，再重验格子、实体、平面、创造状态、运行时和存档身份。快照失败或目标变化时不会执行世界写入。
+- 快照等待期间只阻止新的商店/编辑器写入；相机和非写入菜单仍可使用。快速重复输入不会排队，也不会创建第二份快照。
+- 鼠标、游戏手柄、桌面触控和移动端独立触屏路径共用同一事务协调器；搬迁仍调用当前完整 `processClick()` 补丁链，以兼容 Gradient 搬迁修复。
+- 解锁、唯一建筑、不可破坏实体、Cube、平面、最后一个 Pump/Gradient 和搬迁类型等原版限制继续生效。
+- World Editor 配置 `创造模式购买花费显示` 默认关闭并支持 hot 预览：
+  - 关闭时，原商店、Better UIs 分类商店及鼠标旁的购买/升级/橡皮擦花费提示为空。
+  - 开启时，显示关闭创造模式后当前完整 Mod 补丁链会计算出的参考花费；实际结算仍免费。
+  - Dynamic Details 的购买倒计时及升级/删除退款提示在创造模式中始终隐藏。
+- 独立顶部状态胶囊会显示快照、重验、执行、成功、取消和失败状态，即使世界编辑器当前未激活也可见；它仍跟随原版 HUD 隐藏规则。
+
+开发者控制台可检查：
+
+```js
+globalThis[Symbol.for('cattail.world-editor.creative-economy')].snapshot()
+globalThis[Symbol.for('cattail.world-editor.creative-mode')].snapshot()
+```
+
+4A-2b 不包含蓝图真实放置、世界编辑器删除/剪切/移动、undo/redo、快照恢复或导入界面。

@@ -12,6 +12,7 @@
     "scripts/core/shared.js",
     "scripts/core/editor-state.js",
     "scripts/core/creative-mode.js",
+    "scripts/core/creative-economy.js",
     "scripts/core/selection-state.js",
     "scripts/core/tool-state.js",
     "scripts/core/selection-analysis.js",
@@ -39,6 +40,13 @@
       "default": true,
       "description": "Controls whether World Editor features are active.",
       "reloadPolicy": "hot"
+    },
+    "showCreativePurchaseCosts": {
+      "type": "boolean",
+      "label": "Show Creative-Mode Purchase Costs",
+      "default": false,
+      "description": "Shows normal-mode reference purchase costs while Creative Mode remains free.",
+      "reloadPolicy": "hot"
     }
   },
   "translations": {
@@ -49,6 +57,10 @@
         "enabled": {
           "label": "Enable World Editor",
           "description": "Controls whether World Editor features are active."
+        },
+        "showCreativePurchaseCosts": {
+          "label": "Show Creative-Mode Purchase Costs",
+          "description": "Shows normal-mode reference purchase costs while Creative Mode remains free."
         }
       }
     },
@@ -59,6 +71,10 @@
         "enabled": {
           "label": "启用世界编辑器",
           "description": "控制世界编辑器功能是否启用。"
+        },
+        "showCreativePurchaseCosts": {
+          "label": "创造模式购买花费显示",
+          "description": "显示普通模式的参考购买花费；创造模式仍然免费。"
         }
       }
     },
@@ -69,6 +85,10 @@
         "enabled": {
           "label": "启用世界编辑器",
           "description": "控制世界编辑器功能是否启用。"
+        },
+        "showCreativePurchaseCosts": {
+          "label": "创造模式购买花费显示",
+          "description": "显示普通模式的参考购买花费；创造模式仍然免费。"
         }
       }
     },
@@ -79,6 +99,10 @@
         "enabled": {
           "label": "Включить редактор мира",
           "description": "Определяет, активны ли функции редактора мира."
+        },
+        "showCreativePurchaseCosts": {
+          "label": "Показывать цены в творческом режиме",
+          "description": "Показывает справочные цены обычного режима; творческий режим остается бесплатным."
         }
       }
     },
@@ -89,6 +113,10 @@
         "enabled": {
           "label": "Welteditor aktivieren",
           "description": "Steuert, ob die Funktionen des Welteditors aktiv sind."
+        },
+        "showCreativePurchaseCosts": {
+          "label": "Kaufkosten im Kreativmodus anzeigen",
+          "description": "Zeigt die Referenzkosten des normalen Modus; der Kreativmodus bleibt kostenlos."
         }
       }
     },
@@ -99,6 +127,10 @@
         "enabled": {
           "label": "Ativar Editor de Mundo",
           "description": "Controla se os recursos do Editor de Mundo estão ativos."
+        },
+        "showCreativePurchaseCosts": {
+          "label": "Mostrar custos no Modo Criativo",
+          "description": "Mostra os custos de referência do modo normal; o Modo Criativo continua gratuito."
         }
       }
     },
@@ -109,6 +141,10 @@
         "enabled": {
           "label": "Abilita Editor del mondo",
           "description": "Controlla se le funzioni dell'Editor del mondo sono attive."
+        },
+        "showCreativePurchaseCosts": {
+          "label": "Mostra costi in modalità creativa",
+          "description": "Mostra i costi di riferimento della modalità normale; la modalità creativa resta gratuita."
         }
       }
     },
@@ -119,6 +155,10 @@
         "enabled": {
           "label": "Activar Editor del mundo",
           "description": "Controla si las funciones del Editor del mundo están activas."
+        },
+        "showCreativePurchaseCosts": {
+          "label": "Mostrar costes en modo creativo",
+          "description": "Muestra los costes de referencia del modo normal; el modo creativo sigue siendo gratuito."
         }
       }
     },
@@ -129,6 +169,10 @@
         "enabled": {
           "label": "Activer l'Éditeur de monde",
           "description": "Détermine si les fonctions de l'Éditeur de monde sont actives."
+        },
+        "showCreativePurchaseCosts": {
+          "label": "Afficher les coûts en mode créatif",
+          "description": "Affiche les coûts de référence du mode normal ; le mode créatif reste gratuit."
         }
       }
     },
@@ -139,6 +183,10 @@
         "enabled": {
           "label": "Wereldeditor inschakelen",
           "description": "Bepaalt of de functies van de Wereldeditor actief zijn."
+        },
+        "showCreativePurchaseCosts": {
+          "label": "Aankoopkosten in creatieve modus tonen",
+          "description": "Toont de referentiekosten van de normale modus; de creatieve modus blijft gratis."
         }
       }
     },
@@ -149,6 +197,10 @@
         "enabled": {
           "label": "Zapnout Editor světa",
           "description": "Určuje, zda jsou funkce Editoru světa aktivní."
+        },
+        "showCreativePurchaseCosts": {
+          "label": "Zobrazit ceny v kreativním režimu",
+          "description": "Zobrazuje referenční ceny normálního režimu; kreativní režim zůstává zdarma."
         }
       }
     },
@@ -159,6 +211,10 @@
         "enabled": {
           "label": "Włącz Edytor świata",
           "description": "Określa, czy funkcje Edytora świata są aktywne."
+        },
+        "showCreativePurchaseCosts": {
+          "label": "Pokaż koszty w trybie kreatywnym",
+          "description": "Pokazuje koszty referencyjne trybu normalnego; tryb kreatywny pozostaje bezpłatny."
         }
       }
     },
@@ -169,6 +225,10 @@
         "enabled": {
           "label": "ワールドエディターを有効化",
           "description": "ワールドエディター機能を有効にするかを制御します。"
+        },
+        "showCreativePurchaseCosts": {
+          "label": "クリエイティブモードの購入費用を表示",
+          "description": "通常モードの参考購入費用を表示します。クリエイティブモードは無料のままです。"
         }
       }
     },
@@ -179,6 +239,10 @@
         "enabled": {
           "label": "월드 에디터 활성화",
           "description": "월드 에디터 기능의 활성화 여부를 제어합니다."
+        },
+        "showCreativePurchaseCosts": {
+          "label": "크리에이티브 모드 구매 비용 표시",
+          "description": "일반 모드의 참고 구매 비용을 표시합니다. 크리에이티브 모드는 계속 무료입니다."
         }
       }
     },
@@ -189,6 +253,10 @@
         "enabled": {
           "label": "啟用世界編輯器",
           "description": "控制世界編輯器功能是否啟用。"
+        },
+        "showCreativePurchaseCosts": {
+          "label": "顯示創造模式購買花費",
+          "description": "顯示普通模式的參考購買花費；創造模式仍然免費。"
         }
       }
     },
@@ -199,6 +267,10 @@
         "enabled": {
           "label": "เปิดใช้ตัวแก้ไขโลก",
           "description": "ควบคุมว่าจะเปิดใช้ฟีเจอร์ของตัวแก้ไขโลกหรือไม่"
+        },
+        "showCreativePurchaseCosts": {
+          "label": "แสดงค่าใช้จ่ายซื้อในโหมดสร้างสรรค์",
+          "description": "แสดงค่าใช้จ่ายอ้างอิงของโหมดปกติ โดยโหมดสร้างสรรค์ยังคงฟรี"
         }
       }
     },
@@ -209,6 +281,10 @@
         "enabled": {
           "label": "Világszerkesztő engedélyezése",
           "description": "A Világszerkesztő funkcióinak engedélyezését szabályozza."
+        },
+        "showCreativePurchaseCosts": {
+          "label": "Kreatív mód vásárlási költségeinek mutatása",
+          "description": "A normál mód referenciaárait mutatja; a kreatív mód továbbra is ingyenes."
         }
       }
     },
@@ -219,6 +295,10 @@
         "enabled": {
           "label": "Iespējot Pasaules redaktoru",
           "description": "Nosaka, vai Pasaules redaktora funkcijas ir iespējotas."
+        },
+        "showCreativePurchaseCosts": {
+          "label": "Rādīt radošā režīma pirkumu izmaksas",
+          "description": "Rāda parastā režīma atsauces izmaksas; radošais režīms paliek bezmaksas."
         }
       }
     },
@@ -229,6 +309,10 @@
         "enabled": {
           "label": "Activează Editorul de lume",
           "description": "Controlează dacă funcțiile Editorului de lume sunt active."
+        },
+        "showCreativePurchaseCosts": {
+          "label": "Arată costurile în modul creativ",
+          "description": "Arată costurile de referință din modul normal; modul creativ rămâne gratuit."
         }
       }
     },
@@ -239,6 +323,10 @@
         "enabled": {
           "label": "Aktiver Verdensredigerer",
           "description": "Styrer om funksjonene i Verdensredigereren er aktive."
+        },
+        "showCreativePurchaseCosts": {
+          "label": "Vis kjøpskostnader i kreativ modus",
+          "description": "Viser referansekostnader fra normal modus; kreativ modus forblir gratis."
         }
       }
     }

@@ -2,6 +2,7 @@ ModLoader.register({
 	id: 'Cattail_TweaksQuality_World-Editor',
 	init(api) {
 		const CREATIVE_KEY = Symbol.for('cattail.world-editor.creative-mode')
+		const CREATIVE_ECONOMY_KEY = Symbol.for('cattail.world-editor.creative-economy')
 		const SAVE_SLOTS_KEY = Symbol.for('cattail.better-uis.save-slots')
 		const SAVE_ID_PATTERN = /^[0-9a-f-]{16,128}$/i
 		const CONTROL_CHARACTER_PATTERN = /[\u0000-\u001f\u007f]/
@@ -96,6 +97,7 @@ ModLoader.register({
 				if (disposed) throw createError('NOT_READY', 'Creative mode is not available.')
 				if (!ready) throw error || createError('NOT_READY', 'Creative mode is not ready.')
 				if (busy) throw createError('BUSY', 'A creative-mode operation is already active.')
+				if (isEconomyBusy(game)) throw createError('BUSY', 'A creative shop operation is already active.')
 				if (!game || typeof game.saveGame !== 'function' || typeof game.decodeSave !== 'function') {
 					throw createError('NOT_READY', 'Saving is not available.')
 				}
@@ -165,6 +167,7 @@ ModLoader.register({
 			async function createFork(options) {
 				if (disposed || !ready) throw error || createError('NOT_READY', 'Creative mode is not ready.')
 				if (busy) throw createError('BUSY', 'A creative-mode operation is already active.')
+				if (isEconomyBusy(game)) throw createError('BUSY', 'A creative shop operation is already active.')
 				if (persisted.creativeMode) throw createError('INVALID_STATE', 'Creative mode is already enabled.')
 				if (game.preventSaving || game.preventCloud) throw createError('SAVING_BLOCKED', 'Saving is currently blocked.')
 				const originalName = normalizeOriginalName(options?.originalName)
@@ -265,6 +268,7 @@ ModLoader.register({
 				},
 				setDialogOpen(open, reason) {
 					if (disposed || (busy && !open)) return false
+					if (open && isEconomyBusy(game)) return false
 					const next = !!open
 					if (dialogOpen === next) return false
 					dialogOpen = next
@@ -306,6 +310,14 @@ ModLoader.register({
 				entryMode: value.entryMode === 'forked' ? 'forked' : value.entryMode === 'in-place' ? 'in-place' : null,
 				createdAt: finiteTimestamp(value.createdAt)
 			})
+		}
+
+		function isEconomyBusy(game) {
+			const economy = globalThis[CREATIVE_ECONOMY_KEY]
+			return !!(
+				economy?.game === game &&
+				(economy.isInputBlocked?.() || economy.snapshot?.().busy)
+			)
 		}
 
 		function defaultPersistedState() {
