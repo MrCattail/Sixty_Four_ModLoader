@@ -70,6 +70,52 @@ labels follow the current game language where ModLoader translations exist.
 The lower-left status line also shows the loader version, enabled mod count,
 and `Ctrl+M` reminder.
 
+## Storage Snapshot API
+
+ModLoader 0.2.0 exposes Storage API `1.0.0` to every bound Mod API. It stores
+opaque Mod-owned recovery data outside the game save without giving the Mod a
+filesystem path or a way to select another save:
+
+```js
+const snapshots = api.storage.snapshots
+
+const info = await snapshots.create({
+  data: JSON.stringify({ version: 1, selection }),
+  reason: 'before applying blueprint',
+  tags: { feature: 'world-editor' }
+})
+
+const newestFirst = await snapshots.list()
+const saved = await snapshots.read({ id: info.id })
+await snapshots.remove({ id: info.id })
+await snapshots.prune()
+```
+
+`data` accepts a UTF-8 string or `Uint8Array`; `read()` returns the same payload
+type. Each payload is limited to 16 MiB and each Mod/current-save namespace
+keeps at most 10 normal snapshots. `reason` is required and is limited to 128
+trimmed characters. Optional `tags` must be a small JSON-safe plain object.
+Call `snapshots.capabilities()` to discover the exact v1 limits and supported
+payload types.
+
+The active game save carries a stable `save.modloader.saveInstanceId`. ModLoader
+creates and persists it before enabling snapshot writes, binds it to the current
+trusted account or installation scope, and never accepts a save id from a Mod.
+A reset starts a new save lineage; older snapshots remain visible to the local
+administrator.
+
+Operations reject with `ModLoaderSnapshotError` and one of these stable codes:
+`UNAVAILABLE`, `NO_ACTIVE_SAVE`, `INVALID_PAYLOAD`, `TOO_LARGE`, `NOT_FOUND`,
+`CORRUPT`, `QUOTA`, or `IO`. Snapshot data is checksummed with SHA-256 and
+published atomically. Corrupt records are moved to a bounded quarantine area.
+Storage v1 deliberately provides no compression, encryption, streaming,
+automatic retry, import, or restore operation.
+
+Open `Ctrl+M` -> `Snapshots` to inspect every local Mod/save namespace, validate
+records, export a self-describing `.modloader-snapshot` file, or delete a record
+after confirmation. Quarantined data can be exported for forensic inspection.
+The page cannot import a file, restore a snapshot, or overwrite a Steam save.
+
 ## Game HUD API
 
 Press `H` in game to hide or restore the game HUD. ModLoader handles vanilla

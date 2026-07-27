@@ -18,11 +18,19 @@ resources/app/game/modloader/state/snapshots/
 
 ## Verify
 
-Checks that loader hook points still exist:
+Checks that loader hook points still exist, validates JavaScript syntax when
+Node.js is available, and runs the Render API plus Storage Snapshot API v1
+contract suites:
 
 ```powershell
 .\resources\app\game\modloader\tools\verify.ps1
 ```
+
+The three `snapshot-*-v1-contract.test.js` files test the public Storage API,
+binary export container, atomic store, namespace isolation, rotation,
+quarantine, and the management-page action boundary. These runtime snapshots
+are stored under Electron `userData/modloader/snapshots/`; they are separate
+from the integration backup made by `snapshot.ps1`.
 
 ## Report
 

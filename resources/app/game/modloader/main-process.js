@@ -1,7 +1,10 @@
 const { app, BrowserWindow, ipcMain, screen, dialog } = require('electron')
+const crypto = require('crypto')
 const fs = require('fs')
 const path = require('path')
 const { spawn } = require('child_process')
+const { SnapshotStore, SnapshotStoreError, safeMessageForCode } = require('./snapshot-store.js')
+const { encodeSnapshotContainer } = require('./snapshot-container.js')
 
 const runtimeLogPath = path.join(__dirname, 'state', 'runtime.log')
 function runtimeLog(...args){
@@ -104,9 +107,141 @@ function applyModloaderMainProcessManifests(){
 
 applyModloaderMainProcessManifests()
 const modloaderWindows = new Map()
+const snapshotContexts = new Map()
 let modloaderParentWindowState = null
 const modloaderWindowMargin = 12
 let win = null
+let snapshotStore = null
+let snapshotAccountScope = ''
+const snapshotSaveIdPattern = /^[a-f0-9]{8}-[a-f0-9]{4}-[1-5][a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/i
+
+function snapshotEnvelope(value){
+  return { ok: true, value }
+}
+
+function snapshotErrorEnvelope(error){
+  const allowed = new Set(['UNAVAILABLE', 'NO_ACTIVE_SAVE', 'INVALID_PAYLOAD', 'TOO_LARGE', 'NOT_FOUND', 'CORRUPT', 'QUOTA', 'IO'])
+  const code = allowed.has(error?.code) ? error.code : 'IO'
+  runtimeLog('snapshotRequestFailed', { code, internalCode: error?.code || '', message: error?.message || String(error) })
+  return { ok: false, error: { code, message: safeMessageForCode(code) } }
+}
+
+function installationIdentity(){
+  const directory = path.join(app.getPath('userData'), 'modloader')
+  const identityPath = path.join(directory, 'identity.json')
+  const existingIdentity = fs.existsSync(identityPath)
+  try {
+    const parsed = JSON.parse(fs.readFileSync(identityPath, 'utf8'))
+    if (parsed?.version === 1 && snapshotSaveIdPattern.test(String(parsed.id || ''))) return parsed.id
+  } catch (error) {}
+  const id = crypto.randomUUID()
+  const temporaryPath = identityPath + `.tmp-${process.pid}-${Date.now()}`
+  let corruptPath = ''
+  fs.mkdirSync(directory, { recursive: true })
+  try {
+    fs.writeFileSync(temporaryPath, JSON.stringify({ version: 1, id }, null, 2), { encoding: 'utf8', flag: 'wx' })
+    if (existingIdentity) {
+      corruptPath = identityPath + `.corrupt-${Date.now()}`
+      fs.renameSync(identityPath, corruptPath)
+      runtimeLog('snapshotInstallationIdentityReset', { reason: 'invalid-identity' })
+    }
+    fs.renameSync(temporaryPath, identityPath)
+  } catch (error) {
+    try { fs.rmSync(temporaryPath, { force: true }) } catch (cleanupError) {}
+    if (corruptPath && !fs.existsSync(identityPath)) {
+      try { fs.renameSync(corruptPath, identityPath) } catch (restoreError) {}
+    }
+    try {
+      const parsed = JSON.parse(fs.readFileSync(identityPath, 'utf8'))
+      if (parsed?.version === 1 && snapshotSaveIdPattern.test(String(parsed.id || ''))) return parsed.id
+    } catch (readError) {}
+    throw error
+  }
+  return id
+}
+
+function configureSnapshotStore(options){
+  const accountId = String(options?.accountId || '').trim()
+  try {
+    snapshotAccountScope = accountId ? `steam:${accountId}` : `installation:${installationIdentity()}`
+    snapshotStore = new SnapshotStore({
+      rootDir: path.join(app.getPath('userData'), 'modloader', 'snapshots'),
+      log(event, details) { runtimeLog(event, details) }
+    })
+    snapshotStore.initialize().catch(error=>{
+      runtimeLog('snapshotStoreInitializationFailed', { code: error?.code || 'IO', message: error?.message || String(error) })
+    })
+  } catch (error) {
+    snapshotAccountScope = ''
+    snapshotStore = null
+    runtimeLog('snapshotStoreConfigurationFailed', { code: error?.code || 'IO', message: error?.message || String(error) })
+  }
+}
+
+function snapshotSenderKey(sender){
+  return String(sender?.id ?? '')
+}
+
+function clearSnapshotContext(sender){
+  const key = typeof sender === 'string' || typeof sender === 'number' ? String(sender) : snapshotSenderKey(sender)
+  if (key) snapshotContexts.delete(key)
+}
+
+function activeSnapshotContext(event, token){
+  const key = snapshotSenderKey(event?.sender)
+  const context = key ? snapshotContexts.get(key) : null
+  if (!context || context.token !== String(token || '')) {
+    throw new SnapshotStoreError('NO_ACTIVE_SAVE', 'No active save is available.')
+  }
+  return context
+}
+
+function snapshotRuntimeContext(event, payload){
+  const active = activeSnapshotContext(event, payload?.token)
+  const modId = String(payload?.modId || '').trim()
+  if (!modId) throw new SnapshotStoreError('INVALID_PAYLOAD', 'Snapshot Mod identity is invalid.')
+  return {
+    modId,
+    saveInstanceId: active.saveInstanceId,
+    accountScope: snapshotAccountScope
+  }
+}
+
+function sanitizeSnapshotFilePart(value, fallback){
+  const safe = String(value || '').trim().replace(/[^a-z0-9._-]+/gi, '-').replace(/^-+|-+$/g, '').slice(0, 72)
+  return safe || fallback
+}
+
+function snapshotExportFileName(record){
+  const item = record?.item || {}
+  const date = new Date(Number(item.createdAt) || Date.now())
+  const pad = value=>String(value).padStart(2, '0')
+  const stamp = `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}_${pad(date.getHours())}-${pad(date.getMinutes())}-${pad(date.getSeconds())}`
+  const mod = sanitizeSnapshotFilePart(item.modId, 'mod')
+  const id = sanitizeSnapshotFilePart(item.id, 'snapshot').slice(-20)
+  return `${mod}_${stamp}_${id}.modloader-snapshot`
+}
+
+function snapshotContainerMetadata(record){
+  const metadata = record?.metadata || {}
+  return {
+    exportedAt: Date.now(),
+    snapshot: {
+      id: metadata.id || record?.item?.id || '',
+      createdAt: Number(metadata.createdAt || record?.item?.createdAt || 0),
+      modId: metadata.modId || record?.item?.modId || '',
+      saveInstanceId: metadata.saveInstanceId || '',
+      namespace: record?.item?.namespace || '',
+      bytes: Number(metadata.bytes || record?.payload?.length || 0),
+      sha256: metadata.sha256 || '',
+      apiVersion: metadata.apiVersion || '1.0.0',
+      payloadType: metadata.payloadType === 'utf8' ? 'utf8' : 'bytes',
+      reason: metadata.reason || '',
+      tags: metadata.tags
+    },
+    integrity: record?.integrity || { status: 'unknown' }
+  }
+}
 function getModloaderWindowWorkArea(bounds){
   try {
     const baseBounds = bounds || win?.getBounds?.()
@@ -391,6 +526,99 @@ function normalizeModloaderDialogOptions(options){
   return options && typeof options === 'object' ? options : {}
 }
 
+ipcMain.handle(`modloader:snapshots:activate`, async (event, payload)=>{
+  try {
+    if (!snapshotStore || !snapshotAccountScope) throw new SnapshotStoreError('UNAVAILABLE', 'Snapshot storage is unavailable.')
+    const saveInstanceId = String(payload?.saveInstanceId || '').trim().toLowerCase()
+    if (!snapshotSaveIdPattern.test(saveInstanceId)) throw new SnapshotStoreError('NO_ACTIVE_SAVE', 'No active save is available.')
+    await snapshotStore.initialize()
+    const key = snapshotSenderKey(event?.sender)
+    if (!key) throw new SnapshotStoreError('UNAVAILABLE', 'Snapshot storage is unavailable.')
+    const token = crypto.randomUUID()
+    snapshotContexts.set(key, { saveInstanceId, token })
+    if (event?.sender?.once) event.sender.once('destroyed', ()=>clearSnapshotContext(key))
+    return snapshotEnvelope({
+      token,
+      saveInstanceId,
+      capabilities: Object.assign({}, snapshotStore.capabilities(), { activeSave: true })
+    })
+  } catch (error) {
+    return snapshotErrorEnvelope(error)
+  }
+})
+
+ipcMain.handle(`modloader:snapshots:runtime`, async (event, payload)=>{
+  try {
+    if (!snapshotStore) throw new SnapshotStoreError('UNAVAILABLE', 'Snapshot storage is unavailable.')
+    const action = String(payload?.action || '')
+    if (action === 'capabilities') {
+      const key = snapshotSenderKey(event?.sender)
+      const active = key ? snapshotContexts.get(key) : null
+      return snapshotEnvelope(Object.assign({}, snapshotStore.capabilities(), {
+        activeSave: !!active,
+        available: true
+      }))
+    }
+    const context = snapshotRuntimeContext(event, payload)
+    let result
+    if (action === 'create') result = await snapshotStore.create(context, payload?.request)
+    else if (action === 'list') result = await snapshotStore.list(context)
+    else if (action === 'read') {
+      const record = await snapshotStore.read(context, payload?.request)
+      result = {
+        info: record.info,
+        data: record.info.payloadType === 'utf8' ? record.payload.toString('utf8') : Uint8Array.from(record.payload)
+      }
+    } else if (action === 'remove') result = await snapshotStore.remove(context, payload?.request)
+    else if (action === 'prune') result = await snapshotStore.prune(context)
+    else throw new SnapshotStoreError('INVALID_PAYLOAD', 'Snapshot request is invalid.')
+    return snapshotEnvelope(result)
+  } catch (error) {
+    return snapshotErrorEnvelope(error)
+  }
+})
+
+ipcMain.handle(`modloader:snapshots:admin`, async (event, payload)=>{
+  try {
+    if (!snapshotStore) throw new SnapshotStoreError('UNAVAILABLE', 'Snapshot storage is unavailable.')
+    const action = String(payload?.action || '')
+    let result
+    if (action === 'list') result = await snapshotStore.adminList()
+    else if (action === 'validate') result = await snapshotStore.adminValidate(payload?.locator)
+    else if (action === 'remove') result = await snapshotStore.adminRemove(payload?.locator)
+    else if (action === 'export') {
+      const record = await snapshotStore.adminExportData(payload?.locator)
+      const container = encodeSnapshotContainer({
+        metadata: snapshotContainerMetadata(record),
+        payload: record.payload
+      })
+      const parent = getModloaderDialogParent(event)
+      const defaultPath = snapshotExportFileName(record)
+      const dialogOptions = {
+        title: 'Export ModLoader Snapshot',
+        defaultPath,
+        filters: [
+          { name: 'ModLoader Snapshot', extensions: ['modloader-snapshot'] },
+          { name: 'All Files', extensions: ['*'] }
+        ]
+      }
+      const selected = parent ? await dialog.showSaveDialog(parent, dialogOptions) : await dialog.showSaveDialog(dialogOptions)
+      if (selected?.canceled || !selected?.filePath) return snapshotEnvelope({ canceled: true })
+      await fs.promises.writeFile(selected.filePath, container)
+      runtimeLog('snapshotExported', {
+        status: record.status,
+        id: record.item?.id || '',
+        bytes: container.length,
+        fileName: path.basename(selected.filePath)
+      })
+      result = { canceled: false, fileName: path.basename(selected.filePath), bytes: container.length }
+    } else throw new SnapshotStoreError('INVALID_PAYLOAD', 'Snapshot request is invalid.')
+    return snapshotEnvelope(result)
+  } catch (error) {
+    return snapshotErrorEnvelope(error)
+  }
+})
+
 ipcMain.handle(`modloader:dialog:save`, async (event, options)=>{
   const parent = getModloaderDialogParent(event)
   const dialogOptions = normalizeModloaderDialogOptions(options)
@@ -538,11 +766,15 @@ ipcMain.on(`modloader:window:close`, (event, payload)=>{
   const id = record?.id || String(payload?.id || '')
   if (id) closeModloaderWindow(id)
 })
-function attachWindow(parentWindow){
+function attachWindow(parentWindow, options){
   win = parentWindow
+  configureSnapshotStore(options)
+  const sender = win?.webContents
+  if (sender?.once) sender.once('destroyed', ()=>clearSnapshotContext(sender))
 }
 
 module.exports = {
   attachWindow,
+  clearSnapshotContext,
   runtimeLog
 }

@@ -2,7 +2,7 @@
 	'use strict'
 
 	const state = {
-		version: '0.1.4',
+		version: '0.2.0',
 		booted: false,
 		mods: [],
 		modById: {},
@@ -88,7 +88,20 @@
 		renderTimingEntityDepth: 0,
 		renderTimingEntityDetailMethods: [],
 		renderTimingPatchedEntityMethods: [],
-		renderTimingEntityPrototypeMarks: null
+		renderTimingEntityPrototypeMarks: null,
+		snapshotIpcRenderer: undefined,
+		snapshotSaveInstanceId: '',
+		snapshotIdentityNeedsPersistence: false,
+		snapshotContextToken: '',
+		snapshotContextReady: false,
+		snapshotContextGame: null,
+		snapshotCapabilities: null,
+		snapshotIssueReported: false,
+		snapshotPanelOpen: false,
+		snapshotPanelItems: [],
+		snapshotPanelLoading: false,
+		snapshotPanelLoaded: false,
+		snapshotPanelMessage: ''
 	}
 
 	const addIssue = function (level, code, message, details) {
@@ -3464,7 +3477,35 @@
 		translationImportSkipMods: 'Do not write',
 		translationImportWriteModsResult: 'Mod write-back: {written} written, {unchanged} already current, {failed} failed.',
 		translationImportNoMatchingMods: 'No installed mod.json matched the imported mod entries.',
-		translationImportModFailures: 'Failures: {failures}'
+		translationImportModFailures: 'Failures: {failures}',
+		snapshots: 'Snapshots',
+		snapshotsTitle: 'Snapshot Management',
+		snapshotsOpenTitle: 'Manage Mod snapshots',
+		snapshotsBack: 'Back to Mod Manager',
+		snapshotsRefresh: 'Refresh',
+		snapshotsLoading: 'Loading snapshots...',
+		snapshotsEmpty: 'No snapshots or quarantined records were found.',
+		snapshotsSummary: '{ready} ready, {quarantined} quarantined',
+		snapshotReady: 'Ready',
+		snapshotQuarantined: 'Quarantined',
+		snapshotValidate: 'Validate',
+		snapshotExport: 'Export',
+		snapshotDelete: 'Delete',
+		snapshotDeleteTitle: 'Delete Snapshot?',
+		snapshotDeleteMessage: 'Delete snapshot {id} for {mod}? This cannot be undone.',
+		snapshotDeleted: 'Deleted snapshot {id}.',
+		snapshotValid: 'Snapshot {id} passed integrity validation.',
+		snapshotInvalid: 'Snapshot {id} failed validation and is quarantined.',
+		snapshotExported: 'Exported {file}.',
+		snapshotExportCanceled: 'Snapshot export canceled.',
+		snapshotActionFailed: 'Snapshot action failed: {value}',
+		snapshotNamespace: 'Save namespace',
+		snapshotBytes: 'Payload',
+		snapshotCreated: 'Created',
+		snapshotReason: 'Reason',
+		snapshotTags: 'Tags',
+		snapshotNoReason: 'No reason metadata',
+		snapshotDetectedReason: 'Detected issue'
 	})
 	Object.assign(PANEL_TEXT.sch, {
 		devTools: 'DevTools',
@@ -3489,7 +3530,35 @@
 		translationImportSkipMods: '\u4e0d\u5199\u5165 mod',
 		translationImportWriteModsResult: 'mod \u5199\u56de\uff1a\u5df2\u5199\u5165 {written}\uff0c\u5df2\u662f\u6700\u65b0 {unchanged}\uff0c\u5931\u8d25 {failed}\u3002',
 		translationImportNoMatchingMods: '\u6ca1\u6709\u5df2\u5b89\u88c5\u7684 mod.json \u5339\u914d\u5bfc\u5165\u6587\u4ef6\u4e2d\u7684 mod \u6761\u76ee\u3002',
-		translationImportModFailures: '\u5931\u8d25\uff1a{failures}'
+		translationImportModFailures: '\u5931\u8d25\uff1a{failures}',
+		snapshots: '\u5feb\u7167',
+		snapshotsTitle: '\u5feb\u7167\u7ba1\u7406',
+		snapshotsOpenTitle: '\u7ba1\u7406 Mod \u5feb\u7167',
+		snapshotsBack: '\u8fd4\u56de Mod \u7ba1\u7406',
+		snapshotsRefresh: '\u5237\u65b0',
+		snapshotsLoading: '\u6b63\u5728\u52a0\u8f7d\u5feb\u7167\u2026\u2026',
+		snapshotsEmpty: '\u6ca1\u6709\u627e\u5230\u5feb\u7167\u6216\u9694\u79bb\u8bb0\u5f55\u3002',
+		snapshotsSummary: '\u6b63\u5e38 {ready} \u4e2a\uff0c\u9694\u79bb {quarantined} \u4e2a',
+		snapshotReady: '\u6b63\u5e38',
+		snapshotQuarantined: '\u5df2\u9694\u79bb',
+		snapshotValidate: '\u9a8c\u8bc1',
+		snapshotExport: '\u5bfc\u51fa',
+		snapshotDelete: '\u5220\u9664',
+		snapshotDeleteTitle: '\u5220\u9664\u5feb\u7167\uff1f',
+		snapshotDeleteMessage: '\u5220\u9664 {mod} \u7684\u5feb\u7167 {id}\uff1f\u8fd9\u4e2a\u64cd\u4f5c\u4e0d\u80fd\u64a4\u9500\u3002',
+		snapshotDeleted: '\u5df2\u5220\u9664\u5feb\u7167 {id}\u3002',
+		snapshotValid: '\u5feb\u7167 {id} \u901a\u8fc7\u5b8c\u6574\u6027\u9a8c\u8bc1\u3002',
+		snapshotInvalid: '\u5feb\u7167 {id} \u9a8c\u8bc1\u5931\u8d25\uff0c\u5df2\u79fb\u5165\u9694\u79bb\u533a\u3002',
+		snapshotExported: '\u5df2\u5bfc\u51fa {file}\u3002',
+		snapshotExportCanceled: '\u5df2\u53d6\u6d88\u5feb\u7167\u5bfc\u51fa\u3002',
+		snapshotActionFailed: '\u5feb\u7167\u64cd\u4f5c\u5931\u8d25\uff1a{value}',
+		snapshotNamespace: '\u5b58\u6863\u547d\u540d\u7a7a\u95f4',
+		snapshotBytes: '\u8d1f\u8f7d',
+		snapshotCreated: '\u521b\u5efa\u65f6\u95f4',
+		snapshotReason: '\u539f\u56e0',
+		snapshotTags: '\u6807\u7b7e',
+		snapshotNoReason: '\u65e0\u539f\u56e0\u5143\u6570\u636e',
+		snapshotDetectedReason: '\u68c0\u6d4b\u5230\u7684\u95ee\u9898'
 	})
 	PANEL_TEXT.modsch = PANEL_TEXT.sch
 	PANEL_TEXT.tch = PANEL_TEXT.sch
@@ -3818,6 +3887,9 @@
 			#modloader-panel .modloader-action-icon-plus:after { transform: translate(-50%, -50%) rotate(90deg); }
 			#modloader-panel .modloader-action-icon-folder { width: 16px; height: 12px; margin-top: 3px; border-radius: 3px; background: currentColor; }
 			#modloader-panel .modloader-action-icon-folder:before { content: ''; position: absolute; left: 2px; top: -2px; width: 6px; height: 3px; border-radius: 2px 2px 0 0; background: currentColor; }
+			#modloader-panel .modloader-action-icon-snapshots:before, #modloader-panel .modloader-action-icon-snapshots:after { content: ''; position: absolute; box-sizing: border-box; width: 12px; height: 9px; border: 1.5px solid currentColor; border-radius: 2px; }
+			#modloader-panel .modloader-action-icon-snapshots:before { left: 1px; top: 1px; opacity: .56; }
+			#modloader-panel .modloader-action-icon-snapshots:after { left: 3px; top: 5px; background: var(--modloader-control-bg); }
 			#modloader-panel .modloader-action-icon-translation:before { content: 'Aa'; position: absolute; left: 50%; top: 50%; transform: translate(-50%, -52%); font: 700 10px/1 Montserrat, Arial, sans-serif; letter-spacing: -.5px; }
 			#modloader-panel .modloader-action-icon-export:before, #modloader-panel .modloader-action-icon-import:before { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -55%); font: 700 13px/1 Montserrat, Arial, sans-serif; }
 			#modloader-panel .modloader-action-icon-export:before { content: '\\2191'; }
@@ -3838,6 +3910,32 @@
 			#modloader-panel .modloader-mod-manager::-webkit-scrollbar-track { background: transparent; }
 			#modloader-panel .modloader-mod-manager::-webkit-scrollbar-thumb { border-radius: 999px; background: rgba(185,185,185,.48); }
 			#modloader-panel .modloader-mod-manager::-webkit-scrollbar-thumb:hover { background: rgba(210,210,210,.62); }
+			#modloader-panel .modloader-snapshot-page { display: grid; gap: 10px; min-height: 0; }
+			#modloader-panel .modloader-snapshot-toolbar { position: sticky; top: -14px; z-index: 2; display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 2px -2px 0; padding: 8px 2px; background: var(--modloader-panel-bg); }
+			#modloader-panel .modloader-snapshot-title { margin: 0; color: var(--modloader-text-strong); font-size: 15px; }
+			#modloader-panel .modloader-snapshot-toolbar-actions, #modloader-panel .modloader-snapshot-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; }
+			#modloader-panel .modloader-snapshot-message, #modloader-panel .modloader-snapshot-summary, #modloader-panel .modloader-snapshot-empty { color: var(--modloader-text-muted); }
+			#modloader-panel .modloader-snapshot-message:empty { display: none; }
+			#modloader-panel .modloader-snapshot-list { display: grid; gap: 7px; max-height: min(58vh, 560px); overflow-x: hidden; overflow-y: auto; padding-right: 5px; scrollbar-gutter: stable; scrollbar-width: thin; scrollbar-color: rgba(185,185,185,.48) transparent; }
+			#modloader-panel .modloader-snapshot-list::-webkit-scrollbar { width: 4px; }
+			#modloader-panel .modloader-snapshot-list::-webkit-scrollbar-track { background: transparent; }
+			#modloader-panel .modloader-snapshot-list::-webkit-scrollbar-thumb { border-radius: 999px; background: rgba(185,185,185,.48); }
+			#modloader-panel .modloader-snapshot-list::-webkit-scrollbar-thumb:hover { background: rgba(210,210,210,.62); }
+			#modloader-panel .modloader-snapshot-item { display: grid; gap: 7px; border: 1px solid var(--modloader-border); border-radius: 7px; padding: 9px; background: var(--modloader-surface); }
+			#modloader-panel .modloader-snapshot-item-quarantined { border-color: var(--modloader-danger-border); background: var(--modloader-danger-bg); }
+			#modloader-panel .modloader-snapshot-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+			#modloader-panel .modloader-snapshot-name { min-width: 0; color: var(--modloader-text-strong); font-weight: 600; overflow-wrap: anywhere; }
+			#modloader-panel .modloader-snapshot-id { display: block; margin-top: 2px; color: var(--modloader-text-subtle); font: 10px/1.35 Consolas, monospace; }
+			#modloader-panel .modloader-snapshot-badge { flex: 0 0 auto; border: 1px solid var(--modloader-border-strong); border-radius: 999px; padding: 2px 7px; color: var(--modloader-ok-text); font-size: 10px; }
+			#modloader-panel .modloader-snapshot-badge-quarantined { border-color: var(--modloader-danger-border); color: var(--modloader-danger-text); }
+			#modloader-panel .modloader-snapshot-meta { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 5px 10px; color: var(--modloader-text-muted); font-size: 11px; }
+			#modloader-panel .modloader-snapshot-meta strong { display: block; margin-bottom: 1px; color: var(--modloader-text-subtle); font-weight: 500; }
+			#modloader-panel .modloader-snapshot-reason { color: var(--modloader-text); overflow-wrap: anywhere; }
+			#modloader-panel .modloader-snapshot-detected { color: var(--modloader-danger-text); overflow-wrap: anywhere; }
+			#modloader-panel .modloader-snapshot-tags { color: var(--modloader-text-muted); }
+			#modloader-panel .modloader-snapshot-tags summary { cursor: pointer; user-select: none; }
+			#modloader-panel .modloader-snapshot-tags pre { max-height: 150px; margin: 5px 0 0; overflow: auto; border-radius: 5px; padding: 7px; background: var(--modloader-surface-hover); color: var(--modloader-text); white-space: pre-wrap; overflow-wrap: anywhere; }
+			#modloader-panel .modloader-snapshot-empty { border: 1px dashed var(--modloader-border-strong); border-radius: 7px; padding: 22px 12px; text-align: center; }
 			#modloader-panel .modloader-mod-row { --modloader-row-gap: 10px; --modloader-row-padding: 9px; --modloader-row-radius: 7px; --modloader-row-font-size: 13px; --modloader-row-check-offset: 2px; --modloader-row-actions-gap: 2px; --modloader-row-index-width: 13px; --modloader-row-index-size: 11px; --modloader-row-action-size: 25px; --modloader-row-action-radius: 5px; --modloader-row-sort-x: 7px; --modloader-row-sort-y: 7px; --modloader-row-sort-width: 11px; --modloader-row-sort-height: 2px; --modloader-row-sort-shadow-1: 5px; --modloader-row-sort-shadow-2: 10px; --modloader-row-delete-body-x: 8px; --modloader-row-delete-body-y: 9px; --modloader-row-delete-body-width: 9px; --modloader-row-delete-body-height: 10px; --modloader-row-delete-border: 2px; --modloader-row-delete-radius-small: 1px; --modloader-row-delete-radius-large: 3px; --modloader-row-delete-lid-x: 7px; --modloader-row-delete-lid-y: 6px; --modloader-row-delete-lid-width: 11px; --modloader-row-delete-lid-height: 2px; --modloader-row-delete-lid-shadow-x: 3px; --modloader-row-delete-lid-shadow-y: -3px; --modloader-row-delete-lid-shadow-spread: -1px; --modloader-row-title-gap: 8px; --modloader-row-meta-gap: 3px; --modloader-row-warning-gap: 5px; --modloader-row-switch-width: 46px; --modloader-row-switch-height: 24px; --modloader-row-switch-knob: 20px; --modloader-row-switch-pad: 2px; --modloader-row-switch-slide: 22px; --modloader-row-switch-label-off: 6px; --modloader-row-switch-label-on: 7px; --modloader-row-switch-label-size: 9px; --modloader-row-switch-letter-spacing: .25px; position: relative; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: var(--modloader-row-gap); align-items: flex-start; padding: var(--modloader-row-padding); border: 1px solid var(--modloader-border); border-radius: var(--modloader-row-radius); background: var(--modloader-surface); font-size: var(--modloader-row-font-size); line-height: 1.45; transition: border-color .14s ease, background .14s ease, box-shadow .14s ease, opacity .14s ease; }
 			#modloader-panel .modloader-mod-row-configurable { cursor: pointer; }
 			#modloader-panel .modloader-mod-row-configurable:hover { border-color: var(--modloader-control-border-hover); }
@@ -3991,6 +4089,7 @@
 			#modloader-panel .modloader-modal-button-danger { background: var(--modloader-danger-bg); color: var(--modloader-danger-text); border-color: var(--modloader-danger-border); }
 			@media (max-width: 640px) {
 				#modloader-panel .modloader-panel-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+				#modloader-panel .modloader-snapshot-meta { grid-template-columns: 1fr; }
 				#modloader-panel .modloader-config-field { grid-template-columns: 1fr; }
 				#modloader-panel .modloader-config-error { grid-column: auto; }
 			}
@@ -6950,6 +7049,184 @@
 		}, true)
 		addCleanup(clearDrag)
 	}
+
+	const snapshotAdminRequest = function (action, locator) {
+		return invokeSnapshotIpc('modloader:snapshots:admin', { action, locator })
+	}
+
+	const formatSnapshotDate = function (value) {
+		const date = new Date(Number(value) || 0)
+		if (!Number.isFinite(date.getTime()) || date.getTime() <= 0) return '-'
+		try {
+			return date.toLocaleString()
+		} catch (error) {
+			return date.toISOString()
+		}
+	}
+
+	const formatSnapshotBytes = function (value) {
+		let bytes = Math.max(0, Number(value) || 0)
+		if (bytes < 1024) return `${bytes} B`
+		const units = ['KiB', 'MiB', 'GiB']
+		let unit = -1
+		do {
+			bytes /= 1024
+			unit++
+		} while (bytes >= 1024 && unit < units.length - 1)
+		return `${bytes >= 10 ? bytes.toFixed(1) : bytes.toFixed(2)} ${units[unit]}`
+	}
+
+	const loadSnapshotPanelItems = async function () {
+		if (state.snapshotPanelLoading) return
+		state.snapshotPanelLoading = true
+		try {
+			const items = await snapshotAdminRequest('list')
+			state.snapshotPanelItems = Array.isArray(items) ? items : []
+			state.snapshotPanelLoaded = true
+		} catch (error) {
+			state.snapshotPanelItems = []
+			state.snapshotPanelLoaded = true
+			state.snapshotPanelMessage = t('snapshotActionFailed', { value: error.message })
+		} finally {
+			state.snapshotPanelLoading = false
+			if (state.snapshotPanelOpen && document.getElementById('modloader-panel')) renderPanel()
+		}
+	}
+
+	const snapshotMetaCell = function (label, value) {
+		const cell = element('span')
+		cell.appendChild(element('strong', '', label))
+		cell.appendChild(document.createTextNode(value))
+		return cell
+	}
+
+	const runSnapshotPanelAction = async function (button, action) {
+		button.disabled = true
+		try {
+			await action()
+		} catch (error) {
+			state.snapshotPanelMessage = t('snapshotActionFailed', { value: error.message })
+			renderPanel()
+		}
+	}
+
+	const createSnapshotPanelItem = function (panel, item) {
+		const quarantined = item?.status === 'quarantined'
+		const card = element('article', 'modloader-snapshot-item' + (quarantined ? ' modloader-snapshot-item-quarantined' : ''))
+		const heading = element('div', 'modloader-snapshot-heading')
+		const name = element('div', 'modloader-snapshot-name', item?.modId || 'unknown')
+		name.appendChild(element('span', 'modloader-snapshot-id', item?.id || '-'))
+		const badge = element('span', 'modloader-snapshot-badge' + (quarantined ? ' modloader-snapshot-badge-quarantined' : ''), quarantined ? t('snapshotQuarantined') : t('snapshotReady'))
+		heading.append(name, badge)
+		card.appendChild(heading)
+
+		const meta = element('div', 'modloader-snapshot-meta')
+		meta.append(
+			snapshotMetaCell(t('snapshotCreated'), formatSnapshotDate(item?.createdAt)),
+			snapshotMetaCell(t('snapshotNamespace'), item?.namespace || '-'),
+			snapshotMetaCell(t('snapshotBytes'), `${formatSnapshotBytes(item?.bytes)} / ${item?.payloadType || 'bytes'}`)
+		)
+		card.appendChild(meta)
+		card.appendChild(element('div', 'modloader-snapshot-reason', `${t('snapshotReason')}: ${item?.reason || t('snapshotNoReason')}`))
+		if (quarantined && item?.detectedReason) {
+			card.appendChild(element('div', 'modloader-snapshot-detected', `${t('snapshotDetectedReason')}: ${item.detectedReason}`))
+		}
+		if (item?.tags && Object.keys(item.tags).length) {
+			const details = element('details', 'modloader-snapshot-tags')
+			details.appendChild(element('summary', '', t('snapshotTags')))
+			details.appendChild(element('pre', '', JSON.stringify(item.tags, null, 2)))
+			card.appendChild(details)
+		}
+
+		const actions = element('div', 'modloader-snapshot-actions')
+		const validate = element('button', 'modloader-action-button', t('snapshotValidate'))
+		validate.type = 'button'
+		validate.onclick = function (event) {
+			event.preventDefault()
+			runSnapshotPanelAction(validate, async function () {
+				const result = await snapshotAdminRequest('validate', item.locator)
+				state.snapshotPanelMessage = t(result?.valid ? 'snapshotValid' : 'snapshotInvalid', { id: item.id || '-' })
+				state.snapshotPanelLoaded = false
+				await loadSnapshotPanelItems()
+			})
+		}
+		const exportButton = element('button', 'modloader-action-button', t('snapshotExport'))
+		exportButton.type = 'button'
+		exportButton.onclick = function (event) {
+			event.preventDefault()
+			runSnapshotPanelAction(exportButton, async function () {
+				const result = await snapshotAdminRequest('export', item.locator)
+				state.snapshotPanelMessage = result?.canceled
+					? t('snapshotExportCanceled')
+					: t('snapshotExported', { file: result?.fileName || '-' })
+				renderPanel()
+			})
+		}
+		const remove = element('button', 'modloader-action-button', t('snapshotDelete'))
+		remove.type = 'button'
+		remove.onclick = async function (event) {
+			event.preventDefault()
+			const confirmed = await showPanelConfirm(panel, {
+				title: t('snapshotDeleteTitle'),
+				message: t('snapshotDeleteMessage', { id: item?.id || '-', mod: item?.modId || 'unknown' }),
+				confirmText: t('snapshotDelete'),
+				danger: true
+			})
+			if (!confirmed) return
+			runSnapshotPanelAction(remove, async function () {
+				await snapshotAdminRequest('remove', item.locator)
+				state.snapshotPanelMessage = t('snapshotDeleted', { id: item?.id || '-' })
+				state.snapshotPanelLoaded = false
+				await loadSnapshotPanelItems()
+			})
+		}
+		actions.append(validate, exportButton, remove)
+		card.appendChild(actions)
+		return card
+	}
+
+	const renderSnapshotPanelPage = function (panel) {
+		const page = element('section', 'modloader-snapshot-page')
+		const toolbar = element('div', 'modloader-snapshot-toolbar')
+		toolbar.appendChild(element('h3', 'modloader-snapshot-title', t('snapshotsTitle')))
+		const toolbarActions = element('div', 'modloader-snapshot-toolbar-actions')
+		const back = element('button', 'modloader-action-button', t('snapshotsBack'))
+		back.type = 'button'
+		back.onclick = function (event) {
+			event.preventDefault()
+			state.snapshotPanelOpen = false
+			renderPanel()
+		}
+		const refresh = element('button', 'modloader-action-button', t('snapshotsRefresh'))
+		refresh.type = 'button'
+		refresh.disabled = state.snapshotPanelLoading
+		refresh.onclick = function (event) {
+			event.preventDefault()
+			state.snapshotPanelMessage = ''
+			state.snapshotPanelLoaded = false
+			renderPanel()
+		}
+		toolbarActions.append(back, refresh)
+		toolbar.appendChild(toolbarActions)
+		page.appendChild(toolbar)
+
+		const ready = state.snapshotPanelItems.filter(function (item) { return item?.status === 'ready' }).length
+		const quarantined = state.snapshotPanelItems.filter(function (item) { return item?.status === 'quarantined' }).length
+		page.appendChild(element('div', 'modloader-snapshot-summary', t('snapshotsSummary', { ready, quarantined })))
+		page.appendChild(element('div', 'modloader-snapshot-message', state.snapshotPanelMessage || ''))
+		if (!state.snapshotPanelLoaded || state.snapshotPanelLoading) {
+			page.appendChild(element('div', 'modloader-snapshot-empty', t('snapshotsLoading')))
+		} else if (!state.snapshotPanelItems.length) {
+			page.appendChild(element('div', 'modloader-snapshot-empty', t('snapshotsEmpty')))
+		} else {
+			const list = element('div', 'modloader-snapshot-list')
+			for (const item of state.snapshotPanelItems) list.appendChild(createSnapshotPanelItem(panel, item))
+			page.appendChild(list)
+		}
+		panel.appendChild(page)
+		if (!state.snapshotPanelLoaded && !state.snapshotPanelLoading) loadSnapshotPanelItems()
+	}
+
 	const renderPanel = function () {
 		if (!document.body) return
 		loadPanelState()
@@ -7010,6 +7287,13 @@
 		settings.onclick = function (event) {
 			event.preventDefault()
 			event.stopPropagation()
+			if (state.snapshotPanelOpen) {
+				state.snapshotPanelOpen = false
+				state.panelSettingsOpen = true
+				savePanelState()
+				renderPanel()
+				return
+			}
 			togglePanelSettingsPage(panel)
 		}
 		const hide = element('button', 'modloader-panel-edge')
@@ -7031,6 +7315,7 @@
 		close.onclick = function () {
 			state.panelHidden = false
 			state.panelSettingsOpen = false
+			state.snapshotPanelOpen = false
 			savePanelState({ restoreAsTab: false })
 			if (panel.__modloaderCleanup) panel.__modloaderCleanup()
 			panel.remove()
@@ -7198,6 +7483,14 @@
 			clearPanelAutoHideTimer()
 		})
 
+		if (state.snapshotPanelOpen) {
+			renderSnapshotPanelPage(panel)
+			applyPanelStoredPosition(panel)
+			rememberVisiblePanelRestoreTab(panel)
+			savePanelState()
+			return
+		}
+
 		if (state.issues.length) {
 			const issues = element('ul', 'modloader-panel-issues')
 			for (const issue of state.issues) {
@@ -7260,6 +7553,7 @@
 		cancelChanges.setAttribute('aria-label', t('cancel'))
 		const insert = createPanelActionButton('plus', t('insert'), t('insert'))
 		const folder = createPanelActionButton('folder', t('folder'), t('folder'))
+		const snapshots = createPanelActionButton('snapshots', t('snapshots'), t('snapshotsOpenTitle'))
 		save.disabled = true
 		cancelChanges.disabled = true
 		insert.disabled = !getModFileTools()
@@ -7273,9 +7567,17 @@
 		selectAll.setAttribute('aria-label', t('selectAll'))
 		selectAllWrap.append(selectAll, element('span', 'modloader-select-all-text', t('selectAll')))
 		left.append(selectAllWrap, note, document.createTextNode(' '), reloadNote, document.createTextNode(' '), configNote, document.createTextNode(' '), message)
-		actions.append(cancelChanges, insert, folder, save)
+		actions.append(cancelChanges, snapshots, insert, folder, save)
 		toolbar.append(left, actions)
 		panel.appendChild(toolbar)
+		snapshots.onclick = function (event) {
+			event.preventDefault()
+			state.panelSettingsOpen = false
+			state.snapshotPanelOpen = true
+			state.snapshotPanelLoaded = false
+			state.snapshotPanelMessage = ''
+			renderPanel()
+		}
 
 		const list = element('div', 'modloader-mod-manager')
 		panel.appendChild(list)
@@ -8255,6 +8557,7 @@
 		if (panel) {
 			state.panelHidden = false
 			state.panelSettingsOpen = false
+			state.snapshotPanelOpen = false
 			savePanelState({ restoreAsTab: false })
 			if (panel.__modloaderCleanup) panel.__modloaderCleanup()
 			panel.remove()
@@ -8551,6 +8854,178 @@
 		return current
 	}
 
+	const SNAPSHOT_API_VERSION = '1.0.0'
+	const SNAPSHOT_SAVE_ID_PATTERN = /^[a-f0-9]{8}-[a-f0-9]{4}-[1-5][a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/i
+	const SNAPSHOT_ERROR_CODES = new Set(['UNAVAILABLE', 'NO_ACTIVE_SAVE', 'INVALID_PAYLOAD', 'TOO_LARGE', 'NOT_FOUND', 'CORRUPT', 'QUOTA', 'IO'])
+
+	class ModLoaderSnapshotError extends Error {
+		constructor(code, message) {
+			super(message)
+			this.name = 'ModLoaderSnapshotError'
+			this.code = SNAPSHOT_ERROR_CODES.has(code) ? code : 'IO'
+		}
+	}
+
+	const createSnapshotSaveInstanceId = function () {
+		try {
+			if (globalThis.crypto?.randomUUID) return globalThis.crypto.randomUUID().toLowerCase()
+		} catch (error) {}
+		try {
+			if (typeof require === 'function') return require('crypto').randomUUID().toLowerCase()
+		} catch (error) {}
+		throw new ModLoaderSnapshotError('UNAVAILABLE', 'Snapshot storage is unavailable.')
+	}
+
+	const ensureSnapshotSaveObject = function (save) {
+		if (!save || typeof save !== 'object' || Array.isArray(save)) return null
+		if (!save.modloader || typeof save.modloader !== 'object' || Array.isArray(save.modloader)) save.modloader = {}
+		return save.modloader
+	}
+
+	const setSnapshotSaveIdentity = function (save, saveInstanceId) {
+		const modloader = ensureSnapshotSaveObject(save)
+		if (modloader) modloader.saveInstanceId = saveInstanceId
+		return save
+	}
+
+	const establishLoadedSnapshotIdentity = function (save) {
+		const loaded = String(save?.modloader?.saveInstanceId || '').trim().toLowerCase()
+		if (SNAPSHOT_SAVE_ID_PATTERN.test(loaded)) {
+			state.snapshotSaveInstanceId = loaded
+			state.snapshotIdentityNeedsPersistence = false
+		} else {
+			state.snapshotSaveInstanceId = createSnapshotSaveInstanceId()
+			state.snapshotIdentityNeedsPersistence = true
+		}
+		state.snapshotContextToken = ''
+		state.snapshotContextReady = false
+		state.snapshotContextGame = null
+		state.snapshotCapabilities = null
+		return setSnapshotSaveIdentity(save, state.snapshotSaveInstanceId)
+	}
+
+	const ensureCurrentSnapshotIdentity = function () {
+		if (!SNAPSHOT_SAVE_ID_PATTERN.test(state.snapshotSaveInstanceId)) {
+			state.snapshotSaveInstanceId = createSnapshotSaveInstanceId()
+			state.snapshotIdentityNeedsPersistence = true
+		}
+		return state.snapshotSaveInstanceId
+	}
+
+	const getSnapshotIpcRenderer = function () {
+		if (state.snapshotIpcRenderer !== undefined) return state.snapshotIpcRenderer
+		try {
+			if (typeof require !== 'function') {
+				state.snapshotIpcRenderer = null
+				return null
+			}
+			state.snapshotIpcRenderer = require('electron')?.ipcRenderer || null
+		} catch (error) {
+			state.snapshotIpcRenderer = null
+		}
+		return state.snapshotIpcRenderer
+	}
+
+	const unwrapSnapshotEnvelope = function (envelope) {
+		if (envelope?.ok === true) return envelope.value
+		const code = SNAPSHOT_ERROR_CODES.has(envelope?.error?.code) ? envelope.error.code : 'IO'
+		const message = typeof envelope?.error?.message === 'string' && envelope.error.message
+			? envelope.error.message
+			: 'Snapshot storage operation failed.'
+		throw new ModLoaderSnapshotError(code, message)
+	}
+
+	const invokeSnapshotIpc = async function (channel, payload) {
+		const ipcRenderer = getSnapshotIpcRenderer()
+		if (!ipcRenderer?.invoke) throw new ModLoaderSnapshotError('UNAVAILABLE', 'Snapshot storage is unavailable.')
+		try {
+			return unwrapSnapshotEnvelope(await ipcRenderer.invoke(channel, payload))
+		} catch (error) {
+			if (error instanceof ModLoaderSnapshotError) throw error
+			throw new ModLoaderSnapshotError('IO', 'Snapshot storage operation failed.')
+		}
+	}
+
+	const verifyPersistedSnapshotIdentity = function (game, saveInstanceId) {
+		try {
+			const key = `abstractv03${game?.steamId || ''}`
+			const encoded = localStorage.getItem(key)
+			if (!encoded || typeof game?.decodeSave !== 'function') return false
+			const decoded = game.decodeSave(encoded)
+			return String(decoded?.modloader?.saveInstanceId || '').toLowerCase() === saveInstanceId
+		} catch (error) {
+			return false
+		}
+	}
+
+	const persistSnapshotIdentity = function (game) {
+		const saveInstanceId = ensureCurrentSnapshotIdentity()
+		if (!state.snapshotIdentityNeedsPersistence) return
+		if (!game || typeof game.saveGame !== 'function' || game.preventSaving || game.preventCloud) {
+			throw new ModLoaderSnapshotError('UNAVAILABLE', 'Snapshot storage is unavailable.')
+		}
+		game.saveGame()
+		if (!verifyPersistedSnapshotIdentity(game, saveInstanceId)) {
+			throw new ModLoaderSnapshotError('UNAVAILABLE', 'Snapshot storage is unavailable.')
+		}
+		state.snapshotIdentityNeedsPersistence = false
+	}
+
+	const activateSnapshotContext = async function (game) {
+		if (state.snapshotContextReady && state.snapshotContextGame === game && state.snapshotContextToken) return state.snapshotCapabilities
+		state.snapshotContextReady = false
+		state.snapshotContextToken = ''
+		state.snapshotContextGame = game || null
+		try {
+			ensureCurrentSnapshotIdentity()
+			persistSnapshotIdentity(game)
+			const result = await invokeSnapshotIpc('modloader:snapshots:activate', {
+				saveInstanceId: state.snapshotSaveInstanceId
+			})
+			state.snapshotContextToken = String(result?.token || '')
+			state.snapshotCapabilities = clone(result?.capabilities || {})
+			state.snapshotContextReady = !!state.snapshotContextToken
+			state.snapshotIssueReported = false
+			return state.snapshotCapabilities
+		} catch (error) {
+			state.snapshotCapabilities = null
+			if (!state.snapshotIssueReported) {
+				state.snapshotIssueReported = true
+				addIssue('error', 'snapshot-storage-unavailable', 'snapshot storage could not establish the active save context', error.message)
+				warn('Snapshot storage could not establish the active save context.', error)
+			}
+			return null
+		}
+	}
+
+	const snapshotRuntimeRequest = async function (modId, action, request) {
+		const result = await invokeSnapshotIpc('modloader:snapshots:runtime', {
+			action,
+			modId,
+			token: state.snapshotContextToken,
+			request
+		})
+		if (action === 'read' && result?.info?.payloadType === 'bytes') {
+			const data = result.data
+			if (data instanceof Uint8Array) result.data = new Uint8Array(data)
+			else if (Array.isArray(data?.data)) result.data = Uint8Array.from(data.data)
+			else throw new ModLoaderSnapshotError('CORRUPT', 'Snapshot integrity verification failed.')
+		}
+		return result
+	}
+
+	const createSnapshotApi = function (modId) {
+		const api = {
+			create(options) { return snapshotRuntimeRequest(modId, 'create', options) },
+			list() { return snapshotRuntimeRequest(modId, 'list') },
+			read(options) { return snapshotRuntimeRequest(modId, 'read', options) },
+			remove(options) { return snapshotRuntimeRequest(modId, 'remove', options) },
+			prune() { return snapshotRuntimeRequest(modId, 'prune') },
+			capabilities() { return snapshotRuntimeRequest(modId, 'capabilities') }
+		}
+		return Object.freeze(api)
+	}
+
 	const modloaderWindowApiState = {
 		ipcRenderer: undefined,
 		listenerInstalled: false,
@@ -8776,6 +9251,7 @@
 			if (name === 'afterGameInit') {
 				installGameHud(context)
 				installVanillaGameHudSync(context)
+				await activateSnapshotContext(context)
 				requestAnimationFrame(refreshOpenPanel)
 				requestAnimationFrame(restorePanelAfterLoad)
 				requestAnimationFrame(syncUiDocks)
@@ -8827,6 +9303,10 @@
 				replaceAsset(from, to) { return api.replaceAsset(from, api.asset(modId, to), modId) },
 				registerSound(name, src, options) { return api.registerSound(name, api.asset(modId, src), options, modId) },
 				registerMusic(name, src, options) { return api.registerMusic(name, api.asset(modId, src), options, modId) },
+				storage: Object.freeze({
+					version: SNAPSHOT_API_VERSION,
+					snapshots: createSnapshotApi(modId)
+				}),
 				config: {
 					get(key, fallback) { return getConfigValue(modId, key, fallback) },
 					set(key, value) { return setConfigValue(modId, key, value) },
@@ -8872,7 +9352,9 @@
 
 		applyLoadedSave(save, game) {
 			state.orphanEntities = Array.isArray(save?.modloader?.orphanEntities) ? save.modloader.orphanEntities.slice() : []
-			return runHookSync('beforeSaveLoad', save, game)
+			establishLoadedSnapshotIdentity(save)
+			const loaded = runHookSync('beforeSaveLoad', save, game)
+			return setSnapshotSaveIdentity(loaded, state.snapshotSaveInstanceId)
 		},
 
 		canLoadEntity(name, game) {
@@ -8893,7 +9375,9 @@
 			save.modloader.enabledMods = {}
 			for (const mod of state.mods) save.modloader.enabledMods[saveSafeText(mod.id)] = saveSafeText(mod.manifest.version || true)
 			if (state.orphanEntities.length) save.modloader.orphanEntities = state.orphanEntities.slice()
-			return runHookSync('beforeSaveWrite', save, game)
+			setSnapshotSaveIdentity(save, ensureCurrentSnapshotIdentity())
+			const prepared = runHookSync('beforeSaveWrite', save, game)
+			return setSnapshotSaveIdentity(prepared, state.snapshotSaveInstanceId)
 		},
 
 		showStatus,

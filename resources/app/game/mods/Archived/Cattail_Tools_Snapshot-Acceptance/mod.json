@@ -1,0 +1,30 @@
+{
+  "id": "Cattail_Tools_Snapshot-Acceptance",
+  "uniqueId": "Cattail_Tools_Snapshot-Acceptance",
+  "name": "[TEMP] Snapshot API Acceptance",
+  "version": "0.1.0",
+  "loaderVersion": ">=0.2.0",
+  "languageSupport": {
+    "gameLanguage": true
+  },
+  "entry": "scripts/main.js",
+  "description": "Temporary, disabled-by-default in-game acceptance harness for ModLoader Storage Snapshot API 1.0.0. It only stores test payloads in its own current-save namespace and never writes world data.",
+  "translations": {
+    "en": {
+      "name": "[TEMP] Snapshot API Acceptance",
+      "description": "Temporary, disabled-by-default acceptance harness for Storage Snapshot API 1.0.0. Remove or disable it after testing."
+    },
+    "sch": {
+      "name": "[临时] 快照 API 验收工具",
+      "description": "默认不启用的 Storage Snapshot API 1.0.0 游戏内验收工具。测试结束后请禁用或删除。"
+    },
+    "modsch": {
+      "name": "[临时] 快照 API 验收工具",
+      "description": "默认不启用的 Storage Snapshot API 1.0.0 游戏内验收工具。测试结束后请禁用或删除。"
+    },
+    "tch": {
+      "name": "[臨時] 快照 API 驗收工具",
+      "description": "預設不啟用的 Storage Snapshot API 1.0.0 遊戲內驗收工具。測試結束後請停用或刪除。"
+    }
+  }
+}

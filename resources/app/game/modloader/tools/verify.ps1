@@ -9,12 +9,19 @@ $checks = @(
 	[ordered]@{ file = 'scripts\game.js'; pattern = 'ModLoader?.applySoundList'; description = 'audio sample hook' },
 	[ordered]@{ file = 'scripts\sprites.js'; pattern = 'ModLoader?.resolveAsset'; description = 'sprite asset hook' },
 	[ordered]@{ file = 'scripts\ui.js'; pattern = 'ModLoader?.resolveAsset'; description = 'shop icon asset hook' },
-	[ordered]@{ file = '..\main.js'; pattern = 'ModLoaderMainProcess.attachWindow(win)'; description = 'main process bridge support' },
+	[ordered]@{ file = '..\main.js'; pattern = 'ModLoaderMainProcess.attachWindow(win, { accountId: STEAMID })'; description = 'main process bridge and trusted account scope' },
+	[ordered]@{ file = '..\main.js'; pattern = 'ModLoaderMainProcess.clearSnapshotContext(e.sender)'; description = 'reset clears active snapshot context' },
 	[ordered]@{ file = '..\main.js'; pattern = 'toggleDevTools'; description = 'DevTools shortcut/menu support' },
 	[ordered]@{ file = '..\main.js'; pattern = 'modloader:toggle-devtools'; description = 'DevTools menu button IPC support' },
 	[ordered]@{ file = 'modloader\main-process.js'; pattern = 'module.exports'; description = 'main process window module' },
 	[ordered]@{ file = 'modloader\main-process.js'; pattern = 'applyModloaderMainProcessManifests'; description = 'main process manifest support' },
-	[ordered]@{ file = 'modloader\loader.js'; pattern = 'window.ModLoader = api'; description = 'loader exports API' }
+	[ordered]@{ file = 'modloader\main-process.js'; pattern = 'modloader:snapshots:activate'; description = 'snapshot save-context IPC support' },
+	[ordered]@{ file = 'modloader\main-process.js'; pattern = 'modloader:snapshots:runtime'; description = 'snapshot runtime IPC support' },
+	[ordered]@{ file = 'modloader\main-process.js'; pattern = 'modloader:snapshots:admin'; description = 'snapshot administration IPC support' },
+	[ordered]@{ file = 'modloader\loader.js'; pattern = 'window.ModLoader = api'; description = 'loader exports API' },
+	[ordered]@{ file = 'modloader\loader.js'; pattern = "const SNAPSHOT_API_VERSION = '1.0.0'"; description = 'Storage Snapshot API v1 support' },
+	[ordered]@{ file = 'modloader\loader.js'; pattern = 'modloader.saveInstanceId = saveInstanceId'; description = 'snapshot save-lineage identity support' },
+	[ordered]@{ file = 'modloader\loader.js'; pattern = 'const renderSnapshotPanelPage'; description = 'snapshot management subpage support' }
 )
 
 $results = @()
@@ -67,6 +74,36 @@ if (Test-Path -LiteralPath $mainJsPath) {
 	}
 }
 
+$modloaderJavaScriptFiles = @(
+	'modloader\loader.js',
+	'modloader\main-process.js',
+	'modloader\snapshot-container.js',
+	'modloader\snapshot-store.js'
+)
+foreach ($relativePath in $modloaderJavaScriptFiles) {
+	$javaScriptPath = Join-Path $GameRoot $relativePath
+	if (-not (Test-Path -LiteralPath $javaScriptPath)) {
+		$results += [ordered]@{
+			description = "$relativePath JavaScript syntax"
+			file = $relativePath
+			pattern = 'file exists'
+			ok = $false
+		}
+		continue
+	}
+	if ($nodeCommand) {
+		& $nodeCommand.Source --check $javaScriptPath
+		$results += [ordered]@{
+			description = "$relativePath JavaScript syntax"
+			file = $relativePath
+			pattern = 'node --check'
+			ok = $LASTEXITCODE -eq 0
+		}
+	} else {
+		$warnings += "Node.js is not available; skipped $relativePath JavaScript syntax check."
+	}
+}
+
 $renderApiContractTestPath = Join-Path $PSScriptRoot 'render-api-v1-contract.test.js'
 if (Test-Path -LiteralPath $renderApiContractTestPath) {
 	if ($nodeCommand) {
@@ -79,6 +116,35 @@ if (Test-Path -LiteralPath $renderApiContractTestPath) {
 		}
 	} else {
 		$warnings += 'Node.js is not available; skipped Render API v1 runtime contract check.'
+	}
+}
+
+$snapshotContractTests = @(
+	[ordered]@{ file = 'snapshot-container-v1-contract.test.js'; description = 'Snapshot export container v1 contract'; pattern = 'binary framing, metadata, checksum, corruption rejection' },
+	[ordered]@{ file = 'snapshot-store-v1-contract.test.js'; description = 'Snapshot store v1 contract'; pattern = 'validation, isolation, queueing, rotation, quarantine, cleanup' },
+	[ordered]@{ file = 'snapshot-api-v1-contract.test.js'; description = 'Storage Snapshot API v1 runtime contract'; pattern = 'bound Mod API, data types, safe errors, save identity, admin UI boundary' }
+)
+foreach ($contract in $snapshotContractTests) {
+	$contractPath = Join-Path $PSScriptRoot $contract.file
+	if (-not (Test-Path -LiteralPath $contractPath)) {
+		$results += [ordered]@{
+			description = $contract.description
+			file = "modloader\tools\$($contract.file)"
+			pattern = 'file exists'
+			ok = $false
+		}
+		continue
+	}
+	if ($nodeCommand) {
+		& $nodeCommand.Source $contractPath
+		$results += [ordered]@{
+			description = $contract.description
+			file = "modloader\tools\$($contract.file)"
+			pattern = $contract.pattern
+			ok = $LASTEXITCODE -eq 0
+		}
+	} else {
+		$warnings += "Node.js is not available; skipped $($contract.description)."
 	}
 }
 

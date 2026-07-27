@@ -102,6 +102,7 @@ ipcMain.on(`updateAccumulatedPlaytime`, (e,d)=>{
 })
 
 ipcMain.on(`reset`, (e,d)=>{
+  ModLoaderMainProcess.clearSnapshotContext(e.sender)
   client.cloud?.deleteFile(`SFSaveFile`)
 })
 
@@ -191,7 +192,7 @@ const createWindow = _=> {
   })
 
   if (!options.fullscreen) win.setFullScreen(false)
-  ModLoaderMainProcess.attachWindow(win)
+  ModLoaderMainProcess.attachWindow(win, { accountId: STEAMID })
 
   const isMac = process.platform === 'darwin'
   const temp = [
