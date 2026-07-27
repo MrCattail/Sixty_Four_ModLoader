@@ -305,7 +305,7 @@ await globalThis[Symbol.for('cattail.world-editor.blueprint-preview')].benchmark
 - 变换中心来自全部选区相对坐标的整体外包矩形中心。半格中心向 `maxU/maxV` 方向取整，并在绑定源蓝图时固定；连续操作不会重新计算或漂移。
 - 同步变换实体位置、完整足迹、选区起终点/边界和内容边界。锚点继续保持原 schema 2 数据，结构配置和限制对象复用不可变源引用。
 - 原始会话蓝图、`exportJSON()` 和系统剪贴板保持不变。完整蓝图在当前非创造模式下只生成不含 Cube 和运行状态的结构投影；没有结构实体时不显示预览或信息卡。
-- 当前尚未实现 4A 全局创造模式，因此玩家工具栏只显示结构模式，隐藏完整模式和 Cube 控件。程序化 `setMode('full')` 与完整捕获合同继续保留，供未来创造模式接入。
+- 非创造模式下玩家工具栏只显示结构模式并隐藏完整模式和 Cube 控件；4A-2a 创造状态安全就绪后才显示这些控件。程序化 `setMode('full')` 与完整捕获合同继续保留。
 - 工具栏和蓝图信息卡同时提供顺/逆旋转、U/V 镜像和重置图标。默认热键为 `R`、`Shift+R`、`M`、`Shift+M`；文本输入、弹窗、组合修饰键和按键重复不会触发。
 - 预览目标跟随鼠标时整张蓝图信息卡穿透，变换使用工具栏或热键；目标固定后信息卡按钮和滚动恢复交互。信息卡自身的长期显示固定状态继续保留。
 - 固定目标每次变换立即取消陈旧计划并只请求一次新计划；跟随目标保留旧缓存画面，并在停止 100 ms 后只规划一次。变换不在每帧、鼠标移动或规划器内部重复计算。
@@ -369,4 +369,24 @@ globalThis[Symbol.for('cattail.world-editor.blueprint-preview')].snapshot()
 ```js
 globalThis[Symbol.for('cattail.world-editor.production')].snapshot()
 globalThis[Symbol.for('cattail.world-editor.blueprint')].snapshot().blueprint?.production
+```
+
+## 4A-2a 创造模式安全基础
+
+- 创造模式状态按存档保存在 `save.modloader.worldEditor`，并通过独立的 `cattail.world-editor.creative-mode` 控制器发布。缺失、损坏或未知 schema 的旧存档默认保持关闭。
+- 顶部工具栏明确显示创造模式开关。开启时可以直接切换当前存档，也可以通过 Better UIs 创建独立创造副本；关闭时恢复正常材料消耗，现有建筑与蓝图不会删除。
+- 直接切换保留当前 `saveInstanceId`。状态只有在原版保存完成、活动存档可重新解码且谱系 ID 未变化后才会发布成功。
+- 创建创造副本要求两个空闲 Better UIs 手动槽。原备份使用用户确认的原名，创造副本严格使用 `原名 + 创造模式`，不会覆盖已有槽或创建同名创造副本。
+- Better UIs Save Slots Service v1 在一次事务中发布两个槽、复读验证并激活创造副本；reload 前失败会恢复手动槽、活动存档和 pending marker。
+- 创造副本初始载荷不继承原 `saveInstanceId`。reload 后由 ModLoader 生成新 ID，Better UIs 再把包含新 ID 的活动载荷回填到命名的创造手动槽，确保以后重载继续使用同一创造谱系。
+- 原版存档编码直接使用 `btoa()`，因此 Unicode 槽名只保存在 Better UIs 槽位外层；World Editor 存档字段仅包含 ASCII 键和值、布尔值和数字。
+- 创造弹窗或存档事务进行期间，World Editor 会暂停地图指针输入以及 `V`、`Esc`、`Backspace`、复制、旋转、镜像和临时固定热键。
+- 只有创造状态持久化和必要的谱系回填完成后，蓝图工具栏才显示完整模式与 Cube 控件。关闭创造模式会立即回到结构模式，但不会删除已经捕获的完整蓝图数据。
+- 4A-2a 不执行免费建造、升级、删除、搬迁或蓝图放置，也不新增其他世界写入。原版商店免费经济和异步写前快照协调属于 4A-2b；undo/redo 仍属于 4A-3。
+
+开发者控制台可检查：
+
+```js
+globalThis[Symbol.for('cattail.world-editor.creative-mode')].snapshot()
+globalThis[Symbol.for('cattail.better-uis.save-slots')]?.snapshot()
 ```

@@ -11,6 +11,7 @@ ModLoader.register({
 		const PREVIEW_KEY = Symbol.for('cattail.world-editor.blueprint-preview')
 		const CARD_OPACITY_KEY = Symbol.for('cattail.world-editor.card-opacity')
 		const SHARED_KEY = Symbol.for('cattail.world-editor.shared')
+		const CREATIVE_KEY = Symbol.for('cattail.world-editor.creative-mode')
 		const SHELL_ID = 'cattail-world-editor-shell'
 		const SELECTION_CARD_ID = 'cattail-world-editor-selection-card'
 		const CARD_ID = 'cattail-world-editor-blueprint-card'
@@ -22,6 +23,24 @@ ModLoader.register({
 		const ICON_ASSETS = Object.freeze({})
 		let refreshMountedText = null
 
+		function unavailableCreativeController(game) {
+			const state = Object.freeze({
+				version: '1.0.0',
+				ready: false,
+				creativeMode: false,
+				busy: false,
+				pendingForkFinalization: false
+			})
+			return Object.freeze({
+				game,
+				snapshot() { return state },
+				subscribe(listener) {
+					listener(state)
+					return function () {}
+				}
+			})
+		}
+
 		api.on('afterWords', function (words, game) {
 			if (typeof refreshMountedText === 'function') refreshMountedText(game)
 		})
@@ -32,6 +51,7 @@ ModLoader.register({
 			const i18n = globalThis[I18N_KEY]
 			const transform = globalThis[TRANSFORM_KEY]
 			const shared = globalThis[SHARED_KEY]
+			let creative = globalThis[CREATIVE_KEY]
 			const transformAvailable = !!(
 				transform &&
 				typeof transform.bind === 'function' &&
@@ -56,6 +76,10 @@ ModLoader.register({
 				console.warn('[Cattail World Editor] Blueprint 3A could not find the editor translations.')
 				return
 			}
+			if (!creative || creative.game !== game || typeof creative.subscribe !== 'function') {
+				console.warn('[Cattail World Editor] Blueprint 4A-2a could not find creative mode state.')
+				creative = unavailableCreativeController(game)
+			}
 			if (
 				!shared ||
 				typeof shared.isEditableEvent !== 'function' ||
@@ -65,6 +89,7 @@ ModLoader.register({
 				typeof shared.cardCandidateFits !== 'function' ||
 				typeof shared.rectanglesOverlap !== 'function' ||
 				typeof shared.rectangleOverlapArea !== 'function' ||
+				typeof shared.resolveEntityIcon !== 'function' ||
 				typeof shared.createDisclosureController !== 'function' ||
 				typeof shared.registerWorldDragCard !== 'function'
 			) {
@@ -85,6 +110,7 @@ ModLoader.register({
 			let currentRuntime = runtime.snapshot()
 			let currentSelection = selection.snapshot()
 			let currentSession = session.snapshot()
+			let currentCreative = creative.snapshot()
 			if (transformAvailable) transform.clear('session-initialized')
 			let currentTransform = transformAvailable
 				? transform.snapshot()
@@ -141,6 +167,16 @@ ModLoader.register({
 				}
 				refreshUi()
 			})
+			const stopCreativeSubscription = creative.subscribe(function (state) {
+				currentCreative = state
+				if ((!state.ready || !state.creativeMode) && currentSession.mode !== 'structure') {
+					session.setMode('structure', 'creative-mode-unavailable')
+				}
+				if ((!state.ready || !state.creativeMode) && currentSession.includeBlocks) {
+					session.setIncludeBlocks(false, 'creative-mode-unavailable')
+				}
+				refreshUi()
+			})
 			const stopTransformSubscription = transformAvailable ? transform.subscribe(function (state) {
 				const previousState = currentTransform
 				currentTransform = state
@@ -162,6 +198,7 @@ ModLoader.register({
 			}) : null
 
 			const handleKeydown = function (event) {
+				if (shared.isWorldEditorInputBlocked?.()) return
 				if (event?.key === 'Escape' && cancelAllSectionResizes('escape', true)) {
 					consume(event)
 					return
@@ -233,6 +270,7 @@ ModLoader.register({
 				if (typeof stopRuntimeSubscription === 'function') stopRuntimeSubscription()
 				if (typeof stopSelectionSubscription === 'function') stopSelectionSubscription()
 				if (typeof stopSessionSubscription === 'function') stopSessionSubscription()
+				if (typeof stopCreativeSubscription === 'function') stopCreativeSubscription()
 				if (typeof stopTransformSubscription === 'function') stopTransformSubscription()
 				if (typeof stopPreviewSubscription === 'function') stopPreviewSubscription()
 				if (typeof stopRenderFrame === 'function') stopRenderFrame()
@@ -841,6 +879,7 @@ ModLoader.register({
 
 				const modes = document.createElement('span')
 				modes.className = 'cattail-world-editor-blueprint-modes'
+				modes.dataset.columns = '1'
 				modes.setAttribute('role', 'group')
 				const structure = createModeButton('structure')
 				const full = createModeButton('full')
@@ -1119,14 +1158,18 @@ ModLoader.register({
 
 			function refreshToolbar() {
 				const state = currentSession
+				const creativeAvailable = !!currentCreative?.ready && !!currentCreative?.creativeMode
 				const captureAvailable = canCapture(currentSelection) && !!currentRuntime.active && !state.capturing
-				ui.controls.structure.dataset.active = 'true'
-				ui.controls.full.dataset.active = 'false'
-				ui.controls.structure.setAttribute('aria-pressed', 'true')
-				ui.controls.full.setAttribute('aria-pressed', 'false')
-				ui.controls.full.hidden = true
-				ui.controls.blocks.hidden = true
-				ui.controls.blocks.disabled = true
+				ui.controls.structure.dataset.active = state.mode === 'structure' ? 'true' : 'false'
+				ui.controls.full.dataset.active = state.mode === 'full' ? 'true' : 'false'
+				ui.controls.structure.setAttribute('aria-pressed', state.mode === 'structure' ? 'true' : 'false')
+				ui.controls.full.setAttribute('aria-pressed', state.mode === 'full' ? 'true' : 'false')
+				ui.controls.full.hidden = !creativeAvailable
+				ui.controls.full.setAttribute('aria-hidden', creativeAvailable ? 'false' : 'true')
+				ui.controls.modes.dataset.columns = creativeAvailable ? '2' : '1'
+				ui.controls.blocks.hidden = !creativeAvailable || state.mode !== 'full'
+				ui.controls.blocks.setAttribute('aria-hidden', !creativeAvailable || state.mode !== 'full' ? 'true' : 'false')
+				ui.controls.blocks.disabled = !creativeAvailable || state.mode !== 'full'
 				ui.controls.blocks.dataset.active = state.includeBlocks ? 'true' : 'false'
 				ui.controls.blocks.setAttribute('aria-pressed', state.includeBlocks ? 'true' : 'false')
 				ui.controls.copy.disabled = !captureAvailable
@@ -1585,27 +1628,27 @@ ModLoader.register({
 					return item?.name === name
 				})
 				const source = shopItem?.html?.querySelector?.('.imageVessel img')
+				const imageSource = source?.currentSrc ||
+					source?.src ||
+					source?.getAttribute?.('src') ||
+					shared.resolveEntityIcon(game, name)
+				if (!imageSource) return createNeutralEntityIcon()
 				const image = document.createElement('img')
 				image.alt = ''
-				image.src = source?.currentSrc || source?.src || source?.getAttribute?.('src') || resolveEntityIcon(name)
+				image.src = imageSource
 				image.addEventListener('error', function () {
-					const canvas = document.createElement('canvas')
-					canvas.width = 32
-					canvas.height = 32
-					canvas.setAttribute('aria-hidden', 'true')
-					drawNeutralBuilding(canvas)
-					image.replaceWith(canvas)
+					image.replaceWith(createNeutralEntityIcon())
 				}, { once: true })
 				return image
 			}
 
-			function resolveEntityIcon(name) {
-				const path = game.codex?.entities?.[name]?.shopImage || 'img/shop/' + name + '.jpg'
-				try {
-					return globalThis.ModLoader?.resolveAsset?.(path) || path
-				} catch (error) {
-					return path
-				}
+			function createNeutralEntityIcon() {
+				const canvas = document.createElement('canvas')
+				canvas.width = 32
+				canvas.height = 32
+				canvas.setAttribute('aria-hidden', 'true')
+				drawNeutralBuilding(canvas)
+				return canvas
 			}
 
 			function localizedEntityName(name) {
@@ -1847,11 +1890,13 @@ ModLoader.register({
 
 			function handleFullMode(event) {
 				stopUiEvent(event)
+				if (!currentCreative?.ready || !currentCreative?.creativeMode) return
 				session.setMode('full', 'toolbar')
 			}
 
 			function handleBlocksToggle(event) {
 				stopUiEvent(event)
+				if (!currentCreative?.ready || !currentCreative?.creativeMode || currentSession.mode !== 'full') return
 				session.setIncludeBlocks(!currentSession.includeBlocks, 'toolbar')
 			}
 
@@ -1862,7 +1907,9 @@ ModLoader.register({
 			}
 
 			function captureFromUi(reason) {
-				if (currentSession.mode !== 'structure') session.setMode('structure', reason + '-structure')
+				if ((!currentCreative?.ready || !currentCreative?.creativeMode) && currentSession.mode !== 'structure') {
+					session.setMode('structure', reason + '-structure')
+				}
 				return session.capture(reason)
 			}
 
@@ -2172,6 +2219,9 @@ ModLoader.register({
 						border: 1px solid var(--world-editor-shell-border);
 						border-radius: 6px;
 						overflow: hidden;
+					}
+					.cattail-world-editor-blueprint-modes[data-columns="2"] {
+						grid-template-columns: repeat(2, minmax(0, 1fr));
 					}
 					.cattail-world-editor-blueprint-mode,
 					.cattail-world-editor-blueprint-icon-button,

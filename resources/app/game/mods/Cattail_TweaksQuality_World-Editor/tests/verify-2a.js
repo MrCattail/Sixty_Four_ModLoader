@@ -700,7 +700,7 @@ function testI18nAndUi() {
 
 	const i18n = sandbox[I18N_KEY]
 	const languages = ['en', 'sch', 'modsch', 'ru', 'de', 'ptbr', 'it', 'es', 'fr', 'nl', 'cz', 'pl', 'jp', 'kr', 'tch', 'thai', 'hu', 'lv', 'ro', 'no']
-	assert.equal(i18n.version, '0.3.5')
+	assert.equal(i18n.version, '0.4.0')
 	assert.equal(i18n.languages.length, 20)
 	assert.deepEqual(new Set(i18n.languages), new Set(languages))
 	for (const key of ['brand', 'modeArea', 'exitHint', 'cancelHint', 'toolbarModeArea', 'toolbarModeMove', 'toolSelect', 'toolMove', 'cardMovePreview', 'moveHint', 'selectionCount']) {

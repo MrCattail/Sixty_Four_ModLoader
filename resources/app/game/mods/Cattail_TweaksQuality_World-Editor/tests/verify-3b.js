@@ -1191,9 +1191,9 @@ function testManifestLocalizationAndStaticContracts() {
 		'previewNoCost'
 	]
 	const i18n = loadI18n()
-	assert.equal(i18n.version, '0.3.5')
+	assert.equal(i18n.version, '0.4.0')
 	assert.equal(i18n.languages.length, 20)
-	assert.equal(i18n.keys.length, 99)
+	assert.equal(i18n.keys.length, 118)
 	for (const language of i18n.languages) {
 		for (const key of previewKeys) {
 			const translated = i18n.t(language, key)
@@ -1203,12 +1203,13 @@ function testManifestLocalizationAndStaticContracts() {
 	}
 
 	const manifest = JSON.parse(fs.readFileSync(path.join(MOD_ROOT, 'mod.json'), 'utf8'))
-	assert.equal(manifest.version, '0.3.5')
+	assert.equal(manifest.version, '0.4.0')
 	assert.equal(manifest.languageSupport.gameLanguage, true)
 	assert.deepEqual(manifest.entry, [
 		'scripts/core/foundation.js',
 		'scripts/core/shared.js',
 		'scripts/core/editor-state.js',
+		'scripts/core/creative-mode.js',
 		'scripts/core/selection-state.js',
 		'scripts/core/tool-state.js',
 		'scripts/core/selection-analysis.js',

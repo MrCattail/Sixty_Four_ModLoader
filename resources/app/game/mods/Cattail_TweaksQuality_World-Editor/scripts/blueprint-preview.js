@@ -388,6 +388,7 @@ ModLoader.register({
 					event?.repeat ||
 					event?.isComposing ||
 					event?.keyCode === 229 ||
+					shared.isWorldEditorInputBlocked?.() ||
 					shared.isEditableEvent(event) ||
 					!active ||
 					paused ||
@@ -415,6 +416,7 @@ ModLoader.register({
 					paused ||
 					!target ||
 					!shouldOwnInput() ||
+					shared.isWorldEditorInputBlocked?.() ||
 					shared.isEditableEvent(event)
 				) {
 					return

@@ -1125,6 +1125,21 @@ function testSharedEditorServices() {
 		}
 	}), false)
 
+	const iconGame = {
+		codex: {
+			entities: {
+				custom: { shopImage: 'mods/custom/icon.png' },
+				scan: { isDark: true },
+				silo: {}
+			}
+		}
+	}
+	assert.equal(shared.resolveEntityIcon(iconGame, 'custom'), 'mods/custom/icon.png')
+	assert.equal(shared.resolveEntityIcon(iconGame, 'stabilizer3'), 'img/stabilizer3.png')
+	assert.equal(shared.resolveEntityIcon(iconGame, 'surge'), '')
+	assert.equal(shared.resolveEntityIcon(iconGame, 'scan'), 'img/shop/scan_dark.jpg')
+	assert.equal(shared.resolveEntityIcon(iconGame, 'silo'), 'img/shop/silo.jpg')
+
 	const canvas = {}
 	const game = { canvas }
 	const firstCard = { dataset: {} }
@@ -1297,7 +1312,7 @@ function testLocalizationAndIntegrationContract() {
 	]
 
 	assert.equal(i18n.languages.length, 20)
-	assert.equal(i18n.keys.length, 99)
+	assert.equal(i18n.keys.length, 118)
 	for (const language of i18n.languages) {
 		for (const key of transformKeys) {
 			const translated = i18n.t(language, key)
@@ -1306,9 +1321,9 @@ function testLocalizationAndIntegrationContract() {
 		}
 	}
 
-	assert.equal(manifest.version, '0.3.5')
+	assert.equal(manifest.version, '0.4.0')
 	assert.equal(manifest.languageSupport.gameLanguage, true)
-	assert.equal(manifest.entry.length, 21)
+	assert.equal(manifest.entry.length, 22)
 	assert.equal(
 		manifest.entry.indexOf(SHARED_SOURCE),
 		manifest.entry.indexOf('scripts/core/foundation.js') + 1
@@ -1514,6 +1529,9 @@ function testLocalizationAndIntegrationContract() {
 	assert.match(sessionSource, /crossing\.className = 'cattail-world-editor-blueprint-card__preview-status'/)
 	assert.match(sessionSource, /crossing\.dataset\.status = 'cross-boundary'/)
 	assert.match(sessionSource, /worldEditorBlueprintText = 'crossing-count'/)
+	assert.match(sessionSource, /shared\.resolveEntityIcon\(game, name\)/)
+	assert.match(sessionSource, /if \(!imageSource\) return createNeutralEntityIcon\(\)/)
+	assert.doesNotMatch(sessionSource, /function resolveEntityIcon\(/)
 	assert.match(sessionSource, /font-weight:\s*400/)
 	assert.match(planSource, /function planningEntityAt\(game,\s*position\)/)
 	assert.match(planSource, /safeName\(entity\?\.name\)\s*===\s*'surge'\s*\?\s*null\s*:\s*entity/)

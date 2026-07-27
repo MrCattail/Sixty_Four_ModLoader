@@ -520,9 +520,9 @@ function testLanguagesManifestUiAndReadOnlyBoundary() {
 	vm.runInContext(fs.readFileSync(i18nFilename, 'utf8'), i18nSandbox, { filename: i18nFilename })
 	i18nDefinitions[0].init()
 	const i18n = i18nSandbox[I18N_KEY]
-	assert.equal(i18n.version, '0.3.5')
+	assert.equal(i18n.version, '0.4.0')
 	assert.equal(i18n.languages.length, 20)
-	assert.equal(i18n.keys.length, 99)
+	assert.equal(i18n.keys.length, 118)
 	const blueprintKeys = [
 		'blueprintModeStructure',
 		'blueprintModeFull',
@@ -553,9 +553,9 @@ function testLanguagesManifestUiAndReadOnlyBoundary() {
 	}
 
 	const manifest = JSON.parse(fs.readFileSync(path.join(MOD_ROOT, 'mod.json'), 'utf8'))
-	assert.equal(manifest.version, '0.3.5')
+	assert.equal(manifest.version, '0.4.0')
 	assert.equal(manifest.languageSupport.gameLanguage, true)
-	assert.equal(manifest.entry.length, 21)
+	assert.equal(manifest.entry.length, 22)
 	assert.ok(manifest.entry.includes(BLUEPRINT_SOURCE))
 	assert.ok(
 		manifest.entry.indexOf('scripts/ui/editor-shell.js') <
@@ -563,6 +563,7 @@ function testLanguagesManifestUiAndReadOnlyBoundary() {
 	)
 
 	const source = fs.readFileSync(path.join(MOD_ROOT, BLUEPRINT_SOURCE), 'utf8')
+	const sharedSource = fs.readFileSync(path.join(MOD_ROOT, SHARED_SOURCE), 'utf8')
 	assert.match(source, /schemaVersion:\s*3/)
 	assert.match(source, /version:\s*'0\.3\.5'/)
 	assert.match(source, /selectionIds:\s*source\.selectionIds/)
@@ -579,7 +580,8 @@ function testLanguagesManifestUiAndReadOnlyBoundary() {
 	assert.match(source, /font:[^;]*Montserrat/)
 	assert.match(source, /data-input-pass-through/)
 	assert.match(source, /drawCubeThumbnail/)
-	assert.match(source, /img\/shop\//)
+	assert.match(sharedSource, /img\/shop\//)
+	assert.match(source, /shared\.resolveEntityIcon\(game, name\)/)
 	assert.doesNotMatch(source, /\baddEntity\s*\(/)
 	assert.doesNotMatch(source, /\bclearCell\s*\(/)
 	assert.doesNotMatch(source, /\brequestResources\s*\(/)

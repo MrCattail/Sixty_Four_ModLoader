@@ -455,9 +455,9 @@ function loadI18n() {
 
 function testManifestLocalizationUiAndReadOnlyContracts() {
 	const manifest = JSON.parse(fs.readFileSync(path.join(MOD_ROOT, 'mod.json'), 'utf8'))
-	assert.equal(manifest.version, '0.3.5')
+	assert.equal(manifest.version, '0.4.0')
 	assert.equal(manifest.languageSupport.gameLanguage, true)
-	assert.equal(manifest.entry.length, 21)
+	assert.equal(manifest.entry.length, 22)
 	assert.equal(
 		manifest.entry.indexOf(SHARED_SOURCE),
 		manifest.entry.indexOf('scripts/core/foundation.js') + 1
@@ -490,9 +490,9 @@ function testManifestLocalizationUiAndReadOnlyContracts() {
 		'productionHide',
 		'productionPumpMining'
 	]
-	assert.equal(i18n.version, '0.3.5')
+	assert.equal(i18n.version, '0.4.0')
 	assert.equal(i18n.languages.length, 20)
-	assert.equal(i18n.keys.length, 99)
+	assert.equal(i18n.keys.length, 118)
 	for (const language of i18n.languages) {
 		for (const key of productionKeys) {
 			const translated = i18n.t(language, key)
@@ -528,7 +528,7 @@ function testManifestLocalizationUiAndReadOnlyContracts() {
 	assert.match(cardsSource, /UNIT_FACTORS = Object\.freeze\(\[1, 60, 3600\]\)/)
 	assert.match(cardsSource, /game\.resourcesSprites/)
 	assert.match(cardsSource, /img\/resources\.png/)
-	assert.match(cardsSource, /img\/shop\//)
+	assert.match(sharedSource, /img\/shop\//)
 	assert.match(cardsSource, /font-family:\s*Montserrat/)
 	assert.match(cardsSource, /SELECTION_PRODUCTION_CARD_ID = 'cattail-world-editor-selection-production-card'/)
 	assert.match(cardsSource, /group:\s*'selection-production'/)
@@ -552,6 +552,11 @@ function testManifestLocalizationUiAndReadOnlyContracts() {
 	assert.match(cardsSource, /createNoFlowSection\(noFlow, unit, viewKey, onNestedLayoutChange\)/)
 	assert.match(cardsSource, /function createNoFlowSection\(entries, unit, viewKey, onNestedLayoutChange\)/)
 	assert.match(cardsSource, /mounted\.disclosure = mountProductionDisclosure\([\s\S]*noFlowStates\[viewKey\]/)
+	assert.match(sharedSource, /entityName === 'stabilizer3'[\s\S]*'img\/stabilizer3\.png'/)
+	assert.match(sharedSource, /entityName === 'surge'[\s\S]*\? ''/)
+	assert.match(sharedSource, /entity\?\.isDark \? entityName \+ '_dark' : entityName/)
+	assert.match(cardsSource, /const source = shared\.resolveEntityIcon\(game, name\)[\s\S]*if \(!source\) \{[\s\S]*wrapper\.textContent = '·'[\s\S]*return wrapper/)
+	assert.doesNotMatch(cardsSource, /function resolveEntityIcon\(/)
 	assert.match(cardsSource, /markCompanionLayoutDirty\(card\)[\s\S]*syncBlueprintCompanion\(\)[\s\S]*onNestedLayoutChange\(mounted, detail\.state\.expanded\)/)
 	assert.match(cardsSource, /function renderTypesSection\([\s\S]*viewKey,\s*function \(nestedSection, nestedExpanded\) \{\s*projectNestedProductionSectionHeight\(section, nestedSection, nestedExpanded\)\s*\}/)
 	assert.doesNotMatch(cardsSource, /'selectionActual',\s*function \(\)/)

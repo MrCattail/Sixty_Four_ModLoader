@@ -50,6 +50,7 @@ ModLoader.register({
 				typeof shared.visibleCardRect !== 'function' ||
 				typeof shared.cardCandidateFits !== 'function' ||
 				typeof shared.rectanglesOverlap !== 'function' ||
+				typeof shared.resolveEntityIcon !== 'function' ||
 				typeof shared.createDisclosureController !== 'function' ||
 				typeof shared.registerWorldDragCard !== 'function'
 			) {
@@ -1167,24 +1168,20 @@ ModLoader.register({
 			function createEntityIcon(name) {
 				const wrapper = document.createElement('span')
 				wrapper.className = 'cattail-world-editor-production__entity-icon'
+				const source = shared.resolveEntityIcon(game, name)
+				if (!source) {
+					wrapper.textContent = '·'
+					return wrapper
+				}
 				const image = document.createElement('img')
 				image.alt = ''
-				image.src = resolveEntityIcon(name)
+				image.src = source
 				image.addEventListener('error', function () {
 					image.remove()
 					wrapper.textContent = '·'
 				}, { once: true })
 				wrapper.append(image)
 				return wrapper
-			}
-
-			function resolveEntityIcon(name) {
-				const path = game.codex?.entities?.[name]?.shopImage || 'img/shop/' + name + '.jpg'
-				try {
-					return globalThis.ModLoader?.resolveAsset?.(path) || path
-				} catch (error) {
-					return path
-				}
 			}
 
 			function localizedEntityName(name) {

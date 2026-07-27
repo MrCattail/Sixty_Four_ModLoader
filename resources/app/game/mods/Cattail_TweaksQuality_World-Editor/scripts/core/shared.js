@@ -2,6 +2,7 @@ ModLoader.register({
 	id: 'Cattail_TweaksQuality_World-Editor',
 	init() {
 		const SHARED_KEY = Symbol.for('cattail.world-editor.shared')
+		const CREATIVE_KEY = Symbol.for('cattail.world-editor.creative-mode')
 		const SHARED_STYLE_ID = 'cattail-world-editor-shared-style'
 		const EDITABLE_SELECTOR = 'input, textarea, select, [contenteditable]:not([contenteditable="false"]), [role="textbox"]'
 		const CARD_CONTROL_SELECTOR = 'button, input, select, textarea, [contenteditable]:not([contenteditable="false"]), [role="textbox"], [data-world-editor-card-control]'
@@ -23,6 +24,10 @@ ModLoader.register({
 			if (typeof document === 'undefined') return false
 			const panel = document.getElementById('modloader-panel')
 			return !!(panel && !panel.classList.contains('modloader-panel-autohidden'))
+		}
+
+		function isWorldEditorInputBlocked() {
+			return !!globalThis[CREATIVE_KEY]?.isInputBlocked?.()
 		}
 
 		function isCardControlEvent(event, extraSelector) {
@@ -90,6 +95,25 @@ ModLoader.register({
 				Math.min(left.top + left.height, right.top + right.height) - Math.max(left.top, right.top)
 			)
 			return width * height
+		}
+
+		function resolveEntityIcon(game, name) {
+			const entityName = String(name || '').trim()
+			if (!entityName) return ''
+			const entity = game?.codex?.entities?.[entityName]
+			const explicitPath = typeof entity?.shopImage === 'string' ? entity.shopImage.trim() : ''
+			const path = explicitPath ||
+				(entityName === 'stabilizer3'
+					? 'img/stabilizer3.png'
+					: entityName === 'surge'
+						? ''
+						: 'img/shop/' + (entity?.isDark ? entityName + '_dark' : entityName) + '.jpg')
+			if (!path) return ''
+			try {
+				return globalThis.ModLoader?.resolveAsset?.(path) || path
+			} catch (error) {
+				return path
+			}
 		}
 
 		function createDisclosureController(options) {
@@ -638,12 +662,14 @@ ModLoader.register({
 			version: 1,
 			isEditableEvent,
 			isModLoaderPanelBlocking,
+			isWorldEditorInputBlocked,
 			isCardControlEvent,
 			cardIsVisible,
 			visibleCardRect,
 			cardCandidateFits,
 			rectanglesOverlap,
 			rectangleOverlapArea,
+			resolveEntityIcon,
 			createDisclosureController,
 			registerWorldDragCard,
 			dispose() {

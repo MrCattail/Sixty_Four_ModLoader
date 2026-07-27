@@ -148,6 +148,42 @@ foreach ($contract in $snapshotContractTests) {
 	}
 }
 
+$modFeatureContractTests = @(
+	[ordered]@{
+		path = 'mods\Cattail_TweaksQuality_Better-UIs\tests\verify-save-slots-service-v1.js'
+		description = 'Better UIs Save Slots Service v1 contract'
+		pattern = 'atomic batch creation, activation rollback, lineage finalization, name conflict'
+	},
+	[ordered]@{
+		path = 'mods\Cattail_TweaksQuality_World-Editor\tests\verify-4a-2a.js'
+		description = 'World Editor 4A-2a creative mode contract'
+		pattern = 'save persistence, in-place identity, fork identity removal, input and full-mode gates'
+	}
+)
+foreach ($contract in $modFeatureContractTests) {
+	$contractPath = Join-Path $GameRoot $contract.path
+	if (-not (Test-Path -LiteralPath $contractPath)) {
+		$results += [ordered]@{
+			description = $contract.description
+			file = $contract.path
+			pattern = 'file exists'
+			ok = $false
+		}
+		continue
+	}
+	if ($nodeCommand) {
+		& $nodeCommand.Source $contractPath
+		$results += [ordered]@{
+			description = $contract.description
+			file = $contract.path
+			pattern = $contract.pattern
+			ok = $LASTEXITCODE -eq 0
+		}
+	} else {
+		$warnings += "Node.js is not available; skipped $($contract.description)."
+	}
+}
+
 $enabledNames = @()
 $enabledPath = Join-Path $GameRoot 'mods\enabled.json'
 try {

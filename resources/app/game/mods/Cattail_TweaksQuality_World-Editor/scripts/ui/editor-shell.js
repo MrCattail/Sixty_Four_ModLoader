@@ -5,8 +5,11 @@ ModLoader.register({
 		const I18N_KEY = Symbol.for('cattail.world-editor.i18n')
 		const SELECTION_KEY = Symbol.for('cattail.world-editor.selection')
 		const TOOL_KEY = Symbol.for('cattail.world-editor.tool')
+		const CREATIVE_KEY = Symbol.for('cattail.world-editor.creative-mode')
+		const SAVE_SLOTS_KEY = Symbol.for('cattail.better-uis.save-slots')
 		const SHELL_ID = 'cattail-world-editor-shell'
 		const STYLE_ID = 'cattail-world-editor-shell-style'
+		const DIALOG_ID = 'cattail-world-editor-creative-dialog'
 		const UI_SCALE_BASE_WIDTH = 1600
 		const UI_SCALE_BASE_HEIGHT = 1000
 		const UI_SCALE_MIN = .5
@@ -33,6 +36,7 @@ ModLoader.register({
 			const i18n = globalThis[I18N_KEY]
 			const selection = globalThis[SELECTION_KEY]
 			const tool = globalThis[TOOL_KEY]
+			let creative = globalThis[CREATIVE_KEY]
 			if (!runtime || runtime.game !== game || typeof runtime.addCleanup !== 'function') {
 				console.warn('[Cattail World Editor] Toolbar 2G could not find the editor runtime.')
 				return
@@ -53,6 +57,10 @@ ModLoader.register({
 				console.warn('[Cattail World Editor] Toolbar 2E could not find the tool state.')
 				return
 			}
+			if (!creative || creative.game !== game || typeof creative.subscribe !== 'function') {
+				console.warn('[Cattail World Editor] Toolbar 4A-2a could not find creative mode state.')
+				creative = unavailableCreativeController(game)
+			}
 			if (!api.ui?.hud || typeof api.ui.hud.register !== 'function') {
 				console.warn('[Cattail World Editor] Toolbar 2E requires the ModLoader game HUD API.')
 				return
@@ -69,15 +77,19 @@ ModLoader.register({
 			let currentState = runtime.snapshot()
 			let currentSelection = selection.snapshot()
 			let currentTool = tool.snapshot()
+			let currentCreative = creative.snapshot()
 			let gameHudHidden = api.ui.hud.isHidden()
 			let vanillaHudHidden = api.ui.isVanillaGameHudHidden(game)
+			let creativeDialog = null
 			const selectButton = shell.querySelector('[data-world-editor-action="select"]')
 			const removeButton = shell.querySelector('[data-world-editor-action="remove-selection"]')
+			const creativeButton = shell.querySelector('[data-world-editor-action="creative-mode"]')
 			const accessibleText = {
 				brand: '',
 				mode: '',
 				count: '',
 				remove: '',
+				creative: '',
 				exitHint: ''
 			}
 
@@ -87,6 +99,7 @@ ModLoader.register({
 					accessibleText.mode,
 					accessibleText.count,
 					accessibleText.remove,
+					accessibleText.creative,
 					accessibleText.exitHint
 				].filter(Boolean).join('. ') + '.')
 			}
@@ -101,6 +114,7 @@ ModLoader.register({
 				removeButton.setAttribute('aria-label', removeText)
 				accessibleText.brand = brand
 				accessibleText.remove = removeText
+				refreshCreative(source)
 				refreshTool(source)
 				refreshHint(source)
 				refreshSelectionCount(source)
@@ -145,6 +159,24 @@ ModLoader.register({
 			const refreshTheme = function (themeGame) {
 				if (themeGame && themeGame !== game) return
 				shell.dataset.theme = game.plane ? 'void' : 'reality'
+				if (creativeDialog?.element) creativeDialog.element.dataset.theme = shell.dataset.theme
+			}
+
+			const refreshCreative = function (languageGame) {
+				const source = languageGame || game
+				const active = !!currentCreative?.ready && !!currentCreative?.creativeMode
+				const busy = !!currentCreative?.busy || !!currentCreative?.pendingForkFinalization
+				const label = i18n.t(source, active ? 'creativeModeOn' : 'creativeModeOff')
+				creativeButton.querySelector('[data-world-editor-text="creative-mode"]').textContent = label
+				creativeButton.dataset.active = active ? 'true' : 'false'
+				creativeButton.dataset.creative = active ? 'true' : 'false'
+				creativeButton.setAttribute('aria-pressed', active ? 'true' : 'false')
+				creativeButton.disabled = !currentCreative?.ready || busy
+				creativeButton.title = currentCreative?.error?.message || label
+				creativeButton.setAttribute('aria-label', label)
+				accessibleText.creative = label
+				refreshCreativeDialogText(source)
+				refreshAccessibility()
 			}
 
 			const refreshVisibility = function () {
@@ -176,6 +208,7 @@ ModLoader.register({
 
 			const stopStateSubscription = runtime.subscribe(function (state) {
 				currentState = state
+				if (!state.active && creativeDialog && !currentCreative?.busy) closeCreativeDialog('editor-inactive')
 				refreshVisibility()
 			})
 
@@ -188,6 +221,10 @@ ModLoader.register({
 			const stopToolSubscription = tool.subscribe(function (state) {
 				currentTool = state
 				refreshTool(game)
+			})
+			const stopCreativeSubscription = creative.subscribe(function (state) {
+				currentCreative = state
+				refreshCreative(game)
 			})
 
 			const handleSelectClick = function (event) {
@@ -206,8 +243,279 @@ ModLoader.register({
 				}
 			}
 
+			const handleCreativeClick = function (event) {
+				event?.preventDefault?.()
+				event?.stopPropagation?.()
+				if (!currentCreative?.ready || currentCreative.busy) return
+				if (currentCreative.creativeMode) openDisableCreativeDialog()
+				else openEnableCreativeDialog()
+			}
+
+			function openEnableCreativeDialog() {
+				closeCreativeDialog('replace-dialog', true)
+				creative.setDialogOpen(true, 'enable-dialog-opened')
+				const dialog = createCreativeDialog('enable')
+				const saveSlots = globalThis[SAVE_SLOTS_KEY]
+				let slotsState = saveSlots?.version === 1 && typeof saveSlots.snapshot === 'function'
+					? saveSlots.snapshot()
+					: null
+				const input = document.createElement('input')
+				input.type = 'text'
+				input.maxLength = 60
+				input.className = 'cattail-world-editor-creative-dialog__input'
+				input.value = String(slotsState?.source?.name || '').slice(0, 60)
+				input.autocomplete = 'off'
+				input.spellcheck = false
+				input.setAttribute('data-creative-name', '')
+				const inputLabel = document.createElement('label')
+				inputLabel.className = 'cattail-world-editor-creative-dialog__field'
+				const inputLabelText = document.createElement('span')
+				inputLabelText.dataset.creativeText = 'creativeOriginalName'
+				inputLabel.append(inputLabelText, input)
+				const preview = document.createElement('div')
+				preview.className = 'cattail-world-editor-creative-dialog__preview'
+				const copyStatus = document.createElement('div')
+				copyStatus.className = 'cattail-world-editor-creative-dialog__status'
+				dialog.content.append(inputLabel, preview, copyStatus)
+
+				const enableCurrent = createDialogButton('creativeEnableCurrent', true)
+				const createCopy = createDialogButton('creativeCreateCopy', true)
+				const cancel = createDialogButton('creativeCancel', false)
+				dialog.actions.append(enableCurrent, createCopy, cancel)
+				dialog.input = input
+				dialog.preview = preview
+				dialog.copyStatus = copyStatus
+				dialog.enableCurrent = enableCurrent
+				dialog.createCopy = createCopy
+				dialog.cancel = cancel
+				creativeDialog = dialog
+
+				const validateCopy = function () {
+					if (saveSlots?.version === 1 && typeof saveSlots.snapshot === 'function') {
+						slotsState = saveSlots.snapshot()
+					}
+					const originalName = input.value.trim()
+					const creativeName = originalName + '创造模式'
+					preview.textContent = originalName
+						? formatTemplate(i18n.t(game, 'creativeCopyNamePreview'), { name: creativeName })
+						: i18n.t(game, 'creativeNameRequired')
+					let statusKey = 'creativeCopyReady'
+					let available = true
+					if (!originalName || originalName.length > 60 || /[\u0000-\u001f\u007f]/.test(originalName)) {
+						statusKey = 'creativeNameRequired'
+						available = false
+					} else if (!slotsState?.ready || typeof saveSlots?.createAndActivate !== 'function') {
+						statusKey = 'creativeCopyUnavailable'
+						available = false
+					} else if (Number(slotsState.emptyCount) < 2) {
+						copyStatus.textContent = formatTemplate(i18n.t(game, 'creativeCopyNeedsSlots'), {
+							count: Number(slotsState.emptyCount) || 0
+						})
+						createCopy.disabled = true
+						return
+					} else if (slotsState.slots?.some?.(function (slot) {
+						return slot?.occupied && slot.name === creativeName
+					})) {
+						statusKey = 'creativeCopyNameConflict'
+						available = false
+					}
+					copyStatus.textContent = i18n.t(game, statusKey)
+					createCopy.disabled = !available || dialog.busy
+				}
+
+				const scheduleCopyValidation = function () {
+					setTimeout(function () {
+						if (creativeDialog === dialog && !dialog.busy) validateCopy()
+					}, 0)
+				}
+				for (const type of ['input', 'change', 'keyup', 'compositionend']) {
+					input.addEventListener(type, validateCopy)
+				}
+				for (const type of ['keydown', 'paste', 'cut']) {
+					input.addEventListener(type, scheduleCopyValidation)
+				}
+				input.addEventListener('keydown', function (event) {
+					if (event.key === 'Enter') event.preventDefault()
+				})
+				enableCurrent.addEventListener('click', async function () {
+					if (dialog.busy) return
+					setCreativeDialogBusy(dialog, true)
+					try {
+						await creative.enableInPlace('creative-dialog-current')
+						closeCreativeDialog('enable-current-complete', true)
+					} catch (operationError) {
+						showCreativeDialogError(dialog, operationError)
+						setCreativeDialogBusy(dialog, false)
+						validateCopy()
+					}
+				})
+				createCopy.addEventListener('click', async function () {
+					if (dialog.busy || createCopy.disabled) return
+					setCreativeDialogBusy(dialog, true)
+					try {
+						await creative.createFork({
+							originalName: input.value,
+							reason: 'creative-dialog-copy'
+						})
+						copyStatus.textContent = i18n.t(game, 'creativeCopyReloading')
+					} catch (operationError) {
+						showCreativeDialogError(dialog, operationError)
+						setCreativeDialogBusy(dialog, false)
+						validateCopy()
+					}
+				})
+				cancel.addEventListener('click', function () {
+					closeCreativeDialog('enable-dialog-cancelled')
+				})
+				finishCreativeDialogMount(dialog)
+				validateCopy()
+				setTimeout(function () { input.focus(); input.select() }, 0)
+			}
+
+			function openDisableCreativeDialog() {
+				closeCreativeDialog('replace-dialog', true)
+				creative.setDialogOpen(true, 'disable-dialog-opened')
+				const dialog = createCreativeDialog('disable')
+				const confirm = createDialogButton('creativeDisableConfirm', true)
+				const cancel = createDialogButton('creativeCancel', false)
+				dialog.actions.append(confirm, cancel)
+				dialog.confirm = confirm
+				dialog.cancel = cancel
+				creativeDialog = dialog
+				confirm.addEventListener('click', async function () {
+					if (dialog.busy) return
+					setCreativeDialogBusy(dialog, true)
+					try {
+						await creative.disable('creative-dialog-disable')
+						closeCreativeDialog('disable-complete', true)
+					} catch (operationError) {
+						showCreativeDialogError(dialog, operationError)
+						setCreativeDialogBusy(dialog, false)
+					}
+				})
+				cancel.addEventListener('click', function () {
+					closeCreativeDialog('disable-dialog-cancelled')
+				})
+				finishCreativeDialogMount(dialog)
+				setTimeout(function () { cancel.focus() }, 0)
+			}
+
+			function createCreativeDialog(kind) {
+				const element = document.createElement('div')
+				element.id = DIALOG_ID
+				element.className = 'cattail-world-editor-creative-dialog'
+				element.dataset.theme = shell.dataset.theme
+				element.dataset.kind = kind
+				element.setAttribute('role', 'dialog')
+				element.setAttribute('aria-modal', 'true')
+				const box = document.createElement('div')
+				box.className = 'cattail-world-editor-creative-dialog__box'
+				const title = document.createElement('h2')
+				title.className = 'cattail-world-editor-creative-dialog__title'
+				title.id = DIALOG_ID + '-title'
+				title.dataset.creativeText = kind === 'enable' ? 'creativeEnableTitle' : 'creativeDisableTitle'
+				const message = document.createElement('p')
+				message.className = 'cattail-world-editor-creative-dialog__message'
+				message.dataset.creativeText = kind === 'enable' ? 'creativeEnableMessage' : 'creativeDisableMessage'
+				const content = document.createElement('div')
+				content.className = 'cattail-world-editor-creative-dialog__content'
+				const errorNode = document.createElement('div')
+				errorNode.className = 'cattail-world-editor-creative-dialog__error'
+				errorNode.hidden = true
+				errorNode.setAttribute('role', 'alert')
+				const actions = document.createElement('div')
+				actions.className = 'cattail-world-editor-creative-dialog__actions'
+				box.append(title, message, content, errorNode, actions)
+				element.append(box)
+				element.setAttribute('aria-labelledby', title.id)
+				return {
+					element,
+					box,
+					title,
+					message,
+					content,
+					errorNode,
+					actions,
+					kind,
+					busy: false,
+					previousFocus: document.activeElement,
+					handleKeydown: null
+				}
+			}
+
+			function createDialogButton(textKey, primary) {
+				const button = document.createElement('button')
+				button.type = 'button'
+				button.className = 'cattail-world-editor-creative-dialog__button'
+				if (primary) button.className += ' cattail-world-editor-creative-dialog__button--primary'
+				button.dataset.creativeText = textKey
+				return button
+			}
+
+			function finishCreativeDialogMount(dialog) {
+				dialog.handleKeydown = function (event) {
+					if (event.key === 'Escape') {
+						event.preventDefault()
+						event.stopImmediatePropagation()
+						if (!dialog.busy) closeCreativeDialog('dialog-escape')
+						return
+					}
+					if (event.key !== 'Tab') return
+					const focusable = Array.from(dialog.element.querySelectorAll('button:not(:disabled), input:not(:disabled)'))
+					if (!focusable.length) return
+					const first = focusable[0]
+					const last = focusable[focusable.length - 1]
+					if (event.shiftKey && document.activeElement === first) {
+						event.preventDefault()
+						last.focus()
+					} else if (!event.shiftKey && document.activeElement === last) {
+						event.preventDefault()
+						first.focus()
+					}
+				}
+				dialog.element.addEventListener('keydown', dialog.handleKeydown, true)
+				for (const type of ['mousedown', 'mouseup', 'click', 'pointerdown', 'pointerup', 'touchstart', 'touchend', 'wheel']) {
+					dialog.element.addEventListener(type, function (event) { event.stopPropagation() })
+				}
+				document.body.append(dialog.element)
+				refreshCreativeDialogText(game)
+			}
+
+			function refreshCreativeDialogText(languageGame) {
+				if (!creativeDialog?.element) return
+				const source = languageGame || game
+				for (const node of creativeDialog.element.querySelectorAll('[data-creative-text]')) {
+					node.textContent = i18n.t(source, node.dataset.creativeText)
+				}
+			}
+
+			function setCreativeDialogBusy(dialog, busy) {
+				dialog.busy = !!busy
+				dialog.element.dataset.busy = dialog.busy ? 'true' : 'false'
+				for (const control of dialog.element.querySelectorAll('button, input')) control.disabled = dialog.busy
+			}
+
+			function showCreativeDialogError(dialog, operationError) {
+				dialog.errorNode.hidden = false
+				dialog.errorNode.textContent = String(operationError?.message || i18n.t(game, 'creativeOperationFailed'))
+			}
+
+			function closeCreativeDialog(reason, force) {
+				const dialog = creativeDialog
+				if (!dialog || (dialog.busy && !force)) return false
+				creativeDialog = null
+				dialog.element.removeEventListener('keydown', dialog.handleKeydown, true)
+				dialog.element.remove()
+				creative.setDialogOpen(false, reason || 'dialog-closed')
+				const focusTarget = dialog.previousFocus
+				if (focusTarget?.isConnected && typeof focusTarget.focus === 'function') focusTarget.focus()
+				else creativeButton.focus()
+				return true
+			}
+
 			selectButton.addEventListener('click', handleSelectClick)
 			removeButton.addEventListener('click', handleRemoveClick)
+			creativeButton.addEventListener('click', handleCreativeClick)
 
 			const handleGameHud = function (event) {
 				if (event?.detail?.game && event.detail.game !== game) return
@@ -242,6 +550,7 @@ ModLoader.register({
 			runtime.addCleanup(function () {
 				if (refreshMountedText === refreshText) refreshMountedText = null
 				if (refreshMountedTheme === refreshTheme) refreshMountedTheme = null
+				if (creativeDialog) closeCreativeDialog('shell-cleanup', true)
 				window.removeEventListener('modloader:game-hud', handleGameHud)
 				window.removeEventListener('modloader:vanilla-game-hud', handleVanillaGameHud)
 				window.removeEventListener('resize', refreshUiScale)
@@ -249,8 +558,10 @@ ModLoader.register({
 				if (typeof stopStateSubscription === 'function') stopStateSubscription()
 				if (typeof stopSelectionSubscription === 'function') stopSelectionSubscription()
 				if (typeof stopToolSubscription === 'function') stopToolSubscription()
+				if (typeof stopCreativeSubscription === 'function') stopCreativeSubscription()
 				selectButton.removeEventListener('click', handleSelectClick)
 				removeButton.removeEventListener('click', handleRemoveClick)
+				creativeButton.removeEventListener('click', handleCreativeClick)
 				if (typeof releaseHud === 'function') releaseHud()
 				writeStyleProperty(rootStyle, '--world-editor-ui-scale', previousScale)
 				writeStyleProperty(rootStyle, '--world-editor-toolbar-layout-width', previousToolbarWidth)
@@ -305,7 +616,11 @@ ModLoader.register({
 			actions.dataset.worldEditorSlot = 'actions'
 			const selectButton = createToolButton('select', 'tool-select')
 			const removeButton = createIconButton('remove-selection', '×')
-			actions.append(selectButton, removeButton)
+			const creativeButton = createToolButton('creative-mode', 'creative-mode')
+			creativeButton.className += ' cattail-world-editor-shell__tool--creative'
+			creativeButton.dataset.active = 'false'
+			creativeButton.dataset.creative = 'false'
+			actions.append(selectButton, removeButton, creativeButton)
 
 			const hint = document.createElement('span')
 			hint.className = 'cattail-world-editor-shell__hint'
@@ -342,6 +657,33 @@ ModLoader.register({
 			return button
 		}
 
+		function unavailableCreativeController(game) {
+			const state = Object.freeze({
+				version: '1.0.0',
+				ready: false,
+				creativeMode: false,
+				entryMode: null,
+				createdAt: 0,
+				busy: false,
+				dialogOpen: false,
+				pendingForkFinalization: false,
+				revision: 0,
+				lastReason: 'creative-service-unavailable',
+				error: Object.freeze({ code: 'NOT_READY', message: 'Creative mode is unavailable.' }),
+				disposed: false
+			})
+			return Object.freeze({
+				game,
+				snapshot() { return state },
+				subscribe(listener) {
+					listener(state)
+					return function () {}
+				},
+				setDialogOpen() { return false },
+				isInputBlocked() { return false }
+			})
+		}
+
 		function ensureStyle() {
 			const existing = document.getElementById(STYLE_ID)
 			if (existing) return existing
@@ -358,6 +700,9 @@ ModLoader.register({
 					--world-editor-shell-chip: rgba(18, 20, 22, .07);
 					--world-editor-shell-active: rgba(113, 79, 163, .16);
 					--world-editor-shell-active-border: rgba(113, 79, 163, .34);
+					--world-editor-shell-creative: rgba(181, 125, 34, .18);
+					--world-editor-shell-creative-border: rgba(181, 125, 34, .48);
+					--world-editor-shell-creative-text: rgb(125, 77, 9);
 					--world-editor-shell-shadow: 0 12px 36px rgba(0, 0, 0, .18);
 					position: fixed;
 					top: max(12px, env(safe-area-inset-top));
@@ -383,6 +728,9 @@ ModLoader.register({
 					--world-editor-shell-chip: rgba(255, 255, 255, .09);
 					--world-editor-shell-active: rgba(210, 188, 250, .16);
 					--world-editor-shell-active-border: rgba(210, 188, 250, .34);
+					--world-editor-shell-creative: rgba(240, 201, 106, .18);
+					--world-editor-shell-creative-border: rgba(240, 201, 106, .52);
+					--world-editor-shell-creative-text: rgb(255, 220, 138);
 					--world-editor-shell-shadow: 0 12px 36px rgba(0, 0, 0, .35);
 				}
 				.cattail-world-editor-shell[data-visible="true"] {
@@ -493,6 +841,11 @@ ModLoader.register({
 					background: var(--world-editor-shell-active);
 					color: var(--world-editor-shell-text);
 				}
+				.cattail-world-editor-shell__tool--creative[data-creative="true"] {
+					border-color: var(--world-editor-shell-creative-border);
+					background: var(--world-editor-shell-creative);
+					color: var(--world-editor-shell-creative-text);
+				}
 				.cattail-world-editor-shell__tool:disabled {
 					opacity: .38;
 					cursor: default;
@@ -503,6 +856,126 @@ ModLoader.register({
 					border-left: 1px solid var(--world-editor-shell-border);
 					color: var(--world-editor-shell-muted);
 					font-size: 13px;
+				}
+				.cattail-world-editor-creative-dialog {
+					--world-editor-dialog-bg: rgba(248, 248, 246, .97);
+					--world-editor-dialog-text: rgba(18, 20, 22, .94);
+					--world-editor-dialog-muted: rgba(18, 20, 22, .66);
+					--world-editor-dialog-border: rgba(0, 0, 0, .16);
+					--world-editor-dialog-control: rgba(18, 20, 22, .06);
+					position: fixed;
+					inset: 0;
+					z-index: 80;
+					display: grid;
+					place-items: center;
+					box-sizing: border-box;
+					padding: 20px;
+					background: rgba(8, 10, 12, .36);
+					backdrop-filter: blur(10px);
+					-webkit-backdrop-filter: blur(10px);
+					color: var(--world-editor-dialog-text);
+					font-family: Montserrat, Arial, sans-serif;
+					pointer-events: auto;
+				}
+				.cattail-world-editor-creative-dialog[data-theme="void"] {
+					--world-editor-dialog-bg: rgba(8, 10, 12, .97);
+					--world-editor-dialog-text: rgba(255, 255, 255, .94);
+					--world-editor-dialog-muted: rgba(255, 255, 255, .66);
+					--world-editor-dialog-border: rgba(255, 255, 255, .18);
+					--world-editor-dialog-control: rgba(255, 255, 255, .08);
+				}
+				.cattail-world-editor-creative-dialog__box {
+					width: min(620px, calc(100vw - 32px));
+					max-height: calc(100vh - 40px);
+					overflow: auto;
+					box-sizing: border-box;
+					padding: 24px;
+					border: 1px solid var(--world-editor-dialog-border);
+					border-radius: 10px;
+					background: var(--world-editor-dialog-bg);
+					box-shadow: 0 20px 70px rgba(0, 0, 0, .34);
+				}
+				.cattail-world-editor-creative-dialog__title {
+					margin: 0 0 10px;
+					font-size: 22px;
+					line-height: 1.3;
+				}
+				.cattail-world-editor-creative-dialog__message {
+					margin: 0 0 18px;
+					color: var(--world-editor-dialog-muted);
+					font-size: 14px;
+					line-height: 1.55;
+					white-space: pre-line;
+				}
+				.cattail-world-editor-creative-dialog__content {
+					display: grid;
+					gap: 10px;
+				}
+				.cattail-world-editor-creative-dialog__field {
+					display: grid;
+					gap: 7px;
+					color: var(--world-editor-dialog-muted);
+					font-size: 13px;
+					font-weight: 600;
+				}
+				.cattail-world-editor-creative-dialog__input {
+					box-sizing: border-box;
+					width: 100%;
+					min-height: 40px;
+					border: 1px solid var(--world-editor-dialog-border);
+					border-radius: 6px;
+					padding: 8px 10px;
+					background: var(--world-editor-dialog-control);
+					color: var(--world-editor-dialog-text);
+					font: 500 14px/1.3 Montserrat, Arial, sans-serif;
+					outline: none;
+					user-select: text !important;
+					-webkit-user-select: text !important;
+				}
+				.cattail-world-editor-creative-dialog__input:focus {
+					border-color: var(--world-editor-shell-creative-border);
+				}
+				.cattail-world-editor-creative-dialog__preview,
+				.cattail-world-editor-creative-dialog__status {
+					color: var(--world-editor-dialog-muted);
+					font-size: 13px;
+					line-height: 1.45;
+					overflow-wrap: anywhere;
+				}
+				.cattail-world-editor-creative-dialog__error {
+					margin-top: 12px;
+					color: #c14b45;
+					font-size: 13px;
+					line-height: 1.45;
+				}
+				.cattail-world-editor-creative-dialog__actions {
+					display: flex;
+					justify-content: flex-end;
+					flex-wrap: wrap;
+					gap: 8px;
+					margin-top: 20px;
+				}
+				.cattail-world-editor-creative-dialog__button {
+					min-height: 38px;
+					border: 1px solid var(--world-editor-dialog-border);
+					border-radius: 6px;
+					padding: 8px 12px;
+					background: var(--world-editor-dialog-control);
+					color: var(--world-editor-dialog-text);
+					font: 600 13px/1.2 Montserrat, Arial, sans-serif;
+					cursor: pointer;
+				}
+				.cattail-world-editor-creative-dialog__button--primary {
+					border-color: var(--world-editor-shell-creative-border);
+					background: var(--world-editor-shell-creative);
+					color: var(--world-editor-shell-creative-text);
+				}
+				.cattail-world-editor-creative-dialog__button:disabled {
+					cursor: default;
+					opacity: .38;
+				}
+				.cattail-world-editor-creative-dialog[data-busy="true"] {
+					cursor: progress;
 				}
 				@media (max-width: 900px) {
 					.cattail-world-editor-shell__bar {
@@ -626,6 +1099,12 @@ ModLoader.register({
 
 		function formatCount(template, count) {
 			return String(template || '').replace(/\{count\}/g, String(count))
+		}
+
+		function formatTemplate(template, values) {
+			return String(template || '').replace(/\{(\w+)\}/g, function (match, key) {
+				return Object.hasOwn(values || {}, key) ? String(values[key]) : match
+			})
 		}
 	}
 })

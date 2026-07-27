@@ -28,6 +28,7 @@ ModLoader.register({
 				}
 
 				if (event.isComposing || event.keyCode === 229 || shared.isEditableEvent(event)) return
+				if (shared.isWorldEditorInputBlocked?.()) return
 
 				if (game.splash?.isShown) {
 					runtime.deactivate('splash-visible')
