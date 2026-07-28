@@ -4,7 +4,7 @@
 
 ## 当前阶段
 
-阶段 3F 在 3E 只读蓝图预览基础上消费 Dynamic Details 0.1.1 的生产遥测 API：选区卡显示每秒刷新的实际产量，schema 3 蓝图在捕获时保存一次理论产量和当时实际产量，蓝图主卡可打开独立产量卡。本阶段仍不提供真实放置按钮、`Ctrl+V`、确认弹窗或任何世界写入。
+当前阶段 4A-3a 在已验收的创造模式与免费商店写前快照协调之上，新增会话内的内部事务、undo/redo、外部变化阻止和失败回滚状态机。产品运行时尚未注册真实写入适配器，也不提供撤销按钮、热键、蓝图真实放置或其他新的世界写入。
 
 ## 不变量
 
@@ -22,6 +22,7 @@ scripts/
     foundation.js        # 1A：注册入口
     shared.js            # 通用输入守卫、卡片几何、固定发光、滚动条、折叠/调高控制与右键世界拖动穿透
     editor-state.js      # 1B：编辑器生命周期、订阅和清理
+    editor-transactions.js # 4A-3a：会话事务历史、写前快照、重验、回滚和内部 undo/redo 状态机
     selection-state.js   # 2G：稳定 ID 多选、主选区、兼容快照及指针/滚轮事务
     tool-state.js        # 2G：单一选择工具状态和生命周期
     selection-analysis.js # 3F：可取消的分批只读统计与已完成实体只读视图
@@ -413,3 +414,20 @@ globalThis[Symbol.for('cattail.world-editor.creative-mode')].snapshot()
 ```
 
 4A-2b 不包含蓝图真实放置、世界编辑器删除/剪切/移动、undo/redo、快照恢复或导入界面。
+
+## 4A-3a 内部事务引擎
+
+- `cattail.world-editor.transactions` 提供会话内的事务适配器、写前物理快照、二次预检、结果验证、失败回滚以及最多 50 项的内部 undo/redo 历史。
+- 一次完整编辑器命令对应一条事务。事务记录只保存冻结的纯数据、精确 guard scope、before/after 状态、资源与统计增量以及快照 ID，不保存 DOM、实体对象或整份存档。
+- forward、undo 和 redo 都必须在任何世界写入前创建物理快照。快照失败或目标在等待期间改变时不会执行写入；apply 开始后的失败必须恢复操作前状态，恢复失败会阻止后续事务直到重新载入。
+- 外部变化检查只比较适配器声明的危险状态；不会比较带时间戳的整份存档，也不会把正常生产得到的资源或累计统计恢复成旧绝对值。
+- 当前产品运行时没有注册真实世界写入适配器，也没有撤销/重做按钮或热键。4A-2b 的原版商店操作不进入编辑器历史，蓝图放置适配器仍属于未来 4B。
+- 4A-3a 不修改原版、ModLoader、Better UIs、配置、翻译或现有 UI，World Editor 版本继续保持 `0.4.0`。
+
+开发者控制台可检查：
+
+```js
+globalThis[Symbol.for('cattail.world-editor.transactions')].snapshot()
+```
+
+未接入真实写入适配器时，`registeredKinds`、`undoCount` 和 `redoCount` 均应为空或 `0`。
