@@ -14,6 +14,11 @@ ModLoader.register({
 			'touchend',
 			'wheel'
 		])
+		const KEY_EVENT_TYPES = Object.freeze([
+			'keydown',
+			'keyup',
+			'keypress'
+		])
 		const FOCUSABLE_SELECTOR = [
 			'button:not(:disabled)',
 			'input:not(:disabled)',
@@ -89,8 +94,18 @@ ModLoader.register({
 				let busy = false
 				const previousFocus = document.activeElement
 
-				const stopPropagation = function (event) {
+				const handleSurfaceEvent = function (event) {
 					event.stopPropagation()
+					if (
+						event.type === 'click' &&
+						event.target === element &&
+						settings.closeOnBackdrop !== false &&
+						!busy
+					) {
+						event.preventDefault()
+						event.stopImmediatePropagation()
+						handle.close('dialog-backdrop')
+					}
 				}
 				const handleKeydown = function (event) {
 					if (event.key === 'Escape') {
@@ -115,6 +130,11 @@ ModLoader.register({
 						event.preventDefault()
 						first.focus()
 					}
+				}
+				const handleWindowKeyEvent = function (event) {
+					if (!mounted || closed) return
+					event.stopImmediatePropagation()
+					if (event.type === 'keydown') handleKeydown(event)
 				}
 
 				const handle = {
@@ -148,8 +168,9 @@ ModLoader.register({
 					mount(focusTarget) {
 						if (closed || mounted) return false
 						mounted = true
-						element.addEventListener('keydown', handleKeydown, true)
-						for (const type of EVENT_TYPES) element.addEventListener(type, stopPropagation)
+						releaseGameKeyboardState(game)
+						for (const type of KEY_EVENT_TYPES) window.addEventListener(type, handleWindowKeyEvent, true)
+						for (const type of EVENT_TYPES) element.addEventListener(type, handleSurfaceEvent)
 						document.body.append(element)
 						const target = focusTarget || element.querySelector(FOCUSABLE_SELECTOR) || box
 						if (target === box) box.tabIndex = -1
@@ -198,8 +219,8 @@ ModLoader.register({
 						closed = true
 						mounted = false
 						handles.delete(handle)
-						element.removeEventListener('keydown', handleKeydown, true)
-						for (const type of EVENT_TYPES) element.removeEventListener(type, stopPropagation)
+						for (const type of KEY_EVENT_TYPES) window.removeEventListener(type, handleWindowKeyEvent, true)
+						for (const type of EVENT_TYPES) element.removeEventListener(type, handleSurfaceEvent)
 						element.remove()
 						try {
 							settings.onClose?.(String(reason || 'dialog-closed'), handle)
@@ -259,6 +280,19 @@ ModLoader.register({
 			)
 		}
 
+		function releaseGameKeyboardState(game) {
+			if (Array.isArray(game?.translationMap)) {
+				for (let index = 0; index < game.translationMap.length; index += 1) {
+					game.translationMap[index] = 0
+				}
+			}
+			if (game) {
+				delete game.keyboardMovementHappening
+				game.altActive = false
+			}
+			document.body?.classList?.remove?.('altHolded')
+		}
+
 		function ensureStyle() {
 			const existing = document.getElementById(STYLE_ID)
 			if (existing) return existing
@@ -294,6 +328,14 @@ ModLoader.register({
 					--world-editor-dialog-border: rgba(255, 255, 255, .18);
 					--world-editor-dialog-control: rgba(255, 255, 255, .08);
 					--world-editor-dialog-accent-text: #17150b;
+				}
+				.cattail-world-editor-dialog[data-kind^="creative-"] {
+					--world-editor-dialog-accent: #a6f246;
+					--world-editor-dialog-accent-text: #17200c;
+				}
+				.cattail-world-editor-dialog[data-theme="void"][data-kind^="creative-"] {
+					--world-editor-dialog-accent: #e3fd43;
+					--world-editor-dialog-accent-text: #171a05;
 				}
 				.cattail-world-editor-dialog__box {
 					width: min(620px, calc(100vw - 32px));

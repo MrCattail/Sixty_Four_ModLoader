@@ -13,6 +13,11 @@ ModLoader.register({
 		const ECONOMY_STATUS_ID = 'cattail-world-editor-economy-status'
 		const STYLE_ID = 'cattail-world-editor-shell-style'
 		const DIALOG_ID = 'cattail-world-editor-creative-dialog'
+		const COPY_DIALOG_RETURN_REASONS = new Set([
+			'copy-dialog-cancelled',
+			'dialog-escape',
+			'dialog-backdrop'
+		])
 		const UI_SCALE_BASE_WIDTH = 1600
 		const UI_SCALE_BASE_HEIGHT = 1000
 		const UI_SCALE_MIN = .5
@@ -314,6 +319,39 @@ ModLoader.register({
 				closeCreativeDialog('replace-dialog', true)
 				creative.setDialogOpen(true, 'enable-dialog-opened')
 				const dialog = createCreativeDialog('enable')
+				const enableCurrent = createDialogButton(dialog, 'creativeEnableCurrent', true)
+				const createCopy = createDialogButton(dialog, 'creativeCreateCopy', true)
+				const cancel = createDialogButton(dialog, 'creativeCancel', false)
+				dialog.actions.append(enableCurrent, createCopy, cancel)
+				dialog.enableCurrent = enableCurrent
+				dialog.createCopy = createCopy
+				dialog.cancel = cancel
+				creativeDialog = dialog
+				enableCurrent.addEventListener('click', async function () {
+					if (dialog.busy) return
+					setCreativeDialogBusy(dialog, true)
+					try {
+						await creative.enableInPlace('creative-dialog-current')
+						closeCreativeDialog('enable-current-complete', true)
+					} catch (operationError) {
+						showCreativeDialogError(dialog, operationError)
+						setCreativeDialogBusy(dialog, false)
+					}
+				})
+				createCopy.addEventListener('click', function () {
+					if (dialog.busy) return
+					openCreateCopyDialog()
+				})
+				cancel.addEventListener('click', function () {
+					closeCreativeDialog('enable-dialog-cancelled')
+				})
+				finishCreativeDialogMount(dialog, enableCurrent)
+			}
+
+			function openCreateCopyDialog() {
+				closeCreativeDialog('copy-dialog-opened', true)
+				creative.setDialogOpen(true, 'copy-dialog-opened')
+				const dialog = createCreativeDialog('copy')
 				const saveSlots = globalThis[SAVE_SLOTS_KEY]
 				let slotsState = saveSlots?.version === 1 && typeof saveSlots.snapshot === 'function'
 					? saveSlots.snapshot()
@@ -337,14 +375,12 @@ ModLoader.register({
 				copyStatus.className = 'cattail-world-editor-creative-dialog__status'
 				dialog.content.append(inputLabel, preview, copyStatus)
 
-				const enableCurrent = createDialogButton(dialog, 'creativeEnableCurrent', true)
 				const createCopy = createDialogButton(dialog, 'creativeCreateCopy', true)
 				const cancel = createDialogButton(dialog, 'creativeCancel', false)
-				dialog.actions.append(enableCurrent, createCopy, cancel)
+				dialog.actions.append(createCopy, cancel)
 				dialog.input = input
 				dialog.preview = preview
 				dialog.copyStatus = copyStatus
-				dialog.enableCurrent = enableCurrent
 				dialog.createCopy = createCopy
 				dialog.cancel = cancel
 				creativeDialog = dialog
@@ -357,7 +393,7 @@ ModLoader.register({
 					const creativeName = originalName + '创造模式'
 					preview.textContent = originalName
 						? formatTemplate(i18n.t(game, 'creativeCopyNamePreview'), { name: creativeName })
-						: i18n.t(game, 'creativeNameRequired')
+						: ''
 					let statusKey = 'creativeCopyReady'
 					let available = true
 					if (!originalName || originalName.length > 60 || /[\u0000-\u001f\u007f]/.test(originalName)) {
@@ -396,18 +432,6 @@ ModLoader.register({
 				input.addEventListener('keydown', function (event) {
 					if (event.key === 'Enter') event.preventDefault()
 				})
-				enableCurrent.addEventListener('click', async function () {
-					if (dialog.busy) return
-					setCreativeDialogBusy(dialog, true)
-					try {
-						await creative.enableInPlace('creative-dialog-current')
-						closeCreativeDialog('enable-current-complete', true)
-					} catch (operationError) {
-						showCreativeDialogError(dialog, operationError)
-						setCreativeDialogBusy(dialog, false)
-						validateCopy()
-					}
-				})
 				createCopy.addEventListener('click', async function () {
 					if (dialog.busy || createCopy.disabled) return
 					setCreativeDialogBusy(dialog, true)
@@ -424,9 +448,9 @@ ModLoader.register({
 					}
 				})
 				cancel.addEventListener('click', function () {
-					closeCreativeDialog('enable-dialog-cancelled')
+					closeCreativeDialog('copy-dialog-cancelled')
 				})
-				finishCreativeDialogMount(dialog)
+				finishCreativeDialogMount(dialog, input)
 				validateCopy()
 				setTimeout(function () { input.focus(); input.select() }, 0)
 			}
@@ -460,21 +484,42 @@ ModLoader.register({
 			}
 
 			function createCreativeDialog(kind) {
+				const textKeys = {
+					enable: {
+						title: 'creativeEnableTitle',
+						message: 'creativeEnableMessage'
+					},
+					copy: {
+						title: 'creativeCreateCopy',
+						message: null
+					},
+					disable: {
+						title: 'creativeDisableTitle',
+						message: 'creativeDisableMessage'
+					}
+				}[kind] || {
+					title: 'creativeEnableTitle',
+					message: 'creativeEnableMessage'
+				}
 				const dialog = dialogs.create({
 					id: DIALOG_ID,
 					theme: shell.dataset.theme,
 					kind: 'creative-' + kind,
 					fallbackFocus: creativeButton,
 					onClose(reason, closedDialog) {
+						const closeReason = String(reason || 'dialog-closed')
+						const returnToEnable = kind === 'copy' && COPY_DIALOG_RETURN_REASONS.has(closeReason)
 						if (creativeDialog === closedDialog) creativeDialog = null
-						creative.setDialogOpen(false, reason || 'dialog-closed')
+						creative.setDialogOpen(false, closeReason)
+						if (returnToEnable) openEnableCreativeDialog()
 					}
 				})
 				dialog.element.classList.add('cattail-world-editor-creative-dialog')
 				const title = dialog.title
-				title.dataset.creativeText = kind === 'enable' ? 'creativeEnableTitle' : 'creativeDisableTitle'
+				title.dataset.creativeText = textKeys.title
 				const message = dialog.message
-				message.dataset.creativeText = kind === 'enable' ? 'creativeEnableMessage' : 'creativeDisableMessage'
+				if (textKeys.message) message.dataset.creativeText = textKeys.message
+				else message.hidden = true
 				dialog.kind = kind
 				return dialog
 			}
@@ -485,8 +530,8 @@ ModLoader.register({
 				return button
 			}
 
-			function finishCreativeDialogMount(dialog) {
-				dialog.mount()
+			function finishCreativeDialogMount(dialog, focusTarget) {
+				dialog.mount(focusTarget)
 				refreshCreativeDialogText(game)
 			}
 
@@ -748,9 +793,9 @@ ModLoader.register({
 					--world-editor-shell-chip: rgba(18, 20, 22, .07);
 					--world-editor-shell-active: rgba(113, 79, 163, .16);
 					--world-editor-shell-active-border: rgba(113, 79, 163, .34);
-					--world-editor-shell-creative: rgba(181, 125, 34, .18);
-					--world-editor-shell-creative-border: rgba(181, 125, 34, .48);
-					--world-editor-shell-creative-text: rgb(125, 77, 9);
+					--world-editor-shell-creative: rgba(166, 242, 70, .2);
+					--world-editor-shell-creative-border: rgba(166, 242, 70, .62);
+					--world-editor-shell-creative-text: rgb(91, 128, 25);
 					--world-editor-shell-shadow: 0 12px 36px rgba(0, 0, 0, .18);
 					position: fixed;
 					top: max(12px, env(safe-area-inset-top));
@@ -776,9 +821,9 @@ ModLoader.register({
 					--world-editor-shell-chip: rgba(255, 255, 255, .09);
 					--world-editor-shell-active: rgba(210, 188, 250, .16);
 					--world-editor-shell-active-border: rgba(210, 188, 250, .34);
-					--world-editor-shell-creative: rgba(240, 201, 106, .18);
-					--world-editor-shell-creative-border: rgba(240, 201, 106, .52);
-					--world-editor-shell-creative-text: rgb(255, 220, 138);
+					--world-editor-shell-creative: rgba(227, 253, 67, .18);
+					--world-editor-shell-creative-border: rgba(227, 253, 67, .64);
+					--world-editor-shell-creative-text: rgb(227, 253, 67);
 					--world-editor-shell-shadow: 0 12px 36px rgba(0, 0, 0, .35);
 				}
 				.cattail-world-editor-shell[data-visible="true"] {
@@ -976,6 +1021,7 @@ ModLoader.register({
 				}
 				.cattail-world-editor-creative-dialog__input:focus {
 					border-color: var(--world-editor-dialog-accent);
+					box-shadow: 0 0 0 2px color-mix(in srgb, var(--world-editor-dialog-accent) 24%, transparent);
 				}
 				.cattail-world-editor-creative-dialog__preview,
 				.cattail-world-editor-creative-dialog__status {
