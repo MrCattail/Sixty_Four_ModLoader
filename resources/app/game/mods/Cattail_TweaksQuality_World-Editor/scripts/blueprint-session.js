@@ -782,17 +782,20 @@ ModLoader.register({
 
 			function mountUi() {
 				const shell = document.getElementById(SHELL_ID)
-				const actions = shell?.querySelector?.('[data-world-editor-slot="actions"]')
-				if (!shell || !actions) {
-					console.warn('[Cattail World Editor] Blueprint 3A could not find the toolbar action slot.')
+				const blueprintSlot = shell?.querySelector?.('[data-world-editor-slot="blueprint"]')
+				const transformSlot = shell?.querySelector?.('[data-world-editor-slot="transform"]')
+				if (!shell || !blueprintSlot || !transformSlot) {
+					console.warn('[Cattail World Editor] Blueprint 3A could not find the grouped toolbar slots.')
 					return null
 				}
 				document.getElementById(CARD_ID)?.remove()
-				actions.querySelector?.('[data-world-editor-blueprint-controls]')?.remove()
+				blueprintSlot.querySelector?.('[data-world-editor-blueprint-controls]')?.remove()
+				transformSlot.querySelector?.('[data-world-editor-transform-controls="toolbar"]')?.remove()
 				const style = ensureStyle()
 				const controls = createControls()
 				const card = createCard()
-				actions.append(controls.root)
+				blueprintSlot.append(controls.root)
+				transformSlot.append(controls.transforms)
 				document.body.append(card)
 
 				const mounted = {
@@ -933,6 +936,7 @@ ModLoader.register({
 				ui.worldDragControls?.release?.()
 				if (typeof ui.releaseHud === 'function') ui.releaseHud()
 				ui.controls.root.remove()
+				ui.controls.transforms.remove()
 				ui.card.remove()
 				if (ui.style.isConnected && !document.getElementById(CARD_ID)) ui.style.remove()
 				ui = null
@@ -977,7 +981,7 @@ ModLoader.register({
 				copy.append(copyIcon)
 
 				const transforms = createTransformControls('toolbar')
-				root.append(modes, blocks, copy, transforms)
+				root.append(modes, blocks, copy)
 				return { root, modes, structure, full, blocks, copy, transforms }
 			}
 
@@ -2453,7 +2457,8 @@ ModLoader.register({
 					.cattail-world-editor-blueprint-controls {
 						display: inline-flex;
 						align-items: center;
-						flex-wrap: wrap;
+						flex: none;
+						flex-wrap: nowrap;
 						gap: 6px;
 						font-family: Montserrat, Arial, sans-serif;
 					}
@@ -2519,7 +2524,7 @@ ModLoader.register({
 						display: inline-flex;
 						align-items: center;
 						flex: none;
-						flex-wrap: wrap;
+						flex-wrap: nowrap;
 						gap: 4px;
 					}
 					.cattail-world-editor-transform-button {
@@ -3048,12 +3053,7 @@ ModLoader.register({
 						font-size: 10px;
 					}
 					@media (max-width: 680px) {
-						.cattail-world-editor-shell__bar {
-							flex-wrap: wrap;
-							justify-content: center;
-						}
 						.cattail-world-editor-blueprint-controls {
-							order: 3;
 							justify-content: center;
 						}
 						.cattail-world-editor-blueprint-mode {

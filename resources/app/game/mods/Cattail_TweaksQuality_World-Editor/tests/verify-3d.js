@@ -1446,6 +1446,72 @@ function testLocalizationAndIntegrationContract() {
 	assert.match(shellSource, /uiScaleObserver\?\.disconnect\?\.\(\)/)
 	assert.match(shellSource, /--world-editor-ui-scale/)
 	assert.match(sessionSource, /scale\(var\(--world-editor-ui-scale,\s*1\)\)/)
+	assert.match(shellSource, /layout\.className = 'cattail-world-editor-shell__layout'/)
+	assert.match(shellSource, /statusBar\.className = 'cattail-world-editor-shell__status-bar'/)
+	assert.match(shellSource, /toolbarBar\.className = 'cattail-world-editor-shell__toolbar-bar'/)
+	assert.match(shellSource, /historyGroup\.dataset\.worldEditorSlot = 'history'/)
+	assert.match(shellSource, /blueprintGroup\.dataset\.worldEditorSlot = 'blueprint'/)
+	assert.match(shellSource, /transformGroup\.dataset\.worldEditorSlot = 'transform'/)
+	assert.match(
+		shellSource,
+		/actions\.append\(selectionGroup,\s*historyGroup,\s*blueprintGroup,\s*transformGroup,\s*creativeGroup\)/
+	)
+	assert.match(shellSource, /statusBar\.append\(identity,\s*divider,\s*status,\s*hint\)/)
+	assert.match(shellSource, /toolbarBar\.append\(actions\)/)
+	assert.match(shellSource, /layout\.append\(statusBar,\s*toolbarBar\)/)
+	assert.match(shellSource, /shell\.append\(layout\)/)
+	assert.match(
+		shellSource,
+		/\.cattail-world-editor-shell__layout\s*\{[\s\S]*flex-direction:\s*column;[\s\S]*align-items:\s*center;[\s\S]*gap:\s*8px;/
+	)
+	const toolbarLayoutStyle = shellSource.match(
+		/\.cattail-world-editor-shell__layout\s*\{([^}]*)\}/
+	)?.[1] || ''
+	assert.doesNotMatch(toolbarLayoutStyle, /(?:^|[\s;])(?:background|border|box-shadow)\s*:/)
+	assert.match(shellSource, /width:\s*max-content/)
+	assert.match(
+		shellSource,
+		/\.cattail-world-editor-shell__status-bar,\s*\.cattail-world-editor-shell__toolbar-bar\s*\{[\s\S]*border:\s*1px solid var\(--world-editor-shell-border\);[\s\S]*background:\s*var\(--world-editor-shell-bg\);[\s\S]*box-shadow:\s*var\(--world-editor-shell-shadow\);/
+	)
+	assert.match(
+		shellSource,
+		/\.cattail-world-editor-shell__status-bar\s*\{[\s\S]*width:\s*max-content;[\s\S]*padding:\s*10px 14px;/
+	)
+	assert.match(
+		shellSource,
+		/\.cattail-world-editor-shell__toolbar-bar\s*\{[\s\S]*width:\s*max-content;[\s\S]*padding:\s*8px 10px;/
+	)
+	assert.doesNotMatch(shellSource, /cattail-world-editor-shell__bar/)
+	assert.doesNotMatch(shellSource, /grid-template-rows:/)
+	assert.match(
+		shellSource,
+		/\.cattail-world-editor-shell__group\s*\{[\s\S]*flex:\s*none;[\s\S]*flex-wrap:\s*nowrap;[\s\S]*border-radius:\s*8px/
+	)
+	assert.match(shellSource, /\.cattail-world-editor-shell__group:empty\s*\{\s*display:\s*none/)
+	assert.match(
+		shellSource,
+		/@media \(max-width:\s*520px\)[\s\S]*\.cattail-world-editor-shell__identity,[\s\S]*\.cattail-world-editor-shell__hint \{ display:\s*none; \}/
+	)
+	assert.doesNotMatch(shellSource, /data-world-editor-slot="actions"/)
+	assert.doesNotMatch(shellSource, /createIconButton\('(?:undo|redo)'/)
+	assert.match(sessionSource, /const blueprintSlot = shell\?\.querySelector\?\.\('\[data-world-editor-slot="blueprint"\]'\)/)
+	assert.match(sessionSource, /const transformSlot = shell\?\.querySelector\?\.\('\[data-world-editor-slot="transform"\]'\)/)
+	assert.match(sessionSource, /blueprintSlot\.append\(controls\.root\)/)
+	assert.match(sessionSource, /transformSlot\.append\(controls\.transforms\)/)
+	assert.match(sessionSource, /root\.append\(modes,\s*blocks,\s*copy\)/)
+	assert.doesNotMatch(sessionSource, /root\.append\(modes,\s*blocks,\s*copy,\s*transforms\)/)
+	assert.match(sessionSource, /ui\.controls\.transforms\.remove\(\)/)
+	assert.match(
+		sessionSource,
+		/\.cattail-world-editor-blueprint-controls\s*\{[\s\S]*flex:\s*none;[\s\S]*flex-wrap:\s*nowrap/
+	)
+	assert.match(
+		sessionSource,
+		/\.cattail-world-editor-transform-controls\s*\{[\s\S]*flex:\s*none;[\s\S]*flex-wrap:\s*nowrap/
+	)
+	assert.match(readme, /顶部状态栏和工具栏是两个彻底独立的玻璃浮层/)
+	assert.match(readme, /不存在包围二者的共同外框/)
+	assert.match(readme, /未来历史入口/)
 	assert.doesNotMatch(sessionSource, /SECTION_LONG_PRESS_MS|SECTION_PREACTIVATION_PX/)
 	assert.match(sharedSource, /\[data-world-editor-disclosure-resize\]\s*\{[\s\S]*height:\s*10px/)
 	assert.match(sharedSource, /handle\.setPointerCapture\?\.\(activeResize\.pointerId\)/)

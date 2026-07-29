@@ -634,8 +634,12 @@ ModLoader.register({
 			shell.setAttribute('role', 'toolbar')
 			shell.setAttribute('aria-hidden', 'true')
 
-			const bar = document.createElement('div')
-			bar.className = 'cattail-world-editor-shell__bar'
+			const layout = document.createElement('div')
+			layout.className = 'cattail-world-editor-shell__layout'
+			const statusBar = document.createElement('div')
+			statusBar.className = 'cattail-world-editor-shell__status-bar'
+			const toolbarBar = document.createElement('div')
+			toolbarBar.className = 'cattail-world-editor-shell__toolbar-bar'
 
 			const identity = document.createElement('span')
 			identity.className = 'cattail-world-editor-shell__identity'
@@ -665,22 +669,41 @@ ModLoader.register({
 
 			const actions = document.createElement('span')
 			actions.className = 'cattail-world-editor-shell__actions'
-			actions.dataset.worldEditorSlot = 'actions'
 			const selectButton = createToolButton('select', 'tool-select')
 			const removeButton = createIconButton('remove-selection', '×')
 			const creativeButton = createToolButton('creative-mode', 'creative-mode')
 			creativeButton.className += ' cattail-world-editor-shell__tool--creative'
 			creativeButton.dataset.active = 'false'
 			creativeButton.dataset.creative = 'false'
-			actions.append(selectButton, removeButton, creativeButton)
+
+			const selectionGroup = createToolbarGroup('selection')
+			const historyGroup = createToolbarGroup('history')
+			const blueprintGroup = createToolbarGroup('blueprint')
+			const transformGroup = createToolbarGroup('transform')
+			const creativeGroup = createToolbarGroup('creative')
+			historyGroup.dataset.worldEditorSlot = 'history'
+			blueprintGroup.dataset.worldEditorSlot = 'blueprint'
+			transformGroup.dataset.worldEditorSlot = 'transform'
+			selectionGroup.append(selectButton, removeButton)
+			creativeGroup.append(creativeButton)
+			actions.append(selectionGroup, historyGroup, blueprintGroup, transformGroup, creativeGroup)
 
 			const hint = document.createElement('span')
 			hint.className = 'cattail-world-editor-shell__hint'
 			hint.dataset.worldEditorText = 'hint'
 
-			bar.append(identity, divider, status, actions, hint)
-			shell.append(bar)
+			statusBar.append(identity, divider, status, hint)
+			toolbarBar.append(actions)
+			layout.append(statusBar, toolbarBar)
+			shell.append(layout)
 			return shell
+		}
+
+		function createToolbarGroup(kind) {
+			const group = document.createElement('span')
+			group.className = 'cattail-world-editor-shell__group cattail-world-editor-shell__group--' + kind
+			group.dataset.worldEditorToolbarGroup = kind
+			return group
 		}
 
 		function createToolButton(action, textKey) {
@@ -791,12 +814,13 @@ ModLoader.register({
 					--world-editor-shell-border: rgba(0, 0, 0, .12);
 					--world-editor-shell-dot: rgba(18, 20, 22, .82);
 					--world-editor-shell-chip: rgba(18, 20, 22, .07);
+					--world-editor-shell-group: rgba(18, 20, 22, .035);
 					--world-editor-shell-active: rgba(113, 79, 163, .16);
 					--world-editor-shell-active-border: rgba(113, 79, 163, .34);
 					--world-editor-shell-creative: rgba(166, 242, 70, .2);
 					--world-editor-shell-creative-border: rgba(166, 242, 70, .62);
 					--world-editor-shell-creative-text: rgb(91, 128, 25);
-					--world-editor-shell-shadow: 0 12px 36px rgba(0, 0, 0, .18);
+					--world-editor-shell-shadow: 0 10px 28px rgba(0, 0, 0, .16);
 					position: fixed;
 					top: max(12px, env(safe-area-inset-top));
 					left: 0;
@@ -819,12 +843,13 @@ ModLoader.register({
 					--world-editor-shell-border: rgba(255, 255, 255, .14);
 					--world-editor-shell-dot: rgba(242, 242, 237, .94);
 					--world-editor-shell-chip: rgba(255, 255, 255, .09);
+					--world-editor-shell-group: rgba(255, 255, 255, .055);
 					--world-editor-shell-active: rgba(210, 188, 250, .16);
 					--world-editor-shell-active-border: rgba(210, 188, 250, .34);
 					--world-editor-shell-creative: rgba(227, 253, 67, .18);
 					--world-editor-shell-creative-border: rgba(227, 253, 67, .64);
 					--world-editor-shell-creative-text: rgb(227, 253, 67);
-					--world-editor-shell-shadow: 0 12px 36px rgba(0, 0, 0, .35);
+					--world-editor-shell-shadow: 0 10px 28px rgba(0, 0, 0, .3);
 				}
 				.cattail-world-editor-shell[data-visible="true"] {
 					visibility: visible;
@@ -832,28 +857,45 @@ ModLoader.register({
 					transform: translateY(0);
 					transition-delay: 0s;
 				}
-				.cattail-world-editor-shell__bar {
+				.cattail-world-editor-shell__layout {
 					display: flex;
+					flex-direction: column;
 					align-items: center;
-					flex-wrap: wrap;
-					gap: 14px;
+					gap: 8px;
+					width: max-content;
 					max-width: var(--world-editor-toolbar-layout-width, calc(100vw - 24px));
-					min-height: 54px;
-					box-sizing: border-box;
-					padding: 10px 16px;
-					border: 1px solid var(--world-editor-shell-border);
-					border-radius: 8px;
-					background: var(--world-editor-shell-bg);
-					box-shadow: var(--world-editor-shell-shadow);
-					backdrop-filter: blur(14px) saturate(1.12);
-					-webkit-backdrop-filter: blur(14px) saturate(1.12);
 					color: var(--world-editor-shell-text);
 					font: 400 14px/1.4 Montserrat, Arial, sans-serif;
 					-webkit-font-smoothing: antialiased;
 					white-space: nowrap;
 					transform: scale(var(--world-editor-ui-scale, 1));
 					transform-origin: top center;
+				}
+				.cattail-world-editor-shell__status-bar,
+				.cattail-world-editor-shell__toolbar-bar {
+					box-sizing: border-box;
+					border: 1px solid var(--world-editor-shell-border);
+					border-radius: 10px;
+					background: var(--world-editor-shell-bg);
+					box-shadow: var(--world-editor-shell-shadow);
+					backdrop-filter: blur(14px) saturate(1.12);
+					-webkit-backdrop-filter: blur(14px) saturate(1.12);
 					transition: background .18s ease, border-color .18s ease, color .18s ease, box-shadow .18s ease;
+				}
+				.cattail-world-editor-shell__status-bar {
+					display: flex;
+					align-items: center;
+					gap: 14px;
+					width: max-content;
+					max-width: 100%;
+					min-width: 0;
+					padding: 10px 14px;
+				}
+				.cattail-world-editor-shell__toolbar-bar {
+					display: flex;
+					width: max-content;
+					max-width: 100%;
+					padding: 8px 10px;
 				}
 				.cattail-world-editor-shell__identity {
 					display: inline-flex;
@@ -899,11 +941,30 @@ ModLoader.register({
 					font-weight: 600;
 				}
 				.cattail-world-editor-shell__actions {
-					display: inline-flex;
+					display: flex;
 					align-items: center;
 					flex-wrap: wrap;
-					gap: 6px;
+					justify-content: center;
+					gap: 8px;
+					width: max-content;
+					max-width: 100%;
 					pointer-events: auto;
+				}
+				.cattail-world-editor-shell__group {
+					display: inline-flex;
+					align-items: center;
+					flex: none;
+					flex-wrap: nowrap;
+					gap: 6px;
+					min-height: 36px;
+					box-sizing: border-box;
+					padding: 3px 6px;
+					border: 1px solid var(--world-editor-shell-border);
+					border-radius: 8px;
+					background: var(--world-editor-shell-group);
+				}
+				.cattail-world-editor-shell__group:empty {
+					display: none;
 				}
 				.cattail-world-editor-shell__tool {
 					min-height: 30px;
@@ -1031,24 +1092,22 @@ ModLoader.register({
 					overflow-wrap: anywhere;
 				}
 				@media (max-width: 900px) {
-					.cattail-world-editor-shell__bar {
-						justify-content: center;
-						gap: 8px;
+					.cattail-world-editor-shell__status-bar {
+						gap: 10px;
 						padding: 8px 10px;
 					}
+					.cattail-world-editor-shell__toolbar-bar { padding: 7px 8px; }
 					.cattail-world-editor-shell__actions {
 						justify-content: center;
+						gap: 7px;
 					}
-					.cattail-world-editor-shell__hint {
-						margin-left: 0;
-						padding-left: 0;
-						border-left: 0;
-					}
+					.cattail-world-editor-shell__group { padding-inline: 5px; }
 				}
 				@media (max-width: 520px) {
-					.cattail-world-editor-shell__bar { gap: 7px; }
-					.cattail-world-editor-shell__brand,
-					.cattail-world-editor-shell__divider { display: none; }
+					.cattail-world-editor-shell__identity,
+					.cattail-world-editor-shell__divider,
+					.cattail-world-editor-shell__hint { display: none; }
+					.cattail-world-editor-shell__status-bar { justify-content: center; }
 					.cattail-world-editor-shell__mode { font-size: 16px; }
 					.cattail-world-editor-shell__tool { padding-inline: 8px; }
 				}
