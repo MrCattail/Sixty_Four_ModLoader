@@ -409,9 +409,9 @@ function testI18nManifestAndReadOnlyBoundary() {
 	const { definitions, sandbox } = loadModules(['scripts/i18n/editor-text.js'])
 	for (const definition of definitions) definition.init(createApi())
 	const i18n = sandbox[I18N_KEY]
-	assert.equal(i18n.version, '0.4.0')
+	assert.equal(i18n.version, '0.4.1')
 	assert.equal(i18n.languages.length, 20)
-	assert.equal(i18n.keys.length, 118)
+	assert.equal(i18n.keys.length, 130)
 	assert.ok(i18n.keys.includes('removeSelection'))
 	for (const language of i18n.languages) {
 		const translated = i18n.t(language, 'removeSelection')
@@ -433,11 +433,15 @@ function testI18nManifestAndReadOnlyBoundary() {
 	assert.match(controllerSource, /selection\.isPrimarySelected/)
 
 	const manifest = JSON.parse(fs.readFileSync(path.join(MOD_ROOT, 'mod.json'), 'utf8'))
-	assert.equal(manifest.version, '0.4.0')
+	assert.equal(manifest.version, '0.4.1')
 	assert.equal(manifest.languageSupport.gameLanguage, true)
-	assert.equal(manifest.entry.length, 24)
+	assert.equal(manifest.entry.length, 26)
 
 	const scriptText = manifest.entry
+		.map(relativePath => fs.readFileSync(path.join(MOD_ROOT, relativePath), 'utf8'))
+		.join('\n')
+	const readOnlyScriptText = manifest.entry
+		.filter(relativePath => relativePath !== 'scripts/core/blueprint-placement.js')
 		.map(relativePath => fs.readFileSync(path.join(MOD_ROOT, relativePath), 'utf8'))
 		.join('\n')
 	const stateFreeScriptText = manifest.entry
@@ -449,8 +453,8 @@ function testI18nManifestAndReadOnlyBoundary() {
 		.join('\n')
 	const cardOpacityText = fs.readFileSync(path.join(MOD_ROOT, 'scripts/ui/card-opacity.js'), 'utf8')
 	const creativeModeText = fs.readFileSync(path.join(MOD_ROOT, 'scripts/core/creative-mode.js'), 'utf8')
-	assert.doesNotMatch(scriptText, /\baddEntity\s*\(/)
-	assert.doesNotMatch(scriptText, /\bclearCell\s*\(/)
+	assert.doesNotMatch(readOnlyScriptText, /\baddEntity\s*\(/)
+	assert.doesNotMatch(readOnlyScriptText, /\bclearCell\s*\(/)
 	assert.doesNotMatch(stateFreeScriptText, /\blocalStorage\b|\bsessionStorage\b/)
 	assert.doesNotMatch(cardOpacityText, /\bsessionStorage\b/)
 	assert.match(creativeModeText, /\blocalStorage\b/)

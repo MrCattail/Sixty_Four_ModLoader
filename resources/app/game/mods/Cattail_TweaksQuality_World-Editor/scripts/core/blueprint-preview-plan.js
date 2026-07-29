@@ -21,7 +21,7 @@ ModLoader.register({
 
 		let disposed = false
 		const planner = Object.freeze({
-			version: '0.3.4',
+			version: '0.4.1',
 			status: STATUS,
 			statusPriority: STATUS_PRIORITY,
 			async build(game, blueprint, target, options) {
@@ -81,19 +81,29 @@ ModLoader.register({
 					for (let u = footprint.minU; u <= footprint.maxU; u += 1) {
 						if (isCancelled()) throw planError('plan-cancelled')
 						const cell = [u, v]
-						const entity = planningEntityAt(game, cell)
+						const entity = planningEntityAt(game, cell, options)
 						guardCells.set(cellKey(cell), { position: cell, entity })
-						if (entity) {
-							conflicts.add(entity)
-							const conflictName = safeName(entity.name)
-							if (conflictName) relevantNames.add(conflictName)
-						}
+						if (entity) conflicts.add(entity)
 						processedCells += 1
 						if (processedCells % chunkSize === 0) await yieldControl()
 					}
 				}
 				relevantNames.add(name)
-				const classification = classifyRecord(game, source, name, position, footprint, Array.from(conflicts))
+				const classification = classifyRecord(
+					game,
+					source,
+					name,
+					position,
+					footprint,
+					Array.from(conflicts),
+					options
+				)
+				if (classification.status === STATUS.CONFLICT) {
+					for (const entity of conflicts) {
+						const conflictName = safeName(entity?.name)
+						if (conflictName) relevantNames.add(conflictName)
+					}
+				}
 				records.push({
 					id: Number.isInteger(source.id) ? source.id : index + 1,
 					index,
@@ -109,11 +119,11 @@ ModLoader.register({
 				})
 			}
 
-			const guard = createGuard(game, guardCells, relevantNames)
+			const guard = createGuard(game, guardCells, relevantNames, options)
 			const statusCounts = countStatuses(records)
 			const cost = simulateCost(game, records, guard)
 			return {
-				version: '0.3.4',
+				version: '0.4.1',
 				sourcePlane: Number(blueprint.sourcePlane) ? 1 : 0,
 				target: normalizedTarget,
 				bounds: targetBounds(blueprint.contentBounds, normalizedTarget, records),
@@ -136,7 +146,7 @@ ModLoader.register({
 			if (!normalizePosition(target)) throw planError('target-invalid')
 		}
 
-		function classifyRecord(game, source, name, position, footprint, conflicts) {
+		function classifyRecord(game, source, name, position, footprint, conflicts, options) {
 			const definition = game.codex?.entities?.[name]
 			if (!definition || definition.canPurchase !== true) {
 				return { status: STATUS.BLOCKED, reason: 'unsupported' }
@@ -149,6 +159,20 @@ ModLoader.register({
 				})
 			) {
 				return { status: STATUS.BLOCKED, reason: 'indestructible' }
+			}
+			if (
+				conflicts.length &&
+				typeof options?.canReplaceEntity === 'function' &&
+				conflicts.some(function (entity) {
+					try {
+						const assessment = options.canReplaceEntity(entity)
+						return assessment === false || assessment?.safe === false
+					} catch (error) {
+						return true
+					}
+				})
+			) {
+				return { status: STATUS.BLOCKED, reason: 'unsafe-replacement' }
 			}
 			if (source.restricted?.onlyOne === true || definition.onlyone === true) {
 				if (game.onlyones?.[name] || Number(game.entitiesInGame?.[name]) > 0) {
@@ -202,7 +226,7 @@ ModLoader.register({
 			return result
 		}
 
-		function createGuard(game, cells, relevantNames) {
+		function createGuard(game, cells, relevantNames, options) {
 			const counts = {}
 			const onlyones = {}
 			for (const name of relevantNames) {
@@ -213,7 +237,8 @@ ModLoader.register({
 				cells: Array.from(cells.values()),
 				counts,
 				onlyones,
-				resources: numericArray(game.resources)
+				resources: numericArray(game.resources),
+				includeDynamicConflicts: !!options?.includeDynamicConflicts
 			}
 		}
 
@@ -224,7 +249,13 @@ ModLoader.register({
 		function inspectGuard(game, guard) {
 			if (!game || !guard || !Array.isArray(guard.cells)) return guardResult('invalid')
 			for (const entry of guard.cells) {
-				if (planningEntityAt(game, entry.position) !== entry.entity) return guardResult('cells')
+				if (
+					planningEntityAt(game, entry.position, {
+						includeDynamicConflicts: !!guard.includeDynamicConflicts
+					}) !== entry.entity
+				) {
+					return guardResult('cells')
+				}
 			}
 			for (const name of Object.keys(guard.counts || {})) {
 				if (finiteOr(game.entitiesInGame?.[name], 0) !== guard.counts[name]) return guardResult('counts')
@@ -539,7 +570,7 @@ ModLoader.register({
 				})
 			}
 			return {
-				version: '0.3.4',
+				version: '0.4.1',
 				kind: 'synthetic-plan',
 				results
 			}

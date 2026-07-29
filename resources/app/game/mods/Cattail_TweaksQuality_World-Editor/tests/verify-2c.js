@@ -532,6 +532,7 @@ function testUnifiedToolbarAndLocalization() {
 	const { definitions, sandbox } = loadModules([
 		'scripts/core/tool-state.js',
 		'scripts/i18n/editor-text.js',
+		'scripts/ui/dialog.js',
 		'scripts/ui/editor-shell.js'
 	], {
 		Game,
@@ -578,9 +579,9 @@ function testUnifiedToolbarAndLocalization() {
 	const selectButton = shell.querySelector('[data-world-editor-action="select"]')
 	const moveButton = shell.querySelector('[data-world-editor-action="move"]')
 	const resizeButton = shell.querySelector('[data-world-editor-action="resize"]')
-	assert.equal(i18n.version, '0.4.0')
+	assert.equal(i18n.version, '0.4.1')
 	assert.equal(i18n.languages.length, 20)
-	assert.equal(i18n.keys.length, 118)
+	assert.equal(i18n.keys.length, 130)
 	assert.equal(shell.getAttribute('role'), 'toolbar')
 	assert.equal(moveButton, null)
 	assert.equal(resizeButton, null)
@@ -613,7 +614,7 @@ function testUnifiedToolbarAndLocalization() {
 
 function testManifestAndReadOnlyBoundary() {
 	const manifest = JSON.parse(fs.readFileSync(path.join(MOD_ROOT, 'mod.json'), 'utf8'))
-	assert.equal(manifest.version, '0.4.0')
+	assert.equal(manifest.version, '0.4.1')
 	assert.equal(manifest.languageSupport.gameLanguage, true)
 	assert.deepEqual(manifest.entry, [
 		'scripts/core/foundation.js',
@@ -628,6 +629,7 @@ function testManifestAndReadOnlyBoundary() {
 		'scripts/core/production-state.js',
 		'scripts/core/blueprint-transform.js',
 		'scripts/core/blueprint-preview-plan.js',
+		'scripts/core/blueprint-placement.js',
 		'scripts/core/input-controller.js',
 		'scripts/render/resize-handles.js',
 		'scripts/input/selection-controller.js',
@@ -635,6 +637,7 @@ function testManifestAndReadOnlyBoundary() {
 		'scripts/render/selected-overlay.js',
 		'scripts/i18n/editor-text.js',
 		'scripts/ui/card-opacity.js',
+		'scripts/ui/dialog.js',
 		'scripts/ui/editor-shell.js',
 		'scripts/blueprint-session.js',
 		'scripts/blueprint-preview.js',
@@ -645,12 +648,16 @@ function testManifestAndReadOnlyBoundary() {
 	const scriptRoot = path.join(MOD_ROOT, 'scripts')
 	const cardOpacitySource = fs.readFileSync(path.join(scriptRoot, 'ui', 'card-opacity.js'), 'utf8')
 	const creativeModeSource = fs.readFileSync(path.join(scriptRoot, 'core', 'creative-mode.js'), 'utf8')
+	const placementSource = fs.readFileSync(path.join(scriptRoot, 'core', 'blueprint-placement.js'), 'utf8')
 	const scriptSources = readScriptSources(scriptRoot)
 	const sources = scriptSources.join('\n')
+	const readOnlySources = scriptSources
+		.filter(source => source !== placementSource)
+		.join('\n')
 	const stateFreeSources = scriptSources
 		.filter(source => source !== cardOpacitySource && source !== creativeModeSource)
 		.join('\n')
-	assert.doesNotMatch(sources, /\bgame\.(?:addEntity|clearCell|deleteEntity|removeEntity|placeEntity)\b/)
+	assert.doesNotMatch(readOnlySources, /\bgame\.(?:addEntity|clearCell|deleteEntity|removeEntity|placeEntity)\b/)
 	assert.doesNotMatch(stateFreeSources, /\b(?:localStorage|sessionStorage)\b/)
 	assert.doesNotMatch(cardOpacitySource, /\bsessionStorage\b/)
 	assert.match(creativeModeSource, /\blocalStorage\b/)

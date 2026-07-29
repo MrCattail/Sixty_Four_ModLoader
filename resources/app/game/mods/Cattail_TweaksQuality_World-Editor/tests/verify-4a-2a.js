@@ -7,6 +7,7 @@ const MOD_ROOT = path.resolve(__dirname, '..')
 const CREATIVE_SOURCE = 'scripts/core/creative-mode.js'
 const I18N_SOURCE = 'scripts/i18n/editor-text.js'
 const SHELL_SOURCE = 'scripts/ui/editor-shell.js'
+const DIALOG_SOURCE = 'scripts/ui/dialog.js'
 const SHARED_SOURCE = 'scripts/core/shared.js'
 const INPUT_SOURCE = 'scripts/core/input-controller.js'
 const SESSION_SOURCE = 'scripts/blueprint-session.js'
@@ -248,20 +249,21 @@ async function verifyFinalizationFailureBlocksCreativeReadiness() {
 
 function verifyIntegrationSources() {
 	const manifest = JSON.parse(source('mod.json'))
-	assert.equal(manifest.version, '0.4.0')
+	assert.equal(manifest.version, '0.4.1')
 	assert.equal(manifest.loaderVersion, '>=0.2.0')
 	assert.ok(manifest.entry.indexOf(CREATIVE_SOURCE) > manifest.entry.indexOf('scripts/core/editor-state.js'))
 	assert.ok(manifest.entry.indexOf(CREATIVE_SOURCE) < manifest.entry.indexOf('scripts/blueprint-session.js'))
 
 	const shell = source(SHELL_SOURCE)
+	const dialog = source(DIALOG_SOURCE)
 	const shared = source(SHARED_SOURCE)
 	const input = source(INPUT_SOURCE)
 	const session = source(SESSION_SOURCE)
 	const preview = source(PREVIEW_SOURCE)
 	assert.match(shell, /data-world-editor-action="creative-mode"/)
-	assert.match(shell, /role', 'dialog'/)
+	assert.match(dialog, /setAttribute\('role', 'dialog'\)/)
 	assert.match(shell, /createFork\(/)
-	assert.match(shell, /createDialogButton\('creativeCreateCopy', true\)/)
+	assert.match(shell, /createDialogButton\(dialog, 'creativeCreateCopy', true\)/)
 	assert.match(shell, /\['input', 'change', 'keyup', 'compositionend'\]/)
 	assert.match(shell, /\['keydown', 'paste', 'cut'\]/)
 	assert.match(shell, /creativeDialog === dialog && !dialog\.busy/)

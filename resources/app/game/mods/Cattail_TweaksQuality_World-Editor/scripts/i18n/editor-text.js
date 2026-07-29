@@ -2881,6 +2881,50 @@ ModLoader.register({
 				creativeEconomyExecutionFailed: 'Kreativ handling mislyktes. Sikkerhetsøyeblikksbildet ble beholdt.'
 			}
 		}
+		const PLACEMENT_TEXT = {
+			en: {
+				blueprintPlace: 'Place Blueprint',
+				placementCtrlVHint: 'Ctrl+V places at the hovered cell',
+				placementConflictTitle: 'Replace conflicting buildings?',
+				placementConflictMessage: '{count} red conflicts were found. Skip every red item, or dismantle and replace every safely restorable conflict.',
+				placementSkipConflicts: 'Skip Red Conflicts',
+				placementReplaceConflicts: 'Dismantle and Replace',
+				placementCancel: 'Cancel',
+				placementPlacing: 'Creating a safety snapshot and placing the blueprint…',
+				placementSuccess: 'Blueprint placement completed.',
+				placementFailed: 'Placement failed: {reason}',
+				placementBlocked: 'Placement is blocked until the game is reloaded.',
+				placementNothingToBuild: 'Nothing remains to build at this target.'
+			},
+			sch: {
+				blueprintPlace: '放置蓝图',
+				placementCtrlVHint: 'Ctrl+V 可直接放置到鼠标所在格',
+				placementConflictTitle: '是否替换冲突建筑？',
+				placementConflictMessage: '发现 {count} 个红色冲突。可以跳过全部红色条目，或拆除并替换全部可安全恢复的冲突。',
+				placementSkipConflicts: '跳过红色冲突',
+				placementReplaceConflicts: '拆除并替换',
+				placementCancel: '取消',
+				placementPlacing: '正在创建安全快照并放置蓝图…',
+				placementSuccess: '蓝图放置完成。',
+				placementFailed: '放置失败：{reason}',
+				placementBlocked: '放置功能已被安全锁定，请重新加载游戏。',
+				placementNothingToBuild: '此目标位置没有需要建造的内容。'
+			},
+			modsch: {
+				blueprintPlace: '放置蓝图',
+				placementCtrlVHint: 'Ctrl+V 可直接放置到鼠标所在格',
+				placementConflictTitle: '是否替换冲突建筑？',
+				placementConflictMessage: '发现 {count} 个红色冲突。可以跳过全部红色条目，或拆除并替换全部可安全恢复的冲突。',
+				placementSkipConflicts: '跳过红色冲突',
+				placementReplaceConflicts: '拆除并替换',
+				placementCancel: '取消',
+				placementPlacing: '正在创建安全快照并放置蓝图…',
+				placementSuccess: '蓝图放置完成。',
+				placementFailed: '放置失败：{reason}',
+				placementBlocked: '放置功能已被安全锁定，请重新加载游戏。',
+				placementNothingToBuild: '此目标位置没有需要建造的内容。'
+			}
+		}
 		for (const language of Object.keys(TEXT)) {
 			Object.assign(
 				TEXT[language],
@@ -2890,7 +2934,8 @@ ModLoader.register({
 				SECTION_TEXT[language] || SECTION_TEXT.en,
 				PRODUCTION_TEXT[language] || PRODUCTION_TEXT.en,
 				CARD_OPACITY_TEXT[language] || CARD_OPACITY_TEXT.en,
-				CREATIVE_TEXT[language] || CREATIVE_TEXT.en
+				CREATIVE_TEXT[language] || CREATIVE_TEXT.en,
+				PLACEMENT_TEXT[language] || PLACEMENT_TEXT.en
 			)
 		}
 		const LANGUAGES = Object.freeze(Object.keys(TEXT))
@@ -2900,7 +2945,7 @@ ModLoader.register({
 		Object.freeze(TEXT)
 
 		const i18n = Object.freeze({
-			version: '0.4.0',
+			version: '0.4.1',
 			languages: LANGUAGES,
 			keys: KEYS,
 			t(languageOrGame, key) {

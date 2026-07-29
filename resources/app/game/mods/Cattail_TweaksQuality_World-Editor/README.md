@@ -4,7 +4,7 @@
 
 ## 当前阶段
 
-当前阶段 4A-3a 在已验收的创造模式与免费商店写前快照协调之上，新增会话内的内部事务、undo/redo、外部变化阻止和失败回滚状态机。产品运行时尚未注册真实写入适配器，也不提供撤销按钮、热键、蓝图真实放置或其他新的世界写入。
+当前阶段 4B-1a 在已验收的内部事务引擎之上，加入结构蓝图安全放置。固定预览可用卡片按钮放置，`Ctrl+V` 可把按键时悬停格临时锁定为命令目标并直接放置；红色冲突统一选择“全部跳过”或“拆除并替换”，不能证明可无损恢复的实体保持紫色阻止。
 
 ## 不变量
 
@@ -28,7 +28,8 @@ scripts/
     selection-analysis.js # 3F：可取消的分批只读统计与已完成实体只读视图
     production-state.js  # 3F：Dynamic Details 软依赖、选区实际产量刷新与蓝图生产快照
     blueprint-transform.js # 3D：固定枢轴、有序旋转/镜像和完整蓝图结构投影
-    blueprint-preview-plan.js # 3E：只读快照、四级冲突、单一 Build Plan 成本和合成规划基准
+    blueprint-preview-plan.js # 4B-1a：四级冲突、安全替换分类、Build Plan 成本和合成规划基准
+    blueprint-placement.js # 4B-1a：结构蓝图放置事务、经济结算、恢复适配和内部 undo/redo
     input-controller.js  # 2G：V / Esc / Backspace、统一手势取消与输入环境保护
   input/
     selection-controller.js # 2F：混合指针手势、最近边/角判定、持久目标锁定和自动提交
@@ -40,6 +41,7 @@ scripts/
     editor-text.js       # 3F：20 种原版语言的选区、蓝图、预览、成本、生产和警告文本
   ui/
     card-opacity.js      # 3F：独立分组、可持久化的 Z+滚轮透明度与中键内容模式
+    dialog.js            # 4B-1a：共享对话框 DOM、主题、焦点、Escape、忙碌态和错误状态
     editor-shell.js      # 2G：大状态、真实多选数量、选择与移除主选区按钮
     selection-card.js    # 3F：主选区实时统计、右左下上定位、3 秒临时显示和点击锁定
     production-cards.js  # 3F：主卡总产量、选区/蓝图建筑明细副卡与自适应双列
@@ -331,7 +333,7 @@ await globalThis[Symbol.for('cattail.world-editor.blueprint-preview')].benchmark
 - U/V 镜像图标统一顺时针旋转 `45deg`。顺/逆时针旋转图标保留既有左右映射，三角箭头位于圆弧断口的下端且箭尖背离圆弧线段；重置图标使用相同的下端反向箭头几何。顺/逆旋转和重置引起角度变化时，旧缓存画面围绕固定逻辑锚点按当前 UV 投影基向量执行旋转；每 90° 至少采样 8 个等角度区间，并通过 Web Animations 在 `160 ms linear` 内播放投影矩阵关键帧和淡出。镜像仍立即切换，不对每座实体插值。
 - 鼠标悬停或键盘聚焦旋转、镜像和重置按钮时，独立的 `z=41` 缓存提示层在蓝图外框外显示两条约 `150°` 旋转弧或两条平行 UV 双箭头。主线使用原版字体灰 `#889`、`1.25 CSS px` 线宽、轻描边和约 `6 CSS px` 箭头；U 镜像提示显示在 V 方向两侧，V 镜像提示显示在 U 方向两侧。镜像双箭头端点严格使用对应外框轴向投影的两端，不再额外向外延伸。提示层只做 `100 ms` 透明度过渡，目标与相机移动通过 CSS 位移跟随，不重绘建筑缓存。
 - 蓝图卡位置使用“目标格定位快照”：预览目标进入新游戏格时，记录当时变换后蓝图的内容外框并重新选择右/左/下/上位置。顺/逆旋转、U/V 镜像、重置及其新计划只刷新卡片内容，不改变卡片屏幕位置；永久固定、`Alt` 临时固定或解除固定也不会在目标格未变时触发跳动。相机平移/缩放和窗口变化仍重新投影当前定位快照，使卡片随画面移动并保持在视口内；下一次目标格改变时才采用最新变换后的外框。
-- 原版 `surge` 浪涌实体在结构蓝图规划、占格分类和完整性 guard 中按空地处理，因此对应建筑保持可建造并计入 Build Plan。浪涌仍由原版世界渲染和管理，本模组不删除或修改它；其他不可破坏、自然或 Mod 实体不受此例外影响。
+- 原版独立 `surge` 浪涌实体在结构蓝图规划、占格分类和完整性 guard 中按空地处理，因此对应建筑保持绿色可建造并计入 Build Plan。真实放置会把目标足迹内的独立浪涌作为无退款、无售出统计的临时环境占用事务性移除；内部 undo 恢复实际拆除瞬间的浪涌状态，redo 再移除。目标外浪涌不受影响；其他不可破坏、自然或 Mod 实体不适用此例外。
 - 顶部工具栏会换行并收紧间距；选区卡宽度限制为 `230–320 CSS px`，蓝图卡限制为 `270–372 CSS px`，两张卡最高均为 `68vh`。窗口变化会立刻重新约束尺寸并按 `10 CSS px` 视口边距定位。
 - 工具栏和蓝图卡按 `clamp(0.5, min(availableWidth / 1600, availableHeight / 1000), 1)` 连续整体缩放，字体、图标和按钮随容器同比缩放；可用尺寸取窗口、游戏画布及其非页面级父容器的有效最小值。`ResizeObserver` 主动监听游戏画布/容器，窗口 `resize` 作为后备。工具栏的未缩放布局宽度会反向补偿，避免过早换行；选区卡保持原尺寸。
 - 蓝图标题行内显示结构模式和选区数量，来源文字在窄窗口下换到第二行，清除按钮保持右侧。跨边界数量作为第五个标准状态项进入可建造/已满足/冲突/阻止区域；Build Plan 与捕获类型成本数字改用原版 `Montserrat` 的 `400` 字重。
@@ -421,8 +423,8 @@ globalThis[Symbol.for('cattail.world-editor.creative-mode')].snapshot()
 - 一次完整编辑器命令对应一条事务。事务记录只保存冻结的纯数据、精确 guard scope、before/after 状态、资源与统计增量以及快照 ID，不保存 DOM、实体对象或整份存档。
 - forward、undo 和 redo 都必须在任何世界写入前创建物理快照。快照失败或目标在等待期间改变时不会执行写入；apply 开始后的失败必须恢复操作前状态，恢复失败会阻止后续事务直到重新载入。
 - 外部变化检查只比较适配器声明的危险状态；不会比较带时间戳的整份存档，也不会把正常生产得到的资源或累计统计恢复成旧绝对值。
-- 当前产品运行时没有注册真实世界写入适配器，也没有撤销/重做按钮或热键。4A-2b 的原版商店操作不进入编辑器历史，蓝图放置适配器仍属于未来 4B。
-- 4A-3a 不修改原版、ModLoader、Better UIs、配置、翻译或现有 UI，World Editor 版本继续保持 `0.4.0`。
+- 4B-1a 现已注册结构蓝图放置适配器；仍没有玩家可见的撤销/重做按钮或热键。4A-2b 的原版商店操作不进入编辑器历史。
+- 4A-3a 的冻结基础本身不修改原版、ModLoader、Better UIs、配置、翻译或现有 UI。
 
 开发者控制台可检查：
 
@@ -430,4 +432,26 @@ globalThis[Symbol.for('cattail.world-editor.creative-mode')].snapshot()
 globalThis[Symbol.for('cattail.world-editor.transactions')].snapshot()
 ```
 
-未接入真实写入适配器时，`registeredKinds`、`undoCount` 和 `redoCount` 均应为空或 `0`。
+完成 4B-1a 加载后，`registeredKinds` 应包含 `blueprint-placement`；在第一次成功放置前，`undoCount` 和 `redoCount` 仍应为 `0`。
+
+## 4B-1a 结构蓝图安全放置
+
+- 仅支持 `mode: "structure"` 的结构蓝图，不恢复完整蓝图的 Cube 或内部运行状态。
+- 永久固定和按住 Alt 的临时固定都可使用蓝图卡片中的“放置蓝图”按钮；`Ctrl+V` 无需预先固定，会捕获按键时的 `game.hoveredCell`、临时锁定该命令目标、重新规划并放置，随后恢复此前的跟随/临时固定/永久固定状态。
+- 放置事务始终重新构建计划，不信任界面缓存。绿色建筑进入最终建造集合，黄色与紫色跳过；红色冲突每次放置只询问一次，默认焦点为“跳过红色冲突”，也可选择“拆除并替换”全部安全红色冲突。
+- 除上述独立 `surge` 空地例外外，动态、不可破坏、未知 Mod、Cube、正在搬迁、Pump/Stabilizer 与 Cube/Surge 关联或缺少明确恢复适配的冲突不会被删除，而会降为紫色 `unsafe-replacement`。
+- 普通模式按确定顺序模拟并结算当前橡皮擦成本、50%/90%/100% 退款及逐个建造价格；每一步都必须可负担。创造模式不扣款、不退款，也不产生零资源转移动画。
+- 一次放置只创建一条事务和一份写前 Snapshot。没有任何最终建筑时不会创建 Snapshot；apply 开始后的失败会本地回滚，完整恢复失败则由 4A-3a 锁定后续事务并要求重载。
+- 内部 undo 会移除本次新建筑、恢复被替换建筑、精确反转本次资源和 `machinesBuild` / `machinesSold` 增量；若撤销需要收回净资源收益但当前资源不足，则返回 `INSUFFICIENT_RESOURCES`，不修改世界且保留历史。
+- 成功、取消和可恢复失败都会保留蓝图、变换和固定状态并立即重规划；终止性回滚失败会保留预览但禁用放置。
+- 创造模式开关确认框和蓝图红色冲突确认框共用 `cattail.world-editor.dialogs` 的 DOM、主题、焦点陷阱、Escape、忙碌态和错误规则。
+- 当前仍不提供玩家可见的 undo/redo 控件或热键；可在开发者控制台调用服务验证。
+
+开发者控制台可检查：
+
+```js
+globalThis[Symbol.for('cattail.world-editor.blueprint-placement')].snapshot()
+globalThis[Symbol.for('cattail.world-editor.transactions')].snapshot()
+```
+
+4B-1a 不修改原版、ModLoader、Better UIs、其他 Mod、`enabled.json` 或归档旧版，也不包含完整蓝图放置、Cube 恢复、导入界面、玩家可见 undo/redo 控件、打包或发布。

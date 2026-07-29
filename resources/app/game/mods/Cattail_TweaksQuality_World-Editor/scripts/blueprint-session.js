@@ -9,6 +9,8 @@ ModLoader.register({
 		const PRODUCTION_KEY = Symbol.for('cattail.world-editor.production')
 		const TRANSFORM_KEY = Symbol.for('cattail.world-editor.blueprint-transform')
 		const PREVIEW_KEY = Symbol.for('cattail.world-editor.blueprint-preview')
+		const PLACEMENT_KEY = Symbol.for('cattail.world-editor.blueprint-placement')
+		const DIALOGS_KEY = Symbol.for('cattail.world-editor.dialogs')
 		const CARD_OPACITY_KEY = Symbol.for('cattail.world-editor.card-opacity')
 		const SHARED_KEY = Symbol.for('cattail.world-editor.shared')
 		const CREATIVE_KEY = Symbol.for('cattail.world-editor.creative-mode')
@@ -37,7 +39,28 @@ ModLoader.register({
 				subscribe(listener) {
 					listener(state)
 					return function () {}
-				}
+				},
+				setDialogOpen() { return false }
+			})
+		}
+
+		function unavailablePlacementController(game) {
+			const state = Object.freeze({
+				version: '1.0.0',
+				ready: false,
+				busy: false,
+				phase: 'idle',
+				error: null,
+				terminalBlockedReason: null
+			})
+			return Object.freeze({
+				game,
+				snapshot() { return state },
+				subscribe(listener) {
+					listener(state)
+					return function () {}
+				},
+				isInputBlocked() { return false }
 			})
 		}
 
@@ -51,7 +74,9 @@ ModLoader.register({
 			const i18n = globalThis[I18N_KEY]
 			const transform = globalThis[TRANSFORM_KEY]
 			const shared = globalThis[SHARED_KEY]
+			const dialogs = globalThis[DIALOGS_KEY]
 			let creative = globalThis[CREATIVE_KEY]
+			let placement = globalThis[PLACEMENT_KEY]
 			const transformAvailable = !!(
 				transform &&
 				typeof transform.bind === 'function' &&
@@ -79,6 +104,10 @@ ModLoader.register({
 			if (!creative || creative.game !== game || typeof creative.subscribe !== 'function') {
 				console.warn('[Cattail World Editor] Blueprint 4A-2a could not find creative mode state.')
 				creative = unavailableCreativeController(game)
+			}
+			if (!placement || placement.game !== game || typeof placement.subscribe !== 'function') {
+				console.warn('[Cattail World Editor] Blueprint 4B-1a could not find the placement service.')
+				placement = unavailablePlacementController(game)
 			}
 			if (
 				!shared ||
@@ -111,6 +140,7 @@ ModLoader.register({
 			let currentSelection = selection.snapshot()
 			let currentSession = session.snapshot()
 			let currentCreative = creative.snapshot()
+			let currentPlacement = placement.snapshot()
 			if (transformAvailable) transform.clear('session-initialized')
 			let currentTransform = transformAvailable
 				? transform.snapshot()
@@ -177,6 +207,10 @@ ModLoader.register({
 				}
 				refreshUi()
 			})
+			const stopPlacementSubscription = placement.subscribe(function (state) {
+				currentPlacement = state
+				refreshCard()
+			})
 			const stopTransformSubscription = transformAvailable ? transform.subscribe(function (state) {
 				const previousState = currentTransform
 				currentTransform = state
@@ -198,14 +232,43 @@ ModLoader.register({
 			}) : null
 
 			const handleKeydown = function (event) {
-				if (shared.isWorldEditorInputBlocked?.()) return
+				if (shared.isWorldEditorInputBlocked?.() || placement.isInputBlocked?.()) return
 				if (event?.key === 'Escape' && cancelAllSectionResizes('escape', true)) {
 					consume(event)
 					return
 				}
 				const key = String(event?.key || '').toLowerCase()
+				const controlKey = !!(event?.ctrlKey || event?.metaKey)
+				const pasteKey = event?.code === 'KeyV' || key === 'v'
 				if (
-					!(event?.ctrlKey || event?.metaKey) ||
+					controlKey &&
+					!event?.shiftKey &&
+					pasteKey &&
+					!event?.repeat &&
+					!event?.isComposing &&
+					event?.keyCode !== 229 &&
+					!shared.isEditableEvent(event) &&
+					runtime.isActive() &&
+					!game.splash?.isShown &&
+					!shared.isModLoaderPanelBlocking()
+				) {
+					connectPreviewController()
+					const target = normalizePosition(game.hoveredCell)
+					const state = previewSnapshot()
+					if (
+						target &&
+						state?.active &&
+						!state.paused &&
+						currentTransform?.blueprint?.mode === 'structure' &&
+						typeof previewController?.lockCommandTarget === 'function'
+					) {
+						consume(event)
+						placeFromHotkey(target)
+					}
+					return
+				}
+				if (
+					!controlKey ||
 					event?.altKey ||
 					event?.shiftKey ||
 					!(event?.code === 'KeyC' || key === 'c') ||
@@ -271,6 +334,7 @@ ModLoader.register({
 				if (typeof stopSelectionSubscription === 'function') stopSelectionSubscription()
 				if (typeof stopSessionSubscription === 'function') stopSessionSubscription()
 				if (typeof stopCreativeSubscription === 'function') stopCreativeSubscription()
+				if (typeof stopPlacementSubscription === 'function') stopPlacementSubscription()
 				if (typeof stopTransformSubscription === 'function') stopTransformSubscription()
 				if (typeof stopPreviewSubscription === 'function') stopPreviewSubscription()
 				if (typeof stopRenderFrame === 'function') stopRenderFrame()
@@ -336,7 +400,7 @@ ModLoader.register({
 
 				function snapshot() {
 					return Object.freeze({
-						version: '0.3.5',
+						version: '0.4.1',
 						mode,
 						includeBlocks: mode === 'full' && includeBlocks,
 						blueprint,
@@ -473,7 +537,7 @@ ModLoader.register({
 				}
 
 				const session = Object.freeze({
-					version: '0.3.5',
+					version: '0.4.1',
 					game: sessionGame,
 					schemaVersion: 3,
 					snapshot,
@@ -778,6 +842,7 @@ ModLoader.register({
 				card.addEventListener('click', toggleCardPinned)
 				card.addEventListener('keydown', handleCardKeydown)
 				card.querySelector('[data-world-editor-blueprint-action="clear"]').addEventListener('click', handleClear)
+				card.querySelector('[data-world-editor-blueprint-action="place"]').addEventListener('click', handlePlace)
 				const cardTransforms = card.querySelector('[data-world-editor-transform-controls="card"]')
 				cardTransforms.addEventListener('click', handleTransformAction)
 				cardTransforms.addEventListener('pointerover', handleTransformGuidePointerOver)
@@ -857,6 +922,7 @@ ModLoader.register({
 				ui.card.removeEventListener('click', toggleCardPinned)
 				ui.card.removeEventListener('keydown', handleCardKeydown)
 				ui.card.querySelector('[data-world-editor-blueprint-action="clear"]')?.removeEventListener('click', handleClear)
+				ui.card.querySelector('[data-world-editor-blueprint-action="place"]')?.removeEventListener('click', handlePlace)
 				const cardTransforms = ui.card.querySelector('[data-world-editor-transform-controls="card"]')
 				cardTransforms?.removeEventListener('click', handleTransformAction)
 				cardTransforms?.removeEventListener('pointerover', handleTransformGuidePointerOver)
@@ -1023,6 +1089,18 @@ ModLoader.register({
 				crossing.append(crossingSymbol, crossingLabel, crossingCount)
 				previewStatuses.append(crossing)
 
+				const placementActions = document.createElement('div')
+				placementActions.className = 'cattail-world-editor-blueprint-card__placement'
+				const placeButton = document.createElement('button')
+				placeButton.type = 'button'
+				placeButton.className = 'cattail-world-editor-blueprint-card__place'
+				placeButton.dataset.worldEditorBlueprintAction = 'place'
+				const placementState = document.createElement('div')
+				placementState.className = 'cattail-world-editor-blueprint-card__placement-state'
+				placementState.dataset.worldEditorBlueprintText = 'placement-state'
+				placementState.hidden = true
+				placementActions.append(placeButton, placementState)
+
 				const costs = createAdjustableSection('costs')
 				costs.section.classList.add('cattail-world-editor-blueprint-card__costs')
 				costs.section.dataset.worldEditorPreviewCosts = ''
@@ -1044,6 +1122,7 @@ ModLoader.register({
 					previewWarning,
 					transformPanel,
 					previewStatuses,
+					placementActions,
 					costs.section,
 					captured.section,
 					skipped.section,
@@ -1201,6 +1280,11 @@ ModLoader.register({
 				const clearText = i18n.t(source, 'blueprintClear')
 				clear.title = clearText
 				clear.setAttribute('aria-label', clearText)
+				const place = ui.card.querySelector('[data-world-editor-blueprint-action="place"]')
+				const placeText = i18n.t(source, 'blueprintPlace')
+				place.textContent = placeText
+				place.title = placeText
+				place.setAttribute('aria-label', placeText)
 				refreshSectionText(source)
 				refreshCard()
 			}
@@ -1404,6 +1488,48 @@ ModLoader.register({
 				if (costs) costs.hidden = !state?.plan
 				setCardText('costs-title', i18n.t(game, 'previewBuildPlan'))
 				renderPreviewResources(state?.plan?.cost || null)
+				renderPlacementDetails(state)
+			}
+
+			function renderPlacementDetails(previewState) {
+				if (!ui) return
+				const button = ui.card.querySelector('[data-world-editor-blueprint-action="place"]')
+				const status = ui.card.querySelector('[data-world-editor-blueprint-text="placement-state"]')
+				const counts = previewState?.plan?.statusCounts || {}
+				const possibleBuilds = (
+					Math.max(0, Number(counts.buildable) || 0) +
+					Math.max(0, Number(counts.conflict) || 0)
+				)
+				const terminal = currentPlacement?.terminalBlockedReason
+				const available = !!(
+					currentPlacement?.ready &&
+					!currentPlacement.busy &&
+					!terminal &&
+					previewState?.active &&
+					previewState.effectivePinned &&
+					!previewState.commandLocked &&
+					!previewState.paused &&
+					!previewState.calculating &&
+					previewState.plan &&
+					currentTransform?.blueprint?.mode === 'structure' &&
+					possibleBuilds > 0
+				)
+				if (button) button.disabled = !available
+				let text = ''
+				if (terminal) text = i18n.t(game, 'placementBlocked')
+				else if (currentPlacement?.busy) text = i18n.t(game, 'placementPlacing')
+				else if (currentPlacement?.phase === 'success') text = i18n.t(game, 'placementSuccess')
+				else if (currentPlacement?.error?.code === 'NOTHING_TO_BUILD') {
+					text = i18n.t(game, 'placementNothingToBuild')
+				} else if (currentPlacement?.phase === 'failed' && currentPlacement?.error) {
+					text = formatTemplate(i18n.t(game, 'placementFailed'), {
+						reason: currentPlacement.error.message || currentPlacement.error.code
+					})
+				}
+				if (status) {
+					status.textContent = text
+					status.hidden = !text
+				}
 			}
 
 			function renderPreviewResources(cost) {
@@ -1470,6 +1596,7 @@ ModLoader.register({
 				if (state?.active) {
 					hints.push(i18n.t(game, 'previewExitHint'))
 					if (!state.pinned) hints.push(i18n.t(game, 'previewTemporaryPinHint'))
+					hints.push(i18n.t(game, 'placementCtrlVHint'))
 				}
 				hints.push(i18n.t(game, cardPinnedState() ? 'cardUnpinAction' : 'cardPinAction'))
 				return hints.join(' · ')
@@ -1911,6 +2038,129 @@ ModLoader.register({
 					session.setMode('structure', reason + '-structure')
 				}
 				return session.capture(reason)
+			}
+
+			function handlePlace(event) {
+				const button = event?.target?.closest?.('[data-world-editor-blueprint-action="place"]')
+				if (!button || button.disabled) return
+				stopUiEvent(event)
+				connectPreviewController()
+				const state = previewSnapshot()
+				const target = normalizePosition(state?.target)
+				if (!target || !state?.effectivePinned || state.commandLocked) return
+				placeAtTarget('mouse', target)
+			}
+
+			async function placeFromHotkey(target) {
+				connectPreviewController()
+				const controller = previewController || globalThis[PREVIEW_KEY]
+				if (
+					!controller ||
+					typeof controller.lockCommandTarget !== 'function' ||
+					typeof controller.releaseCommandTarget !== 'function'
+				) {
+					return false
+				}
+				const token = await controller.lockCommandTarget(target, 'ctrl-v-target')
+				if (!token) return false
+				try {
+					await placeAtTarget('keyboard', target)
+					return true
+				} finally {
+					await controller.releaseCommandTarget(token, 'ctrl-v-complete')
+				}
+			}
+
+			async function placeAtTarget(input, target) {
+				if (
+					placement.isInputBlocked?.() ||
+					!currentPlacement?.ready ||
+					currentPlacement.terminalBlockedReason
+				) {
+					return null
+				}
+				const blueprint = currentTransform?.blueprint
+				const controller = previewController || globalThis[PREVIEW_KEY]
+				if (!blueprint || blueprint.mode !== 'structure' || !normalizePosition(target)) return null
+				const plan = controller?.snapshot?.().plan || null
+				if (!plan) return null
+				const conflictCount = Math.max(0, Number(plan?.statusCounts?.conflict) || 0)
+				let replaceConflicts = false
+				if (conflictCount) {
+					const choice = await confirmConflictChoice(conflictCount)
+					if (!choice) {
+						await controller?.refreshNow?.('placement-cancelled')
+						refreshCard()
+						return null
+					}
+					replaceConflicts = choice === 'replace'
+				}
+				creative.setDialogOpen?.(true, 'blueprint-placement-running')
+				let result
+				try {
+					result = await placement.place({
+						blueprint,
+						target,
+						input,
+						replaceConflicts
+					})
+				} finally {
+					creative.setDialogOpen?.(false, 'blueprint-placement-finished')
+				}
+				await controller?.refreshNow?.(
+					result?.executed ? 'placement-complete' : 'placement-recoverable-failure'
+				)
+				refreshCard()
+				return result
+			}
+
+			function confirmConflictChoice(count) {
+				if (!dialogs || dialogs.game !== game || typeof dialogs.create !== 'function') {
+					return Promise.resolve(null)
+				}
+				creative.setDialogOpen?.(true, 'blueprint-conflict-dialog-opened')
+				return new Promise(function (resolve) {
+					let settled = false
+					const finish = function (choice, dialog, reason) {
+						if (settled) return
+						settled = true
+						resolve(choice)
+						dialog.close(reason || 'blueprint-conflict-choice', true)
+					}
+					const dialog = dialogs.create({
+						id: 'cattail-world-editor-blueprint-conflict-dialog',
+						theme: game.plane ? 'void' : 'reality',
+						kind: 'blueprint-conflict',
+						onClose() {
+							creative.setDialogOpen?.(false, 'blueprint-conflict-dialog-closed')
+							if (!settled) {
+								settled = true
+								resolve(null)
+							}
+						}
+					})
+					dialog.title.textContent = i18n.t(game, 'placementConflictTitle')
+					dialog.message.textContent = formatTemplate(i18n.t(game, 'placementConflictMessage'), {
+						count
+					})
+					const skip = dialog.createButton(i18n.t(game, 'placementSkipConflicts'), { primary: true })
+					const replace = dialog.createButton(i18n.t(game, 'placementReplaceConflicts'), {
+						primary: true,
+						danger: true
+					})
+					const cancel = dialog.createButton(i18n.t(game, 'placementCancel'))
+					skip.addEventListener('click', function () {
+						finish('skip', dialog, 'blueprint-conflicts-skipped')
+					})
+					replace.addEventListener('click', function () {
+						finish('replace', dialog, 'blueprint-conflicts-replaced')
+					})
+					cancel.addEventListener('click', function () {
+						finish(null, dialog, 'blueprint-placement-cancelled')
+					})
+					dialog.actions.append(skip, replace, cancel)
+					dialog.mount(skip)
+				})
 			}
 
 			function handleTransformAction(event) {
@@ -2591,6 +2841,33 @@ ModLoader.register({
 					.cattail-world-editor-blueprint-card__preview-status[data-status="conflict"] .cattail-world-editor-blueprint-card__preview-symbol { color: #d63d3d; }
 					.cattail-world-editor-blueprint-card__preview-status[data-status="blocked"] .cattail-world-editor-blueprint-card__preview-symbol { color: #8554e8; }
 					.cattail-world-editor-blueprint-card__preview-status[data-status="cross-boundary"] .cattail-world-editor-blueprint-card__preview-symbol { color: #889; }
+					.cattail-world-editor-blueprint-card__placement {
+						display: grid;
+						gap: 5px;
+						margin-top: 9px;
+					}
+					.cattail-world-editor-blueprint-card__place {
+						min-height: 34px;
+						border: 1px solid color-mix(in srgb, #09a943 62%, var(--blueprint-card-border));
+						border-radius: 6px;
+						padding: 7px 10px;
+						background: color-mix(in srgb, rgba(9, 169, 67, .20) var(--world-editor-card-shell-percent), transparent);
+						color: var(--blueprint-card-text);
+						font: 700 11px/1.25 Montserrat, Arial, sans-serif;
+						cursor: pointer;
+						outline: none;
+					}
+					.cattail-world-editor-blueprint-card__place:disabled {
+						opacity: .36;
+						cursor: default;
+					}
+					.cattail-world-editor-blueprint-card__placement-state {
+						color: var(--blueprint-card-muted);
+						text-align: center;
+						font-size: 10px;
+						line-height: 1.4;
+						overflow-wrap: anywhere;
+					}
 					.cattail-world-editor-blueprint-card__transform {
 						display: flex;
 						align-items: center;

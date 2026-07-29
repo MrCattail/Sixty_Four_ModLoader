@@ -6,6 +6,7 @@ ModLoader.register({
 		const BLUEPRINT_KEY = Symbol.for('cattail.world-editor.blueprint')
 		const TRANSFORM_KEY = Symbol.for('cattail.world-editor.blueprint-transform')
 		const PLAN_KEY = Symbol.for('cattail.world-editor.blueprint-preview-plan')
+		const PLACEMENT_KEY = Symbol.for('cattail.world-editor.blueprint-placement')
 		const PREVIEW_KEY = Symbol.for('cattail.world-editor.blueprint-preview')
 		const SHARED_KEY = Symbol.for('cattail.world-editor.shared')
 		const RENDER_LAYER_ID = 'world-editor-blueprint-preview'
@@ -52,6 +53,7 @@ ModLoader.register({
 			const session = globalThis[BLUEPRINT_KEY]
 			const transform = globalThis[TRANSFORM_KEY]
 			const planner = globalThis[PLAN_KEY]
+			const placement = globalThis[PLACEMENT_KEY]
 			const shared = globalThis[SHARED_KEY]
 			const transformAvailable = !!(
 				transform &&
@@ -118,6 +120,8 @@ ModLoader.register({
 			let pinned = false
 			let temporaryPinned = false
 			const temporaryAltKeys = new Set()
+			let commandLock = null
+			let commandSequence = 0
 			let paused = false
 			let target = null
 			let blueprint = null
@@ -127,6 +131,7 @@ ModLoader.register({
 			let warningTimer = null
 			let planToken = 0
 			let planRetry = 0
+			let lastPlanPromise = Promise.resolve(null)
 			let revision = 0
 			let disposed = false
 			let handledAttemptId = Number(currentSession?.attemptId) || 0
@@ -174,7 +179,7 @@ ModLoader.register({
 			}
 
 			const controller = Object.freeze({
-				version: '0.3.4',
+				version: '0.4.1',
 				game,
 				snapshot,
 				exit,
@@ -199,12 +204,21 @@ ModLoader.register({
 				setTransformGuide(action, reason) {
 					return setTransformGuide(action, reason || 'preview-api')
 				},
+				refreshNow(reason) {
+					return refreshNow(reason || 'preview-api-refresh')
+				},
+				lockCommandTarget(position, reason) {
+					return lockCommandTarget(position, reason || 'preview-command-lock')
+				},
+				releaseCommandTarget(token, reason) {
+					return releaseCommandTarget(token, reason || 'preview-command-release')
+				},
 				async benchmark(options) {
 					const settings = options || {}
 					const planning = await planner.benchmark(settings)
 					const rendering = await benchmarkRendering(settings)
 					const result = {
-						version: '0.3.4',
+						version: '0.4.1',
 						planning,
 						rendering,
 						runtime: performanceSnapshot()
@@ -343,7 +357,16 @@ ModLoader.register({
 					cameraDragging = true
 					return
 				}
-				if (event?.button !== 0 || !active || paused || !shouldOwnInput() || shared.isEditableEvent(event)) return
+				if (
+					event?.button !== 0 ||
+					!active ||
+					paused ||
+					commandLock ||
+					!shouldOwnInput() ||
+					shared.isEditableEvent(event)
+				) {
+					return
+				}
 				refreshHoveredCell(event)
 				if (temporaryPinned) {
 					setPinned(true, 'map-alt-promote')
@@ -364,7 +387,7 @@ ModLoader.register({
 				finishCameraDrag()
 				setTransformGuide(null, 'window-blur')
 				releaseTemporaryPin('window-blur', false)
-				if (active && !pinned) exit('window-blur')
+				if (active && !pinned && !commandLock) exit('window-blur')
 			}
 			const handleWindowMouseUp = function (event) {
 				if (event?.button === 2) finishCameraDrag()
@@ -392,6 +415,7 @@ ModLoader.register({
 					shared.isEditableEvent(event) ||
 					!active ||
 					paused ||
+					commandLock ||
 					blueprint?.mode !== 'structure' ||
 					!transformAvailable ||
 					!shouldOwnInput()
@@ -412,6 +436,7 @@ ModLoader.register({
 				if (
 					!keyId ||
 					pinned ||
+					commandLock ||
 					!active ||
 					paused ||
 					!target ||
@@ -484,11 +509,12 @@ ModLoader.register({
 
 			function snapshot() {
 				return Object.freeze({
-					version: '0.3.4',
+					version: '0.4.1',
 					active,
 					pinned,
 					temporaryPinned,
 					effectivePinned: isTargetPinned(),
+					commandLocked: !!commandLock,
 					paused,
 					target: clonePosition(target),
 					blueprint,
@@ -553,6 +579,7 @@ ModLoader.register({
 				pinned = false
 				temporaryPinned = false
 				temporaryAltKeys.clear()
+				commandLock = null
 				paused = Number(nextBlueprint.sourcePlane) !== (game.plane ? 1 : 0)
 				target = null
 				blueprint = nextBlueprint
@@ -572,7 +599,7 @@ ModLoader.register({
 			}
 
 			function exit(reason) {
-				const changed = active || pinned || temporaryPinned || paused || target || plan || calculating
+				const changed = active || pinned || temporaryPinned || commandLock || paused || target || plan || calculating
 				setTransformGuide(null, reason || 'preview-exited')
 				clearFollowPlan()
 				planToken += 1
@@ -580,6 +607,7 @@ ModLoader.register({
 				pinned = false
 				temporaryPinned = false
 				temporaryAltKeys.clear()
+				commandLock = null
 				paused = false
 				target = null
 				blueprint = null
@@ -621,7 +649,7 @@ ModLoader.register({
 			}
 
 			function setPinned(next, reason) {
-				if (!active || paused || !target) return false
+				if (!active || paused || commandLock || !target) return false
 				if (next && temporaryPinned) {
 					temporaryPinned = false
 					temporaryAltKeys.clear()
@@ -636,13 +664,17 @@ ModLoader.register({
 			}
 
 			function isTargetPinned() {
-				return pinned || temporaryPinned
+				return pinned || temporaryPinned || !!commandLock
 			}
 
 			function releaseTemporaryPin(reason, resumeFollowing) {
 				if (!temporaryPinned && !temporaryAltKeys.size) return false
 				temporaryPinned = false
 				temporaryAltKeys.clear()
+				if (commandLock?.saved) {
+					commandLock.saved.temporaryPinned = false
+					commandLock.saved.altKeys = []
+				}
 				let moved = false
 				if (resumeFollowing && active && !pinned && !paused) {
 					moved = setTarget(game.hoveredCell, reason || 'temporary-pin-released')
@@ -682,9 +714,13 @@ ModLoader.register({
 				calculating = true
 				metrics.planRequests += 1
 				if (!wasCalculating) notify()
-				Promise.resolve().then(async function () {
+				lastPlanPromise = Promise.resolve().then(async function () {
 					let candidate = await planner.build(game, requestBlueprint, requestTarget, {
 						chunkSize: 512,
+						includeDynamicConflicts: !!placement,
+						canReplaceEntity: typeof placement?.assessEntity === 'function'
+							? function (entity) { return placement.assessEntity(entity) }
+							: undefined,
 						isCancelled() {
 							return disposed || token !== planToken || !active
 						}
@@ -716,15 +752,81 @@ ModLoader.register({
 					if (reason && !isFollowPlanReason(reason)) {
 						console.info('[Cattail World Editor] Blueprint preview planned (' + reason + ').')
 					}
+					return candidate
 				}).catch(function (error) {
 					if (disposed || token !== planToken || error?.code === 'plan-cancelled') {
 						if (error?.code === 'plan-cancelled') metrics.planCancellations += 1
-						return
+						return null
 					}
 					calculating = false
 					clearRotationTransition()
 					showWarning('plan-failed', blueprint, error)
+					return null
 				})
+				return true
+			}
+
+			async function refreshNow(reason) {
+				if (!requestPlan(reason || 'preview-refresh', 1)) return Promise.resolve(plan)
+				let pending = lastPlanPromise
+				while (pending) {
+					await pending
+					if (pending === lastPlanPromise) break
+					pending = lastPlanPromise
+				}
+				return plan
+			}
+
+			async function lockCommandTarget(value, reason) {
+				const next = normalizePosition(value)
+				if (disposed || commandLock || !active || paused || !next || blueprint?.mode !== 'structure') return null
+				clearFollowPlan()
+				planToken += 1
+				const id = 'command-' + (++commandSequence)
+				commandLock = {
+					id,
+					saved: {
+						target: clonePosition(target),
+						pinned,
+						temporaryPinned,
+						altKeys: Array.from(temporaryAltKeys)
+					}
+				}
+				target = next
+				plan = null
+				calculating = false
+				metrics.targetChanges += 1
+				renderFallbacks = new Set()
+				orderedRecords = []
+				instances.clear()
+				markPreviewDirty()
+				notify()
+				await refreshNow(reason || 'preview-command-lock')
+				if (!commandLock || commandLock.id !== id) return null
+				return Object.freeze({ id })
+			}
+
+			async function releaseCommandTarget(token, reason) {
+				const id = String(token?.id || token || '')
+				if (!commandLock || commandLock.id !== id) return false
+				const saved = commandLock.saved
+				commandLock = null
+				pinned = !!saved.pinned
+				temporaryPinned = !!saved.temporaryPinned
+				temporaryAltKeys.clear()
+				for (const key of saved.altKeys || []) temporaryAltKeys.add(key)
+				const followingTarget = !pinned && !temporaryPinned
+					? normalizePosition(game.hoveredCell) || saved.target
+					: saved.target
+				target = clonePosition(followingTarget)
+				plan = null
+				calculating = false
+				renderFallbacks = new Set()
+				orderedRecords = []
+				instances.clear()
+				markPreviewDirty()
+				notify()
+				await refreshNow(reason || 'preview-command-release')
 				return true
 			}
 
