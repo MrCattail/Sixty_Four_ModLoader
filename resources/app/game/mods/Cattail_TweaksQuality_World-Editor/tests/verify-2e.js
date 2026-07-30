@@ -19,6 +19,7 @@ const ANALYSIS_KEY = Symbol.for('cattail.world-editor.analysis')
 const I18N_KEY = Symbol.for('cattail.world-editor.i18n')
 const RESIZE_HANDLES_KEY = Symbol.for('cattail.world-editor.resize-handles')
 const INTERACTION_KEY = Symbol.for('cattail.world-editor.selection-interaction')
+const BLUEPRINT_PREVIEW_KEY = Symbol.for('cattail.world-editor.blueprint-preview')
 
 function createApi() {
 	const handlers = new Map()
@@ -399,10 +400,17 @@ function testCardLockAndTemporaryWindow() {
 		cubes: 1
 	})
 	analysis.game = game
+	const blueprintPreview = createFeed({
+		active: false,
+		pinned: false,
+		temporaryPinned: false,
+		effectivePinned: false
+	})
 	let wheelLatched = false
 	sandbox[RUNTIME_KEY] = runtime
 	sandbox[SELECTION_KEY] = selection
 	sandbox[ANALYSIS_KEY] = analysis
+	sandbox[BLUEPRINT_PREVIEW_KEY] = blueprintPreview
 	sandbox[INTERACTION_KEY] = {
 		snapshot() {
 			return { wheelLatched }
@@ -461,6 +469,7 @@ function testCardLockAndTemporaryWindow() {
 	assert.doesNotMatch(style.textContent, /\.cattail-world-editor-selection-card::before/)
 	assert.doesNotMatch(style.textContent, /inset:\s*-1px/)
 	assert.equal(card.dataset.wheelLatched, 'false')
+	assert.equal(card.dataset.blueprintFollowing, 'false')
 	assert.equal(card.dataset.inputPassThrough, 'false')
 
 	wheelLatched = true
@@ -470,6 +479,39 @@ function testCardLockAndTemporaryWindow() {
 	wheelLatched = false
 	frameCallback({ game })
 	assert.equal(card.dataset.wheelLatched, 'false')
+	assert.equal(card.dataset.inputPassThrough, 'false')
+
+	blueprintPreview.emit({
+		active: true,
+		pinned: false,
+		temporaryPinned: false,
+		effectivePinned: false
+	})
+	assert.equal(card.dataset.blueprintFollowing, 'true')
+	assert.equal(card.dataset.inputPassThrough, 'true')
+	blueprintPreview.emit({
+		active: true,
+		pinned: true,
+		temporaryPinned: false,
+		effectivePinned: true
+	})
+	assert.equal(card.dataset.blueprintFollowing, 'false')
+	assert.equal(card.dataset.inputPassThrough, 'false')
+	blueprintPreview.emit({
+		active: true,
+		pinned: false,
+		temporaryPinned: true,
+		effectivePinned: true
+	})
+	assert.equal(card.dataset.blueprintFollowing, 'false')
+	assert.equal(card.dataset.inputPassThrough, 'false')
+	blueprintPreview.emit({
+		active: false,
+		pinned: false,
+		temporaryPinned: false,
+		effectivePinned: false
+	})
+	assert.equal(card.dataset.blueprintFollowing, 'false')
 	assert.equal(card.dataset.inputPassThrough, 'false')
 
 	selection.emit({
@@ -593,4 +635,4 @@ testUnifiedInputGestures()
 testCardLockAndTemporaryWindow()
 testHoverLayerI18nManifestAndReadOnlyBoundary()
 
-console.log('2E verification passed: unified click/long-press/drag/handle priority, operation locking, interior hover layer, card temporary/pinned/immediate selection-move-resize pass-through states, switch-green styling, 20-language UI, manifest, and read-only boundary.')
+console.log('2E verification passed: unified click/long-press/drag/handle priority, operation locking, interior hover layer, card temporary/pinned/selection-operation/blueprint-follow pass-through states, switch-green styling, 20-language UI, manifest, and read-only boundary.')

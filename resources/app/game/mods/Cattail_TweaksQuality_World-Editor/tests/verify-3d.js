@@ -1514,6 +1514,10 @@ function testLocalizationAndIntegrationContract() {
 	assert.match(readme, /未来历史入口/)
 	assert.doesNotMatch(sessionSource, /SECTION_LONG_PRESS_MS|SECTION_PREACTIVATION_PX/)
 	assert.match(sharedSource, /\[data-world-editor-disclosure-resize\]\s*\{[\s\S]*height:\s*10px/)
+	assert.match(
+		sharedSource,
+		/\[data-input-pass-through="true"\]\s+\[data-world-editor-disclosure-resize\],\s*\[data-world-drag-pass-through="true"\]\s+\[data-world-editor-disclosure-resize\]\s*\{\s*pointer-events:\s*none !important;/s
+	)
 	assert.match(sharedSource, /handle\.setPointerCapture\?\.\(activeResize\.pointerId\)/)
 	assert.match(sharedSource, /body\.offsetHeight/)
 	assert.match(sharedSource, /deltaY \* direction \/ activeResize\.scale/)

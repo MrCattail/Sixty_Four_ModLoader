@@ -583,6 +583,10 @@ ModLoader.register({
 				[data-world-editor-disclosure][data-resizable="true"] > [data-world-editor-disclosure-resize] {
 					pointer-events: auto;
 				}
+				[data-input-pass-through="true"] [data-world-editor-disclosure-resize],
+				[data-world-drag-pass-through="true"] [data-world-editor-disclosure-resize] {
+					pointer-events: none !important;
+				}
 				[data-world-editor-disclosure][data-resizable="true"] > [data-world-editor-disclosure-resize]:hover,
 				[data-world-editor-disclosure-resize][data-active="true"] {
 					opacity: .72;

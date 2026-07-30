@@ -6,6 +6,7 @@ ModLoader.register({
 		const ANALYSIS_KEY = Symbol.for('cattail.world-editor.analysis')
 		const I18N_KEY = Symbol.for('cattail.world-editor.i18n')
 		const INTERACTION_KEY = Symbol.for('cattail.world-editor.selection-interaction')
+		const BLUEPRINT_PREVIEW_KEY = Symbol.for('cattail.world-editor.blueprint-preview')
 		const CARD_OPACITY_KEY = Symbol.for('cattail.world-editor.card-opacity')
 		const SHARED_KEY = Symbol.for('cattail.world-editor.shared')
 		const CARD_ID = 'cattail-world-editor-selection-card'
@@ -76,6 +77,8 @@ ModLoader.register({
 			let currentRuntime = runtime.snapshot()
 			let currentSelection = selection.snapshot()
 			let currentAnalysis = analysis.snapshot()
+			const blueprintPreview = globalThis[BLUEPRINT_PREVIEW_KEY]
+			let currentBlueprintPreview = blueprintPreview?.snapshot?.() || null
 			let gameHudHidden = api.ui.hud.isHidden()
 			let vanillaHudHidden = api.ui.isVanillaGameHudHidden(game)
 			let positionVisible = false
@@ -232,8 +235,10 @@ ModLoader.register({
 					latched = false
 				}
 				const previewing = isRange(currentSelection?.previewRange)
+				const blueprintFollowing = !!currentBlueprintPreview?.active && !currentBlueprintPreview?.effectivePinned
 				card.dataset.wheelLatched = latched ? 'true' : 'false'
-				card.dataset.inputPassThrough = latched || previewing ? 'true' : 'false'
+				card.dataset.blueprintFollowing = blueprintFollowing ? 'true' : 'false'
+				card.dataset.inputPassThrough = latched || previewing || blueprintFollowing ? 'true' : 'false'
 			}
 
 			const refreshContent = function (languageGame) {
@@ -412,6 +417,12 @@ ModLoader.register({
 				currentAnalysis = state
 				refreshContent(game)
 			})
+			const stopBlueprintPreviewSubscription = typeof blueprintPreview?.subscribe === 'function'
+				? blueprintPreview.subscribe(function (state) {
+					currentBlueprintPreview = state
+					syncInputPointerPassThrough()
+				})
+				: null
 			const stopRenderFrame = api.render.onFrame(function (context) {
 				syncPosition(context?.game || game)
 			})
@@ -493,6 +504,7 @@ ModLoader.register({
 				if (typeof stopRuntimeSubscription === 'function') stopRuntimeSubscription()
 				if (typeof stopSelectionSubscription === 'function') stopSelectionSubscription()
 				if (typeof stopAnalysisSubscription === 'function') stopAnalysisSubscription()
+				if (typeof stopBlueprintPreviewSubscription === 'function') stopBlueprintPreviewSubscription()
 				if (typeof stopRenderFrame === 'function') stopRenderFrame()
 				opacityControls?.release?.()
 				opacityControls = null
@@ -517,6 +529,7 @@ ModLoader.register({
 			card.dataset.worldEditorPinnable = 'true'
 			card.dataset.worldEditorScrollbar = ''
 			card.dataset.wheelLatched = 'false'
+			card.dataset.blueprintFollowing = 'false'
 			card.dataset.inputPassThrough = 'false'
 			card.dataset.autoHiding = 'false'
 			card.setAttribute('role', 'button')
