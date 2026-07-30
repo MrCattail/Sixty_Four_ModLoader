@@ -50,6 +50,13 @@
       "default": false,
       "description": "Shows normal-mode reference purchase costs while Creative Mode remains free.",
       "reloadPolicy": "hot"
+    },
+    "largeToolbarCards": {
+      "type": "boolean",
+      "label": "Use Large-Card Toolbar",
+      "default": false,
+      "description": "Uses fixed large toolbar cards with horizontal inertial scrolling.",
+      "reloadPolicy": "hot"
     }
   },
   "translations": {
@@ -64,6 +71,10 @@
         "showCreativePurchaseCosts": {
           "label": "Show Creative-Mode Purchase Costs",
           "description": "Shows normal-mode reference purchase costs while Creative Mode remains free."
+        },
+        "largeToolbarCards": {
+          "label": "Use Large-Card Toolbar",
+          "description": "Uses fixed large toolbar cards with horizontal inertial scrolling."
         }
       }
     },
@@ -78,6 +89,10 @@
         "showCreativePurchaseCosts": {
           "label": "创造模式购买花费显示",
           "description": "显示普通模式的参考购买花费；创造模式仍然免费。"
+        },
+        "largeToolbarCards": {
+          "label": "使用大卡片工具栏",
+          "description": "使用固定尺寸的大卡片工具栏，并支持横向惯性滚动。"
         }
       }
     },
@@ -92,6 +107,10 @@
         "showCreativePurchaseCosts": {
           "label": "创造模式购买花费显示",
           "description": "显示普通模式的参考购买花费；创造模式仍然免费。"
+        },
+        "largeToolbarCards": {
+          "label": "使用大卡片工具栏",
+          "description": "使用固定尺寸的大卡片工具栏，并支持横向惯性滚动。"
         }
       }
     },
@@ -106,6 +125,10 @@
         "showCreativePurchaseCosts": {
           "label": "Показывать цены в творческом режиме",
           "description": "Показывает справочные цены обычного режима; творческий режим остается бесплатным."
+        },
+        "largeToolbarCards": {
+          "label": "Крупные карточки панели",
+          "description": "Использует фиксированные крупные карточки с горизонтальной инерционной прокруткой."
         }
       }
     },
@@ -120,6 +143,10 @@
         "showCreativePurchaseCosts": {
           "label": "Kaufkosten im Kreativmodus anzeigen",
           "description": "Zeigt die Referenzkosten des normalen Modus; der Kreativmodus bleibt kostenlos."
+        },
+        "largeToolbarCards": {
+          "label": "Große Werkzeugkarten verwenden",
+          "description": "Verwendet feste große Karten mit horizontalem Trägheitsscrollen."
         }
       }
     },
@@ -134,6 +161,10 @@
         "showCreativePurchaseCosts": {
           "label": "Mostrar custos no Modo Criativo",
           "description": "Mostra os custos de referência do modo normal; o Modo Criativo continua gratuito."
+        },
+        "largeToolbarCards": {
+          "label": "Usar cartões grandes",
+          "description": "Usa cartões grandes fixos com rolagem horizontal inercial."
         }
       }
     },
@@ -148,6 +179,10 @@
         "showCreativePurchaseCosts": {
           "label": "Mostra costi in modalità creativa",
           "description": "Mostra i costi di riferimento della modalità normale; la modalità creativa resta gratuita."
+        },
+        "largeToolbarCards": {
+          "label": "Usa schede grandi",
+          "description": "Usa schede grandi fisse con scorrimento orizzontale inerziale."
         }
       }
     },
@@ -162,6 +197,10 @@
         "showCreativePurchaseCosts": {
           "label": "Mostrar costes en modo creativo",
           "description": "Muestra los costes de referencia del modo normal; el modo creativo sigue siendo gratuito."
+        },
+        "largeToolbarCards": {
+          "label": "Usar tarjetas grandes",
+          "description": "Usa tarjetas grandes fijas con desplazamiento horizontal inercial."
         }
       }
     },
@@ -176,6 +215,10 @@
         "showCreativePurchaseCosts": {
           "label": "Afficher les coûts en mode créatif",
           "description": "Affiche les coûts de référence du mode normal ; le mode créatif reste gratuit."
+        },
+        "largeToolbarCards": {
+          "label": "Utiliser de grandes cartes",
+          "description": "Utilise de grandes cartes fixes avec défilement horizontal inertiel."
         }
       }
     },
@@ -190,6 +233,10 @@
         "showCreativePurchaseCosts": {
           "label": "Aankoopkosten in creatieve modus tonen",
           "description": "Toont de referentiekosten van de normale modus; de creatieve modus blijft gratis."
+        },
+        "largeToolbarCards": {
+          "label": "Grote werkbalkkaarten",
+          "description": "Gebruikt vaste grote kaarten met horizontaal traagheidsscrollen."
         }
       }
     },
@@ -204,6 +251,10 @@
         "showCreativePurchaseCosts": {
           "label": "Zobrazit ceny v kreativním režimu",
           "description": "Zobrazuje referenční ceny normálního režimu; kreativní režim zůstává zdarma."
+        },
+        "largeToolbarCards": {
+          "label": "Použít velké karty",
+          "description": "Používá pevné velké karty s vodorovným setrvačným posouváním."
         }
       }
     },
@@ -218,6 +269,10 @@
         "showCreativePurchaseCosts": {
           "label": "Pokaż koszty w trybie kreatywnym",
           "description": "Pokazuje koszty referencyjne trybu normalnego; tryb kreatywny pozostaje bezpłatny."
+        },
+        "largeToolbarCards": {
+          "label": "Użyj dużych kart",
+          "description": "Używa stałych dużych kart z poziomym przewijaniem bezwładnościowym."
         }
       }
     },
@@ -232,6 +287,10 @@
         "showCreativePurchaseCosts": {
           "label": "クリエイティブモードの購入費用を表示",
           "description": "通常モードの参考購入費用を表示します。クリエイティブモードは無料のままです。"
+        },
+        "largeToolbarCards": {
+          "label": "大カードツールバーを使用",
+          "description": "固定サイズの大カードと横方向の慣性スクロールを使用します。"
         }
       }
     },
@@ -246,6 +305,10 @@
         "showCreativePurchaseCosts": {
           "label": "크리에이티브 모드 구매 비용 표시",
           "description": "일반 모드의 참고 구매 비용을 표시합니다. 크리에이티브 모드는 계속 무료입니다."
+        },
+        "largeToolbarCards": {
+          "label": "큰 카드 도구 모음 사용",
+          "description": "고정 크기 큰 카드와 가로 관성 스크롤을 사용합니다."
         }
       }
     },
@@ -260,6 +323,10 @@
         "showCreativePurchaseCosts": {
           "label": "顯示創造模式購買花費",
           "description": "顯示普通模式的參考購買花費；創造模式仍然免費。"
+        },
+        "largeToolbarCards": {
+          "label": "使用大卡片工具列",
+          "description": "使用固定尺寸的大卡片工具列，並支援橫向慣性捲動。"
         }
       }
     },
@@ -274,6 +341,10 @@
         "showCreativePurchaseCosts": {
           "label": "แสดงค่าใช้จ่ายซื้อในโหมดสร้างสรรค์",
           "description": "แสดงค่าใช้จ่ายอ้างอิงของโหมดปกติ โดยโหมดสร้างสรรค์ยังคงฟรี"
+        },
+        "largeToolbarCards": {
+          "label": "ใช้แถบเครื่องมือการ์ดใหญ่",
+          "description": "ใช้การ์ดขนาดใหญ่คงที่พร้อมการเลื่อนแนวนอนแบบมีแรงเฉื่อย"
         }
       }
     },
@@ -288,6 +359,10 @@
         "showCreativePurchaseCosts": {
           "label": "Kreatív mód vásárlási költségeinek mutatása",
           "description": "A normál mód referenciaárait mutatja; a kreatív mód továbbra is ingyenes."
+        },
+        "largeToolbarCards": {
+          "label": "Nagy kártyás eszköztár",
+          "description": "Rögzített nagy kártyákat használ vízszintes tehetetlenségi görgetéssel."
         }
       }
     },
@@ -302,6 +377,10 @@
         "showCreativePurchaseCosts": {
           "label": "Rādīt radošā režīma pirkumu izmaksas",
           "description": "Rāda parastā režīma atsauces izmaksas; radošais režīms paliek bezmaksas."
+        },
+        "largeToolbarCards": {
+          "label": "Lietot lielas kartītes",
+          "description": "Lieto fiksētas lielas kartītes ar horizontālu inerces ritināšanu."
         }
       }
     },
@@ -316,6 +395,10 @@
         "showCreativePurchaseCosts": {
           "label": "Arată costurile în modul creativ",
           "description": "Arată costurile de referință din modul normal; modul creativ rămâne gratuit."
+        },
+        "largeToolbarCards": {
+          "label": "Folosește carduri mari",
+          "description": "Folosește carduri mari fixe cu derulare orizontală inerțială."
         }
       }
     },
@@ -330,6 +413,10 @@
         "showCreativePurchaseCosts": {
           "label": "Vis kjøpskostnader i kreativ modus",
           "description": "Viser referansekostnader fra normal modus; kreativ modus forblir gratis."
+        },
+        "largeToolbarCards": {
+          "label": "Bruk store verktøykort",
+          "description": "Bruker faste store kort med horisontal treghetsrulling."
         }
       }
     }

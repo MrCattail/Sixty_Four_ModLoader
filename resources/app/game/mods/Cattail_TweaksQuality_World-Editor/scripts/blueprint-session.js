@@ -940,6 +940,7 @@ ModLoader.register({
 				ui.card.remove()
 				if (ui.style.isConnected && !document.getElementById(CARD_ID)) ui.style.remove()
 				ui = null
+				notifyToolbarLayout('blueprint-unmounted')
 			}
 
 			function createControls() {
@@ -961,6 +962,7 @@ ModLoader.register({
 				blocks.type = 'button'
 				blocks.className = 'cattail-world-editor-blueprint-icon-button'
 				blocks.dataset.worldEditorBlueprintAction = 'blocks'
+				blocks.dataset.worldEditorToolbarCard = ''
 				blocks.setAttribute('aria-pressed', 'false')
 				blocks.hidden = true
 				blocks.setAttribute('aria-hidden', 'true')
@@ -969,16 +971,19 @@ ModLoader.register({
 				cubeCanvas.height = 24
 				cubeCanvas.setAttribute('aria-hidden', 'true')
 				blocks.append(cubeCanvas)
+				appendToolbarCardLabel(blocks, 'cubes')
 
 				const copy = document.createElement('button')
 				copy.type = 'button'
 				copy.className = 'cattail-world-editor-blueprint-icon-button'
 				copy.dataset.worldEditorBlueprintAction = 'copy'
+				copy.dataset.worldEditorToolbarCard = ''
 				const copyIcon = document.createElement('span')
 				copyIcon.className = 'cattail-world-editor-blueprint-copy-icon'
 				copyIcon.setAttribute('aria-hidden', 'true')
 				copyIcon.textContent = '⧉'
 				copy.append(copyIcon)
+				appendToolbarCardLabel(copy, 'copy')
 
 				const transforms = createTransformControls('toolbar')
 				root.append(modes, blocks, copy)
@@ -990,8 +995,26 @@ ModLoader.register({
 				button.type = 'button'
 				button.className = 'cattail-world-editor-blueprint-mode'
 				button.dataset.worldEditorBlueprintMode = mode
+				button.dataset.worldEditorToolbarCard = ''
 				button.setAttribute('aria-pressed', mode === 'structure' ? 'true' : 'false')
+				const compactLabel = document.createElement('span')
+				compactLabel.className = 'cattail-world-editor-blueprint-compact-label'
+				button.append(compactLabel)
+				const cardIcon = document.createElement('span')
+				cardIcon.className = 'cattail-world-editor-blueprint-card-icon'
+				cardIcon.dataset.cardIcon = mode
+				cardIcon.setAttribute('aria-hidden', 'true')
+				cardIcon.textContent = mode === 'full' ? '▦' : '▤'
+				button.append(cardIcon)
+				appendToolbarCardLabel(button, mode)
 				return button
+			}
+
+			function appendToolbarCardLabel(button, key) {
+				const label = document.createElement('span')
+				label.className = 'cattail-world-editor-toolbar-card-label'
+				label.dataset.worldEditorCardText = key
+				button.append(label)
 			}
 
 			function createCard() {
@@ -1146,7 +1169,9 @@ ModLoader.register({
 					button.type = 'button'
 					button.className = 'cattail-world-editor-transform-button'
 					button.dataset.worldEditorTransformAction = action
+					if (location === 'toolbar') button.dataset.worldEditorToolbarCard = ''
 					button.append(createTransformIcon(action))
+					if (location === 'toolbar') appendToolbarCardLabel(button, action)
 					if (action === 'mirror-u' || action === 'mirror-v') button.setAttribute('aria-pressed', 'false')
 					root.append(button)
 				}
@@ -1242,7 +1267,15 @@ ModLoader.register({
 			function refreshToolbar() {
 				const state = currentSession
 				const creativeAvailable = !!currentCreative?.ready && !!currentCreative?.creativeMode
-				const captureAvailable = canCapture(currentSelection) && !!currentRuntime.active && !state.capturing
+				const selectionAvailable = !!(
+					Array.isArray(currentSelection?.selections) &&
+					currentSelection.selections.length &&
+					currentSelection.selections.every(function (entry) {
+						return isRange(entry?.range)
+					})
+				)
+				const captureEligible = canCapture(currentSelection) && !!currentRuntime.active
+				const captureAvailable = captureEligible && !state.capturing
 				ui.controls.structure.dataset.active = state.mode === 'structure' ? 'true' : 'false'
 				ui.controls.full.dataset.active = state.mode === 'full' ? 'true' : 'false'
 				ui.controls.structure.setAttribute('aria-pressed', state.mode === 'structure' ? 'true' : 'false')
@@ -1256,6 +1289,8 @@ ModLoader.register({
 				ui.controls.blocks.dataset.active = state.includeBlocks ? 'true' : 'false'
 				ui.controls.blocks.setAttribute('aria-pressed', state.includeBlocks ? 'true' : 'false')
 				ui.controls.copy.disabled = !captureAvailable
+				ui.controls.copy.dataset.worldEditorLargeHidden = selectionAvailable && !!currentRuntime.active ? 'false' : 'true'
+				ui.controls.copy.dataset.worldEditorToolbarBusy = state.capturing ? 'true' : 'false'
 				refreshTransformUi()
 			}
 
@@ -1271,14 +1306,20 @@ ModLoader.register({
 				const fullText = i18n.t(source, 'blueprintModeFull')
 				const blocksText = i18n.t(source, 'blueprintIncludeBlocks')
 				const copyText = i18n.t(source, 'blueprintCopy')
-				ui.controls.structure.textContent = structureText
-				ui.controls.full.textContent = fullText
+				ui.controls.structure.querySelector('.cattail-world-editor-blueprint-compact-label').textContent = structureText
+				ui.controls.full.querySelector('.cattail-world-editor-blueprint-compact-label').textContent = fullText
 				ui.controls.structure.title = structureText
 				ui.controls.full.title = fullText
+				ui.controls.structure.setAttribute('aria-label', structureText)
+				ui.controls.full.setAttribute('aria-label', fullText)
 				ui.controls.blocks.title = blocksText
 				ui.controls.blocks.setAttribute('aria-label', blocksText)
 				ui.controls.copy.title = copyText
 				ui.controls.copy.setAttribute('aria-label', copyText)
+				setToolbarCardText(ui.controls.structure, i18n.t(source, 'toolbarCardStructure'))
+				setToolbarCardText(ui.controls.full, i18n.t(source, 'toolbarCardFull'))
+				setToolbarCardText(ui.controls.blocks, i18n.t(source, 'toolbarCardCubes'))
+				setToolbarCardText(ui.controls.copy, i18n.t(source, 'toolbarCardCopy'))
 				refreshTransformText(source)
 				const clear = ui.card.querySelector('[data-world-editor-blueprint-action="clear"]')
 				const clearText = i18n.t(source, 'blueprintClear')
@@ -1378,10 +1419,18 @@ ModLoader.register({
 					'mirror-v': i18n.t(source, 'blueprintMirrorV'),
 					reset: i18n.t(source, 'blueprintResetTransform')
 				}
-				for (const button of ui.controls.root.querySelectorAll('[data-world-editor-transform-action]')) {
+				const cardKeys = {
+					'rotate-clockwise': 'toolbarCardRotateClockwise',
+					'rotate-counterclockwise': 'toolbarCardRotateCounterclockwise',
+					'mirror-u': 'toolbarCardMirrorU',
+					'mirror-v': 'toolbarCardMirrorV',
+					reset: 'toolbarCardReset'
+				}
+				for (const button of ui.controls.transforms.querySelectorAll('[data-world-editor-transform-action]')) {
 					const label = labels[button.dataset.worldEditorTransformAction] || ''
 					button.title = label
 					button.setAttribute('aria-label', label)
+					setToolbarCardText(button, i18n.t(source, cardKeys[button.dataset.worldEditorTransformAction]))
 				}
 				for (const button of ui.card.querySelectorAll('[data-world-editor-transform-action]')) {
 					const label = labels[button.dataset.worldEditorTransformAction] || ''
@@ -1418,11 +1467,17 @@ ModLoader.register({
 							button.setAttribute('aria-pressed', active ? 'true' : 'false')
 						}
 						button.disabled = !available || (action === 'reset' && !!currentTransform.identity)
+						if (root.dataset.worldEditorTransformControls === 'toolbar') {
+							button.dataset.worldEditorLargeHidden = action === 'reset' && !!currentTransform.identity
+								? 'true'
+								: 'false'
+						}
 					}
 				}
 				const panel = ui.card.querySelector('[data-world-editor-transform-panel]')
 				if (panel) panel.hidden = !available
 				setCardText('transform-state', transformStateText())
+				notifyToolbarLayout('blueprint-transform')
 			}
 
 			function transformStateText() {
@@ -2446,6 +2501,25 @@ ModLoader.register({
 			function setCardText(key, value) {
 				const element = ui?.card?.querySelector?.('[data-world-editor-blueprint-text="' + key + '"]')
 				if (element) element.textContent = String(value ?? '')
+			}
+
+			function setToolbarCardText(button, value) {
+				const label = button?.querySelector?.('[data-world-editor-card-text]')
+				if (label) label.textContent = String(value ?? '')
+			}
+
+			function notifyToolbarLayout(reason) {
+				if (
+					typeof window === 'undefined' ||
+					typeof window.dispatchEvent !== 'function' ||
+					typeof globalThis.CustomEvent !== 'function'
+				) return
+				window.dispatchEvent(new CustomEvent('cattail:world-editor-toolbar-layout', {
+					detail: {
+						modId: 'Cattail_TweaksQuality_World-Editor',
+						reason: String(reason || 'blueprint')
+					}
+				}))
 			}
 
 			function ensureStyle() {
