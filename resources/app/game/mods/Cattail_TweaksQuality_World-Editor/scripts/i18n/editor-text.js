@@ -3203,6 +3203,229 @@ ModLoader.register({
 				toolbarStyleLargeCards: '大卡片工具栏'
 			}
 		}
+		function createHistoryText(
+			undo,
+			redo,
+			noUndo,
+			noRedo,
+			busy,
+			notReady,
+			unavailable,
+			planeChanged,
+			saveChanged,
+			externalChange,
+			insufficientResources,
+			failed,
+			rolledBack,
+			reloadRequired,
+			undoSuccess,
+			redoSuccess,
+			previewRefreshFailed
+		) {
+			return {
+				historyUndo: undo,
+				historyRedo: redo,
+				toolbarCardUndo: undo,
+				toolbarCardRedo: redo,
+				historyNoUndo: noUndo,
+				historyNoRedo: noRedo,
+				historyBusy: busy,
+				historyNotReady: notReady,
+				historyUnavailable: unavailable,
+				historyPlaneChanged: planeChanged,
+				historySaveChanged: saveChanged,
+				historyExternalChange: externalChange,
+				historyInsufficientResources: insufficientResources,
+				historyFailed: failed,
+				historyRolledBack: rolledBack,
+				historyReloadRequired: reloadRequired,
+				historyUndoSuccess: undoSuccess,
+				historyRedoSuccess: redoSuccess,
+				historyPreviewRefreshFailed: previewRefreshFailed
+			}
+		}
+		const HISTORY_TEXT = {
+			en: createHistoryText(
+				'Undo', 'Redo', 'Nothing to undo.', 'Nothing to redo.', 'History operation in progress…',
+				'Transaction history is not ready.', 'The required transaction adapter is unavailable.',
+				'Switch back to the operation plane.', 'The active save changed; history was cleared.',
+				'The target changed; try again.', 'Not enough resources to undo this operation.',
+				'The operation failed.', 'The operation failed; the previous state was restored.',
+				'Recovery failed. Reload the game before editing again.', 'Change undone.', 'Change redone.',
+				'The operation completed, but the blueprint preview could not refresh.'
+			),
+			ru: createHistoryText(
+				'Отменить', 'Повторить', 'Нечего отменять.', 'Нечего повторять.', 'Выполняется операция истории…',
+				'История операций пока недоступна.', 'Нужный адаптер операции недоступен.',
+				'Вернитесь на плоскость операции.', 'Активное сохранение изменилось; история очищена.',
+				'Цель изменилась; повторите попытку.', 'Недостаточно ресурсов для отмены.',
+				'Операция не выполнена.', 'Операция не выполнена; прежнее состояние восстановлено.',
+				'Восстановление не удалось. Перезагрузите игру.', 'Изменение отменено.', 'Изменение повторено.',
+				'Операция завершена, но предпросмотр не обновился.'
+			),
+			de: createHistoryText(
+				'Rückgängig', 'Wiederholen', 'Nichts rückgängig zu machen.', 'Nichts zu wiederholen.', 'Verlaufsvorgang läuft…',
+				'Der Transaktionsverlauf ist noch nicht bereit.', 'Der benötigte Transaktionsadapter ist nicht verfügbar.',
+				'Wechsle zurück zur Ebene des Vorgangs.', 'Der aktive Spielstand wurde geändert; der Verlauf wurde geleert.',
+				'Das Ziel wurde geändert; versuche es erneut.', 'Nicht genug Ressourcen zum Rückgängigmachen.',
+				'Der Vorgang ist fehlgeschlagen.', 'Der Vorgang ist fehlgeschlagen; der vorherige Zustand wurde wiederhergestellt.',
+				'Wiederherstellung fehlgeschlagen. Lade das Spiel neu.', 'Änderung rückgängig gemacht.', 'Änderung wiederholt.',
+				'Der Vorgang ist abgeschlossen, aber die Vorschau wurde nicht aktualisiert.'
+			),
+			ptbr: createHistoryText(
+				'Desfazer', 'Refazer', 'Nada para desfazer.', 'Nada para refazer.', 'Operação do histórico em andamento…',
+				'O histórico de transações ainda não está pronto.', 'O adaptador necessário não está disponível.',
+				'Volte ao plano da operação.', 'O jogo salvo ativo mudou; o histórico foi limpo.',
+				'O alvo mudou; tente novamente.', 'Recursos insuficientes para desfazer.',
+				'A operação falhou.', 'A operação falhou; o estado anterior foi restaurado.',
+				'A recuperação falhou. Recarregue o jogo.', 'Alteração desfeita.', 'Alteração refeita.',
+				'A operação terminou, mas a prévia não pôde ser atualizada.'
+			),
+			it: createHistoryText(
+				'Annulla', 'Ripeti', 'Niente da annullare.', 'Niente da ripetere.', 'Operazione della cronologia in corso…',
+				'La cronologia delle transazioni non è pronta.', 'L’adattatore richiesto non è disponibile.',
+				'Torna al piano dell’operazione.', 'Il salvataggio attivo è cambiato; la cronologia è stata svuotata.',
+				'Il bersaglio è cambiato; riprova.', 'Risorse insufficienti per annullare.',
+				'L’operazione non è riuscita.', 'L’operazione non è riuscita; lo stato precedente è stato ripristinato.',
+				'Ripristino non riuscito. Ricarica il gioco.', 'Modifica annullata.', 'Modifica ripetuta.',
+				'L’operazione è terminata, ma l’anteprima non è stata aggiornata.'
+			),
+			es: createHistoryText(
+				'Deshacer', 'Rehacer', 'Nada que deshacer.', 'Nada que rehacer.', 'Operación del historial en curso…',
+				'El historial de transacciones aún no está listo.', 'El adaptador necesario no está disponible.',
+				'Vuelve al plano de la operación.', 'La partida activa cambió; se borró el historial.',
+				'El objetivo cambió; inténtalo de nuevo.', 'No hay recursos suficientes para deshacer.',
+				'La operación falló.', 'La operación falló; se restauró el estado anterior.',
+				'La recuperación falló. Recarga el juego.', 'Cambio deshecho.', 'Cambio rehecho.',
+				'La operación terminó, pero no se pudo actualizar la vista previa.'
+			),
+			fr: createHistoryText(
+				'Annuler', 'Rétablir', 'Rien à annuler.', 'Rien à rétablir.', 'Opération d’historique en cours…',
+				'L’historique des transactions n’est pas prêt.', 'L’adaptateur requis est indisponible.',
+				'Revenez au plan de l’opération.', 'La sauvegarde active a changé ; l’historique a été effacé.',
+				'La cible a changé ; réessayez.', 'Ressources insuffisantes pour annuler.',
+				'L’opération a échoué.', 'L’opération a échoué ; l’état précédent a été restauré.',
+				'La récupération a échoué. Rechargez le jeu.', 'Modification annulée.', 'Modification rétablie.',
+				'L’opération est terminée, mais l’aperçu n’a pas pu être actualisé.'
+			),
+			nl: createHistoryText(
+				'Ongedaan maken', 'Opnieuw', 'Niets om ongedaan te maken.', 'Niets om opnieuw te doen.', 'Geschiedenisbewerking bezig…',
+				'De transactiegeschiedenis is nog niet gereed.', 'De vereiste transactieadapter is niet beschikbaar.',
+				'Ga terug naar het vlak van de bewerking.', 'De actieve opslag is gewijzigd; de geschiedenis is gewist.',
+				'Het doel is gewijzigd; probeer opnieuw.', 'Onvoldoende grondstoffen om dit ongedaan te maken.',
+				'De bewerking is mislukt.', 'De bewerking is mislukt; de vorige toestand is hersteld.',
+				'Herstel is mislukt. Laad het spel opnieuw.', 'Wijziging ongedaan gemaakt.', 'Wijziging opnieuw uitgevoerd.',
+				'De bewerking is voltooid, maar het voorbeeld kon niet worden vernieuwd.'
+			),
+			cz: createHistoryText(
+				'Zpět', 'Znovu', 'Není co vrátit.', 'Není co zopakovat.', 'Probíhá operace historie…',
+				'Historie transakcí ještě není připravena.', 'Požadovaný adaptér transakce není dostupný.',
+				'Vraťte se do roviny operace.', 'Aktivní pozice se změnila; historie byla vymazána.',
+				'Cíl se změnil; zkuste to znovu.', 'K vrácení není dost prostředků.',
+				'Operace selhala.', 'Operace selhala; předchozí stav byl obnoven.',
+				'Obnovení selhalo. Načtěte hru znovu.', 'Změna vrácena.', 'Změna zopakována.',
+				'Operace skončila, ale náhled nešlo obnovit.'
+			),
+			pl: createHistoryText(
+				'Cofnij', 'Ponów', 'Brak zmian do cofnięcia.', 'Brak zmian do ponowienia.', 'Trwa operacja historii…',
+				'Historia transakcji nie jest jeszcze gotowa.', 'Wymagany adapter transakcji jest niedostępny.',
+				'Wróć na płaszczyznę operacji.', 'Aktywny zapis się zmienił; historia została wyczyszczona.',
+				'Cel się zmienił; spróbuj ponownie.', 'Za mało zasobów, aby cofnąć operację.',
+				'Operacja nie powiodła się.', 'Operacja nie powiodła się; przywrócono poprzedni stan.',
+				'Przywracanie nie powiodło się. Wczytaj grę ponownie.', 'Zmiana cofnięta.', 'Zmiana ponowiona.',
+				'Operacja zakończona, ale nie udało się odświeżyć podglądu.'
+			),
+			jp: createHistoryText(
+				'元に戻す', 'やり直す', '元に戻す操作はありません。', 'やり直す操作はありません。', '履歴操作を実行中…',
+				'トランザクション履歴の準備ができていません。', '必要なトランザクションアダプターを利用できません。',
+				'操作した平面に戻ってください。', '使用中のセーブが変わったため、履歴を消去しました。',
+				'対象が変わりました。もう一度お試しください。', '元に戻すための資源が足りません。',
+				'操作に失敗しました。', '操作に失敗しましたが、以前の状態に復元しました。',
+				'復元に失敗しました。ゲームを再読み込みしてください。', '変更を元に戻しました。', '変更をやり直しました。',
+				'操作は完了しましたが、プレビューを更新できませんでした。'
+			),
+			kr: createHistoryText(
+				'실행 취소', '다시 실행', '실행 취소할 작업이 없습니다.', '다시 실행할 작업이 없습니다.', '기록 작업 진행 중…',
+				'트랜잭션 기록이 아직 준비되지 않았습니다.', '필요한 트랜잭션 어댑터를 사용할 수 없습니다.',
+				'작업한 평면으로 돌아가세요.', '활성 저장이 변경되어 기록을 지웠습니다.',
+				'대상이 변경되었습니다. 다시 시도하세요.', '실행 취소에 필요한 자원이 부족합니다.',
+				'작업에 실패했습니다.', '작업에 실패했지만 이전 상태를 복원했습니다.',
+				'복구에 실패했습니다. 게임을 다시 불러오세요.', '변경을 취소했습니다.', '변경을 다시 실행했습니다.',
+				'작업은 완료됐지만 미리 보기를 새로 고치지 못했습니다.'
+			),
+			sch: createHistoryText(
+				'撤销', '重做', '没有可撤销的操作。', '没有可重做的操作。', '正在执行历史操作…',
+				'事务历史尚未就绪。', '所需的事务适配器不可用。',
+				'请切回执行操作时的平面。', '当前存档已改变，历史已清空。',
+				'目标已改变，请重试。', '资源不足，无法撤销此操作。',
+				'操作失败。', '操作失败，旧状态已恢复。',
+				'恢复失败。请重新加载游戏后再编辑。', '已撤销更改。', '已重做更改。',
+				'操作已完成，但蓝图预览刷新失败。'
+			),
+			tch: createHistoryText(
+				'復原', '重做', '沒有可復原的操作。', '沒有可重做的操作。', '正在執行歷史操作…',
+				'交易歷史尚未就緒。', '所需的交易配接器無法使用。',
+				'請切回執行操作時的平面。', '目前存檔已改變，歷史已清空。',
+				'目標已改變，請重試。', '資源不足，無法復原此操作。',
+				'操作失敗。', '操作失敗，舊狀態已還原。',
+				'還原失敗。請重新載入遊戲後再編輯。', '已復原變更。', '已重做變更。',
+				'操作已完成，但藍圖預覽重新整理失敗。'
+			),
+			thai: createHistoryText(
+				'เลิกทำ', 'ทำซ้ำ', 'ไม่มีรายการให้เลิกทำ', 'ไม่มีรายการให้ทำซ้ำ', 'กำลังดำเนินการประวัติ…',
+				'ประวัติธุรกรรมยังไม่พร้อม', 'อะแดปเตอร์ธุรกรรมที่ต้องใช้ไม่พร้อมใช้งาน',
+				'กลับไปยังระนาบที่ทำรายการ', 'เซฟที่ใช้งานเปลี่ยนไป ประวัติถูกล้างแล้ว',
+				'เป้าหมายเปลี่ยนไป โปรดลองอีกครั้ง', 'ทรัพยากรไม่พอสำหรับการเลิกทำ',
+				'การดำเนินการล้มเหลว', 'การดำเนินการล้มเหลวและคืนสถานะเดิมแล้ว',
+				'การกู้คืนล้มเหลว โปรดโหลดเกมใหม่', 'เลิกทำการเปลี่ยนแปลงแล้ว', 'ทำการเปลี่ยนแปลงซ้ำแล้ว',
+				'ดำเนินการเสร็จแล้ว แต่รีเฟรชตัวอย่างไม่ได้'
+			),
+			hu: createHistoryText(
+				'Visszavonás', 'Újra', 'Nincs mit visszavonni.', 'Nincs mit újra végrehajtani.', 'Előzményművelet folyamatban…',
+				'A tranzakciós előzmény még nem áll készen.', 'A szükséges tranzakcióadapter nem érhető el.',
+				'Térj vissza a művelet síkjára.', 'Az aktív mentés megváltozott; az előzmény törölve lett.',
+				'A cél megváltozott; próbáld újra.', 'Nincs elég erőforrás a visszavonáshoz.',
+				'A művelet sikertelen.', 'A művelet sikertelen; az előző állapot helyreállt.',
+				'A helyreállítás sikertelen. Töltsd újra a játékot.', 'Módosítás visszavonva.', 'Módosítás újra végrehajtva.',
+				'A művelet befejeződött, de az előnézet nem frissült.'
+			),
+			lv: createHistoryText(
+				'Atsaukt', 'Atkārtot', 'Nav ko atsaukt.', 'Nav ko atkārtot.', 'Notiek vēstures darbība…',
+				'Darījumu vēsture vēl nav gatava.', 'Nepieciešamais darījuma adapteris nav pieejams.',
+				'Atgriezieties darbības plaknē.', 'Aktīvais saglabājums mainījās; vēsture tika notīrīta.',
+				'Mērķis mainījās; mēģiniet vēlreiz.', 'Nepietiek resursu, lai atsauktu.',
+				'Darbība neizdevās.', 'Darbība neizdevās; iepriekšējais stāvoklis tika atjaunots.',
+				'Atjaunošana neizdevās. Pārlādējiet spēli.', 'Izmaiņa atsaukta.', 'Izmaiņa atkārtota.',
+				'Darbība pabeigta, bet priekšskatījumu neizdevās atsvaidzināt.'
+			),
+			ro: createHistoryText(
+				'Anulare', 'Refacere', 'Nu există nimic de anulat.', 'Nu există nimic de refăcut.', 'Operațiune de istoric în curs…',
+				'Istoricul tranzacțiilor nu este pregătit.', 'Adaptorul necesar nu este disponibil.',
+				'Reveniți la planul operațiunii.', 'Salvarea activă s-a schimbat; istoricul a fost șters.',
+				'Ținta s-a schimbat; încercați din nou.', 'Resurse insuficiente pentru anulare.',
+				'Operațiunea a eșuat.', 'Operațiunea a eșuat; starea anterioară a fost restaurată.',
+				'Restaurarea a eșuat. Reîncărcați jocul.', 'Modificare anulată.', 'Modificare refăcută.',
+				'Operațiunea s-a încheiat, dar previzualizarea nu s-a actualizat.'
+			),
+			no: createHistoryText(
+				'Angre', 'Gjør om', 'Ingenting å angre.', 'Ingenting å gjøre om.', 'Historikkhandling pågår…',
+				'Transaksjonshistorikken er ikke klar.', 'Den nødvendige transaksjonsadapteren er utilgjengelig.',
+				'Gå tilbake til planet for handlingen.', 'Den aktive lagringen ble endret; historikken ble tømt.',
+				'Målet ble endret; prøv igjen.', 'Ikke nok ressurser til å angre.',
+				'Handlingen mislyktes.', 'Handlingen mislyktes; forrige tilstand ble gjenopprettet.',
+				'Gjenoppretting mislyktes. Last spillet på nytt.', 'Endringen ble angret.', 'Endringen ble gjort om.',
+				'Handlingen ble fullført, men forhåndsvisningen kunne ikke oppdateres.'
+			),
+			modsch: createHistoryText(
+				'撤销', '重做', '没有可撤销的操作。', '没有可重做的操作。', '正在执行历史操作…',
+				'事务历史尚未就绪。', '所需的事务适配器不可用。',
+				'请切回执行操作时的平面。', '当前存档已改变，历史已清空。',
+				'目标已改变，请重试。', '资源不足，无法撤销此操作。',
+				'操作失败。', '操作失败，旧状态已恢复。',
+				'恢复失败。请重新加载游戏后再编辑。', '已撤销更改。', '已重做更改。',
+				'操作已完成，但蓝图预览刷新失败。'
+			)
+		}
 		const PLACEMENT_TEXT = {
 			en: {
 				blueprintPlace: 'Place Blueprint',
@@ -3258,13 +3481,21 @@ ModLoader.register({
 				CARD_OPACITY_TEXT[language] || CARD_OPACITY_TEXT.en,
 				CREATIVE_TEXT[language] || CREATIVE_TEXT.en,
 				TOOLBAR_CARD_TEXT[language] || TOOLBAR_CARD_TEXT.en,
+				HISTORY_TEXT[language] || HISTORY_TEXT.en,
 				PLACEMENT_TEXT[language] || PLACEMENT_TEXT.en
 			)
 		}
 		const LANGUAGES = Object.freeze(Object.keys(TEXT))
-		const TOOLBAR_KEYS = Object.freeze(Object.keys(TOOLBAR_CARD_TEXT.en))
+		const TOOLBAR_KEYS = Object.freeze(
+			Object.keys(TOOLBAR_CARD_TEXT.en).concat(['toolbarCardUndo', 'toolbarCardRedo'])
+		)
+		const HISTORY_KEYS = Object.freeze(
+			Object.keys(HISTORY_TEXT.en).filter(function (key) {
+				return !TOOLBAR_KEYS.includes(key)
+			})
+		)
 		const KEYS = Object.freeze(Object.keys(TEXT.en).filter(function (key) {
-			return !TOOLBAR_KEYS.includes(key)
+			return !TOOLBAR_KEYS.includes(key) && !HISTORY_KEYS.includes(key)
 		}))
 
 		for (const language of LANGUAGES) Object.freeze(TEXT[language])
@@ -3275,6 +3506,7 @@ ModLoader.register({
 			languages: LANGUAGES,
 			keys: KEYS,
 			toolbarKeys: TOOLBAR_KEYS,
+			historyKeys: HISTORY_KEYS,
 			t(languageOrGame, key) {
 				const language = typeof languageOrGame === 'string' ? languageOrGame : languageOrGame?.language
 				const economyTable = CREATIVE_ECONOMY_TEXT[language] || CREATIVE_ECONOMY_TEXT.en

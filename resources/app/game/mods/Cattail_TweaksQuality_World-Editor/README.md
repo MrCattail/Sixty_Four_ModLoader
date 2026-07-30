@@ -430,7 +430,7 @@ globalThis[Symbol.for('cattail.world-editor.creative-mode')].snapshot()
 - 一次完整编辑器命令对应一条事务。事务记录只保存冻结的纯数据、精确 guard scope、before/after 状态、资源与统计增量以及快照 ID，不保存 DOM、实体对象或整份存档。
 - forward、undo 和 redo 都必须在任何世界写入前创建物理快照。快照失败或目标在等待期间改变时不会执行写入；apply 开始后的失败必须恢复操作前状态，恢复失败会阻止后续事务直到重新载入。
 - 外部变化检查只比较适配器声明的危险状态；不会比较带时间戳的整份存档，也不会把正常生产得到的资源或累计统计恢复成旧绝对值。
-- 4B-1a 现已注册结构蓝图放置适配器；仍没有玩家可见的撤销/重做按钮或热键。4A-2b 的原版商店操作不进入编辑器历史。
+- 4B-1a 现已注册结构蓝图放置适配器；4B-1b 通过同一事务服务提供玩家可见的撤销/重做按钮与热键。4A-2b 的原版商店操作不进入编辑器历史。
 - 4A-3a 的冻结基础本身不修改原版、ModLoader、Better UIs、配置、翻译或现有 UI。
 
 开发者控制台可检查：
@@ -452,7 +452,7 @@ globalThis[Symbol.for('cattail.world-editor.transactions')].snapshot()
 - 内部 undo 会移除本次新建筑、恢复被替换建筑、精确反转本次资源和 `machinesBuild` / `machinesSold` 增量；若撤销需要收回净资源收益但当前资源不足，则返回 `INSUFFICIENT_RESOURCES`，不修改世界且保留历史。
 - 成功、取消和可恢复失败都会保留蓝图、变换和固定状态并立即重规划；终止性回滚失败会保留预览但禁用放置。
 - 创造模式开关确认框和蓝图红色冲突确认框共用 `cattail.world-editor.dialogs` 的 DOM、主题、焦点陷阱、Escape、忙碌态和错误规则。
-- 当前仍不提供玩家可见的 undo/redo 控件或热键；可在开发者控制台调用服务验证。
+- 4B-1b 在不改变本阶段放置事务语义的前提下，提供玩家可见的 undo/redo 控件与热键。
 
 开发者控制台可检查：
 
@@ -462,3 +462,24 @@ globalThis[Symbol.for('cattail.world-editor.transactions')].snapshot()
 ```
 
 4B-1a 不修改原版、ModLoader、Better UIs、其他 Mod、`enabled.json` 或归档旧版，也不包含完整蓝图放置、Cube 恢复、导入界面、玩家可见 undo/redo 控件、打包或发布。
+
+## 4B-1b 撤销与重做控件
+
+- 顶部工具栏的历史组位于选择/移除之后、蓝图与变换之前，并直接使用 `cattail.world-editor.transactions` 的 `snapshot()`、`subscribe()`、`undo({ input })` 与 `redo({ input })`；不会创建第二套历史。
+- 紧凑模式提供始终可聚焦的 `↶` / `↷` 30px 按钮。不可执行时使用 `aria-disabled="true"`、本地化工具提示和无障碍原因，但不使用原生 `disabled`，因此仍可聚焦并说明阻止原因。
+- 大卡片模式提供两张 `120 × 112 CSS px` 的中性灰色撤销/重做卡。无历史、服务未就绪、平面/存档变化或终止锁定等长期阻止状态会隐藏并自动回流；事务忙碌时两张卡保持可见但不可再次执行。
+- Windows 快捷键为 `Ctrl+Z` 撤销，以及 `Ctrl+Y` / `Ctrl+Shift+Z` 重做。监听位于捕获阶段；组合键只有在编辑器活动、非重复/输入法组合、焦点不在可编辑控件、启动画面隐藏、ModLoader 面板未阻挡且创造/经济/共享对话框未占用输入时才会被消费。通过全部守卫后，即使当前没有可执行历史，也会阻止浏览器默认行为并显示本地原因。
+- 鼠标点击以 `mouse`、键盘激活按钮与快捷键以 `keyboard` 传给事务服务。本地忙碌锁覆盖事务 Promise 及成功后的预览刷新；忙碌期间不会排队或启动第二条命令。
+- 只有 `result.executed === true` 才会对活动中的 `cattail.world-editor.blueprint-preview` 调用一次 `refreshNow('transaction-undo-complete')` 或 `refreshNow('transaction-redo-complete')`。预览未活动或控制器不可用不影响事务成功；预览刷新失败也不会把已完成的事务改写为失败。
+- 工具栏下方、横向大卡片滚动区之外共用一个 `role="status"`、`aria-live="polite"` 的非模态状态胶囊。成功显示约 3 秒，可恢复警告和失败显示约 6 秒，忙碌持续到命令结束；`ROLLBACK_FAILED` 等终止锁定会持续显示到重新载入。
+- 无历史属于中性状态；资源不足、外部变化、平面/存档/价格/经济状态变化、适配器或服务暂不可用属于可恢复警告；快照、预检、应用、验证和失效错误属于失败。若事务已经回滚，界面明确说明旧状态已恢复；回滚失败则要求重新载入。
+- 所有新增按钮、卡片、状态、阻止原因、成功与失败文本覆盖现有 20 种原版语言，并随游戏语言切换即时刷新。
+
+开发者控制台可检查：
+
+```js
+globalThis[Symbol.for('cattail.world-editor.transactions')].snapshot()
+globalThis[Symbol.for('cattail.world-editor.blueprint-preview')]?.snapshot()
+```
+
+4B-1b 不修改事务引擎、蓝图放置适配器、预览控制器、原版、ModLoader、Better UIs、其他 Mod、`enabled.json` 或归档旧版，也不包含打包、发布或提交。

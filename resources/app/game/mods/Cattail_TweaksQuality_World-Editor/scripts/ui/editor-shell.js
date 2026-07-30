@@ -4,6 +4,9 @@ ModLoader.register({
 		const MOD_ID = api.id
 		const RUNTIME_KEY = Symbol.for('cattail.world-editor.runtime')
 		const I18N_KEY = Symbol.for('cattail.world-editor.i18n')
+		const SHARED_KEY = Symbol.for('cattail.world-editor.shared')
+		const TRANSACTIONS_KEY = Symbol.for('cattail.world-editor.transactions')
+		const BLUEPRINT_PREVIEW_KEY = Symbol.for('cattail.world-editor.blueprint-preview')
 		const SELECTION_KEY = Symbol.for('cattail.world-editor.selection')
 		const TOOL_KEY = Symbol.for('cattail.world-editor.tool')
 		const CREATIVE_KEY = Symbol.for('cattail.world-editor.creative-mode')
@@ -30,6 +33,28 @@ ModLoader.register({
 		const LARGE_TOOLBAR_SNAP_MS = 400
 		const LARGE_TOOLBAR_DECAY_PER_FRAME = .94
 		const LARGE_TOOLBAR_STOP_VELOCITY = .01
+		const HISTORY_SUCCESS_MS = 3000
+		const HISTORY_FAILURE_MS = 6000
+		const HISTORY_WARNING_CODES = new Set([
+			'PLANE_CHANGED',
+			'SAVE_CHANGED',
+			'SAVE_IDENTITY_UNAVAILABLE',
+			'EXTERNAL_CHANGE',
+			'ADAPTER_UNAVAILABLE',
+			'NOT_READY',
+			'INSUFFICIENT_RESOURCES',
+			'ECONOMY_MODE_CHANGED',
+			'PRICE_CHANGED',
+			'PRICE_UNAVAILABLE'
+		])
+		const HISTORY_ERROR_CODES = new Set([
+			'SNAPSHOT_FAILED',
+			'SNAPSHOT_UNAVAILABLE',
+			'PREFLIGHT_FAILED',
+			'APPLY_FAILED',
+			'VERIFY_FAILED',
+			'INVALIDATED'
+		])
 		let refreshMountedText = null
 		let refreshMountedTheme = null
 
@@ -51,6 +76,8 @@ ModLoader.register({
 		api.on('afterGameInit', function (payload, game) {
 			const runtime = globalThis[RUNTIME_KEY]
 			const i18n = globalThis[I18N_KEY]
+			let shared = globalThis[SHARED_KEY]
+			let transactions = globalThis[TRANSACTIONS_KEY]
 			const selection = globalThis[SELECTION_KEY]
 			const tool = globalThis[TOOL_KEY]
 			const dialogs = globalThis[DIALOGS_KEY]
@@ -63,6 +90,25 @@ ModLoader.register({
 			if (!i18n || typeof i18n.t !== 'function') {
 				console.warn('[Cattail World Editor] Toolbar 2G could not find the editor translations.')
 				return
+			}
+			if (
+				!shared ||
+				typeof shared.isEditableEvent !== 'function' ||
+				typeof shared.isModLoaderPanelBlocking !== 'function'
+			) {
+				console.warn('[Cattail World Editor] Toolbar 4B-1b could not find shared input guards.')
+				shared = unavailableSharedGuards()
+			}
+			if (
+				!transactions ||
+				transactions.game !== game ||
+				typeof transactions.snapshot !== 'function' ||
+				typeof transactions.subscribe !== 'function' ||
+				typeof transactions.undo !== 'function' ||
+				typeof transactions.redo !== 'function'
+			) {
+				console.warn('[Cattail World Editor] Toolbar 4B-1b could not find transaction history.')
+				transactions = unavailableTransactions(game)
 			}
 			if (
 				!selection ||
@@ -108,11 +154,18 @@ ModLoader.register({
 			let currentTool = tool.snapshot()
 			let currentCreative = creative.snapshot()
 			let currentCreativeEconomy = creativeEconomy.snapshot()
+			let currentTransactions = transactions.snapshot()
 			let gameHudHidden = api.ui.hud.isHidden()
 			let vanillaHudHidden = api.ui.isVanillaGameHudHidden(game)
 			let creativeDialog = null
+			let historyUiBusy = false
+			let historyStatusTimer = 0
+			let historyStatusState = null
 			const selectButton = shell.querySelector('[data-world-editor-action="select"]')
 			const removeButton = shell.querySelector('[data-world-editor-action="remove-selection"]')
+			const undoButton = shell.querySelector('[data-world-editor-action="undo"]')
+			const redoButton = shell.querySelector('[data-world-editor-action="redo"]')
+			const historyStatus = shell.querySelector('[data-world-editor-action="history-status"]')
 			const creativeButton = shell.querySelector('[data-world-editor-action="creative-mode"]')
 			const actions = (selectButton.parentElement || selectButton.parentNode)?.parentElement ||
 				(selectButton.parentElement || selectButton.parentNode)?.parentNode
@@ -128,6 +181,8 @@ ModLoader.register({
 				mode: '',
 				count: '',
 				remove: '',
+				undo: '',
+				redo: '',
 				creative: '',
 				exitHint: ''
 			}
@@ -138,9 +193,131 @@ ModLoader.register({
 					accessibleText.mode,
 					accessibleText.count,
 					accessibleText.remove,
+					accessibleText.undo,
+					accessibleText.redo,
 					accessibleText.creative,
 					accessibleText.exitHint
 				].filter(Boolean).join('. ') + '.')
+			}
+
+			const historyBlockedReason = function (direction) {
+				if (historyUiBusy) return 'BUSY'
+				const key = direction === 'undo' ? 'undoBlockedReason' : 'redoBlockedReason'
+				return String(currentTransactions?.[key] || '') || null
+			}
+
+			const historyTextKey = function (code, direction) {
+				const normalized = String(code || '').toUpperCase()
+				if (normalized === 'NO_UNDO') return 'historyNoUndo'
+				if (normalized === 'NO_REDO') return 'historyNoRedo'
+				if (normalized === 'BUSY') return 'historyBusy'
+				if (normalized === 'NOT_READY') return 'historyNotReady'
+				if (normalized === 'ADAPTER_UNAVAILABLE') return 'historyUnavailable'
+				if (normalized === 'PLANE_CHANGED') return 'historyPlaneChanged'
+				if (normalized === 'SAVE_CHANGED' || normalized === 'SAVE_IDENTITY_UNAVAILABLE') return 'historySaveChanged'
+				if (
+					normalized === 'EXTERNAL_CHANGE' ||
+					normalized === 'ECONOMY_MODE_CHANGED' ||
+					normalized === 'PRICE_CHANGED' ||
+					normalized === 'PRICE_UNAVAILABLE'
+				) return 'historyExternalChange'
+				if (normalized === 'INSUFFICIENT_RESOURCES') return 'historyInsufficientResources'
+				if (normalized === 'ROLLBACK_FAILED') return 'historyReloadRequired'
+				if (HISTORY_ERROR_CODES.has(normalized)) return 'historyFailed'
+				return 'historyFailed'
+			}
+
+			const historyStatusKind = function (code) {
+				const normalized = String(code || '').toUpperCase()
+				if (normalized === 'NO_UNDO' || normalized === 'NO_REDO') return 'neutral'
+				if (normalized === 'BUSY') return 'busy'
+				if (normalized === 'ROLLBACK_FAILED' || currentTransactions?.terminalBlockedReason) return 'terminal'
+				if (HISTORY_WARNING_CODES.has(normalized)) return 'warning'
+				return 'error'
+			}
+
+			const renderHistoryStatus = function (languageGame) {
+				if (!historyStatusState) return
+				const text = i18n.t(languageGame || game, historyStatusState.key)
+				historyStatus.textContent = text
+				historyStatus.title = text
+				historyStatus.dataset.active = 'true'
+				historyStatus.dataset.kind = historyStatusState.kind
+			}
+
+			const clearHistoryStatus = function (force) {
+				if (historyStatusState?.persistent && !force) return false
+				if (historyStatusTimer) clearTimeout(historyStatusTimer)
+				historyStatusTimer = 0
+				historyStatusState = null
+				historyStatus.textContent = ''
+				historyStatus.title = ''
+				historyStatus.dataset.active = 'false'
+				historyStatus.dataset.kind = 'neutral'
+				return true
+			}
+
+			const showHistoryStatus = function (key, kind, duration, persistent) {
+				if (historyStatusTimer) clearTimeout(historyStatusTimer)
+				historyStatusTimer = 0
+				historyStatusState = {
+					key: String(key || 'historyFailed'),
+					kind: String(kind || 'neutral'),
+					persistent: persistent === true
+				}
+				renderHistoryStatus(game)
+				if (!historyStatusState.persistent && Number(duration) > 0) {
+					historyStatusTimer = setTimeout(function () {
+						historyStatusTimer = 0
+						clearHistoryStatus()
+					}, Number(duration))
+				}
+			}
+
+			const showHistoryCode = function (code, direction) {
+				const kind = historyStatusKind(code)
+				showHistoryStatus(
+					historyTextKey(code, direction),
+					kind,
+					kind === 'busy' || kind === 'terminal' ? 0 : HISTORY_FAILURE_MS,
+					kind === 'terminal'
+				)
+			}
+
+			const refreshHistory = function (languageGame) {
+				const source = languageGame || game
+				const definitions = [
+					{
+						button: undoButton,
+						direction: 'undo',
+						labelKey: 'historyUndo',
+						cardKey: 'toolbarCardUndo',
+						shortcut: 'Ctrl+Z'
+					},
+					{
+						button: redoButton,
+						direction: 'redo',
+						labelKey: 'historyRedo',
+						cardKey: 'toolbarCardRedo',
+						shortcut: 'Ctrl+Y / Ctrl+Shift+Z'
+					}
+				]
+				for (const definition of definitions) {
+					const label = i18n.t(source, definition.labelKey)
+					const reason = historyBlockedReason(definition.direction)
+					const reasonText = reason ? i18n.t(source, historyTextKey(reason, definition.direction)) : ''
+					const accessibleLabel = label + ' (' + definition.shortcut + ')' + (reasonText ? ' — ' + reasonText : '')
+					definition.button.disabled = false
+					definition.button.setAttribute('aria-disabled', reason ? 'true' : 'false')
+					definition.button.dataset.worldEditorToolbarBusy = reason === 'BUSY' ? 'true' : 'false'
+					definition.button.dataset.historyBlockedReason = reason || ''
+					definition.button.title = accessibleLabel
+					definition.button.setAttribute('aria-label', accessibleLabel)
+					setCardText(definition.button, i18n.t(source, definition.cardKey))
+					accessibleText[definition.direction] = accessibleLabel
+				}
+				toolbarScroller.refresh('history')
+				refreshAccessibility()
 			}
 
 			const refreshText = function (languageGame) {
@@ -165,6 +342,8 @@ ModLoader.register({
 				largeStyleButton.setAttribute('aria-label', largeStyleText)
 				accessibleText.brand = brand
 				accessibleText.remove = removeText
+				refreshHistory(source)
+				renderHistoryStatus(source)
 				refreshCreative(source)
 				refreshEconomyStatus(source)
 				refreshTool(source)
@@ -326,6 +505,146 @@ ModLoader.register({
 				refreshCreative(game)
 				refreshEconomyStatus(game)
 			})
+			const stopTransactionSubscription = transactions.subscribe(function (state) {
+				currentTransactions = state
+				refreshHistory(game)
+				if (state?.terminalBlockedReason) {
+					showHistoryCode(state.terminalBlockedReason)
+				} else if (state?.busy && !historyUiBusy) {
+					showHistoryCode('BUSY')
+				} else if (
+					!state?.busy &&
+					!historyUiBusy &&
+					historyStatusState?.key === 'historyBusy'
+				) {
+					clearHistoryStatus(true)
+				}
+			})
+
+			const runHistory = async function (direction, input) {
+				const blocked = historyBlockedReason(direction)
+				if (blocked) {
+					showHistoryCode(blocked, direction)
+					return Object.freeze({
+						accepted: false,
+						executed: false,
+						direction,
+						reason: blocked
+					})
+				}
+				historyUiBusy = true
+				refreshHistory(game)
+				showHistoryCode('BUSY', direction)
+				let status = null
+				let result = null
+				try {
+					result = await transactions[direction]({ input })
+					if (result?.executed === true) {
+						let previewRefreshFailed = false
+						const preview = globalThis[BLUEPRINT_PREVIEW_KEY]
+						try {
+							const previewState = typeof preview?.snapshot === 'function' ? preview.snapshot() : null
+							if (previewState?.active && typeof preview?.refreshNow === 'function') {
+								const refreshedPlan = await preview.refreshNow('transaction-' + direction + '-complete')
+								previewRefreshFailed = (
+									!refreshedPlan ||
+									refreshedPlan?.ok === false ||
+									refreshedPlan?.success === false ||
+									!!refreshedPlan?.error
+								)
+							}
+						} catch (previewError) {
+							previewRefreshFailed = true
+							console.warn('[Cattail World Editor] History preview refresh failed.', previewError)
+						}
+						status = previewRefreshFailed
+							? { key: 'historyPreviewRefreshFailed', kind: 'warning', duration: HISTORY_FAILURE_MS }
+							: {
+								key: direction === 'undo' ? 'historyUndoSuccess' : 'historyRedoSuccess',
+								kind: 'success',
+								duration: HISTORY_SUCCESS_MS
+							}
+					} else if (result?.reason === 'rolled-back') {
+						status = { key: 'historyRolledBack', kind: 'error', duration: HISTORY_FAILURE_MS }
+						console.warn(
+							'[Cattail World Editor] History operation rolled back.',
+							result?.error?.code || 'UNKNOWN',
+							result?.error?.message || ''
+						)
+					} else {
+						const code = String(result?.error?.code || result?.reason || 'UNKNOWN').toUpperCase()
+						const kind = historyStatusKind(code)
+						status = {
+							key: historyTextKey(code, direction),
+							kind,
+							duration: kind === 'terminal' ? 0 : HISTORY_FAILURE_MS,
+							persistent: kind === 'terminal'
+						}
+						console.warn(
+							'[Cattail World Editor] History operation failed.',
+							code,
+							result?.error?.message || ''
+						)
+					}
+				} catch (operationError) {
+					status = { key: 'historyFailed', kind: 'error', duration: HISTORY_FAILURE_MS }
+					console.warn(
+						'[Cattail World Editor] History operation threw.',
+						operationError?.code || 'UNKNOWN',
+						operationError?.message || ''
+					)
+				} finally {
+					historyUiBusy = false
+					currentTransactions = transactions.snapshot()
+					refreshHistory(game)
+				}
+				if (status) {
+					showHistoryStatus(status.key, status.kind, status.duration, status.persistent)
+				}
+				return result
+			}
+
+			const handleUndoClick = function (event) {
+				event?.preventDefault?.()
+				event?.stopPropagation?.()
+				void runHistory('undo', event?.detail === 0 ? 'keyboard' : 'mouse')
+			}
+
+			const handleRedoClick = function (event) {
+				event?.preventDefault?.()
+				event?.stopPropagation?.()
+				void runHistory('redo', event?.detail === 0 ? 'keyboard' : 'mouse')
+			}
+
+			const historyShortcutDirection = function (event) {
+				if (!event?.ctrlKey || event.altKey || event.metaKey) return null
+				const key = String(event.key || '').toLowerCase()
+				if (key === 'z' && !event.shiftKey) return 'undo'
+				if (key === 'y' && !event.shiftKey) return 'redo'
+				if (key === 'z' && event.shiftKey) return 'redo'
+				return null
+			}
+
+			const handleHistoryKeydown = function (event) {
+				const direction = historyShortcutDirection(event)
+				if (!direction) return
+				if (
+					!currentState?.active ||
+					game.halt ||
+					game.splash?.isShown ||
+					event.repeat ||
+					event.isComposing ||
+					event.keyCode === 229 ||
+					shared.isEditableEvent(event) ||
+					shared.isModLoaderPanelBlocking() ||
+					shared.isWorldEditorInputBlocked?.() ||
+					Number(dialogs.snapshot?.().openCount) > 0
+				) return
+				event.preventDefault()
+				event.stopPropagation()
+				event.stopImmediatePropagation?.()
+				void runHistory(direction, 'keyboard')
+			}
 
 			const handleSelectClick = function (event) {
 				event?.preventDefault?.()
@@ -640,6 +959,8 @@ ModLoader.register({
 
 			selectButton.addEventListener('click', handleSelectClick)
 			removeButton.addEventListener('click', handleRemoveClick)
+			undoButton.addEventListener('click', handleUndoClick)
+			redoButton.addEventListener('click', handleRedoClick)
 			creativeButton.addEventListener('click', handleCreativeClick)
 			compactStyleButton.addEventListener('click', handleCompactStyleClick)
 			largeStyleButton.addEventListener('click', handleLargeStyleClick)
@@ -660,6 +981,7 @@ ModLoader.register({
 			window.addEventListener('modloader:vanilla-game-hud', handleVanillaGameHud)
 			window.addEventListener('modloader:config-preview', handleToolbarConfigPreview)
 			window.addEventListener('cattail:world-editor-toolbar-layout', handleToolbarLayoutChange)
+			window.addEventListener('keydown', handleHistoryKeydown, true)
 			window.addEventListener('resize', refreshUiScale)
 			const uiScaleObserver = createUiScaleObserver(game, refreshUiScale)
 			const releaseHud = api.ui.hud.register({
@@ -690,7 +1012,10 @@ ModLoader.register({
 				window.removeEventListener('modloader:vanilla-game-hud', handleVanillaGameHud)
 				window.removeEventListener('modloader:config-preview', handleToolbarConfigPreview)
 				window.removeEventListener('cattail:world-editor-toolbar-layout', handleToolbarLayoutChange)
+				window.removeEventListener('keydown', handleHistoryKeydown, true)
 				window.removeEventListener('resize', refreshUiScale)
+				if (historyStatusTimer) clearTimeout(historyStatusTimer)
+				historyStatusTimer = 0
 				uiScaleObserver?.disconnect?.()
 				toolbarScroller.dispose()
 				if (globalThis[TOOLBAR_SCROLL_PROBE_KEY] === toolbarScroller.probe) {
@@ -702,8 +1027,11 @@ ModLoader.register({
 				if (typeof stopToolSubscription === 'function') stopToolSubscription()
 				if (typeof stopCreativeSubscription === 'function') stopCreativeSubscription()
 				if (typeof stopCreativeEconomySubscription === 'function') stopCreativeEconomySubscription()
+				if (typeof stopTransactionSubscription === 'function') stopTransactionSubscription()
 				selectButton.removeEventListener('click', handleSelectClick)
 				removeButton.removeEventListener('click', handleRemoveClick)
+				undoButton.removeEventListener('click', handleUndoClick)
+				redoButton.removeEventListener('click', handleRedoClick)
 				creativeButton.removeEventListener('click', handleCreativeClick)
 				compactStyleButton.removeEventListener('click', handleCompactStyleClick)
 				largeStyleButton.removeEventListener('click', handleLargeStyleClick)
@@ -767,6 +1095,8 @@ ModLoader.register({
 			actions.className = 'cattail-world-editor-shell__actions'
 			const selectButton = createToolButton('select', 'tool-select', 'select', '⌗')
 			const removeButton = createIconButton('remove-selection', '×', 'remove', '×')
+			const undoButton = createHistoryButton('undo', '↶')
+			const redoButton = createHistoryButton('redo', '↷')
 			const creativeButton = createToolButton('creative-mode', 'creative-mode', 'creative', '✦')
 			creativeButton.className += ' cattail-world-editor-shell__tool--creative'
 			creativeButton.dataset.active = 'false'
@@ -781,6 +1111,7 @@ ModLoader.register({
 			blueprintGroup.dataset.worldEditorSlot = 'blueprint'
 			transformGroup.dataset.worldEditorSlot = 'transform'
 			selectionGroup.append(selectButton, removeButton)
+			historyGroup.append(undoButton, redoButton)
 			creativeGroup.append(creativeButton)
 			actions.append(selectionGroup, historyGroup, blueprintGroup, transformGroup, creativeGroup)
 
@@ -795,10 +1126,21 @@ ModLoader.register({
 			const largeStyleButton = createToolbarStyleButton('cards', '▦')
 			toolbarStyleSwitch.append(compactStyleButton, largeStyleButton)
 
+			const historyStatus = document.createElement('div')
+			historyStatus.className = 'cattail-world-editor-shell__history-status'
+			historyStatus.dataset.worldEditorHistoryStatus = ''
+			historyStatus.dataset.worldEditorAction = 'history-status'
+			historyStatus.dataset.active = 'false'
+			historyStatus.dataset.kind = 'neutral'
+			historyStatus.setAttribute('role', 'status')
+			historyStatus.setAttribute('aria-live', 'polite')
+			historyStatus.setAttribute('aria-atomic', 'true')
+
 			statusBar.append(identity, divider, status, hint)
 			statusBar.append(toolbarStyleSwitch)
 			toolbarBar.append(actions)
 			layout.append(statusBar, toolbarBar)
+			layout.append(historyStatus)
 			shell.append(layout)
 			return shell
 		}
@@ -839,6 +1181,14 @@ ModLoader.register({
 			icon.textContent = symbol
 			button.append(icon)
 			appendCardDecoration(button, cardKey, cardIcon)
+			return button
+		}
+
+		function createHistoryButton(action, symbol) {
+			const button = createIconButton(action, symbol, action, symbol)
+			button.disabled = false
+			button.setAttribute('aria-disabled', 'true')
+			button.dataset.historyBlockedReason = action === 'undo' ? 'NO_UNDO' : 'NO_REDO'
 			return button
 		}
 
@@ -1374,6 +1724,57 @@ ModLoader.register({
 			return status
 		}
 
+		function unavailableSharedGuards() {
+			return Object.freeze({
+				isEditableEvent() { return false },
+				isModLoaderPanelBlocking() { return false },
+				isWorldEditorInputBlocked() { return false }
+			})
+		}
+
+		function unavailableTransactions(game) {
+			const state = Object.freeze({
+				version: '1.0.0',
+				ready: false,
+				busy: false,
+				phase: 'idle',
+				direction: null,
+				undoCount: 0,
+				redoCount: 0,
+				canUndo: false,
+				canRedo: false,
+				undoBlockedReason: 'NOT_READY',
+				redoBlockedReason: 'NOT_READY',
+				terminalBlockedReason: null,
+				error: Object.freeze({
+					code: 'NOT_READY',
+					message: 'Transaction history is unavailable.'
+				}),
+				disposed: false
+			})
+			const reject = function (direction) {
+				return Promise.resolve(Object.freeze({
+					accepted: false,
+					executed: false,
+					direction,
+					reason: 'not-ready',
+					transaction: null,
+					snapshotId: null,
+					error: state.error
+				}))
+			}
+			return Object.freeze({
+				game,
+				snapshot() { return state },
+				subscribe(listener) {
+					listener(state)
+					return function () {}
+				},
+				undo() { return reject('undo') },
+				redo() { return reject('redo') }
+			})
+		}
+
 		function unavailableCreativeController(game) {
 			const state = Object.freeze({
 				version: '1.0.0',
@@ -1447,6 +1848,10 @@ ModLoader.register({
 					--world-editor-shell-creative: rgba(166, 242, 70, .2);
 					--world-editor-shell-creative-border: rgba(166, 242, 70, .62);
 					--world-editor-shell-creative-text: rgb(91, 128, 25);
+					--world-editor-history-success: rgba(76, 185, 107, .72);
+					--world-editor-history-warning: rgba(205, 142, 44, .72);
+					--world-editor-history-error: rgba(198, 71, 71, .76);
+					--world-editor-history-busy: rgba(113, 79, 163, .62);
 					--world-editor-shell-shadow: 0 10px 28px rgba(0, 0, 0, .16);
 					position: fixed;
 					top: max(12px, env(safe-area-inset-top));
@@ -1476,6 +1881,10 @@ ModLoader.register({
 					--world-editor-shell-creative: rgba(227, 253, 67, .18);
 					--world-editor-shell-creative-border: rgba(227, 253, 67, .64);
 					--world-editor-shell-creative-text: rgb(227, 253, 67);
+					--world-editor-history-success: rgba(151, 224, 120, .76);
+					--world-editor-history-warning: rgba(240, 201, 106, .76);
+					--world-editor-history-error: rgba(245, 115, 115, .8);
+					--world-editor-history-busy: rgba(210, 188, 250, .7);
 					--world-editor-shell-shadow: 0 10px 28px rgba(0, 0, 0, .3);
 				}
 				.cattail-world-editor-shell[data-visible="true"] {
@@ -1660,6 +2069,13 @@ ModLoader.register({
 					opacity: .38;
 					cursor: default;
 				}
+				.cattail-world-editor-shell__tool[aria-disabled="true"] {
+					opacity: .38;
+					cursor: default;
+				}
+				.cattail-world-editor-shell__tool[aria-disabled="true"]:hover {
+					color: var(--world-editor-shell-muted);
+				}
 				.cattail-world-editor-shell__card-icon,
 				.cattail-world-editor-shell__card-label,
 				.cattail-world-editor-blueprint-card-icon,
@@ -1672,6 +2088,39 @@ ModLoader.register({
 					border-left: 1px solid var(--world-editor-shell-border);
 					color: var(--world-editor-shell-muted);
 					font-size: 13px;
+				}
+				.cattail-world-editor-shell__history-status {
+					display: none;
+					max-width: min(520px, calc(var(--world-editor-toolbar-layout-width, calc(100vw - 24px)) - 28px));
+					box-sizing: border-box;
+					padding: 7px 12px;
+					border: 1px solid var(--world-editor-shell-border);
+					border-radius: 999px;
+					background: var(--world-editor-shell-bg);
+					box-shadow: var(--world-editor-shell-shadow);
+					backdrop-filter: blur(12px) saturate(1.08);
+					-webkit-backdrop-filter: blur(12px) saturate(1.08);
+					color: var(--world-editor-shell-text);
+					font: 600 12px/1.35 Montserrat, Arial, sans-serif;
+					text-align: center;
+					white-space: normal;
+					pointer-events: none;
+				}
+				.cattail-world-editor-shell__history-status[data-active="true"] {
+					display: block;
+				}
+				.cattail-world-editor-shell__history-status[data-kind="busy"] {
+					border-color: var(--world-editor-history-busy);
+				}
+				.cattail-world-editor-shell__history-status[data-kind="success"] {
+					border-color: var(--world-editor-history-success);
+				}
+				.cattail-world-editor-shell__history-status[data-kind="warning"] {
+					border-color: var(--world-editor-history-warning);
+				}
+				.cattail-world-editor-shell__history-status[data-kind="error"],
+				.cattail-world-editor-shell__history-status[data-kind="terminal"] {
+					border-color: var(--world-editor-history-error);
 				}
 				.cattail-world-editor-shell[data-toolbar-style="compact"] .cattail-world-editor-shell__actions {
 					gap: 0;
@@ -1713,7 +2162,7 @@ ModLoader.register({
 					background: transparent !important;
 					box-shadow: none !important;
 				}
-				.cattail-world-editor-shell[data-toolbar-style="compact"] .cattail-world-editor-shell__tool:hover:not(:disabled),
+				.cattail-world-editor-shell[data-toolbar-style="compact"] .cattail-world-editor-shell__tool:hover:not(:disabled):not([aria-disabled="true"]),
 				.cattail-world-editor-shell[data-toolbar-style="compact"] .cattail-world-editor-blueprint-mode:hover:not(:disabled),
 				.cattail-world-editor-shell[data-toolbar-style="compact"] .cattail-world-editor-blueprint-icon-button:hover:not(:disabled),
 				.cattail-world-editor-shell[data-toolbar-style="compact"] .cattail-world-editor-transform-button:hover:not(:disabled) {
@@ -1874,17 +2323,17 @@ ModLoader.register({
 					clip-path: polygon(50% 0, 100% 34%, 100% 66%, 50% 100%, 0 66%, 0 34%);
 					pointer-events: none;
 				}
-				.cattail-world-editor-shell[data-toolbar-style="cards"] [data-world-editor-toolbar-card]:hover:not(:disabled) {
+				.cattail-world-editor-shell[data-toolbar-style="cards"] [data-world-editor-toolbar-card]:hover:not(:disabled):not([aria-disabled="true"]) {
 					background: transparent;
 					color: var(--world-editor-shell-text);
 				}
-				.cattail-world-editor-shell[data-toolbar-style="cards"] [data-world-editor-toolbar-card]:hover:not(:disabled)::after {
+				.cattail-world-editor-shell[data-toolbar-style="cards"] [data-world-editor-toolbar-card]:hover:not(:disabled):not([aria-disabled="true"])::after {
 					background: var(--world-editor-shell-chip);
 				}
-				.cattail-world-editor-shell[data-toolbar-style="cards"] .cattail-world-editor-shell__toolbar-bar[data-scrolling="true"] [data-world-editor-toolbar-card]:hover:not(:disabled):not([data-active="true"]) {
+				.cattail-world-editor-shell[data-toolbar-style="cards"] .cattail-world-editor-shell__toolbar-bar[data-scrolling="true"] [data-world-editor-toolbar-card]:hover:not(:disabled):not([aria-disabled="true"]):not([data-active="true"]) {
 					color: var(--world-editor-shell-muted);
 				}
-				.cattail-world-editor-shell[data-toolbar-style="cards"] .cattail-world-editor-shell__toolbar-bar[data-scrolling="true"] [data-world-editor-toolbar-card]:hover:not(:disabled):not([data-active="true"])::after {
+				.cattail-world-editor-shell[data-toolbar-style="cards"] .cattail-world-editor-shell__toolbar-bar[data-scrolling="true"] [data-world-editor-toolbar-card]:hover:not(:disabled):not([aria-disabled="true"]):not([data-active="true"])::after {
 					background: transparent;
 					transition: none;
 				}

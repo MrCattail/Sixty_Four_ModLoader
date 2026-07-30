@@ -57,7 +57,9 @@ function testManifestAndLocalization() {
 		'toolbarCardMirrorU',
 		'toolbarCardMirrorV',
 		'toolbarCardReset',
-		'toolbarCardCreative'
+		'toolbarCardCreative',
+		'toolbarCardUndo',
+		'toolbarCardRedo'
 	]
 	assert.equal(i18n.languages.length, 20)
 	assert.deepEqual(
@@ -82,6 +84,16 @@ function testSourceContracts() {
 	assert.match(shellSource, /detail\?\.modId\s*!==\s*MOD_ID\s*\|\|\s*detail\?\.key\s*!==\s*LARGE_TOOLBAR_CONFIG_KEY/)
 	assert.match(shellSource, /createToolbarStyleButton\('compact',\s*'≡'\)/)
 	assert.match(shellSource, /createToolbarStyleButton\('cards',\s*'▦'\)/)
+	assert.match(shellSource, /createHistoryButton\('undo',\s*'↶'\)/)
+	assert.match(shellSource, /createHistoryButton\('redo',\s*'↷'\)/)
+	assert.match(shellSource, /historyGroup\.append\(undoButton,\s*redoButton\)/)
+	assert.match(shellSource, /layout\.append\(statusBar,\s*toolbarBar\)/)
+	assert.match(shellSource, /layout\.append\(historyStatus\)/)
+	assert.match(shellSource, /historyStatus\.setAttribute\('role',\s*'status'\)/)
+	assert.match(shellSource, /historyStatus\.setAttribute\('aria-live',\s*'polite'\)/)
+	assert.match(shellSource, /button\.setAttribute\('aria-disabled',\s*'true'\)/)
+	assert.match(shellSource, /definition\.button\.disabled\s*=\s*false/)
+	assert.match(shellSource, /worldEditorToolbarBusy\s*=\s*reason\s*===\s*'BUSY'\s*\?\s*'true'\s*:\s*'false'/)
 	assert.match(shellSource, /LARGE_TOOLBAR_CARD_WIDTH\s*=\s*120/)
 	assert.match(shellSource, /LARGE_TOOLBAR_VISIBLE_LIMIT\s*=\s*8/)
 	assert.match(shellSource, /LARGE_TOOLBAR_SCROLL_RESIDUAL_PROPERTY\s*=\s*'--world-editor-large-toolbar-scroll-residual'/)
@@ -161,11 +173,11 @@ function testSourceContracts() {
 	)
 	assert.match(
 		shellSource,
-		/\[data-world-editor-toolbar-card\]:hover:not\(:disabled\)::after\s*\{\s*background:\s*var\(--world-editor-shell-chip\);/
+		/\[data-world-editor-toolbar-card\]:hover:not\(:disabled\):not\(\[aria-disabled="true"\]\)::after\s*\{\s*background:\s*var\(--world-editor-shell-chip\);/
 	)
 	assert.match(
 		shellSource,
-		/\[data-scrolling="true"\]\s+\[data-world-editor-toolbar-card\]:hover:not\(:disabled\):not\(\[data-active="true"\]\)::after\s*\{[^}]*background:\s*transparent;[^}]*transition:\s*none;/s
+		/\[data-scrolling="true"\]\s+\[data-world-editor-toolbar-card\]:hover:not\(:disabled\):not\(\[aria-disabled="true"\]\):not\(\[data-active="true"\]\)::after\s*\{[^}]*background:\s*transparent;[^}]*transition:\s*none;/s
 	)
 	assert.match(
 		shellSource,
@@ -187,6 +199,8 @@ function testSourceContracts() {
 	assert.match(shellSource, /actions\.removeEventListener\('scroll',\s*handleScroll\)/)
 	assert.match(shellSource, /\[data-world-editor-large-hidden="true"\]/)
 	assert.match(shellSource, /\[aria-disabled="true"\]:not\(\[data-world-editor-toolbar-busy="true"\]\)/)
+	assert.match(shellSource, /\.cattail-world-editor-shell__tool\[aria-disabled="true"\]\s*\{\s*opacity:\s*\.38;\s*cursor:\s*default;/)
+	assert.match(shellSource, /\.cattail-world-editor-shell__history-status\[data-active="true"\]\s*\{\s*display:\s*block;/)
 	assert.match(shellSource, /group\.dataset\.largeEmpty\s*=\s*available\s*\?\s*'false'\s*:\s*'true'/)
 	assert.match(shellSource, /font-size:\s*48px/)
 	assert.match(shellSource, /opacity:\s*\.12 !important/)
