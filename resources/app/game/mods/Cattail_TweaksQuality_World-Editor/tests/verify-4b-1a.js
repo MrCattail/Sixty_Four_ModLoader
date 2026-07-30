@@ -430,7 +430,7 @@ function loadPreviewRuntime() {
 			const retry = key === retryTarget && !retryIssued
 			if (retry) retryIssued = true
 			return Promise.resolve({
-				version: '0.4.3',
+				version: '0.4.4',
 				target: normalizedTarget,
 				records: [],
 				statusCounts: {
@@ -597,8 +597,8 @@ function keyEvent(code, key) {
 
 async function testInitializationAndBasicHistory() {
 	const runtime = loadRuntime()
-	assert.equal(runtime.placement.version, '1.0.0')
-	assert.equal(runtime.placement.snapshot().version, '1.0.0')
+	assert.equal(runtime.placement.version, '1.1.0')
+	assert.equal(runtime.placement.snapshot().version, '1.1.0')
 	assert.equal(runtime.placement.snapshot().ready, true)
 	assert.deepEqual(
 		Array.from(runtime.transactions.snapshot().registeredKinds),
@@ -719,7 +719,7 @@ async function testNoWriteBeforeSnapshotAndUnsafeClassification() {
 		replaceConflicts: false
 	})
 	assert.equal(skipResult.executed, false)
-	assert.equal(skipResult.error.code, 'NOTHING_TO_BUILD')
+	assert.equal(skipResult.error.code, 'NOTHING_TO_CHANGE')
 	assert.equal(pureSkip.snapshotStore.created.length, 0)
 	assert.equal(pureSkip.game.entityAtCoordinates([2, 2]), original)
 	pureSkip.dispose()
@@ -1122,7 +1122,7 @@ async function testPreviewCommandLockLifecycle() {
 
 function testStaticUiLocalizationAndManifestContracts() {
 	const manifest = JSON.parse(source('mod.json'))
-	assert.equal(manifest.version, '0.4.3')
+	assert.equal(manifest.version, '0.4.4')
 	assert.equal(manifest.entry.length, 30)
 	assert.ok(manifest.entry.indexOf(PLACEMENT_SOURCE) > manifest.entry.indexOf(PLAN_SOURCE))
 	assert.ok(manifest.entry.indexOf(PLACEMENT_SOURCE) < manifest.entry.indexOf('scripts/core/input-controller.js'))
@@ -1177,10 +1177,11 @@ function testStaticUiLocalizationAndManifestContracts() {
 	assert.doesNotMatch(pasteShortcutSource, /!event\?\.altKey/)
 	assert.match(pasteShortcutSource, /!event\?\.shiftKey/)
 	assert.match(sessionSource, /if \(!plan\) return null/)
-	assert.match(sessionSource, /placementSkipConflicts/)
-	assert.match(sessionSource, /placementReplaceConflicts/)
+	assert.match(sessionSource, /placementOptionsTitle/)
+	assert.match(sessionSource, /placementReplaceOption/)
+	assert.match(sessionSource, /placementSyncEmptyOption/)
 	assert.match(sessionSource, /refreshNow\?\.\('placement-cancelled'\)/)
-	assert.match(sessionSource, /danger:\s*true/)
+	assert.match(sessionSource, /cattail-world-editor-dialog__button--danger/)
 	assert.match(previewSource, /lockCommandTarget\(position,\s*reason\)/)
 	assert.match(previewSource, /releaseCommandTarget\(token,\s*reason\)/)
 	assert.match(previewSource, /commandLocked:\s*!!commandLock/)
@@ -1193,6 +1194,12 @@ function testStaticUiLocalizationAndManifestContracts() {
 		'placementConflictMessage',
 		'placementSkipConflicts',
 		'placementReplaceConflicts',
+		'placementOptionsTitle',
+		'placementOptionsMessage',
+		'placementReplaceOption',
+		'placementSyncEmptyOption',
+		'placementOptionsSummary',
+		'placementConfirmAction',
 		'placementCancel',
 		'placementPlacing',
 		'placementSuccess',
@@ -1226,7 +1233,18 @@ async function run() {
 	)
 }
 
-run().catch(error => {
-	console.error(error)
-	process.exitCode = 1
-})
+module.exports = {
+	MOD_ROOT,
+	source,
+	createGame,
+	blueprint,
+	loadRuntime,
+	cellKey
+}
+
+if (require.main === module) {
+	run().catch(error => {
+		console.error(error)
+		process.exitCode = 1
+	})
+}

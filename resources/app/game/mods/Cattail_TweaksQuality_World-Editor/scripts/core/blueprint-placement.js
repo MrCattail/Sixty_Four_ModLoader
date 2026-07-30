@@ -7,8 +7,9 @@ ModLoader.register({
 		const CREATIVE_KEY = Symbol.for('cattail.world-editor.creative-mode')
 		const PLACEMENT_KEY = Symbol.for('cattail.world-editor.blueprint-placement')
 		const TRANSACTION_KIND = 'blueprint-placement'
-		const SERVICE_VERSION = '1.0.0'
+		const SERVICE_VERSION = '1.1.0'
 		const ADAPTER_VERSION = '1.0.0'
+		const PROBE_EVENT_LIMIT = 200
 		const EPSILON = 1e-7
 		const RESTORABLE_NAMES = new Set([
 			'pinhole',
@@ -84,7 +85,7 @@ ModLoader.register({
 				!planner ||
 				typeof planner.build !== 'function'
 			) {
-				console.warn('[Cattail World Editor] Blueprint placement 4B-1a could not find its core services.')
+				console.warn('[Cattail World Editor] Blueprint placement 4C-1c could not find its core services.')
 				return
 			}
 
@@ -97,7 +98,7 @@ ModLoader.register({
 			runtime.addCleanup(function () {
 				service.dispose('runtime-disposed')
 			})
-			console.info('[Cattail World Editor] Safe structure blueprint placement 4B-1a ready.')
+			console.info('[Cattail World Editor] Safe structure blueprint placement and empty sync 4C-1c ready.')
 		})
 
 		function createService(game, transactions, planner, creative) {
@@ -105,7 +106,9 @@ ModLoader.register({
 			const identityByEntity = new WeakMap()
 			const transactionData = new Map()
 			const operations = new Map()
+			const probeEvents = []
 			let identitySequence = 0
+			let probeSequence = 0
 			let disposed = false
 			let busy = false
 			let phase = 'idle'
@@ -121,6 +124,15 @@ ModLoader.register({
 					const blueprint = cloneBlueprint(request?.blueprint)
 					const target = normalizePosition(request?.target)
 					const replaceConflicts = request?.replaceConflicts === true
+					const syncEmpty = request?.syncEmpty === true
+					traceProbe('adapter.prepare.start', {
+						operationId: context?.operationId,
+						direction: context?.direction,
+						target,
+						replaceConflicts,
+						syncEmpty,
+						confirmedSignature: signatureProbe(request?.confirmedSignature)
+					})
 					if (!target) throw placementError('INVALID_TARGET', 'A valid blueprint placement target is required.')
 					const plan = await planner.build(game, blueprint, target, {
 						chunkSize: 512,
@@ -133,84 +145,30 @@ ModLoader.register({
 						}
 					})
 					requireCurrent(context)
-					const buildRecords = plan.records.filter(function (record) {
-						return (
-							record.status === 'buildable' ||
-							(replaceConflicts && record.status === 'conflict')
-						)
+					const proposal = createPlacementProposal(plan, {
+						replaceConflicts,
+						syncEmpty,
+						transactionBuilds: true
 					})
-					if (!buildRecords.length) {
-						throw placementError('NOTHING_TO_BUILD', 'The blueprint has no buildings to place at this target.')
+					const confirmedSignature = String(request?.confirmedSignature || '')
+					traceProbe('adapter.prepare.rebuilt', {
+						plan: planProbeDetails(plan),
+						proposal: proposalProbeDetails(proposal),
+						confirmedSignature: signatureProbe(confirmedSignature),
+						rebuiltSignature: signatureProbe(proposal.signature),
+						signatureMatch: !confirmedSignature || proposal.signature === confirmedSignature,
+						signatureDifference: compareSignaturePayloads(confirmedSignature, proposal.signature)
+					})
+					if (confirmedSignature && proposal.signature !== confirmedSignature) {
+						throw placementError('TARGET_CHANGED', 'The confirmed blueprint placement target changed.')
 					}
-
-					const removals = []
-					const removalEntities = new Set()
-					if (replaceConflicts) {
-						for (const record of buildRecords) {
-							if (record.status !== 'conflict') continue
-							for (const entity of record.conflicts || []) {
-								if (removalEntities.has(entity)) continue
-								const assessment = assessEntity(entity)
-								if (!assessment.safe) {
-									throw placementError('UNSAFE_REPLACEMENT', 'A conflict cannot be restored safely.')
-								}
-								removalEntities.add(entity)
-								removals.push(captureRestorableEntity(entity))
-							}
-						}
-					}
-					removals.sort(compareDescriptors)
-
-					const builds = buildRecords.map(function (record) {
-						return {
-							identity: createIdentity('built'),
-							id: finiteInteger(record.id, record.index + 1),
-							name: safeName(record.name),
-							position: clonePosition(record.position),
-							footprint: cloneFootprint(record.footprint),
-							config: jsonClone(record.config || {})
-						}
-					}).sort(compareDescriptors)
-					const transients = collectTransientSurges(builds)
-					const scopeCells = collectScopeCells(plan.records, removals.concat(transients))
-					const onlyOneKeys = collectOnlyOneKeys(game, builds, removals)
-					const onlyonesBefore = captureOnlyones(game, onlyOneKeys)
-					const onlyonesAfter = simulateOnlyones(game, onlyonesBefore, onlyOneKeys, builds, removals)
-					const economy = simulateEconomy(game, builds, removals, creativeActive(creative, game))
-					const statsDelta = {
-						machinesBuild: builds.length,
-						machinesSold: removals.length
+					if (!proposal.summary.changeCount) {
+						throw placementError('NOTHING_TO_CHANGE', 'The blueprint placement would not change the world.')
 					}
 					return {
-						summary: {
-							label: 'Structure blueprint placement',
-							buildCount: builds.length,
-							replaceCount: removals.length,
-							transientCount: transients.length,
-							skippedConflictCount: replaceConflicts ? 0 : plan.statusCounts.conflict,
-							blockedCount: plan.statusCounts.blocked
-						},
-						scope: {
-							target,
-							cells: scopeCells,
-							buildCount: builds.length,
-							replaceCount: removals.length,
-							transientCount: transients.length
-						},
-						payload: {
-							schema: 1,
-							target,
-							replaceConflicts,
-							builds,
-							removals,
-							transients,
-							scopeCells,
-							onlyOneKeys,
-							onlyonesBefore,
-							onlyonesAfter,
-							economy,
-							statsDelta
-						}
+						summary: proposal.transactionSummary,
+						scope: proposal.scope,
+						payload: proposal.payload
 					}
 				},
 				async preflight(context, record, direction) {
@@ -218,11 +176,58 @@ ModLoader.register({
 					validateRecord(record)
 					requireGameMethods(game)
 					const payload = record.payload
+					traceProbe('adapter.preflight.start', {
+						operationId: context?.operationId,
+						direction,
+						hasSnapshot: !!context?.snapshotId,
+						payload: payloadProbeDetails(payload)
+					})
 					if (creativeActive(creative, game) !== payload.economy.creative) {
-						return denied('ECONOMY_MODE_CHANGED', 'Creative mode changed after this placement was prepared.')
+						return traceDenied(
+							'adapter.preflight.denied',
+							denied('ECONOMY_MODE_CHANGED', 'Creative mode changed after this placement was prepared.'),
+							{ direction, stage: 'economy-mode' }
+						)
+					}
+					if (direction === 'forward') {
+						const resourcesChanged = !sameNumericArray(game.resources, payload.resourcesBefore)
+						if (resourcesChanged) {
+							if (!context?.snapshotId) {
+								return traceDenied(
+									'adapter.preflight.denied',
+									denied('RESOURCES_CHANGED', 'Resources changed after this placement was prepared.'),
+									{ direction, stage: 'resources' }
+								)
+							}
+							traceProbe('adapter.preflight.resources-rebased', {
+								direction,
+								stage: 'post-snapshot',
+								resourcesBefore: numericArray(payload.resourcesBefore),
+								resourcesCurrent: numericArray(game.resources)
+							})
+						}
+						if (!samePlain(captureStats(game), payload.statsBefore)) {
+							return traceDenied(
+								'adapter.preflight.denied',
+								denied('STATS_CHANGED', 'World statistics changed after this placement was prepared.'),
+								{ direction, stage: 'stats' }
+							)
+						}
+						if (!samePlain(captureOnlyones(game, payload.onlyOneKeys), payload.onlyonesBefore)) {
+							return traceDenied(
+								'adapter.preflight.denied',
+								denied('ONLYONE_CHANGED', 'Only-one state changed after this placement was prepared.'),
+								{ direction, stage: 'onlyone' }
+							)
+						}
 					}
 					const targetState = inspectTargetState(payload, direction)
-					if (!targetState.ok) return targetState
+					if (!targetState.ok) {
+						return traceDenied('adapter.preflight.denied', targetState, {
+							direction,
+							stage: 'target-state'
+						})
+					}
 					if (direction !== 'undo') {
 						try {
 							const currentEconomy = simulateEconomy(
@@ -232,27 +237,58 @@ ModLoader.register({
 								payload.economy.creative
 							)
 							if (!sameEconomy(currentEconomy, payload.economy)) {
-								return denied('PRICE_CHANGED', 'Building or eraser prices changed before placement.')
+								return traceDenied(
+									'adapter.preflight.denied',
+									denied('PRICE_CHANGED', 'Building or eraser prices changed before placement.'),
+									{ direction, stage: 'economy' }
+								)
 							}
 						} catch (economyError) {
-							return denied(
-								economyError?.code || 'PREFLIGHT_FAILED',
-								economyError?.message || 'The placement economy could not be revalidated.'
+							return traceDenied(
+								'adapter.preflight.denied',
+								denied(
+									economyError?.code || 'PREFLIGHT_FAILED',
+									economyError?.message || 'The placement economy could not be revalidated.'
+								),
+								{ direction, stage: 'economy-exception' }
 							)
 						}
 					}
 					const affordability = inspectAffordability(game.resources, payload.economy, direction)
-					if (!affordability.ok) return affordability
+					if (!affordability.ok) {
+						return traceDenied('adapter.preflight.denied', affordability, {
+							direction,
+							stage: 'affordability'
+						})
+					}
+					traceProbe('adapter.preflight.ready', {
+						direction,
+						hasSnapshot: !!context?.snapshotId,
+						deleteCount: payload.removals.length,
+						buildCount: payload.builds.length
+					})
 					return approved()
 				},
 				async capture(context, record) {
 					if (!context.isCurrent()) throw placementError('INVALIDATED', 'The placement operation was invalidated.')
 					validateRecord(record)
-					return captureScope(record.payload)
+					const captured = captureScope(record.payload)
+					traceProbe('adapter.capture', {
+						direction: context?.direction,
+						hasSnapshot: !!context?.snapshotId,
+						cellCount: captured.cells.length,
+						entityCount: captured.entities.length
+					})
+					return captured
 				},
 				async apply(context, record, direction) {
 					requireCurrent(context)
 					validateRecord(record)
+					traceProbe('adapter.apply.start', {
+						operationId: context?.operationId,
+						direction,
+						payload: payloadProbeDetails(record.payload)
+					})
 					const state = {
 						recordId: record.id,
 						direction,
@@ -267,34 +303,81 @@ ModLoader.register({
 					if (direction === 'undo') applyUndo(context, record, state)
 					else applyForward(context, record, state)
 					refreshWorld(game)
+					traceProbe('adapter.apply.complete', {
+						operationId: context?.operationId,
+						direction,
+						mutationCount: state.mutations.length,
+						removedSaveCount: state.removedSaves.size
+					})
 					return { ok: true }
 				},
 				async verify(context, record, direction) {
 					requireCurrent(context)
 					const state = operations.get(context.operationId)
-					if (!state) return denied('VERIFY_FAILED', 'The placement operation state is unavailable.')
+					traceProbe('adapter.verify.start', {
+						operationId: context?.operationId,
+						direction,
+						hasOperationState: !!state
+					})
+					if (!state) {
+						return traceDenied(
+							'adapter.verify.denied',
+							denied('VERIFY_FAILED', 'The placement operation state is unavailable.'),
+							{ direction, stage: 'operation-state' }
+						)
+					}
 					const expectedAfter = direction !== 'undo'
 					const verification = verifyAppliedState(record.payload, state, expectedAfter)
-					if (!verification.ok) return verification
+					if (!verification.ok) {
+						return traceDenied('adapter.verify.denied', verification, {
+							direction,
+							stage: 'applied-state'
+						})
+					}
 					if (expectedAfter && state.removedSaves.size) {
 						transactionData.set(record.id, {
 							removalSaves: new Map(state.removedSaves)
 						})
 					}
 					operations.delete(context.operationId)
+					traceProbe('adapter.verify.ready', {
+						operationId: context?.operationId,
+						direction,
+						deleteCount: record.payload.removals.length,
+						buildCount: record.payload.builds.length
+					})
 					return approved()
 				},
 				async restore(context, record) {
 					const state = operations.get(context.operationId)
-					if (!state) return denied('ROLLBACK_FAILED', 'The placement rollback state is unavailable.')
+					traceProbe('adapter.restore.start', {
+						operationId: context?.operationId,
+						direction: context?.direction,
+						hasOperationState: !!state
+					})
+					if (!state) {
+						return traceDenied(
+							'adapter.restore.denied',
+							denied('ROLLBACK_FAILED', 'The placement rollback state is unavailable.'),
+							{ stage: 'operation-state' }
+						)
+					}
 					try {
 						rollbackMutations(state)
 						refreshWorld(game)
 						operations.delete(context.operationId)
+						traceProbe('adapter.restore.complete', {
+							operationId: context?.operationId,
+							mutationCount: state.mutations.length
+						})
 						return { ok: true }
 					} catch (rollbackError) {
 						console.error('[Cattail World Editor] Blueprint placement rollback failed.', rollbackError)
-						return denied('ROLLBACK_FAILED', rollbackError?.message || 'The placement rollback failed.')
+						return traceDenied(
+							'adapter.restore.denied',
+							denied('ROLLBACK_FAILED', rollbackError?.message || 'The placement rollback failed.'),
+							{ stage: 'rollback-exception' }
+						)
 					}
 				}
 			}
@@ -333,12 +416,71 @@ ModLoader.register({
 				}
 			}
 
+			function traceProbe(event, details) {
+				const normalizedDetails = probeDetails(details)
+				const entry = Object.freeze({
+					sequence: ++probeSequence,
+					timestamp: Date.now(),
+					event: String(event || 'unknown'),
+					details: normalizedDetails
+				})
+				probeEvents.push(entry)
+				if (probeEvents.length > PROBE_EVENT_LIMIT) {
+					probeEvents.splice(0, probeEvents.length - PROBE_EVENT_LIMIT)
+				}
+				return entry
+			}
+
+			function probeSnapshot() {
+				const transactionState = transactions.snapshot?.() || null
+				return Object.freeze({
+					version: 1,
+					generatedAt: Date.now(),
+					service: {
+						ready: !disposed,
+						busy,
+						phase,
+						lastReason,
+						error: publicError(error)
+					},
+					transaction: {
+						ready: !!transactionState?.ready,
+						busy: !!transactionState?.busy,
+						phase: String(transactionState?.phase || ''),
+						undoCount: nonNegativeInteger(transactionState?.undoCount, 0),
+						redoCount: nonNegativeInteger(transactionState?.redoCount, 0),
+						terminalBlockedReason: transactionState?.terminalBlockedReason || null,
+						error: publicError(transactionState?.error)
+					},
+					events: probeEvents.map(function (entry) {
+						return {
+							sequence: entry.sequence,
+							timestamp: entry.timestamp,
+							event: entry.event,
+							details: probeDetails(entry.details)
+						}
+					})
+				})
+			}
+
+			function traceDenied(event, result, details) {
+				traceProbe(event, Object.assign({}, details || {}, {
+					code: result?.code,
+					message: result?.message
+				}))
+				return result
+			}
+
 			async function runOperation(kind, callback) {
 				if (disposed) return rejectedResult('NOT_READY', 'Blueprint placement is unavailable.')
 				if (busy || transactions.isBusy?.()) return rejectedResult('BUSY', 'Another World Editor transaction is running.')
 				busy = true
 				phase = kind === 'place' ? 'placing' : kind
 				error = null
+				traceProbe('operation.start', {
+					kind,
+					transactionBusy: !!transactions.isBusy?.()
+				})
 				notify('blueprint-placement-' + kind + '-started')
 				try {
 					const result = await callback()
@@ -352,15 +494,30 @@ ModLoader.register({
 							: result?.reason === 'cancelled'
 								? 'cancelled'
 								: 'failed'
+					traceProbe('operation.result', {
+						kind,
+						accepted: result?.accepted === true,
+						executed: result?.executed === true,
+						reason: result?.reason,
+						errorCode: result?.error?.code,
+						errorMessage: result?.error?.message,
+						snapshotCreated: !!result?.snapshotId
+					})
 					return result
 				} catch (operationError) {
 					error = publicError(operationError)
 					phase = transactions.snapshot?.().terminalBlockedReason ? 'blocked' : 'failed'
 					const result = rejectedResult(error.code, error.message)
 					lastResult = result
+					traceProbe('operation.threw', {
+						kind,
+						code: operationError?.code,
+						message: operationError?.message
+					})
 					return result
 				} finally {
 					busy = false
+					traceProbe('operation.complete', { kind, phase })
 					notify('blueprint-placement-' + kind + '-' + phase)
 				}
 			}
@@ -369,6 +526,19 @@ ModLoader.register({
 				version: SERVICE_VERSION,
 				game,
 				snapshot,
+				diagnostics() {
+					return probeSnapshot()
+				},
+				clearDiagnostics() {
+					probeEvents.length = 0
+					traceProbe('diagnostics.cleared')
+					return true
+				},
+				markProbe(event, details) {
+					if (disposed) return false
+					traceProbe('ui.' + String(event || 'unknown'), details)
+					return true
+				},
 				subscribe(listener) {
 					if (typeof listener !== 'function') throw new TypeError('Blueprint placement listener must be a function.')
 					if (disposed) return function () {}
@@ -382,6 +552,56 @@ ModLoader.register({
 				canReplaceEntity(entity) {
 					return assessEntity(entity).safe
 				},
+				analyze(plan) {
+					if (disposed) throw placementError('NOT_READY', 'Blueprint placement is unavailable.')
+					if (!plan || !Array.isArray(plan.records) || !normalizePosition(plan.target)) {
+						throw placementError('INVALID_PLAN', 'A current blueprint preview plan is required.')
+					}
+					const guard = planner.inspect?.(game, plan.guard)
+					if (guard && guard.valid === false) {
+						if (guard.reason === 'resources' && typeof planner.refreshResources === 'function') {
+							plan = planner.refreshResources(game, plan)
+							traceProbe('analyze.resources-refreshed', {
+								target: plan.target,
+								resourceCount: Array.isArray(plan.guard?.resources) ? plan.guard.resources.length : 0
+							})
+						} else {
+							throw placementError('TARGET_CHANGED', 'The blueprint placement target changed while options were prepared.')
+						}
+					}
+					const variants = {}
+					for (const replaceConflicts of [false, true]) {
+						for (const syncEmpty of [false, true]) {
+							const key = optionKey(replaceConflicts, syncEmpty)
+							variants[key] = createPlacementProposal(plan, {
+								replaceConflicts,
+								syncEmpty,
+								transactionBuilds: false
+							})
+						}
+					}
+					const syncVariant = variants['01']
+					const hasEmptyTargets = (
+						Number(syncVariant?.summary?.syncDeleteCount) +
+						Number(syncVariant?.summary?.protectedCount)
+					) > 0
+					const analysis = Object.freeze({
+						version: SERVICE_VERSION,
+						target: clonePosition(plan.target),
+						hasConflicts: Number(plan.statusCounts?.conflict) > 0,
+						hasEmptyMask: Array.isArray(plan.emptyCells) && plan.emptyCells.length > 0,
+						hasEmptyTargets,
+						variants: Object.freeze(variants)
+					})
+					traceProbe('analyze.complete', {
+						plan: planProbeDetails(plan),
+						hasConflicts: analysis.hasConflicts,
+						hasEmptyMask: analysis.hasEmptyMask,
+						hasEmptyTargets: analysis.hasEmptyTargets,
+						variants: proposalVariantsProbeDetails(analysis.variants)
+					})
+					return analysis
+				},
 				place(options) {
 					const request = options || {}
 					return runOperation('place', function () {
@@ -391,7 +611,9 @@ ModLoader.register({
 							payload: {
 								blueprint: cloneBlueprint(request.blueprint),
 								target: normalizePosition(request.target),
-								replaceConflicts: request.replaceConflicts === true
+								replaceConflicts: request.replaceConflicts === true,
+								syncEmpty: request.syncEmpty === true,
+								confirmedSignature: String(request.confirmedSignature || '')
 							}
 						})
 					})
@@ -424,6 +646,274 @@ ModLoader.register({
 				}
 			})
 			return service
+
+			function createPlacementProposal(plan, options) {
+				const replaceConflicts = options?.replaceConflicts === true
+				const syncEmpty = options?.syncEmpty === true
+				let buildRecords = (plan.records || []).filter(function (record) {
+					return record.status === 'buildable' || (replaceConflicts && record.status === 'conflict')
+				})
+				const emptyMask = new Set((plan.emptyCells || []).map(cellKey))
+				const syncEntities = syncEmpty ? Array.from(new Set(plan.emptyEntities || [])) : []
+				const blockedEntities = new Set()
+				const blockedSources = new Map()
+
+				for (let pass = 0; pass < 32; pass += 1) {
+					const sources = collectRemovalSources(buildRecords, syncEntities)
+					const safeExtractorEntries = Array.from(sources.values()).filter(function (entry) {
+						return (
+							!blockedEntities.has(entry.entity) &&
+							isExtractorName(entry.name) &&
+							assessEntity(entry.entity).safe
+						)
+					})
+					const buildExtractorCount = buildRecords.filter(function (record) {
+						return isExtractorName(record.name)
+					}).length
+					const finalExtractorCount = pumpFamilyCount(game) + buildExtractorCount - safeExtractorEntries.length
+					if (finalExtractorCount >= 1 || !safeExtractorEntries.length) break
+					safeExtractorEntries.sort(function (left, right) {
+						const leftPriority = left.sync && !left.conflict ? 0 : left.sync ? 1 : 2
+						const rightPriority = right.sync && !right.conflict ? 0 : right.sync ? 1 : 2
+						return leftPriority - rightPriority || compareEntities(left.entity, right.entity)
+					})
+					const protectedEntry = safeExtractorEntries[0]
+					blockedEntities.add(protectedEntry.entity)
+					blockedSources.set(protectedEntry.identity, Object.assign({}, protectedEntry))
+					if (protectedEntry.conflict) {
+						buildRecords = buildRecords.filter(function (record) {
+							return !(record.conflicts || []).includes(protectedEntry.entity)
+						})
+					}
+				}
+
+				const sources = collectRemovalSources(buildRecords, syncEntities)
+				for (const blockedEntry of blockedSources.values()) {
+					const existing = sources.get(blockedEntry.identity)
+					if (existing) {
+						existing.conflict = existing.conflict || blockedEntry.conflict
+						existing.sync = existing.sync || blockedEntry.sync
+					} else {
+						sources.set(blockedEntry.identity, blockedEntry)
+					}
+				}
+				const removals = []
+				const protectedTargets = []
+				for (const entry of sources.values()) {
+					const assessment = blockedEntities.has(entry.entity)
+						? assessmentResult(false, 'last-extractor')
+						: assessEntity(entry.entity)
+					const footprint = entityFootprint(entry.entity, entry.entity.position)
+					const crossBoundary = entry.sync && footprintCrossesCellMask(footprint, emptyMask)
+					if (assessment.safe) {
+						removals.push(Object.assign(captureRestorableEntity(entry.entity), {
+							sourceConflict: entry.conflict,
+							sourceSync: entry.sync,
+							crossBoundary
+						}))
+					} else if (entry.sync || entry.conflict) {
+						protectedTargets.push(captureProtectedEntity(
+							entry.entity,
+							assessment.reason,
+							entry.conflict,
+							entry.sync,
+							crossBoundary
+						))
+					}
+				}
+				removals.sort(compareDescriptors)
+				protectedTargets.sort(compareDescriptors)
+
+				const builds = buildRecords.map(function (record) {
+					return {
+						identity: options?.transactionBuilds
+							? createIdentity('built')
+							: 'preview-built-' + finiteInteger(record.id, record.index + 1),
+						id: finiteInteger(record.id, record.index + 1),
+						name: safeName(record.name),
+						position: clonePosition(record.position),
+						footprint: cloneFootprint(record.footprint),
+						config: jsonClone(record.config || {})
+					}
+				}).sort(compareDescriptors)
+				const removalIdentities = new Set(removals.map(function (entry) { return entry.identity }))
+				const transients = collectTransientSurges(builds).filter(function (entry) {
+					return !removalIdentities.has(entry.identity)
+				})
+				const scopeCells = collectScopeCells(plan.records, removals.concat(transients))
+				const onlyOneKeys = collectOnlyOneKeys(game, builds, removals)
+				const onlyonesBefore = captureOnlyones(game, onlyOneKeys)
+				const onlyonesAfter = simulateOnlyones(game, onlyonesBefore, onlyOneKeys, builds, removals)
+				const economy = simulateEconomy(game, builds, removals, creativeActive(creative, game))
+				const resourcesBefore = numericArray(game.resources)
+				const statsBefore = captureStats(game)
+				const statsDelta = {
+					machinesBuild: builds.length,
+					machinesSold: removals.length
+				}
+				const replaceCount = removals.filter(function (entry) { return entry.sourceConflict }).length
+				const syncDeleteCount = removals.filter(function (entry) { return entry.sourceSync }).length
+				const protectedCount = protectedTargets.length
+				const crossBoundaryCount = removals.concat(protectedTargets).filter(function (entry) {
+					return entry.crossBoundary
+				}).length
+				const changeCount = builds.length + removals.length
+				const summary = {
+					buildCount: builds.length,
+					replaceCount,
+					syncDeleteCount,
+					deleteCount: removals.length,
+					protectedCount,
+					crossBoundaryCount,
+					transientCount: transients.length,
+					skippedConflictCount: replaceConflicts
+						? Math.max(0, Number(plan.statusCounts?.conflict) - buildRecords.filter(function (record) {
+							return record.status === 'conflict'
+						}).length)
+						: Number(plan.statusCounts?.conflict) || 0,
+					blockedCount: Number(plan.statusCounts?.blocked) || 0,
+					changeCount,
+					creative: economy.creative,
+					resourceDelta: economy.delta.slice()
+				}
+				const signature = proposalSignature({
+					target: plan.target,
+					replaceConflicts,
+					syncEmpty,
+					builds,
+					removals,
+					protectedTargets,
+					transients,
+					economy,
+					resourcesBefore,
+					statsBefore,
+					statsDelta,
+					onlyonesBefore,
+					onlyonesAfter
+				})
+				const transactionSummary = {
+					label: 'Structure blueprint placement',
+					buildCount: builds.length,
+					replaceCount,
+					syncDeleteCount,
+					deleteCount: removals.length,
+					protectedCount,
+					crossBoundaryCount,
+					transientCount: transients.length,
+					skippedConflictCount: summary.skippedConflictCount,
+					blockedCount: summary.blockedCount
+				}
+				const scope = {
+					target: clonePosition(plan.target),
+					cells: scopeCells,
+					buildCount: builds.length,
+					replaceCount,
+					syncDeleteCount,
+					deleteCount: removals.length,
+					transientCount: transients.length
+				}
+				const payload = {
+					schema: 2,
+					target: clonePosition(plan.target),
+					replaceConflicts,
+					syncEmpty,
+					confirmedSignature: signature,
+					builds,
+					removals,
+					protectedTargets,
+					transients,
+					emptyCells: (plan.emptyCells || []).map(clonePosition),
+					scopeCells,
+					onlyOneKeys,
+					onlyonesBefore,
+					onlyonesAfter,
+					economy,
+					resourcesBefore,
+					statsBefore,
+					statsDelta
+				}
+				return Object.freeze({
+					signature,
+					options: Object.freeze({ replaceConflicts, syncEmpty }),
+					summary: Object.freeze(summary),
+					transactionSummary: Object.freeze(transactionSummary),
+					scope: Object.freeze(scope),
+					payload: Object.freeze(payload),
+					removals: Object.freeze(removals),
+					protectedTargets: Object.freeze(protectedTargets),
+					emptyCells: Object.freeze((plan.emptyCells || []).map(clonePosition))
+				})
+			}
+
+			function collectRemovalSources(buildRecords, syncEntities) {
+				const sources = new Map()
+				function add(entity, kind) {
+					if (!entity || typeof entity !== 'object') return
+					const identity = ensureIdentity(entity)
+					let entry = sources.get(identity)
+					if (!entry) {
+						entry = {
+							identity,
+							entity,
+							name: safeName(entity.name),
+							conflict: false,
+							sync: false
+						}
+						sources.set(identity, entry)
+					}
+					entry[kind] = true
+				}
+				for (const record of buildRecords || []) {
+					if (record.status !== 'conflict') continue
+					for (const entity of record.conflicts || []) add(entity, 'conflict')
+				}
+				for (const entity of syncEntities || []) add(entity, 'sync')
+				return sources
+			}
+
+			function captureProtectedEntity(entity, reason, sourceConflict, sourceSync, crossBoundary) {
+				const position = normalizePosition(entity?.position) || [0, 0]
+				let save = null
+				try {
+					save = captureEntitySave(game, entity)
+				} catch (saveError) {}
+				return {
+					identity: ensureIdentity(entity),
+					name: safeName(entity?.name),
+					position,
+					footprint: entityFootprint(entity, position),
+					save,
+					reason: String(reason || 'protected'),
+					sourceConflict: sourceConflict === true,
+					sourceSync: sourceSync === true,
+					crossBoundary: crossBoundary === true
+				}
+			}
+
+			function compareEntities(left, right) {
+				const leftPosition = normalizePosition(left?.position) || [0, 0]
+				const rightPosition = normalizePosition(right?.position) || [0, 0]
+				return leftPosition[1] - rightPosition[1] ||
+					leftPosition[0] - rightPosition[0] ||
+					safeName(left?.name).localeCompare(safeName(right?.name))
+			}
+
+			function isExtractorName(name) {
+				return name === 'pump' || name === 'pump2' || name === 'gradient'
+			}
+
+			function footprintCrossesCellMask(footprint, mask) {
+				for (let v = footprint.minV; v <= footprint.maxV; v += 1) {
+					for (let u = footprint.minU; u <= footprint.maxU; u += 1) {
+						if (!mask.has(u + ':' + v)) return true
+					}
+				}
+				return false
+			}
+
+			function assessmentResult(safe, reason) {
+				return { safe: safe === true, reason: String(reason || '') }
+			}
 
 			function assessEntity(entity) {
 				if (!entity || typeof entity !== 'object') return assessment(false, 'missing')
@@ -545,7 +1035,7 @@ ModLoader.register({
 						return denied('UNSAFE_REPLACEMENT', 'A replacement target is no longer safe to restore.')
 					}
 					try {
-						if (!samePlain(captureEntitySave(game, entity), removal.save)) {
+						if (!samePlacementSave(captureEntitySave(game, entity), removal.save)) {
 							return denied('EXTERNAL_CHANGE', 'A replacement target state changed outside World Editor.')
 						}
 					} catch (saveError) {
@@ -571,6 +1061,46 @@ ModLoader.register({
 						}
 					} catch (saveError) {
 						return denied('UNSAFE_REPLACEMENT', 'A transient surge can no longer be serialized safely.')
+					}
+				}
+				for (const protectedTarget of payload.protectedTargets) {
+					const entity = entityAt(game, protectedTarget.position)
+					if (
+						!entity ||
+						ensureIdentity(entity) !== protectedTarget.identity ||
+						safeName(entity.name) !== protectedTarget.name ||
+						!samePlain(entityFootprint(entity, entity.position), protectedTarget.footprint)
+					) {
+						return denied('EXTERNAL_CHANGE', 'A protected placement target changed outside World Editor.')
+					}
+					if (protectedTarget.save) {
+						try {
+							if (!samePlacementSave(captureEntitySave(game, entity), protectedTarget.save)) {
+								return denied('EXTERNAL_CHANGE', 'A protected placement target state changed outside World Editor.')
+							}
+						} catch (saveError) {
+							return denied('EXTERNAL_CHANGE', 'A protected placement target can no longer be inspected safely.')
+						}
+					}
+					const assessment = assessEntity(entity)
+					if (protectedTarget.reason === 'last-extractor') {
+						const buildExtractorCount = payload.builds.filter(function (entry) {
+							return isExtractorName(entry.name)
+						}).length
+						const removalExtractorCount = payload.removals.filter(function (entry) {
+							return isExtractorName(entry.name)
+						}).length
+						const wouldRemain = (
+							pumpFamilyCount(game) +
+							buildExtractorCount -
+							removalExtractorCount -
+							1
+						)
+						if (assessment.reason !== 'last-extractor' && wouldRemain >= 1) {
+							return denied('EXTERNAL_CHANGE', 'The last-extractor protection result changed outside World Editor.')
+						}
+					} else if (assessment.safe || assessment.reason !== protectedTarget.reason) {
+						return denied('EXTERNAL_CHANGE', 'A protected placement target safety result changed outside World Editor.')
 					}
 				}
 				for (const build of payload.builds) {
@@ -673,6 +1203,15 @@ ModLoader.register({
 
 			function removeExpectedEntity(descriptor) {
 				const entity = entityAt(game, descriptor.position)
+				traceProbe('apply.clear.before', {
+					descriptor: descriptorProbeDetails(descriptor),
+					found: !!entity,
+					foundName: safeName(entity?.name),
+					foundPosition: normalizePosition(entity?.position),
+					identityMatch: !!entity && ensureIdentity(entity) === descriptor.identity,
+					stuffCount: Array.isArray(game.stuff) ? game.stuff.length : null,
+					entityCount: finiteOr(game.entitiesInGame?.[descriptor.name], null)
+				})
 				if (!entity || ensureIdentity(entity) !== descriptor.identity) {
 					throw placementError('EXTERNAL_CHANGE', 'A placement target entity changed.')
 				}
@@ -684,7 +1223,26 @@ ModLoader.register({
 					save
 				})
 				clearOnlyoneChain(game, entity.name)
-				game.clearCell(entity.position)
+				try {
+					game.clearCell(entity.position)
+				} catch (clearError) {
+					traceProbe('apply.clear.threw', {
+						descriptor: descriptorProbeDetails(descriptor),
+						code: clearError?.code,
+						message: clearError?.message
+					})
+					throw clearError
+				}
+				const remaining = entityAt(game, descriptor.position)
+				traceProbe('apply.clear.after', {
+					descriptor: descriptorProbeDetails(descriptor),
+					remaining: !!remaining,
+					remainingName: safeName(remaining?.name),
+					remainingPosition: normalizePosition(remaining?.position),
+					sameEntityRemaining: remaining === entity,
+					stuffCount: Array.isArray(game.stuff) ? game.stuff.length : null,
+					entityCount: finiteOr(game.entitiesInGame?.[descriptor.name], null)
+				})
 				return removed
 			}
 
@@ -812,11 +1370,19 @@ ModLoader.register({
 			if (
 				!blueprint ||
 				blueprint.mode !== 'structure' ||
-				![1, 2, 3].includes(Number(blueprint.schemaVersion)) ||
+				![1, 2, 3, 4].includes(Number(blueprint.schemaVersion)) ||
 				!Array.isArray(blueprint.entities) ||
-				!blueprint.entities.length
+				(
+					!blueprint.entities.length &&
+					!(
+						Number(blueprint.schemaVersion) === 4 &&
+						Array.isArray(blueprint.emptyCells) &&
+						blueprint.emptyCells.length
+					)
+				) ||
+				(Number(blueprint.schemaVersion) === 4 && !Array.isArray(blueprint.emptyCells))
 			) {
-				throw placementError('STRUCTURE_BLUEPRINT_REQUIRED', 'A non-empty structure blueprint is required.')
+				throw placementError('STRUCTURE_BLUEPRINT_REQUIRED', 'A valid structure blueprint is required.')
 			}
 			return blueprint
 		}
@@ -945,7 +1511,7 @@ ModLoader.register({
 
 		function pushEconomyStep(resources, steps, kind, name, delta) {
 			const normalized = numericArray(delta)
-			applyShadowDelta(resources, normalized)
+			applyShadowDelta(resources, normalized, true)
 			steps.push({ kind, name, delta: normalized })
 		}
 
@@ -1007,11 +1573,13 @@ ModLoader.register({
 			return true
 		}
 
-		function applyShadowDelta(resources, delta) {
+		function applyShadowDelta(resources, delta, allowNegative) {
 			const length = Math.max(resources.length, delta.length)
 			for (let index = 0; index < length; index += 1) {
 				const next = finiteOr(resources[index], 0) + finiteOr(delta[index], 0)
-				if (next < -EPSILON) throw placementError('INSUFFICIENT_RESOURCES', 'Insufficient resources.')
+				if (!allowNegative && next < -EPSILON) {
+					throw placementError('INSUFFICIENT_RESOURCES', 'Insufficient resources.')
+				}
 				resources[index] = Math.abs(next) <= EPSILON ? 0 : next
 			}
 		}
@@ -1166,12 +1734,13 @@ ModLoader.register({
 			if (
 				!record ||
 				record.kind !== TRANSACTION_KIND ||
-				record.payload?.schema !== 1 ||
+				record.payload?.schema !== 2 ||
 				!Array.isArray(record.payload.builds) ||
-				!record.payload.builds.length ||
 				!Array.isArray(record.payload.removals) ||
+				!Array.isArray(record.payload.protectedTargets) ||
 				!Array.isArray(record.payload.transients) ||
-				!Array.isArray(record.payload.scopeCells)
+				!Array.isArray(record.payload.scopeCells) ||
+				(!record.payload.builds.length && !record.payload.removals.length)
 			) {
 				throw placementError('INVALID_SPEC', 'The blueprint placement transaction record is invalid.')
 			}
@@ -1243,6 +1812,152 @@ ModLoader.register({
 			})
 		}
 
+		function probeDetails(value) {
+			try {
+				const serialized = JSON.stringify(stableValue(value || {}))
+				return serialized ? JSON.parse(serialized) : {}
+			} catch (probeError) {
+				return {
+					unavailable: true,
+					message: String(probeError?.message || 'Probe details could not be serialized.')
+				}
+			}
+		}
+
+		function signatureProbe(value) {
+			const text = String(value || '')
+			let hash = 2166136261
+			for (let index = 0; index < text.length; index += 1) {
+				hash ^= text.charCodeAt(index)
+				hash = Math.imul(hash, 16777619)
+			}
+			return {
+				length: text.length,
+				hash: (hash >>> 0).toString(16).padStart(8, '0')
+			}
+		}
+
+		function compareSignaturePayloads(confirmedValue, rebuiltValue) {
+			const confirmedText = String(confirmedValue || '')
+			const rebuiltText = String(rebuiltValue || '')
+			if (!confirmedText || confirmedText === rebuiltText) return null
+			let confirmed
+			let rebuilt
+			try {
+				confirmed = JSON.parse(confirmedText)
+				rebuilt = JSON.parse(rebuiltText)
+			} catch (parseError) {
+				return {
+					parseFailed: true,
+					message: String(parseError?.message || 'Signature details could not be compared.')
+				}
+			}
+			const differences = []
+			let differenceCount = 0
+			compareNode(confirmed, rebuilt, '$')
+			return {
+				differenceCount,
+				truncated: differenceCount > differences.length,
+				differences
+			}
+
+			function compareNode(left, right, path) {
+				if (samePlain(left, right)) return
+				const leftObject = !!left && typeof left === 'object'
+				const rightObject = !!right && typeof right === 'object'
+				if (!leftObject || !rightObject || Array.isArray(left) !== Array.isArray(right)) {
+					addDifference(path, left, right)
+					return
+				}
+				if (Array.isArray(left)) {
+					if (left.length !== right.length) {
+						addDifference(path + '.length', left.length, right.length)
+					}
+					const length = Math.max(left.length, right.length)
+					for (let index = 0; index < length; index += 1) {
+						compareNode(left[index], right[index], path + '[' + index + ']')
+					}
+					return
+				}
+				const keys = Array.from(new Set(Object.keys(left).concat(Object.keys(right)))).sort()
+				for (const key of keys) compareNode(left[key], right[key], path + '.' + key)
+			}
+
+			function addDifference(path, confirmedEntry, rebuiltEntry) {
+				differenceCount += 1
+				if (differences.length >= 24) return
+				differences.push({
+					path,
+					confirmed: probeDetails({ value: confirmedEntry }).value,
+					rebuilt: probeDetails({ value: rebuiltEntry }).value
+				})
+			}
+		}
+
+		function planProbeDetails(plan) {
+			return {
+				target: normalizePosition(plan?.target),
+				recordCount: Array.isArray(plan?.records) ? plan.records.length : 0,
+				statusCounts: plan?.statusCounts || {},
+				emptyCellCount: Array.isArray(plan?.emptyCells) ? plan.emptyCells.length : 0,
+				emptyCells: (plan?.emptyCells || []).slice(0, 64).map(normalizePosition),
+				emptyEntityCount: Array.isArray(plan?.emptyEntities) ? plan.emptyEntities.length : 0,
+				emptyEntities: (plan?.emptyEntities || []).slice(0, 32).map(function (entity) {
+					return {
+						name: safeName(entity?.name),
+						position: normalizePosition(entity?.position),
+						span: nonNegativeInteger(entity?.entitySpan, 0)
+					}
+				})
+			}
+		}
+
+		function descriptorProbeDetails(entry) {
+			return {
+				identity: String(entry?.identity || ''),
+				name: safeName(entry?.name),
+				position: normalizePosition(entry?.position),
+				footprint: entry?.footprint || null,
+				sourceConflict: entry?.sourceConflict === true,
+				sourceSync: entry?.sourceSync === true,
+				crossBoundary: entry?.crossBoundary === true,
+				reason: String(entry?.reason || '')
+			}
+		}
+
+		function payloadProbeDetails(payload) {
+			return {
+				target: normalizePosition(payload?.target),
+				replaceConflicts: payload?.replaceConflicts === true,
+				syncEmpty: payload?.syncEmpty === true,
+				buildCount: Array.isArray(payload?.builds) ? payload.builds.length : 0,
+				deleteCount: Array.isArray(payload?.removals) ? payload.removals.length : 0,
+				protectedCount: Array.isArray(payload?.protectedTargets) ? payload.protectedTargets.length : 0,
+				transientCount: Array.isArray(payload?.transients) ? payload.transients.length : 0,
+				builds: (payload?.builds || []).map(descriptorProbeDetails),
+				removals: (payload?.removals || []).map(descriptorProbeDetails),
+				protectedTargets: (payload?.protectedTargets || []).map(descriptorProbeDetails),
+				transients: (payload?.transients || []).map(descriptorProbeDetails),
+				creative: payload?.economy?.creative === true,
+				resourceDelta: numericArray(payload?.economy?.delta)
+			}
+		}
+
+		function proposalProbeDetails(proposal) {
+			return Object.assign({
+				signature: signatureProbe(proposal?.signature),
+				summary: proposal?.summary || {}
+			}, payloadProbeDetails(proposal?.payload || proposal))
+		}
+
+		function proposalVariantsProbeDetails(variants) {
+			const result = {}
+			for (const key of ['00', '01', '10', '11']) {
+				result[key] = proposalProbeDetails(variants?.[key])
+			}
+			return result
+		}
+
 		function placementError(code, message) {
 			const error = new Error(String(message || code || 'Blueprint placement failed.'))
 			error.code = String(code || 'PLACEMENT_FAILED')
@@ -1277,10 +1992,88 @@ ModLoader.register({
 			return left[1] - right[1] || left[0] - right[0]
 		}
 
+		function cellKey(position) {
+			return position[0] + ':' + position[1]
+		}
+
+		function optionKey(replaceConflicts, syncEmpty) {
+			return (replaceConflicts ? '1' : '0') + (syncEmpty ? '1' : '0')
+		}
+
+		function proposalSignature(value) {
+			return JSON.stringify(stableValue({
+				target: value?.target,
+				replaceConflicts: value?.replaceConflicts === true,
+				syncEmpty: value?.syncEmpty === true,
+				builds: (value?.builds || []).map(function (entry) {
+					return {
+						id: entry.id,
+						name: entry.name,
+						position: entry.position,
+						footprint: entry.footprint,
+						config: entry.config
+					}
+				}),
+				removals: (value?.removals || []).map(function (entry) {
+					return {
+						identity: entry.identity,
+						name: entry.name,
+						position: entry.position,
+						footprint: entry.footprint,
+						save: comparablePlacementSave(entry.save),
+						sourceConflict: entry.sourceConflict === true,
+						sourceSync: entry.sourceSync === true,
+						crossBoundary: entry.crossBoundary === true
+					}
+				}),
+				protectedTargets: (value?.protectedTargets || []).map(function (entry) {
+					return {
+						identity: entry.identity,
+						name: entry.name,
+						position: entry.position,
+						footprint: entry.footprint,
+						save: comparablePlacementSave(entry.save),
+						reason: entry.reason,
+						sourceConflict: entry.sourceConflict === true,
+						sourceSync: entry.sourceSync === true,
+						crossBoundary: entry.crossBoundary === true
+					}
+				}),
+				transients: (value?.transients || []).map(function (entry) {
+					return {
+						identity: entry.identity,
+						name: entry.name,
+						position: entry.position,
+						footprint: entry.footprint,
+						save: comparablePlacementSave(entry.save)
+					}
+				}),
+				economy: value?.economy,
+				resourcesBefore: value?.resourcesBefore,
+				statsBefore: value?.statsBefore,
+				statsDelta: value?.statsDelta,
+				onlyonesBefore: value?.onlyonesBefore,
+				onlyonesAfter: value?.onlyonesAfter
+			}))
+		}
+
 		function samePosition(left, right) {
 			const a = normalizePosition(left)
 			const b = normalizePosition(right)
 			return !!a && !!b && a[0] === b[0] && a[1] === b[1]
+		}
+
+		function comparablePlacementSave(value) {
+			const save = jsonClone(value)
+			if (save?.par && typeof save.par === 'object') delete save.par.soul
+			return save
+		}
+
+		function samePlacementSave(left, right) {
+			return samePlain(
+				comparablePlacementSave(left),
+				comparablePlacementSave(right)
+			)
 		}
 
 		function numericArray(value) {

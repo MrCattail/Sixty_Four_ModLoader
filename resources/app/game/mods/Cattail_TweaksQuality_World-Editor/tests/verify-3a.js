@@ -277,13 +277,14 @@ async function testStructureCaptureAndImmutability() {
 	assert.equal(result.status, 'captured')
 	assert.equal(result.clipboard, 'ready')
 	assert.equal(env.writes.length, 1)
-	assert.match(env.writes[0], /\n  "schemaVersion": 3,/)
+	assert.match(env.writes[0], /\n  "schemaVersion": 4,/)
 
 	const blueprint = env.session.snapshot().blueprint
-	assert.equal(env.session.version, '0.4.3')
-	assert.equal(env.session.schemaVersion, 3)
-	assert.equal(env.session.snapshot().version, '0.4.3')
-	assert.equal(blueprint.schemaVersion, 3)
+	assert.equal(env.session.version, '0.4.4')
+	assert.equal(env.session.schemaVersion, 4)
+	assert.equal(env.session.snapshot().version, '0.4.4')
+	assert.equal(blueprint.schemaVersion, 4)
+	assert.deepEqual(plain(blueprint.emptyCells), [])
 	assert.equal(blueprint.mode, 'structure')
 	assert.equal(blueprint.sourcePlane, 0)
 	assert.deepEqual(plain(blueprint.anchor), { position: [1, 1], selectionIds: [1, 2] })
@@ -323,6 +324,75 @@ async function testStructureCaptureAndImmutability() {
 	assert.equal(Object.isFrozen(blueprint.entities), true)
 	assert.equal(Object.isFrozen(blueprint.entities[1].footprint), true)
 	assert.equal(env.session.exportJSON(), env.writes[0])
+}
+
+async function testSchema4EmptyMaskCaptureAndCut() {
+	const selectedRange = range([0, 0], [2, 0])
+	const state = selectionState([
+		{ id: 7, primary: true, plane: 0, range: selectedRange }
+	], 7)
+	const env = createEnvironment({ selection: state })
+	const silo = { name: 'silo', position: [0, 0], entitySpan: 0, par: { marker: 'capture' } }
+	const unsupported = { name: 'hollow', position: [1, 0], entitySpan: 0 }
+	env.game.setCell(0, 0, silo)
+	env.game.setCell(1, 0, unsupported)
+
+	const result = await env.session.capture('schema-4-empty-mask')
+	assert.equal(result.status, 'captured')
+	const captured = env.session.snapshot().blueprint
+	assert.equal(captured.schemaVersion, 4)
+	assert.deepEqual(plain(captured.anchor.position), [2, 0])
+	assert.deepEqual(plain(captured.emptyCells), [[0, 0]])
+	assert.deepEqual(plain(captured.entities.map(entity => entity.name)), ['silo'])
+	assert.deepEqual(
+		plain(captured.summary.skippedTypes.map(entry => [entry.name, entry.reason])),
+		[['hollow', 'unsupported']]
+	)
+
+	const cutCandidate = env.session.prepareCut({
+		schema: 1,
+		signature: 'schema-4-cut-token',
+		source: {
+			kind: 'selection',
+			plane: 0,
+			ranges: [{
+				id: 7,
+				primary: true,
+				range: selectedRange
+			}]
+		},
+		removals: [{
+			name: 'silo',
+			position: [0, 0],
+			footprint: {
+				span: 0,
+				minU: 0,
+				maxU: 0,
+				minV: 0,
+				maxV: 0
+			},
+			crossBoundary: false
+		}],
+		protectedTargets: [{
+			name: 'hollow',
+			position: [1, 0],
+			footprint: {
+				span: 0,
+				minU: 1,
+				maxU: 1,
+				minV: 0,
+				maxV: 0
+			},
+			reason: 'unsupported'
+		}],
+		summary: {
+			sourceCellCount: 3
+		}
+	})
+	assert.equal(cutCandidate.blueprint.schemaVersion, 4)
+	assert.deepEqual(plain(cutCandidate.blueprint.emptyCells), [[0, 0]])
+	assert.deepEqual(plain(cutCandidate.blueprint.entities[0].position), [-2, 0])
+	assert.equal(cutCandidate.blueprint.summary.skippedCount, 1)
 }
 
 async function testVisualRightAnchorProjectionAndFallbacks() {
@@ -599,9 +669,9 @@ function testLanguagesManifestUiAndReadOnlyBoundary() {
 	vm.runInContext(fs.readFileSync(i18nFilename, 'utf8'), i18nSandbox, { filename: i18nFilename })
 	i18nDefinitions[0].init()
 	const i18n = i18nSandbox[I18N_KEY]
-	assert.equal(i18n.version, '0.4.3')
+	assert.equal(i18n.version, '0.4.4')
 	assert.equal(i18n.languages.length, 20)
-	assert.equal(i18n.keys.length, 171)
+	assert.equal(i18n.keys.length, 177)
 	const blueprintKeys = [
 		'blueprintModeStructure',
 		'blueprintModeFull',
@@ -632,7 +702,7 @@ function testLanguagesManifestUiAndReadOnlyBoundary() {
 	}
 
 	const manifest = JSON.parse(fs.readFileSync(path.join(MOD_ROOT, 'mod.json'), 'utf8'))
-	assert.equal(manifest.version, '0.4.3')
+	assert.equal(manifest.version, '0.4.4')
 	assert.equal(manifest.languageSupport.gameLanguage, true)
 	assert.equal(manifest.entry.length, 30)
 	assert.ok(manifest.entry.includes(BLUEPRINT_SOURCE))
@@ -643,8 +713,8 @@ function testLanguagesManifestUiAndReadOnlyBoundary() {
 
 	const source = fs.readFileSync(path.join(MOD_ROOT, BLUEPRINT_SOURCE), 'utf8')
 	const sharedSource = fs.readFileSync(path.join(MOD_ROOT, SHARED_SOURCE), 'utf8')
-	assert.match(source, /schemaVersion:\s*3/)
-	assert.match(source, /version:\s*'0\.4\.3'/)
+	assert.match(source, /schemaVersion:\s*captureMode === 'structure' \? 4 : 3/)
+	assert.match(source, /version:\s*'0\.4\.4'/)
 	assert.match(source, /selectionIds:\s*source\.selectionIds/)
 	assert.match(source, /typeof game\.uvToXY !== 'function'/)
 	assert.match(source, /Object\.freeze/)
@@ -673,12 +743,13 @@ function testLanguagesManifestUiAndReadOnlyBoundary() {
 
 async function run() {
 	await testStructureCaptureAndImmutability()
+	await testSchema4EmptyMaskCaptureAndCut()
 	await testVisualRightAnchorProjectionAndFallbacks()
 	await testFullCaptureCubeRulesAndFailureRetention()
 	await testChunkCancellationHotkeyAndLifecycle()
 	await testCutCandidateClipboardAndOutcome()
 	testLanguagesManifestUiAndReadOnlyBoundary()
-	console.log('3A/3C verification passed: immutable schema-3 session, projected outer-bounds visual-right anchor, sorted selection IDs, deterministic projection fallback, structure/full capture, multi-selection union, cross-boundary footprints, Mod and transient skips, stable Cube gating, clipboard success/failure, empty retention, chunk cancellation, lifecycle, 20-language UI, original-font card contract, manifest, and read-only boundary.')
+	console.log('3A/3C verification passed: immutable schema-4 structure/schema-3 full sessions, exact empty masks, projected outer-bounds visual-right anchor, sorted selection IDs, deterministic projection fallback, structure/full capture, cut projection, multi-selection union, cross-boundary footprints, Mod and transient skips, stable Cube gating, clipboard success/failure, empty retention, chunk cancellation, lifecycle, 20-language UI, original-font card contract, manifest, and read-only boundary.')
 }
 
 run().catch(error => {

@@ -923,7 +923,7 @@ function testLocalizationManifestUiAndDocumentation() {
 		'deleteReloadRequired',
 		'deletePreviewRefreshFailed'
 	]
-	assert.equal(i18n.version, '0.4.3')
+	assert.equal(i18n.version, '0.4.4')
 	assert.equal(i18n.languages.length, 20)
 	assert.ok(i18n.toolbarKeys.includes('toolbarCardDelete'))
 	for (const language of i18n.languages) {
@@ -935,7 +935,7 @@ function testLocalizationManifestUiAndDocumentation() {
 	assert.match(i18n.t('sch', 'deleteConfirmMessage'), /\{safe\}.*\{protected\}.*\{cross\}/)
 
 	const manifest = JSON.parse(source('mod.json'))
-	assert.equal(manifest.version, '0.4.3')
+	assert.equal(manifest.version, '0.4.4')
 	const placementIndex = manifest.entry.indexOf('scripts/core/blueprint-placement.js')
 	const deletionIndex = manifest.entry.indexOf(DELETE_SOURCE)
 	const inputIndex = manifest.entry.indexOf('scripts/core/input-controller.js')

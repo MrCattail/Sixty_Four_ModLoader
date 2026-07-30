@@ -4,7 +4,7 @@
 
 ## 当前阶段
 
-当前阶段 4B-1a 在已验收的内部事务引擎之上，加入结构蓝图安全放置。固定预览可用卡片按钮放置，`Ctrl+V` 可把按键时悬停格临时锁定为命令目标并直接放置；红色冲突统一选择“全部跳过”或“拆除并替换”，不能证明可无损恢复的实体保持紫色阻止。
+当前阶段 4C-1c 把新复制或剪切的结构蓝图升级为 schema 4，并记录选区内真正没有实体的空地掩码。放置时统一确认“替换冲突建筑”和“同步蓝图空地”两个默认关闭的独立绿色发光选项；安全拆除、退款和建造合并在同一条蓝图放置事务中。
 
 ## 不变量
 
@@ -27,9 +27,9 @@ scripts/
     tool-state.js        # 2G：单一选择工具状态和生命周期
     selection-analysis.js # 3F：可取消的分批只读统计与已完成实体只读视图
     production-state.js  # 3F：Dynamic Details 软依赖、选区实际产量刷新与蓝图生产快照
-    blueprint-transform.js # 3D：固定枢轴、有序旋转/镜像和完整蓝图结构投影
-    blueprint-preview-plan.js # 4B-1a：四级冲突、安全替换分类、Build Plan 成本和合成规划基准
-    blueprint-placement.js # 4B-1a：结构蓝图放置事务、经济结算、恢复适配和内部 undo/redo
+    blueprint-transform.js # 4C-1c：固定枢轴、有序旋转/镜像、完整蓝图结构投影和 schema 4 空地掩码变换
+    blueprint-preview-plan.js # 4C-1c：四级冲突、空地目标、安全替换分类、Build Plan 成本和合成规划基准
+    blueprint-placement.js # 4C-1c：结构蓝图建造/冲突/空地同步的单事务经济结算、恢复和 undo/redo
     input-controller.js  # 2G：V / Esc / Backspace、统一手势取消与输入环境保护
   input/
     selection-controller.js # 2F：混合指针手势、最近边/角判定、持久目标锁定和自动提交
@@ -45,8 +45,8 @@ scripts/
     editor-shell.js      # 独立状态栏/工具栏、紧凑/大卡片热切换与横向惯性滚动
     selection-card.js    # 3F：主选区实时统计、右左下上定位、3 秒临时显示和点击锁定
     production-cards.js  # 3F：主卡总产量、选区/蓝图建筑明细副卡与自适应双列
-  blueprint-session.js   # 3E：会话蓝图、分批捕获、剪贴板、类型/成本图标和统一蓝图卡片
-  blueprint-preview.js   # 3E：自动预览、原版实体着色、固定输入、旋转过渡和只读渲染基准
+  blueprint-session.js   # 4C-1c：schema 4 空地捕获、会话蓝图、剪贴板、统一放置选项和蓝图卡片
+  blueprint-preview.js   # 4C-1c：自动预览、空地/拆除/保护叠层、固定输入、旋转过渡和只读渲染基准
 ```
 
 未来模块只在对应小阶段获批后创建，并按 manifest 中的 `entry` 顺序加载。
@@ -360,7 +360,7 @@ globalThis[Symbol.for('cattail.world-editor.blueprint-preview')].snapshot()
 - `production-state.js` 通过全局 Symbol 软依赖 Dynamic Details 0.1.1 的 `cattail.dynamic-details.production-telemetry` API；依赖未安装、未就绪或暂时失效时只发布不可用状态，不阻止 World Editor 的选区和蓝图流程。
 - World Editor 激活且已提交选区统计完成时，每 `1000 ms` 对当前去重建筑引用调用一次 `snapshotEntities(entities, { theoretical: false, supplemental: true })`。选区扫描中、无选区或编辑器退出时不保留刷新定时器。矿井专用的 `pumpMining / instantaneous` 按当前工作状态、转速和深度资源分布映射为矿井实时实际输出，不用理论产量补零，也不与资源入账事件重复相加。
 - 蓝图捕获只在结构记录接受实体后执行一次完整 `snapshotEntities(entities)`，把理论产量、捕获瞬间的 30 秒实际产量、数据质量、采样时长、不支持计数、截断状态、分类数据和 `pumpMining` 补充通道规范化为深度冻结快照。
-- 新蓝图使用 `schemaVersion: 3` 并保存 `production` 字段。旋转、镜像和非创造模式的完整蓝图结构投影保持同一份不可变生产快照；预览规划器继续兼容 schema 1、2 和 3。
+- 3F 引入的 `production` 字段继续保留；当前新结构蓝图由 4C-1c 使用 schema 4，新完整蓝图仍使用 schema 3。旋转、镜像和非创造模式的完整蓝图结构投影保持同一份不可变生产快照；预览规划器兼容 schema 1、2、3 和 4。
 - 选区主卡默认展开实际总产量；蓝图主卡保存理论总产量和捕获时实际总产量。总输出、消耗、净值、数据质量和不支持计数只放在各自主卡中，两张主卡的标题行都提供三线产量按钮。蓝图主卡内容顺序为“产量 → 已捕获类型 → 建造方案 → 已跳过类型”。
 - 选区和蓝图产量副卡只显示按建筑类型明细。建筑按总输出降序、总消耗降序、本地化名称排序；有资源流的建筑持续显示资源图标、资源名、输出、消耗和净值，没有资源流的建筑归入默认收起且保留会话展开状态的分类。无流量建筑 DOM 在分类收起时仍持续更新，并通过建筑组估算和挂载后下一帧重测保证展开高度；蓝图中的无流量分类切换会在列布局同步后，从外层当前内容减去内层当前可见高度取得稳定基线，再按目标状态加上完整内层高度或保持基线，避免动画起始几何把外层 `max-height` 双向写反。理论/实际产量、建筑类型、建造方案、已捕获类型及没有资源流分类现在共用产量分类的按钮对齐、正文色箭头、展开状态控制器和上下调高手柄；拖动偏好高度在当前页面生命周期内按分类保留，嵌套无流量分类仍通过外层高度投影钩子同步。选区卡、蓝图卡、蓝图内部列表、产量卡和拖高正文统一使用共享的 4px 半透明灰色滚动条及悬停色；蓝图内部列表单独保留稳定 gutter。单列内容超过可用高度且宽卡能放入视口时自动改为两个按实际高度平衡的独立纵向列，否则保持单列。
 - 选区和蓝图各自使用仅限当前页面会话的 `s / min / hr` 三档滑动条。蓝图的共享滑动条只挂载在第一个展开的总产量区：理论优先，否则使用捕获实际，两区都收起时隐藏。滑块沿用 Mod 菜单的连续拖动逻辑，松手、轨道点击或键盘操作后以 `160 ms ease-out` 动画吸附到最近档位；数值统一从每秒基准换算，不修改遥测快照。资源使用原版运行时资源贴图和本地化名称，建筑类型使用原版商店贴图。
@@ -520,7 +520,7 @@ copy(JSON.stringify(globalThis[Symbol.for('cattail.world-editor.selection-delete
 ## 4C-1b 剪切为结构蓝图
 
 - 选区工具栏新增独立“剪切内容”命令，快捷键为 `Ctrl+X`。它使用当前平面全部已提交选区的精确并集，并沿用 4C-1a 的重叠去重、跨边界整栋处理、保护对象、最后一个 Pump/Gradient、经济和事务守卫。
-- 剪切始终生成 schema 3 结构蓝图；Cube、完整运行状态、Mod/未知对象和其他受保护或跳过对象留在世界，也不会进入剪切蓝图。完整蓝图剪切继续留给后续 4D。
+- 4C-1b 的基线剪切生成 schema 3 结构蓝图；从 4C-1c 起，新剪切结果升级为 schema 4 并附带空地掩码。Cube、完整运行状态、Mod/未知对象和其他受保护或跳过对象留在世界，也不会进入剪切蓝图。完整蓝图剪切继续留给后续 4D。
 - 蓝图实体与世界删除实体来自同一份 `selection-delete` plan 的安全 removals，不会分别扫描并产生两套目标。没有安全目标时不打开危险确认、不覆盖剪贴板、不创建 Snapshot 或 history。
 - 每次剪切都显示危险确认，列出将剪切、保留和跨选区边界的建筑数量及资源变化。已有蓝图时会提示确认后将替换当前蓝图和系统剪贴板；取消、`Escape` 或点击遮罩均没有副作用。
 - 确认后先把候选结构蓝图写入系统剪贴板。写入失败时保留旧蓝图和世界；写入成功后，新蓝图立即成为当前预览，再由既有 `selection-delete` adapter 执行一次世界删除。
@@ -539,3 +539,35 @@ globalThis[Symbol.for('cattail.world-editor.transactions')].snapshot()
 ```
 
 4C-1b 不新增事务 adapter，不修改原版、ModLoader、Better UIs、其他 Mod、`enabled.json` 或归档旧版，也不包含结构/完整蓝图同步空地、完整状态/Cube 恢复、打包、发布或提交。
+
+## 4C-1c 结构蓝图同步空地
+
+- 新复制和新剪切的结构蓝图使用 schema 4，`emptyCells` 是选区精确并集内真正没有任何实体的相对格坐标，并按 `v → u` 排序和去重。被 Cube、Mod/未知、受保护、跳过或跨边界建筑占用的格不会被误记为空地。
+- schema 1–3 结构蓝图继续按原行为放置，但没有可同步的空地掩码；当前完整蓝图仍维持 schema 3 和既有行为，完整蓝图同步空地留给 4D。
+- 旋转、镜像、会话复制和 JSON 导出会与建筑使用同一枢轴、矩阵和稳定顺序精确保留/变换 `emptyCells`。
+- 放置目标上确实存在冲突建筑或空地掩码覆盖的安全/受保护建筑时，才打开统一确认框；只有 schema 4 空地掩码、但当前空地没有覆盖任何建筑且没有冲突时直接按原路径放置。两个独立选项为“替换冲突建筑”和“同步蓝图空地”，每次默认关闭且不记忆；按下后使用现实平面的 `#A6F246` 或虚空平面的 `#E3FD43` 发光，再按一次取消，并通过 `aria-pressed` 暴露状态。没有对应目标时按钮禁用并显示 `0`。
+- 四种开关组合共享确认前的一次只读扫描。摘要实时显示建造、拆除、保护、跨边界和资源净变化；有实际拆除时最终确认按钮变为危险色，但两个选项按钮保持晶体绿色。
+- 同步空地按整栋建筑处理：任一占格碰到变换后的空地掩码即成为候选。安全对象显示红色拆除叠层；Cube、不可安全恢复对象和最后一个 Pump/Gradient 家族对象保持紫色保护；跨掩码边界使用虚线整栋轮廓。关闭选项或确认框会恢复原预览。
+- 冲突替换和空地同步命中的同一建筑按稳定会话身份去重。普通模式先逐项结算橡皮擦费用和退款，再结算建造成本；创造模式全部为零。每栋实体只更新一次删除统计、only-one 链和存档状态。
+- 最终冲突拆除、空地同步拆除、临时 Surge 清理和全部建造合并到现有 `blueprint-placement` 的一份 Snapshot、一条事务和一条 history；不会创建独立删除事务。允许 `0` 建造加 `N` 次同步拆除；若四种选项结果都不改变世界，则不创建 Snapshot 或 history。
+- 点击确认时先针对锁定计划刷新仅资源变化并重新生成当前精确 proposal；若建筑/拆除/保护集合、数量或玩家可见经济发生变化，窗口会更新并要求再次确认，不静默换目标。随后 prepare 重建计划，并重验确认时的选项签名、实体存档、平面/存档、价格、模式、资源、统计和 only-one；从点击确认到第一次 preflight 的漂移保持零写入拒绝。物理 Snapshot 的异步创建期间若只有资源余额自然变化，第二次 preflight 会改用最新余额重新检查可负担性并让 apply 以该余额为基准；目标、价格、统计、only-one 或不可负担变化仍会在写世界前拒绝。应用/验证失败完整回滚，回滚失败继续沿用事务引擎的终止锁定。
+- undo/redo 只往返该条放置事务记录的世界、资源、统计和 only-one 状态，不回滚蓝图、剪贴板或确认框按钮；下一次确认仍默认两个选项关闭。
+
+4C-1c 保留最近 200 条定向 placement 环形诊断，但不再把每个事件主动写入 Console。需要排错时可通过以下命令按需导出：
+
+```js
+globalThis[Symbol.for('cattail.world-editor.blueprint-placement')].diagnostics()
+```
+
+环形诊断覆盖目标锁、只读分析、弹窗跳过/打开、按钮组合、确认签名、事务 prepare/preflight/capture/apply/verify/rollback、每栋建筑 `clearCell` 前后和最终执行结果。诊断只保存在内存中，不主动输出 Console，也不额外写入世界。
+
+开发者控制台可检查：
+
+```js
+globalThis[Symbol.for('cattail.world-editor.blueprint')].snapshot()
+globalThis[Symbol.for('cattail.world-editor.blueprint-preview')].snapshot()
+globalThis[Symbol.for('cattail.world-editor.blueprint-placement')].snapshot()
+globalThis[Symbol.for('cattail.world-editor.transactions')].snapshot()
+```
+
+4C-1c 不修改原版、ModLoader、Better UIs、其他 Mod、`enabled.json` 或归档旧版，不包含完整蓝图同步空地、完整状态/Cube 恢复、导入界面、打包、发布或提交。

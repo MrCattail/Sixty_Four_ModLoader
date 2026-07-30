@@ -21,7 +21,7 @@ ModLoader.register({
 
 		let disposed = false
 		const planner = Object.freeze({
-			version: '0.4.3',
+			version: '0.4.4',
 			status: STATUS,
 			statusPriority: STATUS_PRIORITY,
 			async build(game, blueprint, target, options) {
@@ -62,6 +62,8 @@ ModLoader.register({
 			const isCancelled = typeof options.isCancelled === 'function' ? options.isCancelled : function () { return false }
 			const normalizedTarget = normalizePosition(target)
 			const records = []
+			const emptyCells = []
+			const emptyEntities = new Set()
 			const guardCells = new Map()
 			const relevantNames = new Set()
 			let processedCells = 0
@@ -119,15 +121,40 @@ ModLoader.register({
 				})
 			}
 
+			if (Number(blueprint.schemaVersion) === 4) {
+				const seenEmptyCells = new Set()
+				for (const relativeValue of blueprint.emptyCells || []) {
+					if (isCancelled()) throw planError('plan-cancelled')
+					const relative = normalizePosition(relativeValue)
+					if (!relative) throw planError('invalid-blueprint-empty-cell')
+					const position = addPosition(normalizedTarget, relative)
+					const key = cellKey(position)
+					if (seenEmptyCells.has(key)) continue
+					seenEmptyCells.add(key)
+					const entity = planningEntityAt(game, position, options)
+					guardCells.set(key, { position, entity })
+					emptyCells.push(position)
+					if (entity) {
+						emptyEntities.add(entity)
+						const name = safeName(entity.name)
+						if (name) relevantNames.add(name)
+					}
+					processedCells += 1
+					if (processedCells % chunkSize === 0) await yieldControl()
+				}
+			}
+
 			const guard = createGuard(game, guardCells, relevantNames, options)
 			const statusCounts = countStatuses(records)
 			const cost = simulateCost(game, records, guard)
 			return {
-				version: '0.4.3',
+				version: '0.4.4',
 				sourcePlane: Number(blueprint.sourcePlane) ? 1 : 0,
 				target: normalizedTarget,
-				bounds: targetBounds(blueprint.contentBounds, normalizedTarget, records),
+				bounds: targetBounds(blueprint.contentBounds, normalizedTarget, records, emptyCells),
 				records,
+				emptyCells,
+				emptyEntities: Array.from(emptyEntities),
 				statusCounts,
 				cost,
 				guard
@@ -137,11 +164,24 @@ ModLoader.register({
 		function validateRoot(game, blueprint, target) {
 			if (!game || typeof game !== 'object') throw planError('game-unavailable')
 			const schemaVersion = Number(blueprint?.schemaVersion)
-			if (!blueprint || (schemaVersion !== 1 && schemaVersion !== 2 && schemaVersion !== 3) || blueprint.mode !== 'structure') {
+			if (
+				!blueprint ||
+				(schemaVersion !== 1 && schemaVersion !== 2 && schemaVersion !== 3 && schemaVersion !== 4) ||
+				blueprint.mode !== 'structure'
+			) {
 				throw planError('structure-blueprint-required')
 			}
-			if (!Array.isArray(blueprint.entities) || !blueprint.entities.length) {
+			if (
+				!Array.isArray(blueprint.entities) ||
+				(
+					!blueprint.entities.length &&
+					!(schemaVersion === 4 && Array.isArray(blueprint.emptyCells) && blueprint.emptyCells.length)
+				)
+			) {
 				throw planError('blueprint-empty')
+			}
+			if (schemaVersion === 4 && !Array.isArray(blueprint.emptyCells)) {
+				throw planError('blueprint-empty-mask-missing')
 			}
 			if (!normalizePosition(target)) throw planError('target-invalid')
 		}
@@ -391,29 +431,34 @@ ModLoader.register({
 			}
 		}
 
-		function targetBounds(bounds, target, records) {
+		function targetBounds(bounds, target, records, emptyCells) {
 			const min = normalizePosition(bounds?.min)
 			const max = normalizePosition(bounds?.max)
-			if (min && max) {
-				return {
-					minU: target[0] + Math.min(min[0], max[0]),
-					maxU: target[0] + Math.max(min[0], max[0]),
-					minV: target[1] + Math.min(min[1], max[1]),
-					maxV: target[1] + Math.max(min[1], max[1])
-				}
-			}
-			return records.reduce(function (result, record) {
-				result.minU = Math.min(result.minU, record.footprint.minU)
-				result.maxU = Math.max(result.maxU, record.footprint.maxU)
-				result.minV = Math.min(result.minV, record.footprint.minV)
-				result.maxV = Math.max(result.maxV, record.footprint.maxV)
-				return result
-			}, {
+			const result = {
 				minU: Infinity,
 				maxU: -Infinity,
 				minV: Infinity,
 				maxV: -Infinity
-			})
+			}
+			if (min && max) {
+				result.minU = target[0] + Math.min(min[0], max[0])
+				result.maxU = target[0] + Math.max(min[0], max[0])
+				result.minV = target[1] + Math.min(min[1], max[1])
+				result.maxV = target[1] + Math.max(min[1], max[1])
+			}
+			for (const record of records) {
+				result.minU = Math.min(result.minU, record.footprint.minU)
+				result.maxU = Math.max(result.maxU, record.footprint.maxU)
+				result.minV = Math.min(result.minV, record.footprint.minV)
+				result.maxV = Math.max(result.maxV, record.footprint.maxV)
+			}
+			for (const position of emptyCells || []) {
+				result.minU = Math.min(result.minU, position[0])
+				result.maxU = Math.max(result.maxU, position[0])
+				result.minV = Math.min(result.minV, position[1])
+				result.maxV = Math.max(result.maxV, position[1])
+			}
+			return result
 		}
 
 		function countStatuses(records) {
@@ -570,7 +615,7 @@ ModLoader.register({
 				})
 			}
 			return {
-				version: '0.4.3',
+				version: '0.4.4',
 				kind: 'synthetic-plan',
 				results
 			}

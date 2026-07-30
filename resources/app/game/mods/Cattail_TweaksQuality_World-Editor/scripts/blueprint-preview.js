@@ -148,6 +148,7 @@ ModLoader.register({
 			let guideLayerScale = null
 			let guideRenderedPlanPoint = null
 			let guideAction = null
+			let placementOverlay = null
 			let visualFollowSignature = null
 			let cameraDragging = false
 			let rotationOverlay = null
@@ -179,7 +180,7 @@ ModLoader.register({
 			}
 
 			const controller = Object.freeze({
-				version: '0.4.3',
+				version: '0.4.4',
 				game,
 				snapshot,
 				exit,
@@ -204,6 +205,9 @@ ModLoader.register({
 				setTransformGuide(action, reason) {
 					return setTransformGuide(action, reason || 'preview-api')
 				},
+				setPlacementOverlay(value, reason) {
+					return setPlacementOverlay(value, reason || 'preview-placement-options')
+				},
 				refreshNow(reason) {
 					return refreshNow(reason || 'preview-api-refresh')
 				},
@@ -218,7 +222,7 @@ ModLoader.register({
 					const planning = await planner.benchmark(settings)
 					const rendering = await benchmarkRendering(settings)
 					const result = {
-						version: '0.4.3',
+						version: '0.4.4',
 						planning,
 						rendering,
 						runtime: performanceSnapshot()
@@ -509,7 +513,7 @@ ModLoader.register({
 
 			function snapshot() {
 				return Object.freeze({
-					version: '0.4.3',
+					version: '0.4.4',
 					active,
 					pinned,
 					temporaryPinned,
@@ -524,6 +528,7 @@ ModLoader.register({
 					warning: warning?.code || null,
 					renderFallbackCount: renderFallbacks.size,
 					guideAction,
+					placementOverlay,
 					performance: performanceSnapshot(),
 					revision,
 					disposed
@@ -580,6 +585,7 @@ ModLoader.register({
 				temporaryPinned = false
 				temporaryAltKeys.clear()
 				commandLock = null
+				placementOverlay = null
 				paused = Number(nextBlueprint.sourcePlane) !== (game.plane ? 1 : 0)
 				target = null
 				blueprint = nextBlueprint
@@ -599,7 +605,7 @@ ModLoader.register({
 			}
 
 			function exit(reason) {
-				const changed = active || pinned || temporaryPinned || commandLock || paused || target || plan || calculating
+				const changed = active || pinned || temporaryPinned || commandLock || paused || target || plan || calculating || placementOverlay
 				setTransformGuide(null, reason || 'preview-exited')
 				clearFollowPlan()
 				planToken += 1
@@ -608,6 +614,7 @@ ModLoader.register({
 				temporaryPinned = false
 				temporaryAltKeys.clear()
 				commandLock = null
+				placementOverlay = null
 				paused = false
 				target = null
 				blueprint = null
@@ -633,6 +640,7 @@ ModLoader.register({
 				if (!active || nextBlueprint?.mode !== 'structure') return false
 				clearFollowPlan()
 				planToken += 1
+				clearPlacementOverlay()
 				blueprint = nextBlueprint
 				metrics.transformChanges += 1
 				let scheduled = false
@@ -694,6 +702,7 @@ ModLoader.register({
 				const next = normalizePosition(value)
 				if (!active || paused || isTargetPinned() || !next || samePosition(next, target)) return false
 				target = next
+				clearPlacementOverlay()
 				metrics.targetChanges += 1
 				planToken += 1
 				const planReason = reason || 'target-changed'
@@ -793,6 +802,7 @@ ModLoader.register({
 					}
 				}
 				target = next
+				clearPlacementOverlay()
 				plan = null
 				calculating = false
 				metrics.targetChanges += 1
@@ -811,6 +821,7 @@ ModLoader.register({
 				if (!commandLock || commandLock.id !== id) return false
 				const saved = commandLock.saved
 				commandLock = null
+				clearPlacementOverlay()
 				pinned = !!saved.pinned
 				temporaryPinned = !!saved.temporaryPinned
 				temporaryAltKeys.clear()
@@ -1026,6 +1037,7 @@ ModLoader.register({
 					if (typeof ctx.setTransform === 'function') ctx.setTransform(1, 0, 0, 1, centerX, centerY)
 					else ctx.translate?.(centerX, centerY)
 					const newFallbacks = new Set(renderFallbacks)
+					drawPlacementEmptyMask(ctx)
 					for (const record of orderedRecords) {
 						const instance = instances.get(instanceKey(record))
 						const entity = instance?.entity
@@ -1033,6 +1045,7 @@ ModLoader.register({
 						if (!entity || !renderEntity(entity, record, colors.tint)) newFallbacks.add(record.index)
 					}
 					for (const record of orderedRecords) drawRecordOverlay(ctx, record, newFallbacks.has(record.index))
+					drawPlacementTargets(ctx)
 					if (newFallbacks.size !== renderFallbacks.size) {
 						renderFallbacks = newFallbacks
 						notify()
@@ -1261,6 +1274,61 @@ ModLoader.register({
 				markGuideDirty()
 				notify()
 				return true
+			}
+
+			function setPlacementOverlay(value, reason) {
+				const normalized = normalizePlacementOverlay(value)
+				const previousSignature = placementOverlay ? JSON.stringify(placementOverlay) : ''
+				const nextSignature = normalized ? JSON.stringify(normalized) : ''
+				if (previousSignature === nextSignature) return false
+				placementOverlay = normalized
+				markPreviewDirty()
+				notify()
+				return true
+			}
+
+			function clearPlacementOverlay() {
+				if (!placementOverlay) return false
+				placementOverlay = null
+				markPreviewDirty()
+				return true
+			}
+
+			function normalizePlacementOverlay(value) {
+				if (!value || !active || paused || !plan || !samePosition(value.target, plan.target)) return null
+				const replaceConflicts = value.replaceConflicts === true
+				const syncEmpty = value.syncEmpty === true
+				if (!replaceConflicts && !syncEmpty) return null
+				return Object.freeze({
+					target: clonePosition(plan.target),
+					replaceConflicts,
+					syncEmpty,
+					emptyCells: Object.freeze((syncEmpty ? value.emptyCells : []).map(clonePosition).filter(Boolean)),
+					removals: Object.freeze((value.removals || []).map(clonePlacementDescriptor).filter(Boolean)),
+					protectedTargets: Object.freeze((value.protectedTargets || []).map(clonePlacementDescriptor).filter(Boolean))
+				})
+			}
+
+			function clonePlacementDescriptor(value) {
+				const position = normalizePosition(value?.position)
+				const footprint = value?.footprint
+				if (
+					!position ||
+					![footprint?.minU, footprint?.maxU, footprint?.minV, footprint?.maxV].every(Number.isFinite)
+				) return null
+				return Object.freeze({
+					position,
+					footprint: Object.freeze({
+						minU: Number(footprint.minU),
+						maxU: Number(footprint.maxU),
+						minV: Number(footprint.minV),
+						maxV: Number(footprint.maxV)
+					}),
+					sourceConflict: value.sourceConflict === true,
+					sourceSync: value.sourceSync === true,
+					crossBoundary: value.crossBoundary === true,
+					reason: String(value.reason || '')
+				})
 			}
 
 			function normalizeGuideAction(action) {
@@ -1766,6 +1834,71 @@ ModLoader.register({
 				} finally {
 					ctx.restore()
 				}
+			}
+
+			function drawPlacementEmptyMask(ctx) {
+				if (!placementOverlay?.syncEmpty) return
+				const lineWidth = clamp(Math.sqrt(Math.max(0.01, finiteOr(game.zoom, 1))) * .9, .55, 2.2)
+				for (const position of placementOverlay.emptyCells) {
+					const corners = projectFootprint({
+						minU: position[0],
+						maxU: position[0],
+						minV: position[1],
+						maxV: position[1]
+					})
+					if (!corners) continue
+					ctx.save()
+					try {
+						traceProjectedFootprint(ctx, corners)
+						ctx.fillStyle = 'rgba(166, 242, 70, .10)'
+						ctx.fill()
+						ctx.strokeStyle = 'rgba(166, 242, 70, .68)'
+						ctx.lineWidth = lineWidth
+						ctx.setLineDash([])
+						ctx.stroke()
+					} finally {
+						ctx.restore()
+					}
+				}
+			}
+
+			function drawPlacementTargets(ctx) {
+				if (!placementOverlay) return
+				for (const descriptor of placementOverlay.removals) {
+					drawPlacementTarget(ctx, descriptor, false)
+				}
+				for (const descriptor of placementOverlay.protectedTargets) {
+					drawPlacementTarget(ctx, descriptor, true)
+				}
+			}
+
+			function drawPlacementTarget(ctx, descriptor, protectedTarget) {
+				const corners = projectFootprint(descriptor.footprint)
+				if (!corners) return
+				const unit = Math.max(1, finiteOr(game.unit, 1))
+				const lineWidth = clamp(Math.sqrt(Math.max(0.01, finiteOr(game.zoom, 1))) * 2.2, 1.2, 5)
+				ctx.save()
+				try {
+					traceProjectedFootprint(ctx, corners)
+					ctx.fillStyle = protectedTarget ? 'rgba(155, 108, 255, .20)' : 'rgba(236, 74, 74, .22)'
+					ctx.fill()
+					ctx.strokeStyle = protectedTarget ? '#B38CFF' : '#FF6868'
+					ctx.lineWidth = lineWidth
+					ctx.lineJoin = 'round'
+					ctx.setLineDash(descriptor.crossBoundary ? [unit * .18, unit * .10] : [])
+					ctx.stroke()
+				} finally {
+					ctx.restore()
+				}
+			}
+
+			function traceProjectedFootprint(ctx, corners) {
+				ctx.beginPath()
+				ctx.moveTo(corners[0][0], corners[0][1])
+				for (let index = 1; index < corners.length; index += 1) {
+					ctx.lineTo(corners[index][0], corners[index][1])
+				}
+				ctx.closePath()
 			}
 
 			function projectFootprint(footprint) {

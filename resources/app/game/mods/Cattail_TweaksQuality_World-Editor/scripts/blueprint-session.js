@@ -106,7 +106,7 @@ ModLoader.register({
 				creative = unavailableCreativeController(game)
 			}
 			if (!placement || placement.game !== game || typeof placement.subscribe !== 'function') {
-				console.warn('[Cattail World Editor] Blueprint 4B-1a could not find the placement service.')
+				console.warn('[Cattail World Editor] Blueprint 4C-1c could not find the placement service.')
 				placement = unavailablePlacementController(game)
 			}
 			if (
@@ -400,7 +400,7 @@ ModLoader.register({
 
 				function snapshot() {
 					return Object.freeze({
-						version: '0.4.3',
+						version: '0.4.4',
 						mode,
 						includeBlocks: mode === 'full' && includeBlocks,
 						blueprint,
@@ -620,9 +620,9 @@ ModLoader.register({
 				}
 
 				const session = Object.freeze({
-					version: '0.4.3',
+					version: '0.4.4',
 					game: sessionGame,
-					schemaVersion: 3,
+					schemaVersion: 4,
 					snapshot,
 					setMode(nextMode, reason) {
 						if (disposed || (nextMode !== 'structure' && nextMode !== 'full') || nextMode === mode) return false
@@ -720,6 +720,7 @@ ModLoader.register({
 				for (const entry of selectionEntries) sourceBounds = includeBounds(sourceBounds, entry.range)
 				const anchor = visualRightAnchor(sourceBounds)
 				const ranges = normalizeSelections(selectionEntries, sourcePlane, anchor)
+				const emptyCells = cutEmptyCells(planValue, ranges.absolute, anchor)
 				const entityRecords = []
 				const capturedEntities = []
 				const skipped = new Map()
@@ -784,7 +785,7 @@ ModLoader.register({
 					schema: 1,
 					cutToken: String(planValue.signature),
 					blueprint: {
-						schemaVersion: 3,
+						schemaVersion: 4,
 						mode: 'structure',
 						sourcePlane,
 						anchor: {
@@ -796,6 +797,7 @@ ModLoader.register({
 							})
 						},
 						selections: ranges.relative,
+						emptyCells,
 						contentBounds: relativeBounds(contentBounds, anchor),
 						includeBlocks: false,
 						entities: entityRecords,
@@ -811,11 +813,12 @@ ModLoader.register({
 					Number(value?.schema) !== 1 ||
 					typeof value?.cutToken !== 'string' ||
 					!value.cutToken ||
-					Number(value?.blueprint?.schemaVersion) !== 3 ||
+					Number(value?.blueprint?.schemaVersion) !== 4 ||
 					value.blueprint?.mode !== 'structure' ||
 					value.blueprint?.includeBlocks !== false ||
 					!Array.isArray(value.blueprint?.entities) ||
 					!value.blueprint.entities.length ||
+					!Array.isArray(value.blueprint?.emptyCells) ||
 					!Array.isArray(value.blueprint?.blocks) ||
 					value.blueprint.blocks.length
 				) {
@@ -840,9 +843,43 @@ ModLoader.register({
 				return !!left && !!right && left[0] === right[0] && left[1] === right[1]
 			}
 
+			function comparePositions(left, right) {
+				return Number(left?.[1]) - Number(right?.[1]) || Number(left?.[0]) - Number(right?.[0])
+			}
+
+			function cutEmptyCells(planValue, selections, anchor) {
+				const occupied = new Set()
+				const descriptors = []
+					.concat(Array.isArray(planValue?.removals) ? planValue.removals : [])
+					.concat(Array.isArray(planValue?.protectedTargets) ? planValue.protectedTargets : [])
+				for (const descriptor of descriptors) {
+					const position = normalizePosition(descriptor?.position)
+					if (!position) continue
+					const footprint = normalizeCutFootprint(descriptor?.footprint, position)
+					for (let v = footprint.minV; v <= footprint.maxV; v += 1) {
+						for (let u = footprint.minU; u <= footprint.maxU; u += 1) {
+							occupied.add(u + ':' + v)
+						}
+					}
+				}
+				const cells = new Map()
+				for (const entry of selections || []) {
+					const range = entry?.range
+					if (!isRange(range)) continue
+					for (let v = range.minV; v <= range.maxV; v += 1) {
+						for (let u = range.minU; u <= range.maxU; u += 1) {
+							const key = u + ':' + v
+							if (!occupied.has(key)) cells.set(key, subtract([u, v], anchor))
+						}
+					}
+				}
+				return Array.from(cells.values()).sort(comparePositions)
+			}
+
 			async function buildBlueprint(selectionState, source, captureMode, captureBlocks, isCancelled) {
 				const ranges = normalizeSelections(selectionState.selections, source.sourcePlane, source.anchor)
 				const uniqueCells = new Set()
+				const emptyCells = new Map()
 				const foundEntities = new Set()
 				let processed = 0
 
@@ -856,11 +893,13 @@ ModLoader.register({
 								uniqueCells.add(key)
 								let entity = null
 								try {
-									entity = typeof game.entityAtCoordinates === 'function'
-										? game.entityAtCoordinates([u, v])
-										: game.stuffMap?.['u' + u + 'v' + v] || null
+									if (typeof game.entityAtCoordinates === 'function') {
+										entity = game.entityAtCoordinates([u, v]) || null
+									}
 								} catch (error) {}
+								if (!entity) entity = game.stuffMap?.['u' + u + 'v' + v] || null
 								if (entity) foundEntities.add(entity)
+								else emptyCells.set(key, subtract([u, v], source.anchor))
 							}
 							processed += 1
 							if (processed % SCAN_CHUNK_SIZE === 0) await yieldFrame()
@@ -967,7 +1006,14 @@ ModLoader.register({
 
 				sortRecords(entityRecords)
 				sortRecords(blockRecords)
-				if (!entityRecords.length && !blockRecords.length) {
+				const normalizedEmptyCells = captureMode === 'structure'
+					? Array.from(emptyCells.values()).sort(comparePositions)
+					: []
+				if (
+					!entityRecords.length &&
+					!blockRecords.length &&
+					!(captureMode === 'structure' && normalizedEmptyCells.length)
+				) {
 					return {
 						blueprint: null,
 						summary: createSummary(
@@ -997,7 +1043,7 @@ ModLoader.register({
 					: null
 				return {
 					blueprint: {
-						schemaVersion: 3,
+						schemaVersion: captureMode === 'structure' ? 4 : 3,
 						mode: captureMode,
 						sourcePlane: source.sourcePlane,
 						anchor: {
@@ -1005,6 +1051,7 @@ ModLoader.register({
 							selectionIds: source.selectionIds
 						},
 						selections: ranges.relative,
+						...(captureMode === 'structure' ? { emptyCells: normalizedEmptyCells } : {}),
 						contentBounds: relativeBounds(contentBounds, source.anchor),
 						includeBlocks: captureMode === 'full' && captureBlocks,
 						entities: entityRecords,
@@ -1797,6 +1844,7 @@ ModLoader.register({
 					Math.max(0, Number(counts.buildable) || 0) +
 					Math.max(0, Number(counts.conflict) || 0)
 				)
+				const possibleEmptySync = Math.max(0, Number(previewState?.plan?.emptyCells?.length) || 0)
 				const terminal = currentPlacement?.terminalBlockedReason
 				const available = !!(
 					currentPlacement?.ready &&
@@ -1809,14 +1857,17 @@ ModLoader.register({
 					!previewState.calculating &&
 					previewState.plan &&
 					currentTransform?.blueprint?.mode === 'structure' &&
-					possibleBuilds > 0
+					(possibleBuilds > 0 || possibleEmptySync > 0)
 				)
 				if (button) button.disabled = !available
 				let text = ''
 				if (terminal) text = i18n.t(game, 'placementBlocked')
 				else if (currentPlacement?.busy) text = i18n.t(game, 'placementPlacing')
 				else if (currentPlacement?.phase === 'success') text = i18n.t(game, 'placementSuccess')
-				else if (currentPlacement?.error?.code === 'NOTHING_TO_BUILD') {
+				else if (
+					currentPlacement?.error?.code === 'NOTHING_TO_BUILD' ||
+					currentPlacement?.error?.code === 'NOTHING_TO_CHANGE'
+				) {
 					text = i18n.t(game, 'placementNothingToBuild')
 				} else if (currentPlacement?.phase === 'failed' && currentPlacement?.error) {
 					text = formatTemplate(i18n.t(game, 'placementFailed'), {
@@ -2349,10 +2400,14 @@ ModLoader.register({
 				const state = previewSnapshot()
 				const target = normalizePosition(state?.target)
 				if (!target || !state?.effectivePinned || state.commandLocked) return
-				placeAtTarget('mouse', target)
+				void placeWithLockedTarget('mouse', target, 'mouse-place-target')
 			}
 
 			async function placeFromHotkey(target) {
+				return placeWithLockedTarget('keyboard', target, 'ctrl-v-target')
+			}
+
+			async function placeWithLockedTarget(input, target, reason) {
 				connectPreviewController()
 				const controller = previewController || globalThis[PREVIEW_KEY]
 				if (
@@ -2362,13 +2417,20 @@ ModLoader.register({
 				) {
 					return false
 				}
-				const token = await controller.lockCommandTarget(target, 'ctrl-v-target')
-				if (!token) return false
+				markPlacementProbe('target-lock.requested', { input, target, reason })
+				const token = await controller.lockCommandTarget(target, reason || 'blueprint-placement-target')
+				if (!token) {
+					markPlacementProbe('target-lock.failed', { input, target, reason })
+					return false
+				}
+				markPlacementProbe('target-lock.ready', { input, target, reason })
 				try {
-					await placeAtTarget('keyboard', target)
+					await placeAtTarget(input, target)
 					return true
 				} finally {
-					await controller.releaseCommandTarget(token, 'ctrl-v-complete')
+					controller.setPlacementOverlay?.(null, 'blueprint-placement-target-released')
+					await controller.releaseCommandTarget(token, 'blueprint-placement-complete')
+					markPlacementProbe('target-lock.released', { input, target })
 				}
 			}
 
@@ -2385,25 +2447,83 @@ ModLoader.register({
 				if (!blueprint || blueprint.mode !== 'structure' || !normalizePosition(target)) return null
 				const plan = controller?.snapshot?.().plan || null
 				if (!plan) return null
-				const conflictCount = Math.max(0, Number(plan?.statusCounts?.conflict) || 0)
+				markPlacementProbe('place.requested', {
+					input,
+					target,
+					schemaVersion: Number(blueprint.schemaVersion) || 0,
+					recordCount: Array.isArray(plan.records) ? plan.records.length : 0,
+					emptyCellCount: Array.isArray(plan.emptyCells) ? plan.emptyCells.length : 0,
+					emptyEntityCount: Array.isArray(plan.emptyEntities) ? plan.emptyEntities.length : 0,
+					statusCounts: plan.statusCounts || {}
+				})
+				let analysis
+				try {
+					analysis = placement.analyze(plan)
+				} catch (analysisError) {
+					console.warn('[Cattail World Editor] Blueprint placement options could not be prepared.', analysisError)
+					await controller?.refreshNow?.('placement-analysis-failed')
+					refreshCard()
+					return null
+				}
+				markPlacementProbe('analysis.ready', {
+					target: analysis.target,
+					hasConflicts: analysis.hasConflicts,
+					hasEmptyMask: analysis.hasEmptyMask,
+					hasEmptyTargets: analysis.hasEmptyTargets,
+					variants: placementVariantsProbe(analysis.variants)
+				})
 				let replaceConflicts = false
-				if (conflictCount) {
-					const choice = await confirmConflictChoice(conflictCount)
+				let syncEmpty = false
+				let confirmedProposal = analysis.variants?.['00'] || null
+				if (analysis.hasConflicts || analysis.hasEmptyTargets) {
+					markPlacementProbe('options.required', {
+						hasConflicts: analysis.hasConflicts,
+						hasEmptyTargets: analysis.hasEmptyTargets
+					})
+					const choice = await confirmPlacementOptions(analysis, controller, plan)
 					if (!choice) {
+						markPlacementProbe('options.cancelled', { input, target })
 						await controller?.refreshNow?.('placement-cancelled')
 						refreshCard()
 						return null
 					}
-					replaceConflicts = choice === 'replace'
+					replaceConflicts = choice.replaceConflicts === true
+					syncEmpty = choice.syncEmpty === true
+					confirmedProposal = choice.proposal
+				} else {
+					markPlacementProbe('options.skipped', {
+						hasConflicts: analysis.hasConflicts,
+						hasEmptyMask: analysis.hasEmptyMask,
+						hasEmptyTargets: analysis.hasEmptyTargets,
+						proposal: placementProposalProbe(confirmedProposal)
+					})
 				}
+				if (!confirmedProposal?.signature) return null
 				creative.setDialogOpen?.(true, 'blueprint-placement-running')
 				let result
 				try {
+					markPlacementProbe('execute.called', {
+						input,
+						target,
+						replaceConflicts,
+						syncEmpty,
+						proposal: placementProposalProbe(confirmedProposal)
+					})
 					result = await placement.place({
 						blueprint,
 						target,
 						input,
-						replaceConflicts
+						replaceConflicts,
+						syncEmpty,
+						confirmedSignature: confirmedProposal.signature
+					})
+					markPlacementProbe('execute.returned', {
+						accepted: result?.accepted === true,
+						executed: result?.executed === true,
+						reason: result?.reason,
+						errorCode: result?.error?.code,
+						errorMessage: result?.error?.message,
+						snapshotCreated: !!result?.snapshotId
 					})
 				} finally {
 					creative.setDialogOpen?.(false, 'blueprint-placement-finished')
@@ -2415,52 +2535,290 @@ ModLoader.register({
 				return result
 			}
 
-			function confirmConflictChoice(count) {
+			function confirmPlacementOptions(analysis, controller, plan) {
 				if (!dialogs || dialogs.game !== game || typeof dialogs.create !== 'function') {
 					return Promise.resolve(null)
 				}
-				creative.setDialogOpen?.(true, 'blueprint-conflict-dialog-opened')
+				creative.setDialogOpen?.(true, 'blueprint-placement-options-opened')
 				return new Promise(function (resolve) {
 					let settled = false
+					let replaceConflicts = false
+					let syncEmpty = false
+					let replaceCandidateCount = (
+						Number(analysis.variants?.['10']?.summary?.replaceCount) +
+						Number(analysis.variants?.['10']?.summary?.protectedCount)
+					) || 0
+					let syncCandidateCount = (
+						Number(analysis.variants?.['01']?.summary?.syncDeleteCount) +
+						Number(analysis.variants?.['01']?.summary?.protectedCount)
+					) || 0
+					markPlacementProbe('options.opened', {
+						target: analysis.target,
+						replaceCandidateCount,
+						syncCandidateCount,
+						variants: placementVariantsProbe(analysis.variants)
+					})
 					const finish = function (choice, dialog, reason) {
 						if (settled) return
 						settled = true
+						controller?.setPlacementOverlay?.(null, 'blueprint-placement-options-closed')
 						resolve(choice)
-						dialog.close(reason || 'blueprint-conflict-choice', true)
+						dialog.close(reason || 'blueprint-placement-options-choice', true)
 					}
 					const dialog = dialogs.create({
-						id: 'cattail-world-editor-blueprint-conflict-dialog',
+						id: 'cattail-world-editor-blueprint-placement-options-dialog',
 						theme: game.plane ? 'void' : 'reality',
-						kind: 'blueprint-conflict',
+						kind: 'blueprint-placement-options',
 						onClose() {
-							creative.setDialogOpen?.(false, 'blueprint-conflict-dialog-closed')
+							controller?.setPlacementOverlay?.(null, 'blueprint-placement-options-dismissed')
+							creative.setDialogOpen?.(false, 'blueprint-placement-options-closed')
 							if (!settled) {
 								settled = true
 								resolve(null)
 							}
 						}
 					})
-					dialog.title.textContent = i18n.t(game, 'placementConflictTitle')
-					dialog.message.textContent = formatTemplate(i18n.t(game, 'placementConflictMessage'), {
-						count
-					})
-					const skip = dialog.createButton(i18n.t(game, 'placementSkipConflicts'), { primary: true })
-					const replace = dialog.createButton(i18n.t(game, 'placementReplaceConflicts'), {
-						primary: true,
-						danger: true
-					})
+					dialog.title.textContent = i18n.t(game, 'placementOptionsTitle')
+					dialog.message.textContent = i18n.t(game, 'placementOptionsMessage')
+
+					const optionList = document.createElement('div')
+					optionList.className = 'cattail-world-editor-blueprint-placement-options'
+					const replace = dialog.createButton('', {})
+					replace.classList.add('cattail-world-editor-blueprint-placement-option')
+					replace.disabled = !replaceCandidateCount
+					const sync = dialog.createButton('', {})
+					sync.classList.add('cattail-world-editor-blueprint-placement-option')
+					sync.disabled = !syncCandidateCount
+					optionList.append(replace, sync)
+
+					const summary = document.createElement('p')
+					summary.className = 'cattail-world-editor-blueprint-placement-options__summary'
+					summary.setAttribute('aria-live', 'polite')
+					const economy = document.createElement('p')
+					economy.className = 'cattail-world-editor-blueprint-placement-options__economy'
+					economy.setAttribute('aria-live', 'polite')
+					dialog.content.append(optionList, summary, economy)
+
 					const cancel = dialog.createButton(i18n.t(game, 'placementCancel'))
-					skip.addEventListener('click', function () {
-						finish('skip', dialog, 'blueprint-conflicts-skipped')
-					})
+					const confirm = dialog.createButton(i18n.t(game, 'placementConfirmAction'), { primary: true })
+					const renderChoice = function () {
+						const key = (replaceConflicts ? '1' : '0') + (syncEmpty ? '1' : '0')
+						const proposal = analysis.variants?.[key] || analysis.variants?.['00']
+						replace.textContent = formatTemplate(i18n.t(game, 'placementReplaceOption'), {
+							count: replaceCandidateCount
+						})
+						sync.textContent = formatTemplate(i18n.t(game, 'placementSyncEmptyOption'), {
+							count: syncCandidateCount
+						})
+						for (const entry of [[replace, replaceConflicts], [sync, syncEmpty]]) {
+							entry[0].classList.toggle('cattail-world-editor-blueprint-placement-option--active', entry[1])
+							entry[0].setAttribute('aria-pressed', entry[1] ? 'true' : 'false')
+						}
+						const detail = proposal?.summary || {}
+						summary.textContent = formatTemplate(i18n.t(game, 'placementOptionsSummary'), {
+							build: Number(detail.buildCount) || 0,
+							delete: Number(detail.deleteCount) || 0,
+							protected: Number(detail.protectedCount) || 0,
+							cross: Number(detail.crossBoundaryCount) || 0
+						})
+						economy.textContent = detail.creative
+							? i18n.t(game, 'deleteCreativeNoEconomy')
+							: formatPlacementResourceDelta(detail.resourceDelta)
+						confirm.disabled = !(Number(detail.changeCount) > 0)
+						confirm.classList.toggle(
+							'cattail-world-editor-dialog__button--danger',
+							Number(detail.deleteCount) > 0
+						)
+						controller?.setPlacementOverlay?.({
+							target: analysis.target,
+							replaceConflicts,
+							syncEmpty,
+							emptyCells: proposal?.emptyCells || [],
+							removals: proposal?.removals || [],
+							protectedTargets: proposal?.protectedTargets || []
+						}, 'blueprint-placement-option-changed')
+						markPlacementProbe('options.rendered', {
+							key,
+							replaceConflicts,
+							syncEmpty,
+							proposal: placementProposalProbe(proposal)
+						})
+						return proposal
+					}
 					replace.addEventListener('click', function () {
-						finish('replace', dialog, 'blueprint-conflicts-replaced')
+						if (replace.disabled) return
+						replaceConflicts = !replaceConflicts
+						markPlacementProbe('options.replace-toggled', { replaceConflicts, syncEmpty })
+						renderChoice()
+					})
+					sync.addEventListener('click', function () {
+						if (sync.disabled) return
+						syncEmpty = !syncEmpty
+						markPlacementProbe('options.sync-toggled', { replaceConflicts, syncEmpty })
+						renderChoice()
 					})
 					cancel.addEventListener('click', function () {
 						finish(null, dialog, 'blueprint-placement-cancelled')
 					})
-					dialog.actions.append(skip, replace, cancel)
-					dialog.mount(skip)
+					confirm.addEventListener('click', function () {
+						const displayedProposal = renderChoice()
+						if (!displayedProposal || confirm.disabled) return
+						let refreshedAnalysis
+						try {
+							refreshedAnalysis = placement.analyze(plan)
+						} catch (refreshError) {
+							markPlacementProbe('options.refresh-failed', {
+								code: refreshError?.code,
+								message: refreshError?.message
+							})
+							finish(null, dialog, 'blueprint-placement-options-target-changed')
+							return
+						}
+						const key = (replaceConflicts ? '1' : '0') + (syncEmpty ? '1' : '0')
+						const refreshedProposal = refreshedAnalysis.variants?.[key] || refreshedAnalysis.variants?.['00']
+						const visibleChanged = (
+							placementConfirmationFingerprint(displayedProposal) !==
+							placementConfirmationFingerprint(refreshedProposal)
+						)
+						markPlacementProbe('options.refreshed', {
+							key,
+							visibleChanged,
+							displayed: placementProposalProbe(displayedProposal),
+							refreshed: placementProposalProbe(refreshedProposal)
+						})
+						if (visibleChanged) {
+							analysis = refreshedAnalysis
+							replaceCandidateCount = (
+								Number(analysis.variants?.['10']?.summary?.replaceCount) +
+								Number(analysis.variants?.['10']?.summary?.protectedCount)
+							) || 0
+							syncCandidateCount = (
+								Number(analysis.variants?.['01']?.summary?.syncDeleteCount) +
+								Number(analysis.variants?.['01']?.summary?.protectedCount)
+							) || 0
+							replace.disabled = !replaceCandidateCount
+							sync.disabled = !syncCandidateCount
+							if (!replaceCandidateCount) replaceConflicts = false
+							if (!syncCandidateCount) syncEmpty = false
+							renderChoice()
+							markPlacementProbe('options.reconfirmation-required', {
+								replaceCandidateCount,
+								syncCandidateCount
+							})
+							return
+						}
+						if (!refreshedProposal?.signature) return
+						markPlacementProbe('options.confirmed', {
+							replaceConflicts,
+							syncEmpty,
+							proposal: placementProposalProbe(refreshedProposal)
+						})
+						finish({
+							replaceConflicts,
+							syncEmpty,
+							proposal: refreshedProposal
+						}, dialog, 'blueprint-placement-options-confirmed')
+					})
+					dialog.actions.append(cancel, confirm)
+					renderChoice()
+					dialog.mount(cancel)
+				})
+			}
+
+			function markPlacementProbe(event, details) {
+				try {
+					placement.markProbe?.(event, details)
+				} catch (probeError) {}
+			}
+
+			function placementSignatureProbe(value) {
+				const text = String(value || '')
+				let hash = 2166136261
+				for (let index = 0; index < text.length; index += 1) {
+					hash ^= text.charCodeAt(index)
+					hash = Math.imul(hash, 16777619)
+				}
+				return {
+					length: text.length,
+					hash: (hash >>> 0).toString(16).padStart(8, '0')
+				}
+			}
+
+			function placementDescriptorProbe(entry) {
+				return {
+					identity: String(entry?.identity || ''),
+					name: String(entry?.name || ''),
+					position: normalizePosition(entry?.position),
+					sourceConflict: entry?.sourceConflict === true,
+					sourceSync: entry?.sourceSync === true,
+					crossBoundary: entry?.crossBoundary === true,
+					reason: String(entry?.reason || '')
+				}
+			}
+
+			function placementProposalProbe(proposal) {
+				return {
+					signature: placementSignatureProbe(proposal?.signature),
+					summary: proposal?.summary || {},
+					removals: (proposal?.removals || []).map(placementDescriptorProbe),
+					protectedTargets: (proposal?.protectedTargets || []).map(placementDescriptorProbe)
+				}
+			}
+
+			function placementConfirmationFingerprint(proposal) {
+				const detail = proposal?.summary || {}
+				return JSON.stringify({
+					options: {
+						replaceConflicts: proposal?.options?.replaceConflicts === true,
+						syncEmpty: proposal?.options?.syncEmpty === true
+					},
+					summary: {
+						buildCount: Number(detail.buildCount) || 0,
+						replaceCount: Number(detail.replaceCount) || 0,
+						syncDeleteCount: Number(detail.syncDeleteCount) || 0,
+						deleteCount: Number(detail.deleteCount) || 0,
+						protectedCount: Number(detail.protectedCount) || 0,
+						crossBoundaryCount: Number(detail.crossBoundaryCount) || 0,
+						transientCount: Number(detail.transientCount) || 0,
+						skippedConflictCount: Number(detail.skippedConflictCount) || 0,
+						blockedCount: Number(detail.blockedCount) || 0,
+						changeCount: Number(detail.changeCount) || 0,
+						creative: detail.creative === true,
+						resourceDelta: Array.isArray(detail.resourceDelta) ? detail.resourceDelta : []
+					},
+					builds: (proposal?.payload?.builds || []).map(function (entry) {
+						return {
+							id: Number(entry?.id),
+							name: String(entry?.name || ''),
+							position: normalizePosition(entry?.position),
+							footprint: entry?.footprint || null,
+							config: entry?.config || {}
+						}
+					}),
+					removals: (proposal?.removals || []).map(placementDescriptorProbe),
+					protectedTargets: (proposal?.protectedTargets || []).map(placementDescriptorProbe),
+					transients: (proposal?.payload?.transients || []).map(placementDescriptorProbe)
+				})
+			}
+
+			function placementVariantsProbe(variants) {
+				const result = {}
+				for (const key of ['00', '01', '10', '11']) {
+					result[key] = placementProposalProbe(variants?.[key])
+				}
+				return result
+			}
+
+			function formatPlacementResourceDelta(delta) {
+				const values = Array.isArray(delta) ? delta : []
+				const parts = []
+				for (let index = 0; index < values.length; index += 1) {
+					const value = Number(values[index]) || 0
+					if (Math.abs(value) <= 1e-7) continue
+					parts.push(localizedResourceName(index) + ' ' + (value > 0 ? '+' : '') + formatNumber(value))
+				}
+				return formatTemplate(i18n.t(game, 'deleteResourceChanges'), {
+					changes: parts.length ? parts.join(', ') : i18n.t(game, 'deleteNoResourceChange')
 				})
 			}
 
@@ -3188,6 +3546,59 @@ ModLoader.register({
 						font-size: 10px;
 						line-height: 1.4;
 						overflow-wrap: anywhere;
+					}
+					.cattail-world-editor-dialog[data-kind="blueprint-placement-options"] {
+						--world-editor-blueprint-option-green: #a6f246;
+						--world-editor-blueprint-option-green-text: #17200c;
+					}
+					.cattail-world-editor-dialog[data-theme="void"][data-kind="blueprint-placement-options"] {
+						--world-editor-blueprint-option-green: #e3fd43;
+						--world-editor-blueprint-option-green-text: #171a05;
+					}
+					.cattail-world-editor-blueprint-placement-options {
+						display: grid;
+						grid-template-columns: repeat(2, minmax(0, 1fr));
+						gap: 10px;
+					}
+					.cattail-world-editor-blueprint-placement-option {
+						width: 100%;
+						min-height: 48px;
+						transition:
+							background .14s ease,
+							border-color .14s ease,
+							box-shadow .14s ease,
+							color .14s ease,
+							transform .08s ease;
+					}
+					.cattail-world-editor-blueprint-placement-option:not(:disabled):active {
+						transform: translateY(1px);
+					}
+					.cattail-world-editor-blueprint-placement-option--active:not(:disabled) {
+						border-color: color-mix(in srgb, var(--world-editor-blueprint-option-green) 78%, #26331d);
+						background: var(--world-editor-blueprint-option-green);
+						box-shadow:
+							0 0 0 1px color-mix(in srgb, var(--world-editor-blueprint-option-green) 72%, transparent),
+							0 0 11px color-mix(in srgb, var(--world-editor-blueprint-option-green) 72%, transparent),
+							0 0 24px color-mix(in srgb, var(--world-editor-blueprint-option-green) 38%, transparent);
+						color: var(--world-editor-blueprint-option-green-text);
+					}
+					.cattail-world-editor-blueprint-placement-options__summary,
+					.cattail-world-editor-blueprint-placement-options__economy {
+						margin: 0;
+						color: var(--world-editor-dialog-muted);
+						font-size: 13px;
+						line-height: 1.5;
+						overflow-wrap: anywhere;
+					}
+					.cattail-world-editor-blueprint-placement-options__summary {
+						margin-top: 4px;
+						color: var(--world-editor-dialog-text);
+						font-weight: 600;
+					}
+					@media (max-width: 520px) {
+						.cattail-world-editor-blueprint-placement-options {
+							grid-template-columns: minmax(0, 1fr);
+						}
 					}
 					.cattail-world-editor-blueprint-card__transform {
 						display: flex;

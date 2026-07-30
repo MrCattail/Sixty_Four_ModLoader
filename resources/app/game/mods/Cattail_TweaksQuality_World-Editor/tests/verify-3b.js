@@ -326,7 +326,7 @@ async function testPlannerStatusesCostsAndGuards() {
 		record(4, 'silo', [3, 0], { config: { fill: 7 } })
 	])
 	const plan = await planner.build(game, source, [10, 10])
-	assert.equal(plan.version, '0.4.3')
+	assert.equal(plan.version, '0.4.4')
 	assert.deepEqual(plain(plan.records.map(entry => entry.status)), [
 		'buildable',
 		'satisfied',
@@ -839,7 +839,7 @@ function createRuntimeEnvironment(options = {}) {
 async function testRuntimeLifecycleInputAndRendering() {
 	const env = createRuntimeEnvironment()
 	assert.ok(env.controller)
-	assert.equal(env.controller.version, '0.4.3')
+	assert.equal(env.controller.version, '0.4.4')
 	assert.deepEqual(env.getLayer().definition, {
 		order: 39,
 		zIndex: 39,
@@ -1191,9 +1191,9 @@ function testManifestLocalizationAndStaticContracts() {
 		'previewNoCost'
 	]
 	const i18n = loadI18n()
-	assert.equal(i18n.version, '0.4.3')
+	assert.equal(i18n.version, '0.4.4')
 	assert.equal(i18n.languages.length, 20)
-	assert.equal(i18n.keys.length, 171)
+	assert.equal(i18n.keys.length, 177)
 	for (const language of i18n.languages) {
 		for (const key of previewKeys) {
 			const translated = i18n.t(language, key)
@@ -1203,7 +1203,7 @@ function testManifestLocalizationAndStaticContracts() {
 	}
 
 	const manifest = JSON.parse(fs.readFileSync(path.join(MOD_ROOT, 'mod.json'), 'utf8'))
-	assert.equal(manifest.version, '0.4.3')
+	assert.equal(manifest.version, '0.4.4')
 	assert.equal(manifest.languageSupport.gameLanguage, true)
 	assert.deepEqual(manifest.entry, [
 		'scripts/core/foundation.js',

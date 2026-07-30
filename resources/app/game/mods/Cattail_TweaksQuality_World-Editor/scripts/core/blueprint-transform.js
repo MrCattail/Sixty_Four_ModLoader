@@ -30,7 +30,7 @@ ModLoader.register({
 		const listeners = new Set()
 
 		const controller = Object.freeze({
-			version: '0.3.3',
+			version: '0.4.4',
 			snapshot,
 			bind(nextSource, reason) {
 				if (disposed || nextSource === source) return false
@@ -116,7 +116,7 @@ ModLoader.register({
 			const normalizedMatrix = Object.freeze(matrix.slice())
 			const normalizedPivot = pivot ? Object.freeze(pivot.slice()) : null
 			return Object.freeze({
-				version: '0.3.3',
+				version: '0.4.4',
 				source,
 				blueprint,
 				sourceMode: source?.mode || null,
@@ -241,6 +241,7 @@ ModLoader.register({
 				sourcePlane: Number(value.sourcePlane) ? 1 : 0,
 				anchor: value.anchor,
 				selections: value.selections,
+				emptyCells: Object.freeze([]),
 				contentBounds: contentBoundsFromEntities(entities),
 				includeBlocks: false,
 				entities: Object.freeze(entities),
@@ -312,11 +313,17 @@ ModLoader.register({
 					}))
 				}))
 			})
+			const emptyCells = Number(value.schemaVersion) === 4 && Array.isArray(value.emptyCells)
+				? value.emptyCells.map(function (position) {
+					return transformPoint(position, center, transformMatrix)
+				}).sort(comparePositions)
+				: []
 			const contentBounds = value.contentBounds
 				? boundsWithSize(transformBounds(value.contentBounds.min, value.contentBounds.max, center, transformMatrix))
 				: contentBoundsFromEntities(entities)
 			return freezeContainer(Object.assign({}, value, {
 				selections: Object.freeze(selections),
+				emptyCells: Object.freeze(emptyCells),
 				contentBounds,
 				entities: Object.freeze(entities)
 			}))
@@ -425,14 +432,19 @@ ModLoader.register({
 		function validSource(value) {
 			const schemaVersion = Number(value?.schemaVersion)
 			return !!value &&
-				(schemaVersion === 1 || schemaVersion === 2 || schemaVersion === 3) &&
+				(schemaVersion === 1 || schemaVersion === 2 || schemaVersion === 3 || schemaVersion === 4) &&
 				(value.mode === 'structure' || value.mode === 'full') &&
-				Array.isArray(value.entities)
+				Array.isArray(value.entities) &&
+				(schemaVersion !== 4 || value.mode !== 'structure' || Array.isArray(value.emptyCells))
 		}
 
 		function nonNegativeInteger(value, fallback) {
 			const number = Number(value)
 			return Number.isInteger(number) && number >= 0 ? number : fallback
+		}
+
+		function comparePositions(left, right) {
+			return left[1] - right[1] || left[0] - right[0]
 		}
 
 		function freezeContainer(value) {

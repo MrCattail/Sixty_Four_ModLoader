@@ -455,7 +455,7 @@ function loadI18n() {
 
 function testManifestLocalizationUiAndReadOnlyContracts() {
 	const manifest = JSON.parse(fs.readFileSync(path.join(MOD_ROOT, 'mod.json'), 'utf8'))
-	assert.equal(manifest.version, '0.4.3')
+	assert.equal(manifest.version, '0.4.4')
 	assert.equal(manifest.languageSupport.gameLanguage, true)
 	assert.equal(manifest.entry.length, 30)
 	assert.equal(
@@ -490,9 +490,9 @@ function testManifestLocalizationUiAndReadOnlyContracts() {
 		'productionHide',
 		'productionPumpMining'
 	]
-	assert.equal(i18n.version, '0.4.3')
+	assert.equal(i18n.version, '0.4.4')
 	assert.equal(i18n.languages.length, 20)
-	assert.equal(i18n.keys.length, 171)
+	assert.equal(i18n.keys.length, 177)
 	for (const language of i18n.languages) {
 		for (const key of productionKeys) {
 			const translated = i18n.t(language, key)
@@ -518,12 +518,12 @@ function testManifestLocalizationUiAndReadOnlyContracts() {
 	assert.match(productionSource, /const REFRESH_MS = 1000/)
 	assert.match(productionSource, /deepFreeze/)
 	assert.match(analysisSource, /entities\(\)\s*\{\s*return current\.status === 'ready' \? currentEntities\.slice\(\) : \[\]/)
-	assert.match(sessionSource, /schemaVersion:\s*3/)
+	assert.match(sessionSource, /schemaVersion:\s*captureMode === 'structure' \? 4 : 3/)
 	assert.match(sessionSource, /productionState\.captureEntities\(capturedEntities\)/)
 	assert.match(sessionSource, /production,\s*\n/)
 	assert.match(transformSource, /production:\s*value\.production \|\| null/)
-	assert.match(transformSource, /schemaVersion === 3/)
-	assert.match(plannerSource, /schemaVersion !== 3/)
+	assert.match(transformSource, /schemaVersion\) === 4/)
+	assert.match(plannerSource, /schemaVersion !== 4/)
 	assert.match(cardsSource, /UNIT_NAMES = Object\.freeze\(\['s', 'min', 'hr'\]\)/)
 	assert.match(cardsSource, /UNIT_FACTORS = Object\.freeze\(\[1, 60, 3600\]\)/)
 	assert.match(cardsSource, /game\.resourcesSprites/)
