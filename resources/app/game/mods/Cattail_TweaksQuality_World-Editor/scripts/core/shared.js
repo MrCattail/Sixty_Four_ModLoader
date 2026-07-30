@@ -5,6 +5,7 @@ ModLoader.register({
 		const CREATIVE_KEY = Symbol.for('cattail.world-editor.creative-mode')
 		const CREATIVE_ECONOMY_KEY = Symbol.for('cattail.world-editor.creative-economy')
 		const SELECTION_DELETE_KEY = Symbol.for('cattail.world-editor.selection-delete')
+		const SELECTION_CUT_KEY = Symbol.for('cattail.world-editor.selection-cut')
 		const SHARED_STYLE_ID = 'cattail-world-editor-shared-style'
 		const EDITABLE_SELECTOR = 'input, textarea, select, [contenteditable]:not([contenteditable="false"]), [role="textbox"]'
 		const CARD_CONTROL_SELECTOR = 'button, input, select, textarea, [contenteditable]:not([contenteditable="false"]), [role="textbox"], [data-world-editor-card-control]'
@@ -32,7 +33,8 @@ ModLoader.register({
 			return !!(
 				globalThis[CREATIVE_KEY]?.isInputBlocked?.() ||
 				globalThis[CREATIVE_ECONOMY_KEY]?.isInputBlocked?.() ||
-				globalThis[SELECTION_DELETE_KEY]?.isInputBlocked?.()
+				globalThis[SELECTION_DELETE_KEY]?.isInputBlocked?.() ||
+				globalThis[SELECTION_CUT_KEY]?.isInputBlocked?.()
 			)
 		}
 

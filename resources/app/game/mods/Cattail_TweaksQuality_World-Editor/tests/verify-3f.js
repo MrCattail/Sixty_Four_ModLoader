@@ -455,9 +455,9 @@ function loadI18n() {
 
 function testManifestLocalizationUiAndReadOnlyContracts() {
 	const manifest = JSON.parse(fs.readFileSync(path.join(MOD_ROOT, 'mod.json'), 'utf8'))
-	assert.equal(manifest.version, '0.4.2')
+	assert.equal(manifest.version, '0.4.3')
 	assert.equal(manifest.languageSupport.gameLanguage, true)
-	assert.equal(manifest.entry.length, 28)
+	assert.equal(manifest.entry.length, 30)
 	assert.equal(
 		manifest.entry.indexOf(SHARED_SOURCE),
 		manifest.entry.indexOf('scripts/core/foundation.js') + 1
@@ -490,9 +490,9 @@ function testManifestLocalizationUiAndReadOnlyContracts() {
 		'productionHide',
 		'productionPumpMining'
 	]
-	assert.equal(i18n.version, '0.4.2')
+	assert.equal(i18n.version, '0.4.3')
 	assert.equal(i18n.languages.length, 20)
-	assert.equal(i18n.keys.length, 149)
+	assert.equal(i18n.keys.length, 171)
 	for (const language of i18n.languages) {
 		for (const key of productionKeys) {
 			const translated = i18n.t(language, key)

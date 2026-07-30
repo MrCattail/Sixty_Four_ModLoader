@@ -249,7 +249,7 @@ async function verifyFinalizationFailureBlocksCreativeReadiness() {
 
 function verifyIntegrationSources() {
 	const manifest = JSON.parse(source('mod.json'))
-	assert.equal(manifest.version, '0.4.2')
+	assert.equal(manifest.version, '0.4.3')
 	assert.equal(manifest.loaderVersion, '>=0.2.0')
 	assert.ok(manifest.entry.indexOf(CREATIVE_SOURCE) > manifest.entry.indexOf('scripts/core/editor-state.js'))
 	assert.ok(manifest.entry.indexOf(CREATIVE_SOURCE) < manifest.entry.indexOf('scripts/blueprint-session.js'))

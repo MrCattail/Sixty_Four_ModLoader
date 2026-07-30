@@ -516,3 +516,26 @@ copy(JSON.stringify(globalThis[Symbol.for('cattail.world-editor.selection-delete
 探针最多保留 160 条内存事件，只记录 UI/事务阶段、计数、错误码、实体名称与坐标，不记录完整实体存档或资源数组；重载后自动清空。
 
 4C-1a 不修改原版、ModLoader、Better UIs、其他 Mod、`enabled.json` 或归档旧版，不包含剪切、结构/完整蓝图同步空地、打包、发布或提交。
+
+## 4C-1b 剪切为结构蓝图
+
+- 选区工具栏新增独立“剪切内容”命令，快捷键为 `Ctrl+X`。它使用当前平面全部已提交选区的精确并集，并沿用 4C-1a 的重叠去重、跨边界整栋处理、保护对象、最后一个 Pump/Gradient、经济和事务守卫。
+- 剪切始终生成 schema 3 结构蓝图；Cube、完整运行状态、Mod/未知对象和其他受保护或跳过对象留在世界，也不会进入剪切蓝图。完整蓝图剪切继续留给后续 4D。
+- 蓝图实体与世界删除实体来自同一份 `selection-delete` plan 的安全 removals，不会分别扫描并产生两套目标。没有安全目标时不打开危险确认、不覆盖剪贴板、不创建 Snapshot 或 history。
+- 每次剪切都显示危险确认，列出将剪切、保留和跨选区边界的建筑数量及资源变化。已有蓝图时会提示确认后将替换当前蓝图和系统剪贴板；取消、`Escape` 或点击遮罩均没有副作用。
+- 确认后先把候选结构蓝图写入系统剪贴板。写入失败时保留旧蓝图和世界；写入成功后，新蓝图立即成为当前预览，再由既有 `selection-delete` adapter 执行一次世界删除。
+- 系统剪贴板无法加入游戏 Snapshot。若确认后的目标、价格、模式或资源变化，或删除事务被拒绝/回滚，世界保持或恢复原状，新蓝图仍作为“只复制、未剪切”（copied only）结果可用，并显示明确警告。
+- 成功剪切只创建一个物理 Snapshot、一条 `selection-delete` 事务和一条 undo/redo history，并记录 `origin: cut`。普通模式沿用原版橡皮擦费用/退款，创造模式零费用零退款，forward/redo 每次只播放一次回收音效。
+- 成功、失败、undo 和 redo 都保留全部选区。undo/redo 只往返世界建筑、资源、统计和 only-one；不会清空蓝图或回滚系统剪贴板。
+- 活动蓝图预览不会阻止剪切；确认成功复制后会由新结构蓝图替换。输入框/IME、重复快捷键、选区 preview/move/resize、其他 dialog、事务 busy、splash 和 ModLoader 面板继续阻止剪切。
+
+开发者控制台可检查：
+
+```js
+globalThis[Symbol.for('cattail.world-editor.selection-cut')].snapshot()
+globalThis[Symbol.for('cattail.world-editor.blueprint')].snapshot()
+globalThis[Symbol.for('cattail.world-editor.selection-delete')].diagnostics()
+globalThis[Symbol.for('cattail.world-editor.transactions')].snapshot()
+```
+
+4C-1b 不新增事务 adapter，不修改原版、ModLoader、Better UIs、其他 Mod、`enabled.json` 或归档旧版，也不包含结构/完整蓝图同步空地、完整状态/Cube 恢复、打包、发布或提交。

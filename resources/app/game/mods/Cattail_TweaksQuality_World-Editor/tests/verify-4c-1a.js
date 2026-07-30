@@ -634,6 +634,7 @@ async function testUnionPlanningExecutionUndoRedo() {
 	const result = await env.deletion.execute(plan, 'keyboard')
 	assert.equal(result.executed, true, JSON.stringify(result))
 	assert.equal(result.transaction.kind, 'selection-delete')
+	assert.equal(result.transaction.summary.label, 'Selection contents deletion')
 	assert.equal(env.transactions.snapshotCount, 1)
 	assert.equal(env.game.entityAtCoordinates([0, 0]), null)
 	assert.equal(env.game.entityAtCoordinates([2, 0]), null)
@@ -744,8 +745,9 @@ async function testProtectedEmptyEconomyAndCreativeRules() {
 	assert.equal(creativePlan.economy.creative, true)
 	assert.deepEqual(clone(creativePlan.economy.delta), [])
 	assert.deepEqual(clone(creativePlan.economy.steps), [])
-	const creativeResult = await creativeEnv.deletion.execute(creativePlan, 'mouse')
+	const creativeResult = await creativeEnv.deletion.execute(creativePlan, 'mouse', { origin: 'cut' })
 	assert.equal(creativeResult.executed, true)
+	assert.equal(creativeResult.transaction.summary.label, 'Selection cut')
 	assert.deepEqual(creativeEnv.game.resources, [0])
 	creativeEnv.dispose()
 }
@@ -921,7 +923,7 @@ function testLocalizationManifestUiAndDocumentation() {
 		'deleteReloadRequired',
 		'deletePreviewRefreshFailed'
 	]
-	assert.equal(i18n.version, '0.4.2')
+	assert.equal(i18n.version, '0.4.3')
 	assert.equal(i18n.languages.length, 20)
 	assert.ok(i18n.toolbarKeys.includes('toolbarCardDelete'))
 	for (const language of i18n.languages) {
@@ -933,7 +935,7 @@ function testLocalizationManifestUiAndDocumentation() {
 	assert.match(i18n.t('sch', 'deleteConfirmMessage'), /\{safe\}.*\{protected\}.*\{cross\}/)
 
 	const manifest = JSON.parse(source('mod.json'))
-	assert.equal(manifest.version, '0.4.2')
+	assert.equal(manifest.version, '0.4.3')
 	const placementIndex = manifest.entry.indexOf('scripts/core/blueprint-placement.js')
 	const deletionIndex = manifest.entry.indexOf(DELETE_SOURCE)
 	const inputIndex = manifest.entry.indexOf('scripts/core/input-controller.js')

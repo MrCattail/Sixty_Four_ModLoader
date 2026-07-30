@@ -2,7 +2,7 @@
   "id": "Cattail_TweaksQuality_World-Editor",
   "uniqueId": "Cattail_TweaksQuality_World-Editor",
   "name": "World Editor",
-  "version": "0.4.2",
+  "version": "0.4.3",
   "loaderVersion": ">=0.2.0",
   "languageSupport": {
     "gameLanguage": true
@@ -33,6 +33,8 @@
     "scripts/ui/editor-shell.js",
     "scripts/ui/selection-delete-ui.js",
     "scripts/blueprint-session.js",
+    "scripts/core/selection-cut.js",
+    "scripts/ui/selection-cut-ui.js",
     "scripts/blueprint-preview.js",
     "scripts/ui/selection-card.js",
     "scripts/ui/production-cards.js"

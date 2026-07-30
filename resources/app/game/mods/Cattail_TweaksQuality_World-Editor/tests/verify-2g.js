@@ -409,9 +409,9 @@ function testI18nManifestAndReadOnlyBoundary() {
 	const { definitions, sandbox } = loadModules(['scripts/i18n/editor-text.js'])
 	for (const definition of definitions) definition.init(createApi())
 	const i18n = sandbox[I18N_KEY]
-	assert.equal(i18n.version, '0.4.2')
+	assert.equal(i18n.version, '0.4.3')
 	assert.equal(i18n.languages.length, 20)
-	assert.equal(i18n.keys.length, 149)
+	assert.equal(i18n.keys.length, 171)
 	assert.ok(i18n.keys.includes('removeSelection'))
 	for (const language of i18n.languages) {
 		const translated = i18n.t(language, 'removeSelection')
@@ -433,9 +433,9 @@ function testI18nManifestAndReadOnlyBoundary() {
 	assert.match(controllerSource, /selection\.isPrimarySelected/)
 
 	const manifest = JSON.parse(fs.readFileSync(path.join(MOD_ROOT, 'mod.json'), 'utf8'))
-	assert.equal(manifest.version, '0.4.2')
+	assert.equal(manifest.version, '0.4.3')
 	assert.equal(manifest.languageSupport.gameLanguage, true)
-	assert.equal(manifest.entry.length, 28)
+	assert.equal(manifest.entry.length, 30)
 
 	const scriptText = manifest.entry
 		.map(relativePath => fs.readFileSync(path.join(MOD_ROOT, relativePath), 'utf8'))

@@ -60,7 +60,8 @@ function testManifestAndLocalization() {
 		'toolbarCardCreative',
 		'toolbarCardUndo',
 		'toolbarCardRedo',
-		'toolbarCardDelete'
+		'toolbarCardDelete',
+		'toolbarCardCut'
 	]
 	assert.equal(i18n.languages.length, 20)
 	assert.deepEqual(

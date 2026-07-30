@@ -82,9 +82,11 @@ ModLoader.register({
 			const adapter = {
 				version: ADAPTER_VERSION,
 				async prepare(context, request) {
+					const origin = normalizeOrigin(request?.origin)
 					traceProbe('adapter.prepare.start', {
 						operationId: context?.operationId,
-						direction: context?.direction
+						direction: context?.direction,
+						origin
 					})
 					requireCurrent(context)
 					const requested = normalizePlanRequest(request?.plan)
@@ -114,7 +116,7 @@ ModLoader.register({
 					})
 					return {
 						summary: {
-							label: 'Selection contents deletion',
+							label: origin === 'cut' ? 'Selection cut' : 'Selection contents deletion',
 							deleteCount: rebuilt.summary.safeCount,
 							protectedCount: rebuilt.summary.protectedCount,
 							crossBoundaryCount: rebuilt.summary.crossBoundaryCount
@@ -127,6 +129,7 @@ ModLoader.register({
 						},
 						payload: {
 							schema: TRANSACTION_SCHEMA,
+							origin,
 							source: rebuilt.source,
 							planSignature: rebuilt.signature,
 							removals: rebuilt.removals,
@@ -477,9 +480,11 @@ ModLoader.register({
 				}
 			}
 
-			async function executePlan(planValue, input) {
+			async function executePlan(planValue, input, options) {
+				const origin = normalizeOrigin(options?.origin)
 				traceProbe('execute.requested', {
 					input: normalizeInput(input),
+					origin,
 					safeCount: nonNegativeInteger(planValue?.summary?.safeCount, 0),
 					protectedCount: nonNegativeInteger(planValue?.summary?.protectedCount, 0)
 				})
@@ -506,7 +511,8 @@ ModLoader.register({
 						kind: TRANSACTION_KIND,
 						input: normalizeInput(input),
 						payload: {
-							plan: request
+							plan: request,
+							origin
 						}
 					})
 					lastResult = result || null
@@ -517,6 +523,7 @@ ModLoader.register({
 						reason: result?.reason,
 						errorCode: result?.error?.code,
 						errorMessage: result?.error?.message,
+						origin,
 						snapshotCreated: !!result?.snapshotId
 					})
 					if (result?.executed === true) {
@@ -585,8 +592,8 @@ ModLoader.register({
 						return createCellsSource(cells, options)
 					}, options)
 				},
-				execute(planValue, input) {
-					return executePlan(planValue, input)
+				execute(planValue, input, options) {
+					return executePlan(planValue, input, options)
 				},
 				isInputBlocked() {
 					return !disposed && (planning || busy || !!transactions.isBusy?.())
@@ -630,6 +637,7 @@ ModLoader.register({
 					}
 					return {
 						id: finiteInteger(entry?.id, 0),
+						primary: entry?.id === state?.primaryId || entry?.primary === true,
 						range: normalizeRange(entry?.range)
 					}
 				})
@@ -651,6 +659,7 @@ ModLoader.register({
 					ranges: ranges.map(function (range, index) {
 						return {
 							id: index + 1,
+							primary: index === ranges.length - 1,
 							range: normalizeRange(range)
 						}
 					})
@@ -1224,6 +1233,7 @@ ModLoader.register({
 				ranges: value.ranges.map(function (entry, index) {
 					return {
 						id: finiteInteger(entry?.id, index + 1),
+						primary: entry?.primary === true,
 						range: normalizeRange(entry?.range)
 					}
 				})
@@ -1837,6 +1847,10 @@ ModLoader.register({
 		function normalizeInput(value) {
 			const input = String(value || 'api')
 			return ['mouse', 'keyboard', 'gamepad', 'touch', 'api'].includes(input) ? input : 'api'
+		}
+
+		function normalizeOrigin(value) {
+			return String(value || '') === 'cut' ? 'cut' : 'delete'
 		}
 
 		function normalizeRequestedPlane(value, fallback) {

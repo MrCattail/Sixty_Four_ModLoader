@@ -3897,6 +3897,140 @@ ModLoader.register({
 				'删除已完成，但选区统计或蓝图预览刷新失败。'
 			])
 		}
+		const CUT_TEXT_KEYS = Object.freeze([
+			'cutSelectionContents',
+			'toolbarCardCut',
+			'cutConfirmTitle',
+			'cutConfirmMessage',
+			'cutReplaceWarning',
+			'cutConfirmAction',
+			'cutPlanning',
+			'cutCopying',
+			'cutDeleting',
+			'cutSuccess',
+			'cutNothing',
+			'cutTargetChanged',
+			'cutTargetChangedCopied',
+			'cutClipboardFailed',
+			'cutCopiedOnly',
+			'cutBusy',
+			'cutFailed',
+			'cutReloadRequired',
+			'cutPreviewRefreshFailed',
+			'blueprintCutPending',
+			'blueprintCutSuccess',
+			'blueprintCutCopiedOnly',
+			'blueprintCutFailed'
+		])
+		function createCutText(values) {
+			const result = {}
+			for (let index = 0; index < CUT_TEXT_KEYS.length; index += 1) {
+				result[CUT_TEXT_KEYS[index]] = String(values[index] || '')
+			}
+			return result
+		}
+		const CUT_TEXT = {
+			en: createCutText([
+				'Cut selection contents (Ctrl+X)',
+				'Cut Contents',
+				'Cut selected buildings to a blueprint?',
+				'{safe} buildings will be copied and deleted. {protected} protected or skipped buildings will remain. {cross} buildings cross a selection boundary.',
+				'This will replace the current blueprint and system clipboard after you confirm.',
+				'Cut Buildings',
+				'Planning a safe structure-blueprint cut…',
+				'Writing the structure blueprint to the clipboard…',
+				'Creating a safety snapshot and deleting the copied buildings…',
+				'Selection contents cut to a structure blueprint.',
+				'No safely cuttable buildings were found.',
+				'The selection target changed. Review it and try again.',
+				'The blueprint was copied, but the cut target changed and no buildings were deleted.',
+				'The clipboard could not be updated. The current blueprint and world were left unchanged.',
+				'The blueprint was copied, but the buildings were not deleted.',
+				'Another World Editor operation is running.',
+				'Cut failed.',
+				'Rollback failed. Reload the game before editing again; the copied blueprint remains available.',
+				'Cut completed, but selection or blueprint preview refresh failed.',
+				'Blueprint copied; preparing the world deletion…',
+				'Cut completed; the structure blueprint is ready.',
+				'Blueprint copied only; the source buildings remain.',
+				'Cut did not complete safely; reload may be required.'
+			]),
+			sch: createCutText([
+				'剪切选区内容（Ctrl+X）',
+				'剪切内容',
+				'将选中的建筑剪切为蓝图？',
+				'将复制并删除 {safe} 栋建筑；{protected} 栋受保护或跳过的建筑会保留；{cross} 栋建筑跨越选区边界。',
+				'确认后将替换当前蓝图和系统剪贴板。',
+				'剪切建筑',
+				'正在规划安全的结构蓝图剪切…',
+				'正在把结构蓝图写入剪贴板…',
+				'正在创建安全快照并删除已复制建筑…',
+				'选区内容已剪切为结构蓝图。',
+				'没有找到可安全剪切的建筑。',
+				'选区目标已发生变化，请检查后重试。',
+				'蓝图已复制，但剪切目标已变化，因此没有删除建筑。',
+				'无法更新剪贴板；当前蓝图和世界均保持不变。',
+				'蓝图已复制，但建筑没有删除。',
+				'另一项世界编辑器操作正在进行。',
+				'剪切失败。',
+				'回滚失败。请重新加载游戏后再继续编辑；已复制的蓝图仍可使用。',
+				'剪切已完成，但选区统计或蓝图预览刷新失败。',
+				'蓝图已复制，正在准备删除世界建筑…',
+				'剪切已完成，结构蓝图可以使用。',
+				'仅复制了蓝图，来源建筑仍然保留。',
+				'剪切未能安全完成，可能需要重新加载游戏。'
+			]),
+			tch: createCutText([
+				'剪下選區內容（Ctrl+X）',
+				'剪下內容',
+				'將選取的建築剪下為藍圖？',
+				'將複製並刪除 {safe} 棟建築；{protected} 棟受保護或略過的建築會保留；{cross} 棟建築跨越選區邊界。',
+				'確認後將取代目前藍圖與系統剪貼簿。',
+				'剪下建築',
+				'正在規劃安全的結構藍圖剪下…',
+				'正在將結構藍圖寫入剪貼簿…',
+				'正在建立安全快照並刪除已複製建築…',
+				'選區內容已剪下為結構藍圖。',
+				'找不到可安全剪下的建築。',
+				'選區目標已變更，請檢查後重試。',
+				'藍圖已複製，但剪下目標已變更，因此沒有刪除建築。',
+				'無法更新剪貼簿；目前藍圖與世界均保持不變。',
+				'藍圖已複製，但建築沒有刪除。',
+				'另一項世界編輯器操作正在進行。',
+				'剪下失敗。',
+				'回復失敗。請重新載入遊戲後再繼續編輯；已複製的藍圖仍可使用。',
+				'剪下已完成，但選區統計或藍圖預覽更新失敗。',
+				'藍圖已複製，正在準備刪除世界建築…',
+				'剪下已完成，結構藍圖可以使用。',
+				'僅複製了藍圖，來源建築仍然保留。',
+				'剪下未能安全完成，可能需要重新載入遊戲。'
+			]),
+			modsch: createCutText([
+				'剪切选区内容（Ctrl+X）',
+				'剪切内容',
+				'将选中的建筑剪切为蓝图？',
+				'将复制并删除 {safe} 栋建筑；{protected} 栋受保护或跳过的建筑会保留；{cross} 栋建筑跨越选区边界。',
+				'确认后将替换当前蓝图和系统剪贴板。',
+				'剪切建筑',
+				'正在规划安全的结构蓝图剪切…',
+				'正在把结构蓝图写入剪贴板…',
+				'正在创建安全快照并删除已复制建筑…',
+				'选区内容已剪切为结构蓝图。',
+				'没有找到可安全剪切的建筑。',
+				'选区目标已发生变化，请检查后重试。',
+				'蓝图已复制，但剪切目标已变化，因此没有删除建筑。',
+				'无法更新剪贴板；当前蓝图和世界均保持不变。',
+				'蓝图已复制，但建筑没有删除。',
+				'另一项世界编辑器操作正在进行。',
+				'剪切失败。',
+				'回滚失败。请重新加载游戏后再继续编辑；已复制的蓝图仍可使用。',
+				'剪切已完成，但选区统计或蓝图预览刷新失败。',
+				'蓝图已复制，正在准备删除世界建筑…',
+				'剪切已完成，结构蓝图可以使用。',
+				'仅复制了蓝图，来源建筑仍然保留。',
+				'剪切未能安全完成，可能需要重新加载游戏。'
+			])
+		}
 		const PLACEMENT_TEXT = {
 			en: {
 				blueprintPlace: 'Place Blueprint',
@@ -3954,12 +4088,18 @@ ModLoader.register({
 				TOOLBAR_CARD_TEXT[language] || TOOLBAR_CARD_TEXT.en,
 				HISTORY_TEXT[language] || HISTORY_TEXT.en,
 				DELETE_TEXT[language],
+				CUT_TEXT[language] || CUT_TEXT.en,
 				PLACEMENT_TEXT[language] || PLACEMENT_TEXT.en
 			)
 		}
 		const LANGUAGES = Object.freeze(Object.keys(TEXT))
 		const TOOLBAR_KEYS = Object.freeze(
-			Object.keys(TOOLBAR_CARD_TEXT.en).concat(['toolbarCardUndo', 'toolbarCardRedo', 'toolbarCardDelete'])
+			Object.keys(TOOLBAR_CARD_TEXT.en).concat([
+				'toolbarCardUndo',
+				'toolbarCardRedo',
+				'toolbarCardDelete',
+				'toolbarCardCut'
+			])
 		)
 		const HISTORY_KEYS = Object.freeze(
 			Object.keys(HISTORY_TEXT.en).filter(function (key) {
@@ -3974,7 +4114,7 @@ ModLoader.register({
 		Object.freeze(TEXT)
 
 		const i18n = Object.freeze({
-			version: '0.4.2',
+			version: '0.4.3',
 			languages: LANGUAGES,
 			keys: KEYS,
 			toolbarKeys: TOOLBAR_KEYS,

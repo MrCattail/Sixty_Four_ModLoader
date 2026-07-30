@@ -280,9 +280,9 @@ async function testStructureCaptureAndImmutability() {
 	assert.match(env.writes[0], /\n  "schemaVersion": 3,/)
 
 	const blueprint = env.session.snapshot().blueprint
-	assert.equal(env.session.version, '0.4.2')
+	assert.equal(env.session.version, '0.4.3')
 	assert.equal(env.session.schemaVersion, 3)
-	assert.equal(env.session.snapshot().version, '0.4.2')
+	assert.equal(env.session.snapshot().version, '0.4.3')
 	assert.equal(blueprint.schemaVersion, 3)
 	assert.equal(blueprint.mode, 'structure')
 	assert.equal(blueprint.sourcePlane, 0)
@@ -506,6 +506,85 @@ async function testChunkCancellationHotkeyAndLifecycle() {
 	assert.equal(env.window.listenerCount('keydown'), 0)
 }
 
+async function testCutCandidateClipboardAndOutcome() {
+	const state = selectionState([
+		{ id: 31, primary: true, plane: 0, range: range([0, 0], [0, 0]) }
+	], 31)
+	const env = createEnvironment({ selection: state })
+	const silo = { name: 'silo', position: [0, 0], entitySpan: 0, par: { fill: 4 } }
+	const pump = { name: 'pump', position: [1, 0], entitySpan: 0, par: { depth: 2 } }
+	env.game.setCell(0, 0, silo)
+	env.game.setCell(1, 0, pump)
+	assert.equal((await env.session.capture('cut-existing-blueprint')).status, 'captured')
+	const existingBlueprint = env.session.snapshot().blueprint
+	const writesBeforeCut = env.writes.length
+	const deletionPlan = {
+		schema: 1,
+		signature: 'cut-signature-1',
+		source: {
+			kind: 'selection',
+			plane: 0,
+			revision: 9,
+			ranges: [
+				{ id: 32, primary: true, range: range([1, 0], [1, 0]) }
+			]
+		},
+		summary: {
+			sourceCellCount: 1,
+			safeCount: 1,
+			protectedCount: 1,
+			crossBoundaryCount: 0,
+			resourceDelta: [0],
+			creative: false
+		},
+		removals: [
+			{
+				name: 'pump',
+				position: [1, 0],
+				footprint: { span: 0, minU: 1, maxU: 1, minV: 0, maxV: 0 },
+				crossBoundary: false
+			}
+		],
+		protectedTargets: [
+			{ name: 'cube', reason: 'cube', position: [2, 0] }
+		]
+	}
+
+	const candidate = env.session.prepareCut(deletionPlan)
+	assert.equal(candidate.schema, 1)
+	assert.equal(candidate.cutToken, deletionPlan.signature)
+	assert.strictEqual(env.session.snapshot().blueprint, existingBlueprint)
+	assert.equal(env.writes.length, writesBeforeCut)
+	assert.deepEqual(plain(candidate.blueprint.entities.map(entry => entry.name)), ['pump'])
+	assert.deepEqual(plain(candidate.blueprint.summary.skippedTypes), [
+		{ name: 'cube', reason: 'cube', count: 1 }
+	])
+
+	env.setClipboardFailure(true)
+	const failed = await env.session.publishCut(candidate, 'cut-clipboard-failure')
+	assert.equal(failed.status, 'clipboard-failed')
+	assert.strictEqual(env.session.snapshot().blueprint, existingBlueprint)
+	assert.equal(env.writes.length, writesBeforeCut)
+
+	env.setClipboardFailure(false)
+	assert.equal(env.session.setMode('full', 'cut-force-structure'), true)
+	const published = await env.session.publishCut(candidate, 'cut-ready')
+	assert.equal(published.status, 'ready')
+	assert.equal(published.cutToken, deletionPlan.signature)
+	assert.equal(env.session.snapshot().mode, 'structure')
+	assert.equal(env.session.snapshot().blueprint.mode, 'structure')
+	assert.deepEqual(plain(env.session.snapshot().blueprint.entities.map(entry => entry.name)), ['pump'])
+	assert.equal(env.writes.length, writesBeforeCut + 1)
+	assert.equal(env.session.snapshot().lastResult.cutStatus, 'pending')
+	assert.equal(env.session.completeCut(
+		deletionPlan.signature,
+		{ status: 'copied-only', error: { code: 'TARGET_CHANGED', message: 'changed' } },
+		'cut-copied-only'
+	), true)
+	assert.equal(env.session.snapshot().lastResult.cutStatus, 'copied-only')
+	assert.equal(env.session.snapshot().lastResult.cutError.code, 'TARGET_CHANGED')
+}
+
 function testLanguagesManifestUiAndReadOnlyBoundary() {
 	const i18nDefinitions = []
 	const i18nSandbox = {
@@ -520,9 +599,9 @@ function testLanguagesManifestUiAndReadOnlyBoundary() {
 	vm.runInContext(fs.readFileSync(i18nFilename, 'utf8'), i18nSandbox, { filename: i18nFilename })
 	i18nDefinitions[0].init()
 	const i18n = i18nSandbox[I18N_KEY]
-	assert.equal(i18n.version, '0.4.2')
+	assert.equal(i18n.version, '0.4.3')
 	assert.equal(i18n.languages.length, 20)
-	assert.equal(i18n.keys.length, 149)
+	assert.equal(i18n.keys.length, 171)
 	const blueprintKeys = [
 		'blueprintModeStructure',
 		'blueprintModeFull',
@@ -553,9 +632,9 @@ function testLanguagesManifestUiAndReadOnlyBoundary() {
 	}
 
 	const manifest = JSON.parse(fs.readFileSync(path.join(MOD_ROOT, 'mod.json'), 'utf8'))
-	assert.equal(manifest.version, '0.4.2')
+	assert.equal(manifest.version, '0.4.3')
 	assert.equal(manifest.languageSupport.gameLanguage, true)
-	assert.equal(manifest.entry.length, 28)
+	assert.equal(manifest.entry.length, 30)
 	assert.ok(manifest.entry.includes(BLUEPRINT_SOURCE))
 	assert.ok(
 		manifest.entry.indexOf('scripts/ui/editor-shell.js') <
@@ -565,12 +644,15 @@ function testLanguagesManifestUiAndReadOnlyBoundary() {
 	const source = fs.readFileSync(path.join(MOD_ROOT, BLUEPRINT_SOURCE), 'utf8')
 	const sharedSource = fs.readFileSync(path.join(MOD_ROOT, SHARED_SOURCE), 'utf8')
 	assert.match(source, /schemaVersion:\s*3/)
-	assert.match(source, /version:\s*'0\.4\.2'/)
+	assert.match(source, /version:\s*'0\.4\.3'/)
 	assert.match(source, /selectionIds:\s*source\.selectionIds/)
 	assert.match(source, /typeof game\.uvToXY !== 'function'/)
 	assert.match(source, /Object\.freeze/)
 	assert.match(source, /JSON\.stringify\(normalized,\s*null,\s*2\)/)
 	assert.match(source, /navigator\?\.clipboard\?\.writeText/)
+	assert.match(source, /prepareCut/)
+	assert.match(source, /publishCut/)
+	assert.match(source, /completeCut/)
 	assert.match(source, /entityPatches/)
 	assert.match(source, /definition\.canPurchase !== true/)
 	assert.match(source, /name === 'cube'/)
@@ -594,6 +676,7 @@ async function run() {
 	await testVisualRightAnchorProjectionAndFallbacks()
 	await testFullCaptureCubeRulesAndFailureRetention()
 	await testChunkCancellationHotkeyAndLifecycle()
+	await testCutCandidateClipboardAndOutcome()
 	testLanguagesManifestUiAndReadOnlyBoundary()
 	console.log('3A/3C verification passed: immutable schema-3 session, projected outer-bounds visual-right anchor, sorted selection IDs, deterministic projection fallback, structure/full capture, multi-selection union, cross-boundary footprints, Mod and transient skips, stable Cube gating, clipboard success/failure, empty retention, chunk cancellation, lifecycle, 20-language UI, original-font card contract, manifest, and read-only boundary.')
 }

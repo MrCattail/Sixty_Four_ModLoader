@@ -450,9 +450,9 @@ function testCardI18nManifestAndCompatibilityBoundary() {
 	const api = createApi()
 	for (const definition of definitions) definition.init(api)
 	const i18n = sandbox[I18N_KEY]
-	assert.equal(i18n.version, '0.4.2')
+	assert.equal(i18n.version, '0.4.3')
 	assert.equal(i18n.languages.length, 20)
-	assert.equal(i18n.keys.length, 149)
+	assert.equal(i18n.keys.length, 171)
 	assert.ok(i18n.keys.includes('wheelHint'))
 	for (const language of i18n.languages) {
 		assert.notEqual(i18n.t(language, 'wheelHint'), 'wheelHint')
@@ -507,9 +507,9 @@ function testCardI18nManifestAndCompatibilityBoundary() {
 	assert.match(dynamicCameraSource, /\},\s*true\)/)
 
 	const manifest = JSON.parse(fs.readFileSync(path.join(MOD_ROOT, 'mod.json'), 'utf8'))
-	assert.equal(manifest.version, '0.4.2')
+	assert.equal(manifest.version, '0.4.3')
 	assert.equal(manifest.languageSupport.gameLanguage, true)
-	assert.equal(manifest.entry.length, 28)
+	assert.equal(manifest.entry.length, 30)
 
 	const scriptText = manifest.entry
 		.map(relativePath => fs.readFileSync(path.join(MOD_ROOT, relativePath), 'utf8'))

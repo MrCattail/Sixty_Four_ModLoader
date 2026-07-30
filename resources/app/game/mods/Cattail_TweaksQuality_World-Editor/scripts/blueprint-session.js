@@ -400,7 +400,7 @@ ModLoader.register({
 
 				function snapshot() {
 					return Object.freeze({
-						version: '0.4.2',
+						version: '0.4.3',
 						mode,
 						includeBlocks: mode === 'full' && includeBlocks,
 						blueprint,
@@ -536,8 +536,91 @@ ModLoader.register({
 					return true
 				}
 
+				function prepareCut(planValue) {
+					if (disposed) throw new Error('blueprint-session-disposed')
+					return buildCutCandidate(planValue)
+				}
+
+				async function publishCut(candidateValue, reason) {
+					if (disposed) return deepFreeze({ status: 'disposed' })
+					const candidate = normalizeCutCandidate(candidateValue)
+					try {
+						await writeClipboardText(JSON.stringify(candidate.blueprint, null, 2))
+					} catch (error) {
+						console.warn('[Cattail World Editor] Cut blueprint clipboard write failed.', error)
+						return deepFreeze({
+							status: 'clipboard-failed',
+							error: {
+								code: 'CLIPBOARD_FAILED',
+								message: String(error?.message || 'The blueprint could not be written to the clipboard.')
+							}
+						})
+					}
+					if (disposed) {
+						return deepFreeze({
+							status: 'cancelled',
+							clipboard: 'ready',
+							error: {
+								code: 'SESSION_DISPOSED',
+								message: 'The blueprint session ended after the clipboard was updated.'
+							}
+						})
+					}
+
+					captureToken += 1
+					capturing = false
+					attemptId += 1
+					mode = 'structure'
+					includeBlocks = false
+					blueprint = candidate.blueprint
+					const result = deepFreeze({
+						attemptId,
+						status: 'captured',
+						clipboard: 'ready',
+						cutStatus: 'pending',
+						cutToken: candidate.cutToken,
+						mode: 'structure',
+						includeBlocks: false,
+						sourcePlane: blueprint.sourcePlane,
+						anchor: blueprint.anchor.position,
+						summary: blueprint.summary,
+						capturedTypes: blueprint.summary.capturedTypes,
+						skippedTypes: blueprint.summary.skippedTypes
+					})
+					publishResult(result, reason || 'cut-blueprint-ready')
+					return deepFreeze({
+						status: 'ready',
+						cutToken: candidate.cutToken,
+						blueprint,
+						result
+					})
+				}
+
+				function completeCut(cutToken, outcome, reason) {
+					if (
+						disposed ||
+						!lastResult ||
+						lastResult.cutToken !== String(cutToken || '') ||
+						lastResult.clipboard !== 'ready'
+					) {
+						return false
+					}
+					const status = ['success', 'copied-only', 'failed'].includes(outcome?.status)
+						? outcome.status
+						: 'failed'
+					const error = outcome?.error ? {
+						code: String(outcome.error.code || 'CUT_FAILED'),
+						message: String(outcome.error.message || 'Cut did not complete.')
+					} : null
+					publishResult(Object.assign({}, lastResult, {
+						cutStatus: status,
+						cutError: error
+					}), reason || ('cut-' + status))
+					return true
+				}
+
 				const session = Object.freeze({
-					version: '0.4.2',
+					version: '0.4.3',
 					game: sessionGame,
 					schemaVersion: 3,
 					snapshot,
@@ -562,6 +645,9 @@ ModLoader.register({
 					},
 					capture,
 					cancelCapture,
+					prepareCut,
+					publishCut,
+					completeCut,
 					clear(reason) {
 						if (disposed || (!blueprint && !lastResult && !capturing)) return false
 						cancelCapture(reason || 'cleared')
@@ -600,6 +686,158 @@ ModLoader.register({
 				})
 
 				return session
+			}
+
+			function buildCutCandidate(planValue) {
+				if (
+					!planValue ||
+					Number(planValue.schema) !== 1 ||
+					planValue.source?.kind !== 'selection' ||
+					!Array.isArray(planValue.source?.ranges) ||
+					!planValue.source.ranges.length ||
+					!Array.isArray(planValue.removals) ||
+					!planValue.removals.length ||
+					typeof planValue.signature !== 'string' ||
+					!planValue.signature
+				) {
+					throw new Error('invalid-cut-plan')
+				}
+				const sourcePlane = Number(planValue.source.plane) ? 1 : 0
+				if (sourcePlane !== (Number(game.plane) ? 1 : 0)) throw new Error('cut-plane-changed')
+				const selectionEntries = planValue.source.ranges.map(function (entry, index) {
+					if (!isRange(entry?.range)) throw new Error('invalid-cut-selection')
+					return {
+						id: Number(entry.id) || index + 1,
+						primary: entry.primary === true,
+						plane: sourcePlane,
+						range: cloneRange(entry.range)
+					}
+				})
+				if (!selectionEntries.some(function (entry) { return entry.primary })) {
+					selectionEntries[selectionEntries.length - 1].primary = true
+				}
+				let sourceBounds = null
+				for (const entry of selectionEntries) sourceBounds = includeBounds(sourceBounds, entry.range)
+				const anchor = visualRightAnchor(sourceBounds)
+				const ranges = normalizeSelections(selectionEntries, sourcePlane, anchor)
+				const entityRecords = []
+				const capturedEntities = []
+				const skipped = new Map()
+				let crossBoundaryCount = 0
+				let contentBounds = null
+
+				for (const descriptor of planValue.removals) {
+					const name = String(descriptor?.name || '').trim()
+					const position = normalizePosition(descriptor?.position)
+					if (!name || !position) throw new Error('invalid-cut-removal')
+					const footprint = normalizeCutFootprint(descriptor?.footprint, position)
+					const definition = game.codex?.entities?.[name]
+					if (!definition || definition.canPurchase !== true || name === 'cube') {
+						throw new Error('unsafe-cut-removal')
+					}
+					let entity = null
+					try {
+						entity = game.entityAtCoordinates?.(position) || null
+					} catch (error) {}
+					if (
+						!entity ||
+						safeEntityName(entity) !== name ||
+						!samePosition(normalizePosition(entity.position), position)
+					) {
+						throw new Error('cut-target-changed')
+					}
+					entityRecords.push({
+						kind: 'entity',
+						name,
+						position: subtract(position, anchor),
+						footprint: {
+							span: footprint.span,
+							min: subtract([footprint.minU, footprint.minV], anchor),
+							max: subtract([footprint.maxU, footprint.maxV], anchor)
+						},
+						restricted: {
+							onlyOne: definition.onlyone === true
+						},
+						config: {}
+					})
+					capturedEntities.push(entity)
+					if (descriptor.crossBoundary === true) crossBoundaryCount += 1
+					contentBounds = includeBounds(contentBounds, footprint)
+				}
+				for (const descriptor of Array.isArray(planValue.protectedTargets) ? planValue.protectedTargets : []) {
+					addTypeCount(skipped, descriptor?.name || 'unknown', descriptor?.reason || 'protected')
+				}
+				sortRecords(entityRecords)
+				const summary = createSummary(
+					ranges.relative.length,
+					Number(planValue.summary?.sourceCellCount) || 0,
+					entityRecords,
+					[],
+					crossBoundaryCount,
+					skipped
+				)
+				const productionState = globalThis[PRODUCTION_KEY]
+				const production = typeof productionState?.captureEntities === 'function'
+					? productionState.captureEntities(capturedEntities)
+					: null
+				return deepFreeze({
+					schema: 1,
+					cutToken: String(planValue.signature),
+					blueprint: {
+						schemaVersion: 3,
+						mode: 'structure',
+						sourcePlane,
+						anchor: {
+							position: anchor,
+							selectionIds: selectionEntries.map(function (entry) {
+								return entry.id
+							}).sort(function (left, right) {
+								return left - right
+							})
+						},
+						selections: ranges.relative,
+						contentBounds: relativeBounds(contentBounds, anchor),
+						includeBlocks: false,
+						entities: entityRecords,
+						blocks: [],
+						production,
+						summary
+					}
+				})
+			}
+
+			function normalizeCutCandidate(value) {
+				if (
+					Number(value?.schema) !== 1 ||
+					typeof value?.cutToken !== 'string' ||
+					!value.cutToken ||
+					Number(value?.blueprint?.schemaVersion) !== 3 ||
+					value.blueprint?.mode !== 'structure' ||
+					value.blueprint?.includeBlocks !== false ||
+					!Array.isArray(value.blueprint?.entities) ||
+					!value.blueprint.entities.length ||
+					!Array.isArray(value.blueprint?.blocks) ||
+					value.blueprint.blocks.length
+				) {
+					throw new Error('invalid-cut-candidate')
+				}
+				return deepFreeze(jsonClone(value))
+			}
+
+			function normalizeCutFootprint(value, position) {
+				const span = Number.isInteger(Number(value?.span)) && Number(value.span) >= 0
+					? Number(value.span)
+					: 0
+				const minU = Number.isFinite(Number(value?.minU)) ? Number(value.minU) : position[0] - span
+				const maxU = Number.isFinite(Number(value?.maxU)) ? Number(value.maxU) : position[0] + span
+				const minV = Number.isFinite(Number(value?.minV)) ? Number(value.minV) : position[1] - span
+				const maxV = Number.isFinite(Number(value?.maxV)) ? Number(value.maxV) : position[1] + span
+				if (minU > maxU || minV > maxV) throw new Error('invalid-cut-footprint')
+				return { span, minU, maxU, minV, maxV }
+			}
+
+			function samePosition(left, right) {
+				return !!left && !!right && left[0] === right[0] && left[1] === right[1]
 			}
 
 			async function buildBlueprint(selectionState, source, captureMode, captureBlocks, isCancelled) {
@@ -1680,6 +1918,10 @@ ModLoader.register({
 				if (result.status === 'empty') return i18n.t(game, 'blueprintNothingCaptured')
 				if (result.clipboard === 'failed') return i18n.t(game, 'blueprintClipboardFailed')
 				if (result.clipboard === 'pending') return i18n.t(game, 'blueprintClipboardWriting')
+				if (result.cutStatus === 'pending') return i18n.t(game, 'blueprintCutPending')
+				if (result.cutStatus === 'success') return i18n.t(game, 'blueprintCutSuccess')
+				if (result.cutStatus === 'copied-only') return i18n.t(game, 'blueprintCutCopiedOnly')
+				if (result.cutStatus === 'failed') return i18n.t(game, 'blueprintCutFailed')
 				return i18n.t(game, 'blueprintClipboardReady')
 			}
 
