@@ -858,7 +858,7 @@ async function verifyRuntimeContract() {
 
 function verifyStaticIntegration() {
 	const manifest = JSON.parse(source('mod.json'))
-	assert.equal(manifest.version, '0.4.1')
+	assert.equal(manifest.version, '0.4.2')
 	assert.equal(manifest.config.showCreativePurchaseCosts.type, 'boolean')
 	assert.equal(manifest.config.showCreativePurchaseCosts.default, false)
 	assert.equal(manifest.config.showCreativePurchaseCosts.reloadPolicy, 'hot')

@@ -145,7 +145,7 @@ ModLoader.register({
 				return true
 			}
 
-			function startScan(range, plane, phase) {
+			function startScan(range, plane, phase, reason) {
 				cancelJob()
 				const total = range.width * range.height
 				const key = scanKey(range, plane)
@@ -181,7 +181,10 @@ ModLoader.register({
 					cubes: new Set(),
 					scheduled: null
 				}
-				publish(jobSnapshot(job), phase === 'preview' ? 'preview-scan-started' : 'selection-scan-started')
+				publish(
+					jobSnapshot(job),
+					reason || (phase === 'preview' ? 'preview-scan-started' : 'selection-scan-started')
+				)
 				scheduleJob(job)
 			}
 
@@ -262,6 +265,17 @@ ModLoader.register({
 					return current.status === 'ready' ? currentEntities.slice() : []
 				},
 				updateSelection,
+				refresh(reason) {
+					if (disposed || !isRange(current.range) || current.phase === 'none') return false
+					suspendedCommitted = null
+					startScan(
+						cloneRange(current.range),
+						current.plane ? 1 : 0,
+						current.phase,
+						reason || 'selection-analysis-refreshed'
+					)
+					return true
+				},
 				clear,
 				subscribe(listener) {
 					if (typeof listener !== 'function') throw new TypeError('World Editor analysis listener must be a function.')

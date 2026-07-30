@@ -326,7 +326,7 @@ async function testPlannerStatusesCostsAndGuards() {
 		record(4, 'silo', [3, 0], { config: { fill: 7 } })
 	])
 	const plan = await planner.build(game, source, [10, 10])
-	assert.equal(plan.version, '0.4.1')
+	assert.equal(plan.version, '0.4.2')
 	assert.deepEqual(plain(plan.records.map(entry => entry.status)), [
 		'buildable',
 		'satisfied',
@@ -839,7 +839,7 @@ function createRuntimeEnvironment(options = {}) {
 async function testRuntimeLifecycleInputAndRendering() {
 	const env = createRuntimeEnvironment()
 	assert.ok(env.controller)
-	assert.equal(env.controller.version, '0.4.1')
+	assert.equal(env.controller.version, '0.4.2')
 	assert.deepEqual(env.getLayer().definition, {
 		order: 39,
 		zIndex: 39,
@@ -1191,9 +1191,9 @@ function testManifestLocalizationAndStaticContracts() {
 		'previewNoCost'
 	]
 	const i18n = loadI18n()
-	assert.equal(i18n.version, '0.4.1')
+	assert.equal(i18n.version, '0.4.2')
 	assert.equal(i18n.languages.length, 20)
-	assert.equal(i18n.keys.length, 130)
+	assert.equal(i18n.keys.length, 149)
 	for (const language of i18n.languages) {
 		for (const key of previewKeys) {
 			const translated = i18n.t(language, key)
@@ -1203,7 +1203,7 @@ function testManifestLocalizationAndStaticContracts() {
 	}
 
 	const manifest = JSON.parse(fs.readFileSync(path.join(MOD_ROOT, 'mod.json'), 'utf8'))
-	assert.equal(manifest.version, '0.4.1')
+	assert.equal(manifest.version, '0.4.2')
 	assert.equal(manifest.languageSupport.gameLanguage, true)
 	assert.deepEqual(manifest.entry, [
 		'scripts/core/foundation.js',
@@ -1219,6 +1219,7 @@ function testManifestLocalizationAndStaticContracts() {
 		'scripts/core/blueprint-transform.js',
 		'scripts/core/blueprint-preview-plan.js',
 		'scripts/core/blueprint-placement.js',
+		'scripts/core/selection-delete.js',
 		'scripts/core/input-controller.js',
 		'scripts/render/resize-handles.js',
 		'scripts/input/selection-controller.js',
@@ -1228,6 +1229,7 @@ function testManifestLocalizationAndStaticContracts() {
 		'scripts/ui/card-opacity.js',
 		'scripts/ui/dialog.js',
 		'scripts/ui/editor-shell.js',
+		'scripts/ui/selection-delete-ui.js',
 		'scripts/blueprint-session.js',
 		'scripts/blueprint-preview.js',
 		'scripts/ui/selection-card.js',

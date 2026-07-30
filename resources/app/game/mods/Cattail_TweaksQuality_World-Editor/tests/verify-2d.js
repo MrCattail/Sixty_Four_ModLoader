@@ -584,9 +584,9 @@ function testLocalizationManifestAndReadOnlyBoundary() {
 	const api = createApi()
 	for (const definition of definitions) definition.init(api)
 	const i18n = sandbox[I18N_KEY]
-	assert.equal(i18n.version, '0.4.1')
+	assert.equal(i18n.version, '0.4.2')
 	assert.equal(i18n.languages.length, 20)
-	assert.equal(i18n.keys.length, 130)
+	assert.equal(i18n.keys.length, 149)
 	for (const language of i18n.languages) {
 		for (const key of ['toolbarModeResize', 'toolResize', 'cardResizePreview', 'resizeHint']) {
 			assert.notEqual(i18n.t(language, key), key)
@@ -598,7 +598,7 @@ function testLocalizationManifestAndReadOnlyBoundary() {
 	assert.equal(i18n.t('en', 'resizeHint'), 'Release to resize / Esc Cancel')
 
 	const manifest = JSON.parse(fs.readFileSync(path.join(MOD_ROOT, 'mod.json'), 'utf8'))
-	assert.equal(manifest.version, '0.4.1')
+	assert.equal(manifest.version, '0.4.2')
 	assert.equal(manifest.languageSupport.gameLanguage, true)
 	assert.deepEqual(manifest.entry, [
 		'scripts/core/foundation.js',
@@ -614,6 +614,7 @@ function testLocalizationManifestAndReadOnlyBoundary() {
 		'scripts/core/blueprint-transform.js',
 		'scripts/core/blueprint-preview-plan.js',
 		'scripts/core/blueprint-placement.js',
+		'scripts/core/selection-delete.js',
 		'scripts/core/input-controller.js',
 		'scripts/render/resize-handles.js',
 		'scripts/input/selection-controller.js',
@@ -623,6 +624,7 @@ function testLocalizationManifestAndReadOnlyBoundary() {
 		'scripts/ui/card-opacity.js',
 		'scripts/ui/dialog.js',
 		'scripts/ui/editor-shell.js',
+		'scripts/ui/selection-delete-ui.js',
 		'scripts/blueprint-session.js',
 		'scripts/blueprint-preview.js',
 		'scripts/ui/selection-card.js',
@@ -633,10 +635,11 @@ function testLocalizationManifestAndReadOnlyBoundary() {
 	const cardOpacitySource = fs.readFileSync(path.join(scriptRoot, 'ui', 'card-opacity.js'), 'utf8')
 	const creativeModeSource = fs.readFileSync(path.join(scriptRoot, 'core', 'creative-mode.js'), 'utf8')
 	const placementSource = fs.readFileSync(path.join(scriptRoot, 'core', 'blueprint-placement.js'), 'utf8')
+	const selectionDeleteSource = fs.readFileSync(path.join(scriptRoot, 'core', 'selection-delete.js'), 'utf8')
 	const scriptSources = readScriptSources(scriptRoot)
 	const sources = scriptSources.join('\n')
 	const readOnlySources = scriptSources
-		.filter(source => source !== placementSource)
+		.filter(source => source !== placementSource && source !== selectionDeleteSource)
 		.join('\n')
 	const stateFreeSources = scriptSources
 		.filter(source => source !== cardOpacitySource && source !== creativeModeSource)

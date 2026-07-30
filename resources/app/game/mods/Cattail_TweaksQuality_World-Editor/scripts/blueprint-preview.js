@@ -179,7 +179,7 @@ ModLoader.register({
 			}
 
 			const controller = Object.freeze({
-				version: '0.4.1',
+				version: '0.4.2',
 				game,
 				snapshot,
 				exit,
@@ -218,7 +218,7 @@ ModLoader.register({
 					const planning = await planner.benchmark(settings)
 					const rendering = await benchmarkRendering(settings)
 					const result = {
-						version: '0.4.1',
+						version: '0.4.2',
 						planning,
 						rendering,
 						runtime: performanceSnapshot()
@@ -509,7 +509,7 @@ ModLoader.register({
 
 			function snapshot() {
 				return Object.freeze({
-					version: '0.4.1',
+					version: '0.4.2',
 					active,
 					pinned,
 					temporaryPinned,

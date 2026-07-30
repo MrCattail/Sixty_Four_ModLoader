@@ -21,7 +21,7 @@ ModLoader.register({
 
 		let disposed = false
 		const planner = Object.freeze({
-			version: '0.4.1',
+			version: '0.4.2',
 			status: STATUS,
 			statusPriority: STATUS_PRIORITY,
 			async build(game, blueprint, target, options) {
@@ -123,7 +123,7 @@ ModLoader.register({
 			const statusCounts = countStatuses(records)
 			const cost = simulateCost(game, records, guard)
 			return {
-				version: '0.4.1',
+				version: '0.4.2',
 				sourcePlane: Number(blueprint.sourcePlane) ? 1 : 0,
 				target: normalizedTarget,
 				bounds: targetBounds(blueprint.contentBounds, normalizedTarget, records),
@@ -570,7 +570,7 @@ ModLoader.register({
 				})
 			}
 			return {
-				version: '0.4.1',
+				version: '0.4.2',
 				kind: 'synthetic-plan',
 				results
 			}

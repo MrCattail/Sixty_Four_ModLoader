@@ -400,7 +400,7 @@ ModLoader.register({
 
 				function snapshot() {
 					return Object.freeze({
-						version: '0.4.1',
+						version: '0.4.2',
 						mode,
 						includeBlocks: mode === 'full' && includeBlocks,
 						blueprint,
@@ -537,7 +537,7 @@ ModLoader.register({
 				}
 
 				const session = Object.freeze({
-					version: '0.4.1',
+					version: '0.4.2',
 					game: sessionGame,
 					schemaVersion: 3,
 					snapshot,

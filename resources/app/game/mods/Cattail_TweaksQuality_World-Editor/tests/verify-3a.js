@@ -280,9 +280,9 @@ async function testStructureCaptureAndImmutability() {
 	assert.match(env.writes[0], /\n  "schemaVersion": 3,/)
 
 	const blueprint = env.session.snapshot().blueprint
-	assert.equal(env.session.version, '0.4.1')
+	assert.equal(env.session.version, '0.4.2')
 	assert.equal(env.session.schemaVersion, 3)
-	assert.equal(env.session.snapshot().version, '0.4.1')
+	assert.equal(env.session.snapshot().version, '0.4.2')
 	assert.equal(blueprint.schemaVersion, 3)
 	assert.equal(blueprint.mode, 'structure')
 	assert.equal(blueprint.sourcePlane, 0)
@@ -520,9 +520,9 @@ function testLanguagesManifestUiAndReadOnlyBoundary() {
 	vm.runInContext(fs.readFileSync(i18nFilename, 'utf8'), i18nSandbox, { filename: i18nFilename })
 	i18nDefinitions[0].init()
 	const i18n = i18nSandbox[I18N_KEY]
-	assert.equal(i18n.version, '0.4.1')
+	assert.equal(i18n.version, '0.4.2')
 	assert.equal(i18n.languages.length, 20)
-	assert.equal(i18n.keys.length, 130)
+	assert.equal(i18n.keys.length, 149)
 	const blueprintKeys = [
 		'blueprintModeStructure',
 		'blueprintModeFull',
@@ -553,9 +553,9 @@ function testLanguagesManifestUiAndReadOnlyBoundary() {
 	}
 
 	const manifest = JSON.parse(fs.readFileSync(path.join(MOD_ROOT, 'mod.json'), 'utf8'))
-	assert.equal(manifest.version, '0.4.1')
+	assert.equal(manifest.version, '0.4.2')
 	assert.equal(manifest.languageSupport.gameLanguage, true)
-	assert.equal(manifest.entry.length, 26)
+	assert.equal(manifest.entry.length, 28)
 	assert.ok(manifest.entry.includes(BLUEPRINT_SOURCE))
 	assert.ok(
 		manifest.entry.indexOf('scripts/ui/editor-shell.js') <
@@ -565,7 +565,7 @@ function testLanguagesManifestUiAndReadOnlyBoundary() {
 	const source = fs.readFileSync(path.join(MOD_ROOT, BLUEPRINT_SOURCE), 'utf8')
 	const sharedSource = fs.readFileSync(path.join(MOD_ROOT, SHARED_SOURCE), 'utf8')
 	assert.match(source, /schemaVersion:\s*3/)
-	assert.match(source, /version:\s*'0\.4\.1'/)
+	assert.match(source, /version:\s*'0\.4\.2'/)
 	assert.match(source, /selectionIds:\s*source\.selectionIds/)
 	assert.match(source, /typeof game\.uvToXY !== 'function'/)
 	assert.match(source, /Object\.freeze/)

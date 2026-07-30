@@ -587,9 +587,9 @@ function testHoverLayerI18nManifestAndReadOnlyBoundary() {
 	const api = createApi()
 	for (const definition of definitions) definition.init(api)
 	const i18n = sandbox[I18N_KEY]
-	assert.equal(i18n.version, '0.4.1')
+	assert.equal(i18n.version, '0.4.2')
 	assert.equal(i18n.languages.length, 20)
-	assert.equal(i18n.keys.length, 130)
+	assert.equal(i18n.keys.length, 149)
 	for (const language of i18n.languages) {
 		for (const key of ['toolbarModeArea', 'toolSelect', 'cardPinAction', 'cardUnpinAction']) {
 			assert.notEqual(i18n.t(language, key), key)
@@ -600,9 +600,9 @@ function testHoverLayerI18nManifestAndReadOnlyBoundary() {
 	assert.equal(i18n.t('modsch', 'toolSelect'), '选择')
 
 	const manifest = JSON.parse(fs.readFileSync(path.join(MOD_ROOT, 'mod.json'), 'utf8'))
-	assert.equal(manifest.version, '0.4.1')
+	assert.equal(manifest.version, '0.4.2')
 	assert.equal(manifest.languageSupport.gameLanguage, true)
-	assert.equal(manifest.entry.length, 26)
+	assert.equal(manifest.entry.length, 28)
 	assert.equal(manifest.entry.filter(entry => /selection-controller/.test(entry)).length, 1)
 	assert.equal(manifest.entry.filter(entry => /resize-handles/.test(entry)).length, 1)
 
@@ -610,7 +610,10 @@ function testHoverLayerI18nManifestAndReadOnlyBoundary() {
 		.map(relativePath => fs.readFileSync(path.join(MOD_ROOT, relativePath), 'utf8'))
 		.join('\n')
 	const readOnlyScriptText = manifest.entry
-		.filter(relativePath => relativePath !== 'scripts/core/blueprint-placement.js')
+		.filter(relativePath => (
+			relativePath !== 'scripts/core/blueprint-placement.js' &&
+			relativePath !== 'scripts/core/selection-delete.js'
+		))
 		.map(relativePath => fs.readFileSync(path.join(MOD_ROOT, relativePath), 'utf8'))
 		.join('\n')
 	const stateFreeScriptText = manifest.entry

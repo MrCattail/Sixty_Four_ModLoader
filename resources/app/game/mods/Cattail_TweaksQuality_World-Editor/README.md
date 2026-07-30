@@ -483,3 +483,36 @@ globalThis[Symbol.for('cattail.world-editor.blueprint-preview')]?.snapshot()
 ```
 
 4B-1b 不修改事务引擎、蓝图放置适配器、预览控制器、原版、ModLoader、Better UIs、其他 Mod、`enabled.json` 或归档旧版，也不包含打包、发布或提交。
+
+## 4C-1a 选区安全删除
+
+- 顶部工具栏新增独立的“删除内容”命令，`Delete` 是对应快捷键；现有 `Backspace` / `×` 仍然只移除主选区边界，不会删除世界建筑。
+- 删除目标是当前平面全部已提交选区的精确并集。重叠格和同一多格建筑会去重；建筑任一占格碰到选区就按整栋处理，并在确认框中单独显示跨选区边界数量。
+- 每次实际删除前都会显示危险确认框，列出可安全删除数、受保护数、跨边界数和资源净变化。默认焦点是“取消”，`Escape` 或点击遮罩也会取消。
+- `Cube`、不可破坏对象、未知 Mod / 无法序列化对象、正在搬迁的对象、带 Cube 的 Pump、带 Surge 的 Stabilizer，以及会导致 Pump / Gradient 家族全部消失的对象都会保留。其他安全建筑仍可在同一命令中继续删除。
+- 普通模式按稳定的 `v → u → 名称 → 会话实体身份` 顺序逐项模拟和执行原版橡皮擦费用与动态退款；任一步资源不足就不会创建快照或写入世界。创造模式零费用、零退款。
+- 确认后的事务仍会在物理写前快照之前和之后各重算一次选区、目标实体完整存档、创造/经济状态和价格。任何变化都会以零写入拒绝，不会使用过期确认结果。
+- 一次命令只创建一份物理快照、一条 `selection-delete` 事务和一条 undo/redo 历史。应用或验证失败会完整回滚；回滚失败会终止锁定到重新加载。
+- 成功删除、撤销和重做都保留全部选区，不倒带选区状态；删除会精确恢复/反转建筑存档、资源、`machinesSold`、`timeSinceLastDelete` 和 only-one 链，并刷新当前选区统计。活动蓝图预览刷新失败只显示警告，不改写已经成功的事务。
+- 扫描每批最多 512 格且可取消；应用按小批次执行并在整个事务期间阻止新的编辑器写入。每次 forward/redo 删除只播放一次回收音效，不创建逐建筑资源飞行动画。
+- 核心服务同时公开 `planSelections()`、`planRanges()` 和 `planCells()` 只读规划入口，供后续剪切和蓝图“同步空地”组合事务复用；4C-1a 本身不显示或执行任何同步空地 UI/行为。
+- 所有新增按钮、确认、状态、警告和失败文本覆盖现有 20 种原版语言。自动验证完成后仍必须进行真实游戏验收。
+
+开发者控制台可检查：
+
+```js
+globalThis[Symbol.for('cattail.world-editor.selection-delete')].snapshot()
+globalThis[Symbol.for('cattail.world-editor.selection-delete')].diagnostics()
+globalThis[Symbol.for('cattail.world-editor.transactions')].snapshot()
+globalThis[Symbol.for('cattail.world-editor.analysis')].snapshot()
+```
+
+若删除没有生效，可在开发者工具 Console 中复制最近一次有界探针报告：
+
+```js
+copy(JSON.stringify(globalThis[Symbol.for('cattail.world-editor.selection-delete')].diagnostics(), null, 2))
+```
+
+探针最多保留 160 条内存事件，只记录 UI/事务阶段、计数、错误码、实体名称与坐标，不记录完整实体存档或资源数组；重载后自动清空。
+
+4C-1a 不修改原版、ModLoader、Better UIs、其他 Mod、`enabled.json` 或归档旧版，不包含剪切、结构/完整蓝图同步空地、打包、发布或提交。
