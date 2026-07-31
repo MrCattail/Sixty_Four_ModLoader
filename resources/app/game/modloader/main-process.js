@@ -1,10 +1,11 @@
-const { app, BrowserWindow, ipcMain, screen, dialog } = require('electron')
+const { app, BrowserWindow, ipcMain, screen, dialog, shell } = require('electron')
 const crypto = require('crypto')
 const fs = require('fs')
 const path = require('path')
 const { spawn } = require('child_process')
 const { SnapshotStore, SnapshotStoreError, safeMessageForCode } = require('./snapshot-store.js')
 const { encodeSnapshotContainer } = require('./snapshot-container.js')
+const { LibraryStore, LibraryStoreError, normalizeManifestLibraries, safeMessageForCode: safeLibraryMessageForCode } = require('./library-store.js')
 
 const runtimeLogPath = path.join(__dirname, 'state', 'runtime.log')
 function runtimeLog(...args){
@@ -105,14 +106,29 @@ function applyModloaderMainProcessManifests(){
   }
 }
 
+function collectLibraryDeclarations(){
+  const modsDir = path.resolve(__dirname, '..', 'mods')
+  const enabled = readJsonFile(path.join(modsDir, 'enabled.json'), { mods: [] })
+  const declarations = []
+  for (const entry of normalizeEnabledEntries(enabled)) {
+    const manifest = readJsonFile(path.join(modsDir, entry.path, 'mod.json'), null)
+    if (!manifest || typeof manifest !== 'object') continue
+    const modId = String(manifest.id || entry.id || entry.path || '').trim()
+    declarations.push(...normalizeManifestLibraries(modId, manifest.libraries))
+  }
+  return declarations
+}
+
 applyModloaderMainProcessManifests()
 const modloaderWindows = new Map()
 const snapshotContexts = new Map()
+const librarySubscriptions = new Map()
 let modloaderParentWindowState = null
 const modloaderWindowMargin = 12
 let win = null
 let snapshotStore = null
 let snapshotAccountScope = ''
+let libraryStore = null
 const snapshotSaveIdPattern = /^[a-f0-9]{8}-[a-f0-9]{4}-[1-5][a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/i
 
 function snapshotEnvelope(value){
@@ -124,6 +140,17 @@ function snapshotErrorEnvelope(error){
   const code = allowed.has(error?.code) ? error.code : 'IO'
   runtimeLog('snapshotRequestFailed', { code, internalCode: error?.code || '', message: error?.message || String(error) })
   return { ok: false, error: { code, message: safeMessageForCode(code) } }
+}
+
+function libraryEnvelope(value){
+  return { ok: true, value }
+}
+
+function libraryErrorEnvelope(error){
+  const allowed = new Set(['NOT_READY', 'PERMISSION_DENIED', 'PATH_INVALID', 'NAME_CONFLICT', 'REVISION_CONFLICT', 'TOO_LARGE', 'QUOTA_EXCEEDED', 'CORRUPT', 'NOT_FOUND', 'IO_FAILED', 'WATCH_UNAVAILABLE'])
+  const code = allowed.has(error?.code) ? error.code : 'IO_FAILED'
+  runtimeLog('libraryRequestFailed', { code, internalCode: error?.code || '', message: error?.message || String(error) })
+  return { ok: false, error: { code, message: safeLibraryMessageForCode(code) } }
 }
 
 function installationIdentity(){
@@ -175,6 +202,41 @@ function configureSnapshotStore(options){
     snapshotAccountScope = ''
     snapshotStore = null
     runtimeLog('snapshotStoreConfigurationFailed', { code: error?.code || 'IO', message: error?.message || String(error) })
+  }
+}
+
+function configureLibraryStore(options){
+  try {
+    for (const record of librarySubscriptions.values()) {
+      try { record.handle?.close() } catch (error) {}
+    }
+    librarySubscriptions.clear()
+    libraryStore?.dispose()
+    libraryStore = new LibraryStore({
+      installationRoot: path.resolve(options?.installationRoot || path.resolve(__dirname, '..', '..', '..', '..')),
+      declarations: collectLibraryDeclarations(),
+      log(event, details) { runtimeLog(event, details) }
+    })
+  } catch (error) {
+    libraryStore = null
+    runtimeLog('libraryStoreConfigurationFailed', { code: error?.code || 'NOT_READY', message: error?.message || String(error) })
+  }
+}
+
+function libraryRuntimeContext(payload){
+  const modId = String(payload?.modId || '').trim()
+  const libraryId = String(payload?.libraryId || '').trim().toLowerCase()
+  if (!modId || !libraryId) throw new LibraryStoreError('PATH_INVALID', safeLibraryMessageForCode('PATH_INVALID'))
+  return { modId, libraryId }
+}
+
+function clearLibrarySubscriptions(sender){
+  const senderKey = typeof sender === 'string' || typeof sender === 'number' ? String(sender) : snapshotSenderKey(sender)
+  if (!senderKey) return
+  for (const [id, record] of librarySubscriptions) {
+    if (record.senderKey !== senderKey) continue
+    try { record.handle?.close() } catch (error) {}
+    librarySubscriptions.delete(id)
   }
 }
 
@@ -619,6 +681,62 @@ ipcMain.handle(`modloader:snapshots:admin`, async (event, payload)=>{
   }
 })
 
+ipcMain.handle(`modloader:libraries:runtime`, async (event, payload)=>{
+  try {
+    if (!libraryStore) throw new LibraryStoreError('NOT_READY', safeLibraryMessageForCode('NOT_READY'))
+    const action = String(payload?.action || '')
+    const context = libraryRuntimeContext(payload)
+    const request = payload?.request
+    let result
+    if (action === 'capabilities') result = await libraryStore.capabilities(context)
+    else if (action === 'list') result = await libraryStore.list(context, request)
+    else if (action === 'read') {
+      const record = await libraryStore.read(context, request)
+      result = {
+        info: record.info,
+        data: record.payloadType === 'utf8' ? record.payload.toString('utf8') : Uint8Array.from(record.payload)
+      }
+    } else if (action === 'write') result = await libraryStore.write(context, request)
+    else if (action === 'rename') result = await libraryStore.rename(context, request)
+    else if (action === 'trash') result = await libraryStore.trash(context, request)
+    else if (action === 'restore') result = await libraryStore.restore(context, request)
+    else if (action === 'quarantine') result = await libraryStore.quarantine(context, request)
+    else if (action === 'remove') result = await libraryStore.remove(context, request)
+    else if (action === 'openFolder') {
+      const directory = await libraryStore.folder(context, request)
+      const openError = await shell.openPath(directory)
+      if (openError) throw new LibraryStoreError('IO_FAILED', openError)
+      result = { opened: true, area: String(request?.area || 'active'), bucket: request?.bucket || undefined }
+    } else if (action === 'watch') {
+      const sender = event?.sender
+      const senderKey = snapshotSenderKey(sender)
+      if (!senderKey || !sender?.send) throw new LibraryStoreError('WATCH_UNAVAILABLE', safeLibraryMessageForCode('WATCH_UNAVAILABLE'))
+      const handle = await libraryStore.watch(context, watchEvent=>{
+        try {
+          if (!sender.isDestroyed?.()) sender.send('modloader:libraries:event', { subscriptionId: handle.id, event: watchEvent })
+        } catch (error) {
+          runtimeLog('libraryWatchDeliveryFailed', { subscriptionId: handle.id, message: error?.message || String(error) })
+        }
+      })
+      librarySubscriptions.set(handle.id, { handle, senderKey, modId: context.modId, libraryId: context.libraryId })
+      sender.once?.('destroyed', ()=>clearLibrarySubscriptions(senderKey))
+      result = { subscriptionId: handle.id }
+    } else if (action === 'unwatch') {
+      const subscriptionId = String(request?.subscriptionId || '')
+      const record = librarySubscriptions.get(subscriptionId)
+      if (!record || record.senderKey !== snapshotSenderKey(event?.sender) || record.modId !== context.modId || record.libraryId !== context.libraryId) {
+        throw new LibraryStoreError('PERMISSION_DENIED', safeLibraryMessageForCode('PERMISSION_DENIED'))
+      }
+      record.handle.close()
+      librarySubscriptions.delete(subscriptionId)
+      result = { subscriptionId, closed: true }
+    } else throw new LibraryStoreError('PATH_INVALID', safeLibraryMessageForCode('PATH_INVALID'))
+    return libraryEnvelope(result)
+  } catch (error) {
+    return libraryErrorEnvelope(error)
+  }
+})
+
 ipcMain.handle(`modloader:dialog:save`, async (event, options)=>{
   const parent = getModloaderDialogParent(event)
   const dialogOptions = normalizeModloaderDialogOptions(options)
@@ -769,12 +887,18 @@ ipcMain.on(`modloader:window:close`, (event, payload)=>{
 function attachWindow(parentWindow, options){
   win = parentWindow
   configureSnapshotStore(options)
+  configureLibraryStore(options)
   const sender = win?.webContents
-  if (sender?.once) sender.once('destroyed', ()=>clearSnapshotContext(sender))
+  if (sender?.once) sender.once('destroyed', ()=>{
+    clearSnapshotContext(sender)
+    clearLibrarySubscriptions(sender)
+  })
 }
 
 module.exports = {
   attachWindow,
   clearSnapshotContext,
+  clearLibrarySubscriptions,
+  collectLibraryDeclarations,
   runtimeLog
 }

@@ -2,7 +2,7 @@
 	'use strict'
 
 	const state = {
-		version: '0.2.0',
+		version: '0.3.0',
 		booted: false,
 		mods: [],
 		modById: {},
@@ -8857,12 +8857,22 @@
 	const SNAPSHOT_API_VERSION = '1.0.0'
 	const SNAPSHOT_SAVE_ID_PATTERN = /^[a-f0-9]{8}-[a-f0-9]{4}-[1-5][a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/i
 	const SNAPSHOT_ERROR_CODES = new Set(['UNAVAILABLE', 'NO_ACTIVE_SAVE', 'INVALID_PAYLOAD', 'TOO_LARGE', 'NOT_FOUND', 'CORRUPT', 'QUOTA', 'IO'])
+	const LIBRARY_API_VERSION = '1.0.0'
+	const LIBRARY_ERROR_CODES = new Set(['NOT_READY', 'PERMISSION_DENIED', 'PATH_INVALID', 'NAME_CONFLICT', 'REVISION_CONFLICT', 'TOO_LARGE', 'QUOTA_EXCEEDED', 'CORRUPT', 'NOT_FOUND', 'IO_FAILED', 'WATCH_UNAVAILABLE'])
 
 	class ModLoaderSnapshotError extends Error {
 		constructor(code, message) {
 			super(message)
 			this.name = 'ModLoaderSnapshotError'
 			this.code = SNAPSHOT_ERROR_CODES.has(code) ? code : 'IO'
+		}
+	}
+
+	class ModLoaderLibraryError extends Error {
+		constructor(code, message) {
+			super(message)
+			this.name = 'ModLoaderLibraryError'
+			this.code = LIBRARY_ERROR_CODES.has(code) ? code : 'IO_FAILED'
 		}
 	}
 
@@ -9024,6 +9034,99 @@
 			capabilities() { return snapshotRuntimeRequest(modId, 'capabilities') }
 		}
 		return Object.freeze(api)
+	}
+
+	const libraryApiState = {
+		listenerInstalled: false,
+		listeners: new Map()
+	}
+
+	const unwrapLibraryEnvelope = function (envelope) {
+		if (envelope?.ok === true) return envelope.value
+		const code = LIBRARY_ERROR_CODES.has(envelope?.error?.code) ? envelope.error.code : 'IO_FAILED'
+		const message = typeof envelope?.error?.message === 'string' && envelope.error.message
+			? envelope.error.message
+			: 'Library storage operation failed.'
+		throw new ModLoaderLibraryError(code, message)
+	}
+
+	const ensureLibraryEventListener = function () {
+		const ipcRenderer = getSnapshotIpcRenderer()
+		if (!ipcRenderer?.on || libraryApiState.listenerInstalled) return ipcRenderer
+		libraryApiState.listenerInstalled = true
+		ipcRenderer.on('modloader:libraries:event', function (event, payload) {
+			const listener = libraryApiState.listeners.get(String(payload?.subscriptionId || ''))
+			if (!listener) return
+			try { listener(payload?.event) } catch (error) { warn('Library watcher listener failed.', error) }
+		})
+		return ipcRenderer
+	}
+
+	const libraryRuntimeRequest = async function (modId, libraryId, action, request) {
+		const ipcRenderer = getSnapshotIpcRenderer()
+		if (!ipcRenderer?.invoke) throw new ModLoaderLibraryError('NOT_READY', 'Library storage is not ready.')
+		try {
+			const result = unwrapLibraryEnvelope(await ipcRenderer.invoke('modloader:libraries:runtime', {
+				action,
+				modId,
+				libraryId,
+				request
+			}))
+			if (action === 'read' && result && typeof result.data !== 'string') {
+				const data = result.data
+				if (data instanceof Uint8Array) result.data = new Uint8Array(data)
+				else if (Array.isArray(data?.data)) result.data = Uint8Array.from(data.data)
+				else throw new ModLoaderLibraryError('CORRUPT', 'Library item integrity verification failed.')
+			}
+			return result
+		} catch (error) {
+			if (error instanceof ModLoaderLibraryError) throw error
+			throw new ModLoaderLibraryError('IO_FAILED', 'Library storage operation failed.')
+		}
+	}
+
+	const createLibraryHandle = function (modId, libraryIdValue) {
+		const libraryId = String(libraryIdValue || '').trim().toLowerCase()
+		const request = function (action, options) { return libraryRuntimeRequest(modId, libraryId, action, options) }
+		return Object.freeze({
+			id: libraryId,
+			version: LIBRARY_API_VERSION,
+			capabilities() { return request('capabilities') },
+			list(options) { return request('list', options) },
+			read(options) { return request('read', options) },
+			write(options) { return request('write', options) },
+			rename(options) { return request('rename', options) },
+			trash(options) { return request('trash', options) },
+			restore(options) { return request('restore', options) },
+			quarantine(options) { return request('quarantine', options) },
+			remove(options) { return request('remove', options) },
+			openFolder(options) { return request('openFolder', options) },
+			async watch(listener) {
+				if (typeof listener !== 'function') throw new ModLoaderLibraryError('PATH_INVALID', 'Library path or name is invalid.')
+				ensureLibraryEventListener()
+				const result = await request('watch')
+				const subscriptionId = String(result?.subscriptionId || '')
+				if (!subscriptionId) throw new ModLoaderLibraryError('WATCH_UNAVAILABLE', 'Library change monitoring is unavailable.')
+				libraryApiState.listeners.set(subscriptionId, listener)
+				let closed = false
+				return Object.freeze({
+					subscriptionId,
+					async close() {
+						if (closed) return { subscriptionId, closed: true }
+						closed = true
+						libraryApiState.listeners.delete(subscriptionId)
+						return request('unwatch', { subscriptionId })
+					}
+				})
+			}
+		})
+	}
+
+	const createLibrariesApi = function (modId) {
+		return Object.freeze({
+			version: LIBRARY_API_VERSION,
+			open(libraryId) { return createLibraryHandle(modId, libraryId) }
+		})
 	}
 
 	const modloaderWindowApiState = {
@@ -9305,7 +9408,8 @@
 				registerMusic(name, src, options) { return api.registerMusic(name, api.asset(modId, src), options, modId) },
 				storage: Object.freeze({
 					version: SNAPSHOT_API_VERSION,
-					snapshots: createSnapshotApi(modId)
+					snapshots: createSnapshotApi(modId),
+					libraries: createLibrariesApi(modId)
 				}),
 				config: {
 					get(key, fallback) { return getConfigValue(modId, key, fallback) },

@@ -116,6 +116,106 @@ records, export a self-describing `.modloader-snapshot` file, or delete a record
 after confirmation. Quarantined data can be exported for forensic inspection.
 The page cannot import a file, restore a snapshot, or overwrite a Steam save.
 
+## Installation Library API
+
+ModLoader 0.3.0 adds Library API `1.0.0` for persistent, install-wide,
+Mod-owned document collections. A Mod must declare each named library in its
+enabled `mod.json`; the main process validates the declaration and owns every
+filesystem operation:
+
+```json
+{
+  "id": "my-mod",
+  "loaderVersion": ">=0.3.0",
+  "libraries": {
+    "blueprints": {
+      "directory": "blueprints",
+      "extensions": [".cattail-blueprint.json"],
+      "maxFileBytes": 16777216,
+      "maxTotalBytes": 2147483648,
+      "maxEntries": 5000,
+      "cache": {
+        "directories": ["thumbnails"],
+        "extensions": [".png"],
+        "maxBytes": 536870912
+      }
+    }
+  }
+}
+```
+
+`directory` is one fixed, non-reserved folder directly below the current game
+installation root. Directory ownership is case-insensitively unique; conflicting
+declarations are rejected. File names are single safe names, not paths, and must
+end in a declared extension. The API never returns an absolute path or exposes
+Node `fs`. The configured limits may be lower than, but never exceed, 16 MiB per
+file, 2 GiB and 5,000 active-plus-trash files, and 512 MiB of cache.
+
+Open a bound handle and use its asynchronous methods:
+
+```js
+const library = api.storage.libraries.open('blueprints')
+const capabilities = await library.capabilities()
+
+const saved = await library.write({
+  name: 'Pump array__a1b2c3d4.cattail-blueprint.json',
+  data: JSON.stringify(blueprint)
+})
+
+const active = await library.list({ area: 'active' })
+const loaded = await library.read({
+  name: saved.info.name,
+  expectedRevision: saved.info.revision,
+  encoding: 'utf8'
+})
+```
+
+`data` accepts a UTF-8 string or `Uint8Array`. Reads return `Uint8Array` unless
+`encoding: "utf8"` is requested. `list()` returns safe metadata including the
+SHA-256 `revision`; rename, trash, restore, quarantine, permanent removal, and
+replacement writes require that expected revision. A new write never silently
+overwrites an existing name. An explicitly revision-matched replacement moves
+the previous active file into `.trash/` before publishing the replacement.
+
+The active area is the library root. The managed areas `trash`, `quarantine`,
+and `cache` map to `.trash/`, `.quarantine/`, and a declared cache directory.
+Use `trash()` for recoverable deletion, `restore()` to return an item, and
+`remove()` only for trash, quarantine, or cache items; permanent deletion of an
+active item is denied. Cache writes are subject to their separate quota and may
+prune least-recently-used cache files. Active and trash files are never
+automatically evicted.
+
+```js
+const deleted = await library.trash({
+  name: saved.info.name,
+  expectedRevision: saved.info.revision
+})
+await library.restore({
+  name: deleted.name,
+  expectedRevision: deleted.revision
+})
+
+const watcher = await library.watch(event => refreshLibrary(event))
+await watcher.close()
+await library.openFolder({ area: 'active' })
+```
+
+The main-process watcher combines filesystem events, waits for stable file
+size/mtime observations, ignores managed temporary/trash/quarantine/cache
+changes, and performs a periodic reconciliation. If native watching is not
+available, `watch()` rejects while `list()` remains available for manual
+refresh. `openFolder()` asks Electron to open a declared managed directory but
+still does not reveal its path to the Mod.
+
+Writes use a sibling temporary file, flush, close, SHA-256 verification, and an
+atomic rename. Stable Library API errors use `ModLoaderLibraryError` with one of
+these codes: `NOT_READY`, `PERMISSION_DENIED`, `PATH_INVALID`, `NAME_CONFLICT`,
+`REVISION_CONFLICT`, `TOO_LARGE`, `QUOTA_EXCEEDED`, `CORRUPT`, `NOT_FOUND`,
+`IO_FAILED`, or `WATCH_UNAVAILABLE`. Internal paths and operating-system error
+details are written only to ModLoader diagnostics. Installation libraries are
+player data inside the game folder, so players should back them up before game
+verification, updates, moves, or uninstall operations.
+
 ## Game HUD API
 
 Press `H` in game to hide or restore the game HUD. ModLoader handles vanilla

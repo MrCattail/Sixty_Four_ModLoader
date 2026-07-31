@@ -18,8 +18,12 @@ $checks = @(
 	[ordered]@{ file = 'modloader\main-process.js'; pattern = 'modloader:snapshots:activate'; description = 'snapshot save-context IPC support' },
 	[ordered]@{ file = 'modloader\main-process.js'; pattern = 'modloader:snapshots:runtime'; description = 'snapshot runtime IPC support' },
 	[ordered]@{ file = 'modloader\main-process.js'; pattern = 'modloader:snapshots:admin'; description = 'snapshot administration IPC support' },
+	[ordered]@{ file = 'modloader\main-process.js'; pattern = 'modloader:libraries:runtime'; description = 'Library API v1 main-process IPC support' },
+	[ordered]@{ file = 'modloader\main-process.js'; pattern = 'collectLibraryDeclarations'; description = 'manifest-declared library discovery' },
 	[ordered]@{ file = 'modloader\loader.js'; pattern = 'window.ModLoader = api'; description = 'loader exports API' },
+	[ordered]@{ file = 'modloader\loader.js'; pattern = "version: '0.3.0'"; description = 'ModLoader 0.3.0 runtime version' },
 	[ordered]@{ file = 'modloader\loader.js'; pattern = "const SNAPSHOT_API_VERSION = '1.0.0'"; description = 'Storage Snapshot API v1 support' },
+	[ordered]@{ file = 'modloader\loader.js'; pattern = "const LIBRARY_API_VERSION = '1.0.0'"; description = 'Library API v1 renderer support' },
 	[ordered]@{ file = 'modloader\loader.js'; pattern = 'modloader.saveInstanceId = saveInstanceId'; description = 'snapshot save-lineage identity support' },
 	[ordered]@{ file = 'modloader\loader.js'; pattern = 'const renderSnapshotPanelPage'; description = 'snapshot management subpage support' }
 )
@@ -77,6 +81,7 @@ if (Test-Path -LiteralPath $mainJsPath) {
 $modloaderJavaScriptFiles = @(
 	'modloader\loader.js',
 	'modloader\main-process.js',
+	'modloader\library-store.js',
 	'modloader\snapshot-container.js',
 	'modloader\snapshot-store.js'
 )
@@ -122,7 +127,9 @@ if (Test-Path -LiteralPath $renderApiContractTestPath) {
 $snapshotContractTests = @(
 	[ordered]@{ file = 'snapshot-container-v1-contract.test.js'; description = 'Snapshot export container v1 contract'; pattern = 'binary framing, metadata, checksum, corruption rejection' },
 	[ordered]@{ file = 'snapshot-store-v1-contract.test.js'; description = 'Snapshot store v1 contract'; pattern = 'validation, isolation, queueing, rotation, quarantine, cleanup' },
-	[ordered]@{ file = 'snapshot-api-v1-contract.test.js'; description = 'Storage Snapshot API v1 runtime contract'; pattern = 'bound Mod API, data types, safe errors, save identity, admin UI boundary' }
+	[ordered]@{ file = 'snapshot-api-v1-contract.test.js'; description = 'Storage Snapshot API v1 runtime contract'; pattern = 'bound Mod API, data types, safe errors, save identity, admin UI boundary' },
+	[ordered]@{ file = 'library-store-v1-contract.test.js'; description = 'Library store v1 contract'; pattern = 'declarations, path isolation, atomic writes, revision conflicts, trash, quarantine, cache, watcher' },
+	[ordered]@{ file = 'library-api-v1-contract.test.js'; description = 'Library API v1 runtime contract'; pattern = 'bound named handle, safe errors, binary data, watcher lifecycle, main-process boundary' }
 )
 foreach ($contract in $snapshotContractTests) {
 	$contractPath = Join-Path $PSScriptRoot $contract.file

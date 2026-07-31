@@ -366,7 +366,7 @@ ipcMain.on(`gameError`, (e,d)=>{
 		$Text = Apply-Required $Text $oldGameError $newGameError 'game error runtime log hook'
 	}
 
-	if (-not $Text.Contains('ModLoaderMainProcess.attachWindow(win)')) {
+	if (-not [regex]::IsMatch($Text, 'ModLoaderMainProcess\.attachWindow\(win(?:\s*,|\s*\))')) {
 		$oldAttach = '  if (!options.fullscreen) win.setFullScreen(false)'
 		$newAttach = "  if (!options.fullscreen) win.setFullScreen(false)`n  ModLoaderMainProcess.attachWindow(win)"
 		$Text = Apply-Required $Text $oldAttach $newAttach 'main window attachment'
@@ -449,7 +449,9 @@ Assert-Contains -RelativePath 'resources\app\game\scripts\game.js' -Pattern 'Mod
 Assert-Contains -RelativePath 'resources\app\game\scripts\game.js' -Pattern 'ModLoader?.applySoundList' -Description 'sound list hook'
 Assert-Contains -RelativePath 'resources\app\game\scripts\sprites.js' -Pattern 'ModLoader?.resolveAsset' -Description 'sprite asset hook'
 Assert-Contains -RelativePath 'resources\app\game\scripts\ui.js' -Pattern 'ModLoader?.resolveAsset' -Description 'shop icon asset hook'
-Assert-Contains -RelativePath 'resources\app\main.js' -Pattern 'ModLoaderMainProcess.attachWindow(win)' -Description 'main process bridge'
+Assert-Contains -RelativePath 'resources\app\main.js' -Pattern 'ModLoaderMainProcess.attachWindow(win' -Description 'main process bridge'
 Assert-Contains -RelativePath 'resources\app\game\modloader\main-process.js' -Pattern 'module.exports' -Description 'main process module'
+Assert-Contains -RelativePath 'resources\app\game\modloader\main-process.js' -Pattern 'modloader:libraries:runtime' -Description 'Library API v1 main process bridge'
+Assert-Contains -RelativePath 'resources\app\game\modloader\library-store.js' -Pattern "const API_VERSION = '1.0.0'" -Description 'Library store v1 module'
 
 Write-Host 'ModLoader source hooks are installed.'
