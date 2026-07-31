@@ -9,9 +9,12 @@
 	const maxCacheSide = 2048
 	const maxCachePixels = 2048 * 2048
 	const maxCacheEntries = 96
+	const maxCacheTotalPixels = 32 * 1024 * 1024
 	const sliceCaches = new Map()
 	let previewEnabled = null
 	let activeGame = null
+	let renderFrame = 0
+	let cachePixels = 0
 
 	const stats = {
 		frames: 0,
@@ -26,6 +29,13 @@
 		slicedEntities: 0,
 		hits: 0,
 		misses: 0,
+		cacheBuilds: 0,
+		evictions: 0,
+		admissionRejects: 0,
+		overflowSlices: 0,
+		overflowEntities: 0,
+		peakCacheEntries: 0,
+		peakCachePixels: 0,
 		fallbacks: 0,
 		clears: 0,
 		lastFallback: '',
@@ -162,6 +172,9 @@
 				return Object.assign({}, stats, {
 					enabled: isEnabled(api),
 					cacheEntries: sliceCaches.size,
+					cachePixels,
+					maxCacheEntries,
+					maxCacheTotalPixels,
 					cacheHitRate: totalCached ? roundNumber(stats.hits / totalCached, 4) : 0,
 					candidateEntityRate: stats.visibleEntities ? roundNumber(stats.candidateEntities / stats.visibleEntities, 4) : 0,
 					slicedEntityRate: totalEntityDraws ? roundNumber(stats.slicedEntities / totalEntityDraws, 4) : 0,
@@ -215,6 +228,7 @@
 
 	function renderRealityEntitiesWithSlices(game, dt) {
 		stats.frames++
+		renderFrame++
 		let candidates = []
 		const flush = function () {
 			flushCandidateRun(game, dt, candidates)
@@ -295,13 +309,26 @@
 		const sliceSignature = getSliceSignature(projectionSignature, descriptors)
 		let cache = sliceCaches.get(sliceSignature)
 		if (!cache) {
-			cache = buildSliceCache(game, descriptors, bounds, projectionSignature)
-			if (!cache) return false
-			if (sliceCaches.size >= maxCacheEntries) clearSliceCaches()
-			sliceCaches.set(sliceSignature, cache)
 			stats.misses++
+			const geometry = getSliceCacheGeometry(bounds)
+			if (!geometry) return false
+			if (!prepareCacheAdmission(geometry.pixels)) {
+				stats.admissionRejects++
+				stats.overflowSlices++
+				stats.overflowEntities += descriptors.length
+				return false
+			}
+			cache = buildSliceCache(game, descriptors, bounds, projectionSignature, geometry)
+			if (!cache) return false
+			cache.lastUsedFrame = renderFrame
+			sliceCaches.set(sliceSignature, cache)
+			cachePixels += cache.pixels
+			stats.cacheBuilds++
+			stats.peakCacheEntries = Math.max(stats.peakCacheEntries, sliceCaches.size)
+			stats.peakCachePixels = Math.max(stats.peakCachePixels, cachePixels)
 		} else {
 			stats.hits++
+			cache.lastUsedFrame = renderFrame
 		}
 		const anchorXY = game.uvToXY(cache.anchorUv)
 		if (!isFinitePoint(anchorXY)) {
@@ -316,14 +343,61 @@
 		return true
 	}
 
-	function buildSliceCache(game, descriptors, bounds, projectionSignature) {
+	function getSliceCacheGeometry(bounds) {
 		if (!bounds) return null
 		const width = Math.max(1, Math.ceil(bounds.maxX - bounds.minX + cachePadding * 2))
 		const height = Math.max(1, Math.ceil(bounds.maxY - bounds.minY + cachePadding * 2))
-		if (width > maxCacheSide || height > maxCacheSide || width * height > maxCachePixels) {
+		const pixels = width * height
+		if (width > maxCacheSide || height > maxCacheSide || pixels > maxCachePixels) {
 			recordFallback('slice-too-large')
 			return null
 		}
+		return { width, height, pixels }
+	}
+
+	function prepareCacheAdmission(requiredPixels) {
+		if (!Number.isFinite(requiredPixels) || requiredPixels <= 0 || requiredPixels > maxCacheTotalPixels) return false
+		while (sliceCaches.size >= maxCacheEntries || cachePixels + requiredPixels > maxCacheTotalPixels) {
+			// Preserve the stable working set already used this frame; overflow is cheaper than cyclic rebuilds.
+			let victimKey = null
+			let victimFrame = Infinity
+			sliceCaches.forEach(function (cache, key) {
+				const lastUsedFrame = Number(cache?.lastUsedFrame)
+				if (Number.isFinite(lastUsedFrame) && lastUsedFrame >= renderFrame) return
+				const comparableFrame = Number.isFinite(lastUsedFrame) ? lastUsedFrame : -Infinity
+				if (victimKey === null || comparableFrame < victimFrame) {
+					victimKey = key
+					victimFrame = comparableFrame
+				}
+			})
+			if (victimKey === null) return false
+			evictSliceCache(victimKey)
+		}
+		return true
+	}
+
+	function evictSliceCache(key) {
+		const cache = sliceCaches.get(key)
+		if (!cache) return false
+		sliceCaches.delete(key)
+		cachePixels = Math.max(0, cachePixels - (Number(cache.pixels) || 0))
+		releaseSliceCache(cache)
+		stats.evictions++
+		return true
+	}
+
+	function releaseSliceCache(cache) {
+		try {
+			if (cache?.canvas) {
+				cache.canvas.width = 0
+				cache.canvas.height = 0
+			}
+		} catch (error) {}
+	}
+
+	function buildSliceCache(game, descriptors, bounds, projectionSignature, geometry) {
+		if (!bounds || !geometry) return null
+		const { width, height, pixels } = geometry
 		const anchorUv = descriptors[0]?.position
 		const anchorXY = game.uvToXY(anchorUv)
 		if (!isFinitePoint(anchorXY)) {
@@ -349,6 +423,7 @@
 			offsetX: originX - anchorXY[0],
 			offsetY: originY - anchorXY[1],
 			entityCount: descriptors.length,
+			pixels,
 			names: descriptors.map(function (entry) { return entry.entity?.name || 'unknown' })
 		}
 	}
@@ -604,6 +679,9 @@
 		const report = {
 			enabled: isEnabled(api),
 			cacheEntries: sliceCaches.size,
+			cachePixels,
+			maxCacheEntries,
+			maxCacheTotalPixels,
 			totalEntities: 0,
 			visibleEntities: 0,
 			candidateVisibleEntities: 0,
@@ -679,7 +757,9 @@
 	}
 
 	function clearSliceCaches() {
+		sliceCaches.forEach(releaseSliceCache)
 		sliceCaches.clear()
+		cachePixels = 0
 		stats.clears++
 	}
 
@@ -696,6 +776,13 @@
 		stats.slicedEntities = 0
 		stats.hits = 0
 		stats.misses = 0
+		stats.cacheBuilds = 0
+		stats.evictions = 0
+		stats.admissionRejects = 0
+		stats.overflowSlices = 0
+		stats.overflowEntities = 0
+		stats.peakCacheEntries = sliceCaches.size
+		stats.peakCachePixels = cachePixels
 		stats.fallbacks = 0
 		stats.clears = 0
 		stats.lastFallback = ''
