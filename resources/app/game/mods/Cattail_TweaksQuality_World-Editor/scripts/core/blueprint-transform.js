@@ -2,6 +2,7 @@ ModLoader.register({
 	id: 'Cattail_TweaksQuality_World-Editor',
 	init() {
 		const TRANSFORM_KEY = Symbol.for('cattail.world-editor.blueprint-transform')
+		const STATE_KEY = Symbol.for('cattail.world-editor.blueprint-state')
 		const IDENTITY = Object.freeze([1, 0, 0, 1])
 		const ROTATE_CW = Object.freeze([0, -1, 1, 0])
 		const ROTATE_CCW = Object.freeze([0, 1, -1, 0])
@@ -30,7 +31,7 @@ ModLoader.register({
 		const listeners = new Set()
 
 		const controller = Object.freeze({
-			version: '0.4.4',
+			version: '0.4.5',
 			snapshot,
 			bind(nextSource, reason) {
 				if (disposed || nextSource === source) return false
@@ -41,7 +42,7 @@ ModLoader.register({
 				mirrorU = false
 				mirrorV = false
 				matrix = IDENTITY
-				projected = !!source && source.mode === 'full'
+				projected = false
 				blueprint = baseBlueprint
 				lastCommand = source ? 'bind' : 'clear'
 				sourceRevision += 1
@@ -116,7 +117,7 @@ ModLoader.register({
 			const normalizedMatrix = Object.freeze(matrix.slice())
 			const normalizedPivot = pivot ? Object.freeze(pivot.slice()) : null
 			return Object.freeze({
-				version: '0.4.4',
+				version: '0.4.5',
 				source,
 				blueprint,
 				sourceMode: source?.mode || null,
@@ -226,29 +227,17 @@ ModLoader.register({
 
 		function structureView(value) {
 			if (value.mode === 'structure') return value
-			const entities = value.entities.map(function (entity) {
-				const projectedEntity = {}
-				for (const key of Object.keys(entity || {})) {
-					if (key !== 'state') projectedEntity[key] = entity[key]
-				}
-				return Object.freeze(projectedEntity)
-			})
-			if (!entities.length) return null
-			const summary = projectedSummary(value.summary, entities)
-			return freezeContainer({
-				schemaVersion: Number(value.schemaVersion),
-				mode: 'structure',
-				sourcePlane: Number(value.sourcePlane) ? 1 : 0,
-				anchor: value.anchor,
-				selections: value.selections,
-				emptyCells: Object.freeze([]),
-				contentBounds: contentBoundsFromEntities(entities),
-				includeBlocks: false,
-				entities: Object.freeze(entities),
-				blocks: Object.freeze([]),
-				production: value.production || null,
-				summary
-			})
+			const stateService = globalThis[STATE_KEY]
+			const normalized = typeof stateService?.normalizeBlueprint === 'function'
+				? stateService.normalizeBlueprint(value)
+				: value
+			return freezeContainer(Object.assign({}, normalized, {
+				entities: Object.freeze((normalized.entities || []).map(freezeContainer)),
+				blocks: Object.freeze((normalized.blocks || []).map(freezeContainer)),
+				emptyCells: Object.freeze((normalized.emptyCells || []).map(function (position) {
+					return Object.freeze(position.slice())
+				}))
+			}))
 		}
 
 		function projectedSummary(sourceSummary, entities) {
@@ -313,7 +302,17 @@ ModLoader.register({
 					}))
 				}))
 			})
-			const emptyCells = Number(value.schemaVersion) === 4 && Array.isArray(value.emptyCells)
+			const blocks = (value.blocks || []).map(function (block) {
+				return freezeContainer(Object.assign({}, block, {
+					position: transformPoint(block.position, center, transformMatrix)
+				}))
+			})
+			const supportsEmptyCells = (
+				Number(value.schemaVersion) === 4 && value.mode === 'structure'
+			) || (
+				Number(value.schemaVersion) === 5 && value.mode === 'full'
+			)
+			const emptyCells = supportsEmptyCells && Array.isArray(value.emptyCells)
 				? value.emptyCells.map(function (position) {
 					return transformPoint(position, center, transformMatrix)
 				}).sort(comparePositions)
@@ -325,7 +324,8 @@ ModLoader.register({
 				selections: Object.freeze(selections),
 				emptyCells: Object.freeze(emptyCells),
 				contentBounds,
-				entities: Object.freeze(entities)
+				entities: Object.freeze(entities),
+				blocks: Object.freeze(blocks)
 			}))
 		}
 
@@ -432,10 +432,11 @@ ModLoader.register({
 		function validSource(value) {
 			const schemaVersion = Number(value?.schemaVersion)
 			return !!value &&
-				(schemaVersion === 1 || schemaVersion === 2 || schemaVersion === 3 || schemaVersion === 4) &&
+				(schemaVersion === 1 || schemaVersion === 2 || schemaVersion === 3 || schemaVersion === 4 || schemaVersion === 5) &&
 				(value.mode === 'structure' || value.mode === 'full') &&
 				Array.isArray(value.entities) &&
-				(schemaVersion !== 4 || value.mode !== 'structure' || Array.isArray(value.emptyCells))
+				(schemaVersion !== 4 || value.mode !== 'structure' || Array.isArray(value.emptyCells)) &&
+				(schemaVersion !== 5 || value.mode !== 'full' || Array.isArray(value.emptyCells))
 		}
 
 		function nonNegativeInteger(value, fallback) {

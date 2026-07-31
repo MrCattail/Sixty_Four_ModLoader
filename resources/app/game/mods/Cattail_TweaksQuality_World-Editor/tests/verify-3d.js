@@ -282,7 +282,7 @@ function testRestorationAndBounds() {
 	assert.equal(transform.reset(), false)
 }
 
-function testFullProjectionAndSourceImmutability() {
+function testFullPreservationAndSourceImmutability() {
 	const transform = loadTransform()
 	const source = fixture('full')
 	const before = JSON.stringify(source)
@@ -290,25 +290,26 @@ function testFullProjectionAndSourceImmutability() {
 	let state = transform.snapshot()
 	assert.equal(state.source, source)
 	assert.equal(state.sourceMode, 'full')
-	assert.equal(state.projected, true)
-	assert.equal(state.blueprint.mode, 'structure')
-	assert.equal(state.blueprint.includeBlocks, false)
-	assert.deepEqual(plain(state.blueprint.blocks), [])
-	assert.equal(Object.hasOwn(state.blueprint.entities[0], 'state'), false)
+	assert.equal(state.projected, false)
+	assert.equal(state.blueprint.mode, 'full')
+	assert.equal(state.blueprint.includeBlocks, true)
+	assert.equal(state.blueprint.blocks.length, 1)
+	assert.equal(Object.hasOwn(state.blueprint.entities[0], 'state'), true)
 	assert.equal(state.blueprint.entities[0].config, source.entities[0].config)
 	assert.equal(state.blueprint.entities[0].restricted, source.entities[0].restricted)
 	assert.deepEqual(plain(state.blueprint.contentBounds), {
-		min: [-1, 0],
-		max: [3, 2],
-		width: 5,
-		height: 3
+		min: [-2, -2],
+		max: [7, 2],
+		width: 10,
+		height: 5
 	})
 	assert.deepEqual(plain(state.blueprint.summary.capturedTypes), [
+		{ name: 'cube', reason: 'captured', count: 1 },
 		{ name: 'silo', reason: 'captured', count: 1 },
 		{ name: 'strange1', reason: 'captured', count: 1 }
 	])
-	assert.equal(state.blueprint.summary.blockCount, 0)
-	assert.equal(state.blueprint.summary.skippedCount, 0)
+	assert.equal(state.blueprint.summary.blockCount, 1)
+	assert.equal(state.blueprint.summary.skippedCount, 1)
 	assert.equal(JSON.stringify(source), before)
 
 	transform.rotateClockwise()
@@ -320,7 +321,7 @@ function testFullProjectionAndSourceImmutability() {
 	assert.equal(Object.isFrozen(state.blueprint.entities[0].footprint), true)
 }
 
-function testEmptyProjectionAndLifecycle() {
+function testBlockOnlyFullLifecycle() {
 	const transform = loadTransform()
 	const source = Object.freeze(Object.assign({}, fixture('full'), {
 		entities: Object.freeze([])
@@ -331,11 +332,11 @@ function testEmptyProjectionAndLifecycle() {
 	})
 	assert.equal(transform.bind(source), true)
 	assert.equal(transform.snapshot().source, source)
-	assert.equal(transform.snapshot().blueprint, null)
-	assert.equal(transform.rotateClockwise(), false)
+	assert.equal(transform.snapshot().blueprint.mode, 'full')
+	assert.equal(transform.rotateClockwise(), true)
 	assert.equal(transform.clear(), true)
 	assert.equal(transform.snapshot().source, null)
-	assert.equal(notifications, 3)
+	assert.equal(notifications, 4)
 	stop()
 	assert.equal(transform.dispose(), true)
 	assert.equal(transform.dispose(), false)
@@ -1312,7 +1313,7 @@ function testLocalizationAndIntegrationContract() {
 	]
 
 	assert.equal(i18n.languages.length, 20)
-	assert.equal(i18n.keys.length, 177)
+	assert.equal(i18n.keys.length, 179)
 	for (const language of i18n.languages) {
 		for (const key of transformKeys) {
 			const translated = i18n.t(language, key)
@@ -1321,9 +1322,9 @@ function testLocalizationAndIntegrationContract() {
 		}
 	}
 
-	assert.equal(manifest.version, '0.4.4')
+	assert.equal(manifest.version, '0.4.5')
 	assert.equal(manifest.languageSupport.gameLanguage, true)
-	assert.equal(manifest.entry.length, 30)
+	assert.equal(manifest.entry.length, 31)
 	assert.equal(
 		manifest.entry.indexOf(SHARED_SOURCE),
 		manifest.entry.indexOf('scripts/core/foundation.js') + 1
@@ -1334,7 +1335,7 @@ function testLocalizationAndIntegrationContract() {
 	)
 	assert.equal(
 		manifest.entry.indexOf(TRANSFORM_SOURCE),
-		manifest.entry.indexOf('scripts/core/selection-analysis.js') + 2
+		manifest.entry.indexOf('scripts/core/selection-analysis.js') + 3
 	)
 	assert.equal(
 		manifest.entry.indexOf('scripts/core/blueprint-preview-plan.js'),
@@ -1342,7 +1343,7 @@ function testLocalizationAndIntegrationContract() {
 	)
 
 	assert.match(transformSource, /Symbol\.for\('cattail\.world-editor\.blueprint-transform'\)/)
-	assert.match(transformSource, /version:\s*'0\.4\.4'/)
+	assert.match(transformSource, /version:\s*'0\.4\.5'/)
 	assert.doesNotMatch(transformSource, /requestAnimationFrame|setInterval|onFrame/)
 	assert.doesNotMatch(transformSource, /getEntityString|entityAtCoordinates|stuffMap/)
 	assert.match(previewSource, /FOLLOW_PLAN_IDLE_MS\s*=\s*100/)
@@ -1647,8 +1648,8 @@ async function run() {
 	testPivotAndOrderedMatrixState()
 	testExhaustiveOrderedCommands()
 	testRestorationAndBounds()
-	testFullProjectionAndSourceImmutability()
-	testEmptyProjectionAndLifecycle()
+	testFullPreservationAndSourceImmutability()
+	testBlockOnlyFullLifecycle()
 	testCommandScaleAndSingleNotification()
 	await testCameraTranslationCache()
 	await testIntegrityMetrics()
@@ -1657,7 +1658,7 @@ async function run() {
 	testCardOpacityController()
 	testSharedEditorServices()
 	testLocalizationAndIntegrationContract()
-	console.log('3D verification passed: fixed pivot, ordered D4 normalization, exact restoration, 256-entity command scaling, cached camera translation and compositor geometry, pinned integrity timing with resource-only refresh and structural invalidation, immutable projection, 20-language UI, hidden noncreative controls, hotkeys, card pass-through, and manifest integration.')
+	console.log('3D verification passed: fixed pivot, ordered D4 normalization, exact restoration, 256-entity command scaling, cached camera translation and compositor geometry, pinned integrity timing with resource-only refresh and structural invalidation, immutable full-blueprint preservation, 20-language UI, hidden noncreative controls, hotkeys, card pass-through, and manifest integration.')
 }
 
 run().catch(function (error) {

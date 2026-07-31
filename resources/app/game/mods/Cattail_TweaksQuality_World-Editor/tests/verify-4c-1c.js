@@ -88,7 +88,7 @@ async function testDeleteOnlySyncUndoRedo() {
 	const runtime = loadRuntime({ game })
 	const value = schema4([], [[2, 0]])
 	const plan = await buildPlacementPlan(runtime, value)
-	assert.equal(plan.version, '0.4.4')
+	assert.equal(plan.version, '0.4.5')
 	assert.deepEqual(Array.from(plan.emptyCells[0]), [2, 0])
 	assert.equal(plan.emptyEntities.length, 1)
 
@@ -192,6 +192,82 @@ async function testSnapshotGapResourceDriftUsesLatestAffordableBalance() {
 	runtime.dispose()
 }
 
+async function testPrepareGapResourceDriftUsesLatestAffordableBalance() {
+	const game = createGame()
+	game.seed('silo', [0, 0], { par: { marker: 'prepare-gap' } })
+	const runtime = loadRuntime({ game })
+	const value = schema4([], [[0, 0]])
+	const plan = await buildPlacementPlan(runtime, value)
+	const proposal = runtime.placement.analyze(plan).variants['01']
+	const resourcesAtConfirmation = game.resources.slice()
+	const prepareGapGain = 5
+	const assembleSave = game.assembleSave
+	let assembleCount = 0
+	game.assembleSave = function () {
+		assembleCount += 1
+		if (assembleCount === 2) this.resources[0] += prepareGapGain
+		return assembleSave.apply(this, arguments)
+	}
+
+	const result = await runtime.placement.place({
+		blueprint: value,
+		target: [0, 0],
+		syncEmpty: true,
+		confirmedSignature: proposal.signature,
+		input: 'mouse'
+	})
+	assert.equal(result.executed, true)
+	assert.equal(runtime.snapshotStore.created.length, 1)
+	assert.equal(game.entityAtCoordinates([0, 0]), null)
+	assert.deepEqual(
+		game.resources,
+		resourcesAtConfirmation.map(function (entry, index) {
+			return entry + (index === 0 ? prepareGapGain : 0) + Number(proposal.summary.resourceDelta[index] || 0)
+		})
+	)
+	const resourceRebases = runtime.placement.diagnostics().events.filter(function (entry) {
+		return entry.event === 'adapter.preflight.resources-rebased'
+	})
+	assert.deepEqual(
+		Array.from(resourceRebases, function (entry) { return entry.details.stage }),
+		['pre-snapshot', 'post-snapshot']
+	)
+	runtime.dispose()
+}
+
+async function testUnaffordablePrepareGapIsZeroWrite() {
+	const game = createGame()
+	const runtime = loadRuntime({ game })
+	const value = schema4([{ name: 'silo', position: [0, 0] }], [])
+	const plan = await buildPlacementPlan(runtime, value)
+	const proposal = runtime.placement.analyze(plan).variants['00']
+	const assembleSave = game.assembleSave
+	let assembleCount = 0
+	game.assembleSave = function () {
+		assembleCount += 1
+		if (assembleCount === 2) this.resources.splice(0, this.resources.length, 0, 0)
+		return assembleSave.apply(this, arguments)
+	}
+
+	const result = await runtime.placement.place({
+		blueprint: value,
+		target: [0, 0],
+		confirmedSignature: proposal.signature,
+		input: 'mouse'
+	})
+	assert.equal(result.executed, false)
+	assert.equal(result.error.code, 'INSUFFICIENT_RESOURCES')
+	assert.equal(runtime.snapshotStore.created.length, 0)
+	assert.equal(game.entityAtCoordinates([0, 0]), null)
+	assert.deepEqual(game.stats, { machinesBuild: 0, machinesSold: 0 })
+	assert.equal(runtime.placement.snapshot().canUndo, false)
+	const denied = runtime.placement.diagnostics().events.find(function (entry) {
+		return entry.event === 'adapter.preflight.denied'
+	})
+	assert.equal(denied.details.stage, 'affordability')
+	runtime.dispose()
+}
+
 async function testConflictAndSyncDeduplicateInOneTransaction() {
 	const game = createGame()
 	game.codex.entities.silo.entitySpan = 1
@@ -272,7 +348,7 @@ async function testCreativeSyncHasNoEconomy() {
 	runtime.dispose()
 }
 
-async function testProtectedTargetsAndDriftAreZeroWrite() {
+async function testProtectedTargetsAreZeroWriteAndSafeDriftRebases() {
 	const protectedGame = createGame()
 	protectedGame.seed('cube', [0, 0])
 	const protectedRuntime = loadRuntime({ game: protectedGame })
@@ -309,10 +385,15 @@ async function testProtectedTargetsAndDriftAreZeroWrite() {
 			syncEmpty: true,
 			confirmedSignature: proposal.signature
 		})
-		assert.equal(result.executed, false)
-		assert.equal(result.error.code, 'TARGET_CHANGED')
-		assert.equal(runtime.snapshotStore.created.length, 0)
-		assert.equal(game.entityAtCoordinates([0, 0]).name, 'silo')
+		assert.equal(result.executed, true)
+		assert.equal(runtime.snapshotStore.created.length, 1)
+		assert.equal(game.entityAtCoordinates([0, 0]), null)
+		const undone = await runtime.placement.undo('keyboard')
+		assert.equal(undone.executed, true)
+		assert.equal(
+			game.entityAtCoordinates([0, 0]).marker,
+			kind === 'entity' ? 'after' : 'before'
+		)
 		runtime.dispose()
 	}
 
@@ -336,25 +417,29 @@ async function testProtectedTargetsAndDriftAreZeroWrite() {
 	volatileRuntime.dispose()
 }
 
-async function testConfirmationRefreshUsesCurrentExactSignature() {
-	const game = createGame()
+async function testResourceAndRemovalStateDriftUseStableConfirmation() {
+	const game = createGame({ resources: [1e12, 1e12] })
 	const target = game.seed('silo', [0, 0], { par: { marker: 'before-refresh' } })
 	const runtime = loadRuntime({ game })
 	const value = schema4([], [[0, 0]])
 	const plan = await buildPlacementPlan(runtime, value)
 	const displayedProposal = runtime.placement.analyze(plan).variants['01']
-	game.resources[0] += 1
-	target.par.marker = 'after-refresh'
+	game.resources[0] += 123
 	const refreshedProposal = runtime.placement.analyze(plan).variants['01']
-	assert.notEqual(refreshedProposal.signature, displayedProposal.signature)
+	assert.equal(refreshedProposal.signature, displayedProposal.signature)
+	assert.deepEqual(refreshedProposal.summary.resourceDelta, displayedProposal.summary.resourceDelta)
+	target.par.marker = 'after-refresh'
 	const result = await runtime.placement.place({
 		blueprint: value,
 		target: [0, 0],
 		syncEmpty: true,
-		confirmedSignature: refreshedProposal.signature
+		confirmedSignature: displayedProposal.signature
 	})
 	assert.equal(result.executed, true)
 	assert.equal(game.entityAtCoordinates([0, 0]), null)
+	assert.ok(runtime.placement.diagnostics().events.some(function (entry) {
+		return entry.event === 'adapter.prepare.state-rebased'
+	}))
 	const undone = await runtime.placement.undo('keyboard')
 	assert.equal(undone.executed, true)
 	assert.equal(game.entityAtCoordinates([0, 0]).marker, 'after-refresh')
@@ -475,8 +560,8 @@ function testUiLocalizationDocumentationAndManifestContracts() {
 	const readme = fs.readFileSync(path.join(MOD_ROOT, 'README.md'), 'utf8')
 	const manifest = JSON.parse(fs.readFileSync(path.join(MOD_ROOT, 'mod.json'), 'utf8'))
 
-	assert.equal(manifest.version, '0.4.4')
-	assert.equal(manifest.entry.length, 30)
+	assert.equal(manifest.version, '0.4.5')
+	assert.equal(manifest.entry.length, 31)
 	assert.match(sessionSource, /schemaVersion:\s*4/)
 	assert.match(sessionSource, /emptyCells/)
 	assert.match(sessionSource, /confirmPlacementOptions/)
@@ -492,7 +577,8 @@ function testUiLocalizationDocumentationAndManifestContracts() {
 	assert.doesNotMatch(sessionSource, /analysis\.hasConflicts\s*\|\|\s*analysis\.hasEmptyMask/)
 	assert.match(sessionSource, /markPlacementProbe\('options\.skipped'/)
 	assert.match(sessionSource, /confirmPlacementOptions\(analysis,\s*controller,\s*plan\)/)
-	assert.match(sessionSource, /refreshedAnalysis\s*=\s*placement\.analyze\(plan\)/)
+	assert.match(sessionSource, /await controller\?\.refreshNow\?\.\('placement-options-confirm'\)/)
+	assert.match(sessionSource, /refreshedAnalysis\s*=\s*placement\.analyze\(refreshedPlan\)/)
 	assert.match(sessionSource, /placementConfirmationFingerprint/)
 	assert.match(sessionSource, /options\.reconfirmation-required/)
 	assert.match(previewSource, /setPlacementOverlay/)
@@ -532,10 +618,12 @@ async function run() {
 	await testDeleteOnlySyncUndoRedo()
 	await testEmptyMaskWithoutCoveredTargetSkipsOptions()
 	await testSnapshotGapResourceDriftUsesLatestAffordableBalance()
+	await testPrepareGapResourceDriftUsesLatestAffordableBalance()
+	await testUnaffordablePrepareGapIsZeroWrite()
 	await testConflictAndSyncDeduplicateInOneTransaction()
 	await testCreativeSyncHasNoEconomy()
-	await testProtectedTargetsAndDriftAreZeroWrite()
-	await testConfirmationRefreshUsesCurrentExactSignature()
+	await testProtectedTargetsAreZeroWriteAndSafeDriftRebases()
+	await testResourceAndRemovalStateDriftUseStableConfirmation()
 	await testExtractorInvariantKeepsOneTarget()
 	await testLegacySchemaHasNoEmptySync()
 	testD4EmptyMaskTransformAndExactRestore()

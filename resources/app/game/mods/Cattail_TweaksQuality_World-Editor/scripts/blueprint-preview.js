@@ -7,6 +7,7 @@ ModLoader.register({
 		const TRANSFORM_KEY = Symbol.for('cattail.world-editor.blueprint-transform')
 		const PLAN_KEY = Symbol.for('cattail.world-editor.blueprint-preview-plan')
 		const PLACEMENT_KEY = Symbol.for('cattail.world-editor.blueprint-placement')
+		const CREATIVE_KEY = Symbol.for('cattail.world-editor.creative-mode')
 		const PREVIEW_KEY = Symbol.for('cattail.world-editor.blueprint-preview')
 		const SHARED_KEY = Symbol.for('cattail.world-editor.shared')
 		const RENDER_LAYER_ID = 'world-editor-blueprint-preview'
@@ -54,6 +55,7 @@ ModLoader.register({
 			const transform = globalThis[TRANSFORM_KEY]
 			const planner = globalThis[PLAN_KEY]
 			const placement = globalThis[PLACEMENT_KEY]
+			const creative = globalThis[CREATIVE_KEY]
 			const shared = globalThis[SHARED_KEY]
 			const transformAvailable = !!(
 				transform &&
@@ -111,7 +113,7 @@ ModLoader.register({
 				? transform.snapshot()
 				: Object.freeze({
 					source: currentSession.blueprint || null,
-					blueprint: currentSession.blueprint?.mode === 'structure' ? currentSession.blueprint : null,
+					blueprint: currentSession.blueprint || null,
 					sourceRevision: 0,
 					revision: 0,
 					identity: true
@@ -180,7 +182,7 @@ ModLoader.register({
 			}
 
 			const controller = Object.freeze({
-				version: '0.4.4',
+				version: '0.4.5',
 				game,
 				snapshot,
 				exit,
@@ -222,7 +224,7 @@ ModLoader.register({
 					const planning = await planner.benchmark(settings)
 					const rendering = await benchmarkRendering(settings)
 					const result = {
-						version: '0.4.4',
+						version: '0.4.5',
 						planning,
 						rendering,
 						runtime: performanceSnapshot()
@@ -317,12 +319,7 @@ ModLoader.register({
 					state.blueprint !== previousBlueprint
 				) {
 					handledAttemptId = attemptId
-					if (state.blueprint?.mode === 'structure') {
-						enter(state.blueprint, 'structure-captured')
-					} else {
-						exit('full-blueprint-captured')
-						showWarning('full-unavailable', state.blueprint)
-					}
+					enter(state.blueprint, state.blueprint?.mode === 'full' ? 'full-captured' : 'structure-captured')
 				} else {
 					handledAttemptId = Math.max(handledAttemptId, attemptId)
 				}
@@ -341,7 +338,7 @@ ModLoader.register({
 					return
 				}
 				if (!active || state.sourceRevision !== previousTransform.sourceRevision) {
-					enter(state.blueprint, state.projected ? 'structure-projected' : 'structure-captured')
+					enter(state.blueprint, state.blueprint?.mode === 'full' ? 'full-captured' : 'structure-captured')
 					return
 				}
 				if (state.blueprint !== blueprint) {
@@ -420,7 +417,7 @@ ModLoader.register({
 					!active ||
 					paused ||
 					commandLock ||
-					blueprint?.mode !== 'structure' ||
+					(blueprint?.mode !== 'structure' && blueprint?.mode !== 'full') ||
 					!transformAvailable ||
 					!shouldOwnInput()
 				) {
@@ -509,11 +506,11 @@ ModLoader.register({
 				controller.dispose('runtime-disposed')
 			})
 
-			console.info('[Cattail World Editor] Read-only blueprint preview 3B ready.')
+			console.info('[Cattail World Editor] Structure/full blueprint preview 4D ready.')
 
 			function snapshot() {
 				return Object.freeze({
-					version: '0.4.4',
+					version: '0.4.5',
 					active,
 					pinned,
 					temporaryPinned,
@@ -525,7 +522,7 @@ ModLoader.register({
 					transform: currentTransform,
 					plan,
 					calculating,
-					warning: warning?.code || null,
+					warning: warning?.code || (fullPlacementLocked() ? 'full-unavailable' : null),
 					renderFallbackCount: renderFallbacks.size,
 					guideAction,
 					placementOverlay,
@@ -575,7 +572,11 @@ ModLoader.register({
 			}
 
 			function enter(nextBlueprint, reason) {
-				if (disposed || nextBlueprint?.mode !== 'structure' || !Array.isArray(nextBlueprint.entities)) return false
+				if (
+					disposed ||
+					(nextBlueprint?.mode !== 'structure' && nextBlueprint?.mode !== 'full') ||
+					!Array.isArray(nextBlueprint.entities)
+				) return false
 				setTransformGuide(null, 'preview-entered')
 				clearWarning()
 				clearFollowPlan()
@@ -637,7 +638,7 @@ ModLoader.register({
 			}
 
 			function applyTransformedBlueprint(nextBlueprint, reason) {
-				if (!active || nextBlueprint?.mode !== 'structure') return false
+				if (!active || (nextBlueprint?.mode !== 'structure' && nextBlueprint?.mode !== 'full')) return false
 				clearFollowPlan()
 				planToken += 1
 				clearPlacementOverlay()
@@ -713,7 +714,7 @@ ModLoader.register({
 			}
 
 			function requestPlan(reason, retries) {
-				if (!active || paused || !target || blueprint?.mode !== 'structure') return false
+				if (!active || paused || !target || (blueprint?.mode !== 'structure' && blueprint?.mode !== 'full')) return false
 				clearFollowPlan()
 				const token = ++planToken
 				const requestTarget = target.slice()
@@ -728,7 +729,7 @@ ModLoader.register({
 						chunkSize: 512,
 						includeDynamicConflicts: !!placement,
 						canReplaceEntity: typeof placement?.assessEntity === 'function'
-							? function (entity) { return placement.assessEntity(entity) }
+							? function (entity, details) { return placement.assessEntity(entity, details) }
 							: undefined,
 						isCancelled() {
 							return disposed || token !== planToken || !active
@@ -788,7 +789,15 @@ ModLoader.register({
 
 			async function lockCommandTarget(value, reason) {
 				const next = normalizePosition(value)
-				if (disposed || commandLock || !active || paused || !next || blueprint?.mode !== 'structure') return null
+				if (
+					disposed ||
+					commandLock ||
+					!active ||
+					paused ||
+					!next ||
+					fullPlacementLocked() ||
+					(blueprint?.mode !== 'structure' && blueprint?.mode !== 'full')
+				) return null
 				clearFollowPlan()
 				planToken += 1
 				const id = 'command-' + (++commandSequence)
@@ -842,7 +851,7 @@ ModLoader.register({
 			}
 
 			function scheduleFollowPlan(reason, retries) {
-				if (!active || paused || !target || blueprint?.mode !== 'structure') return false
+				if (!active || paused || !target || (blueprint?.mode !== 'structure' && blueprint?.mode !== 'full')) return false
 				metrics.followSchedules += 1
 				pendingFollowPlan = {
 					reason: reason || 'mouse-follow',
@@ -996,9 +1005,17 @@ ModLoader.register({
 				try {
 					const EntityClass = game.codex?.entities?.[record.name]?.class
 					if (typeof EntityClass !== 'function') return { entity: null, error: 'class-unavailable' }
-					const entity = new EntityClass(game)
+					const entity = record.name === 'cube'
+						? new EntityClass(game, {
+							pump: false,
+							resources: jsonClone(record.state?.resources || [])
+						})
+						: new EntityClass(game)
 					for (const key of Object.keys(record.config || {})) {
 						entity[key] = jsonClone(record.config[key])
+					}
+					for (const key of Object.keys(record.state || {})) {
+						entity[key] = jsonClone(record.state[key])
 					}
 					return { entity, error: null }
 				} catch (error) {
@@ -1973,6 +1990,12 @@ ModLoader.register({
 					!game.splash?.isShown &&
 					!shared.isModLoaderPanelBlocking()
 				)
+			}
+
+			function fullPlacementLocked() {
+				if (blueprint?.mode !== 'full') return false
+				const state = creative?.snapshot?.()
+				return !state?.ready || !state?.creativeMode
 			}
 
 			async function benchmarkRendering(options) {

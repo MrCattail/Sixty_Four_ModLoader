@@ -4,7 +4,7 @@
 
 ## 当前阶段
 
-当前阶段 4C-1c 把新复制或剪切的结构蓝图升级为 schema 4，并记录选区内真正没有实体的空地掩码。放置时统一确认“替换冲突建筑”和“同步蓝图空地”两个默认关闭的独立绿色发光选项；安全拆除、退款和建造合并在同一条蓝图放置事务中。
+当前阶段 4D / v0.4.5 为完整蓝图新增 schema 5：仅在创造模式捕获和放置玩家可见持久状态、稳定 Cube、Waypoint 相对顺序与真正空格；普通模式仍可查看和变换完整蓝图，但放置与 `Ctrl+V` 会锁定。完整蓝图沿用结构蓝图的单一放置事务、双选项确认、Snapshot 和 undo/redo。
 
 ## 不变量
 
@@ -27,9 +27,10 @@ scripts/
     tool-state.js        # 2G：单一选择工具状态和生命周期
     selection-analysis.js # 3F：可取消的分批只读统计与已完成实体只读视图
     production-state.js  # 3F：Dynamic Details 软依赖、选区实际产量刷新与蓝图生产快照
-    blueprint-transform.js # 4C-1c：固定枢轴、有序旋转/镜像、完整蓝图结构投影和 schema 4 空地掩码变换
-    blueprint-preview-plan.js # 4C-1c：四级冲突、空地目标、安全替换分类、Build Plan 成本和合成规划基准
-    blueprint-placement.js # 4C-1c：结构蓝图建造/冲突/空地同步的单事务经济结算、恢复和 undo/redo
+    blueprint-state.js   # 4D：schema 5 状态白名单、运行时字段归一化、旧 schema 3 内存迁移与等价比较
+    blueprint-transform.js # 4D：固定枢轴、有序旋转/镜像、结构/完整蓝图、Cube 与空地掩码变换
+    blueprint-preview-plan.js # 4D：结构/完整状态四级冲突、稳定 Cube、空地目标、安全替换与 Build Plan
+    blueprint-placement.js # 4D：结构/完整蓝图建造、冲突/空地同步、状态恢复、Cube、Waypoint 与 undo/redo
     input-controller.js  # 2G：V / Esc / Backspace、统一手势取消与输入环境保护
   input/
     selection-controller.js # 2F：混合指针手势、最近边/角判定、持久目标锁定和自动提交
@@ -45,8 +46,8 @@ scripts/
     editor-shell.js      # 独立状态栏/工具栏、紧凑/大卡片热切换与横向惯性滚动
     selection-card.js    # 3F：主选区实时统计、右左下上定位、3 秒临时显示和点击锁定
     production-cards.js  # 3F：主卡总产量、选区/蓝图建筑明细副卡与自适应双列
-  blueprint-session.js   # 4C-1c：schema 4 空地捕获、会话蓝图、剪贴板、统一放置选项和蓝图卡片
-  blueprint-preview.js   # 4C-1c：自动预览、空地/拆除/保护叠层、固定输入、旋转过渡和只读渲染基准
+  blueprint-session.js   # 4D：schema 4/5 捕获、创造门控、剪贴板、统一放置选项与蓝图卡片
+  blueprint-preview.js   # 4D：结构/完整状态预览、Cube、空地/拆除/保护叠层、固定输入和只读渲染
 ```
 
 未来模块只在对应小阶段获批后创建，并按 manifest 中的 `entry` 顺序加载。
@@ -571,3 +572,29 @@ globalThis[Symbol.for('cattail.world-editor.transactions')].snapshot()
 ```
 
 4C-1c 不修改原版、ModLoader、Better UIs、其他 Mod、`enabled.json` 或归档旧版，不包含完整蓝图同步空地、完整状态/Cube 恢复、导入界面、打包、发布或提交。
+
+## 4D schema 5 完整蓝图
+
+- 新捕获的完整蓝图使用 schema 5；结构蓝图继续使用 schema 4。旧完整 schema 3 在内存中安全归一化后仍可查看和放置，但不会推断不存在的 `emptyCells`。
+- 完整模式只在创造模式提供捕获和放置。退出创造模式不会删除、降级或改写当前完整蓝图；卡片、预览、旋转和镜像仍可用，并显示“完整蓝图 · 仅创造模式”锁定提示。
+- 状态捕获采用原版 `getEntityString()` 结果的字段级白名单。绝对身份、对象引用、生成对象关系、运行时时间和其他不安全字段不会复制；`spawnedHollows` 等生成计数安全归零，Pump2 运行计时归一化。
+- `Include Cubes` 只捕获和放置 `state === 2` 的稳定 Cube。生长、过渡、爆炸或仍连接 Pump 的活动 Cube 不进入蓝图；目标上的活动 Cube 和带活动 Cube 的 Pump 保持受保护。
+- Hollow、Surge、Mod/未知对象和其他不支持对象会被跳过或保护；它们占据的来源格不会误记为蓝图空地。建筑任一占格碰到选区时按完整建筑捕获并记录跨界数量。
+- Waypoint 不复制绝对时间戳，而是保存蓝图内部相对顺序；每次 forward/redo 放置生成不冲突的新时间戳。undo 恢复操作前目标的最新时间戳和顺序。
+- 完整预览只有类型、占格、配置和全部归一化持久状态均一致时才显示黄色；同类型但状态不同显示红色，不能安全替换的目标显示紫色。
+- schema 5 的 `emptyCells` 只来自真正没有实体的来源格。同步空地默认关闭，并沿用同一个双选项确认框；没有实际红色冲突或可删除空地目标时直接放置，不显示确认框。
+- 完整状态替换、稳定 Cube、同步空地拆除和建造合并到现有单一 `blueprint-placement` 事务。普通生产进度或库存漂移可在物理 Snapshot 后以最新目标状态重定 undo 基线；身份、类型、占格、保护或操作集合变化仍会零写入拒绝或要求重新确认。
+- undo/redo 沿用现有工具栏和 history，记录名为 `Full blueprint placement`。undo 恢复最新目标状态，redo 恢复归一化蓝图副本；当前蓝图、变换、固定和卡片状态不被历史操作清除。
+- 默认 Console 保持静默；`diagnostics()` 的最近 200 条内存事件会额外记录 mode/schema、完整状态差异、稳定 Cube、归一化数量、状态重定基线和失败阶段。
+
+开发者控制台可检查：
+
+```js
+globalThis[Symbol.for('cattail.world-editor.blueprint-state')]
+globalThis[Symbol.for('cattail.world-editor.blueprint')].snapshot()
+globalThis[Symbol.for('cattail.world-editor.blueprint-preview')].snapshot()
+globalThis[Symbol.for('cattail.world-editor.blueprint-placement')].diagnostics()
+globalThis[Symbol.for('cattail.world-editor.transactions')].snapshot()
+```
+
+自动验证入口为 `node tests/verify-4d.js`，并须同时通过全部旧 World Editor 回归。自动门禁不能代替真实游戏内三批验收。4D 不修改原版、ModLoader、Better UIs、其他 Mod、`enabled.json` 或归档旧版，也不包含导入界面、持久蓝图库、打包、发布或提交。

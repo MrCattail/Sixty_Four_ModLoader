@@ -5,6 +5,7 @@ const vm = require('node:vm')
 
 const MOD_ROOT = path.resolve(__dirname, '..')
 const TRANSACTION_SOURCE = 'scripts/core/editor-transactions.js'
+const STATE_SOURCE = 'scripts/core/blueprint-state.js'
 const PLAN_SOURCE = 'scripts/core/blueprint-preview-plan.js'
 const PLACEMENT_SOURCE = 'scripts/core/blueprint-placement.js'
 const DIALOG_SOURCE = 'scripts/ui/dialog.js'
@@ -308,7 +309,7 @@ function loadRuntime(options = {}) {
 	}
 	sandbox.globalThis = sandbox
 	vm.createContext(sandbox)
-	for (const relativePath of [TRANSACTION_SOURCE, PLAN_SOURCE, PLACEMENT_SOURCE]) {
+	for (const relativePath of [TRANSACTION_SOURCE, STATE_SOURCE, PLAN_SOURCE, PLACEMENT_SOURCE]) {
 		vm.runInContext(source(relativePath), sandbox, { filename: relativePath })
 	}
 	const api = {
@@ -430,7 +431,7 @@ function loadPreviewRuntime() {
 			const retry = key === retryTarget && !retryIssued
 			if (retry) retryIssued = true
 			return Promise.resolve({
-				version: '0.4.4',
+				version: '0.4.5',
 				target: normalizedTarget,
 				records: [],
 				statusCounts: {
@@ -597,8 +598,8 @@ function keyEvent(code, key) {
 
 async function testInitializationAndBasicHistory() {
 	const runtime = loadRuntime()
-	assert.equal(runtime.placement.version, '1.1.0')
-	assert.equal(runtime.placement.snapshot().version, '1.1.0')
+	assert.equal(runtime.placement.version, '1.2.0')
+	assert.equal(runtime.placement.snapshot().version, '1.2.0')
 	assert.equal(runtime.placement.snapshot().ready, true)
 	assert.deepEqual(
 		Array.from(runtime.transactions.snapshot().registeredKinds),
@@ -935,13 +936,15 @@ async function testPostSnapshotReplacementStateRevalidation() {
 		target: [72, 72],
 		replaceConflicts: true
 	})
-	assert.equal(result.executed, false)
-	assert.equal(result.error.code, 'EXTERNAL_CHANGE')
+	assert.equal(result.executed, true)
 	assert.equal(runtime.snapshotStore.created.length, 1)
-	assert.equal(runtime.game.entityAtCoordinates([72, 72]), conflict)
-	assert.equal(conflict.par.marker, 'changed-during-snapshot')
+	assert.equal(runtime.game.entityAtCoordinates([72, 72]).name, 'silo')
+	assert.equal(runtime.transactions.snapshot().undoCount, 1)
+	const undone = await runtime.placement.undo('keyboard')
+	assert.equal(undone.executed, true)
+	assert.equal(runtime.game.entityAtCoordinates([72, 72]).name, 'pinhole')
+	assert.equal(runtime.game.entityAtCoordinates([72, 72]).marker, 'changed-during-snapshot')
 	assert.deepEqual(runtime.game.resources, beforeResources)
-	assert.equal(runtime.transactions.snapshot().undoCount, 0)
 	runtime.dispose()
 }
 
@@ -1122,8 +1125,8 @@ async function testPreviewCommandLockLifecycle() {
 
 function testStaticUiLocalizationAndManifestContracts() {
 	const manifest = JSON.parse(source('mod.json'))
-	assert.equal(manifest.version, '0.4.4')
-	assert.equal(manifest.entry.length, 30)
+	assert.equal(manifest.version, '0.4.5')
+	assert.equal(manifest.entry.length, 31)
 	assert.ok(manifest.entry.indexOf(PLACEMENT_SOURCE) > manifest.entry.indexOf(PLAN_SOURCE))
 	assert.ok(manifest.entry.indexOf(PLACEMENT_SOURCE) < manifest.entry.indexOf('scripts/core/input-controller.js'))
 	assert.ok(manifest.entry.indexOf(DIALOG_SOURCE) > manifest.entry.indexOf('scripts/ui/card-opacity.js'))

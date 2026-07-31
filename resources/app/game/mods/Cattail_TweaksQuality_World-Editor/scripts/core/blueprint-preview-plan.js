@@ -2,6 +2,7 @@ ModLoader.register({
 	id: 'Cattail_TweaksQuality_World-Editor',
 	init() {
 		const PLAN_KEY = Symbol.for('cattail.world-editor.blueprint-preview-plan')
+		const STATE_KEY = Symbol.for('cattail.world-editor.blueprint-state')
 		const DEFAULT_CHUNK_SIZE = 512
 		const STATUS = Object.freeze({
 			BUILDABLE: 'buildable',
@@ -21,7 +22,7 @@ ModLoader.register({
 
 		let disposed = false
 		const planner = Object.freeze({
-			version: '0.4.4',
+			version: '0.4.5',
 			status: STATUS,
 			statusPriority: STATUS_PRIORITY,
 			async build(game, blueprint, target, options) {
@@ -57,6 +58,10 @@ ModLoader.register({
 		})
 
 		async function buildPlan(game, blueprint, target, options) {
+			const stateService = globalThis[STATE_KEY]
+			if (blueprint?.mode === 'full' && typeof stateService?.normalizeBlueprint === 'function') {
+				blueprint = stateService.normalizeBlueprint(blueprint)
+			}
 			validateRoot(game, blueprint, target)
 			const chunkSize = positiveInteger(options.chunkSize, DEFAULT_CHUNK_SIZE)
 			const isCancelled = typeof options.isCancelled === 'function' ? options.isCancelled : function () { return false }
@@ -68,11 +73,31 @@ ModLoader.register({
 			const relevantNames = new Set()
 			let processedCells = 0
 
-			for (let index = 0; index < blueprint.entities.length; index += 1) {
+			const sourceRecords = blueprint.entities.concat(
+				(blueprint.blocks || []).map(function (block) {
+					return Object.assign({}, block, {
+						kind: 'cube',
+						footprint: {
+							span: 0,
+							min: block.position,
+							max: block.position
+						},
+						restricted: { onlyOne: false },
+						config: {}
+					})
+				})
+			)
+			const waypointOrders = currentWaypointOrders(game, blueprint, normalizedTarget)
+			for (let index = 0; index < sourceRecords.length; index += 1) {
 				if (isCancelled()) throw planError('plan-cancelled')
-				const source = blueprint.entities[index]
+				const source = sourceRecords[index]
 				const relativePosition = normalizePosition(source?.position)
-				if (!source || source.kind !== 'entity' || !safeName(source.name) || !relativePosition) {
+				if (
+					!source ||
+					(source.kind !== 'entity' && source.kind !== 'cube') ||
+					!safeName(source.name) ||
+					!relativePosition
+				) {
 					throw planError('invalid-blueprint-entity')
 				}
 				const name = safeName(source.name)
@@ -98,7 +123,10 @@ ModLoader.register({
 					position,
 					footprint,
 					Array.from(conflicts),
-					options
+					Object.assign({}, options, {
+						blueprintMode: blueprint.mode,
+						waypointOrder: waypointOrders.get(source)
+					})
 				)
 				if (classification.status === STATUS.CONFLICT) {
 					for (const entity of conflicts) {
@@ -114,6 +142,9 @@ ModLoader.register({
 					position,
 					footprint,
 					config: jsonClone(source.config || {}),
+					state: jsonClone(source.state || {}),
+					stateMeta: jsonClone(source.stateMeta || {}),
+					sourceKind: source.kind,
 					restricted: jsonClone(source.restricted || {}),
 					status: classification.status,
 					reason: classification.reason,
@@ -121,7 +152,10 @@ ModLoader.register({
 				})
 			}
 
-			if (Number(blueprint.schemaVersion) === 4) {
+			if (
+				(Number(blueprint.schemaVersion) === 4 && blueprint.mode === 'structure') ||
+				(Number(blueprint.schemaVersion) === 5 && blueprint.mode === 'full')
+			) {
 				const seenEmptyCells = new Set()
 				for (const relativeValue of blueprint.emptyCells || []) {
 					if (isCancelled()) throw planError('plan-cancelled')
@@ -148,7 +182,10 @@ ModLoader.register({
 			const statusCounts = countStatuses(records)
 			const cost = simulateCost(game, records, guard)
 			return {
-				version: '0.4.4',
+				version: '0.4.5',
+				mode: blueprint.mode,
+				schemaVersion: Number(blueprint.schemaVersion),
+				normalization: jsonClone(blueprint.summary || {}),
 				sourcePlane: Number(blueprint.sourcePlane) ? 1 : 0,
 				target: normalizedTarget,
 				bounds: targetBounds(blueprint.contentBounds, normalizedTarget, records, emptyCells),
@@ -166,8 +203,10 @@ ModLoader.register({
 			const schemaVersion = Number(blueprint?.schemaVersion)
 			if (
 				!blueprint ||
-				(schemaVersion !== 1 && schemaVersion !== 2 && schemaVersion !== 3 && schemaVersion !== 4) ||
-				blueprint.mode !== 'structure'
+				(schemaVersion !== 1 && schemaVersion !== 2 && schemaVersion !== 3 && schemaVersion !== 4 && schemaVersion !== 5) ||
+				(blueprint.mode !== 'structure' && blueprint.mode !== 'full') ||
+				(blueprint.mode === 'structure' && schemaVersion === 5) ||
+				(blueprint.mode === 'full' && schemaVersion !== 3 && schemaVersion !== 5)
 			) {
 				throw planError('structure-blueprint-required')
 			}
@@ -175,7 +214,8 @@ ModLoader.register({
 				!Array.isArray(blueprint.entities) ||
 				(
 					!blueprint.entities.length &&
-					!(schemaVersion === 4 && Array.isArray(blueprint.emptyCells) && blueprint.emptyCells.length)
+					!((schemaVersion === 4 || schemaVersion === 5) && Array.isArray(blueprint.emptyCells) && blueprint.emptyCells.length) &&
+					!(blueprint.mode === 'full' && Array.isArray(blueprint.blocks) && blueprint.blocks.length)
 				)
 			) {
 				throw planError('blueprint-empty')
@@ -183,19 +223,40 @@ ModLoader.register({
 			if (schemaVersion === 4 && !Array.isArray(blueprint.emptyCells)) {
 				throw planError('blueprint-empty-mask-missing')
 			}
+			if (schemaVersion === 5 && !Array.isArray(blueprint.emptyCells)) {
+				throw planError('blueprint-empty-mask-missing')
+			}
 			if (!normalizePosition(target)) throw planError('target-invalid')
 		}
 
 		function classifyRecord(game, source, name, position, footprint, conflicts, options) {
 			const definition = game.codex?.entities?.[name]
-			if (!definition || definition.canPurchase !== true) {
+			const isCube = source.kind === 'cube' && name === 'cube'
+			if (!isCube && (!definition || definition.canPurchase !== true)) {
 				return { status: STATUS.BLOCKED, reason: 'unsupported' }
 			}
-			const exact = conflicts.length === 1 && exactStructureMatch(conflicts[0], source, name, position, footprint)
+			const exact = conflicts.length === 1 && exactBlueprintMatch(
+				game,
+				conflicts[0],
+				source,
+				name,
+				position,
+				footprint,
+				options
+			)
 			if (exact) return { status: STATUS.SATISFIED, reason: 'matched' }
 			if (
+				isCube &&
 				conflicts.some(function (entity) {
-					return entity?.indestructible === true || safeName(entity?.name) === 'cube'
+					return safeName(entity?.name) === 'cube' && Number(entity?.state) !== 2
+				})
+			) {
+				return { status: STATUS.BLOCKED, reason: 'unstable-cube' }
+			}
+			if (
+				conflicts.some(function (entity) {
+					return entity?.indestructible === true ||
+						(safeName(entity?.name) === 'cube' && !isCube)
 				})
 			) {
 				return { status: STATUS.BLOCKED, reason: 'indestructible' }
@@ -205,7 +266,10 @@ ModLoader.register({
 				typeof options?.canReplaceEntity === 'function' &&
 				conflicts.some(function (entity) {
 					try {
-						const assessment = options.canReplaceEntity(entity)
+						const assessment = options.canReplaceEntity(entity, {
+							blueprintMode: options.blueprintMode,
+							sourceKind: source.kind
+						})
 						return assessment === false || assessment?.safe === false
 					} catch (error) {
 						return true
@@ -214,16 +278,19 @@ ModLoader.register({
 			) {
 				return { status: STATUS.BLOCKED, reason: 'unsafe-replacement' }
 			}
-			if (source.restricted?.onlyOne === true || definition.onlyone === true) {
+			if (source.restricted?.onlyOne === true || definition?.onlyone === true) {
 				if (game.onlyones?.[name] || Number(game.entitiesInGame?.[name]) > 0) {
-					return { status: STATUS.BLOCKED, reason: 'only-one' }
+					const replacesSameOnlyOne = conflicts.some(function (entity) {
+						return safeName(entity?.name) === name
+					})
+					if (!replacesSameOnlyOne) return { status: STATUS.BLOCKED, reason: 'only-one' }
 				}
 			}
 			if (conflicts.length) return { status: STATUS.CONFLICT, reason: 'occupied' }
 			return { status: STATUS.BUILDABLE, reason: 'empty' }
 		}
 
-		function exactStructureMatch(entity, source, name, position, footprint) {
+		function exactBlueprintMatch(game, entity, source, name, position, footprint, options) {
 			if (!entity || safeName(entity.name) !== name) return false
 			const existingPosition = normalizePosition(entity.position)
 			if (!existingPosition || !samePosition(existingPosition, position)) return false
@@ -236,7 +303,38 @@ ModLoader.register({
 			) {
 				return false
 			}
-			return sameConfig(source.config || {}, readStructureConfig(entity, source.config || {}))
+			if (!sameConfig(source.config || {}, readStructureConfig(entity, source.config || {}))) return false
+			if (options?.blueprintMode !== 'full') return true
+			const stateService = globalThis[STATE_KEY]
+			const currentSave = stateService?.capture?.(game, entity)
+			if (!currentSave || !stateService?.sameState?.(source.state || {}, currentSave.par || {})) return false
+			if (name === 'waypoint' || name === 'waypoint2') {
+				return Number(source.stateMeta?.waypointOrder) === Number(options?.waypointOrder)
+			}
+			return true
+		}
+
+		function currentWaypointOrders(game, blueprint, target) {
+			const result = new Map()
+			if (blueprint?.mode !== 'full') return result
+			const matches = []
+			for (const source of blueprint.entities || []) {
+				if (source?.name !== 'waypoint' && source?.name !== 'waypoint2') continue
+				const relative = normalizePosition(source.position)
+				if (!relative) continue
+				const entity = planningEntityAt(game, addPosition(target, relative))
+				if (!entity || safeName(entity.name) !== safeName(source.name)) continue
+				matches.push({
+					source,
+					timestamp: finiteOr(entity.timestamp, Number.MAX_SAFE_INTEGER)
+				})
+			}
+			matches.sort(function (left, right) {
+				return left.timestamp - right.timestamp
+			}).forEach(function (entry, order) {
+				result.set(entry.source, order)
+			})
+			return result
 		}
 
 		function readStructureConfig(entity, template) {
@@ -345,7 +443,7 @@ ModLoader.register({
 			const errors = []
 			const typeCosts = new Map()
 			const builds = records.filter(function (record) {
-				return record.status === STATUS.BUILDABLE
+				return record.status === STATUS.BUILDABLE && record.name !== 'cube'
 			}).sort(compareRecords)
 			for (const record of builds) {
 				let typeCost = typeCosts.get(record.name)
@@ -615,7 +713,7 @@ ModLoader.register({
 				})
 			}
 			return {
-				version: '0.4.4',
+				version: '0.4.5',
 				kind: 'synthetic-plan',
 				results
 			}
@@ -675,6 +773,6 @@ ModLoader.register({
 			return Math.round(sorted[index] * 1000) / 1000
 		}
 
-		console.info('[Cattail World Editor] Read-only blueprint preview planner 3B ready.')
+		console.info('[Cattail World Editor] Structure/full blueprint preview planner 4D ready.')
 	}
 })

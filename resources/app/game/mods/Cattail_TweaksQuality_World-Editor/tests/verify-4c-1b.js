@@ -402,9 +402,9 @@ function testI18nManifestUiAndBoundaries() {
 		'blueprintCutCopiedOnly',
 		'blueprintCutFailed'
 	]
-	assert.equal(i18n.version, '0.4.4')
+	assert.equal(i18n.version, '0.4.5')
 	assert.equal(i18n.languages.length, 20)
-	assert.equal(i18n.keys.length, 177)
+	assert.equal(i18n.keys.length, 179)
 	for (const language of i18n.languages) {
 		for (const key of keys) {
 			const value = i18n.t(language, key)
@@ -414,8 +414,8 @@ function testI18nManifestUiAndBoundaries() {
 	}
 
 	const manifest = JSON.parse(source('mod.json'))
-	assert.equal(manifest.version, '0.4.4')
-	assert.equal(manifest.entry.length, 30)
+	assert.equal(manifest.version, '0.4.5')
+	assert.equal(manifest.entry.length, 31)
 	for (const entry of [CUT_SOURCE, CUT_UI_SOURCE]) assert.ok(manifest.entry.includes(entry))
 	const blueprintIndex = manifest.entry.indexOf(BLUEPRINT_SOURCE)
 	const cutIndex = manifest.entry.indexOf(CUT_SOURCE)

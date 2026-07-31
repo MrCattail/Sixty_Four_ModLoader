@@ -430,8 +430,8 @@ function testSchemaThreeProductionPreservation() {
 	assert.equal(transform.bind(blueprint, '3f-test'), true)
 	assert.equal(transform.snapshot().source, blueprint)
 	assert.equal(transform.snapshot().blueprint.production, production)
-	assert.equal(transform.snapshot().projected, true)
-	assert.equal(transform.snapshot().blueprint.mode, 'structure')
+	assert.equal(transform.snapshot().projected, false)
+	assert.equal(transform.snapshot().blueprint.mode, 'full')
 	assert.equal(transform.rotateClockwise('3f-test'), true)
 	assert.equal(transform.snapshot().blueprint.production, production)
 	transform.dispose('3f-test')
@@ -455,9 +455,9 @@ function loadI18n() {
 
 function testManifestLocalizationUiAndReadOnlyContracts() {
 	const manifest = JSON.parse(fs.readFileSync(path.join(MOD_ROOT, 'mod.json'), 'utf8'))
-	assert.equal(manifest.version, '0.4.4')
+	assert.equal(manifest.version, '0.4.5')
 	assert.equal(manifest.languageSupport.gameLanguage, true)
-	assert.equal(manifest.entry.length, 30)
+	assert.equal(manifest.entry.length, 31)
 	assert.equal(
 		manifest.entry.indexOf(SHARED_SOURCE),
 		manifest.entry.indexOf('scripts/core/foundation.js') + 1
@@ -490,9 +490,9 @@ function testManifestLocalizationUiAndReadOnlyContracts() {
 		'productionHide',
 		'productionPumpMining'
 	]
-	assert.equal(i18n.version, '0.4.4')
+	assert.equal(i18n.version, '0.4.5')
 	assert.equal(i18n.languages.length, 20)
-	assert.equal(i18n.keys.length, 177)
+	assert.equal(i18n.keys.length, 179)
 	for (const language of i18n.languages) {
 		for (const key of productionKeys) {
 			const translated = i18n.t(language, key)
@@ -518,10 +518,10 @@ function testManifestLocalizationUiAndReadOnlyContracts() {
 	assert.match(productionSource, /const REFRESH_MS = 1000/)
 	assert.match(productionSource, /deepFreeze/)
 	assert.match(analysisSource, /entities\(\)\s*\{\s*return current\.status === 'ready' \? currentEntities\.slice\(\) : \[\]/)
-	assert.match(sessionSource, /schemaVersion:\s*captureMode === 'structure' \? 4 : 3/)
+	assert.match(sessionSource, /schemaVersion:\s*captureMode === 'structure' \? 4 : 5/)
 	assert.match(sessionSource, /productionState\.captureEntities\(capturedEntities\)/)
 	assert.match(sessionSource, /production,\s*\n/)
-	assert.match(transformSource, /production:\s*value\.production \|\| null/)
+	assert.match(transformSource, /return freezeContainer\(Object\.assign\(\{\}, normalized/)
 	assert.match(transformSource, /schemaVersion\) === 4/)
 	assert.match(plannerSource, /schemaVersion !== 4/)
 	assert.match(cardsSource, /UNIT_NAMES = Object\.freeze\(\['s', 'min', 'hr'\]\)/)

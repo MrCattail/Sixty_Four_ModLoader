@@ -4113,6 +4113,28 @@ ModLoader.register({
 				placementNothingToBuild: '此目標位置沒有需要建造的內容。'
 			}
 		}
+		const FULL_BLUEPRINT_TEXT = {
+			en: {
+				previewFullUnavailable: 'Full blueprint · Creative Mode only; preview remains available',
+				placementOptionsTitleFull: 'Place full blueprint?',
+				blueprintFullSummary: 'Stable Cubes {cubes} · empty cells {empty} · normalized {normalized}'
+			},
+			sch: {
+				previewFullUnavailable: '完整蓝图 · 仅创造模式可放置；预览仍可用',
+				placementOptionsTitleFull: '放置完整蓝图？',
+				blueprintFullSummary: '稳定 Cube {cubes} · 空格 {empty} · 已归一化 {normalized}'
+			},
+			modsch: {
+				previewFullUnavailable: '完整蓝图 · 仅创造模式可放置；预览仍可用',
+				placementOptionsTitleFull: '放置完整蓝图？',
+				blueprintFullSummary: '稳定 Cube {cubes} · 空格 {empty} · 已归一化 {normalized}'
+			},
+			tch: {
+				previewFullUnavailable: '完整藍圖 · 僅創造模式可放置；預覽仍可用',
+				placementOptionsTitleFull: '放置完整藍圖？',
+				blueprintFullSummary: '穩定 Cube {cubes} · 空格 {empty} · 已正規化 {normalized}'
+			}
+		}
 		for (const language of Object.keys(TEXT)) {
 			Object.assign(
 				TEXT[language],
@@ -4127,7 +4149,8 @@ ModLoader.register({
 				HISTORY_TEXT[language] || HISTORY_TEXT.en,
 				DELETE_TEXT[language],
 				CUT_TEXT[language] || CUT_TEXT.en,
-				PLACEMENT_TEXT[language] || PLACEMENT_TEXT.en
+				PLACEMENT_TEXT[language] || PLACEMENT_TEXT.en,
+				FULL_BLUEPRINT_TEXT[language] || FULL_BLUEPRINT_TEXT.en
 			)
 		}
 		const LANGUAGES = Object.freeze(Object.keys(TEXT))
@@ -4152,7 +4175,7 @@ ModLoader.register({
 		Object.freeze(TEXT)
 
 		const i18n = Object.freeze({
-			version: '0.4.4',
+			version: '0.4.5',
 			languages: LANGUAGES,
 			keys: KEYS,
 			toolbarKeys: TOOLBAR_KEYS,

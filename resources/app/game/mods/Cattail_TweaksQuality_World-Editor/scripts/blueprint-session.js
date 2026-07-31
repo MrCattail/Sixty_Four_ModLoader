@@ -7,6 +7,7 @@ ModLoader.register({
 		const I18N_KEY = Symbol.for('cattail.world-editor.i18n')
 		const BLUEPRINT_KEY = Symbol.for('cattail.world-editor.blueprint')
 		const PRODUCTION_KEY = Symbol.for('cattail.world-editor.production')
+		const BLUEPRINT_STATE_KEY = Symbol.for('cattail.world-editor.blueprint-state')
 		const TRANSFORM_KEY = Symbol.for('cattail.world-editor.blueprint-transform')
 		const PREVIEW_KEY = Symbol.for('cattail.world-editor.blueprint-preview')
 		const PLACEMENT_KEY = Symbol.for('cattail.world-editor.blueprint-placement')
@@ -148,9 +149,6 @@ ModLoader.register({
 			let currentPreview = null
 			let previewController = null
 			let stopPreviewSubscription = null
-			let projectedDisplayResult = null
-			let projectedDisplayBlueprint = null
-			let projectedDisplayValue = null
 			let ui = null
 			let stopRenderFrame = null
 			let gameHudHidden = false
@@ -259,7 +257,7 @@ ModLoader.register({
 						target &&
 						state?.active &&
 						!state.paused &&
-						currentTransform?.blueprint?.mode === 'structure' &&
+						blueprintPlacementAllowed(currentTransform?.blueprint) &&
 						typeof previewController?.lockCommandTarget === 'function'
 					) {
 						consume(event)
@@ -400,7 +398,7 @@ ModLoader.register({
 
 				function snapshot() {
 					return Object.freeze({
-						version: '0.4.4',
+						version: '0.4.5',
 						mode,
 						includeBlocks: mode === 'full' && includeBlocks,
 						blueprint,
@@ -620,7 +618,7 @@ ModLoader.register({
 				}
 
 				const session = Object.freeze({
-					version: '0.4.4',
+					version: '0.4.5',
 					game: sessionGame,
 					schemaVersion: 4,
 					snapshot,
@@ -877,6 +875,7 @@ ModLoader.register({
 			}
 
 			async function buildBlueprint(selectionState, source, captureMode, captureBlocks, isCancelled) {
+				const blueprintState = globalThis[BLUEPRINT_STATE_KEY]
 				const ranges = normalizeSelections(selectionState.selections, source.sourcePlane, source.anchor)
 				const uniqueCells = new Set()
 				const emptyCells = new Map()
@@ -912,7 +911,9 @@ ModLoader.register({
 				const blockRecords = []
 				const skipped = new Map()
 				let crossBoundaryCount = 0
+				let normalizedCount = 0
 				let contentBounds = null
+				const waypointRecords = []
 				for (const entity of foundEntities) {
 					if (isCancelled()) throw new Error('capture-cancelled')
 					const name = safeEntityName(entity)
@@ -933,7 +934,10 @@ ModLoader.register({
 						}
 						let saved
 						try {
-							saved = cloneEntitySave(game.getEntityString(entity))
+							const rawSave = cloneEntitySave(game.getEntityString(entity))
+							const detail = blueprintState?.normalizeSaveDetailed?.(rawSave)
+							saved = detail?.save || rawSave
+							if (detail?.changed) normalizedCount += 1
 						} catch (error) {
 							addTypeCount(skipped, name, 'unserializable')
 							continue
@@ -986,8 +990,13 @@ ModLoader.register({
 					}
 					if (captureMode === 'full') {
 						let saved
+						let rawTimestamp = null
 						try {
-							saved = cloneEntitySave(game.getEntityString(entity))
+							const rawSave = cloneEntitySave(game.getEntityString(entity))
+							rawTimestamp = Number(rawSave?.par?.timestamp)
+							const detail = blueprintState?.normalizeSaveDetailed?.(rawSave)
+							saved = detail?.save || rawSave
+							if (detail?.changed) normalizedCount += 1
 						} catch (error) {
 							addTypeCount(skipped, name, 'unserializable')
 							continue
@@ -997,6 +1006,12 @@ ModLoader.register({
 							continue
 						}
 						record.state = saved.par
+						if (name === 'waypoint' || name === 'waypoint2') {
+							waypointRecords.push({
+								record,
+								timestamp: Number.isFinite(rawTimestamp) ? rawTimestamp : Number.MAX_SAFE_INTEGER
+							})
+						}
 					}
 					entityRecords.push(record)
 					capturedEntities.push(entity)
@@ -1006,13 +1021,17 @@ ModLoader.register({
 
 				sortRecords(entityRecords)
 				sortRecords(blockRecords)
-				const normalizedEmptyCells = captureMode === 'structure'
-					? Array.from(emptyCells.values()).sort(comparePositions)
-					: []
+				waypointRecords.sort(function (left, right) {
+					return left.timestamp - right.timestamp ||
+						comparePositions(left.record.position, right.record.position)
+				}).forEach(function (entry, order) {
+					entry.record.stateMeta = { waypointOrder: order }
+				})
+				const normalizedEmptyCells = Array.from(emptyCells.values()).sort(comparePositions)
 				if (
 					!entityRecords.length &&
 					!blockRecords.length &&
-					!(captureMode === 'structure' && normalizedEmptyCells.length)
+					!normalizedEmptyCells.length
 				) {
 					return {
 						blueprint: null,
@@ -1037,13 +1056,15 @@ ModLoader.register({
 					crossBoundaryCount,
 					skipped
 				)
+				summary.normalizedCount = normalizedCount
+				summary.emptyCellCount = normalizedEmptyCells.length
 				const productionState = globalThis[PRODUCTION_KEY]
 				const production = typeof productionState?.captureEntities === 'function'
 					? productionState.captureEntities(capturedEntities)
 					: null
 				return {
 					blueprint: {
-						schemaVersion: captureMode === 'structure' ? 4 : 3,
+						schemaVersion: captureMode === 'structure' ? 4 : 5,
 						mode: captureMode,
 						sourcePlane: source.sourcePlane,
 						anchor: {
@@ -1051,7 +1072,7 @@ ModLoader.register({
 							selectionIds: source.selectionIds
 						},
 						selections: ranges.relative,
-						...(captureMode === 'structure' ? { emptyCells: normalizedEmptyCells } : {}),
+						emptyCells: normalizedEmptyCells,
 						contentBounds: relativeBounds(contentBounds, source.anchor),
 						includeBlocks: captureMode === 'full' && captureBlocks,
 						entities: entityRecords,
@@ -1670,28 +1691,7 @@ ModLoader.register({
 
 			function displayResult() {
 				const result = currentSession.lastResult
-				if (!result || result.mode !== 'full') return result
-				const projectedBlueprint = currentTransform?.source === currentSession.blueprint
-					? currentTransform.blueprint
-					: null
-				if (!projectedBlueprint || projectedBlueprint.mode !== 'structure') return null
-				if (
-					result === projectedDisplayResult &&
-					projectedBlueprint === projectedDisplayBlueprint
-				) {
-					return projectedDisplayValue
-				}
-				const summary = projectedBlueprint.summary || result.summary
-				projectedDisplayResult = result
-				projectedDisplayBlueprint = projectedBlueprint
-				projectedDisplayValue = Object.assign({}, result, {
-					mode: 'structure',
-					includeBlocks: false,
-					summary,
-					capturedTypes: summary?.capturedTypes || [],
-					skippedTypes: summary?.skippedTypes || []
-				})
-				return projectedDisplayValue
+				return result || null
 			}
 
 			function refreshTransformText(languageGame) {
@@ -1730,7 +1730,7 @@ ModLoader.register({
 				const previewState = previewSnapshot()
 				const available = !!(
 					transformAvailable &&
-					currentTransform?.blueprint?.mode === 'structure' &&
+					(currentTransform?.blueprint?.mode === 'structure' || currentTransform?.blueprint?.mode === 'full') &&
 					previewState?.active &&
 					!previewState.paused
 				)
@@ -1856,7 +1856,7 @@ ModLoader.register({
 					!previewState.paused &&
 					!previewState.calculating &&
 					previewState.plan &&
-					currentTransform?.blueprint?.mode === 'structure' &&
+					blueprintPlacementAllowed(currentTransform?.blueprint) &&
 					(possibleBuilds > 0 || possibleEmptySync > 0)
 				)
 				if (button) button.disabled = !available
@@ -1944,7 +1944,11 @@ ModLoader.register({
 				if (state?.active) {
 					hints.push(i18n.t(game, 'previewExitHint'))
 					if (!state.pinned) hints.push(i18n.t(game, 'previewTemporaryPinHint'))
-					hints.push(i18n.t(game, 'placementCtrlVHint'))
+					if (blueprintPlacementAllowed(currentTransform?.blueprint)) {
+						hints.push(i18n.t(game, 'placementCtrlVHint'))
+					} else if (currentTransform?.blueprint?.mode === 'full') {
+						hints.push(i18n.t(game, 'previewFullUnavailable'))
+					}
 				}
 				hints.push(i18n.t(game, cardPinnedState() ? 'cardUnpinAction' : 'cardPinAction'))
 				return hints.join(' · ')
@@ -1973,7 +1977,13 @@ ModLoader.register({
 				if (result.cutStatus === 'success') return i18n.t(game, 'blueprintCutSuccess')
 				if (result.cutStatus === 'copied-only') return i18n.t(game, 'blueprintCutCopiedOnly')
 				if (result.cutStatus === 'failed') return i18n.t(game, 'blueprintCutFailed')
-				return i18n.t(game, 'blueprintClipboardReady')
+				const ready = i18n.t(game, 'blueprintClipboardReady')
+				if (result.mode !== 'full') return ready
+				return ready + ' · ' + formatTemplate(i18n.t(game, 'blueprintFullSummary'), {
+					cubes: Number(result.summary?.blockCount) || 0,
+					empty: Number(result.summary?.emptyCellCount) || 0,
+					normalized: Number(result.summary?.normalizedCount) || 0
+				})
 			}
 
 			function cardAriaLabel(result) {
@@ -2444,7 +2454,7 @@ ModLoader.register({
 				}
 				const blueprint = currentTransform?.blueprint
 				const controller = previewController || globalThis[PREVIEW_KEY]
-				if (!blueprint || blueprint.mode !== 'structure' || !normalizePosition(target)) return null
+				if (!blueprintPlacementAllowed(blueprint) || !normalizePosition(target)) return null
 				const plan = controller?.snapshot?.().plan || null
 				if (!plan) return null
 				markPlacementProbe('place.requested', {
@@ -2578,7 +2588,12 @@ ModLoader.register({
 							}
 						}
 					})
-					dialog.title.textContent = i18n.t(game, 'placementOptionsTitle')
+					dialog.title.textContent = i18n.t(
+						game,
+						currentTransform?.blueprint?.mode === 'full'
+							? 'placementOptionsTitleFull'
+							: 'placementOptionsTitle'
+					)
 					dialog.message.textContent = i18n.t(game, 'placementOptionsMessage')
 
 					const optionList = document.createElement('div')
@@ -2660,12 +2675,14 @@ ModLoader.register({
 					cancel.addEventListener('click', function () {
 						finish(null, dialog, 'blueprint-placement-cancelled')
 					})
-					confirm.addEventListener('click', function () {
+					confirm.addEventListener('click', async function () {
 						const displayedProposal = renderChoice()
 						if (!displayedProposal || confirm.disabled) return
 						let refreshedAnalysis
 						try {
-							refreshedAnalysis = placement.analyze(plan)
+							await controller?.refreshNow?.('placement-options-confirm')
+							const refreshedPlan = controller?.snapshot?.().plan || plan
+							refreshedAnalysis = placement.analyze(refreshedPlan)
 						} catch (refreshError) {
 							markPlacementProbe('options.refresh-failed', {
 								code: refreshError?.code,
@@ -4156,6 +4173,12 @@ ModLoader.register({
 				const u = Number(position[0])
 				const v = Number(position[1])
 				return Number.isInteger(u) && Number.isInteger(v) ? [u, v] : null
+			}
+
+			function blueprintPlacementAllowed(blueprint) {
+				if (!blueprint || (blueprint.mode !== 'structure' && blueprint.mode !== 'full')) return false
+				if (blueprint.mode === 'structure') return true
+				return !!currentCreative?.ready && !!currentCreative?.creativeMode
 			}
 
 			function subtract(point, anchor) {

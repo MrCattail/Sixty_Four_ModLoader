@@ -280,9 +280,9 @@ async function testStructureCaptureAndImmutability() {
 	assert.match(env.writes[0], /\n  "schemaVersion": 4,/)
 
 	const blueprint = env.session.snapshot().blueprint
-	assert.equal(env.session.version, '0.4.4')
+	assert.equal(env.session.version, '0.4.5')
 	assert.equal(env.session.schemaVersion, 4)
-	assert.equal(env.session.snapshot().version, '0.4.4')
+	assert.equal(env.session.snapshot().version, '0.4.5')
 	assert.equal(blueprint.schemaVersion, 4)
 	assert.deepEqual(plain(blueprint.emptyCells), [])
 	assert.equal(blueprint.mode, 'structure')
@@ -481,6 +481,7 @@ async function testFullCaptureCubeRulesAndFailureRetention() {
 	const fullResult = await env.session.capture('test-full')
 	assert.equal(fullResult.status, 'captured')
 	const fullBlueprint = env.session.snapshot().blueprint
+	assert.equal(fullBlueprint.schemaVersion, 5)
 	assert.equal(fullBlueprint.mode, 'full')
 	assert.equal(fullBlueprint.includeBlocks, true)
 	assert.equal(fullBlueprint.entities.length, 1)
@@ -488,6 +489,7 @@ async function testFullCaptureCubeRulesAndFailureRetention() {
 	assert.equal(fullBlueprint.blocks.length, 1)
 	assert.equal(fullBlueprint.blocks[0].state.resources.length, 64)
 	assert.equal(fullBlueprint.blocks[0].state.broken, 0.25)
+	assert.deepEqual(plain(fullBlueprint.emptyCells), [])
 	assert.equal(fullBlueprint.summary.skippedTypes[0].reason, 'unstable')
 
 	env.selection.set(selectionState([
@@ -669,9 +671,9 @@ function testLanguagesManifestUiAndReadOnlyBoundary() {
 	vm.runInContext(fs.readFileSync(i18nFilename, 'utf8'), i18nSandbox, { filename: i18nFilename })
 	i18nDefinitions[0].init()
 	const i18n = i18nSandbox[I18N_KEY]
-	assert.equal(i18n.version, '0.4.4')
+	assert.equal(i18n.version, '0.4.5')
 	assert.equal(i18n.languages.length, 20)
-	assert.equal(i18n.keys.length, 177)
+	assert.equal(i18n.keys.length, 179)
 	const blueprintKeys = [
 		'blueprintModeStructure',
 		'blueprintModeFull',
@@ -702,9 +704,9 @@ function testLanguagesManifestUiAndReadOnlyBoundary() {
 	}
 
 	const manifest = JSON.parse(fs.readFileSync(path.join(MOD_ROOT, 'mod.json'), 'utf8'))
-	assert.equal(manifest.version, '0.4.4')
+	assert.equal(manifest.version, '0.4.5')
 	assert.equal(manifest.languageSupport.gameLanguage, true)
-	assert.equal(manifest.entry.length, 30)
+	assert.equal(manifest.entry.length, 31)
 	assert.ok(manifest.entry.includes(BLUEPRINT_SOURCE))
 	assert.ok(
 		manifest.entry.indexOf('scripts/ui/editor-shell.js') <
@@ -713,8 +715,8 @@ function testLanguagesManifestUiAndReadOnlyBoundary() {
 
 	const source = fs.readFileSync(path.join(MOD_ROOT, BLUEPRINT_SOURCE), 'utf8')
 	const sharedSource = fs.readFileSync(path.join(MOD_ROOT, SHARED_SOURCE), 'utf8')
-	assert.match(source, /schemaVersion:\s*captureMode === 'structure' \? 4 : 3/)
-	assert.match(source, /version:\s*'0\.4\.4'/)
+	assert.match(source, /schemaVersion:\s*captureMode === 'structure' \? 4 : 5/)
+	assert.match(source, /version:\s*'0\.4\.5'/)
 	assert.match(source, /selectionIds:\s*source\.selectionIds/)
 	assert.match(source, /typeof game\.uvToXY !== 'function'/)
 	assert.match(source, /Object\.freeze/)
@@ -749,7 +751,7 @@ async function run() {
 	await testChunkCancellationHotkeyAndLifecycle()
 	await testCutCandidateClipboardAndOutcome()
 	testLanguagesManifestUiAndReadOnlyBoundary()
-	console.log('3A/3C verification passed: immutable schema-4 structure/schema-3 full sessions, exact empty masks, projected outer-bounds visual-right anchor, sorted selection IDs, deterministic projection fallback, structure/full capture, cut projection, multi-selection union, cross-boundary footprints, Mod and transient skips, stable Cube gating, clipboard success/failure, empty retention, chunk cancellation, lifecycle, 20-language UI, original-font card contract, manifest, and read-only boundary.')
+	console.log('3A/3C verification passed: immutable schema-4 structure/schema-5 full sessions, exact empty masks, projected outer-bounds visual-right anchor, sorted selection IDs, deterministic projection fallback, structure/full capture, cut projection, multi-selection union, cross-boundary footprints, Mod and transient skips, stable Cube gating, clipboard success/failure, empty retention, chunk cancellation, lifecycle, 20-language UI, original-font card contract, manifest, and read-only boundary.')
 }
 
 run().catch(error => {

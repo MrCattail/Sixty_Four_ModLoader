@@ -4,10 +4,11 @@ ModLoader.register({
 		const RUNTIME_KEY = Symbol.for('cattail.world-editor.runtime')
 		const TRANSACTIONS_KEY = Symbol.for('cattail.world-editor.transactions')
 		const PLAN_KEY = Symbol.for('cattail.world-editor.blueprint-preview-plan')
+		const STATE_KEY = Symbol.for('cattail.world-editor.blueprint-state')
 		const CREATIVE_KEY = Symbol.for('cattail.world-editor.creative-mode')
 		const PLACEMENT_KEY = Symbol.for('cattail.world-editor.blueprint-placement')
 		const TRANSACTION_KIND = 'blueprint-placement'
-		const SERVICE_VERSION = '1.1.0'
+		const SERVICE_VERSION = '1.2.0'
 		const ADAPTER_VERSION = '1.0.0'
 		const PROBE_EVENT_LIMIT = 200
 		const EPSILON = 1e-7
@@ -64,7 +65,8 @@ ModLoader.register({
 			'clicker2',
 			'clicker3',
 			'stabilizer',
-			'stabilizer2'
+			'stabilizer2',
+			'cube'
 		])
 
 		api.on('afterGameInit', function (payload, game) {
@@ -85,7 +87,7 @@ ModLoader.register({
 				!planner ||
 				typeof planner.build !== 'function'
 			) {
-				console.warn('[Cattail World Editor] Blueprint placement 4C-1c could not find its core services.')
+				console.warn('[Cattail World Editor] Blueprint placement 4D could not find its core services.')
 				return
 			}
 
@@ -98,7 +100,7 @@ ModLoader.register({
 			runtime.addCleanup(function () {
 				service.dispose('runtime-disposed')
 			})
-			console.info('[Cattail World Editor] Safe structure blueprint placement and empty sync 4C-1c ready.')
+			console.info('[Cattail World Editor] Structure/full blueprint placement 4D ready.')
 		})
 
 		function createService(game, transactions, planner, creative) {
@@ -106,6 +108,7 @@ ModLoader.register({
 			const identityByEntity = new WeakMap()
 			const transactionData = new Map()
 			const operations = new Map()
+			const confirmationBaselines = new Map()
 			const probeEvents = []
 			let identitySequence = 0
 			let probeSequence = 0
@@ -134,14 +137,17 @@ ModLoader.register({
 						confirmedSignature: signatureProbe(request?.confirmedSignature)
 					})
 					if (!target) throw placementError('INVALID_TARGET', 'A valid blueprint placement target is required.')
+					if (blueprint.mode === 'full' && !creativeActive(creative, game)) {
+						throw placementError('CREATIVE_REQUIRED', 'Full blueprints can only be placed in Creative Mode.')
+					}
 					const plan = await planner.build(game, blueprint, target, {
 						chunkSize: 512,
 						includeDynamicConflicts: true,
 						isCancelled() {
 							return !context.isCurrent()
 						},
-						canReplaceEntity(entity) {
-							return assessEntity(entity)
+						canReplaceEntity(entity, details) {
+							return assessEntity(entity, details)
 						}
 					})
 					requireCurrent(context)
@@ -151,6 +157,19 @@ ModLoader.register({
 						transactionBuilds: true
 					})
 					const confirmedSignature = String(request?.confirmedSignature || '')
+					const confirmedBaseline = confirmationBaselines.get(confirmedSignature)
+					const rebuiltBaseline = proposalStateBaseline(proposal)
+					if (
+						confirmedBaseline &&
+						!samePlain(confirmedBaseline, rebuiltBaseline) &&
+						proposal.signature === confirmedSignature
+					) {
+						traceProbe('adapter.prepare.state-rebased', {
+							blueprintMode: blueprint.mode,
+							target,
+							changedRemovalCount: rebuiltBaseline.length
+						})
+					}
 					traceProbe('adapter.prepare.rebuilt', {
 						plan: planProbeDetails(plan),
 						proposal: proposalProbeDetails(proposal),
@@ -189,21 +208,16 @@ ModLoader.register({
 							{ direction, stage: 'economy-mode' }
 						)
 					}
+					let resourcesCurrent = null
 					if (direction === 'forward') {
-						const resourcesChanged = !sameNumericArray(game.resources, payload.resourcesBefore)
+						resourcesCurrent = numericArray(game.resources)
+						const resourcesChanged = !sameNumericArray(resourcesCurrent, payload.resourcesBefore)
 						if (resourcesChanged) {
-							if (!context?.snapshotId) {
-								return traceDenied(
-									'adapter.preflight.denied',
-									denied('RESOURCES_CHANGED', 'Resources changed after this placement was prepared.'),
-									{ direction, stage: 'resources' }
-								)
-							}
 							traceProbe('adapter.preflight.resources-rebased', {
 								direction,
-								stage: 'post-snapshot',
+								stage: context?.snapshotId ? 'post-snapshot' : 'pre-snapshot',
 								resourcesBefore: numericArray(payload.resourcesBefore),
-								resourcesCurrent: numericArray(game.resources)
+								resourcesCurrent
 							})
 						}
 						if (!samePlain(captureStats(game), payload.statsBefore)) {
@@ -254,7 +268,11 @@ ModLoader.register({
 							)
 						}
 					}
-					const affordability = inspectAffordability(game.resources, payload.economy, direction)
+					const affordability = inspectAffordability(
+						direction === 'forward' ? resourcesCurrent : game.resources,
+						payload.economy,
+						direction
+					)
 					if (!affordability.ok) {
 						return traceDenied('adapter.preflight.denied', affordability, {
 							direction,
@@ -549,8 +567,8 @@ ModLoader.register({
 					}
 				},
 				assessEntity,
-				canReplaceEntity(entity) {
-					return assessEntity(entity).safe
+				canReplaceEntity(entity, details) {
+					return assessEntity(entity, details).safe
 				},
 				analyze(plan) {
 					if (disposed) throw placementError('NOT_READY', 'Blueprint placement is unavailable.')
@@ -593,6 +611,13 @@ ModLoader.register({
 						hasEmptyTargets,
 						variants: Object.freeze(variants)
 					})
+					for (const proposal of Object.values(variants)) {
+						if (!proposal?.signature) continue
+						confirmationBaselines.set(proposal.signature, proposalStateBaseline(proposal))
+					}
+					while (confirmationBaselines.size > PROBE_EVENT_LIMIT) {
+						confirmationBaselines.delete(confirmationBaselines.keys().next().value)
+					}
 					traceProbe('analyze.complete', {
 						plan: planProbeDetails(plan),
 						hasConflicts: analysis.hasConflicts,
@@ -639,6 +664,7 @@ ModLoader.register({
 					} catch (unregisterError) {}
 					listeners.clear()
 					operations.clear()
+					confirmationBaselines.clear()
 					transactionData.clear()
 					lastReason = String(reason || 'disposed')
 					if (globalThis[PLACEMENT_KEY] === service) delete globalThis[PLACEMENT_KEY]
@@ -664,7 +690,7 @@ ModLoader.register({
 						return (
 							!blockedEntities.has(entry.entity) &&
 							isExtractorName(entry.name) &&
-							assessEntity(entry.entity).safe
+							assessEntity(entry.entity, { blueprintMode: plan.mode }).safe
 						)
 					})
 					const buildExtractorCount = buildRecords.filter(function (record) {
@@ -702,7 +728,7 @@ ModLoader.register({
 				for (const entry of sources.values()) {
 					const assessment = blockedEntities.has(entry.entity)
 						? assessmentResult(false, 'last-extractor')
-						: assessEntity(entry.entity)
+						: assessEntity(entry.entity, { blueprintMode: plan.mode })
 					const footprint = entityFootprint(entry.entity, entry.entity.position)
 					const crossBoundary = entry.sync && footprintCrossesCellMask(footprint, emptyMask)
 					if (assessment.safe) {
@@ -725,6 +751,13 @@ ModLoader.register({
 				protectedTargets.sort(compareDescriptors)
 
 				const builds = buildRecords.map(function (record) {
+					const save = plan.mode === 'full'
+						? {
+							name: safeName(record.name),
+							position: clonePosition(record.position),
+							par: jsonClone(record.state || {})
+						}
+						: null
 					return {
 						identity: options?.transactionBuilds
 							? createIdentity('built')
@@ -733,7 +766,10 @@ ModLoader.register({
 						name: safeName(record.name),
 						position: clonePosition(record.position),
 						footprint: cloneFootprint(record.footprint),
-						config: jsonClone(record.config || {})
+						config: jsonClone(record.config || {}),
+						save,
+						stateMeta: jsonClone(record.stateMeta || {}),
+						sourceKind: String(record.sourceKind || 'entity')
 					}
 				}).sort(compareDescriptors)
 				const removalIdentities = new Set(removals.map(function (entry) { return entry.identity }))
@@ -748,9 +784,22 @@ ModLoader.register({
 				const resourcesBefore = numericArray(game.resources)
 				const statsBefore = captureStats(game)
 				const statsDelta = {
-					machinesBuild: builds.length,
-					machinesSold: removals.length
+					machinesBuild: builds.filter(function (entry) { return entry.name !== 'cube' }).length,
+					machinesSold: removals.filter(function (entry) { return entry.name !== 'cube' }).length
 				}
+				const observations = (plan.records || []).map(function (record) {
+					return {
+						id: finiteInteger(record.id, record.index + 1),
+						name: safeName(record.name),
+						position: clonePosition(record.position),
+						status: String(record.status || ''),
+						reason: String(record.reason || '')
+					}
+				}).sort(function (left, right) {
+					return comparePositions(left.position, right.position) ||
+						left.name.localeCompare(right.name) ||
+						left.id - right.id
+				})
 				const replaceCount = removals.filter(function (entry) { return entry.sourceConflict }).length
 				const syncDeleteCount = removals.filter(function (entry) { return entry.sourceSync }).length
 				const protectedCount = protectedTargets.length
@@ -789,10 +838,13 @@ ModLoader.register({
 					statsBefore,
 					statsDelta,
 					onlyonesBefore,
-					onlyonesAfter
+					onlyonesAfter,
+					observations,
+					blueprintMode: plan.mode,
+					blueprintSchemaVersion: Number(plan.schemaVersion) || 0
 				})
 				const transactionSummary = {
-					label: 'Structure blueprint placement',
+					label: plan.mode === 'full' ? 'Full blueprint placement' : 'Structure blueprint placement',
 					buildCount: builds.length,
 					replaceCount,
 					syncDeleteCount,
@@ -813,7 +865,9 @@ ModLoader.register({
 					transientCount: transients.length
 				}
 				const payload = {
-					schema: 2,
+					schema: 3,
+					blueprintMode: plan.mode,
+					blueprintSchemaVersion: Number(plan.schemaVersion) || 0,
 					target: clonePosition(plan.target),
 					replaceConflicts,
 					syncEmpty,
@@ -830,7 +884,8 @@ ModLoader.register({
 					economy,
 					resourcesBefore,
 					statsBefore,
-					statsDelta
+					statsDelta,
+					observations
 				}
 				return Object.freeze({
 					signature,
@@ -915,14 +970,21 @@ ModLoader.register({
 				return { safe: safe === true, reason: String(reason || '') }
 			}
 
-			function assessEntity(entity) {
+			function assessEntity(entity, details) {
 				if (!entity || typeof entity !== 'object') return assessment(false, 'missing')
 				const name = safeName(entity.name)
 				if (!RESTORABLE_NAMES.has(name)) return assessment(false, 'unsupported-type')
+				if (name === 'cube') {
+					if (details?.blueprintMode !== 'full') return assessment(false, 'protected-cube')
+					if (Number(entity.state) !== 2) return assessment(false, 'unstable-cube')
+				}
 				const definition = game.codex?.entities?.[name]
-				if (!definition || definition.canPurchase !== true) return assessment(false, 'not-purchasable')
+				if (name !== 'cube' && (!definition || definition.canPurchase !== true)) {
+					return assessment(false, 'not-purchasable')
+				}
 				if (entity.indestructible === true) return assessment(false, 'indestructible')
 				if (game.transportedEntity === entity) return assessment(false, 'being-relocated')
+				if (finiteOr(entity.spawnedHollows, 0) > 0) return assessment(false, 'generated-attachments')
 				if ((name === 'pump' || name === 'pump2') && hasAttachedCube(game, entity)) {
 					return assessment(false, 'attached-cube')
 				}
@@ -1030,13 +1092,19 @@ ModLoader.register({
 					) {
 						return denied('EXTERNAL_CHANGE', 'A replacement target changed outside World Editor.')
 					}
-					const assessment = assessEntity(entity)
+					const assessment = assessEntity(entity, { blueprintMode: payload.blueprintMode })
 					if (!assessment.safe) {
 						return denied('UNSAFE_REPLACEMENT', 'A replacement target is no longer safe to restore.')
 					}
 					try {
-						if (!samePlacementSave(captureEntitySave(game, entity), removal.save)) {
-							return denied('EXTERNAL_CHANGE', 'A replacement target state changed outside World Editor.')
+						const currentSave = captureEntitySave(game, entity)
+						if (!samePlacementSave(currentSave, removal.save)) {
+							traceProbe('adapter.preflight.state-rebased', {
+								identity: removal.identity,
+								name: removal.name,
+								position: removal.position,
+								blueprintMode: payload.blueprintMode
+							})
 						}
 					} catch (saveError) {
 						return denied('UNSAFE_REPLACEMENT', 'A replacement target can no longer be serialized safely.')
@@ -1073,16 +1141,7 @@ ModLoader.register({
 					) {
 						return denied('EXTERNAL_CHANGE', 'A protected placement target changed outside World Editor.')
 					}
-					if (protectedTarget.save) {
-						try {
-							if (!samePlacementSave(captureEntitySave(game, entity), protectedTarget.save)) {
-								return denied('EXTERNAL_CHANGE', 'A protected placement target state changed outside World Editor.')
-							}
-						} catch (saveError) {
-							return denied('EXTERNAL_CHANGE', 'A protected placement target can no longer be inspected safely.')
-						}
-					}
-					const assessment = assessEntity(entity)
+					const assessment = assessEntity(entity, { blueprintMode: payload.blueprintMode })
 					if (protectedTarget.reason === 'last-extractor') {
 						const buildExtractorCount = payload.builds.filter(function (entry) {
 							return isExtractorName(entry.name)
@@ -1118,6 +1177,7 @@ ModLoader.register({
 
 			function applyForward(context, record, state) {
 				const payload = record.payload
+				const waypointTimestamps = allocateWaypointTimestamps(game, payload.builds)
 				const resourceDelta = payload.economy.creative ? [] : payload.economy.delta
 				applyResourceMutation(state, resourceDelta)
 				for (const removal of payload.removals) {
@@ -1134,7 +1194,7 @@ ModLoader.register({
 				}
 				for (const build of payload.builds) {
 					requireCurrent(context)
-					addExpectedEntity(build)
+					addExpectedEntity(build, waypointTimestamps.get(build.identity))
 					state.mutations.push({ kind: 'created', descriptor: build })
 				}
 				applyStatsMutation(state, payload.statsDelta)
@@ -1246,11 +1306,15 @@ ModLoader.register({
 				return removed
 			}
 
-			function addExpectedEntity(descriptor) {
+			function addExpectedEntity(descriptor, waypointTimestamp) {
 				assertFootprintEmpty(game, descriptor.footprint)
 				let entity
 				if (descriptor.save) {
-					entity = restoreEntitySave(game, descriptor.save)
+					const stateService = globalThis[STATE_KEY]
+					const saved = descriptor.sourceKind && typeof stateService?.materializeSave === 'function'
+						? stateService.materializeSave(descriptor.save, { waypointTimestamp })
+						: descriptor.save
+					entity = restoreEntitySave(game, saved)
 				} else {
 					entity = game.addEntity(descriptor.name, descriptor.position, undefined, { skipShopUpdate: true })
 					if (entity) {
@@ -1366,23 +1430,32 @@ ModLoader.register({
 		}
 
 		function cloneBlueprint(value) {
-			const blueprint = jsonClone(value)
+			let blueprint = jsonClone(value)
+			const stateService = globalThis[STATE_KEY]
+			if (blueprint?.mode === 'full' && typeof stateService?.normalizeBlueprint === 'function') {
+				blueprint = stateService.normalizeBlueprint(blueprint)
+			}
+			const schemaVersion = Number(blueprint?.schemaVersion)
+			const structureValid = blueprint?.mode === 'structure' && [1, 2, 3, 4].includes(schemaVersion)
+			const fullValid = blueprint?.mode === 'full' && (schemaVersion === 3 || schemaVersion === 5)
+			if (fullValid && !Array.isArray(blueprint.blocks)) blueprint.blocks = []
 			if (
 				!blueprint ||
-				blueprint.mode !== 'structure' ||
-				![1, 2, 3, 4].includes(Number(blueprint.schemaVersion)) ||
+				(!structureValid && !fullValid) ||
 				!Array.isArray(blueprint.entities) ||
 				(
 					!blueprint.entities.length &&
 					!(
-						Number(blueprint.schemaVersion) === 4 &&
+						(schemaVersion === 4 || schemaVersion === 5) &&
 						Array.isArray(blueprint.emptyCells) &&
 						blueprint.emptyCells.length
-					)
+					) &&
+					!(fullValid && Array.isArray(blueprint.blocks) && blueprint.blocks.length)
 				) ||
-				(Number(blueprint.schemaVersion) === 4 && !Array.isArray(blueprint.emptyCells))
+				(schemaVersion === 4 && !Array.isArray(blueprint.emptyCells)) ||
+				(schemaVersion === 5 && !Array.isArray(blueprint.emptyCells))
 			) {
-				throw placementError('STRUCTURE_BLUEPRINT_REQUIRED', 'A valid structure blueprint is required.')
+				throw placementError('BLUEPRINT_REQUIRED', 'A valid structure or full blueprint is required.')
 			}
 			return blueprint
 		}
@@ -1500,12 +1573,13 @@ ModLoader.register({
 				pushEconomyStep(resources, steps, 'build-cost', build.name, negateArray(cost))
 				counts[build.name] = finiteOr(counts[build.name], 0) + 1
 			}
-			const initial = numericArray(game.resources)
 			return {
 				creative: false,
 				eraserName,
 				steps,
-				delta: subtractArrays(resources, initial)
+				delta: steps.reduce(function (total, step) {
+					return addArrays(total, step.delta)
+				}, [])
 			}
 		}
 
@@ -1630,6 +1704,12 @@ ModLoader.register({
 
 		function restoreMisc(save) {
 			const par = save.par || {}
+			if (save.name === 'cube') {
+				return {
+					pump: false,
+					resources: jsonClone(par.resources || [])
+				}
+			}
 			if (save.name === 'surge') {
 				return {
 					resources: jsonClone(par.resources),
@@ -1643,6 +1723,27 @@ ModLoader.register({
 			}
 			if (save.name === 'waypoint' || save.name === 'waypoint2') return { timestamp: par.timestamp }
 			return undefined
+		}
+
+		function allocateWaypointTimestamps(game, builds) {
+			const result = new Map()
+			const waypoints = (builds || []).filter(function (entry) {
+				return entry.name === 'waypoint' || entry.name === 'waypoint2'
+			}).sort(function (left, right) {
+				return nonNegativeInteger(left.stateMeta?.waypointOrder, Number.MAX_SAFE_INTEGER) -
+					nonNegativeInteger(right.stateMeta?.waypointOrder, Number.MAX_SAFE_INTEGER) ||
+					compareDescriptors(left, right)
+			})
+			if (!waypoints.length) return result
+			let maximum = Date.now()
+			for (const entity of game.stuff || []) {
+				if (safeName(entity?.name) !== 'waypoint' && safeName(entity?.name) !== 'waypoint2') continue
+				maximum = Math.max(maximum, finiteOr(entity.timestamp, 0))
+			}
+			waypoints.forEach(function (entry, index) {
+				result.set(entry.identity, maximum + index + 1)
+			})
+			return result
 		}
 
 		function applyStructureConfig(entity, config) {
@@ -1734,7 +1835,7 @@ ModLoader.register({
 			if (
 				!record ||
 				record.kind !== TRANSACTION_KIND ||
-				record.payload?.schema !== 2 ||
+				![2, 3].includes(Number(record.payload?.schema)) ||
 				!Array.isArray(record.payload.builds) ||
 				!Array.isArray(record.payload.removals) ||
 				!Array.isArray(record.payload.protectedTargets) ||
@@ -1896,8 +1997,17 @@ ModLoader.register({
 
 		function planProbeDetails(plan) {
 			return {
+				mode: String(plan?.mode || ''),
+				schemaVersion: Number(plan?.schemaVersion) || 0,
 				target: normalizePosition(plan?.target),
 				recordCount: Array.isArray(plan?.records) ? plan.records.length : 0,
+				stateDifferenceCount: (plan?.records || []).filter(function (record) {
+					return record?.status === 'conflict' && plan?.mode === 'full'
+				}).length,
+				stableCubeCount: (plan?.records || []).filter(function (record) {
+					return record?.name === 'cube'
+				}).length,
+				normalizedCount: nonNegativeInteger(plan?.normalization?.normalizedCount, 0),
 				statusCounts: plan?.statusCounts || {},
 				emptyCellCount: Array.isArray(plan?.emptyCells) ? plan.emptyCells.length : 0,
 				emptyCells: (plan?.emptyCells || []).slice(0, 64).map(normalizePosition),
@@ -1927,6 +2037,8 @@ ModLoader.register({
 
 		function payloadProbeDetails(payload) {
 			return {
+				blueprintMode: String(payload?.blueprintMode || 'structure'),
+				blueprintSchemaVersion: Number(payload?.blueprintSchemaVersion) || 0,
 				target: normalizePosition(payload?.target),
 				replaceConflicts: payload?.replaceConflicts === true,
 				syncEmpty: payload?.syncEmpty === true,
@@ -1948,6 +2060,17 @@ ModLoader.register({
 				signature: signatureProbe(proposal?.signature),
 				summary: proposal?.summary || {}
 			}, payloadProbeDetails(proposal?.payload || proposal))
+		}
+
+		function proposalStateBaseline(proposal) {
+			return (proposal?.removals || proposal?.payload?.removals || []).map(function (entry) {
+				return {
+					identity: String(entry?.identity || ''),
+					name: safeName(entry?.name),
+					position: normalizePosition(entry?.position),
+					save: comparablePlacementSave(entry?.save)
+				}
+			})
 		}
 
 		function proposalVariantsProbeDetails(variants) {
@@ -2003,15 +2126,21 @@ ModLoader.register({
 		function proposalSignature(value) {
 			return JSON.stringify(stableValue({
 				target: value?.target,
+				blueprintMode: value?.blueprintMode,
+				blueprintSchemaVersion: value?.blueprintSchemaVersion,
 				replaceConflicts: value?.replaceConflicts === true,
 				syncEmpty: value?.syncEmpty === true,
+				observations: value?.observations || [],
 				builds: (value?.builds || []).map(function (entry) {
 					return {
 						id: entry.id,
 						name: entry.name,
 						position: entry.position,
 						footprint: entry.footprint,
-						config: entry.config
+						config: entry.config,
+						save: comparablePlacementSave(entry.save),
+						stateMeta: entry.stateMeta,
+						sourceKind: entry.sourceKind
 					}
 				}),
 				removals: (value?.removals || []).map(function (entry) {
@@ -2020,7 +2149,6 @@ ModLoader.register({
 						name: entry.name,
 						position: entry.position,
 						footprint: entry.footprint,
-						save: comparablePlacementSave(entry.save),
 						sourceConflict: entry.sourceConflict === true,
 						sourceSync: entry.sourceSync === true,
 						crossBoundary: entry.crossBoundary === true
@@ -2032,7 +2160,6 @@ ModLoader.register({
 						name: entry.name,
 						position: entry.position,
 						footprint: entry.footprint,
-						save: comparablePlacementSave(entry.save),
 						reason: entry.reason,
 						sourceConflict: entry.sourceConflict === true,
 						sourceSync: entry.sourceSync === true,
@@ -2045,11 +2172,10 @@ ModLoader.register({
 						name: entry.name,
 						position: entry.position,
 						footprint: entry.footprint,
-						save: comparablePlacementSave(entry.save)
+						reason: entry.reason
 					}
 				}),
 				economy: value?.economy,
-				resourcesBefore: value?.resourcesBefore,
 				statsBefore: value?.statsBefore,
 				statsDelta: value?.statsDelta,
 				onlyonesBefore: value?.onlyonesBefore,
@@ -2094,10 +2220,6 @@ ModLoader.register({
 				result[index] = finiteOr(left?.[index], 0) + finiteOr(right?.[index], 0)
 			}
 			return result
-		}
-
-		function subtractArrays(left, right) {
-			return addArrays(left, negateArray(right))
 		}
 
 		function sameNumericArray(left, right) {
