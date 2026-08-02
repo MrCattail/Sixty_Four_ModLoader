@@ -130,6 +130,7 @@ let snapshotStore = null
 let snapshotAccountScope = ''
 let libraryStore = null
 const snapshotSaveIdPattern = /^[a-f0-9]{8}-[a-f0-9]{4}-[1-5][a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/i
+const LIBRARY_API_VERSION = '1.1.0'
 
 function snapshotEnvelope(value){
   return { ok: true, value }
@@ -688,7 +689,7 @@ ipcMain.handle(`modloader:libraries:runtime`, async (event, payload)=>{
     const context = libraryRuntimeContext(payload)
     const request = payload?.request
     let result
-    if (action === 'capabilities') result = await libraryStore.capabilities(context)
+    if (action === 'capabilities') result = Object.assign({}, await libraryStore.capabilities(context), { apiVersion: LIBRARY_API_VERSION })
     else if (action === 'list') result = await libraryStore.list(context, request)
     else if (action === 'read') {
       const record = await libraryStore.read(context, request)
@@ -696,6 +697,22 @@ ipcMain.handle(`modloader:libraries:runtime`, async (event, payload)=>{
         info: record.info,
         data: record.payloadType === 'utf8' ? record.payload.toString('utf8') : Uint8Array.from(record.payload)
       }
+    } else if (action === 'pickImport') {
+      const picked = await libraryStore.pickImport(context, request, async options=>{
+        const parent = getModloaderDialogParent(event)
+        return parent ? dialog.showOpenDialog(parent, options) : dialog.showOpenDialog(options)
+      })
+      result = picked.canceled ? picked : {
+        canceled: false,
+        fileName: picked.fileName,
+        bytes: picked.bytes,
+        data: request?.encoding === 'utf8' ? picked.data.toString('utf8') : Uint8Array.from(picked.data)
+      }
+    } else if (action === 'exportItem') {
+      result = await libraryStore.exportItem(context, request, async options=>{
+        const parent = getModloaderDialogParent(event)
+        return parent ? dialog.showSaveDialog(parent, options) : dialog.showSaveDialog(options)
+      })
     } else if (action === 'write') result = await libraryStore.write(context, request)
     else if (action === 'rename') result = await libraryStore.rename(context, request)
     else if (action === 'trash') result = await libraryStore.trash(context, request)

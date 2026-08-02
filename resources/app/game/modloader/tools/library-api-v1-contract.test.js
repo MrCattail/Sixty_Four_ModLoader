@@ -3,8 +3,10 @@
 const assert = require('node:assert/strict')
 const crypto = require('node:crypto')
 const fs = require('node:fs')
+const os = require('node:os')
 const path = require('node:path')
 const vm = require('node:vm')
+const { LibraryStore } = require('../library-store.js')
 
 const loaderPath = path.resolve(__dirname, '..', 'loader.js')
 const mainProcessPath = path.resolve(__dirname, '..', 'main-process.js')
@@ -67,7 +69,7 @@ const fakeIpcRenderer = {
 			return {
 				ok: true,
 				value: {
-					apiVersion: '1.0.0',
+					apiVersion: '1.1.0',
 					available: true,
 					libraryId: payload.libraryId,
 					maxFileBytes: 16 * 1024 * 1024,
@@ -78,6 +80,22 @@ const fakeIpcRenderer = {
 			}
 		}
 		if (action === 'list') return { ok: true, value: [] }
+		if (action === 'pickImport') {
+			if (payload.request?.title === 'Cancel import') return { ok: true, value: { canceled: true } }
+			return {
+				ok: true,
+				value: {
+					canceled: false,
+					fileName: 'shared.64schem',
+					bytes: 3,
+					data: payload.request?.encoding === 'utf8' ? 'abc' : { type: 'Buffer', data: [97, 98, 99] }
+				}
+			}
+		}
+		if (action === 'exportItem') {
+			if (payload.request?.title === 'Cancel export') return { ok: true, value: { canceled: true } }
+			return { ok: true, value: { canceled: false, fileName: payload.request.suggestedName, bytes: 5 } }
+		}
 		if (action === 'write') {
 			return {
 				ok: true,
@@ -127,26 +145,145 @@ sandbox.window.window = sandbox.window
 
 vm.runInNewContext(source, sandbox, { filename: loaderPath })
 
+async function rejectsCode(promise, code) {
+	await assert.rejects(promise, error => error?.name === 'LibraryStoreError' && error.code === code)
+}
+
+async function runDialogStoreContract() {
+	const temporaryRoot = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'modloader-library-dialogs-'))
+	const externalDirectory = path.join(temporaryRoot, 'external')
+	await fs.promises.mkdir(externalDirectory)
+	const context = { modId: 'library-contract-mod', libraryId: 'blueprints' }
+	const store = new LibraryStore({
+		installationRoot: temporaryRoot,
+		declarations: [{
+			modId: context.modId,
+			libraryId: context.libraryId,
+			directory: 'blueprints',
+			extensions: ['.64schem'],
+			maxFileBytes: 16,
+			maxTotalBytes: 128,
+			maxEntries: 10,
+			cache: {}
+		}],
+		now: () => 1700000000000,
+		randomUUID: () => '11111111-1111-4111-8111-111111111111'
+	})
+	try {
+		const canceledImport = await store.pickImport(context, { title: 'Choose blueprint' }, async options => {
+			assert.equal(options.title, 'Choose blueprint')
+			assert.deepEqual(options.filters, [{ name: 'Library files', extensions: ['64schem'] }])
+			assert.deepEqual(options.properties, ['openFile'])
+			return { canceled: true, filePaths: [] }
+		})
+		assert.deepEqual(canceledImport, { canceled: true })
+		assert.equal(fs.existsSync(path.join(temporaryRoot, 'blueprints')), false, 'cancel does not initialize or mutate the library')
+
+		const importPath = path.join(externalDirectory, 'shared.64schem')
+		await fs.promises.writeFile(importPath, 'imported')
+		const imported = await store.pickImport(context, { encoding: 'utf8' }, async () => ({ canceled: false, filePaths: [importPath] }))
+		assert.deepEqual(Object.keys(imported).sort(), ['bytes', 'canceled', 'data', 'fileName'])
+		assert.equal(imported.fileName, 'shared.64schem')
+		assert.equal(imported.bytes, 8)
+		assert.equal(imported.data.toString('utf8'), 'imported')
+		assert.equal('path' in imported, false)
+
+		const invalidExtensionPath = path.join(externalDirectory, 'shared.json')
+		await fs.promises.writeFile(invalidExtensionPath, 'invalid')
+		await rejectsCode(store.pickImport(context, {}, async () => ({ canceled: false, filePaths: [invalidExtensionPath] })), 'PATH_INVALID')
+		const oversizedPath = path.join(externalDirectory, 'oversized.64schem')
+		await fs.promises.writeFile(oversizedPath, 'x'.repeat(17))
+		await rejectsCode(store.pickImport(context, {}, async () => ({ canceled: false, filePaths: [oversizedPath] })), 'TOO_LARGE')
+
+		const symbolicPath = path.join(externalDirectory, 'symbolic.64schem')
+		try {
+			await fs.promises.symlink(importPath, symbolicPath, 'file')
+			await rejectsCode(store.pickImport(context, {}, async () => ({ canceled: false, filePaths: [symbolicPath] })), 'PATH_INVALID')
+		} catch (error) {
+			if (!['EPERM', 'EACCES'].includes(error?.code)) throw error
+		}
+
+		const saved = await store.write(context, { name: 'managed.64schem', data: 'managed' })
+		const revision = saved.info.revision
+		const canceledExport = await store.exportItem(context, {
+			area: 'active',
+			name: saved.info.name,
+			expectedRevision: revision,
+			suggestedName: 'shared.64schem',
+			title: 'Export blueprint'
+		}, async options => {
+			assert.equal(options.title, 'Export blueprint')
+			assert.equal(options.defaultPath, 'shared.64schem')
+			assert.deepEqual(options.filters, [{ name: 'Library files', extensions: ['64schem'] }])
+			return { canceled: true }
+		})
+		assert.deepEqual(canceledExport, { canceled: true })
+		assert.equal((await store.read(context, { name: saved.info.name })).info.revision, revision)
+
+		let revisionDialogOpened = false
+		await rejectsCode(store.exportItem(context, {
+			area: 'active',
+			name: saved.info.name,
+			expectedRevision: '0'.repeat(64)
+		}, async () => { revisionDialogOpened = true; return { canceled: true } }), 'REVISION_CONFLICT')
+		assert.equal(revisionDialogOpened, false, 'revision is checked before opening the save dialog')
+
+		const exportPath = path.join(externalDirectory, 'shared.64schem')
+		await fs.promises.writeFile(exportPath, 'old')
+		const exported = await store.exportItem(context, {
+			area: 'active',
+			name: saved.info.name,
+			expectedRevision: revision,
+			suggestedName: 'shared.64schem'
+		}, async () => ({ canceled: false, filePath: exportPath }))
+		assert.deepEqual(exported, { canceled: false, fileName: 'shared.64schem', bytes: 7 })
+		assert.equal(await fs.promises.readFile(exportPath, 'utf8'), 'managed')
+		assert.equal((await store.read(context, { name: saved.info.name })).info.revision, revision)
+		assert.equal((await fs.promises.readdir(externalDirectory)).some(name => name.startsWith('.tmp-modloader-export-')), false)
+		await rejectsCode(store.exportItem(context, {
+			area: 'active',
+			name: saved.info.name,
+			expectedRevision: revision,
+			suggestedName: 'shared.64schem'
+		}, async () => ({ canceled: false, filePath: path.join(externalDirectory, 'shared.json') })), 'PATH_INVALID')
+
+		await rejectsCode(store.exportItem(context, {
+			area: 'trash',
+			name: saved.info.name,
+			expectedRevision: revision
+		}, async () => ({ canceled: true })), 'PERMISSION_DENIED')
+		await rejectsCode(store.exportItem(context, {
+			area: 'active',
+			name: saved.info.name,
+			expectedRevision: revision,
+			suggestedName: 'copy.64schem'
+		}, async () => ({ canceled: false, filePath: path.join(temporaryRoot, 'blueprints', 'copy.64schem') })), 'PERMISSION_DENIED')
+	} finally {
+		store.dispose()
+		await fs.promises.rm(temporaryRoot, { recursive: true, force: true })
+	}
+}
+
 async function run() {
 	const modLoader = sandbox.window.ModLoader
-	assert.equal(modLoader.version, '0.3.0')
+	assert.equal(modLoader.version, '0.3.1')
 	const modApi = modLoader.forMod('library-contract-mod')
 	assert.equal(modApi.storage.version, '1.0.0')
-	assert.equal(modApi.storage.libraries.version, '1.0.0')
+	assert.equal(modApi.storage.libraries.version, '1.1.0')
 	assert.equal(Object.isFrozen(modApi.storage), true)
 	assert.equal(Object.isFrozen(modApi.storage.libraries), true)
 
 	const library = modApi.storage.libraries.open('Blueprints')
 	assert.equal(Object.isFrozen(library), true)
 	assert.equal(library.id, 'blueprints')
-	assert.equal(library.version, '1.0.0')
+	assert.equal(library.version, '1.1.0')
 	assert.deepEqual(
 		Object.keys(library).sort(),
-		['capabilities', 'id', 'list', 'openFolder', 'quarantine', 'read', 'remove', 'rename', 'restore', 'trash', 'version', 'watch', 'write']
+		['capabilities', 'exportItem', 'id', 'list', 'openFolder', 'pickImport', 'quarantine', 'read', 'remove', 'rename', 'restore', 'trash', 'version', 'watch', 'write']
 	)
 
 	const capabilities = await library.capabilities()
-	assert.equal(capabilities.apiVersion, '1.0.0')
+	assert.equal(capabilities.apiVersion, '1.1.0')
 	assert.equal(capabilities.pathsExposed, false)
 	assert.equal(calls.at(-1).channel, 'modloader:libraries:runtime')
 	assert.equal(calls.at(-1).payload.modId, 'library-contract-mod')
@@ -162,6 +299,30 @@ async function run() {
 	const bytesRecord = await library.read({ name: written.info.name })
 	assert.equal(Object.prototype.toString.call(bytesRecord.data), '[object Uint8Array]')
 	assert.deepEqual(Array.from(bytesRecord.data), [0, 127, 255])
+
+	const pickedBytes = await library.pickImport({ title: 'Choose blueprint' })
+	assert.deepEqual(Object.keys(pickedBytes).sort(), ['bytes', 'canceled', 'data', 'fileName'])
+	assert.equal(Object.prototype.toString.call(pickedBytes.data), '[object Uint8Array]')
+	assert.deepEqual(Array.from(pickedBytes.data), [97, 98, 99])
+	assert.equal('path' in pickedBytes, false)
+	const pickedText = await library.pickImport({ encoding: 'utf8' })
+	assert.equal(pickedText.data, 'abc')
+	assert.deepEqual(await library.pickImport({ title: 'Cancel import' }), { canceled: true })
+	const exported = await library.exportItem({
+		area: 'active',
+		name: written.info.name,
+		expectedRevision: written.info.revision,
+		suggestedName: 'shared.64schem'
+	})
+	assert.deepEqual(exported, { canceled: false, fileName: 'shared.64schem', bytes: 5 })
+	assert.equal('path' in exported, false)
+	assert.deepEqual(await library.exportItem({
+		area: 'active',
+		name: written.info.name,
+		expectedRevision: written.info.revision,
+		suggestedName: 'shared.64schem',
+		title: 'Cancel export'
+	}), { canceled: true })
 
 	assert.deepEqual(await library.rename({}), { action: 'rename' })
 	assert.deepEqual(await library.trash({}), { action: 'trash' })
@@ -192,14 +353,20 @@ async function run() {
 
 	assert.match(mainProcessSource, /collectLibraryDeclarations\(\)/)
 	assert.match(mainProcessSource, /new LibraryStore\(/)
+	assert.match(mainProcessSource, /const LIBRARY_API_VERSION = '1\.1\.0'/)
 	assert.match(mainProcessSource, /modloader:libraries:runtime/)
+	assert.match(mainProcessSource, /libraryStore\.pickImport\(context, request/)
+	assert.match(mainProcessSource, /dialog\.showOpenDialog/)
+	assert.match(mainProcessSource, /libraryStore\.exportItem\(context, request/)
+	assert.match(mainProcessSource, /dialog\.showSaveDialog/)
 	assert.match(mainProcessSource, /libraryStore\.folder\(context, request\)/)
 	assert.match(mainProcessSource, /shell\.openPath\(directory\)/)
 	assert.doesNotMatch(source.slice(source.indexOf('const createLibraryHandle'), source.indexOf('const modloaderWindowApiState')), /require\(['"](?:fs|path)['"]\)/)
+	await runDialogStoreContract()
 }
 
 run().then(
-	() => console.log('Library API v1 contract passed.'),
+	() => console.log('Library API 1.1 contract passed.'),
 	error => {
 		console.error(error)
 		process.exitCode = 1

@@ -421,6 +421,138 @@ class LibraryStore {
 		}
 	}
 
+	_dialogTitle(value, fallback) {
+		const title = String(value || '').trim()
+		if (!title) return fallback
+		if (Buffer.byteLength(title, 'utf8') > 160 || CONTROL_CHAR_PATTERN.test(title)) {
+			throw new LibraryStoreError('PATH_INVALID', safeMessageForCode('PATH_INVALID'))
+		}
+		return title
+	}
+
+	_dialogFilters(declaration) {
+		return [{
+			name: 'Library files',
+			extensions: declaration.extensions.map(extension => extension.slice(1))
+		}]
+	}
+
+	async _readLimitedFile(filePath, maxBytes) {
+		let before
+		try { before = await fs.promises.lstat(filePath) } catch (error) { if (error?.code === 'ENOENT') throw new LibraryStoreError('NOT_FOUND', safeMessageForCode('NOT_FOUND')); throw error }
+		if (before.isSymbolicLink() || !before.isFile()) throw new LibraryStoreError('PATH_INVALID', safeMessageForCode('PATH_INVALID'))
+		if (before.size > maxBytes) throw new LibraryStoreError('TOO_LARGE', safeMessageForCode('TOO_LARGE'))
+		let handle
+		try {
+			handle = await fs.promises.open(filePath, 'r')
+			const opened = await handle.stat()
+			if (!opened.isFile()) throw new LibraryStoreError('PATH_INVALID', safeMessageForCode('PATH_INVALID'))
+			if ((before.dev !== opened.dev || before.ino !== opened.ino) && before.ino && opened.ino) {
+				throw new LibraryStoreError('CORRUPT', safeMessageForCode('CORRUPT'))
+			}
+			if (opened.size > maxBytes) throw new LibraryStoreError('TOO_LARGE', safeMessageForCode('TOO_LARGE'))
+			const chunks = []
+			let bytes = 0
+			const buffer = Buffer.allocUnsafe(Math.min(64 * 1024, maxBytes + 1))
+			while (true) {
+				const remaining = maxBytes + 1 - bytes
+				const read = await handle.read(buffer, 0, Math.min(buffer.length, remaining), null)
+				if (!read.bytesRead) break
+				bytes += read.bytesRead
+				if (bytes > maxBytes) throw new LibraryStoreError('TOO_LARGE', safeMessageForCode('TOO_LARGE'))
+				chunks.push(Buffer.from(buffer.subarray(0, read.bytesRead)))
+			}
+			const after = await handle.stat()
+			if (after.size !== opened.size || after.mtimeMs !== opened.mtimeMs || bytes !== opened.size) {
+				throw new LibraryStoreError('CORRUPT', safeMessageForCode('CORRUPT'))
+			}
+			return Buffer.concat(chunks, bytes)
+		} finally {
+			if (handle) await handle.close().catch(() => {})
+		}
+	}
+
+	async pickImport(context, request, selectFile) {
+		const declaration = this._declaration(context)
+		if (typeof selectFile !== 'function') throw new LibraryStoreError('NOT_READY', safeMessageForCode('NOT_READY'))
+		const encoding = request?.encoding === undefined ? 'bytes' : request.encoding
+		if (encoding !== 'bytes' && encoding !== 'utf8') throw new LibraryStoreError('PATH_INVALID', safeMessageForCode('PATH_INVALID'))
+		const selected = await selectFile({
+			title: this._dialogTitle(request?.title, 'Import library item'),
+			filters: this._dialogFilters(declaration),
+			properties: ['openFile']
+		})
+		if (selected?.canceled) return { canceled: true }
+		if (!Array.isArray(selected?.filePaths) || selected.filePaths.length !== 1) {
+			throw new LibraryStoreError('PATH_INVALID', safeMessageForCode('PATH_INVALID'))
+		}
+		const filePath = String(selected.filePaths[0] || '')
+		if (!path.isAbsolute(filePath)) throw new LibraryStoreError('PATH_INVALID', safeMessageForCode('PATH_INVALID'))
+		const fileName = this._name(path.basename(filePath), declaration.extensions)
+		const data = await this._readLimitedFile(filePath, declaration.maxFileBytes)
+		return { canceled: false, fileName, bytes: data.length, data }
+	}
+
+	async _publishExternalFile(targetPath, payload) {
+		const directory = path.dirname(targetPath)
+		const tempName = `.tmp-modloader-export-${process.pid}-${Number(this.now())}-${this.randomUUID().toLowerCase()}`
+		const tempPath = path.join(directory, tempName)
+		let handle
+		try {
+			handle = await fs.promises.open(tempPath, 'wx')
+			await handle.writeFile(payload)
+			await handle.sync()
+			await handle.close()
+			handle = null
+			const verified = await fs.promises.readFile(tempPath)
+			if (verified.length !== payload.length || sha256(verified) !== sha256(payload)) {
+				throw new LibraryStoreError('CORRUPT', safeMessageForCode('CORRUPT'))
+			}
+			await fs.promises.rename(tempPath, targetPath)
+			await this._syncDirectory(directory)
+		} catch (error) {
+			if (handle) await handle.close().catch(() => {})
+			await fs.promises.rm(tempPath, { force: true }).catch(() => {})
+			throw error
+		}
+	}
+
+	async exportItem(context, request, selectFile) {
+		const declaration = this._declaration(context)
+		if (typeof selectFile !== 'function') throw new LibraryStoreError('NOT_READY', safeMessageForCode('NOT_READY'))
+		const area = normalizeArea(request?.area)
+		if (area !== 'active') throw new LibraryStoreError('PERMISSION_DENIED', safeMessageForCode('PERMISSION_DENIED'))
+		const expectedRevision = normalizeExpectedRevision(request?.expectedRevision, true)
+		const record = await this.read(context, { area, name: request?.name, expectedRevision })
+		const suggestedName = this._name(request?.suggestedName || record.info.name, declaration.extensions)
+		const selected = await selectFile({
+			title: this._dialogTitle(request?.title, 'Export library item'),
+			defaultPath: suggestedName,
+			filters: this._dialogFilters(declaration)
+		})
+		if (selected?.canceled) return { canceled: true }
+		const selectedPath = String(selected?.filePath || '')
+		if (!path.isAbsolute(selectedPath)) throw new LibraryStoreError('PATH_INVALID', safeMessageForCode('PATH_INVALID'))
+		const fileName = this._name(path.basename(selectedPath), declaration.extensions)
+		const parentPath = path.dirname(selectedPath)
+		const parentStat = await fs.promises.lstat(parentPath)
+		if (!parentStat.isDirectory()) throw new LibraryStoreError('PATH_INVALID', safeMessageForCode('PATH_INVALID'))
+		const parentReal = await fs.promises.realpath(parentPath)
+		const targetPath = path.join(parentReal, fileName)
+		const libraryReal = await fs.promises.realpath(this._root(declaration))
+		const relativeToLibrary = path.relative(libraryReal, targetPath)
+		if (!relativeToLibrary || (!relativeToLibrary.startsWith('..') && !path.isAbsolute(relativeToLibrary))) {
+			throw new LibraryStoreError('PERMISSION_DENIED', safeMessageForCode('PERMISSION_DENIED'))
+		}
+		let existing = null
+		try { existing = await fs.promises.lstat(targetPath) } catch (error) { if (error?.code !== 'ENOENT') throw error }
+		if (existing && (existing.isSymbolicLink() || !existing.isFile())) {
+			throw new LibraryStoreError('PATH_INVALID', safeMessageForCode('PATH_INVALID'))
+		}
+		await this._publishExternalFile(targetPath, record.payload)
+		return { canceled: false, fileName, bytes: record.payload.length }
+	}
+
 	async list(context, request) {
 		const declaration = this._declaration(context)
 		await this._ready(declaration)
@@ -841,7 +973,7 @@ class LibraryStore {
 	}
 }
 
-for (const method of ['capabilities', 'list', 'read', 'write', 'rename', 'trash', 'restore', 'quarantine', 'remove', 'folder', 'watch']) {
+for (const method of ['capabilities', 'pickImport', 'exportItem', 'list', 'read', 'write', 'rename', 'trash', 'restore', 'quarantine', 'remove', 'folder', 'watch']) {
 	const original = LibraryStore.prototype[method]
 	LibraryStore.prototype[method] = async function (...args) {
 		try { return await original.apply(this, args) } catch (error) { throw this._publicError(error) }

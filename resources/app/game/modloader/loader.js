@@ -2,7 +2,7 @@
 	'use strict'
 
 	const state = {
-		version: '0.3.0',
+		version: '0.3.1',
 		booted: false,
 		mods: [],
 		modById: {},
@@ -8857,7 +8857,7 @@
 	const SNAPSHOT_API_VERSION = '1.0.0'
 	const SNAPSHOT_SAVE_ID_PATTERN = /^[a-f0-9]{8}-[a-f0-9]{4}-[1-5][a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/i
 	const SNAPSHOT_ERROR_CODES = new Set(['UNAVAILABLE', 'NO_ACTIVE_SAVE', 'INVALID_PAYLOAD', 'TOO_LARGE', 'NOT_FOUND', 'CORRUPT', 'QUOTA', 'IO'])
-	const LIBRARY_API_VERSION = '1.0.0'
+	const LIBRARY_API_VERSION = '1.1.0'
 	const LIBRARY_ERROR_CODES = new Set(['NOT_READY', 'PERMISSION_DENIED', 'PATH_INVALID', 'NAME_CONFLICT', 'REVISION_CONFLICT', 'TOO_LARGE', 'QUOTA_EXCEEDED', 'CORRUPT', 'NOT_FOUND', 'IO_FAILED', 'WATCH_UNAVAILABLE'])
 
 	class ModLoaderSnapshotError extends Error {
@@ -9072,7 +9072,7 @@
 				libraryId,
 				request
 			}))
-			if (action === 'read' && result && typeof result.data !== 'string') {
+			if ((action === 'read' || action === 'pickImport') && result && !result.canceled && typeof result.data !== 'string') {
 				const data = result.data
 				if (data instanceof Uint8Array) result.data = new Uint8Array(data)
 				else if (Array.isArray(data?.data)) result.data = Uint8Array.from(data.data)
@@ -9094,6 +9094,8 @@
 			capabilities() { return request('capabilities') },
 			list(options) { return request('list', options) },
 			read(options) { return request('read', options) },
+			pickImport(options) { return request('pickImport', options) },
+			exportItem(options) { return request('exportItem', options) },
 			write(options) { return request('write', options) },
 			rename(options) { return request('rename', options) },
 			trash(options) { return request('trash', options) },

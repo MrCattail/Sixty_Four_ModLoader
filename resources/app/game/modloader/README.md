@@ -118,7 +118,7 @@ The page cannot import a file, restore a snapshot, or overwrite a Steam save.
 
 ## Installation Library API
 
-ModLoader 0.3.0 adds Library API `1.0.0` for persistent, install-wide,
+ModLoader 0.3.1 exposes Library API `1.1.0` for persistent, install-wide,
 Mod-owned document collections. A Mod must declare each named library in its
 enabled `mod.json`; the main process validates the declaration and owns every
 filesystem operation:
@@ -126,7 +126,7 @@ filesystem operation:
 ```json
 {
   "id": "my-mod",
-  "loaderVersion": ">=0.3.0",
+  "loaderVersion": ">=0.3.1",
   "libraries": {
     "blueprints": {
       "directory": "blueprints",
@@ -168,6 +168,19 @@ const loaded = await library.read({
   expectedRevision: saved.info.revision,
   encoding: 'utf8'
 })
+
+const picked = await library.pickImport({
+  encoding: 'utf8',
+  title: 'Import blueprint'
+})
+
+const exported = await library.exportItem({
+  area: 'active',
+  name: saved.info.name,
+  expectedRevision: saved.info.revision,
+  suggestedName: saved.info.name,
+  title: 'Export blueprint'
+})
 ```
 
 `data` accepts a UTF-8 string or `Uint8Array`. Reads return `Uint8Array` unless
@@ -184,6 +197,20 @@ Use `trash()` for recoverable deletion, `restore()` to return an item, and
 active item is denied. Cache writes are subject to their separate quota and may
 prune least-recently-used cache files. Active and trash files are never
 automatically evicted.
+
+Library API `1.1.0` adds `pickImport()` and `exportItem()` without exposing an
+absolute path. `pickImport()` opens a single-file picker filtered to the
+library's declared extensions, rejects symbolic links and files larger than the
+declared per-file limit before returning a safe `fileName`, byte count, and
+either `Uint8Array` data or UTF-8 text. Cancellation resolves to
+`{ canceled: true }`.
+
+`exportItem()` accepts only an active item with an exact `expectedRevision`,
+opens the system save/overwrite dialog, and publishes the verified managed
+payload through a flushed sibling temporary file and atomic replacement. Its
+result contains only cancellation state, the safe output file name, and byte
+count. Cancellation or failure does not mutate the managed library, and the
+destination may not be inside that library.
 
 ```js
 const deleted = await library.trash({
