@@ -6,11 +6,12 @@ ModLoader.register({
 		const SELECTION_KEY = Symbol.for('cattail.world-editor.selection')
 		const ANALYSIS_KEY = Symbol.for('cattail.world-editor.analysis')
 		const PLACEMENT_KEY = Symbol.for('cattail.world-editor.blueprint-placement')
+		const BLUEPRINT_STATE_KEY = Symbol.for('cattail.world-editor.blueprint-state')
 		const CREATIVE_KEY = Symbol.for('cattail.world-editor.creative-mode')
 		const PREVIEW_KEY = Symbol.for('cattail.world-editor.blueprint-preview')
 		const DELETE_KEY = Symbol.for('cattail.world-editor.selection-delete')
 		const TRANSACTION_KIND = 'selection-delete'
-		const SERVICE_VERSION = '1.0.0'
+		const SERVICE_VERSION = '1.1.0'
 		const ADAPTER_VERSION = '1.0.0'
 		const PLAN_SCHEMA = 1
 		const TRANSACTION_SCHEMA = 1
@@ -25,6 +26,7 @@ ModLoader.register({
 			const transactions = globalThis[TRANSACTIONS_KEY]
 			const selection = globalThis[SELECTION_KEY]
 			const placement = globalThis[PLACEMENT_KEY]
+			const blueprintState = globalThis[BLUEPRINT_STATE_KEY]
 			const creative = globalThis[CREATIVE_KEY]
 			const previous = globalThis[DELETE_KEY]
 			previous?.dispose?.('selection-delete-replaced')
@@ -47,7 +49,7 @@ ModLoader.register({
 				return
 			}
 
-			const service = createService(game, runtime, transactions, selection, placement, creative)
+			const service = createService(game, runtime, transactions, selection, placement, creative, blueprintState)
 			Object.defineProperty(globalThis, DELETE_KEY, {
 				value: service,
 				configurable: true,
@@ -59,7 +61,7 @@ ModLoader.register({
 			console.info('[Cattail World Editor] Safe selection deletion 4C-1a ready.')
 		})
 
-		function createService(game, runtime, transactions, selection, placement, creative) {
+		function createService(game, runtime, transactions, selection, placement, creative, blueprintState) {
 			const listeners = new Set()
 			const identityByEntity = new WeakMap()
 			const transactionData = new Map()
@@ -139,7 +141,7 @@ ModLoader.register({
 							onlyonesAfter: rebuilt.onlyonesAfter,
 							economy: rebuilt.economy,
 							statsDelta: {
-								machinesSold: rebuilt.removals.length
+								machinesSold: rebuilt.removals.filter(isBuildingRemoval).length
 							}
 						}
 					}
@@ -178,7 +180,7 @@ ModLoader.register({
 						if (!targetState.ok) return targetState
 						if (direction === 'redo') {
 							try {
-								const economy = simulateEconomy(game, payload.removals, payload.economy.creative)
+								const economy = simulateEconomy(game, payload.removals.filter(isBuildingRemoval), payload.economy.creative)
 								if (!sameEconomy(economy, payload.economy)) {
 									return denied('PRICE_CHANGED', 'Building or eraser prices changed before deletion.')
 								}
@@ -580,7 +582,9 @@ ModLoader.register({
 					}
 				},
 				planSelections(options) {
-					return plan(createSelectionSource, options)
+					return plan(function () {
+						return createSelectionSource(options)
+					}, options)
 				},
 				planRanges(ranges, options) {
 					return plan(function () {
@@ -618,7 +622,7 @@ ModLoader.register({
 			})
 			return service
 
-			function createSelectionSource() {
+			function createSelectionSource(options) {
 				const state = selection.snapshot()
 				if (
 					state?.previewRange ||
@@ -641,12 +645,15 @@ ModLoader.register({
 						range: normalizeRange(entry?.range)
 					}
 				})
-				return {
+				const source = {
 					kind: 'selection',
 					plane,
 					revision: finiteInteger(state?.revision, 0),
 					ranges
 				}
+				if (creativeActive(creative, game) && options?.removeCubes === true) source.removeCubes = true
+				if (creativeActive(creative, game) && options?.removeSurges === true) source.removeSurges = true
+				return source
 			}
 
 			function createRangesSource(ranges, options) {
@@ -686,7 +693,10 @@ ModLoader.register({
 			async function rebuildPlan(sourceValue, isCancelled) {
 				const source = normalizeSource(sourceValue)
 				if (source.kind === 'selection') {
-					const current = createSelectionSource()
+					const current = createSelectionSource({
+						removeCubes: source.removeCubes === true,
+						removeSurges: source.removeSurges === true
+					})
 					if (!samePlain(current, source)) {
 						throw deletionError('TARGET_CHANGED', 'The committed selections changed after confirmation.')
 					}
@@ -711,26 +721,58 @@ ModLoader.register({
 					if (entity) entities.add(entity)
 					if ((index + 1) % SCAN_CHUNK_SIZE === 0) await yieldTurn(isCancelled)
 				}
+				for (const entity of game.stuff || []) {
+					const name = safeName(entity?.name)
+					const position = normalizePosition(entity?.position)
+					if (
+						(name === 'cube' || name === 'surge') &&
+						position &&
+						cellKeys.has(cellKey(position[0], position[1]))
+					) entities.add(entity)
+				}
 
 				const safe = []
 				const protectedTargets = []
 				for (const entity of entities) {
 					cancelIfNeeded(isCancelled)
-					const assessment = placement.assessEntity(entity)
+					const name = safeName(entity?.name)
+					const requestedLayer = (
+						(name === 'cube' && source.removeCubes === true) ||
+						(name === 'surge' && source.removeSurges === true)
+					)
 					const position = normalizePosition(entity?.position)
 					const footprint = position ? entityFootprint(entity, position) : null
 					const crossBoundary = !!footprint && footprintCrossesMask(footprint, cellKeys)
+					if (name === 'cube' || name === 'surge') {
+						if (requestedLayer && transientRemovalSafe(game, entity, name, blueprintState)) {
+							try {
+								safe.push(captureRestorableEntity(entity, crossBoundary, name))
+							} catch (captureError) {
+								protectedTargets.push(captureProtectedEntity(entity, 'save-unavailable', crossBoundary, name))
+							}
+						} else {
+							protectedTargets.push(captureProtectedEntity(
+								entity,
+								requestedLayer ? 'unsafe-' + name : name,
+								crossBoundary,
+								name
+							))
+						}
+						continue
+					}
+					const assessment = placement.assessEntity(entity)
 					if (assessment?.safe) {
 						try {
-							safe.push(captureRestorableEntity(entity, crossBoundary))
+							safe.push(captureRestorableEntity(entity, crossBoundary, 'building'))
 						} catch (captureError) {
-							protectedTargets.push(captureProtectedEntity(entity, 'save-unavailable', crossBoundary))
+							protectedTargets.push(captureProtectedEntity(entity, 'save-unavailable', crossBoundary, 'building'))
 						}
 					} else {
 						protectedTargets.push(captureProtectedEntity(
 							entity,
 							protectedReason(entity, assessment?.reason),
-							crossBoundary
+							crossBoundary,
+							'building'
 						))
 					}
 				}
@@ -740,10 +782,11 @@ ModLoader.register({
 				safe.sort(compareDescriptors)
 				protectedTargets.sort(compareDescriptors)
 
-				const onlyOneKeys = collectOnlyOneKeys(game, safe)
+				const buildingRemovals = safe.filter(isBuildingRemoval)
+				const onlyOneKeys = collectOnlyOneKeys(game, buildingRemovals)
 				const onlyonesBefore = captureOnlyones(game, onlyOneKeys)
-				const onlyonesAfter = simulateOnlyones(game, onlyonesBefore, onlyOneKeys, safe)
-				const economy = simulateEconomy(game, safe, creativeActive(creative, game))
+				const onlyonesAfter = simulateOnlyones(game, onlyonesBefore, onlyOneKeys, buildingRemovals)
+				const economy = simulateEconomy(game, buildingRemovals, creativeActive(creative, game))
 				const scopeCells = collectScopeCells(safe)
 				const crossBoundaryCount = safe.concat(protectedTargets).filter(function (entry) {
 					return entry.crossBoundary
@@ -754,7 +797,10 @@ ModLoader.register({
 					protectedCount: protectedTargets.length,
 					crossBoundaryCount,
 					resourceDelta: economy.delta.slice(),
-					creative: economy.creative
+					creative: economy.creative,
+					buildingCount: buildingRemovals.length,
+					cubeCount: safe.filter(function (entry) { return entry.layer === 'cube' }).length,
+					surgeCount: safe.filter(function (entry) { return entry.layer === 'surge' }).length
 				}
 				const signatureValue = {
 					source,
@@ -801,7 +847,7 @@ ModLoader.register({
 				return Array.from(result.values()).sort(comparePositions)
 			}
 
-			function captureRestorableEntity(entity, crossBoundary) {
+			function captureRestorableEntity(entity, crossBoundary, layer) {
 				const save = captureEntitySave(game, entity)
 				const position = normalizePosition(entity?.position)
 				if (!position || !save) {
@@ -809,6 +855,7 @@ ModLoader.register({
 				}
 				return {
 					identity: ensureIdentity(entity),
+					layer: normalizeRemovalLayer(layer, entity),
 					name: safeName(entity.name),
 					position,
 					footprint: entityFootprint(entity, position),
@@ -817,7 +864,7 @@ ModLoader.register({
 				}
 			}
 
-			function captureProtectedEntity(entity, reason, crossBoundary) {
+			function captureProtectedEntity(entity, reason, crossBoundary, layer) {
 				const position = normalizePosition(entity?.position) || [0, 0]
 				let save = null
 				try {
@@ -825,6 +872,7 @@ ModLoader.register({
 				} catch (saveError) {}
 				return {
 					identity: ensureIdentity(entity),
+					layer: normalizeRemovalLayer(layer, entity),
 					name: safeName(entity?.name),
 					position,
 					footprint: entityFootprint(entity, position),
@@ -856,6 +904,12 @@ ModLoader.register({
 			function inspectRecordedTargets(payload, direction) {
 				if (direction === 'undo') {
 					for (const descriptor of payload.removals) {
+						if (!isBuildingRemoval(descriptor)) {
+							if (findExpectedEntity(descriptor)) {
+								return denied('EXTERNAL_CHANGE', 'A deleted transient layer changed outside World Editor.')
+							}
+							continue
+						}
 						for (const position of footprintCells(descriptor.footprint)) {
 							if (entityAt(game, position)) {
 								return denied('EXTERNAL_CHANGE', 'A deleted building footprint changed outside World Editor.')
@@ -866,7 +920,7 @@ ModLoader.register({
 				}
 
 				for (const descriptor of payload.removals) {
-					const entity = entityAt(game, descriptor.position)
+					const entity = findExpectedEntity(descriptor)
 					if (
 						!entity ||
 						ensureIdentity(entity) !== descriptor.identity ||
@@ -874,8 +928,13 @@ ModLoader.register({
 					) {
 						return denied('EXTERNAL_CHANGE', 'A deletion target changed outside World Editor.')
 					}
-					const assessment = placement.assessEntity(entity)
-					if (!assessment?.safe && assessment?.reason !== 'last-extractor') {
+					const safeNow = isBuildingRemoval(descriptor)
+						? (function () {
+							const assessment = placement.assessEntity(entity)
+							return assessment?.safe || assessment?.reason === 'last-extractor'
+						})()
+						: transientRemovalSafe(game, entity, descriptor.layer, blueprintState)
+					if (!safeNow) {
 						return denied('UNSAFE_DELETION', 'A deletion target is no longer safe to restore.')
 					}
 					try {
@@ -936,10 +995,14 @@ ModLoader.register({
 					state.mutations.push({ kind: 'removed', descriptor: removed })
 					if ((index + 1) % APPLY_CHUNK_SIZE === 0) await yieldOperation(context)
 				}
-				applyStatsMutation(state, {
-					machinesSold: state.statsBefore.machinesSold + payload.statsDelta.machinesSold,
-					timeSinceLastDelete: 0
-				})
+				if (payload.statsDelta.machinesSold > 0) {
+					applyStatsMutation(state, {
+						machinesSold: state.statsBefore.machinesSold + payload.statsDelta.machinesSold,
+						timeSinceLastDelete: 0
+					})
+				} else {
+					state.statsAfter = captureStats(game)
+				}
 				applyOnlyoneMutation(state, payload.onlyOneKeys, payload.onlyonesAfter)
 			}
 
@@ -958,10 +1021,14 @@ ModLoader.register({
 					state.mutations.push({ kind: 'created', descriptor })
 					if ((index + 1) % APPLY_CHUNK_SIZE === 0) await yieldOperation(context)
 				}
-				applyStatsMutation(state, {
-					machinesSold: state.statsBefore.machinesSold - payload.statsDelta.machinesSold,
-					timeSinceLastDelete: saved?.timeSinceLastDelete ?? state.statsBefore.timeSinceLastDelete
-				})
+				if (payload.statsDelta.machinesSold > 0) {
+					applyStatsMutation(state, {
+						machinesSold: state.statsBefore.machinesSold - payload.statsDelta.machinesSold,
+						timeSinceLastDelete: saved?.timeSinceLastDelete ?? state.statsBefore.timeSinceLastDelete
+					})
+				} else {
+					state.statsAfter = captureStats(game)
+				}
 				applyOnlyoneMutation(state, payload.onlyOneKeys, payload.onlyonesBefore)
 			}
 
@@ -989,7 +1056,7 @@ ModLoader.register({
 			}
 
 			function removeExpectedEntity(descriptor) {
-				const entity = entityAt(game, descriptor.position)
+				const entity = findExpectedEntity(descriptor)
 				traceProbe('apply.clear.before', {
 					name: descriptor.name,
 					position: descriptor.position,
@@ -1021,7 +1088,7 @@ ModLoader.register({
 					})
 					throw clearError
 				}
-				const remaining = entityAt(game, descriptor.position)
+				const remaining = findExpectedEntity(descriptor)
 				traceProbe('apply.clear.after', {
 					name: descriptor.name,
 					position: descriptor.position,
@@ -1035,7 +1102,10 @@ ModLoader.register({
 			}
 
 			function addExpectedEntity(descriptor) {
-				assertFootprintEmpty(game, descriptor.footprint)
+				if (isBuildingRemoval(descriptor)) assertFootprintEmpty(game, descriptor.footprint)
+				else if (findExpectedEntity(descriptor)) {
+					throw deletionError('EXTERNAL_CHANGE', 'A transient deletion target is no longer empty.')
+				}
 				const entity = restoreEntitySave(game, descriptor.save)
 				if (!entity) throw deletionError('APPLY_FAILED', 'A deleted building could not be restored.')
 				assignIdentity(entity, descriptor.identity)
@@ -1046,7 +1116,7 @@ ModLoader.register({
 				for (let index = state.mutations.length - 1; index >= 0; index -= 1) {
 					const mutation = state.mutations[index]
 					if (mutation.kind === 'created') {
-						const entity = entityAt(game, mutation.descriptor.position)
+						const entity = findExpectedEntity(mutation.descriptor)
 						if (!entity || ensureIdentity(entity) !== mutation.descriptor.identity) {
 							throw deletionError('ROLLBACK_FAILED', 'A restored entity could not be removed during rollback.')
 						}
@@ -1067,8 +1137,12 @@ ModLoader.register({
 
 			function verifyAppliedState(payload, state, expectedAfter) {
 				for (const descriptor of payload.removals) {
-					const entity = entityAt(game, descriptor.position)
+					const entity = findExpectedEntity(descriptor)
 					if (expectedAfter) {
+						if (!isBuildingRemoval(descriptor)) {
+							if (entity) return denied('VERIFY_FAILED', 'A deleted transient layer is still present.')
+							continue
+						}
 						for (const position of footprintCells(descriptor.footprint)) {
 							if (entityAt(game, position)) {
 								return denied('VERIFY_FAILED', 'A deleted building is still present.')
@@ -1098,6 +1172,23 @@ ModLoader.register({
 					return denied('VERIFY_FAILED', 'Only-one state did not match the deletion transaction.')
 				}
 				return approved()
+			}
+
+			function findExpectedEntity(descriptor) {
+				const direct = entityAt(game, descriptor?.position)
+				if (
+					direct &&
+					ensureIdentity(direct) === descriptor?.identity &&
+					safeName(direct.name) === safeName(descriptor?.name)
+				) return direct
+				for (const entity of game.stuff || []) {
+					if (
+						ensureIdentity(entity) === descriptor?.identity &&
+						safeName(entity?.name) === safeName(descriptor?.name) &&
+						samePosition(entity?.position, descriptor?.position)
+					) return entity
+				}
+				return null
 			}
 
 			function ensureIdentity(entity) {
@@ -1238,7 +1329,11 @@ ModLoader.register({
 					}
 				})
 			}
-			if (kind === 'selection') source.revision = finiteInteger(value?.revision, -1)
+			if (kind === 'selection') {
+				source.revision = finiteInteger(value?.revision, -1)
+				if (value?.removeCubes === true) source.removeCubes = true
+				if (value?.removeSurges === true) source.removeSurges = true
+			}
 			return source
 		}
 
@@ -1271,6 +1366,35 @@ ModLoader.register({
 		function protectedReason(entity, reason) {
 			if (safeName(entity?.name) === 'cube') return 'cube'
 			return String(reason || 'protected')
+		}
+
+		function normalizeRemovalLayer(value, entity) {
+			const layer = String(value || '').toLowerCase()
+			if (layer === 'cube' || layer === 'surge') return layer
+			const name = safeName(entity?.name)
+			return name === 'cube' || name === 'surge' ? name : 'building'
+		}
+
+		function isBuildingRemoval(value) {
+			return normalizeRemovalLayer(value?.layer, value) === 'building'
+		}
+
+		function transientRemovalSafe(game, entity, layerValue, blueprintState) {
+			const layer = normalizeRemovalLayer(layerValue, entity)
+			if (layer === 'cube') {
+				return safeName(entity?.name) === 'cube' && Number(entity?.state) === 2 && entity?.killme !== true
+			}
+			if (layer !== 'surge' || safeName(entity?.name) !== 'surge' || entity?.killme === true) return false
+			if (Number(entity?.harvestProgression) > 0 || Number(entity?.lifeTimer) <= 0) return false
+			try {
+				const saved = game?.getEntityString?.(entity)
+				if (typeof blueprintState?.surgeEligible === 'function') {
+					return blueprintState.surgeEligible(entity, saved)
+				}
+				return !!saved && Number(saved?.par?.life) > 0 && Number(saved?.par?.maxLife) > 0
+			} catch (error) {
+				return false
+			}
 		}
 
 		function footprintCrossesMask(footprint, mask) {
@@ -1537,6 +1661,12 @@ ModLoader.register({
 
 		function restoreMisc(save) {
 			const par = save.par || {}
+			if (save.name === 'cube') {
+				return {
+					pump: false,
+					resources: jsonClone(par.resources || [])
+				}
+			}
 			if (save.name === 'surge') {
 				return {
 					resources: jsonClone(par.resources),

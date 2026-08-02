@@ -431,7 +431,7 @@ function loadPreviewRuntime() {
 			const retry = key === retryTarget && !retryIssued
 			if (retry) retryIssued = true
 			return Promise.resolve({
-				version: '0.4.5',
+				version: '0.5.0',
 				target: normalizedTarget,
 				records: [],
 				statusCounts: {
@@ -598,8 +598,8 @@ function keyEvent(code, key) {
 
 async function testInitializationAndBasicHistory() {
 	const runtime = loadRuntime()
-	assert.equal(runtime.placement.version, '1.2.0')
-	assert.equal(runtime.placement.snapshot().version, '1.2.0')
+	assert.equal(runtime.placement.version, '1.3.0')
+	assert.equal(runtime.placement.snapshot().version, '1.3.0')
 	assert.equal(runtime.placement.snapshot().ready, true)
 	assert.deepEqual(
 		Array.from(runtime.transactions.snapshot().registeredKinds),
@@ -1125,8 +1125,8 @@ async function testPreviewCommandLockLifecycle() {
 
 function testStaticUiLocalizationAndManifestContracts() {
 	const manifest = JSON.parse(source('mod.json'))
-	assert.equal(manifest.version, '0.4.5')
-	assert.equal(manifest.entry.length, 31)
+	assert.equal(manifest.version, '0.5.0')
+	assert.equal(manifest.entry.length, 35)
 	assert.ok(manifest.entry.indexOf(PLACEMENT_SOURCE) > manifest.entry.indexOf(PLAN_SOURCE))
 	assert.ok(manifest.entry.indexOf(PLACEMENT_SOURCE) < manifest.entry.indexOf('scripts/core/input-controller.js'))
 	assert.ok(manifest.entry.indexOf(DIALOG_SOURCE) > manifest.entry.indexOf('scripts/ui/card-opacity.js'))

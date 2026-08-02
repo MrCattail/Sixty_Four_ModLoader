@@ -51,6 +51,7 @@ function testManifestAndLocalization() {
 		'toolbarCardStructure',
 		'toolbarCardFull',
 		'toolbarCardCubes',
+		'toolbarCardSurges',
 		'toolbarCardCopy',
 		'toolbarCardRotateClockwise',
 		'toolbarCardRotateCounterclockwise',
@@ -214,7 +215,10 @@ function testSourceContracts() {
 	assert.match(blueprintSource, /action\s*===\s*'reset'\s*&&\s*!!currentTransform\.identity/)
 	assert.match(blueprintSource, /root\.hidden\s*=\s*!available/)
 	assert.match(blueprintSource, /full\.hidden\s*=\s*!creativeAvailable/)
-	assert.match(blueprintSource, /blocks\.hidden\s*=\s*!creativeAvailable\s*\|\|\s*state\.mode\s*!==\s*'full'/)
+	assert.match(blueprintSource, /blocksAvailable\s*=\s*creativeAvailable\s*&&\s*state\.mode\s*===\s*'full'\s*&&\s*!!state\.sourceBlueprint\?\.blocks\?\.length/)
+	assert.match(blueprintSource, /blocks\.hidden\s*=\s*!blocksAvailable/)
+	assert.match(blueprintSource, /surgesAvailable\s*=\s*creativeAvailable\s*&&\s*state\.mode\s*===\s*'full'\s*&&\s*!!state\.sourceBlueprint\?\.surges\?\.length/)
+	assert.match(blueprintSource, /surges\.hidden\s*=\s*!surgesAvailable/)
 	assert.match(blueprintSource, /location\s*===\s*'toolbar'\)\s*button\.dataset\.worldEditorToolbarCard/)
 	assert.match(blueprintSource, /toolbarCardRotateCounterclockwise/)
 	assert.match(blueprintSource, /cattail:world-editor-toolbar-layout/)

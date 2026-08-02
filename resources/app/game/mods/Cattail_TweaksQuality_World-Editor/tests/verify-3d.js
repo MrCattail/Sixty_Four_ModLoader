@@ -198,6 +198,17 @@ function testPivotAndOrderedMatrixState() {
 	assert.equal(state.mirrorV, true)
 	assert.deepEqual(plain(state.matrix), [0, 1, -1, 0])
 	assert.deepEqual(plain(state.blueprint.entities[0].position), [0, 3])
+
+	assert.equal(transform.restore({ rotation: 270, mirrorU: true, mirrorV: false }, 'test-restore'), true)
+	state = transform.snapshot()
+	assert.equal(state.rotation, 270)
+	assert.equal(state.mirrorU, true)
+	assert.equal(state.mirrorV, false)
+	assert.deepEqual(plain(state.matrix), [0, 1, 1, 0])
+	assert.equal(state.lastCommand, 'restore')
+	assert.equal(transform.restore({ rotation: 270, mirrorU: true, mirrorV: false }), false)
+	assert.equal(transform.restore({ rotation: 45, mirrorU: false, mirrorV: false }), true)
+	assert.equal(transform.snapshot().identity, true)
 }
 
 function testExhaustiveOrderedCommands() {
@@ -1313,7 +1324,7 @@ function testLocalizationAndIntegrationContract() {
 	]
 
 	assert.equal(i18n.languages.length, 20)
-	assert.equal(i18n.keys.length, 179)
+	assert.equal(i18n.keys.length, 187)
 	for (const language of i18n.languages) {
 		for (const key of transformKeys) {
 			const translated = i18n.t(language, key)
@@ -1322,9 +1333,9 @@ function testLocalizationAndIntegrationContract() {
 		}
 	}
 
-	assert.equal(manifest.version, '0.4.5')
+	assert.equal(manifest.version, '0.5.0')
 	assert.equal(manifest.languageSupport.gameLanguage, true)
-	assert.equal(manifest.entry.length, 31)
+	assert.equal(manifest.entry.length, 35)
 	assert.equal(
 		manifest.entry.indexOf(SHARED_SOURCE),
 		manifest.entry.indexOf('scripts/core/foundation.js') + 1
@@ -1335,7 +1346,7 @@ function testLocalizationAndIntegrationContract() {
 	)
 	assert.equal(
 		manifest.entry.indexOf(TRANSFORM_SOURCE),
-		manifest.entry.indexOf('scripts/core/selection-analysis.js') + 3
+		manifest.entry.indexOf('scripts/core/selection-analysis.js') + 4
 	)
 	assert.equal(
 		manifest.entry.indexOf('scripts/core/blueprint-preview-plan.js'),
@@ -1343,7 +1354,7 @@ function testLocalizationAndIntegrationContract() {
 	)
 
 	assert.match(transformSource, /Symbol\.for\('cattail\.world-editor\.blueprint-transform'\)/)
-	assert.match(transformSource, /version:\s*'0\.4\.5'/)
+	assert.match(transformSource, /version:\s*'0\.5\.0'/)
 	assert.doesNotMatch(transformSource, /requestAnimationFrame|setInterval|onFrame/)
 	assert.doesNotMatch(transformSource, /getEntityString|entityAtCoordinates|stuffMap/)
 	assert.match(previewSource, /FOLLOW_PLAN_IDLE_MS\s*=\s*100/)
@@ -1499,7 +1510,7 @@ function testLocalizationAndIntegrationContract() {
 	assert.match(sessionSource, /const transformSlot = shell\?\.querySelector\?\.\('\[data-world-editor-slot="transform"\]'\)/)
 	assert.match(sessionSource, /blueprintSlot\.append\(controls\.root\)/)
 	assert.match(sessionSource, /transformSlot\.append\(controls\.transforms\)/)
-	assert.match(sessionSource, /root\.append\(modes,\s*blocks,\s*copy\)/)
+	assert.match(sessionSource, /root\.append\(modes,\s*blocks,\s*surges,\s*copy\)/)
 	assert.doesNotMatch(sessionSource, /root\.append\(modes,\s*blocks,\s*copy,\s*transforms\)/)
 	assert.match(sessionSource, /ui\.controls\.transforms\.remove\(\)/)
 	assert.match(

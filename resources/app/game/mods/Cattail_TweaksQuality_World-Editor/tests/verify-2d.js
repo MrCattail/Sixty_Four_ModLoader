@@ -584,9 +584,9 @@ function testLocalizationManifestAndReadOnlyBoundary() {
 	const api = createApi()
 	for (const definition of definitions) definition.init(api)
 	const i18n = sandbox[I18N_KEY]
-	assert.equal(i18n.version, '0.4.5')
+	assert.equal(i18n.version, '0.5.0')
 	assert.equal(i18n.languages.length, 20)
-	assert.equal(i18n.keys.length, 179)
+	assert.equal(i18n.keys.length, 187)
 	for (const language of i18n.languages) {
 		for (const key of ['toolbarModeResize', 'toolResize', 'cardResizePreview', 'resizeHint']) {
 			assert.notEqual(i18n.t(language, key), key)
@@ -598,7 +598,7 @@ function testLocalizationManifestAndReadOnlyBoundary() {
 	assert.equal(i18n.t('en', 'resizeHint'), 'Release to resize / Esc Cancel')
 
 	const manifest = JSON.parse(fs.readFileSync(path.join(MOD_ROOT, 'mod.json'), 'utf8'))
-	assert.equal(manifest.version, '0.4.5')
+	assert.equal(manifest.version, '0.5.0')
 	assert.equal(manifest.languageSupport.gameLanguage, true)
 	assert.deepEqual(manifest.entry, [
 		'scripts/core/foundation.js',
@@ -612,6 +612,7 @@ function testLocalizationManifestAndReadOnlyBoundary() {
 		'scripts/core/selection-analysis.js',
 		'scripts/core/production-state.js',
 		'scripts/core/blueprint-state.js',
+		'scripts/core/blueprint-library-format.js',
 		'scripts/core/blueprint-transform.js',
 		'scripts/core/blueprint-preview-plan.js',
 		'scripts/core/blueprint-placement.js',
@@ -627,9 +628,12 @@ function testLocalizationManifestAndReadOnlyBoundary() {
 		'scripts/ui/editor-shell.js',
 		'scripts/ui/selection-delete-ui.js',
 		'scripts/blueprint-session.js',
+		'scripts/core/blueprint-library.js',
 		'scripts/core/selection-cut.js',
 		'scripts/ui/selection-cut-ui.js',
 		'scripts/blueprint-preview.js',
+		'scripts/render/blueprint-thumbnail.js',
+		'scripts/ui/blueprint-library-ui.js',
 		'scripts/ui/selection-card.js',
 		'scripts/ui/production-cards.js'
 	])
@@ -637,6 +641,7 @@ function testLocalizationManifestAndReadOnlyBoundary() {
 	const scriptRoot = path.join(MOD_ROOT, 'scripts')
 	const cardOpacitySource = fs.readFileSync(path.join(scriptRoot, 'ui', 'card-opacity.js'), 'utf8')
 	const creativeModeSource = fs.readFileSync(path.join(scriptRoot, 'core', 'creative-mode.js'), 'utf8')
+	const libraryUiSource = fs.readFileSync(path.join(scriptRoot, 'ui', 'blueprint-library-ui.js'), 'utf8')
 	const placementSource = fs.readFileSync(path.join(scriptRoot, 'core', 'blueprint-placement.js'), 'utf8')
 	const selectionDeleteSource = fs.readFileSync(path.join(scriptRoot, 'core', 'selection-delete.js'), 'utf8')
 	const scriptSources = readScriptSources(scriptRoot)
@@ -645,13 +650,15 @@ function testLocalizationManifestAndReadOnlyBoundary() {
 		.filter(source => source !== placementSource && source !== selectionDeleteSource)
 		.join('\n')
 	const stateFreeSources = scriptSources
-		.filter(source => source !== cardOpacitySource && source !== creativeModeSource)
+		.filter(source => source !== cardOpacitySource && source !== creativeModeSource && source !== libraryUiSource)
 		.join('\n')
 	assert.doesNotMatch(readOnlySources, /\bgame\.(?:addEntity|clearCell|deleteEntity|removeEntity|placeEntity)\b/)
 	assert.doesNotMatch(stateFreeSources, /\b(?:localStorage|sessionStorage)\b/)
 	assert.doesNotMatch(cardOpacitySource, /\bsessionStorage\b/)
 	assert.match(creativeModeSource, /\blocalStorage\b/)
 	assert.doesNotMatch(creativeModeSource, /\bsessionStorage\b/)
+	assert.match(libraryUiSource, /\blocalStorage\b/)
+	assert.doesNotMatch(libraryUiSource, /\bsessionStorage\b/)
 	assert.doesNotMatch(sources, /\b(?:writeFile|writeFileSync|appendFile|appendFileSync)\b/)
 	assert.match(sources, /api\.render\.onLayer\(RENDER_LAYER_ID/)
 	assert.match(sources, /previewKind: previewRange \? \(moveSession \? 'move' : resizeSession \? 'resize'/)

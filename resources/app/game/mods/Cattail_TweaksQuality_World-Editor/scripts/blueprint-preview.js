@@ -182,7 +182,7 @@ ModLoader.register({
 			}
 
 			const controller = Object.freeze({
-				version: '0.4.5',
+				version: '0.5.0',
 				game,
 				snapshot,
 				exit,
@@ -224,7 +224,7 @@ ModLoader.register({
 					const planning = await planner.benchmark(settings)
 					const rendering = await benchmarkRendering(settings)
 					const result = {
-						version: '0.4.5',
+						version: '0.5.0',
 						planning,
 						rendering,
 						runtime: performanceSnapshot()
@@ -305,6 +305,10 @@ ModLoader.register({
 			})
 			const stopSessionSubscription = session.subscribe(function (state) {
 				const previousBlueprint = currentSession?.blueprint
+				const placementLayerChanged = !!currentSession && (
+					currentSession.includeBlocks !== state.includeBlocks ||
+					currentSession.includeSurges !== state.includeSurges
+				)
 				currentSession = state
 				if (!state.blueprint && !state.lastResult) {
 					exit('blueprint-cleared')
@@ -322,6 +326,7 @@ ModLoader.register({
 					enter(state.blueprint, state.blueprint?.mode === 'full' ? 'full-captured' : 'structure-captured')
 				} else {
 					handledAttemptId = Math.max(handledAttemptId, attemptId)
+					if (placementLayerChanged && active && !paused && target) requestPlan('placement-layer-changed', 1)
 				}
 			})
 			const stopTransformSubscription = transformAvailable ? transform.subscribe(function (state) {
@@ -506,11 +511,11 @@ ModLoader.register({
 				controller.dispose('runtime-disposed')
 			})
 
-			console.info('[Cattail World Editor] Structure/full blueprint preview 4D ready.')
+			console.info('[Cattail World Editor] Structure/full blueprint preview 5A ready.')
 
 			function snapshot() {
 				return Object.freeze({
-					version: '0.4.5',
+					version: '0.5.0',
 					active,
 					pinned,
 					temporaryPinned,
@@ -728,6 +733,8 @@ ModLoader.register({
 					let candidate = await planner.build(game, requestBlueprint, requestTarget, {
 						chunkSize: 512,
 						includeDynamicConflicts: !!placement,
+						includeBlocks: currentSession.includeBlocks === true,
+						includeSurges: currentSession.includeSurges === true,
 						canReplaceEntity: typeof placement?.assessEntity === 'function'
 							? function (entity, details) { return placement.assessEntity(entity, details) }
 							: undefined,

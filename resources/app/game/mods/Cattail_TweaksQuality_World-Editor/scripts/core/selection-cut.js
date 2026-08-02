@@ -5,7 +5,7 @@ ModLoader.register({
 		const DELETE_KEY = Symbol.for('cattail.world-editor.selection-delete')
 		const BLUEPRINT_KEY = Symbol.for('cattail.world-editor.blueprint')
 		const CUT_KEY = Symbol.for('cattail.world-editor.selection-cut')
-		const SERVICE_VERSION = '1.0.0'
+		const SERVICE_VERSION = '1.1.0'
 		const PLAN_SCHEMA = 1
 
 		api.on('afterGameInit', function (payload, game) {
@@ -89,7 +89,7 @@ ModLoader.register({
 				}
 			}
 
-			async function plan() {
+			async function plan(options) {
 				if (disposed) throw cutError('NOT_READY', 'Selection cut is unavailable.')
 				if (planning || busy || dialogOpen || deletion.isInputBlocked?.() || blueprint.snapshot?.().capturing) {
 					throw cutError('BUSY', 'Another World Editor operation is running.')
@@ -100,21 +100,22 @@ ModLoader.register({
 				error = null
 				notify('selection-cut-planning-started')
 				try {
-					const deletionPlan = await deletion.planSelections()
+					const requestedOptions = normalizeCutOptions(options)
+					const deletionPlan = await deletion.planSelections(requestedOptions)
 					if (token !== planToken || disposed) throw cutError('INVALIDATED', 'Selection cut planning was cancelled.')
 					const safeCount = nonNegativeInteger(deletionPlan?.summary?.safeCount)
-					let candidate = null
-					if (safeCount > 0) {
-						try {
-							candidate = await blueprint.prepareCut(deletionPlan)
-						} catch (candidateError) {
-							throw normalizeCandidateError(candidateError)
-						}
+					let candidate
+					try {
+						candidate = await blueprint.prepareCut(deletionPlan)
+					} catch (candidateError) {
+						throw normalizeCandidateError(candidateError)
 					}
+					const effectiveOptions = normalizeCutOptions(requestedOptions, deletionPlan?.summary?.creative === true)
 					const result = deepFreeze({
 						schema: PLAN_SCHEMA,
 						deletionPlan,
 						candidate,
+						options: effectiveOptions,
 						replacesBlueprint: !!blueprint.snapshot?.().blueprint,
 						summary: {
 							sourceCellCount: nonNegativeInteger(deletionPlan?.summary?.sourceCellCount),
@@ -124,11 +125,14 @@ ModLoader.register({
 							resourceDelta: Array.isArray(deletionPlan?.summary?.resourceDelta)
 								? deletionPlan.summary.resourceDelta.slice()
 								: [],
-							creative: deletionPlan?.summary?.creative === true
+							creative: deletionPlan?.summary?.creative === true,
+							buildingCount: nonNegativeInteger(deletionPlan?.summary?.buildingCount),
+							cubeCount: nonNegativeInteger(candidate?.blueprint?.blocks?.length),
+							surgeCount: nonNegativeInteger(candidate?.blueprint?.surges?.length)
 						}
 					})
 					lastPlan = result
-					phase = safeCount ? 'planned' : 'nothing'
+					phase = candidate ? 'planned' : 'nothing'
 					return result
 				} catch (planError) {
 					error = publicError(planError)
@@ -142,7 +146,7 @@ ModLoader.register({
 				}
 			}
 
-			async function execute(planValue, input) {
+			async function execute(planValue, input, options) {
 				if (disposed) return rejectedResult('NOT_READY', 'Selection cut is unavailable.')
 				if (planning || busy || deletion.isInputBlocked?.() || blueprint.snapshot?.().capturing) {
 					return rejectedResult('BUSY', 'Another World Editor operation is running.')
@@ -153,13 +157,39 @@ ModLoader.register({
 				} catch (planError) {
 					return rejectedResult(planError?.code || 'INVALID_PLAN', planError?.message)
 				}
-				if (!planRequest.summary.safeCount || !planRequest.candidate) {
-					return rejectedResult('NOTHING_SAFE', 'The selection contains no safely cuttable buildings.')
-				}
+				if (!planRequest.candidate) return rejectedResult('NOTHING_SAFE', 'The selection contains no capturable blueprint content.')
 
 				busy = true
-				phase = 'copying'
+				phase = 'planning'
 				error = null
+				notify('selection-cut-execution-planning')
+				const requestedOptions = normalizeCutOptions(options, planRequest.summary.creative === true)
+				if (!sameCutOptions(requestedOptions, planRequest.options)) {
+					try {
+						const deletionPlan = await deletion.planSelections(requestedOptions)
+						const candidate = await blueprint.prepareCut(deletionPlan)
+						planRequest = normalizePlan(Object.assign({}, planRequest, {
+							deletionPlan,
+							candidate,
+							options: requestedOptions,
+							summary: Object.assign({}, planRequest.summary, {
+								safeCount: nonNegativeInteger(deletionPlan?.summary?.safeCount),
+								protectedCount: nonNegativeInteger(deletionPlan?.summary?.protectedCount),
+								crossBoundaryCount: nonNegativeInteger(deletionPlan?.summary?.crossBoundaryCount),
+								resourceDelta: Array.isArray(deletionPlan?.summary?.resourceDelta) ? deletionPlan.summary.resourceDelta.slice() : [],
+								buildingCount: nonNegativeInteger(deletionPlan?.summary?.buildingCount)
+							})
+						}))
+					} catch (replanError) {
+						error = publicError(normalizeCandidateError(replanError), 'CUT_PLAN_FAILED')
+						phase = 'failed'
+						lastResult = rejectedResult(error.code, error.message)
+						busy = false
+						notify('selection-cut-execution-failed')
+						return lastResult
+					}
+				}
+				phase = 'copying'
 				notify('selection-cut-copying')
 				let published
 				try {
@@ -190,6 +220,29 @@ ModLoader.register({
 					})
 					busy = false
 					notify(copied ? 'selection-cut-copied-only' : 'selection-cut-clipboard-failed')
+					return lastResult
+				}
+
+				if (!planRequest.summary.safeCount) {
+					blueprint.completeCut(
+						published.cutToken,
+						{ status: 'success' },
+						'selection-cut-copy-complete'
+					)
+					phase = 'success'
+					lastResult = deepFreeze({
+						accepted: true,
+						executed: true,
+						copied: true,
+						deleted: false,
+						reason: 'success-retained-layers',
+						transaction: null,
+						snapshotId: null,
+						options: planRequest.options,
+						error: null
+					})
+					busy = false
+					notify('selection-cut-execution-success')
 					return lastResult
 				}
 
@@ -315,8 +368,8 @@ ModLoader.register({
 
 		function normalizePlan(value) {
 			const safeCount = nonNegativeInteger(value?.summary?.safeCount)
-			const candidateValid = safeCount === 0
-				? value?.candidate == null
+			const candidateValid = value?.candidate == null
+				? safeCount === 0
 				: (
 					Number(value?.candidate?.schema) === 1 &&
 					value.candidate?.cutToken === value?.deletionPlan?.signature
@@ -331,7 +384,21 @@ ModLoader.register({
 			) {
 				throw cutError('INVALID_PLAN', 'A valid selection cut plan is required.')
 			}
-			return value
+			return Object.assign({}, value, {
+				options: normalizeCutOptions(value.options, value.summary?.creative === true)
+			})
+		}
+
+		function normalizeCutOptions(value, creative) {
+			const enabled = creative === undefined ? true : creative === true
+			return {
+				removeCubes: enabled && value?.removeCubes === true,
+				removeSurges: enabled && value?.removeSurges === true
+			}
+		}
+
+		function sameCutOptions(left, right) {
+			return !!left?.removeCubes === !!right?.removeCubes && !!left?.removeSurges === !!right?.removeSurges
 		}
 
 		function normalizeCandidateError(error) {
@@ -347,7 +414,8 @@ ModLoader.register({
 				schema: plan.schema,
 				replacesBlueprint: plan.replacesBlueprint,
 				summary: plan.summary,
-				signature: plan.deletionPlan?.signature || ''
+				signature: plan.deletionPlan?.signature || '',
+				options: plan.options
 			}
 		}
 

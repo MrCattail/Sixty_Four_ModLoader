@@ -264,9 +264,10 @@ ModLoader.register({
 				showStatus('cutPlanning', 'busy', 0)
 				let plan
 				try {
+					currentBlueprint = blueprint.snapshot()
 					plan = await cut.plan()
 					currentCut = cut.snapshot()
-					if (!Number(plan?.summary?.safeCount)) {
+					if (!plan?.candidate) {
 						showStatus('cutNothing', 'neutral', FAILURE_MS)
 						return
 					}
@@ -281,6 +282,8 @@ ModLoader.register({
 
 			function openConfirmation(plan, input) {
 				const summary = plan.summary
+				let removeCubes = false
+				let removeSurges = false
 				const dialog = dialogs.create({
 					id: DIALOG_ID,
 					theme: game.plane ? 'void' : 'reality',
@@ -305,6 +308,32 @@ ModLoader.register({
 					replacement.textContent = text('cutReplaceWarning')
 					dialog.content.append(replacement)
 				}
+				if (summary.creative && (summary.cubeCount || summary.surgeCount)) {
+					const layerMessage = document.createElement('p')
+					layerMessage.className = 'cattail-world-editor-selection-cut__layers-message'
+					layerMessage.textContent = text('cutLayerMessage')
+					const layerOptions = document.createElement('div')
+					layerOptions.className = 'cattail-world-editor-selection-cut__layers'
+					const cubes = dialog.createButton('', {})
+					const surges = dialog.createButton('', {})
+					cubes.classList.add('cattail-world-editor-selection-cut__layer-option')
+					surges.classList.add('cattail-world-editor-selection-cut__layer-option')
+					cubes.hidden = !summary.cubeCount
+					surges.hidden = !summary.surgeCount
+					const renderLayers = function () {
+						cubes.textContent = text('cutCubeOption', { count: summary.cubeCount })
+						surges.textContent = text('cutSurgeOption', { count: summary.surgeCount })
+						for (const entry of [[cubes, removeCubes], [surges, removeSurges]]) {
+							entry[0].dataset.active = entry[1] ? 'true' : 'false'
+							entry[0].setAttribute('aria-pressed', entry[1] ? 'true' : 'false')
+						}
+					}
+					cubes.addEventListener('click', function () { removeCubes = !removeCubes; renderLayers() })
+					surges.addEventListener('click', function () { removeSurges = !removeSurges; renderLayers() })
+					renderLayers()
+					layerOptions.append(cubes, surges)
+					dialog.content.append(layerMessage, layerOptions)
+				}
 				const economy = document.createElement('p')
 				economy.className = 'cattail-world-editor-selection-cut__economy'
 				economy.textContent = summary.creative
@@ -327,7 +356,10 @@ ModLoader.register({
 					renderButton()
 					showStatus('cutCopying', 'busy', 0)
 					try {
-						const result = await cut.execute(plan, input)
+						const result = await cut.execute(plan, input, {
+							removeCubes,
+							removeSurges
+						})
 						currentCut = cut.snapshot()
 						currentDeletion = deletion.snapshot()
 						currentTransactions = transactions.snapshot()
@@ -557,7 +589,8 @@ ModLoader.register({
 					color: #ff7d72;
 				}
 				.cattail-world-editor-selection-cut__economy,
-				.cattail-world-editor-selection-cut__warning {
+				.cattail-world-editor-selection-cut__warning,
+				.cattail-world-editor-selection-cut__layers-message {
 					margin: 0;
 					color: var(--world-editor-dialog-muted);
 					font: 600 13px/1.5 Montserrat, sans-serif;
@@ -565,6 +598,19 @@ ModLoader.register({
 				}
 				.cattail-world-editor-selection-cut__warning {
 					color: var(--world-editor-dialog-accent);
+				}
+				.cattail-world-editor-selection-cut__layers {
+					display: grid;
+					gap: 7px;
+				}
+				.cattail-world-editor-selection-cut__layer-option {
+					white-space: normal;
+					text-align: left;
+				}
+				.cattail-world-editor-selection-cut__layer-option[data-active="true"] {
+					border-color: rgba(166, 242, 70, .75);
+					background: rgba(166, 242, 70, .14);
+					color: #dfff9c;
 				}
 			`
 			document.head.append(style)

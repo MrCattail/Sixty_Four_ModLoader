@@ -2,8 +2,8 @@
   "id": "Cattail_TweaksQuality_World-Editor",
   "uniqueId": "Cattail_TweaksQuality_World-Editor",
   "name": "World Editor",
-  "version": "0.4.5",
-  "loaderVersion": ">=0.2.0",
+  "version": "0.5.0",
+  "loaderVersion": ">=0.3.0",
   "languageSupport": {
     "gameLanguage": true
   },
@@ -19,6 +19,7 @@
     "scripts/core/selection-analysis.js",
     "scripts/core/production-state.js",
     "scripts/core/blueprint-state.js",
+    "scripts/core/blueprint-library-format.js",
     "scripts/core/blueprint-transform.js",
     "scripts/core/blueprint-preview-plan.js",
     "scripts/core/blueprint-placement.js",
@@ -34,13 +35,36 @@
     "scripts/ui/editor-shell.js",
     "scripts/ui/selection-delete-ui.js",
     "scripts/blueprint-session.js",
+    "scripts/core/blueprint-library.js",
     "scripts/core/selection-cut.js",
     "scripts/ui/selection-cut-ui.js",
     "scripts/blueprint-preview.js",
+    "scripts/render/blueprint-thumbnail.js",
+    "scripts/ui/blueprint-library-ui.js",
     "scripts/ui/selection-card.js",
     "scripts/ui/production-cards.js"
   ],
-  "description": "A modular in-game world editor developed in small, independently validated stages without modifying vanilla scripts.",
+  "description": "A modular in-game world editor with safe selection tools, full blueprints, and an install-wide persistent blueprint library.",
+  "libraries": {
+    "blueprints": {
+      "directory": "blueprints",
+      "extensions": [
+        ".cattail-blueprint.json"
+      ],
+      "maxFileBytes": 16777216,
+      "maxTotalBytes": 2147483648,
+      "maxEntries": 5000,
+      "cache": {
+        "directories": [
+          "thumbnails"
+        ],
+        "extensions": [
+          ".png"
+        ],
+        "maxBytes": 536870912
+      }
+    }
+  },
   "config": {
     "enabled": {
       "type": "boolean",

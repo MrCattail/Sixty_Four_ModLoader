@@ -2888,6 +2888,7 @@ ModLoader.register({
 				toolbarCardStructure: 'Structure',
 				toolbarCardFull: 'Full',
 				toolbarCardCubes: 'Cubes',
+				toolbarCardSurges: 'Surges',
 				toolbarCardCopy: 'Copy',
 				toolbarCardRotateClockwise: 'Rotate CW',
 				toolbarCardRotateCounterclockwise: 'Rotate CCW',
@@ -4115,24 +4116,60 @@ ModLoader.register({
 		}
 		const FULL_BLUEPRINT_TEXT = {
 			en: {
-				previewFullUnavailable: 'Full blueprint · Creative Mode only; preview remains available',
+				previewFullUnavailable: 'Full source projected to structure outside Creative Mode',
 				placementOptionsTitleFull: 'Place full blueprint?',
-				blueprintFullSummary: 'Stable Cubes {cubes} · empty cells {empty} · normalized {normalized}'
+				blueprintFullSummary: 'Stable Cubes {cubes} · empty cells {empty} · normalized {normalized}',
+				blueprintIncludeSurges: 'Place surges',
+				blueprintSurge: 'Surge',
+				toolbarCardSurges: 'Surges',
+				placementLayerMessage: 'Choose the transient layers to include in this placement. Both options default to off for each newly loaded or captured blueprint.',
+				placementCubeOption: 'Place stable Cubes ({count})',
+				placementSurgeOption: 'Place safe Surges ({count})',
+				cutLayerMessage: 'Creative Mode can remove captured transient layers in the same safe cut transaction. Both choices apply only to this cut and default to off.',
+				cutCubeOption: 'Also remove the {count} captured stable Cube(s). Recommended only when the source Cubes should move with this blueprint.',
+				cutSurgeOption: 'Also remove the {count} captured safe Surge(s). Recommended only when the source Surges should move with this blueprint.'
 			},
 			sch: {
-				previewFullUnavailable: '完整蓝图 · 仅创造模式可放置；预览仍可用',
+				previewFullUnavailable: '非创造模式会把完整源蓝图按结构规格预览和放置',
 				placementOptionsTitleFull: '放置完整蓝图？',
-				blueprintFullSummary: '稳定 Cube {cubes} · 空格 {empty} · 已归一化 {normalized}'
+				blueprintFullSummary: '稳定 Cube {cubes} · 空格 {empty} · 已归一化 {normalized}',
+				blueprintIncludeSurges: '放置 Surge',
+				blueprintSurge: 'Surge',
+				toolbarCardSurges: 'Surge',
+				placementLayerMessage: '请选择本次放置要包含的临时层。每次新加载或捕获蓝图时，这两个选项都默认关闭。',
+				placementCubeOption: '放置稳定 Cube（{count}）',
+				placementSurgeOption: '放置安全 Surge（{count}）',
+				cutLayerMessage: '创造模式可以在同一条安全剪切事务中移除已捕获的临时层；两个选项都只对本次剪切生效，并且默认关闭。',
+				cutCubeOption: '同时移除已捕获的 {count} 个稳定 Cube；仅当这些 Cube 应随蓝图一起移动时建议启用。',
+				cutSurgeOption: '同时移除已捕获的 {count} 个安全 Surge；仅当这些 Surge 应随蓝图一起移动时建议启用。'
 			},
 			modsch: {
-				previewFullUnavailable: '完整蓝图 · 仅创造模式可放置；预览仍可用',
+				previewFullUnavailable: '非创造模式会把完整源蓝图按结构规格预览和放置',
 				placementOptionsTitleFull: '放置完整蓝图？',
-				blueprintFullSummary: '稳定 Cube {cubes} · 空格 {empty} · 已归一化 {normalized}'
+				blueprintFullSummary: '稳定 Cube {cubes} · 空格 {empty} · 已归一化 {normalized}',
+				blueprintIncludeSurges: '放置 Surge',
+				blueprintSurge: 'Surge',
+				toolbarCardSurges: 'Surge',
+				placementLayerMessage: '请选择本次放置要包含的临时层。每次新加载或捕获蓝图时，这两个选项都默认关闭。',
+				placementCubeOption: '放置稳定 Cube（{count}）',
+				placementSurgeOption: '放置安全 Surge（{count}）',
+				cutLayerMessage: '创造模式可以在同一条安全剪切事务中移除已捕获的临时层；两个选项都只对本次剪切生效，并且默认关闭。',
+				cutCubeOption: '同时移除已捕获的 {count} 个稳定 Cube；仅当这些 Cube 应随蓝图一起移动时建议启用。',
+				cutSurgeOption: '同时移除已捕获的 {count} 个安全 Surge；仅当这些 Surge 应随蓝图一起移动时建议启用。'
 			},
 			tch: {
-				previewFullUnavailable: '完整藍圖 · 僅創造模式可放置；預覽仍可用',
+				previewFullUnavailable: '非創造模式會把完整來源藍圖按結構規格預覽和放置',
 				placementOptionsTitleFull: '放置完整藍圖？',
-				blueprintFullSummary: '穩定 Cube {cubes} · 空格 {empty} · 已正規化 {normalized}'
+				blueprintFullSummary: '穩定 Cube {cubes} · 空格 {empty} · 已正規化 {normalized}',
+				blueprintIncludeSurges: '放置 Surge',
+				blueprintSurge: 'Surge',
+				toolbarCardSurges: 'Surge',
+				placementLayerMessage: '請選擇本次放置要包含的暫態層。每次新載入或擷取藍圖時，這兩個選項都預設關閉。',
+				placementCubeOption: '放置穩定 Cube（{count}）',
+				placementSurgeOption: '放置安全 Surge（{count}）',
+				cutLayerMessage: '創造模式可以在同一筆安全剪下交易中移除已擷取的暫態層；兩個選項都只對本次剪下生效，並且預設關閉。',
+				cutCubeOption: '同時移除已擷取的 {count} 個穩定 Cube；僅當這些 Cube 應隨藍圖一起移動時建議啟用。',
+				cutSurgeOption: '同時移除已擷取的 {count} 個安全 Surge；僅當這些 Surge 應隨藍圖一起移動時建議啟用。'
 			}
 		}
 		for (const language of Object.keys(TEXT)) {
@@ -4175,7 +4212,7 @@ ModLoader.register({
 		Object.freeze(TEXT)
 
 		const i18n = Object.freeze({
-			version: '0.4.5',
+			version: '0.5.0',
 			languages: LANGUAGES,
 			keys: KEYS,
 			toolbarKeys: TOOLBAR_KEYS,

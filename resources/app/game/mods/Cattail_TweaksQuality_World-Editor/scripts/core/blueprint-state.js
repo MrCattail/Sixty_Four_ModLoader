@@ -28,11 +28,14 @@ ModLoader.register({
 		let disposed = false
 
 		const service = Object.freeze({
-			version: '0.4.5',
+			version: '0.5.0',
 			normalizePar,
 			normalizeSave,
 			normalizeSaveDetailed,
 			normalizeBlueprint,
+			normalizeSurge,
+			projectStructure,
+			surgeEligible,
 			capture(game, entity) {
 				if (!game || typeof game.getEntityString !== 'function') return null
 				let saved
@@ -81,7 +84,7 @@ ModLoader.register({
 			if (
 				!blueprint ||
 				blueprint.mode !== 'full' ||
-				(schemaVersion !== 3 && schemaVersion !== 5) ||
+				(schemaVersion !== 3 && schemaVersion !== 5 && schemaVersion !== 6) ||
 				!Array.isArray(blueprint.entities)
 			) {
 				return blueprint
@@ -124,6 +127,11 @@ ModLoader.register({
 					return next
 				})
 				: []
+			if (schemaVersion === 6 && Array.isArray(blueprint.surges)) {
+				blueprint.surges = blueprint.surges.map(normalizeSurge).filter(Boolean)
+			} else if (schemaVersion !== 6) {
+				blueprint.surges = []
+			}
 			const ordered = waypointEntries.slice().sort(function (left, right) {
 				if (left.order !== null || right.order !== null) {
 					return finiteOr(left.order, Number.MAX_SAFE_INTEGER) -
@@ -136,14 +144,101 @@ ModLoader.register({
 				const record = blueprint.entities[entry.index]
 				record.stateMeta = Object.assign({}, record.stateMeta, { waypointOrder: order })
 			})
-			if (schemaVersion === 5 && !Array.isArray(blueprint.emptyCells)) blueprint.emptyCells = []
+			if ((schemaVersion === 5 || schemaVersion === 6) && !Array.isArray(blueprint.emptyCells)) blueprint.emptyCells = []
 			blueprint.summary = Object.assign({}, blueprint.summary, {
+				surgeCount: Array.isArray(blueprint.surges) ? blueprint.surges.length : 0,
 				normalizedCount: Math.max(
 					nonNegativeInteger(blueprint.summary?.normalizedCount, 0),
 					normalizedCount
 				)
 			})
 			return blueprint
+		}
+
+		function normalizeSurge(value) {
+			const position = normalizePosition(value?.position)
+			const detail = normalizeSaveDetailed({
+				name: 'surge',
+				position,
+				par: value?.state || value?.par
+			})
+			const state = detail.save?.par
+			if (
+				!position ||
+				!state ||
+				!Array.isArray(state.resources) ||
+				!Array.isArray(state.colors) ||
+				positiveNumber(state.life) <= 0 ||
+				positiveNumber(state.maxLife) <= 0 ||
+				positiveInteger(state.rayNumber) <= 0
+			) return null
+			return {
+				kind: 'surge',
+				name: 'surge',
+				position,
+				state
+			}
+		}
+
+		function surgeEligible(entity, saved) {
+			if (safeName(entity?.name) !== 'surge' || entity?.killme) return false
+			if (positiveNumber(entity?.harvestProgression) > 0) return false
+			const normalized = normalizeSurge({
+				position: entity?.position,
+				state: saved?.par || saved?.state || saved || entity?.state || entity?.par
+			})
+			return !!normalized && positiveNumber(entity?.lifeTimer ?? normalized.state.life) > 0
+		}
+
+		function projectStructure(value) {
+			const source = normalizeBlueprint(value)
+			if (!source || typeof source !== 'object') return source
+			if (source.mode === 'structure') return source
+			const entities = (source.entities || []).map(function (record) {
+				const next = jsonClone(record)
+				delete next.state
+				delete next.stateMeta
+				return next
+			})
+			const neutral = new Map()
+			for (const record of [].concat(source.blocks || [], source.surges || [])) {
+				const position = normalizePosition(record?.position)
+				if (position) neutral.set(position[0] + ':' + position[1], position)
+			}
+			const emptyCells = (source.emptyCells || []).map(normalizePosition).filter(Boolean).filter(function (position) {
+				return !neutral.has(position[0] + ':' + position[1])
+			})
+			const capturedTypes = typeCounts(entities)
+			const skippedTypes = Array.isArray(source.summary?.skippedTypes)
+				? jsonClone(source.summary.skippedTypes).filter(function (entry) {
+					return safeName(entry?.name) !== 'cube' && safeName(entry?.name) !== 'surge'
+				})
+				: []
+			return {
+				schemaVersion: 4,
+				mode: 'structure',
+				sourceSchemaVersion: Number(source.schemaVersion) || 0,
+				sourceMode: source.mode,
+				sourcePlane: Number(source.sourcePlane) ? 1 : 0,
+				anchor: jsonClone(source.anchor),
+				selections: jsonClone(source.selections || []),
+				emptyCells: emptyCells.sort(comparePositions),
+				neutralCells: Array.from(neutral.values()).sort(comparePositions),
+				contentBounds: jsonClone(source.contentBounds),
+				includeBlocks: false,
+				entities,
+				blocks: [],
+				surges: [],
+				production: jsonClone(source.production),
+				summary: Object.assign({}, jsonClone(source.summary || {}), {
+					entityCount: entities.length,
+					blockCount: 0,
+					surgeCount: 0,
+					neutralCellCount: neutral.size,
+					capturedTypes,
+					skippedTypes
+				})
+			}
 		}
 
 		function normalizeSave(value) {
@@ -239,6 +334,33 @@ ModLoader.register({
 		function nonNegativeInteger(value, fallback) {
 			const number = Math.floor(Number(value))
 			return Number.isFinite(number) && number >= 0 ? number : fallback
+		}
+
+		function positiveInteger(value) {
+			const number = Math.floor(Number(value))
+			return Number.isFinite(number) && number > 0 ? number : 0
+		}
+
+		function positiveNumber(value) {
+			const number = Number(value)
+			return Number.isFinite(number) && number > 0 ? number : 0
+		}
+
+		function comparePositions(left, right) {
+			return Number(left?.[1]) - Number(right?.[1]) || Number(left?.[0]) - Number(right?.[0])
+		}
+
+		function typeCounts(entities) {
+			const counts = new Map()
+			for (const entity of entities || []) {
+				const name = safeName(entity?.name) || 'unknown'
+				counts.set(name, (counts.get(name) || 0) + 1)
+			}
+			return Array.from(counts, function (entry) {
+				return { name: entry[0], reason: 'captured', count: entry[1] }
+			}).sort(function (left, right) {
+				return left.name < right.name ? -1 : left.name > right.name ? 1 : 0
+			})
 		}
 	}
 })

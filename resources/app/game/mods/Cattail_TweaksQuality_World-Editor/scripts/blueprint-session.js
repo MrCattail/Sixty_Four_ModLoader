@@ -181,11 +181,15 @@ ModLoader.register({
 			const stopSessionSubscription = session.subscribe(function (state) {
 				const previousAttempt = currentSession?.attemptId || 0
 				const wasCapturing = !!currentSession?.capturing
-				const previousBlueprint = currentSession?.blueprint
+				const previousSource = currentSession?.sourceBlueprint
+				const previousMode = currentSession?.mode
 				currentSession = state
-				if (transformAvailable && state.blueprint !== previousBlueprint) {
-					if (state.blueprint) transform.bind(state.blueprint, 'session-blueprint')
+				if (transformAvailable && state.sourceBlueprint !== previousSource) {
+					if (state.sourceBlueprint) transform.bind(state.sourceBlueprint, 'session-blueprint')
 					else transform.clear('session-blueprint-cleared')
+				}
+				if (transformAvailable && (state.sourceBlueprint !== previousSource || state.mode !== previousMode)) {
+					transform.setExecutionMode?.(state.mode, 'session-execution-mode')
 				}
 				if (ui && state.attemptId > previousAttempt) restartTemporaryWindow()
 				if (ui && wasCapturing && !state.capturing) resumeTemporaryTimer()
@@ -196,12 +200,19 @@ ModLoader.register({
 				refreshUi()
 			})
 			const stopCreativeSubscription = creative.subscribe(function (state) {
+				const wasCreative = !!currentCreative?.ready && !!currentCreative?.creativeMode
 				currentCreative = state
 				if ((!state.ready || !state.creativeMode) && currentSession.mode !== 'structure') {
 					session.setMode('structure', 'creative-mode-unavailable')
 				}
 				if ((!state.ready || !state.creativeMode) && currentSession.includeBlocks) {
 					session.setIncludeBlocks(false, 'creative-mode-unavailable')
+				}
+				if ((!state.ready || !state.creativeMode) && currentSession.includeSurges) {
+					session.setIncludeSurges(false, 'creative-mode-unavailable')
+				}
+				if (!wasCreative && state.ready && state.creativeMode) {
+					session.setMode('full', 'creative-mode-default')
 				}
 				refreshUi()
 			})
@@ -341,7 +352,7 @@ ModLoader.register({
 				session.dispose('runtime-disposed')
 			})
 
-			console.info('[Cattail World Editor] Read-only blueprint session 3A ready.')
+			console.info('[Cattail World Editor] Persistent blueprint session 5A ready.')
 
 			function connectPreviewController() {
 				const next = globalThis[PREVIEW_KEY]
@@ -385,9 +396,13 @@ ModLoader.register({
 			}
 
 			function createBlueprintSession(sessionGame, selectionState) {
-				let mode = 'structure'
+				let mode = creative.snapshot?.().ready && creative.snapshot?.().creativeMode ? 'full' : 'structure'
 				let includeBlocks = false
+				let includeSurges = false
+				let sourceBlueprint = null
 				let blueprint = null
+				let dirty = false
+				let origin = null
 				let lastResult = null
 				let revision = 0
 				let attemptId = 0
@@ -398,10 +413,14 @@ ModLoader.register({
 
 				function snapshot() {
 					return Object.freeze({
-						version: '0.4.5',
+						version: '0.5.0',
 						mode,
 						includeBlocks: mode === 'full' && includeBlocks,
+						includeSurges: mode === 'full' && includeSurges,
+						sourceBlueprint,
 						blueprint,
+						dirty,
+						origin,
 						lastResult,
 						capturing,
 						attemptId,
@@ -419,6 +438,46 @@ ModLoader.register({
 							console.warn('[Cattail World Editor] Blueprint listener failed.', error)
 						}
 					}
+				}
+
+				function executionBlueprint(source, desiredMode) {
+					if (!source) return null
+					if (source.mode !== 'full' || desiredMode === 'full') return source
+					const stateService = globalThis[BLUEPRINT_STATE_KEY]
+					return deepFreeze(jsonClone(stateService?.projectStructure?.(source) || source))
+				}
+
+				function replaceSource(nextSource, options) {
+					const normalized = deepFreeze(jsonClone(nextSource))
+					if (!normalized || !Array.isArray(normalized.entities) || (normalized.mode !== 'structure' && normalized.mode !== 'full')) {
+						throw new Error('invalid-blueprint-source')
+					}
+					sourceBlueprint = normalized
+					if (normalized.mode === 'structure') mode = 'structure'
+					else if (!creative.snapshot?.().ready || !creative.snapshot?.().creativeMode) mode = 'structure'
+					blueprint = executionBlueprint(normalized, mode)
+					includeBlocks = false
+					includeSurges = false
+					dirty = options?.dirty === true
+					origin = options?.origin ? deepFreeze(jsonClone(options.origin)) : null
+					attemptId += 1
+					lastResult = options?.result ? deepFreeze(jsonClone(options.result)) : deepFreeze({
+						attemptId,
+						status: 'loaded',
+						clipboard: 'unchanged',
+						mode: normalized.mode,
+						executionMode: mode,
+						includeBlocks: Array.isArray(normalized.blocks) && normalized.blocks.length > 0,
+						includeSurges: Array.isArray(normalized.surges) && normalized.surges.length > 0,
+						sourcePlane: Number(normalized.sourcePlane) ? 1 : 0,
+						anchor: normalizePosition(normalized.anchor?.position) || [0, 0],
+						summary: normalized.summary || emptySummary(0),
+						capturedTypes: normalized.summary?.capturedTypes || [],
+						skippedTypes: normalized.summary?.skippedTypes || []
+					})
+					revision += 1
+					notify()
+					return snapshot()
 				}
 
 				function publishResult(result, reason) {
@@ -447,8 +506,10 @@ ModLoader.register({
 						attemptId: currentAttempt,
 						status: 'capturing',
 						clipboard: 'pending',
-						mode,
-						includeBlocks: mode === 'full' && includeBlocks,
+						mode: 'full',
+						executionMode: mode,
+						includeBlocks: true,
+						includeSurges: true,
 						sourcePlane: source.sourcePlane,
 						anchor: source.anchor,
 						summary: emptySummary(selectionSnapshot.selections.length),
@@ -461,8 +522,8 @@ ModLoader.register({
 						candidate = await buildBlueprint(
 							selectionSnapshot,
 							source,
-							mode,
-							mode === 'full' && includeBlocks,
+							'full',
+							true,
 							function () {
 								return disposed || token !== captureToken
 							}
@@ -470,7 +531,7 @@ ModLoader.register({
 					} catch (error) {
 						if (token !== captureToken || disposed) return Object.freeze({ status: 'cancelled' })
 						capturing = false
-						const failed = resultFromError(currentAttempt, source, mode, includeBlocks, error)
+						const failed = resultFromError(currentAttempt, source, 'full', true, error)
 						publishResult(failed, 'capture-failed')
 						return failed
 					}
@@ -482,8 +543,10 @@ ModLoader.register({
 							attemptId: currentAttempt,
 							status: 'empty',
 							clipboard: 'unchanged',
-							mode,
-							includeBlocks: mode === 'full' && includeBlocks,
+							mode: 'full',
+							executionMode: mode,
+							includeBlocks: true,
+							includeSurges: true,
 							sourcePlane: source.sourcePlane,
 							anchor: source.anchor,
 							summary: candidate?.summary || emptySummary(selectionSnapshot.selections.length),
@@ -495,13 +558,18 @@ ModLoader.register({
 					}
 
 					const normalized = deepFreeze(jsonClone(candidate.blueprint))
-					blueprint = normalized
+					sourceBlueprint = normalized
+					blueprint = executionBlueprint(normalized, mode)
+					dirty = true
+					origin = null
 					const pending = deepFreeze({
 						attemptId: currentAttempt,
 						status: 'captured',
 						clipboard: 'pending',
 						mode: normalized.mode,
-						includeBlocks: normalized.includeBlocks,
+						executionMode: mode,
+						includeBlocks: true,
+						includeSurges: true,
 						sourcePlane: normalized.sourcePlane,
 						anchor: normalized.anchor.position,
 						summary: normalized.summary,
@@ -512,7 +580,7 @@ ModLoader.register({
 
 					let clipboard = 'ready'
 					try {
-						await writeClipboardText(JSON.stringify(normalized, null, 2))
+						await writeClipboardText(JSON.stringify(sourceBlueprint, null, 2))
 					} catch (error) {
 						clipboard = 'failed'
 						console.warn('[Cattail World Editor] Blueprint clipboard write failed.', error)
@@ -568,28 +636,33 @@ ModLoader.register({
 					captureToken += 1
 					capturing = false
 					attemptId += 1
-					mode = 'structure'
 					includeBlocks = false
-					blueprint = candidate.blueprint
+					includeSurges = false
+					sourceBlueprint = candidate.blueprint
+					blueprint = executionBlueprint(sourceBlueprint, mode)
+					dirty = true
+					origin = null
 					const result = deepFreeze({
 						attemptId,
 						status: 'captured',
 						clipboard: 'ready',
 						cutStatus: 'pending',
 						cutToken: candidate.cutToken,
-						mode: 'structure',
-						includeBlocks: false,
-						sourcePlane: blueprint.sourcePlane,
-						anchor: blueprint.anchor.position,
-						summary: blueprint.summary,
-						capturedTypes: blueprint.summary.capturedTypes,
-						skippedTypes: blueprint.summary.skippedTypes
+						mode: 'full',
+						executionMode: mode,
+						includeBlocks: true,
+						includeSurges: true,
+						sourcePlane: sourceBlueprint.sourcePlane,
+						anchor: sourceBlueprint.anchor.position,
+						summary: sourceBlueprint.summary,
+						capturedTypes: sourceBlueprint.summary.capturedTypes,
+						skippedTypes: sourceBlueprint.summary.skippedTypes
 					})
 					publishResult(result, reason || 'cut-blueprint-ready')
 					return deepFreeze({
 						status: 'ready',
 						cutToken: candidate.cutToken,
-						blueprint,
+						blueprint: sourceBlueprint,
 						result
 					})
 				}
@@ -618,21 +691,27 @@ ModLoader.register({
 				}
 
 				const session = Object.freeze({
-					version: '0.4.5',
+					version: '0.5.0',
 					game: sessionGame,
-					schemaVersion: 4,
+					schemaVersion: 6,
 					snapshot,
 					setMode(nextMode, reason) {
 						if (disposed || (nextMode !== 'structure' && nextMode !== 'full') || nextMode === mode) return false
+						if (nextMode === 'full' && sourceBlueprint && sourceBlueprint.mode !== 'full') return false
+						if (nextMode === 'full' && (!creative.snapshot?.().ready || !creative.snapshot?.().creativeMode)) return false
 						mode = nextMode
-						if (mode === 'structure') includeBlocks = false
+						if (mode === 'structure') {
+							includeBlocks = false
+							includeSurges = false
+						}
+						blueprint = executionBlueprint(sourceBlueprint, mode)
 						revision += 1
 						notify()
 						if (reason) console.info('[Cattail World Editor] Blueprint mode ' + mode + ' (' + reason + ').')
 						return true
 					},
 					setIncludeBlocks(next, reason) {
-						if (disposed || mode !== 'full') return false
+						if (disposed || mode !== 'full' || !sourceBlueprint?.blocks?.length) return false
 						next = !!next
 						if (includeBlocks === next) return false
 						includeBlocks = next
@@ -641,22 +720,52 @@ ModLoader.register({
 						if (reason) console.info('[Cattail World Editor] Blueprint blocks ' + (next ? 'enabled' : 'disabled') + ' (' + reason + ').')
 						return true
 					},
+					setIncludeSurges(next, reason) {
+						if (disposed || mode !== 'full' || !sourceBlueprint?.surges?.length) return false
+						next = !!next
+						if (includeSurges === next) return false
+						includeSurges = next
+						revision += 1
+						notify()
+						if (reason) console.info('[Cattail World Editor] Blueprint surges ' + (next ? 'enabled' : 'disabled') + ' (' + reason + ').')
+						return true
+					},
+					loadSource(nextSource, metadata, reason) {
+						if (disposed) throw new Error('blueprint-session-disposed')
+						const state = replaceSource(nextSource, { dirty: false, origin: metadata || null })
+						if (reason) console.info('[Cattail World Editor] Blueprint loaded (' + reason + ').')
+						return state
+					},
+					markSaved(metadata, reason) {
+						if (disposed || !sourceBlueprint) return false
+						dirty = false
+						origin = metadata ? deepFreeze(jsonClone(metadata)) : origin
+						revision += 1
+						notify()
+						if (reason) console.info('[Cattail World Editor] Blueprint saved (' + reason + ').')
+						return true
+					},
 					capture,
 					cancelCapture,
 					prepareCut,
 					publishCut,
 					completeCut,
 					clear(reason) {
-						if (disposed || (!blueprint && !lastResult && !capturing)) return false
+						if (disposed || (!sourceBlueprint && !blueprint && !lastResult && !capturing)) return false
 						cancelCapture(reason || 'cleared')
+						sourceBlueprint = null
 						blueprint = null
+						dirty = false
+						origin = null
+						includeBlocks = false
+						includeSurges = false
 						lastResult = null
 						revision += 1
 						notify()
 						return true
 					},
 					exportJSON() {
-						return blueprint ? JSON.stringify(blueprint, null, 2) : ''
+						return sourceBlueprint ? JSON.stringify(sourceBlueprint, null, 2) : ''
 					},
 					subscribe(listener) {
 						if (typeof listener !== 'function') throw new TypeError('World Editor blueprint listener must be a function.')
@@ -675,6 +784,7 @@ ModLoader.register({
 						if (disposed) return false
 						cancelCapture(reason || 'disposed')
 						disposed = true
+						sourceBlueprint = null
 						blueprint = null
 						lastResult = null
 						listeners.clear()
@@ -694,7 +804,6 @@ ModLoader.register({
 					!Array.isArray(planValue.source?.ranges) ||
 					!planValue.source.ranges.length ||
 					!Array.isArray(planValue.removals) ||
-					!planValue.removals.length ||
 					typeof planValue.signature !== 'string' ||
 					!planValue.signature
 				) {
@@ -721,17 +830,23 @@ ModLoader.register({
 				const emptyCells = cutEmptyCells(planValue, ranges.absolute, anchor)
 				const entityRecords = []
 				const capturedEntities = []
+				const blockRecords = []
+				const surgeRecords = []
+				const waypointRecords = []
 				const skipped = new Map()
 				let crossBoundaryCount = 0
 				let contentBounds = null
+				let normalizedCount = 0
+				const blueprintState = globalThis[BLUEPRINT_STATE_KEY]
 
 				for (const descriptor of planValue.removals) {
 					const name = String(descriptor?.name || '').trim()
 					const position = normalizePosition(descriptor?.position)
 					if (!name || !position) throw new Error('invalid-cut-removal')
+					if (name === 'cube' || name === 'surge') continue
 					const footprint = normalizeCutFootprint(descriptor?.footprint, position)
 					const definition = game.codex?.entities?.[name]
-					if (!definition || definition.canPurchase !== true || name === 'cube') {
+					if (!definition || definition.canPurchase !== true) {
 						throw new Error('unsafe-cut-removal')
 					}
 					let entity = null
@@ -745,7 +860,7 @@ ModLoader.register({
 					) {
 						throw new Error('cut-target-changed')
 					}
-					entityRecords.push({
+					const record = {
 						kind: 'entity',
 						name,
 						position: subtract(position, anchor),
@@ -758,23 +873,88 @@ ModLoader.register({
 							onlyOne: definition.onlyone === true
 						},
 						config: {}
-					})
+					}
+					let saved
+					let rawTimestamp = null
+					try {
+						const rawSave = cloneEntitySave(game.getEntityString(entity))
+						rawTimestamp = Number(rawSave?.par?.timestamp)
+						const detail = blueprintState?.normalizeSaveDetailed?.(rawSave)
+						saved = detail?.save || rawSave
+						if (detail?.changed) normalizedCount += 1
+					} catch (error) {}
+					if (!saved) throw new Error('unsafe-cut-removal')
+					record.state = saved.par
+					if (name === 'waypoint' || name === 'waypoint2') {
+						waypointRecords.push({ record, timestamp: Number.isFinite(rawTimestamp) ? rawTimestamp : Number.MAX_SAFE_INTEGER })
+					}
+					entityRecords.push(record)
 					capturedEntities.push(entity)
 					if (descriptor.crossBoundary === true) crossBoundaryCount += 1
 					contentBounds = includeBounds(contentBounds, footprint)
 				}
+				for (const entity of game.stuff || []) {
+					const name = safeEntityName(entity)
+					if (name !== 'cube' && name !== 'surge') continue
+					const position = normalizePosition(entity?.position)
+					if (!position || !pointInSelections(position[0], position[1], ranges.absolute)) continue
+					let rawSave
+					let detail
+					try {
+						rawSave = cloneEntitySave(game.getEntityString(entity))
+						detail = blueprintState?.normalizeSaveDetailed?.(rawSave)
+					} catch (error) {}
+					const saved = detail?.save || rawSave
+					if (name === 'cube') {
+						if (Number(entity.state) !== 2 || !saved) {
+							addTypeCount(skipped, name, Number(entity.state) === 2 ? 'unserializable' : 'unstable')
+							continue
+						}
+						blockRecords.push({ kind: 'cube', name, position: subtract(position, anchor), state: saved.par })
+					} else {
+						if (!saved || !blueprintState?.surgeEligible?.(entity, saved)) {
+							addTypeCount(skipped, name, 'unsafe-transient')
+							continue
+						}
+						const normalizedSurge = blueprintState.normalizeSurge({ position: subtract(position, anchor), state: saved.par })
+						if (!normalizedSurge) {
+							addTypeCount(skipped, name, 'unserializable')
+							continue
+						}
+						surgeRecords.push(normalizedSurge)
+					}
+					if (detail?.changed) normalizedCount += 1
+					contentBounds = includePoint(contentBounds, position)
+				}
 				for (const descriptor of Array.isArray(planValue.protectedTargets) ? planValue.protectedTargets : []) {
+					if (descriptor?.name === 'cube' || descriptor?.name === 'surge') continue
 					addTypeCount(skipped, descriptor?.name || 'unknown', descriptor?.reason || 'protected')
 				}
 				sortRecords(entityRecords)
+				sortRecords(blockRecords)
+				sortRecords(surgeRecords)
+				waypointRecords.sort(function (left, right) {
+					return left.timestamp - right.timestamp || comparePositions(left.record.position, right.record.position)
+				}).forEach(function (entry, order) {
+					entry.record.stateMeta = { waypointOrder: order }
+				})
+				const transientCells = new Set(blockRecords.concat(surgeRecords).map(function (record) {
+					return record.position[0] + ':' + record.position[1]
+				}))
+				const normalizedEmptyCells = emptyCells.filter(function (position) {
+					return !transientCells.has(position[0] + ':' + position[1])
+				})
 				const summary = createSummary(
 					ranges.relative.length,
 					Number(planValue.summary?.sourceCellCount) || 0,
 					entityRecords,
-					[],
+					blockRecords,
 					crossBoundaryCount,
-					skipped
+					skipped,
+					surgeRecords
 				)
+				summary.normalizedCount = normalizedCount
+				summary.emptyCellCount = normalizedEmptyCells.length
 				const productionState = globalThis[PRODUCTION_KEY]
 				const production = typeof productionState?.captureEntities === 'function'
 					? productionState.captureEntities(capturedEntities)
@@ -783,8 +963,8 @@ ModLoader.register({
 					schema: 1,
 					cutToken: String(planValue.signature),
 					blueprint: {
-						schemaVersion: 4,
-						mode: 'structure',
+						schemaVersion: 6,
+						mode: 'full',
 						sourcePlane,
 						anchor: {
 							position: anchor,
@@ -795,11 +975,12 @@ ModLoader.register({
 							})
 						},
 						selections: ranges.relative,
-						emptyCells,
+						emptyCells: normalizedEmptyCells,
 						contentBounds: relativeBounds(contentBounds, anchor),
-						includeBlocks: false,
+						includeBlocks: true,
 						entities: entityRecords,
-						blocks: [],
+						blocks: blockRecords,
+						surges: surgeRecords,
 						production,
 						summary
 					}
@@ -811,14 +992,14 @@ ModLoader.register({
 					Number(value?.schema) !== 1 ||
 					typeof value?.cutToken !== 'string' ||
 					!value.cutToken ||
-					Number(value?.blueprint?.schemaVersion) !== 4 ||
-					value.blueprint?.mode !== 'structure' ||
-					value.blueprint?.includeBlocks !== false ||
+					Number(value?.blueprint?.schemaVersion) !== 6 ||
+					value.blueprint?.mode !== 'full' ||
+					value.blueprint?.includeBlocks !== true ||
 					!Array.isArray(value.blueprint?.entities) ||
-					!value.blueprint.entities.length ||
 					!Array.isArray(value.blueprint?.emptyCells) ||
 					!Array.isArray(value.blueprint?.blocks) ||
-					value.blueprint.blocks.length
+					!Array.isArray(value.blueprint?.surges) ||
+					!(value.blueprint.entities.length + value.blueprint.blocks.length + value.blueprint.surges.length)
 				) {
 					throw new Error('invalid-cut-candidate')
 				}
@@ -909,6 +1090,7 @@ ModLoader.register({
 				const entityRecords = []
 				const capturedEntities = []
 				const blockRecords = []
+				const surgeRecords = []
 				const skipped = new Map()
 				let crossBoundaryCount = 0
 				let normalizedCount = 0
@@ -919,6 +1101,32 @@ ModLoader.register({
 					const name = safeEntityName(entity)
 					if (!name) {
 						addTypeCount(skipped, 'unknown', 'unknown')
+						continue
+					}
+					if (name === 'surge') {
+						const position = normalizePosition(entity.position)
+						let rawSave
+						let detail
+						try {
+							rawSave = cloneEntitySave(game.getEntityString(entity))
+							detail = blueprintState?.normalizeSaveDetailed?.(rawSave)
+						} catch (error) {}
+						const saved = detail?.save || rawSave
+						if (!position || !saved || !blueprintState?.surgeEligible?.(entity, saved)) {
+							addTypeCount(skipped, name, 'unsafe-transient')
+							continue
+						}
+						const normalized = blueprintState.normalizeSurge({
+							position: subtract(position, source.anchor),
+							state: saved.par
+						})
+						if (!normalized) {
+							addTypeCount(skipped, name, 'unserializable')
+							continue
+						}
+						if (detail?.changed) normalizedCount += 1
+						surgeRecords.push(normalized)
+						contentBounds = includePoint(contentBounds, position)
 						continue
 					}
 					if (name === 'cube') {
@@ -1021,6 +1229,7 @@ ModLoader.register({
 
 				sortRecords(entityRecords)
 				sortRecords(blockRecords)
+				sortRecords(surgeRecords)
 				waypointRecords.sort(function (left, right) {
 					return left.timestamp - right.timestamp ||
 						comparePositions(left.record.position, right.record.position)
@@ -1031,6 +1240,7 @@ ModLoader.register({
 				if (
 					!entityRecords.length &&
 					!blockRecords.length &&
+					!surgeRecords.length &&
 					!normalizedEmptyCells.length
 				) {
 					return {
@@ -1041,7 +1251,8 @@ ModLoader.register({
 							entityRecords,
 							blockRecords,
 							crossBoundaryCount,
-							skipped
+							skipped,
+							surgeRecords
 						),
 						capturedTypes: [],
 						skippedTypes: typeCounts(skipped)
@@ -1054,7 +1265,8 @@ ModLoader.register({
 					entityRecords,
 					blockRecords,
 					crossBoundaryCount,
-					skipped
+					skipped,
+					surgeRecords
 				)
 				summary.normalizedCount = normalizedCount
 				summary.emptyCellCount = normalizedEmptyCells.length
@@ -1064,8 +1276,8 @@ ModLoader.register({
 					: null
 				return {
 					blueprint: {
-						schemaVersion: captureMode === 'structure' ? 4 : 5,
-						mode: captureMode,
+						schemaVersion: 6,
+						mode: 'full',
 						sourcePlane: source.sourcePlane,
 						anchor: {
 							position: source.anchor,
@@ -1074,9 +1286,10 @@ ModLoader.register({
 						selections: ranges.relative,
 						emptyCells: normalizedEmptyCells,
 						contentBounds: relativeBounds(contentBounds, source.anchor),
-						includeBlocks: captureMode === 'full' && captureBlocks,
+						includeBlocks: true,
 						entities: entityRecords,
 						blocks: blockRecords,
+						surges: surgeRecords,
 						production,
 						summary
 					},
@@ -1139,6 +1352,7 @@ ModLoader.register({
 				controls.structure.addEventListener('click', handleStructureMode)
 				controls.full.addEventListener('click', handleFullMode)
 				controls.blocks.addEventListener('click', handleBlocksToggle)
+				controls.surges.addEventListener('click', handleSurgesToggle)
 				controls.copy.addEventListener('click', handleCopy)
 				controls.transforms.addEventListener('click', handleTransformAction)
 				controls.transforms.addEventListener('pointerover', handleTransformGuidePointerOver)
@@ -1219,6 +1433,7 @@ ModLoader.register({
 				ui.controls.structure.removeEventListener('click', handleStructureMode)
 				ui.controls.full.removeEventListener('click', handleFullMode)
 				ui.controls.blocks.removeEventListener('click', handleBlocksToggle)
+				ui.controls.surges.removeEventListener('click', handleSurgesToggle)
 				ui.controls.copy.removeEventListener('click', handleCopy)
 				ui.controls.transforms.removeEventListener('click', handleTransformAction)
 				ui.controls.transforms.removeEventListener('pointerover', handleTransformGuidePointerOver)
@@ -1279,6 +1494,21 @@ ModLoader.register({
 				blocks.append(cubeCanvas)
 				appendToolbarCardLabel(blocks, 'cubes')
 
+				const surges = document.createElement('button')
+				surges.type = 'button'
+				surges.className = 'cattail-world-editor-blueprint-icon-button'
+				surges.dataset.worldEditorBlueprintAction = 'surges'
+				surges.dataset.worldEditorToolbarCard = ''
+				surges.setAttribute('aria-pressed', 'false')
+				surges.hidden = true
+				surges.setAttribute('aria-hidden', 'true')
+				const surgeIcon = document.createElement('span')
+				surgeIcon.className = 'cattail-world-editor-blueprint-copy-icon'
+				surgeIcon.setAttribute('aria-hidden', 'true')
+				surgeIcon.textContent = '⚡'
+				surges.append(surgeIcon)
+				appendToolbarCardLabel(surges, 'surges')
+
 				const copy = document.createElement('button')
 				copy.type = 'button'
 				copy.className = 'cattail-world-editor-blueprint-icon-button'
@@ -1292,8 +1522,8 @@ ModLoader.register({
 				appendToolbarCardLabel(copy, 'copy')
 
 				const transforms = createTransformControls('toolbar')
-				root.append(modes, blocks, copy)
-				return { root, modes, structure, full, blocks, copy, transforms }
+				root.append(modes, blocks, surges, copy)
+				return { root, modes, structure, full, blocks, surges, copy, transforms }
 			}
 
 			function createModeButton(mode) {
@@ -1589,11 +1819,18 @@ ModLoader.register({
 				ui.controls.full.hidden = !creativeAvailable
 				ui.controls.full.setAttribute('aria-hidden', creativeAvailable ? 'false' : 'true')
 				ui.controls.modes.dataset.columns = creativeAvailable ? '2' : '1'
-				ui.controls.blocks.hidden = !creativeAvailable || state.mode !== 'full'
-				ui.controls.blocks.setAttribute('aria-hidden', !creativeAvailable || state.mode !== 'full' ? 'true' : 'false')
-				ui.controls.blocks.disabled = !creativeAvailable || state.mode !== 'full'
+				const blocksAvailable = creativeAvailable && state.mode === 'full' && !!state.sourceBlueprint?.blocks?.length
+				const surgesAvailable = creativeAvailable && state.mode === 'full' && !!state.sourceBlueprint?.surges?.length
+				ui.controls.blocks.hidden = !blocksAvailable
+				ui.controls.blocks.setAttribute('aria-hidden', blocksAvailable ? 'false' : 'true')
+				ui.controls.blocks.disabled = !blocksAvailable
 				ui.controls.blocks.dataset.active = state.includeBlocks ? 'true' : 'false'
 				ui.controls.blocks.setAttribute('aria-pressed', state.includeBlocks ? 'true' : 'false')
+				ui.controls.surges.hidden = !surgesAvailable
+				ui.controls.surges.setAttribute('aria-hidden', surgesAvailable ? 'false' : 'true')
+				ui.controls.surges.disabled = !surgesAvailable
+				ui.controls.surges.dataset.active = state.includeSurges ? 'true' : 'false'
+				ui.controls.surges.setAttribute('aria-pressed', state.includeSurges ? 'true' : 'false')
 				ui.controls.copy.disabled = !captureAvailable
 				ui.controls.copy.dataset.worldEditorLargeHidden = selectionAvailable && !!currentRuntime.active ? 'false' : 'true'
 				ui.controls.copy.dataset.worldEditorToolbarBusy = state.capturing ? 'true' : 'false'
@@ -1611,6 +1848,7 @@ ModLoader.register({
 				const structureText = i18n.t(source, 'blueprintModeStructure')
 				const fullText = i18n.t(source, 'blueprintModeFull')
 				const blocksText = i18n.t(source, 'blueprintIncludeBlocks')
+				const surgesText = i18n.t(source, 'blueprintIncludeSurges')
 				const copyText = i18n.t(source, 'blueprintCopy')
 				ui.controls.structure.querySelector('.cattail-world-editor-blueprint-compact-label').textContent = structureText
 				ui.controls.full.querySelector('.cattail-world-editor-blueprint-compact-label').textContent = fullText
@@ -1620,11 +1858,14 @@ ModLoader.register({
 				ui.controls.full.setAttribute('aria-label', fullText)
 				ui.controls.blocks.title = blocksText
 				ui.controls.blocks.setAttribute('aria-label', blocksText)
+				ui.controls.surges.title = surgesText
+				ui.controls.surges.setAttribute('aria-label', surgesText)
 				ui.controls.copy.title = copyText
 				ui.controls.copy.setAttribute('aria-label', copyText)
 				setToolbarCardText(ui.controls.structure, i18n.t(source, 'toolbarCardStructure'))
 				setToolbarCardText(ui.controls.full, i18n.t(source, 'toolbarCardFull'))
 				setToolbarCardText(ui.controls.blocks, i18n.t(source, 'toolbarCardCubes'))
+				setToolbarCardText(ui.controls.surges, i18n.t(source, 'toolbarCardSurges'))
 				setToolbarCardText(ui.controls.copy, i18n.t(source, 'toolbarCardCopy'))
 				refreshTransformText(source)
 				const clear = ui.card.querySelector('[data-world-editor-blueprint-action="clear"]')
@@ -2049,7 +2290,7 @@ ModLoader.register({
 					canvas.width = 32
 					canvas.height = 32
 					canvas.setAttribute('aria-hidden', 'true')
-					const sample = currentSession.blueprint?.blocks?.find?.(function (block) {
+					const sample = currentSession.sourceBlueprint?.blocks?.find?.(function (block) {
 						return block.name === 'cube'
 					})
 					drawCubeThumbnail(canvas, sample?.state?.resources)
@@ -2142,6 +2383,7 @@ ModLoader.register({
 
 			function localizedEntityName(name) {
 				if (name === 'cube') return i18n.t(game, 'blueprintCube')
+				if (name === 'surge') return i18n.t(game, 'blueprintSurge')
 				try {
 					const pronounced = game.pronounce?.('entities', name, 'name')
 					if (pronounced && pronounced !== name) return String(pronounced)
@@ -2389,13 +2631,19 @@ ModLoader.register({
 				session.setIncludeBlocks(!currentSession.includeBlocks, 'toolbar')
 			}
 
+			function handleSurgesToggle(event) {
+				stopUiEvent(event)
+				if (!currentCreative?.ready || !currentCreative?.creativeMode || currentSession.mode !== 'full') return
+				session.setIncludeSurges(!currentSession.includeSurges, 'toolbar')
+			}
+
 			function handleCopy(event) {
 				stopUiEvent(event)
 				if (!canCapture(currentSelection)) return
 				captureFromUi('toolbar-copy')
 			}
 
-			function captureFromUi(reason) {
+			async function captureFromUi(reason) {
 				if ((!currentCreative?.ready || !currentCreative?.creativeMode) && currentSession.mode !== 'structure') {
 					session.setMode('structure', reason + '-structure')
 				}
@@ -2440,6 +2688,8 @@ ModLoader.register({
 				} finally {
 					controller.setPlacementOverlay?.(null, 'blueprint-placement-target-released')
 					await controller.releaseCommandTarget(token, 'blueprint-placement-complete')
+					session.setIncludeBlocks(false, 'placement-finished-default')
+					session.setIncludeSurges(false, 'placement-finished-default')
 					markPlacementProbe('target-lock.released', { input, target })
 				}
 			}
@@ -2455,8 +2705,18 @@ ModLoader.register({
 				const blueprint = currentTransform?.blueprint
 				const controller = previewController || globalThis[PREVIEW_KEY]
 				if (!blueprintPlacementAllowed(blueprint) || !normalizePosition(target)) return null
-				const plan = controller?.snapshot?.().plan || null
+				let plan = controller?.snapshot?.().plan || null
 				if (!plan) return null
+				const sourceBlueprint = currentSession.sourceBlueprint
+				if (
+					blueprint.mode === 'full' &&
+					(sourceBlueprint?.blocks?.length || sourceBlueprint?.surges?.length)
+				) {
+					const layerChoice = await confirmPlacementLayers(controller, sourceBlueprint)
+					if (!layerChoice) return null
+					plan = layerChoice.plan
+					if (!plan) return null
+				}
 				markPlacementProbe('place.requested', {
 					input,
 					target,
@@ -2525,6 +2785,8 @@ ModLoader.register({
 						input,
 						replaceConflicts,
 						syncEmpty,
+						includeBlocks: currentSession.includeBlocks === true,
+						includeSurges: currentSession.includeSurges === true,
 						confirmedSignature: confirmedProposal.signature
 					})
 					markPlacementProbe('execute.returned', {
@@ -2543,6 +2805,78 @@ ModLoader.register({
 				)
 				refreshCard()
 				return result
+			}
+
+			function confirmPlacementLayers(controller, sourceBlueprint) {
+				if (!dialogs || dialogs.game !== game || typeof dialogs.create !== 'function') {
+					return Promise.resolve({
+						includeBlocks: currentSession.includeBlocks === true,
+						includeSurges: currentSession.includeSurges === true,
+						plan: controller?.snapshot?.().plan || null
+					})
+				}
+				return new Promise(function (resolve) {
+					let settled = false
+					let includeBlocks = currentSession.includeBlocks === true
+					let includeSurges = currentSession.includeSurges === true
+					const blockCount = Number(sourceBlueprint?.blocks?.length) || 0
+					const surgeCount = Number(sourceBlueprint?.surges?.length) || 0
+					const finish = function (value, dialog, reason) {
+						if (settled) return
+						settled = true
+						resolve(value)
+						dialog.close(reason || 'blueprint-placement-layers-choice', true)
+					}
+					creative.setDialogOpen?.(true, 'blueprint-placement-layers-opened')
+					const dialog = dialogs.create({
+						id: 'cattail-world-editor-blueprint-placement-layers-dialog',
+						theme: game.plane ? 'void' : 'reality',
+						kind: 'blueprint-placement-options',
+						onClose() {
+							creative.setDialogOpen?.(false, 'blueprint-placement-layers-closed')
+							if (!settled) { settled = true; resolve(null) }
+						}
+					})
+					dialog.title.textContent = i18n.t(game, 'placementOptionsTitleFull')
+					dialog.message.textContent = i18n.t(game, 'placementLayerMessage')
+					const list = document.createElement('div')
+					list.className = 'cattail-world-editor-blueprint-placement-options'
+					const blocks = dialog.createButton('', {})
+					const surges = dialog.createButton('', {})
+					blocks.classList.add('cattail-world-editor-blueprint-placement-option')
+					surges.classList.add('cattail-world-editor-blueprint-placement-option')
+					blocks.hidden = !blockCount
+					surges.hidden = !surgeCount
+					list.append(blocks, surges)
+					dialog.content.append(list)
+					const render = function () {
+						blocks.textContent = formatTemplate(i18n.t(game, 'placementCubeOption'), { count: blockCount })
+						surges.textContent = formatTemplate(i18n.t(game, 'placementSurgeOption'), { count: surgeCount })
+						for (const entry of [[blocks, includeBlocks], [surges, includeSurges]]) {
+							entry[0].classList.toggle('cattail-world-editor-blueprint-placement-option--active', entry[1])
+							entry[0].setAttribute('aria-pressed', entry[1] ? 'true' : 'false')
+						}
+					}
+					blocks.addEventListener('click', function () { includeBlocks = !includeBlocks; render() })
+					surges.addEventListener('click', function () { includeSurges = !includeSurges; render() })
+					const cancel = dialog.createButton(i18n.t(game, 'placementCancel'))
+					const confirm = dialog.createButton(i18n.t(game, 'placementConfirmAction'), { primary: true })
+					cancel.addEventListener('click', function () { finish(null, dialog, 'blueprint-placement-layers-cancelled') })
+					confirm.addEventListener('click', async function () {
+						confirm.disabled = true
+						if (blockCount) session.setIncludeBlocks(includeBlocks, 'placement-dialog')
+						if (surgeCount) session.setIncludeSurges(includeSurges, 'placement-dialog')
+						try {
+							const refreshedPlan = await controller?.refreshNow?.('placement-layers-confirm')
+							finish({ includeBlocks, includeSurges, plan: refreshedPlan || controller?.snapshot?.().plan }, dialog, 'blueprint-placement-layers-confirmed')
+						} catch (error) {
+							finish(null, dialog, 'blueprint-placement-layers-failed')
+						}
+					})
+					dialog.actions.append(cancel, confirm)
+					render()
+					dialog.mount(cancel)
+				})
 			}
 
 			function confirmPlacementOptions(analysis, controller, plan) {
@@ -4051,16 +4385,18 @@ ModLoader.register({
 				return cloned && cloned.par && typeof cloned.par === 'object' ? cloned : null
 			}
 
-			function createSummary(selectionCount, selectedCellCount, entities, blocks, crossing, skipped) {
+			function createSummary(selectionCount, selectedCellCount, entities, blocks, crossing, skipped, surges) {
 				const captured = new Map()
 				for (const record of entities) addTypeCount(captured, record.name, 'captured')
 				for (const record of blocks) addTypeCount(captured, record.name, 'captured')
+				for (const record of surges || []) addTypeCount(captured, record.name, 'captured')
 				const skippedTypes = typeCounts(skipped)
 				return {
 					selectionCount,
 					selectedCellCount,
 					entityCount: entities.length,
 					blockCount: blocks.length,
+					surgeCount: Array.isArray(surges) ? surges.length : 0,
 					crossBoundaryCount: crossing,
 					skippedCount: skippedTypes.reduce(function (sum, entry) {
 						return sum + entry.count
@@ -4076,6 +4412,7 @@ ModLoader.register({
 					selectedCellCount: 0,
 					entityCount: 0,
 					blockCount: 0,
+					surgeCount: 0,
 					crossBoundaryCount: 0,
 					skippedCount: 0,
 					capturedTypes: [],

@@ -481,7 +481,7 @@ function testSelectionCard() {
 	sandbox[RUNTIME_KEY] = runtime
 	sandbox[SELECTION_KEY] = selection
 	sandbox[ANALYSIS_KEY] = analysis
-	assert.equal(sandbox[I18N_KEY].keys.length, 179)
+	assert.equal(sandbox[I18N_KEY].keys.length, 187)
 	api.emit('afterGameInit', {}, game)
 
 	const card = document.getElementById('cattail-world-editor-selection-card')
@@ -604,7 +604,7 @@ function testSelectionCard() {
 
 function testManifest() {
 	const manifest = JSON.parse(fs.readFileSync(path.join(MOD_ROOT, 'mod.json'), 'utf8'))
-	assert.equal(manifest.version, '0.4.5')
+	assert.equal(manifest.version, '0.5.0')
 	assert.equal(manifest.languageSupport.gameLanguage, true)
 	assert.deepEqual(manifest.entry, [
 		'scripts/core/foundation.js',
@@ -618,6 +618,7 @@ function testManifest() {
 		'scripts/core/selection-analysis.js',
 		'scripts/core/production-state.js',
 		'scripts/core/blueprint-state.js',
+		'scripts/core/blueprint-library-format.js',
 		'scripts/core/blueprint-transform.js',
 		'scripts/core/blueprint-preview-plan.js',
 		'scripts/core/blueprint-placement.js',
@@ -633,9 +634,12 @@ function testManifest() {
 		'scripts/ui/editor-shell.js',
 		'scripts/ui/selection-delete-ui.js',
 		'scripts/blueprint-session.js',
+		'scripts/core/blueprint-library.js',
 		'scripts/core/selection-cut.js',
 		'scripts/ui/selection-cut-ui.js',
 		'scripts/blueprint-preview.js',
+		'scripts/render/blueprint-thumbnail.js',
+		'scripts/ui/blueprint-library-ui.js',
 		'scripts/ui/selection-card.js',
 		'scripts/ui/production-cards.js'
 	])

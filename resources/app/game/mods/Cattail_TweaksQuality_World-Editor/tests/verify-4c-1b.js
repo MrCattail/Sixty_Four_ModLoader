@@ -70,15 +70,17 @@ function candidateFor(plan) {
 		schema: 1,
 		cutToken: plan.signature,
 		blueprint: {
-			schemaVersion: 3,
-			mode: 'structure',
-			includeBlocks: false,
+			schemaVersion: 6,
+			mode: 'full',
+			includeBlocks: true,
 			sourcePlane: 0,
 			anchor: { position: [0, 0], selectionIds: [7] },
 			selections: [],
+			emptyCells: [],
 			contentBounds: { min: [0, 0], max: [0, 0], width: 1, height: 1 },
 			entities: [{ kind: 'entity', name: 'silo', position: [0, 0] }],
 			blocks: [],
+			surges: [],
 			production: null,
 			summary: {
 				selectionCount: 1,
@@ -235,13 +237,15 @@ async function testPlanningUsesOneDeletionPlan() {
 	const empty = createEnvironment({ plan: deletionPlan(0), existingBlueprint: false })
 	const emptyPlan = await empty.cut.plan()
 	assert.equal(emptyPlan.summary.safeCount, 0)
-	assert.equal(emptyPlan.candidate, null)
+	assert.ok(emptyPlan.candidate)
 	assert.equal(emptyPlan.replacesBlueprint, false)
-	assert.deepEqual(empty.order, ['plan-deletion'])
+	assert.deepEqual(empty.order, ['plan-deletion', 'prepare-blueprint'])
 	const emptyResult = await empty.cut.execute(emptyPlan, 'keyboard')
-	assert.equal(emptyResult.executed, false)
-	assert.equal(emptyResult.copied, false)
-	assert.equal(emptyResult.error.code, 'NOTHING_SAFE')
+	assert.equal(emptyResult.executed, true)
+	assert.equal(emptyResult.copied, true)
+	assert.equal(emptyResult.deleted, false)
+	assert.equal(emptyResult.reason, 'success-retained-layers')
+	assert.equal(empty.deleteCalls.length, 0)
 }
 
 async function testClipboardBeforeSingleDeletionTransaction() {
@@ -400,11 +404,14 @@ function testI18nManifestUiAndBoundaries() {
 		'blueprintCutPending',
 		'blueprintCutSuccess',
 		'blueprintCutCopiedOnly',
-		'blueprintCutFailed'
+		'blueprintCutFailed',
+		'cutLayerMessage',
+		'cutCubeOption',
+		'cutSurgeOption'
 	]
-	assert.equal(i18n.version, '0.4.5')
+	assert.equal(i18n.version, '0.5.0')
 	assert.equal(i18n.languages.length, 20)
-	assert.equal(i18n.keys.length, 179)
+	assert.equal(i18n.keys.length, 187)
 	for (const language of i18n.languages) {
 		for (const key of keys) {
 			const value = i18n.t(language, key)
@@ -414,8 +421,8 @@ function testI18nManifestUiAndBoundaries() {
 	}
 
 	const manifest = JSON.parse(source('mod.json'))
-	assert.equal(manifest.version, '0.4.5')
-	assert.equal(manifest.entry.length, 31)
+	assert.equal(manifest.version, '0.5.0')
+	assert.equal(manifest.entry.length, 35)
 	for (const entry of [CUT_SOURCE, CUT_UI_SOURCE]) assert.ok(manifest.entry.includes(entry))
 	const blueprintIndex = manifest.entry.indexOf(BLUEPRINT_SOURCE)
 	const cutIndex = manifest.entry.indexOf(CUT_SOURCE)
@@ -429,7 +436,7 @@ function testI18nManifestUiAndBoundaries() {
 	const deletion = source(DELETE_SOURCE)
 	const shared = source(SHARED_SOURCE)
 	const readme = source('README.md')
-	assert.match(core, /deletion\.planSelections\(\)/)
+	assert.match(core, /deletion\.planSelections\(requestedOptions\)/)
 	assert.match(core, /blueprint\.prepareCut\(deletionPlan\)/)
 	assert.match(core, /blueprint\.publishCut\(planRequest\.candidate/)
 	assert.match(core, /\{\s*origin:\s*'cut'\s*\}/)

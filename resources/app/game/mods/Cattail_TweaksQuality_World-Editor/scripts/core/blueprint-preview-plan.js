@@ -22,7 +22,7 @@ ModLoader.register({
 
 		let disposed = false
 		const planner = Object.freeze({
-			version: '0.4.5',
+			version: '0.5.0',
 			status: STATUS,
 			statusPriority: STATUS_PRIORITY,
 			async build(game, blueprint, target, options) {
@@ -73,14 +73,29 @@ ModLoader.register({
 			const relevantNames = new Set()
 			let processedCells = 0
 
+			const includeBlocks = blueprint.mode === 'full' && options.includeBlocks === true
+			const includeSurges = blueprint.mode === 'full' && options.includeSurges === true
 			const sourceRecords = blueprint.entities.concat(
-				(blueprint.blocks || []).map(function (block) {
+				(includeBlocks ? blueprint.blocks || [] : []).map(function (block) {
 					return Object.assign({}, block, {
 						kind: 'cube',
 						footprint: {
 							span: 0,
 							min: block.position,
 							max: block.position
+						},
+						restricted: { onlyOne: false },
+						config: {}
+					})
+				}),
+				(includeSurges ? blueprint.surges || [] : []).map(function (surge) {
+					return Object.assign({}, surge, {
+						kind: 'surge',
+						name: 'surge',
+						footprint: {
+							span: 0,
+							min: surge.position,
+							max: surge.position
 						},
 						restricted: { onlyOne: false },
 						config: {}
@@ -94,7 +109,7 @@ ModLoader.register({
 				const relativePosition = normalizePosition(source?.position)
 				if (
 					!source ||
-					(source.kind !== 'entity' && source.kind !== 'cube') ||
+					(source.kind !== 'entity' && source.kind !== 'cube' && source.kind !== 'surge') ||
 					!safeName(source.name) ||
 					!relativePosition
 				) {
@@ -108,8 +123,11 @@ ModLoader.register({
 					for (let u = footprint.minU; u <= footprint.maxU; u += 1) {
 						if (isCancelled()) throw planError('plan-cancelled')
 						const cell = [u, v]
-						const entity = planningEntityAt(game, cell, options)
-						guardCells.set(cellKey(cell), { position: cell, entity })
+						const includeDynamicEntity = source.kind === 'surge'
+						const entity = includeDynamicEntity
+							? safeEntityAt(game, cell)
+							: planningEntityAt(game, cell, options)
+						guardCells.set(cellKey(cell), { position: cell, entity, includeDynamicEntity })
 						if (entity) conflicts.add(entity)
 						processedCells += 1
 						if (processedCells % chunkSize === 0) await yieldControl()
@@ -154,7 +172,7 @@ ModLoader.register({
 
 			if (
 				(Number(blueprint.schemaVersion) === 4 && blueprint.mode === 'structure') ||
-				(Number(blueprint.schemaVersion) === 5 && blueprint.mode === 'full')
+				((Number(blueprint.schemaVersion) === 5 || Number(blueprint.schemaVersion) === 6) && blueprint.mode === 'full')
 			) {
 				const seenEmptyCells = new Set()
 				for (const relativeValue of blueprint.emptyCells || []) {
@@ -182,7 +200,7 @@ ModLoader.register({
 			const statusCounts = countStatuses(records)
 			const cost = simulateCost(game, records, guard)
 			return {
-				version: '0.4.5',
+				version: '0.5.0',
 				mode: blueprint.mode,
 				schemaVersion: Number(blueprint.schemaVersion),
 				normalization: jsonClone(blueprint.summary || {}),
@@ -191,10 +209,15 @@ ModLoader.register({
 				bounds: targetBounds(blueprint.contentBounds, normalizedTarget, records, emptyCells),
 				records,
 				emptyCells,
+				neutralCells: translateCells(blueprint.neutralCells, normalizedTarget),
 				emptyEntities: Array.from(emptyEntities),
 				statusCounts,
 				cost,
-				guard
+				guard,
+				options: {
+					includeBlocks,
+					includeSurges
+				}
 			}
 		}
 
@@ -203,10 +226,10 @@ ModLoader.register({
 			const schemaVersion = Number(blueprint?.schemaVersion)
 			if (
 				!blueprint ||
-				(schemaVersion !== 1 && schemaVersion !== 2 && schemaVersion !== 3 && schemaVersion !== 4 && schemaVersion !== 5) ||
+				(schemaVersion !== 1 && schemaVersion !== 2 && schemaVersion !== 3 && schemaVersion !== 4 && schemaVersion !== 5 && schemaVersion !== 6) ||
 				(blueprint.mode !== 'structure' && blueprint.mode !== 'full') ||
-				(blueprint.mode === 'structure' && schemaVersion === 5) ||
-				(blueprint.mode === 'full' && schemaVersion !== 3 && schemaVersion !== 5)
+				(blueprint.mode === 'structure' && (schemaVersion === 5 || schemaVersion === 6)) ||
+				(blueprint.mode === 'full' && schemaVersion !== 3 && schemaVersion !== 5 && schemaVersion !== 6)
 			) {
 				throw planError('structure-blueprint-required')
 			}
@@ -214,8 +237,9 @@ ModLoader.register({
 				!Array.isArray(blueprint.entities) ||
 				(
 					!blueprint.entities.length &&
-					!((schemaVersion === 4 || schemaVersion === 5) && Array.isArray(blueprint.emptyCells) && blueprint.emptyCells.length) &&
-					!(blueprint.mode === 'full' && Array.isArray(blueprint.blocks) && blueprint.blocks.length)
+					!((schemaVersion === 4 || schemaVersion === 5 || schemaVersion === 6) && Array.isArray(blueprint.emptyCells) && blueprint.emptyCells.length) &&
+					!(blueprint.mode === 'full' && Array.isArray(blueprint.blocks) && blueprint.blocks.length) &&
+					!(schemaVersion === 6 && Array.isArray(blueprint.surges) && blueprint.surges.length)
 				)
 			) {
 				throw planError('blueprint-empty')
@@ -223,15 +247,24 @@ ModLoader.register({
 			if (schemaVersion === 4 && !Array.isArray(blueprint.emptyCells)) {
 				throw planError('blueprint-empty-mask-missing')
 			}
-			if (schemaVersion === 5 && !Array.isArray(blueprint.emptyCells)) {
+			if ((schemaVersion === 5 || schemaVersion === 6) && !Array.isArray(blueprint.emptyCells)) {
 				throw planError('blueprint-empty-mask-missing')
 			}
+			if (schemaVersion === 6 && !Array.isArray(blueprint.surges)) throw planError('blueprint-surge-layer-missing')
 			if (!normalizePosition(target)) throw planError('target-invalid')
 		}
 
 		function classifyRecord(game, source, name, position, footprint, conflicts, options) {
 			const definition = game.codex?.entities?.[name]
 			const isCube = source.kind === 'cube' && name === 'cube'
+			const isSurge = source.kind === 'surge' && name === 'surge'
+			if (isSurge) {
+				const stateService = globalThis[STATE_KEY]
+				if (!stateService?.surgeEligible?.(source)) return { status: STATUS.BLOCKED, reason: 'invalid-surge' }
+				return conflicts.length
+					? { status: STATUS.BLOCKED, reason: 'surge-occupied' }
+					: { status: STATUS.BUILDABLE, reason: 'empty' }
+			}
 			if (!isCube && (!definition || definition.canPurchase !== true)) {
 				return { status: STATUS.BLOCKED, reason: 'unsupported' }
 			}
@@ -388,9 +421,11 @@ ModLoader.register({
 			if (!game || !guard || !Array.isArray(guard.cells)) return guardResult('invalid')
 			for (const entry of guard.cells) {
 				if (
-					planningEntityAt(game, entry.position, {
-						includeDynamicConflicts: !!guard.includeDynamicConflicts
-					}) !== entry.entity
+					(entry.includeDynamicEntity
+						? safeEntityAt(game, entry.position)
+						: planningEntityAt(game, entry.position, {
+							includeDynamicConflicts: !!guard.includeDynamicConflicts
+						})) !== entry.entity
 				) {
 					return guardResult('cells')
 				}
@@ -443,7 +478,7 @@ ModLoader.register({
 			const errors = []
 			const typeCosts = new Map()
 			const builds = records.filter(function (record) {
-				return record.status === STATUS.BUILDABLE && record.name !== 'cube'
+				return record.status === STATUS.BUILDABLE && record.name !== 'cube' && record.sourceKind !== 'surge'
 			}).sort(compareRecords)
 			for (const record of builds) {
 				let typeCost = typeCosts.get(record.name)
@@ -631,6 +666,21 @@ ModLoader.register({
 			return [left[0] + right[0], left[1] + right[1]]
 		}
 
+		function translateCells(cells, target) {
+			const result = []
+			const seen = new Set()
+			for (const value of cells || []) {
+				const relative = normalizePosition(value)
+				if (!relative) continue
+				const position = addPosition(target, relative)
+				const key = cellKey(position)
+				if (seen.has(key)) continue
+				seen.add(key)
+				result.push(position)
+			}
+			return result
+		}
+
 		function samePosition(left, right) {
 			return left[0] === right[0] && left[1] === right[1]
 		}
@@ -713,7 +763,7 @@ ModLoader.register({
 				})
 			}
 			return {
-				version: '0.4.5',
+				version: '0.5.0',
 				kind: 'synthetic-plan',
 				results
 			}
@@ -773,6 +823,6 @@ ModLoader.register({
 			return Math.round(sorted[index] * 1000) / 1000
 		}
 
-		console.info('[Cattail World Editor] Structure/full blueprint preview planner 4D ready.')
+		console.info('[Cattail World Editor] Structure/full blueprint preview planner 5A ready.')
 	}
 })

@@ -587,9 +587,9 @@ function testHoverLayerI18nManifestAndReadOnlyBoundary() {
 	const api = createApi()
 	for (const definition of definitions) definition.init(api)
 	const i18n = sandbox[I18N_KEY]
-	assert.equal(i18n.version, '0.4.5')
+	assert.equal(i18n.version, '0.5.0')
 	assert.equal(i18n.languages.length, 20)
-	assert.equal(i18n.keys.length, 179)
+	assert.equal(i18n.keys.length, 187)
 	for (const language of i18n.languages) {
 		for (const key of ['toolbarModeArea', 'toolSelect', 'cardPinAction', 'cardUnpinAction']) {
 			assert.notEqual(i18n.t(language, key), key)
@@ -600,9 +600,9 @@ function testHoverLayerI18nManifestAndReadOnlyBoundary() {
 	assert.equal(i18n.t('modsch', 'toolSelect'), '选择')
 
 	const manifest = JSON.parse(fs.readFileSync(path.join(MOD_ROOT, 'mod.json'), 'utf8'))
-	assert.equal(manifest.version, '0.4.5')
+	assert.equal(manifest.version, '0.5.0')
 	assert.equal(manifest.languageSupport.gameLanguage, true)
-	assert.equal(manifest.entry.length, 31)
+	assert.equal(manifest.entry.length, 35)
 	assert.equal(manifest.entry.filter(entry => /selection-controller/.test(entry)).length, 1)
 	assert.equal(manifest.entry.filter(entry => /resize-handles/.test(entry)).length, 1)
 
@@ -619,18 +619,22 @@ function testHoverLayerI18nManifestAndReadOnlyBoundary() {
 	const stateFreeScriptText = manifest.entry
 		.filter(relativePath => (
 			relativePath !== 'scripts/ui/card-opacity.js' &&
-			relativePath !== 'scripts/core/creative-mode.js'
+			relativePath !== 'scripts/core/creative-mode.js' &&
+			relativePath !== 'scripts/ui/blueprint-library-ui.js'
 		))
 		.map(relativePath => fs.readFileSync(path.join(MOD_ROOT, relativePath), 'utf8'))
 		.join('\n')
 	const cardOpacityText = fs.readFileSync(path.join(MOD_ROOT, 'scripts/ui/card-opacity.js'), 'utf8')
 	const creativeModeText = fs.readFileSync(path.join(MOD_ROOT, 'scripts/core/creative-mode.js'), 'utf8')
+	const libraryUiText = fs.readFileSync(path.join(MOD_ROOT, 'scripts/ui/blueprint-library-ui.js'), 'utf8')
 	assert.doesNotMatch(readOnlyScriptText, /\baddEntity\s*\(/)
 	assert.doesNotMatch(readOnlyScriptText, /\bclearCell\s*\(/)
 	assert.doesNotMatch(stateFreeScriptText, /\blocalStorage\b|\bsessionStorage\b/)
 	assert.doesNotMatch(cardOpacityText, /\bsessionStorage\b/)
 	assert.match(creativeModeText, /\blocalStorage\b/)
 	assert.doesNotMatch(creativeModeText, /\bsessionStorage\b/)
+	assert.match(libraryUiText, /\blocalStorage\b/)
+	assert.doesNotMatch(libraryUiText, /\bsessionStorage\b/)
 	assert.doesNotMatch(scriptText, /\brequire\s*\(\s*['"](?:fs|node:fs)['"]\s*\)/)
 }
 

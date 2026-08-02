@@ -100,6 +100,8 @@ function fullBlueprint(entities = [], options = {}) {
 
 async function plan(runtime, value, target = [0, 0]) {
 	return runtime.planner.build(runtime.game, value, target, {
+		includeBlocks: value?.mode === 'full' && value?.includeBlocks === true,
+		includeSurges: value?.mode === 'full' && Array.isArray(value?.surges) && value.surges.length > 0,
 		includeDynamicConflicts: true,
 		canReplaceEntity(entity, details) {
 			return runtime.placement.assessEntity(entity, details)
@@ -110,7 +112,7 @@ async function plan(runtime, value, target = [0, 0]) {
 function testNormalizationAndLegacyMigration() {
 	const runtime = loadRuntime({ creative: true })
 	const state = runtime.sandbox[STATE_KEY]
-	assert.equal(state.version, '0.4.5')
+	assert.equal(state.version, '0.5.0')
 	const detailed = state.normalizeSaveDetailed({
 		name: 'pump2',
 		position: [3, 4],
@@ -189,16 +191,18 @@ async function testCreativeGateFullStateCubeWaypointUndoRedo() {
 	const normal = loadRuntime({ creative: false })
 	normal.game.codex.entities.waypoint = { canPurchase: true, price: [1], priceExponent: 1 }
 	normal.game.codex.entities.waypoint2 = { canPurchase: true, price: [1], priceExponent: 1 }
-	const normalPlan = await plan(normal, value)
+	const projected = normal.sandbox[STATE_KEY].projectStructure(value)
+	const normalPlan = await plan(normal, projected)
 	const normalProposal = normal.placement.analyze(normalPlan).variants['00']
-	const rejected = await normal.placement.place({
+	const placedAsStructure = await normal.placement.place({
 		blueprint: value,
 		target: [0, 0],
 		confirmedSignature: normalProposal.signature
 	})
-	assert.equal(rejected.executed, false)
-	assert.equal(rejected.error.code, 'CREATIVE_REQUIRED')
-	assert.equal(normal.snapshotStore.created.length, 0)
+	assert.equal(placedAsStructure.executed, true)
+	assert.equal(normal.snapshotStore.created.length, 1)
+	assert.equal(normal.game.entityAtCoordinates([3, 0]), null)
+	assert.equal(normal.game.stats.machinesBuild, 3)
 	normal.dispose()
 
 	const runtime = loadRuntime({ creative: true })
@@ -212,6 +216,7 @@ async function testCreativeGateFullStateCubeWaypointUndoRedo() {
 	const placed = await runtime.placement.place({
 		blueprint: value,
 		target: [0, 0],
+		includeBlocks: true,
 		confirmedSignature: proposal.signature
 	})
 	assert.equal(placed.executed, true)
@@ -334,12 +339,12 @@ async function testFullEmptySyncIgnoresNaturalResourceDrift() {
 
 function testManifestI18nAndStaticContracts() {
 	const manifest = JSON.parse(source('mod.json'))
-	assert.equal(manifest.version, '0.4.5')
+	assert.equal(manifest.version, '0.5.0')
 	assert.equal(
 		manifest.entry.indexOf(STATE_SOURCE),
 		manifest.entry.indexOf('scripts/core/production-state.js') + 1
 	)
-	assert.equal(manifest.entry.indexOf(TRANSFORM_SOURCE), manifest.entry.indexOf(STATE_SOURCE) + 1)
+	assert.equal(manifest.entry.indexOf(TRANSFORM_SOURCE), manifest.entry.indexOf(STATE_SOURCE) + 2)
 	for (const filename of [
 		STATE_SOURCE,
 		SESSION_SOURCE,
@@ -364,7 +369,7 @@ function testManifestI18nAndStaticContracts() {
 	vm.runInContext(source(I18N_SOURCE), sandbox, { filename: I18N_SOURCE })
 	definitions[0].init()
 	const i18n = sandbox[I18N_KEY]
-	assert.equal(i18n.version, '0.4.5')
+	assert.equal(i18n.version, '0.5.0')
 	assert.equal(i18n.languages.length, 20)
 	for (const language of i18n.languages) {
 		for (const key of ['previewFullUnavailable', 'placementOptionsTitleFull', 'blueprintFullSummary']) {
@@ -374,7 +379,7 @@ function testManifestI18nAndStaticContracts() {
 		}
 	}
 	const sessionSource = source(SESSION_SOURCE)
-	assert.match(sessionSource, /schemaVersion:\s*captureMode === 'structure' \? 4 : 5/)
+	assert.match(sessionSource, /schemaVersion:\s*6/)
 	assert.match(sessionSource, /emptyCells:\s*normalizedEmptyCells/)
 	assert.match(sessionSource, /waypointOrder/)
 	assert.match(source(PLACEMENT_SOURCE), /label:\s*plan\.mode === 'full' \? 'Full blueprint placement'/)

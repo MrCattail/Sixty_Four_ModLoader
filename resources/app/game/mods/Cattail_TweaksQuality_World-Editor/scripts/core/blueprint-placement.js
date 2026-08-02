@@ -8,7 +8,7 @@ ModLoader.register({
 		const CREATIVE_KEY = Symbol.for('cattail.world-editor.creative-mode')
 		const PLACEMENT_KEY = Symbol.for('cattail.world-editor.blueprint-placement')
 		const TRANSACTION_KIND = 'blueprint-placement'
-		const SERVICE_VERSION = '1.2.0'
+		const SERVICE_VERSION = '1.3.0'
 		const ADAPTER_VERSION = '1.0.0'
 		const PROBE_EVENT_LIMIT = 200
 		const EPSILON = 1e-7
@@ -100,7 +100,7 @@ ModLoader.register({
 			runtime.addCleanup(function () {
 				service.dispose('runtime-disposed')
 			})
-			console.info('[Cattail World Editor] Structure/full blueprint placement 4D ready.')
+			console.info('[Cattail World Editor] Structure/full blueprint placement 5A ready.')
 		})
 
 		function createService(game, transactions, planner, creative) {
@@ -124,25 +124,28 @@ ModLoader.register({
 				version: ADAPTER_VERSION,
 				async prepare(context, request) {
 					requireCurrent(context)
-					const blueprint = cloneBlueprint(request?.blueprint)
+					const blueprint = effectiveBlueprint(game, creative, request?.blueprint)
 					const target = normalizePosition(request?.target)
 					const replaceConflicts = request?.replaceConflicts === true
 					const syncEmpty = request?.syncEmpty === true
+					const includeBlocks = blueprint.mode === 'full' && request?.includeBlocks === true
+					const includeSurges = blueprint.mode === 'full' && request?.includeSurges === true
 					traceProbe('adapter.prepare.start', {
 						operationId: context?.operationId,
 						direction: context?.direction,
 						target,
 						replaceConflicts,
 						syncEmpty,
+						includeBlocks,
+						includeSurges,
 						confirmedSignature: signatureProbe(request?.confirmedSignature)
 					})
 					if (!target) throw placementError('INVALID_TARGET', 'A valid blueprint placement target is required.')
-					if (blueprint.mode === 'full' && !creativeActive(creative, game)) {
-						throw placementError('CREATIVE_REQUIRED', 'Full blueprints can only be placed in Creative Mode.')
-					}
 					const plan = await planner.build(game, blueprint, target, {
 						chunkSize: 512,
 						includeDynamicConflicts: true,
+						includeBlocks,
+						includeSurges,
 						isCancelled() {
 							return !context.isCurrent()
 						},
@@ -638,6 +641,8 @@ ModLoader.register({
 								target: normalizePosition(request.target),
 								replaceConflicts: request.replaceConflicts === true,
 								syncEmpty: request.syncEmpty === true,
+								includeBlocks: request.includeBlocks === true,
+								includeSurges: request.includeSurges === true,
 								confirmedSignature: String(request.confirmedSignature || '')
 							}
 						})
@@ -784,7 +789,9 @@ ModLoader.register({
 				const resourcesBefore = numericArray(game.resources)
 				const statsBefore = captureStats(game)
 				const statsDelta = {
-					machinesBuild: builds.filter(function (entry) { return entry.name !== 'cube' }).length,
+					machinesBuild: builds.filter(function (entry) {
+						return entry.name !== 'cube' && entry.sourceKind !== 'surge'
+					}).length,
 					machinesSold: removals.filter(function (entry) { return entry.name !== 'cube' }).length
 				}
 				const observations = (plan.records || []).map(function (record) {
@@ -815,6 +822,7 @@ ModLoader.register({
 					protectedCount,
 					crossBoundaryCount,
 					transientCount: transients.length,
+					surgeBuildCount: builds.filter(function (entry) { return entry.sourceKind === 'surge' }).length,
 					skippedConflictCount: replaceConflicts
 						? Math.max(0, Number(plan.statusCounts?.conflict) - buildRecords.filter(function (record) {
 							return record.status === 'conflict'
@@ -852,6 +860,7 @@ ModLoader.register({
 					protectedCount,
 					crossBoundaryCount,
 					transientCount: transients.length,
+					surgeBuildCount: summary.surgeBuildCount,
 					skippedConflictCount: summary.skippedConflictCount,
 					blockedCount: summary.blockedCount
 				}
@@ -862,7 +871,8 @@ ModLoader.register({
 					replaceCount,
 					syncDeleteCount,
 					deleteCount: removals.length,
-					transientCount: transients.length
+					transientCount: transients.length,
+					surgeBuildCount: summary.surgeBuildCount
 				}
 				const payload = {
 					schema: 3,
@@ -877,6 +887,7 @@ ModLoader.register({
 					protectedTargets,
 					transients,
 					emptyCells: (plan.emptyCells || []).map(clonePosition),
+					neutralCells: (plan.neutralCells || []).map(clonePosition),
 					scopeCells,
 					onlyOneKeys,
 					onlyonesBefore,
@@ -889,7 +900,12 @@ ModLoader.register({
 				}
 				return Object.freeze({
 					signature,
-					options: Object.freeze({ replaceConflicts, syncEmpty }),
+					options: Object.freeze({
+						replaceConflicts,
+						syncEmpty,
+						includeBlocks: plan.options?.includeBlocks === true,
+						includeSurges: plan.options?.includeSurges === true
+					}),
 					summary: Object.freeze(summary),
 					transactionSummary: Object.freeze(transactionSummary),
 					scope: Object.freeze(scope),
@@ -1437,7 +1453,7 @@ ModLoader.register({
 			}
 			const schemaVersion = Number(blueprint?.schemaVersion)
 			const structureValid = blueprint?.mode === 'structure' && [1, 2, 3, 4].includes(schemaVersion)
-			const fullValid = blueprint?.mode === 'full' && (schemaVersion === 3 || schemaVersion === 5)
+			const fullValid = blueprint?.mode === 'full' && (schemaVersion === 3 || schemaVersion === 5 || schemaVersion === 6)
 			if (fullValid && !Array.isArray(blueprint.blocks)) blueprint.blocks = []
 			if (
 				!blueprint ||
@@ -1446,18 +1462,30 @@ ModLoader.register({
 				(
 					!blueprint.entities.length &&
 					!(
-						(schemaVersion === 4 || schemaVersion === 5) &&
+						(schemaVersion === 4 || schemaVersion === 5 || schemaVersion === 6) &&
 						Array.isArray(blueprint.emptyCells) &&
 						blueprint.emptyCells.length
 					) &&
-					!(fullValid && Array.isArray(blueprint.blocks) && blueprint.blocks.length)
+					!(fullValid && Array.isArray(blueprint.blocks) && blueprint.blocks.length) &&
+					!(schemaVersion === 6 && Array.isArray(blueprint.surges) && blueprint.surges.length)
 				) ||
 				(schemaVersion === 4 && !Array.isArray(blueprint.emptyCells)) ||
-				(schemaVersion === 5 && !Array.isArray(blueprint.emptyCells))
+				((schemaVersion === 5 || schemaVersion === 6) && !Array.isArray(blueprint.emptyCells)) ||
+				(schemaVersion === 6 && !Array.isArray(blueprint.surges))
 			) {
 				throw placementError('BLUEPRINT_REQUIRED', 'A valid structure or full blueprint is required.')
 			}
 			return blueprint
+		}
+
+		function effectiveBlueprint(game, creative, value) {
+			const source = cloneBlueprint(value)
+			if (source.mode !== 'full' || creativeActive(creative, game)) return source
+			const stateService = globalThis[STATE_KEY]
+			if (typeof stateService?.projectStructure !== 'function') {
+				throw placementError('PROJECTION_UNAVAILABLE', 'Full blueprint structure projection is unavailable.')
+			}
+			return cloneBlueprint(stateService.projectStructure(source))
 		}
 
 		function collectScopeCells(records, removals) {
@@ -1569,6 +1597,7 @@ ModLoader.register({
 				counts[removal.name] = Math.max(0, finiteOr(counts[removal.name], 0) - 1)
 			}
 			for (const build of builds) {
+				if (build.name === 'cube' || build.sourceKind === 'surge') continue
 				const cost = priceFor(game, counts, build.name, false)
 				pushEconomyStep(resources, steps, 'build-cost', build.name, negateArray(cost))
 				counts[build.name] = finiteOr(counts[build.name], 0) + 1

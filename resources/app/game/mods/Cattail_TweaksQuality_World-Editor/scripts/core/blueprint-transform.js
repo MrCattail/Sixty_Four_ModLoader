@@ -21,6 +21,7 @@ ModLoader.register({
 		let mirrorV = false
 		let matrix = IDENTITY
 		let projected = false
+		let executionMode = 'structure'
 		let revision = 0
 		let sourceRevision = 0
 		let lastCommand = null
@@ -31,21 +32,38 @@ ModLoader.register({
 		const listeners = new Set()
 
 		const controller = Object.freeze({
-			version: '0.4.5',
+			version: '0.5.0',
 			snapshot,
 			bind(nextSource, reason) {
 				if (disposed || nextSource === source) return false
 				source = validSource(nextSource) ? nextSource : null
-				baseBlueprint = source ? structureView(source) : null
+				baseBlueprint = source ? executionView(source, executionMode) : null
 				pivot = baseBlueprint ? transformPivot(baseBlueprint) : null
 				quarterTurns = 0
 				mirrorU = false
 				mirrorV = false
 				matrix = IDENTITY
-				projected = false
+				projected = !!(source?.mode === 'full' && baseBlueprint?.mode === 'structure')
 				blueprint = baseBlueprint
 				lastCommand = source ? 'bind' : 'clear'
 				sourceRevision += 1
+				revision += 1
+				notify()
+				logReason(reason)
+				return true
+			},
+			setExecutionMode(nextMode, reason) {
+				if (disposed || (nextMode !== 'structure' && nextMode !== 'full')) return false
+				const resolved = nextMode === 'full' && source?.mode === 'full' ? 'full' : 'structure'
+				if (executionMode === resolved && (!source || baseBlueprint?.mode === resolved)) return false
+				executionMode = resolved
+				baseBlueprint = source ? executionView(source, executionMode) : null
+				pivot = baseBlueprint ? transformPivot(baseBlueprint) : null
+				blueprint = baseBlueprint && !isIdentityState()
+					? transformBlueprint(baseBlueprint, pivot, matrix)
+					: baseBlueprint
+				projected = !!(source?.mode === 'full' && baseBlueprint?.mode === 'structure')
+				lastCommand = 'execution-mode-' + executionMode
 				revision += 1
 				notify()
 				logReason(reason)
@@ -62,6 +80,7 @@ ModLoader.register({
 				mirrorV = false
 				matrix = IDENTITY
 				projected = false
+				executionMode = 'structure'
 				lastCommand = 'clear'
 				sourceRevision += 1
 				revision += 1
@@ -80,6 +99,27 @@ ModLoader.register({
 			},
 			mirrorV(reason) {
 				return applyCommand('mirror-v', reason)
+			},
+			restore(value, reason) {
+				if (disposed || !baseBlueprint || !pivot) return false
+				const next = normalizeRestoredState(value)
+				if (quarterTurns === next.quarterTurns && mirrorU === next.mirrorU && mirrorV === next.mirrorV) return false
+				quarterTurns = next.quarterTurns
+				mirrorU = next.mirrorU
+				mirrorV = next.mirrorV
+				matrix = stateMatrix(quarterTurns, mirrorU, mirrorV)
+				const started = now()
+				blueprint = isIdentityState()
+					? baseBlueprint
+					: transformBlueprint(baseBlueprint, pivot, matrix)
+				lastTransformMs = Math.max(0, now() - started)
+				maxTransformMs = Math.max(maxTransformMs, lastTransformMs)
+				transformCount += 1
+				lastCommand = 'restore'
+				revision += 1
+				notify()
+				logReason(reason)
+				return true
 			},
 			reset(reason) {
 				return applyCommand('reset', reason)
@@ -117,10 +157,11 @@ ModLoader.register({
 			const normalizedMatrix = Object.freeze(matrix.slice())
 			const normalizedPivot = pivot ? Object.freeze(pivot.slice()) : null
 			return Object.freeze({
-				version: '0.4.5',
+				version: '0.5.0',
 				source,
 				blueprint,
 				sourceMode: source?.mode || null,
+				executionMode: blueprint?.mode || executionMode,
 				projected,
 				pivot: normalizedPivot,
 				rotation: quarterTurns * 90,
@@ -201,6 +242,20 @@ ModLoader.register({
 			return quarterTurns === 0 && !mirrorU && !mirrorV
 		}
 
+		function normalizeRestoredState(value) {
+			const rawRotation = Number(value?.rotation)
+			const quarterTurnsFromRotation = Number.isInteger(rawRotation) && rawRotation % 90 === 0
+				? rawRotation / 90
+				: 0
+			const rawQuarterTurns = Number(value?.quarterTurns)
+			const turns = Number.isInteger(rawQuarterTurns) ? rawQuarterTurns : quarterTurnsFromRotation
+			return Object.freeze({
+				quarterTurns: ((turns % 4) + 4) % 4,
+				mirrorU: value?.mirrorU === true,
+				mirrorV: value?.mirrorV === true
+			})
+		}
+
 		function stateMatrix(turns, reflectU, reflectV) {
 			let result = rotationMatrix(turns)
 			if (reflectU) result = multiply(MIRROR_U, result)
@@ -225,16 +280,24 @@ ModLoader.register({
 			]
 		}
 
-		function structureView(value) {
-			if (value.mode === 'structure') return value
+		function executionView(value, desiredMode) {
+			if (!(desiredMode === 'structure' && value?.mode === 'full')) return value
 			const stateService = globalThis[STATE_KEY]
 			const normalized = typeof stateService?.normalizeBlueprint === 'function'
 				? stateService.normalizeBlueprint(value)
 				: value
+			const effective = desiredMode === 'structure' && normalized?.mode === 'full' && typeof stateService?.projectStructure === 'function'
+				? stateService.projectStructure(normalized)
+				: normalized
 			return freezeContainer(Object.assign({}, normalized, {
-				entities: Object.freeze((normalized.entities || []).map(freezeContainer)),
-				blocks: Object.freeze((normalized.blocks || []).map(freezeContainer)),
-				emptyCells: Object.freeze((normalized.emptyCells || []).map(function (position) {
+				...effective,
+				entities: Object.freeze((effective.entities || []).map(freezeContainer)),
+				blocks: Object.freeze((effective.blocks || []).map(freezeContainer)),
+				surges: Object.freeze((effective.surges || []).map(freezeContainer)),
+				emptyCells: Object.freeze((effective.emptyCells || []).map(function (position) {
+					return Object.freeze(position.slice())
+				})),
+				neutralCells: Object.freeze((effective.neutralCells || []).map(function (position) {
 					return Object.freeze(position.slice())
 				}))
 			}))
@@ -307,13 +370,23 @@ ModLoader.register({
 					position: transformPoint(block.position, center, transformMatrix)
 				}))
 			})
+			const surges = (value.surges || []).map(function (surge) {
+				return freezeContainer(Object.assign({}, surge, {
+					position: transformPoint(surge.position, center, transformMatrix)
+				}))
+			})
 			const supportsEmptyCells = (
 				Number(value.schemaVersion) === 4 && value.mode === 'structure'
 			) || (
-				Number(value.schemaVersion) === 5 && value.mode === 'full'
+				(Number(value.schemaVersion) === 5 || Number(value.schemaVersion) === 6) && value.mode === 'full'
 			)
 			const emptyCells = supportsEmptyCells && Array.isArray(value.emptyCells)
 				? value.emptyCells.map(function (position) {
+					return transformPoint(position, center, transformMatrix)
+				}).sort(comparePositions)
+				: []
+			const neutralCells = Array.isArray(value.neutralCells)
+				? value.neutralCells.map(function (position) {
 					return transformPoint(position, center, transformMatrix)
 				}).sort(comparePositions)
 				: []
@@ -323,9 +396,11 @@ ModLoader.register({
 			return freezeContainer(Object.assign({}, value, {
 				selections: Object.freeze(selections),
 				emptyCells: Object.freeze(emptyCells),
+				neutralCells: Object.freeze(neutralCells),
 				contentBounds,
 				entities: Object.freeze(entities),
-				blocks: Object.freeze(blocks)
+				blocks: Object.freeze(blocks),
+				surges: Object.freeze(surges)
 			}))
 		}
 
@@ -432,11 +507,12 @@ ModLoader.register({
 		function validSource(value) {
 			const schemaVersion = Number(value?.schemaVersion)
 			return !!value &&
-				(schemaVersion === 1 || schemaVersion === 2 || schemaVersion === 3 || schemaVersion === 4 || schemaVersion === 5) &&
+				(schemaVersion === 1 || schemaVersion === 2 || schemaVersion === 3 || schemaVersion === 4 || schemaVersion === 5 || schemaVersion === 6) &&
 				(value.mode === 'structure' || value.mode === 'full') &&
 				Array.isArray(value.entities) &&
 				(schemaVersion !== 4 || value.mode !== 'structure' || Array.isArray(value.emptyCells)) &&
-				(schemaVersion !== 5 || value.mode !== 'full' || Array.isArray(value.emptyCells))
+				((schemaVersion !== 5 && schemaVersion !== 6) || value.mode !== 'full' || Array.isArray(value.emptyCells)) &&
+				(schemaVersion !== 6 || value.mode !== 'full' || Array.isArray(value.surges))
 		}
 
 		function nonNegativeInteger(value, fallback) {

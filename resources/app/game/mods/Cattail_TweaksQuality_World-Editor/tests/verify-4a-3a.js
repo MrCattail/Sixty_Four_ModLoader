@@ -791,7 +791,7 @@ function testStaticIntegrationBoundary() {
 	const transactionIndex = entries.indexOf(TRANSACTION_SOURCE)
 	assert.ok(transactionIndex > entries.indexOf('scripts/core/creative-economy.js'))
 	assert.ok(transactionIndex < entries.indexOf('scripts/core/selection-state.js'))
-	assert.equal(manifest.version, '0.4.5')
+	assert.equal(manifest.version, '0.5.0')
 	assert.match(readme, /4A-3a 内部事务引擎/)
 	assert.match(readme, /cattail\.world-editor\.transactions/)
 	assert.match(transactionSource, /Symbol\.for\('cattail\.world-editor\.transactions'\)/)

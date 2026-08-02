@@ -5,12 +5,14 @@ const vm = require('node:vm')
 
 const MOD_ROOT = path.resolve(__dirname, '..')
 const SHARED_SOURCE = 'scripts/core/shared.js'
+const STATE_SOURCE = 'scripts/core/blueprint-state.js'
 const BLUEPRINT_SOURCE = 'scripts/blueprint-session.js'
 const RUNTIME_KEY = Symbol.for('cattail.world-editor.runtime')
 const SELECTION_KEY = Symbol.for('cattail.world-editor.selection')
 const INTERACTION_KEY = Symbol.for('cattail.world-editor.selection-interaction')
 const I18N_KEY = Symbol.for('cattail.world-editor.i18n')
 const BLUEPRINT_KEY = Symbol.for('cattail.world-editor.blueprint')
+const CREATIVE_KEY = Symbol.for('cattail.world-editor.creative-mode')
 
 function range(start, end) {
 	const minU = Math.min(start[0], end[0])
@@ -122,6 +124,7 @@ function createGame() {
 	const cells = new Map()
 	const game = {
 		plane: 0,
+		stuff: [],
 		splash: { isShown: false },
 		codex: {
 			entities: {
@@ -157,6 +160,7 @@ function createGame() {
 	}
 	game.setCell = function (u, v, entity) {
 		cells.set(u + ':' + v, entity)
+		if (!game.stuff.includes(entity)) game.stuff.push(entity)
 	}
 	return game
 }
@@ -200,11 +204,11 @@ function createEnvironment(options = {}) {
 		}
 	}
 	vm.createContext(sandbox)
-	for (const source of [SHARED_SOURCE, BLUEPRINT_SOURCE]) {
+	for (const source of [SHARED_SOURCE, STATE_SOURCE, BLUEPRINT_SOURCE]) {
 		const filename = path.join(MOD_ROOT, source)
 		vm.runInContext(fs.readFileSync(filename, 'utf8'), sandbox, { filename })
 	}
-	assert.equal(definitions.length, 2)
+	assert.equal(definitions.length, 3)
 
 	const api = {
 		state: {
@@ -220,8 +224,7 @@ function createEnvironment(options = {}) {
 			for (const listener of handlers.get(name) || []) listener(...args)
 		}
 	}
-	definitions[0].init(api)
-	definitions[1].init(api)
+	for (const definition of definitions) definition.init(api)
 	sandbox[RUNTIME_KEY] = runtime
 	sandbox[SELECTION_KEY] = selection
 	sandbox[INTERACTION_KEY] = {
@@ -233,6 +236,17 @@ function createEnvironment(options = {}) {
 		t(languageOrGame, key) {
 			return key
 		}
+	}
+	sandbox[CREATIVE_KEY] = {
+		game,
+		snapshot() {
+			return { ready: true, creativeMode: options.creative === true }
+		},
+		subscribe(listener) {
+			listener(this.snapshot())
+			return function () {}
+		},
+		setDialogOpen() { return false }
 	}
 	api.emit('afterGameInit', {}, game)
 	const session = sandbox[BLUEPRINT_KEY]
@@ -277,13 +291,16 @@ async function testStructureCaptureAndImmutability() {
 	assert.equal(result.status, 'captured')
 	assert.equal(result.clipboard, 'ready')
 	assert.equal(env.writes.length, 1)
-	assert.match(env.writes[0], /\n  "schemaVersion": 4,/)
+	assert.match(env.writes[0], /\n  "schemaVersion": 6,/)
 
 	const blueprint = env.session.snapshot().blueprint
-	assert.equal(env.session.version, '0.4.5')
-	assert.equal(env.session.schemaVersion, 4)
-	assert.equal(env.session.snapshot().version, '0.4.5')
+	const sourceBlueprint = env.session.snapshot().sourceBlueprint
+	assert.equal(env.session.version, '0.5.0')
+	assert.equal(env.session.schemaVersion, 6)
+	assert.equal(env.session.snapshot().version, '0.5.0')
 	assert.equal(blueprint.schemaVersion, 4)
+	assert.equal(sourceBlueprint.schemaVersion, 6)
+	assert.equal(sourceBlueprint.mode, 'full')
 	assert.deepEqual(plain(blueprint.emptyCells), [])
 	assert.equal(blueprint.mode, 'structure')
 	assert.equal(blueprint.sourcePlane, 0)
@@ -341,6 +358,7 @@ async function testSchema4EmptyMaskCaptureAndCut() {
 	assert.equal(result.status, 'captured')
 	const captured = env.session.snapshot().blueprint
 	assert.equal(captured.schemaVersion, 4)
+	assert.equal(env.session.snapshot().sourceBlueprint.schemaVersion, 6)
 	assert.deepEqual(plain(captured.anchor.position), [2, 0])
 	assert.deepEqual(plain(captured.emptyCells), [[0, 0]])
 	assert.deepEqual(plain(captured.entities.map(entity => entity.name)), ['silo'])
@@ -389,7 +407,8 @@ async function testSchema4EmptyMaskCaptureAndCut() {
 			sourceCellCount: 3
 		}
 	})
-	assert.equal(cutCandidate.blueprint.schemaVersion, 4)
+	assert.equal(cutCandidate.blueprint.schemaVersion, 6)
+	assert.equal(cutCandidate.blueprint.mode, 'full')
 	assert.deepEqual(plain(cutCandidate.blueprint.emptyCells), [[0, 0]])
 	assert.deepEqual(plain(cutCandidate.blueprint.entities[0].position), [-2, 0])
 	assert.equal(cutCandidate.blueprint.summary.skippedCount, 1)
@@ -456,7 +475,7 @@ async function testFullCaptureCubeRulesAndFailureRetention() {
 	const state = selectionState([
 		{ id: 10, primary: true, plane: 0, range: range([5, 5], [7, 5]) }
 	], 10)
-	const env = createEnvironment({ selection: state })
+	const env = createEnvironment({ selection: state, creative: true })
 	const pump = { name: 'pump', position: [5, 5], entitySpan: 0, par: { depth: 2, fill: 42 } }
 	const stableCube = {
 		name: 'cube',
@@ -475,13 +494,13 @@ async function testFullCaptureCubeRulesAndFailureRetention() {
 	env.game.setCell(5, 5, pump)
 	env.game.setCell(6, 5, stableCube)
 	env.game.setCell(7, 5, unstableCube)
-	assert.equal(env.session.setMode('full', 'test'), true)
-	assert.equal(env.session.setIncludeBlocks(true, 'test'), true)
+	assert.equal(env.session.snapshot().mode, 'full')
+	assert.equal(env.session.setIncludeBlocks(true, 'test-before-capture'), false)
 
 	const fullResult = await env.session.capture('test-full')
 	assert.equal(fullResult.status, 'captured')
 	const fullBlueprint = env.session.snapshot().blueprint
-	assert.equal(fullBlueprint.schemaVersion, 5)
+	assert.equal(fullBlueprint.schemaVersion, 6)
 	assert.equal(fullBlueprint.mode, 'full')
 	assert.equal(fullBlueprint.includeBlocks, true)
 	assert.equal(fullBlueprint.entities.length, 1)
@@ -489,6 +508,7 @@ async function testFullCaptureCubeRulesAndFailureRetention() {
 	assert.equal(fullBlueprint.blocks.length, 1)
 	assert.equal(fullBlueprint.blocks[0].state.resources.length, 64)
 	assert.equal(fullBlueprint.blocks[0].state.broken, 0.25)
+	assert.equal(env.session.setIncludeBlocks(true, 'test-after-capture'), true)
 	assert.deepEqual(plain(fullBlueprint.emptyCells), [])
 	assert.equal(fullBlueprint.summary.skippedTypes[0].reason, 'unstable')
 
@@ -498,10 +518,14 @@ async function testFullCaptureCubeRulesAndFailureRetention() {
 	assert.equal(env.session.setMode('structure', 'test'), true)
 	assert.equal(env.session.snapshot().includeBlocks, false)
 	const writesBeforeEmpty = env.writes.length
-	const emptyResult = await env.session.capture('test-structure-cube')
-	assert.equal(emptyResult.status, 'empty')
-	assert.strictEqual(env.session.snapshot().blueprint, fullBlueprint)
-	assert.equal(env.writes.length, writesBeforeEmpty)
+	const cubeResult = await env.session.capture('test-structure-cube')
+	assert.equal(cubeResult.status, 'captured')
+	assert.equal(env.session.snapshot().sourceBlueprint.schemaVersion, 6)
+	assert.equal(env.session.snapshot().sourceBlueprint.blocks.length, 1)
+	assert.equal(env.session.snapshot().blueprint.schemaVersion, 4)
+	assert.deepEqual(plain(env.session.snapshot().blueprint.neutralCells), [[0, 0]])
+	assert.equal(env.writes.length, writesBeforeEmpty + 1)
+	const retainedSource = env.session.snapshot().sourceBlueprint
 
 	env.selection.set(selectionState([
 		{ id: 12, primary: true, plane: 0, range: range([8, 5], [8, 5]) }
@@ -511,7 +535,7 @@ async function testFullCaptureCubeRulesAndFailureRetention() {
 	assert.equal(env.session.setMode('full', 'test'), true)
 	const badResult = await env.session.capture('test-save-failure')
 	assert.equal(badResult.status, 'empty')
-	assert.strictEqual(env.session.snapshot().blueprint, fullBlueprint)
+	assert.strictEqual(env.session.snapshot().sourceBlueprint, retainedSource)
 	assert.equal(badResult.skippedTypes[0].reason, 'unserializable')
 
 	env.selection.set(selectionState([
@@ -521,7 +545,7 @@ async function testFullCaptureCubeRulesAndFailureRetention() {
 	const failedClipboard = await env.session.capture('test-clipboard-failure')
 	assert.equal(failedClipboard.status, 'captured')
 	assert.equal(failedClipboard.clipboard, 'failed')
-	assert.notStrictEqual(env.session.snapshot().blueprint, fullBlueprint)
+	assert.notStrictEqual(env.session.snapshot().sourceBlueprint, retainedSource)
 	assert.equal(env.session.snapshot().blueprint.entities[0].name, 'pump')
 }
 
@@ -628,9 +652,7 @@ async function testCutCandidateClipboardAndOutcome() {
 	assert.strictEqual(env.session.snapshot().blueprint, existingBlueprint)
 	assert.equal(env.writes.length, writesBeforeCut)
 	assert.deepEqual(plain(candidate.blueprint.entities.map(entry => entry.name)), ['pump'])
-	assert.deepEqual(plain(candidate.blueprint.summary.skippedTypes), [
-		{ name: 'cube', reason: 'cube', count: 1 }
-	])
+	assert.deepEqual(plain(candidate.blueprint.summary.skippedTypes), [])
 
 	env.setClipboardFailure(true)
 	const failed = await env.session.publishCut(candidate, 'cut-clipboard-failure')
@@ -639,7 +661,7 @@ async function testCutCandidateClipboardAndOutcome() {
 	assert.equal(env.writes.length, writesBeforeCut)
 
 	env.setClipboardFailure(false)
-	assert.equal(env.session.setMode('full', 'cut-force-structure'), true)
+	assert.equal(env.session.setMode('full', 'cut-normal-mode-locked'), false)
 	const published = await env.session.publishCut(candidate, 'cut-ready')
 	assert.equal(published.status, 'ready')
 	assert.equal(published.cutToken, deletionPlan.signature)
@@ -671,9 +693,9 @@ function testLanguagesManifestUiAndReadOnlyBoundary() {
 	vm.runInContext(fs.readFileSync(i18nFilename, 'utf8'), i18nSandbox, { filename: i18nFilename })
 	i18nDefinitions[0].init()
 	const i18n = i18nSandbox[I18N_KEY]
-	assert.equal(i18n.version, '0.4.5')
+	assert.equal(i18n.version, '0.5.0')
 	assert.equal(i18n.languages.length, 20)
-	assert.equal(i18n.keys.length, 179)
+	assert.equal(i18n.keys.length, 187)
 	const blueprintKeys = [
 		'blueprintModeStructure',
 		'blueprintModeFull',
@@ -704,9 +726,9 @@ function testLanguagesManifestUiAndReadOnlyBoundary() {
 	}
 
 	const manifest = JSON.parse(fs.readFileSync(path.join(MOD_ROOT, 'mod.json'), 'utf8'))
-	assert.equal(manifest.version, '0.4.5')
+	assert.equal(manifest.version, '0.5.0')
 	assert.equal(manifest.languageSupport.gameLanguage, true)
-	assert.equal(manifest.entry.length, 31)
+	assert.equal(manifest.entry.length, 35)
 	assert.ok(manifest.entry.includes(BLUEPRINT_SOURCE))
 	assert.ok(
 		manifest.entry.indexOf('scripts/ui/editor-shell.js') <
@@ -715,12 +737,12 @@ function testLanguagesManifestUiAndReadOnlyBoundary() {
 
 	const source = fs.readFileSync(path.join(MOD_ROOT, BLUEPRINT_SOURCE), 'utf8')
 	const sharedSource = fs.readFileSync(path.join(MOD_ROOT, SHARED_SOURCE), 'utf8')
-	assert.match(source, /schemaVersion:\s*captureMode === 'structure' \? 4 : 5/)
-	assert.match(source, /version:\s*'0\.4\.5'/)
+	assert.match(source, /schemaVersion:\s*6/)
+	assert.match(source, /version:\s*'0\.5\.0'/)
 	assert.match(source, /selectionIds:\s*source\.selectionIds/)
 	assert.match(source, /typeof game\.uvToXY !== 'function'/)
 	assert.match(source, /Object\.freeze/)
-	assert.match(source, /JSON\.stringify\(normalized,\s*null,\s*2\)/)
+	assert.match(source, /JSON\.stringify\(sourceBlueprint,\s*null,\s*2\)/)
 	assert.match(source, /navigator\?\.clipboard\?\.writeText/)
 	assert.match(source, /prepareCut/)
 	assert.match(source, /publishCut/)
