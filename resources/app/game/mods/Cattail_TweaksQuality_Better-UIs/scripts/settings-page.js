@@ -353,6 +353,7 @@ ModLoader.register({
 
 		function shouldHandleGameplayKey(game, event) {
 			if (!game || game.splash?.isShown || event.isComposing || event.altKey || event.metaKey) return false
+			if (document.querySelector?.('[aria-modal="true"]')) return false
 			const target = event.target
 			if (target && /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName || '')) return false
 			return true
