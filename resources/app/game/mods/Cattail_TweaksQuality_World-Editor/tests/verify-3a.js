@@ -295,9 +295,9 @@ async function testStructureCaptureAndImmutability() {
 
 	const blueprint = env.session.snapshot().blueprint
 	const sourceBlueprint = env.session.snapshot().sourceBlueprint
-	assert.equal(env.session.version, '0.5.0')
+	assert.equal(env.session.version, '0.5.1')
 	assert.equal(env.session.schemaVersion, 6)
-	assert.equal(env.session.snapshot().version, '0.5.0')
+	assert.equal(env.session.snapshot().version, '0.5.1')
 	assert.equal(blueprint.schemaVersion, 4)
 	assert.equal(sourceBlueprint.schemaVersion, 6)
 	assert.equal(sourceBlueprint.mode, 'full')
@@ -693,9 +693,9 @@ function testLanguagesManifestUiAndReadOnlyBoundary() {
 	vm.runInContext(fs.readFileSync(i18nFilename, 'utf8'), i18nSandbox, { filename: i18nFilename })
 	i18nDefinitions[0].init()
 	const i18n = i18nSandbox[I18N_KEY]
-	assert.equal(i18n.version, '0.5.0')
+	assert.equal(i18n.version, '0.5.1')
 	assert.equal(i18n.languages.length, 20)
-	assert.equal(i18n.keys.length, 187)
+	assert.equal(i18n.keys.length, 252)
 	const blueprintKeys = [
 		'blueprintModeStructure',
 		'blueprintModeFull',
@@ -726,7 +726,7 @@ function testLanguagesManifestUiAndReadOnlyBoundary() {
 	}
 
 	const manifest = JSON.parse(fs.readFileSync(path.join(MOD_ROOT, 'mod.json'), 'utf8'))
-	assert.equal(manifest.version, '0.5.0')
+	assert.equal(manifest.version, '0.5.1')
 	assert.equal(manifest.languageSupport.gameLanguage, true)
 	assert.equal(manifest.entry.length, 35)
 	assert.ok(manifest.entry.includes(BLUEPRINT_SOURCE))
@@ -738,7 +738,7 @@ function testLanguagesManifestUiAndReadOnlyBoundary() {
 	const source = fs.readFileSync(path.join(MOD_ROOT, BLUEPRINT_SOURCE), 'utf8')
 	const sharedSource = fs.readFileSync(path.join(MOD_ROOT, SHARED_SOURCE), 'utf8')
 	assert.match(source, /schemaVersion:\s*6/)
-	assert.match(source, /version:\s*'0\.5\.0'/)
+	assert.match(source, /version:\s*'0\.5\.1'/)
 	assert.match(source, /selectionIds:\s*source\.selectionIds/)
 	assert.match(source, /typeof game\.uvToXY !== 'function'/)
 	assert.match(source, /Object\.freeze/)

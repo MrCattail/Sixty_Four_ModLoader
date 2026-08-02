@@ -579,9 +579,9 @@ function testUnifiedToolbarAndLocalization() {
 	const selectButton = shell.querySelector('[data-world-editor-action="select"]')
 	const moveButton = shell.querySelector('[data-world-editor-action="move"]')
 	const resizeButton = shell.querySelector('[data-world-editor-action="resize"]')
-	assert.equal(i18n.version, '0.5.0')
+	assert.equal(i18n.version, '0.5.1')
 	assert.equal(i18n.languages.length, 20)
-	assert.equal(i18n.keys.length, 187)
+	assert.equal(i18n.keys.length, 252)
 	assert.equal(shell.getAttribute('role'), 'toolbar')
 	assert.equal(moveButton, null)
 	assert.equal(resizeButton, null)
@@ -614,7 +614,7 @@ function testUnifiedToolbarAndLocalization() {
 
 function testManifestAndReadOnlyBoundary() {
 	const manifest = JSON.parse(fs.readFileSync(path.join(MOD_ROOT, 'mod.json'), 'utf8'))
-	assert.equal(manifest.version, '0.5.0')
+	assert.equal(manifest.version, '0.5.1')
 	assert.equal(manifest.languageSupport.gameLanguage, true)
 	assert.deepEqual(manifest.entry, [
 		'scripts/core/foundation.js',

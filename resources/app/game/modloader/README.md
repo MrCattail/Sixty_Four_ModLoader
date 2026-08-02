@@ -179,7 +179,8 @@ const exported = await library.exportItem({
   name: saved.info.name,
   expectedRevision: saved.info.revision,
   suggestedName: saved.info.name,
-  title: 'Export blueprint'
+  title: 'Export blueprint',
+  data: JSON.stringify(canonicalBlueprint)
 })
 ```
 
@@ -206,11 +207,14 @@ either `Uint8Array` data or UTF-8 text. Cancellation resolves to
 `{ canceled: true }`.
 
 `exportItem()` accepts only an active item with an exact `expectedRevision`,
-opens the system save/overwrite dialog, and publishes the verified managed
-payload through a flushed sibling temporary file and atomic replacement. Its
-result contains only cancellation state, the safe output file name, and byte
-count. Cancellation or failure does not mutate the managed library, and the
-destination may not be inside that library.
+opens the system save/overwrite dialog, and publishes either the verified
+managed payload or an optional caller-supplied UTF-8 string / `Uint8Array`
+`data` payload through a flushed sibling temporary file and atomic replacement.
+The optional payload is limited by the library's declared per-file size and is
+validated before the save dialog opens; it supports canonicalized export without
+rewriting the managed item. The result contains only cancellation state, the
+safe output file name, and byte count. Cancellation or failure does not mutate
+the managed library, and the destination may not be inside that library.
 
 ```js
 const deleted = await library.trash({

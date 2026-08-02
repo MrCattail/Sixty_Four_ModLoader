@@ -1324,7 +1324,7 @@ function testLocalizationAndIntegrationContract() {
 	]
 
 	assert.equal(i18n.languages.length, 20)
-	assert.equal(i18n.keys.length, 187)
+	assert.equal(i18n.keys.length, 252)
 	for (const language of i18n.languages) {
 		for (const key of transformKeys) {
 			const translated = i18n.t(language, key)
@@ -1333,7 +1333,7 @@ function testLocalizationAndIntegrationContract() {
 		}
 	}
 
-	assert.equal(manifest.version, '0.5.0')
+	assert.equal(manifest.version, '0.5.1')
 	assert.equal(manifest.languageSupport.gameLanguage, true)
 	assert.equal(manifest.entry.length, 35)
 	assert.equal(
@@ -1354,7 +1354,7 @@ function testLocalizationAndIntegrationContract() {
 	)
 
 	assert.match(transformSource, /Symbol\.for\('cattail\.world-editor\.blueprint-transform'\)/)
-	assert.match(transformSource, /version:\s*'0\.5\.0'/)
+	assert.match(transformSource, /version:\s*'0\.5\.1'/)
 	assert.doesNotMatch(transformSource, /requestAnimationFrame|setInterval|onFrame/)
 	assert.doesNotMatch(transformSource, /getEntityString|entityAtCoordinates|stuffMap/)
 	assert.match(previewSource, /FOLLOW_PLAN_IDLE_MS\s*=\s*100/)

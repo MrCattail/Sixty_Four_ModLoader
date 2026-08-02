@@ -431,7 +431,7 @@ function loadPreviewRuntime() {
 			const retry = key === retryTarget && !retryIssued
 			if (retry) retryIssued = true
 			return Promise.resolve({
-				version: '0.5.0',
+				version: '0.5.1',
 				target: normalizedTarget,
 				records: [],
 				statusCounts: {
@@ -1125,7 +1125,7 @@ async function testPreviewCommandLockLifecycle() {
 
 function testStaticUiLocalizationAndManifestContracts() {
 	const manifest = JSON.parse(source('mod.json'))
-	assert.equal(manifest.version, '0.5.0')
+	assert.equal(manifest.version, '0.5.1')
 	assert.equal(manifest.entry.length, 35)
 	assert.ok(manifest.entry.indexOf(PLACEMENT_SOURCE) > manifest.entry.indexOf(PLAN_SOURCE))
 	assert.ok(manifest.entry.indexOf(PLACEMENT_SOURCE) < manifest.entry.indexOf('scripts/core/input-controller.js'))

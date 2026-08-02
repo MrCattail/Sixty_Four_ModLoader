@@ -5,6 +5,7 @@ const vm = require('node:vm')
 
 const MOD_ROOT = path.resolve(__dirname, '..')
 const UI_SOURCE = 'scripts/ui/blueprint-library-ui.js'
+const EDITOR_TEXT_SOURCE = 'scripts/i18n/editor-text.js'
 const LIBRARY_SOURCE = 'scripts/core/blueprint-library.js'
 const FORMAT_SOURCE = 'scripts/core/blueprint-library-format.js'
 const THUMBNAIL_SOURCE = 'scripts/render/blueprint-thumbnail.js'
@@ -50,9 +51,11 @@ function testPageRegistrationAndLanguageFallback() {
 	}
 	sandbox.globalThis = sandbox
 	vm.createContext(sandbox)
+	vm.runInContext(source(EDITOR_TEXT_SOURCE), sandbox, { filename: EDITOR_TEXT_SOURCE })
 	vm.runInContext(source(UI_SOURCE), sandbox, { filename: UI_SOURCE })
-	assert.equal(definitions.length, 1)
-	definitions[0].init({
+	assert.equal(definitions.length, 2)
+	definitions[0].init()
+	definitions[1].init({
 		ui: {
 			pages: {
 				register(value) {
@@ -76,7 +79,7 @@ function testPageRegistrationAndLanguageFallback() {
 	assert.equal(page.menuLabel({ language: 'modsch' }), '蓝图库')
 	assert.equal(page.menuLabel({ language: 'tch' }), '蓝图库')
 	assert.equal(page.menuLabel({ language: 'ru' }), 'Blueprint Library')
-	assert.equal(sandbox[UI_KEY].version, '0.5.0')
+	assert.equal(sandbox[UI_KEY].version, '0.5.1')
 	assert.equal(sandbox[UI_KEY].isInputBlocked(), false)
 }
 
@@ -302,11 +305,11 @@ async function testBuildingThumbnailRenderingAndV3Cache() {
 
 function testManifestAndStaticUiContracts() {
 	const manifest = JSON.parse(source('mod.json'))
-	assert.equal(manifest.version, '0.5.0')
-	assert.equal(manifest.loaderVersion, '>=0.3.0')
+	assert.equal(manifest.version, '0.5.1')
+	assert.equal(manifest.loaderVersion, '>=0.3.1')
 	assert.deepEqual(manifest.libraries.blueprints, {
 		directory: 'blueprints',
-		extensions: ['.cattail-blueprint.json'],
+		extensions: ['.64schem', '.cattail-blueprint.json'],
 		maxFileBytes: 16777216,
 		maxTotalBytes: 2147483648,
 		maxEntries: 5000,
@@ -372,6 +375,16 @@ function testManifestAndStaticUiContracts() {
 	assert.match(ui, /controller\.remove\(entry\)/)
 	assert.match(ui, /controller\.retry\(entry\)/)
 	assert.match(ui, /controller\.openFolder\(\{ area:/)
+	assert.match(ui, /controller\.pickImport\(\{ title: label\(game, 'importFileTitle'\) \}\)/)
+	assert.match(ui, /controller\.prepareImportText\(text, \{ source: 'clipboard' \}\)/)
+	assert.match(ui, /controller\.commitImport\(candidate, 'import'\)/)
+	assert.match(ui, /controller\.commitImport\(candidate, resolution\)/)
+	assert.match(ui, /controller\.exportItem\(entry, \{ title: label\(game, 'exportFileTitle'\) \}\)/)
+	assert.match(ui, /controller\.shareText\(entry\)/)
+	assert.match(ui, /globalThis\.navigator\.clipboard\.readText\(\)/)
+	assert.match(ui, /globalThis\.navigator\.clipboard\.writeText\(shared\.text\)/)
+	assert.match(ui, /dialog\.setBusy\(true\)/)
+	assert.match(ui, /dialog\.mount\(copy\)/)
 	assert.match(ui, /toolbarSaveButton\.dataset\.worldEditorBlueprintSave = 'toolbar'/)
 	assert.match(ui, /cardSaveButton\.dataset\.worldEditorBlueprintSave = 'card'/)
 	assert.match(ui, /slot\.append\(toolbarSaveButton, toolbarButton\)/)
@@ -420,7 +433,7 @@ function testManifestAndStaticUiContracts() {
 	assert.match(ui, /\.cattail-world-editor-library-modal \.cattail-world-editor-library\[data-surface="modal"\] button,[\s\S]*?border:\s*1px solid var\(--world-editor-library-border\);[\s\S]*?border-radius:\s*6px;[\s\S]*?background:\s*var\(--world-editor-library-control\);[\s\S]*?color:\s*var\(--world-editor-library-text\);/)
 	assert.match(ui, /\.cattail-world-editor-library-modal \.cattail-world-editor-library__item\[data-selected="true"\],[\s\S]*?background:\s*var\(--world-editor-library-active\) !important;[\s\S]*?box-shadow:\s*inset 0 0 0 1px var\(--world-editor-library-active-border\) !important;/)
 	assert.match(ui, /\.cattail-world-editor-library select:focus\s*\{[\s\S]*?outline:\s*0 !important;[\s\S]*?box-shadow:\s*none !important;/)
-	assert.match(ui, /\.cattail-world-editor-library\s*\{[\s\S]*?display:\s*grid;[\s\S]*?grid-template-rows:\s*auto auto minmax\(0, 1fr\);[\s\S]*?height:\s*100%;[\s\S]*?min-height:\s*0;[\s\S]*?overflow:\s*hidden;/)
+	assert.match(ui, /\.cattail-world-editor-library\s*\{[\s\S]*?display:\s*grid;[\s\S]*?grid-template-rows:\s*auto auto auto minmax\(0, 1fr\);[\s\S]*?height:\s*100%;[\s\S]*?min-height:\s*0;[\s\S]*?overflow:\s*hidden;/)
 	assert.match(ui, /\[data-library-modal-body\]\s*\{[\s\S]*?height:\s*100%;[\s\S]*?min-height:\s*0;/)
 	assert.match(ui, /\.cattail-world-editor-library\[data-surface="modal"\]\s*\{[\s\S]*?height:\s*100%;[\s\S]*?min-height:\s*0;/)
 	assert.match(ui, /\.cattail-world-editor-library__toolbar button,[\s\S]*?min-height:\s*40px;[\s\S]*?padding:\s*8px 12px;[\s\S]*?font-size:\s*15px;/)
@@ -434,8 +447,9 @@ function testManifestAndStaticUiContracts() {
 	assert.match(ui, /preferences\.className = 'cattail-world-editor-library__toolbar-group cattail-world-editor-library__toolbar-group--preferences'/)
 	assert.doesNotMatch(ui, /renderBeforeContent|renderPageRule|cattail-world-editor-library__page-rule/)
 	assert.match(ui, /toolbarRule\.className = 'cattail-world-editor-library__toolbar-rule'/)
-	assert.match(ui, /root\.append\(toolbar, toolbarRule\)[\s\S]*?const layout = document\.createElement\('div'\)/)
-	assert.doesNotMatch(ui, /cattail-world-editor-library__status|正在监视外部文件变化|Watching for external changes|Watcher unavailable; use Refresh/)
+	assert.match(ui, /root\.append\(toolbar, toolbarRule, renderStatus\(\)\)[\s\S]*?const layout = document\.createElement\('div'\)/)
+	assert.match(ui, /cattail-world-editor-library__status/)
+	assert.match(ui, /setAttribute\('aria-live', statusMessage\?\.kind === 'error' \? 'assertive' : 'polite'\)/)
 	assert.match(ui, /\.cattail-world-editor-library__toolbar-rule\s*\{[\s\S]*?width:\s*100%;[\s\S]*?height:\s*1px;[\s\S]*?margin:\s*10px 0 8px;[\s\S]*?background:\s*rgba\(255, 255, 255, \.72\);/)
 	assert.match(ui, /appendSeparated\(primaryActions, \[/)
 	assert.match(ui, /appendSeparated\(viewOptions, \[areaSelect, viewSelect\]\)/)

@@ -2,7 +2,10 @@ const assert = require('node:assert/strict')
 
 class MemoryLibraryHandle {
 	constructor(options = {}) {
-		this.extension = options.extension || '.cattail-blueprint.json'
+		this.extensions = Array.isArray(options.extensions) && options.extensions.length
+			? options.extensions.slice()
+			: [options.extension || '.64schem', '.cattail-blueprint.json']
+		this.extension = this.extensions[0]
 		this.watchEnabled = options.watchEnabled !== false
 		this.maxFileBytes = options.maxFileBytes || 1024 * 1024
 		this.maxTotalBytes = options.maxTotalBytes || 8 * 1024 * 1024
@@ -10,6 +13,11 @@ class MemoryLibraryHandle {
 		this.sequence = 0
 		this.watchers = new Set()
 		this.openFolderCalls = []
+		this.pickImportCalls = []
+		this.exportItemCalls = []
+		this.importSelections = []
+		this.exportSelections = []
+		this.exportedFiles = []
 		this.operations = []
 		this.areas = {
 			active: new Map(),
@@ -20,8 +28,9 @@ class MemoryLibraryHandle {
 
 	async capabilities() {
 		return {
-			apiVersion: '1.0.0',
+			apiVersion: '1.1.0',
 			libraryId: 'blueprints',
+			extensions: this.extensions.slice(),
 			maxFileBytes: this.maxFileBytes,
 			maxTotalBytes: this.maxTotalBytes,
 			maxEntries: this.maxEntries,
@@ -46,6 +55,50 @@ class MemoryLibraryHandle {
 		}
 	}
 
+	queueImport(selection) {
+		this.importSelections.push(clone(selection))
+	}
+
+	queueExport(selection) {
+		this.exportSelections.push(clone(selection))
+	}
+
+	async pickImport(options = {}) {
+		this.pickImportCalls.push(clone(options))
+		const selection = this.importSelections.length ? this.importSelections.shift() : { canceled: true }
+		if (selection?.canceled !== false) return { canceled: true }
+		const fileName = this.validName(selection.fileName)
+		const data = typeof selection.data === 'string' ? selection.data : Buffer.from(selection.data || []).toString()
+		const bytes = Buffer.byteLength(data)
+		if (bytes > this.maxFileBytes) throw apiError('TOO_LARGE', 'The imported file exceeds its quota.')
+		return {
+			canceled: false,
+			fileName,
+			bytes,
+			data: options.encoding === 'utf8' ? data : Uint8Array.from(Buffer.from(data))
+		}
+	}
+
+	async exportItem(options = {}) {
+		if (options.area && options.area !== 'active') throw apiError('PERMISSION_DENIED', 'Only active files can be exported.')
+		const record = this.requireRecord('active', options.name)
+		this.requireRevision(record, options.expectedRevision)
+		const suggestedName = this.validName(options.suggestedName || record.info.name)
+		let data
+		if (options.data === undefined) data = String(record.data)
+		else if (typeof options.data === 'string') data = options.data
+		else if (options.data instanceof Uint8Array || Buffer.isBuffer(options.data)) data = Buffer.from(options.data).toString()
+		else throw apiError('PATH_INVALID', 'Library export data must be a string or Uint8Array.')
+		const bytes = Buffer.byteLength(data)
+		if (bytes > this.maxFileBytes) throw apiError('TOO_LARGE', 'The exported file exceeds its quota.')
+		this.exportItemCalls.push(clone(Object.assign({}, options, { suggestedName })))
+		const selection = this.exportSelections.length ? this.exportSelections.shift() : { canceled: false, fileName: suggestedName }
+		if (selection?.canceled === true) return { canceled: true }
+		const fileName = this.validName(selection?.fileName || suggestedName)
+		this.exportedFiles.push({ fileName, bytes, data, sourceName: record.info.name, sourceData: String(record.data) })
+		return { canceled: false, fileName, bytes }
+	}
+
 	async write(options = {}) {
 		if (options.area && options.area !== 'active') throw apiError('PERMISSION_DENIED', 'Only active writes are supported by this harness.')
 		const name = this.validName(options.name)
@@ -57,7 +110,8 @@ class MemoryLibraryHandle {
 		if (existing) {
 			if (options.expectedRevision === undefined) throw apiError('NAME_CONFLICT', 'The active name already exists.')
 			this.requireRevision(existing, options.expectedRevision)
-			const backupName = this.uniqueAreaName('trash', name.replace(this.extension, '') + '__backup' + this.extension)
+			const extension = this.extensionFor(name)
+			const backupName = this.uniqueAreaName('trash', name.slice(0, -extension.length) + '__backup' + extension)
 			backup = this.moveRecord(existing, 'trash', backupName, false)
 			active.delete(name)
 		} else if (options.expectedRevision !== undefined) {
@@ -187,16 +241,23 @@ class MemoryLibraryHandle {
 
 	validName(value) {
 		const name = String(value || '')
-		if (!name.endsWith(this.extension) || /[\\/]/.test(name) || name.includes('..')) {
+		if (!this.extensionFor(name) || /[\\/]/.test(name) || name.includes('..')) {
 			throw apiError('PATH_INVALID', 'The managed name is invalid.')
 		}
 		return name
 	}
 
+	extensionFor(name) {
+		const lower = String(name || '').toLowerCase()
+		return this.extensions.slice().sort((left, right) => right.length - left.length)
+			.find(extension => lower.endsWith(extension.toLowerCase())) || ''
+	}
+
 	uniqueAreaName(areaName, preferred) {
 		if (!this.areas[areaName].has(preferred)) return preferred
 		this.sequence += 1
-		return preferred.replace(this.extension, '__' + this.sequence + this.extension)
+		const extension = this.extensionFor(preferred)
+		return preferred.slice(0, -extension.length) + '__' + this.sequence + extension
 	}
 
 	area(value) {

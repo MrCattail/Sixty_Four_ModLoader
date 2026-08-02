@@ -22,7 +22,7 @@ ModLoader.register({
 
 		let disposed = false
 		const planner = Object.freeze({
-			version: '0.5.0',
+			version: '0.5.1',
 			status: STATUS,
 			statusPriority: STATUS_PRIORITY,
 			async build(game, blueprint, target, options) {
@@ -200,7 +200,7 @@ ModLoader.register({
 			const statusCounts = countStatuses(records)
 			const cost = simulateCost(game, records, guard)
 			return {
-				version: '0.5.0',
+				version: '0.5.1',
 				mode: blueprint.mode,
 				schemaVersion: Number(blueprint.schemaVersion),
 				normalization: jsonClone(blueprint.summary || {}),
@@ -763,7 +763,7 @@ ModLoader.register({
 				})
 			}
 			return {
-				version: '0.5.0',
+				version: '0.5.1',
 				kind: 'synthetic-plan',
 				results
 			}

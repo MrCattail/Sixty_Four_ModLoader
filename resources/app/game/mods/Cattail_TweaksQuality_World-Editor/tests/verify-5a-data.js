@@ -63,7 +63,7 @@ function fullBlueprint() {
 async function testSchemaProjectionAndPlacementModes() {
 	const normal = loadRuntime({ creative: false })
 	const state = normal.sandbox[STATE_KEY]
-	assert.equal(state.version, '0.5.0')
+	assert.equal(state.version, '0.5.1')
 	const normalized = state.normalizeBlueprint(fullBlueprint())
 	assert.equal(normalized.schemaVersion, 6)
 	assert.equal(normalized.surges.length, 1)

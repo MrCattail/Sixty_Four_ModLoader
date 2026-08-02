@@ -16,8 +16,8 @@ ModLoader.register({
 			const runtime = globalThis[RUNTIME_KEY]
 			const transform = globalThis[TRANSFORM_KEY]
 			const libraries = api.storage?.libraries
-			if (!format || !session || typeof transform?.snapshot !== 'function' || typeof transform?.restore !== 'function' || libraries?.version !== '1.0.0' || typeof libraries.open !== 'function') {
-				console.warn('[Cattail World Editor] Blueprint library requires Library API 1.0.0 and an active blueprint session.')
+			if (!format || !session || typeof transform?.snapshot !== 'function' || typeof transform?.restore !== 'function' || libraries?.version !== '1.1.0' || typeof libraries.open !== 'function') {
+				console.warn('[Cattail World Editor] Blueprint library requires Library API 1.1.0 and an active blueprint session.')
 				return
 			}
 
@@ -51,7 +51,7 @@ ModLoader.register({
 			let problems = []
 
 			const controller = Object.freeze({
-				version: '0.5.0',
+				version: '0.5.1',
 				game,
 				handle,
 				snapshot,
@@ -62,6 +62,11 @@ ModLoader.register({
 				load,
 				rename,
 				duplicate,
+				pickImport,
+				prepareImportText,
+				commitImport,
+				exportItem,
+				shareText,
 				trash: trashEntry,
 				restore,
 				quarantine: quarantineEntry,
@@ -78,7 +83,7 @@ ModLoader.register({
 
 			function snapshot() {
 				return Object.freeze({
-					version: '0.5.0',
+					version: '0.5.1',
 					ready,
 					available,
 					busy,
@@ -213,11 +218,15 @@ ModLoader.register({
 						name = format.fileName(envelope.displayName, envelope.id)
 					}
 					const written = await handle.write({ name, data: format.serialize(envelope), expectedRevision })
-					const savedOrigin = originFrom(envelope, written.info)
+					const desiredName = format.fileName(envelope.displayName, envelope.id)
+					const info = settings.replace && desiredName !== written.info.name
+						? await handle.rename({ name: written.info.name, newName: desiredName, expectedRevision: written.info.revision })
+						: written.info
+					const savedOrigin = originFrom(envelope, info)
 					session.markSaved(savedOrigin, settings.replace ? 'library-replaced' : 'library-saved')
 					await refreshInternal('save-complete')
 					return resolveActiveEntry(savedOrigin) || freezeEntry({
-						area: 'active', info: written.info, name: written.info.name, revision: written.info.revision,
+						area: 'active', info, name: info.name, revision: info.revision,
 						envelope, metadata: format.metadata(envelope)
 					})
 				})
@@ -281,6 +290,175 @@ ModLoader.register({
 				})
 			}
 
+			async function pickImport(options) {
+				const settings = options || {}
+				return run('pick-import', async function () {
+					const picked = await handle.pickImport({
+						encoding: 'utf8',
+						title: settings.title
+					})
+					if (picked?.canceled) return Object.freeze({ canceled: true })
+					return prepareImportCandidate(picked.data, {
+						source: 'file',
+						fileName: picked.fileName,
+						bytes: picked.bytes
+					})
+				})
+			}
+
+			async function prepareImportText(text, options) {
+				const settings = options || {}
+				return run('prepare-import-text', function () {
+					return prepareImportCandidate(text, {
+						source: settings.source || 'clipboard',
+						fileName: settings.fileName || '',
+						bytes: format.utf8Length(text)
+					})
+				})
+			}
+
+			function prepareImportCandidate(text, source) {
+				const data = String(text ?? '')
+				const bytes = Number(source?.bytes)
+				const actualBytes = Number.isFinite(bytes) && bytes >= 0 ? bytes : format.utf8Length(data)
+				const maxBytes = Math.min(16 * 1024 * 1024, Number(capabilities?.maxFileBytes) || 16 * 1024 * 1024)
+				if (actualBytes > maxBytes) throw libraryError('TOO_LARGE', 'The imported blueprint exceeds the library file size limit.')
+				if (!data.trim()) throw libraryError('CORRUPT', 'The imported blueprint is empty.')
+				const envelope = format.parse(data)
+				const conflict = active.find(function (entry) { return entry.envelope?.id === envelope.id }) || null
+				return Object.freeze({
+					canceled: false,
+					source: String(source?.source || 'text'),
+					fileName: String(source?.fileName || ''),
+					bytes: actualBytes,
+					envelope,
+					metadata: format.metadata(envelope),
+					conflict: conflict ? importConflict(conflict) : null
+				})
+			}
+
+			async function commitImport(candidate, resolution) {
+				if (!candidate?.envelope) throw libraryError('CORRUPT', 'The imported blueprint candidate is unavailable.')
+				const choice = String(resolution || (candidate.conflict ? 'copy' : 'import'))
+				if (choice === 'cancel') return Object.freeze({ canceled: true })
+				if (!['import', 'copy', 'replace'].includes(choice)) throw libraryError('PATH_INVALID', 'The import resolution is invalid.')
+				return run('commit-import-' + choice, async function () {
+					const source = candidate.envelope
+					let envelope
+					let name
+					let expectedRevision
+					let replaced = false
+					if (choice === 'replace') {
+						const expected = candidate.conflict
+						const current = expected && active.find(function (entry) { return entry.envelope?.id === source.id })
+						if (!current || current.name !== expected.name || current.revision !== expected.revision) {
+							await refreshInternal('import-conflict-refresh')
+							throw libraryError('REVISION_CONFLICT', 'The existing blueprint changed before replacement was confirmed.')
+						}
+						envelope = format.create({
+							id: current.envelope.id,
+							displayName: source.displayName,
+							createdAt: current.envelope.createdAt,
+							defaultTransform: source.defaultTransform,
+							blueprint: source.blueprint
+						})
+						name = current.name
+						expectedRevision = current.revision
+						replaced = true
+					} else if (choice === 'copy') {
+						envelope = format.create({
+							displayName: source.displayName,
+							defaultTransform: source.defaultTransform,
+							blueprint: source.blueprint
+						})
+						name = format.fileName(envelope.displayName, envelope.id)
+					} else {
+						if (active.some(function (entry) { return entry.envelope?.id === source.id })) {
+							throw libraryError('REVISION_CONFLICT', 'The imported blueprint now conflicts with an active blueprint.')
+						}
+						envelope = format.create({
+							id: source.id,
+							displayName: source.displayName,
+							createdAt: source.createdAt,
+							modifiedAt: source.modifiedAt,
+							defaultTransform: source.defaultTransform,
+							blueprint: source.blueprint
+						})
+						name = format.fileName(envelope.displayName, envelope.id)
+					}
+					let written
+					try {
+						written = await handle.write({ name, data: format.serialize(envelope), expectedRevision })
+					} catch (writeError) {
+						if (writeError?.code === 'REVISION_CONFLICT' || writeError?.code === 'NOT_FOUND') await refreshInternal('import-write-conflict-refresh')
+						throw writeError
+					}
+					const desiredName = format.fileName(envelope.displayName, envelope.id)
+					const info = desiredName === written.info.name
+						? written.info
+						: await handle.rename({ name: written.info.name, newName: desiredName, expectedRevision: written.info.revision })
+					await refreshInternal('import-complete')
+					return Object.freeze({
+						canceled: false,
+						replaced,
+						entry: resolveActiveEntry({ id: envelope.id }) || freezeEntry({
+							area: 'active', info, name: info.name, revision: info.revision,
+							envelope, metadata: format.metadata(envelope)
+						})
+					})
+				})
+			}
+
+			async function exportItem(entryValue, options) {
+				const entry = resolveActiveEntry(entryValue)
+				if (!entry?.envelope) throw libraryError('NOT_FOUND', 'The blueprint is unavailable or cannot be exported.')
+				const settings = options || {}
+				return run('export-item', async function () {
+					const current = await readCanonicalEntry(entry)
+					const data = format.serialize(current.envelope)
+					return handle.exportItem({
+						area: 'active',
+						name: current.info.name,
+						expectedRevision: current.info.revision,
+						suggestedName: format.fileName(current.envelope.displayName, current.envelope.id),
+						title: settings.title,
+						data
+					})
+				})
+			}
+
+			async function shareText(entryValue) {
+				const entry = resolveActiveEntry(entryValue)
+				if (!entry?.envelope) throw libraryError('NOT_FOUND', 'The blueprint is unavailable or cannot be shared.')
+				return run('share-text', async function () {
+					const current = await readCanonicalEntry(entry)
+					return Object.freeze({
+						text: format.serialize(current.envelope),
+						bytes: format.utf8Length(format.serialize(current.envelope)),
+						fileName: format.fileName(current.envelope.displayName, current.envelope.id),
+						envelope: current.envelope
+					})
+				})
+			}
+
+			async function readCanonicalEntry(entry) {
+				const record = await handle.read({
+					area: 'active', name: entry.name, expectedRevision: entry.revision, encoding: 'utf8'
+				})
+				return Object.freeze({ info: record.info, envelope: format.parse(record.data) })
+			}
+
+			function importConflict(entry) {
+				return Object.freeze({
+					id: entry.envelope.id,
+					name: entry.name,
+					revision: entry.revision,
+					info: entry.info,
+					envelope: entry.envelope,
+					metadata: entry.metadata
+				})
+			}
+
 			async function trashEntry(entryValue) {
 				const entry = resolveActiveEntry(entryValue)
 				if (!entry) throw libraryError('NOT_FOUND', 'The blueprint is unavailable.')
@@ -292,9 +470,7 @@ ModLoader.register({
 			async function restore(entryValue) {
 				const entry = resolveEntry(trash, entryValue)
 				if (!entry) throw libraryError('NOT_FOUND', 'The trashed blueprint is unavailable.')
-				const newName = entry.envelope
-					? format.fileName(entry.envelope.displayName, entry.envelope.id)
-					: entry.name
+				const newName = entry.name
 				return mutateAndRefresh('restore', function () {
 					return handle.restore({ name: entry.name, newName, expectedRevision: entry.revision })
 				})

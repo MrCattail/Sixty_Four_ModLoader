@@ -18,7 +18,7 @@ ModLoader.register({
 		})
 
 		const service = Object.freeze({
-			version: '0.5.0',
+			version: '0.5.1',
 			placeholder: placeholderUrl(),
 			peek(entry) {
 				const key = cacheKey(entry)

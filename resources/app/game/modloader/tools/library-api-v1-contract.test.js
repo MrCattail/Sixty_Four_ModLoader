@@ -240,6 +240,34 @@ async function runDialogStoreContract() {
 		assert.equal(await fs.promises.readFile(exportPath, 'utf8'), 'managed')
 		assert.equal((await store.read(context, { name: saved.info.name })).info.revision, revision)
 		assert.equal((await fs.promises.readdir(externalDirectory)).some(name => name.startsWith('.tmp-modloader-export-')), false)
+
+		const transformedPath = path.join(externalDirectory, 'canonical.64schem')
+		const transformed = await store.exportItem(context, {
+			area: 'active',
+			name: saved.info.name,
+			expectedRevision: revision,
+			suggestedName: 'canonical.64schem',
+			data: 'canonical-v2'
+		}, async () => ({ canceled: false, filePath: transformedPath }))
+		assert.deepEqual(transformed, { canceled: false, fileName: 'canonical.64schem', bytes: 12 })
+		assert.equal(await fs.promises.readFile(transformedPath, 'utf8'), 'canonical-v2')
+		assert.equal((await store.read(context, { name: saved.info.name })).payload.toString('utf8'), 'managed', 'an export payload does not rewrite the managed item')
+		assert.equal((await store.read(context, { name: saved.info.name })).info.revision, revision)
+
+		let oversizedPayloadDialogOpened = false
+		await rejectsCode(store.exportItem(context, {
+			area: 'active',
+			name: saved.info.name,
+			expectedRevision: revision,
+			data: 'x'.repeat(17)
+		}, async () => { oversizedPayloadDialogOpened = true; return { canceled: true } }), 'TOO_LARGE')
+		assert.equal(oversizedPayloadDialogOpened, false, 'an oversized export payload is rejected before opening the save dialog')
+		await rejectsCode(store.exportItem(context, {
+			area: 'active',
+			name: saved.info.name,
+			expectedRevision: revision,
+			data: { unsupported: true }
+		}, async () => ({ canceled: true })), 'PATH_INVALID')
 		await rejectsCode(store.exportItem(context, {
 			area: 'active',
 			name: saved.info.name,
@@ -312,10 +340,12 @@ async function run() {
 		area: 'active',
 		name: written.info.name,
 		expectedRevision: written.info.revision,
-		suggestedName: 'shared.64schem'
+		suggestedName: 'shared.64schem',
+		data: 'canonical-v2'
 	})
 	assert.deepEqual(exported, { canceled: false, fileName: 'shared.64schem', bytes: 5 })
 	assert.equal('path' in exported, false)
+	assert.equal(calls.at(-1).payload.request.data, 'canonical-v2')
 	assert.deepEqual(await library.exportItem({
 		area: 'active',
 		name: written.info.name,

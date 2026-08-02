@@ -4172,6 +4172,93 @@ ModLoader.register({
 				cutSurgeOption: '同時移除已擷取的 {count} 個安全 Surge；僅當這些 Surge 應隨藍圖一起移動時建議啟用。'
 			}
 		}
+		const LIBRARY_TEXT_EN = Object.freeze({
+			blueprintLibraryTitle: 'Blueprint Library',
+			blueprintLibraryClose: 'Close',
+			blueprintLibrarySave: 'Save to Library',
+			blueprintLibraryRefresh: 'Refresh',
+			blueprintLibraryFolder: 'Open Folder',
+			blueprintLibraryImport: 'Import',
+			blueprintLibraryActive: 'Blueprints',
+			blueprintLibraryProblems: 'Problems',
+			blueprintLibraryTrash: 'Trash',
+			blueprintLibraryQuarantine: 'Quarantine',
+			blueprintLibraryList: 'List',
+			blueprintLibraryGrid: 'Grid',
+			blueprintLibraryDetails: 'Show details',
+			blueprintLibraryUnavailable: 'Library unavailable',
+			blueprintLibraryEmpty: 'No blueprints here.',
+			blueprintLibrarySelect: 'Select a blueprint to view details.',
+			blueprintLibraryLoad: 'Load',
+			blueprintLibraryRename: 'Rename',
+			blueprintLibraryDuplicate: 'Duplicate',
+			blueprintLibraryTrashAction: 'Move to Trash',
+			blueprintLibraryRetry: 'Retry',
+			blueprintLibraryQuarantineAction: 'Quarantine',
+			blueprintLibraryRestore: 'Restore',
+			blueprintLibraryRemove: 'Delete Permanently',
+			blueprintLibraryConfirmTrash: 'Move this blueprint to Trash?',
+			blueprintLibraryConfirmRemove: 'Permanently delete this item? This cannot be undone.',
+			blueprintLibraryConfirmReplace: 'Replace the saved blueprint contents? The old version will remain recoverable in Trash.',
+			blueprintLibrarySaveTitle: 'Save blueprint',
+			blueprintLibraryRenameTitle: 'Rename blueprint',
+			blueprintLibraryTrashTitle: 'Move blueprint to Trash',
+			blueprintLibraryRemoveTitle: 'Permanently delete blueprint',
+			blueprintLibraryReplaceTitle: 'Replace saved blueprint',
+			blueprintLibraryErrorTitle: 'Blueprint Library error',
+			blueprintLibraryNameMessage: 'Enter a name for this blueprint.',
+			blueprintLibraryNameLabel: 'Blueprint name',
+			blueprintLibrarySaveConfirm: 'Save',
+			blueprintLibraryRenameConfirm: 'Rename',
+			blueprintLibraryReplaceConfirm: 'Replace contents',
+			blueprintLibraryCancel: 'Cancel',
+			blueprintLibraryDialogUnavailable: 'The World Editor dialog service is unavailable.',
+			blueprintLibraryBlueprint: 'Blueprint',
+			blueprintLibraryExportFile: 'Export File',
+			blueprintLibraryCopyShareText: 'Copy Share Text',
+			blueprintLibraryImportTitle: 'Import blueprint',
+			blueprintLibraryChooseFile: 'Choose .64schem File',
+			blueprintLibraryPasteShareText: 'Paste Share Text',
+			blueprintLibraryImportFileTitle: 'Choose a blueprint file',
+			blueprintLibraryExportFileTitle: 'Export blueprint file',
+			blueprintLibraryConflictTitle: 'Blueprint already exists',
+			blueprintLibraryConflictMessage: 'An active blueprint has the same UUID. Import a safe copy, replace the active revision, or cancel.',
+			blueprintLibrarySourceHeading: 'Imported blueprint',
+			blueprintLibraryExistingHeading: 'Existing blueprint',
+			blueprintLibraryMode: 'Mode',
+			blueprintLibraryDimensions: 'Size',
+			blueprintLibraryModified: 'Modified',
+			blueprintLibraryBytes: 'File size',
+			blueprintLibraryImportAsCopy: 'Import as Copy',
+			blueprintLibraryImportReplace: 'Replace',
+			blueprintLibraryImportSuccess: 'Imported {name}.',
+			blueprintLibraryReplaceSuccess: 'Replaced {name}; the previous revision is in Trash.',
+			blueprintLibraryExportSuccess: 'Exported {name}.',
+			blueprintLibraryShareSuccess: 'Copied share text for {name}.',
+			blueprintLibraryClipboardReadFailed: 'Clipboard text could not be read.',
+			blueprintLibraryClipboardWriteFailed: 'Share text could not be copied to the clipboard.',
+			blueprintLibraryStatusDismiss: 'Dismiss message'
+		})
+		const LIBRARY_TEXT_OVERRIDES = Object.freeze({
+			sch: Object.freeze({
+				blueprintLibraryTitle: '蓝图库', blueprintLibraryClose: '关闭', blueprintLibrarySave: '保存到蓝图库', blueprintLibraryRefresh: '刷新', blueprintLibraryFolder: '打开文件夹', blueprintLibraryImport: '导入',
+				blueprintLibraryActive: '蓝图', blueprintLibraryProblems: '问题', blueprintLibraryTrash: '回收站', blueprintLibraryQuarantine: '隔离区', blueprintLibraryList: '列表', blueprintLibraryGrid: '网格', blueprintLibraryDetails: '显示详细信息',
+				blueprintLibraryUnavailable: '蓝图库不可用', blueprintLibraryEmpty: '这里没有蓝图。', blueprintLibrarySelect: '请选择蓝图以查看详细信息。',
+				blueprintLibraryLoad: '加载', blueprintLibraryRename: '重命名', blueprintLibraryDuplicate: '创建副本', blueprintLibraryTrashAction: '移到回收站', blueprintLibraryRetry: '重试', blueprintLibraryQuarantineAction: '移到隔离区', blueprintLibraryRestore: '恢复', blueprintLibraryRemove: '永久删除',
+				blueprintLibraryConfirmTrash: '是否把此蓝图移到回收站？', blueprintLibraryConfirmRemove: '是否永久删除此项目？此操作无法撤销。', blueprintLibraryConfirmReplace: '是否替换已保存蓝图的内容？旧版本仍可在回收站恢复。',
+				blueprintLibrarySaveTitle: '保存蓝图', blueprintLibraryRenameTitle: '重命名蓝图', blueprintLibraryTrashTitle: '把蓝图移到回收站', blueprintLibraryRemoveTitle: '永久删除蓝图', blueprintLibraryReplaceTitle: '替换已保存蓝图', blueprintLibraryErrorTitle: '蓝图库错误',
+				blueprintLibraryNameMessage: '请输入这份蓝图的名称。', blueprintLibraryNameLabel: '蓝图名称', blueprintLibrarySaveConfirm: '保存', blueprintLibraryRenameConfirm: '重命名', blueprintLibraryReplaceConfirm: '替换内容', blueprintLibraryCancel: '取消', blueprintLibraryDialogUnavailable: '世界编辑器对话框服务不可用。', blueprintLibraryBlueprint: '蓝图',
+				blueprintLibraryExportFile: '导出文件', blueprintLibraryCopyShareText: '复制分享文本', blueprintLibraryImportTitle: '导入蓝图', blueprintLibraryChooseFile: '选择 .64schem 文件', blueprintLibraryPasteShareText: '粘贴分享文本', blueprintLibraryImportFileTitle: '选择蓝图文件', blueprintLibraryExportFileTitle: '导出蓝图文件',
+				blueprintLibraryConflictTitle: '蓝图已存在', blueprintLibraryConflictMessage: '活动蓝图库中已有相同 UUID。请选择安全地作为副本导入、替换活动版本或取消。', blueprintLibrarySourceHeading: '导入的蓝图', blueprintLibraryExistingHeading: '现有蓝图', blueprintLibraryMode: '模式', blueprintLibraryDimensions: '尺寸', blueprintLibraryModified: '修改时间', blueprintLibraryBytes: '文件大小', blueprintLibraryImportAsCopy: '作为副本导入', blueprintLibraryImportReplace: '替换',
+				blueprintLibraryImportSuccess: '已导入 {name}。', blueprintLibraryReplaceSuccess: '已替换 {name}；旧版本已移入回收站。', blueprintLibraryExportSuccess: '已导出 {name}。', blueprintLibraryShareSuccess: '已复制 {name} 的分享文本。', blueprintLibraryClipboardReadFailed: '无法读取剪贴板文本。', blueprintLibraryClipboardWriteFailed: '无法把分享文本写入剪贴板。', blueprintLibraryStatusDismiss: '关闭消息'
+			}),
+			modsch: Object.freeze({}),
+			tch: Object.freeze({})
+		})
+		const LIBRARY_TEXT = Object.freeze(Object.fromEntries(Object.keys(TEXT).map(function (language) {
+			const fallback = language === 'modsch' ? LIBRARY_TEXT_OVERRIDES.sch : language === 'tch' ? LIBRARY_TEXT_OVERRIDES.sch : null
+			return [language, Object.freeze(Object.assign({}, LIBRARY_TEXT_EN, fallback || {}, LIBRARY_TEXT_OVERRIDES[language] || {}))]
+		})))
 		for (const language of Object.keys(TEXT)) {
 			Object.assign(
 				TEXT[language],
@@ -4187,7 +4274,8 @@ ModLoader.register({
 				DELETE_TEXT[language],
 				CUT_TEXT[language] || CUT_TEXT.en,
 				PLACEMENT_TEXT[language] || PLACEMENT_TEXT.en,
-				FULL_BLUEPRINT_TEXT[language] || FULL_BLUEPRINT_TEXT.en
+				FULL_BLUEPRINT_TEXT[language] || FULL_BLUEPRINT_TEXT.en,
+				LIBRARY_TEXT[language]
 			)
 		}
 		const LANGUAGES = Object.freeze(Object.keys(TEXT))
@@ -4212,7 +4300,7 @@ ModLoader.register({
 		Object.freeze(TEXT)
 
 		const i18n = Object.freeze({
-			version: '0.5.0',
+			version: '0.5.1',
 			languages: LANGUAGES,
 			keys: KEYS,
 			toolbarKeys: TOOLBAR_KEYS,

@@ -112,7 +112,7 @@ async function plan(runtime, value, target = [0, 0]) {
 function testNormalizationAndLegacyMigration() {
 	const runtime = loadRuntime({ creative: true })
 	const state = runtime.sandbox[STATE_KEY]
-	assert.equal(state.version, '0.5.0')
+	assert.equal(state.version, '0.5.1')
 	const detailed = state.normalizeSaveDetailed({
 		name: 'pump2',
 		position: [3, 4],
@@ -339,7 +339,7 @@ async function testFullEmptySyncIgnoresNaturalResourceDrift() {
 
 function testManifestI18nAndStaticContracts() {
 	const manifest = JSON.parse(source('mod.json'))
-	assert.equal(manifest.version, '0.5.0')
+	assert.equal(manifest.version, '0.5.1')
 	assert.equal(
 		manifest.entry.indexOf(STATE_SOURCE),
 		manifest.entry.indexOf('scripts/core/production-state.js') + 1
@@ -369,7 +369,7 @@ function testManifestI18nAndStaticContracts() {
 	vm.runInContext(source(I18N_SOURCE), sandbox, { filename: I18N_SOURCE })
 	definitions[0].init()
 	const i18n = sandbox[I18N_KEY]
-	assert.equal(i18n.version, '0.5.0')
+	assert.equal(i18n.version, '0.5.1')
 	assert.equal(i18n.languages.length, 20)
 	for (const language of i18n.languages) {
 		for (const key of ['previewFullUnavailable', 'placementOptionsTitleFull', 'blueprintFullSummary']) {

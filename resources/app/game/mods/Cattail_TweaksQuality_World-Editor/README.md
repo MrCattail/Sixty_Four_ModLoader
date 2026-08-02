@@ -4,7 +4,7 @@
 
 ## 当前阶段
 
-当前阶段 5A / v0.5.0 提供安装级持久蓝图库和 schema 6 完整源蓝图。复制或剪切始终生成完整源；普通模式会在预览与放置时自动投影到结构规格，创造模式可选择完整规格，并在每次放置前独立确认是否包含稳定 Cube 和安全 Surge。蓝图库可供同一安装中的多个存档共用，只有主动点击“保存到蓝图库”才会创建文件。
+当前阶段 5B / v0.5.1 在安装级持久蓝图库和 schema 6 完整源蓝图之上增加安全导入、导出与分享流程。复制或剪切始终生成完整源；普通模式会在预览与放置时自动投影到结构规格，创造模式可选择完整规格，并在每次放置前独立确认是否包含稳定 Cube 和安全 Surge。蓝图库可供同一安装中的多个存档共用，只有玩家主动保存或确认导入时才会创建文件。
 
 ## 不变量
 
@@ -28,8 +28,8 @@ scripts/
     selection-analysis.js # 3F：可取消的分批只读统计与已完成实体只读视图
     production-state.js  # 3F：Dynamic Details 软依赖、选区实际产量刷新与蓝图生产快照
     blueprint-state.js   # 5A：schema 6、状态白名单、Surge 安全归一化、结构投影与旧 schema 兼容
-    blueprint-library-format.js # 5A：稳定 UUID 文件信封、名称与元数据合同
-    blueprint-library.js # 5A：Library API CRUD、revision、回收站、隔离、Watcher 与 Problems 控制器
+    blueprint-library-format.js # 5B：稳定 UUID 文件信封、.64schem 双读单写、名称与元数据合同
+    blueprint-library.js # 5B：Library API CRUD、导入/导出/分享、revision、回收站、隔离、Watcher 与 Problems 控制器
     blueprint-transform.js # 5A：固定枢轴、有序旋转/镜像、完整源/结构投影、Cube/Surge 与空地掩码变换
     blueprint-preview-plan.js # 5A：结构/完整状态四级冲突、Cube/Surge、空地目标、安全替换与 Build Plan
     blueprint-placement.js # 5A：结构/完整蓝图建造、Cube/Surge 选项、状态恢复、Waypoint 与 undo/redo
@@ -49,7 +49,7 @@ scripts/
     card-opacity.js      # 3F：独立分组、可持久化的 Z+滚轮透明度与中键内容模式
     dialog.js            # 4B-1a：共享对话框 DOM、主题、焦点、Escape、忙碌态和错误状态
     editor-shell.js      # 独立状态栏/工具栏、紧凑/大卡片热切换与横向惯性滚动
-    blueprint-library-ui.js # 5A：Pages 菜单页、工具栏/蓝图卡片手动保存、列表/网格与恢复操作
+    blueprint-library-ui.js # 5B：Pages/modal 共用蓝图库、导入/导出/分享、列表/网格与恢复操作
     selection-cut-ui.js  # 5A：完整源剪切确认与创造模式临时层选项
     selection-card.js    # 3F：主选区实时统计、右左下上定位、3 秒临时显示和点击锁定
     production-cards.js  # 3F：主卡总产量、选区/蓝图建筑明细副卡与自适应双列
@@ -613,7 +613,7 @@ globalThis[Symbol.for('cattail.world-editor.transactions')].snapshot()
 - 创造模式放置含临时层的完整蓝图时，每次都会询问是否放置稳定 Cube、是否放置安全 Surge；两项默认关闭，结束本次放置后自动复位。Cube/Surge 不参与购买成本、退款、`machinesBuild` 或 `machinesSold`，但与普通建筑共享同一放置 Snapshot、事务、回滚和 undo/redo。
 - 普通模式剪切仍只从世界删除可安全删除的普通建筑，但剪贴板和当前会话会保留选区内可捕获的完整源数据。创造模式剪切额外提供“同时移除 Cube”和“同时移除 Surge”两个仅本次生效、默认关闭的选项；启用后临时层进入同一 `selection-delete` 事务，不另开世界写入路径。
 - 蓝图库是安装根的 `blueprints/` 本地受管文件夹，不属于单个存档。同一款游戏、同一安装中的不同存档都可加载其中的蓝图；自动测试不会预先创建该真实目录。
-- 捕获、复制和剪切只更新当前会话与系统剪贴板。没有手动保存的当前蓝图可以被新捕获、剪切或加载直接覆盖，也可以在清空或会话结束时直接丢弃，不弹出未保存提醒。只有玩家主动点击“保存到蓝图库”才写文件。每个 `.cattail-blueprint.json` 使用独立 Library schema 信封，包含游戏标识、稳定 UUID、显示名称、创建/修改时间和 schema 6 完整源；文件名使用清理后的显示名称和完整 UUID 后缀，并按 Library API 的 240 UTF-8 字节名称上限安全截断，因此重复显示名称仍不会冲突。
+- 捕获、复制和剪切只更新当前会话与系统剪贴板。没有手动保存的当前蓝图可以被新捕获、剪切或加载直接覆盖，也可以在清空或会话结束时直接丢弃，不弹出未保存提醒。只有玩家主动点击“保存到蓝图库”才写文件。每个 `.64schem` 或兼容期旧 `.cattail-blueprint.json` 文件使用独立 Library schema 信封，包含游戏标识、稳定 UUID、显示名称、创建/修改时间和 schema 6 完整源；文件名使用清理后的显示名称和完整 UUID 后缀，并按 Library API 的 240 UTF-8 字节名称上限安全截断，因此重复显示名称仍不会冲突。
 - 新写入文件使用 Library schema 2，并在完整、未烘焙的 `blueprint` 旁保存规范化 `defaultTransform:{rotation,mirrorU,mirrorV}`。保存当前蓝图或替换内容时记录当前 0/90/180/270° 与 U/V 镜像；加载时先绑定完整源并按当前创造/普通模式生成执行视图，再恢复默认变换，因此普通模式不会把结构投影写入文件。加载后变换按钮保持保存时状态，“重置”回到最初捕获朝向。Library schema 1 文件继续兼容，缺失的默认变换按 0°、无镜像处理；重命名、复制或替换旧条目时自然升级为 schema 2。
 - 保存现有条目时必须携带预期 revision；内容替换和改名产生的旧版本由 Library API 留在回收站，可恢复。蓝图库还提供创建副本、移到回收站、恢复、永久删除、隔离损坏文件、Problems 重试、手动刷新和打开文件夹。外部 Watcher 继续在后台刷新蓝图库，但页面不显示常驻的 Watcher 状态文字或独占状态行。
 - 蓝图库同时注册到 ModLoader `api.ui.pages` 菜单和世界编辑器顶部蓝图工具栏；两个入口共用同一筛选、选择和视图模型。顶部工具栏另有直接“保存到蓝图库”按钮，蓝图悬浮卡片也提供同名按钮，蓝图库窗口内仍保留保存操作；三个入口调用同一显式保存流程。通过顶部工具栏打开的世界内模态蓝图库在显示期间独占键盘和表面指针输入：开窗会释放游戏中已经按住的移动、Q/E 与 Alt 状态，所有 `keydown` / `keyup` / `keypress` 不再传给世界或 World Editor，`Tab` 焦点限制在窗口内，`Escape` 只关闭蓝图库并把焦点还给原控件；ModLoader 菜单中的 Pages 入口不使用这套世界内模态锁。列表与网格分别保存“显示详细数据”偏好；无论缩略图是否已经生成，都可显示变换后的尺寸、建筑/Cube/Surge 数量、蓝图 schema 以及 `R0/90/180/270°`、`M-U`、`M-V` 默认变换。列表与网格都会按需读取或生成派生 PNG：v2 缩略图使用游戏商店中的真实建筑图像，并在投影绘制前应用文件的默认旋转/镜像；Cube/Surge 保留蓝色/紫色标记。新缓存键会自然绕过只含色块的旧 PNG，而不删除玩家缓存。派生图片只写入 Library 的 `thumbnails` 缓存，缓存失败不会损坏蓝图文件。蓝图库内容、控件、标题和元数据使用游戏现有 Montserrat，不使用浏览器默认字体。蓝图库窗口、List/Grid 条目、详情面板、工具栏/蓝图卡片入口和蓝图库专属游戏内对话框统一采用 Better UIs Save Slots / Settings Page 的透明背景、主题文字、无阴影和直角视觉：完整的“保存到蓝图库 / 刷新 / 打开文件夹 / 区域 / List-Grid / 显示详细数据”工具栏使用 14px 文字、36px 最小高度、7×10px 内边距和 16px 复选框，工具栏短竖线统一放大为 22px；工具栏与下方蓝图 List/Grid 和 Details 内容之间显示全宽 1px 横线，该线不放在蓝图库 Pages 标题下，横线后直接进入蓝图内容布局，不保留常驻状态行。蓝图库主体固定为“可独立上下滚动的蓝图文件区域 / 独立 1px 分隔线 / 固定 Details 区域”；外层 Pages/模态内容不滚动，Details 不随文件列表移动，内容过长时只滚动自身；窄屏改为文件区、横向分隔线和固定底部 Details 的上下布局。蓝图库详情操作和专属对话框操作继续使用独立且为 18px 高的 1px 分隔节点；按钮、蓝图条目、蓝图预览图和详情面板本身均不绘制边框，条目改用留白及轻微背景表示间距、悬停与选中；主菜单入口不增加额外装饰线。亮色工具栏/蓝图卡片使用黑色主题文字，暗色主题自动使用白字；蓝图库 Pages 视图为 1280×720，世界内模态窗口最大使用 1280px / 96vw 与 94vh。悬停只使用轻微主题色透明层与原版菜单的粉紫强调色。
@@ -628,7 +628,15 @@ globalThis[Symbol.for('cattail.world-editor.transactions')].snapshot()
 - 蓝图库顶部操作区下方的 1px 分隔线在原有 10px 上间距之外增加 8px 下间距，使分隔线与首行蓝图文件留出轻微呼吸空间。派生缩略图缓存升为 v3：PNG 画布不再绘制深色底板或外框，建筑、Cube、Surge 与统计文字以透明背景输出；统计文字使用深色描边和浅色填充，兼容现实亮色与虚空暗色表面。默认三方块占位 SVG 的画布背景也为透明。v3 缓存键会自然绕过旧 v2 深色缩略图，不删除玩家的蓝图文件或旧缓存。
 - 顶部“保存到蓝图库 / 刷新 / 打开文件夹 / 区域 / List-Grid”操作与下拉选项在 Pages 和世界内 modal 中统一为纯文字表面：不绘制按钮/select 边框、圆角底板、背景或阴影。鼠标悬停仅改变文字颜色；键盘 `:focus-visible` 使用同色文字与细下划线，不恢复浏览器橙色外框或背景。显示详细数据仍保留必要的 checkbox 与文字，Details 内的加载/重命名/删除等操作按钮和 modal 关闭按钮不属于这项顶部工具栏修订。
 - 世界内工具栏 modal 的关闭控件不再显示字符 `×` 或主题按钮表面：44×44px 透明无框点击区内使用两个 34×3px CSS 伪元素绘制大号 X，现实/虚空主题分别读取主文字色，hover/focus 仅变为粉紫色。世界内 modal 同时使用 1280×792 的固定设计画布；打开及每次窗口 `resize` 都先计算当前窗口占当前显示器可用宽高的最小比例，再通过 `0.5 + 0.5 × displayRatio` 得到较温和的连续缩放曲线，并与“当前窗口可用宽高 / 设计画布宽高”共同取最小值后对整个 panel 执行 `transform:scale()`。因此窗口从全屏开始缩小时比例会立即变化，但不会在超宽显示器的小窗口中直接缩成窗口占屏比例；设计画布适配项仍保证 panel 不超出窗口。标题、X、toolbar、字体、缩略图、列表/Grid、Details、线条与间距按完全相同的比例缩小，窄窗口不把 modal 改成上下重排。该缩放只属于世界内 modal；主菜单 Pages 继续使用自身的 760px 响应式上下布局。
-- 继续兼容 schema 1–4 结构蓝图与 schema 3/5 完整蓝图。旧格式只使用其实际存在的数据，不推断不存在的 Surge；5A 不包含跨安装导入、导出、在线分享或发布流程。
+- 继续兼容 schema 1–4 结构蓝图与 schema 3/5 完整蓝图。旧格式只使用其实际存在的数据，不推断不存在的 Surge；5A 初始范围不包含跨安装导入、导出、在线分享或发布流程，5B 只增加本地文件与显式剪贴板分享，不增加在线服务。
+
+## 5B `.64schem` 导入、导出与分享
+
+- Library manifest 同时声明 `.64schem` 与 `.cattail-blueprint.json`，因此 active、trash 和 quarantine 的旧文件继续可见；所有新建、复制、外部导入和规范文件名只使用 `.64schem`。启动、刷新、加载、查看和分享不会批量迁移或改名玩家文件；恢复旧 trash 条目保留旧后缀，只有玩家明确重命名或替换旧 active 条目时才自然转为 `.64schem`，旧 revision 继续保留在回收站。
+- 顶部纯文字“导入”在 Pages 与世界内 modal 共用同一操作窗口，玩家可以通过 Library API 1.1 的系统文件选择器读取单个 `.64schem` / 旧后缀文件，或明确选择“粘贴分享文本”后才读取剪贴板。两条入口都执行 16 MiB 上限、UTF-8 JSON、游戏 ID、Library schema v1/v2 与蓝图 schema 校验；空文本、裸蓝图 JSON、其他游戏和不兼容格式不会写入 active。
+- 只有 active 中相同 UUID 才触发冲突窗口；默认焦点和安全动作为“作为副本导入”，也可明确“替换”或取消。副本生成新 UUID 与当前创建/修改时间；替换保留目标 UUID 和创建时间，采用导入的名称、内容及默认变换，并在写入前二次核对 exact revision。替换产生的旧版本进入回收站；trash 历史和 quarantine 不参与 UUID 身份冲突。
+- active Details 提供“导出文件”和“复制分享文本”。两者始终序列化为完整 Library schema v2 envelope；旧 v1 resident 通过 Library API 的可选导出 payload 生成规范 v2 外部文件，但不会写回、改名、改变 revision 或产生 trash。游戏内原有裸蓝图复制/粘贴语义保持不变。文件对话框取消和冲突取消保持静默；导入成功会选中并滚动到新条目，替换保持目标选中；成功通过短暂 `aria-live` 状态提示，错误保留到玩家关闭或下一次操作。
+- 蓝图库新增文本键由全部 20 种原版语言表拥有；简体中文、Mod 简体中文和繁体中文使用中文文本，其余语言当前使用英文 fallback。自动完整性测试不等同于逐语言真实游戏验收。
 
 开发者控制台可检查：
 
@@ -646,6 +654,7 @@ globalThis[Symbol.for('cattail.world-editor.transactions')].snapshot()
 node tests/verify-5a-data.js
 node tests/verify-5a-library.js
 node tests/verify-5a-ui.js
+node tests/verify-5b-import-export.js
 ```
 
 自动门禁不能替代真实游戏验收。游戏内应分别验证：schema 6 捕获、普通模式结构投影、创造模式 Cube/Surge 放置和剪切撤销；跨存档手动保存/加载、无阻拦覆盖、revision、回收站/隔离与外部 Watcher；Pages 菜单、顶部工具栏与蓝图卡片保存入口、列表/网格详情偏好、缩略图及代表性语言显示。5A 不修改原版、ModLoader、Better UIs、其他 Mod、`enabled.json`、归档回归工具或玩家现有蓝图，也不授权暂存、提交、打包、推送或发布。

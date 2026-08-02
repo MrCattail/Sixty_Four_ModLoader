@@ -28,7 +28,7 @@ ModLoader.register({
 		let disposed = false
 
 		const service = Object.freeze({
-			version: '0.5.0',
+			version: '0.5.1',
 			normalizePar,
 			normalizeSave,
 			normalizeSaveDetailed,

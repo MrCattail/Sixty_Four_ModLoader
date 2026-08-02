@@ -88,7 +88,7 @@ async function testDeleteOnlySyncUndoRedo() {
 	const runtime = loadRuntime({ game })
 	const value = schema4([], [[2, 0]])
 	const plan = await buildPlacementPlan(runtime, value)
-	assert.equal(plan.version, '0.5.0')
+	assert.equal(plan.version, '0.5.1')
 	assert.deepEqual(Array.from(plan.emptyCells[0]), [2, 0])
 	assert.equal(plan.emptyEntities.length, 1)
 
@@ -560,7 +560,7 @@ function testUiLocalizationDocumentationAndManifestContracts() {
 	const readme = fs.readFileSync(path.join(MOD_ROOT, 'README.md'), 'utf8')
 	const manifest = JSON.parse(fs.readFileSync(path.join(MOD_ROOT, 'mod.json'), 'utf8'))
 
-	assert.equal(manifest.version, '0.5.0')
+	assert.equal(manifest.version, '0.5.1')
 	assert.equal(manifest.entry.length, 35)
 	assert.match(sessionSource, /schemaVersion:\s*6/)
 	assert.match(sessionSource, /emptyCells/)

@@ -32,7 +32,7 @@ ModLoader.register({
 		const listeners = new Set()
 
 		const controller = Object.freeze({
-			version: '0.5.0',
+			version: '0.5.1',
 			snapshot,
 			bind(nextSource, reason) {
 				if (disposed || nextSource === source) return false
@@ -157,7 +157,7 @@ ModLoader.register({
 			const normalizedMatrix = Object.freeze(matrix.slice())
 			const normalizedPivot = pivot ? Object.freeze(pivot.slice()) : null
 			return Object.freeze({
-				version: '0.5.0',
+				version: '0.5.1',
 				source,
 				blueprint,
 				sourceMode: source?.mode || null,

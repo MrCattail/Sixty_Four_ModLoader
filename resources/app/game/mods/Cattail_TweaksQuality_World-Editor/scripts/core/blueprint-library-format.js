@@ -4,7 +4,9 @@ ModLoader.register({
 		const FORMAT_KEY = Symbol.for('cattail.world-editor.blueprint-library-format')
 		const STATE_KEY = Symbol.for('cattail.world-editor.blueprint-state')
 		const GAME_ID = 'sixty-four'
-		const FILE_EXTENSION = '.cattail-blueprint.json'
+		const FILE_EXTENSION = '.64schem'
+		const LEGACY_FILE_EXTENSION = '.cattail-blueprint.json'
+		const FILE_EXTENSIONS = Object.freeze([FILE_EXTENSION, LEGACY_FILE_EXTENSION])
 		const LIBRARY_SCHEMA_VERSION = 2
 		const LEGACY_LIBRARY_SCHEMA_VERSION = 1
 		const previous = globalThis[FORMAT_KEY]
@@ -12,14 +14,18 @@ ModLoader.register({
 		let disposed = false
 
 		const service = Object.freeze({
-			version: '0.5.0',
+			version: '0.5.1',
 			librarySchemaVersion: LIBRARY_SCHEMA_VERSION,
 			fileExtension: FILE_EXTENSION,
+			legacyFileExtension: LEGACY_FILE_EXTENSION,
+			fileExtensions: FILE_EXTENSIONS,
 			create,
 			parse,
 			serialize,
 			metadata,
 			fileName,
+			isFileName,
+			utf8Length,
 			normalizeDisplayName,
 			newId,
 			dispose(reason) {
@@ -137,6 +143,11 @@ ModLoader.register({
 				.replace(/\s+/g, ' ')
 				.trim(), 240 - utf8Length(suffix)) || 'Blueprint'
 			return safe + suffix
+		}
+
+		function isFileName(value) {
+			const name = String(value || '').toLowerCase()
+			return FILE_EXTENSIONS.some(function (extension) { return name.endsWith(extension) })
 		}
 
 		function truncateUtf8(value, maxBytes) {

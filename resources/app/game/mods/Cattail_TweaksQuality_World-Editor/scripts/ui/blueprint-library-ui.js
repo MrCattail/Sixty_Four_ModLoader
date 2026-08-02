@@ -6,10 +6,18 @@ ModLoader.register({
 		const SESSION_KEY = Symbol.for('cattail.world-editor.blueprint')
 		const RUNTIME_KEY = Symbol.for('cattail.world-editor.runtime')
 		const DIALOG_KEY = Symbol.for('cattail.world-editor.dialogs')
+		const I18N_KEY = Symbol.for('cattail.world-editor.i18n')
 		const SHELL_ID = 'cattail-world-editor-shell'
 		const CARD_ID = 'cattail-world-editor-blueprint-card'
 		const STYLE_ID = 'cattail-world-editor-blueprint-library-style'
 		const PAGE_ID = 'blueprint-library'
+		const LIBRARY_TEXT_KEYS = Object.freeze({
+			library: 'blueprintLibraryTitle', close: 'blueprintLibraryClose', save: 'blueprintLibrarySave', refresh: 'blueprintLibraryRefresh', folder: 'blueprintLibraryFolder', import: 'blueprintLibraryImport',
+			active: 'blueprintLibraryActive', problems: 'blueprintLibraryProblems', trash: 'blueprintLibraryTrash', quarantine: 'blueprintLibraryQuarantine', list: 'blueprintLibraryList', grid: 'blueprintLibraryGrid', details: 'blueprintLibraryDetails',
+			unavailable: 'blueprintLibraryUnavailable', empty: 'blueprintLibraryEmpty', select: 'blueprintLibrarySelect', load: 'blueprintLibraryLoad', rename: 'blueprintLibraryRename', duplicate: 'blueprintLibraryDuplicate', trashAction: 'blueprintLibraryTrashAction', retry: 'blueprintLibraryRetry', quarantineAction: 'blueprintLibraryQuarantineAction', restore: 'blueprintLibraryRestore', remove: 'blueprintLibraryRemove',
+			confirmTrash: 'blueprintLibraryConfirmTrash', confirmRemove: 'blueprintLibraryConfirmRemove', confirmReplace: 'blueprintLibraryConfirmReplace', saveTitle: 'blueprintLibrarySaveTitle', renameTitle: 'blueprintLibraryRenameTitle', trashTitle: 'blueprintLibraryTrashTitle', removeTitle: 'blueprintLibraryRemoveTitle', replaceTitle: 'blueprintLibraryReplaceTitle', errorTitle: 'blueprintLibraryErrorTitle', nameMessage: 'blueprintLibraryNameMessage', nameLabel: 'blueprintLibraryNameLabel', saveConfirm: 'blueprintLibrarySaveConfirm', renameConfirm: 'blueprintLibraryRenameConfirm', replaceConfirm: 'blueprintLibraryReplaceConfirm', cancel: 'blueprintLibraryCancel', dialogUnavailable: 'blueprintLibraryDialogUnavailable', blueprint: 'blueprintLibraryBlueprint',
+			exportFile: 'blueprintLibraryExportFile', copyShareText: 'blueprintLibraryCopyShareText', importTitle: 'blueprintLibraryImportTitle', chooseFile: 'blueprintLibraryChooseFile', pasteShareText: 'blueprintLibraryPasteShareText', importFileTitle: 'blueprintLibraryImportFileTitle', exportFileTitle: 'blueprintLibraryExportFileTitle', conflictTitle: 'blueprintLibraryConflictTitle', conflictMessage: 'blueprintLibraryConflictMessage', sourceHeading: 'blueprintLibrarySourceHeading', existingHeading: 'blueprintLibraryExistingHeading', mode: 'blueprintLibraryMode', dimensions: 'blueprintLibraryDimensions', modified: 'blueprintLibraryModified', bytes: 'blueprintLibraryBytes', importAsCopy: 'blueprintLibraryImportAsCopy', importReplace: 'blueprintLibraryImportReplace', importSuccess: 'blueprintLibraryImportSuccess', replaceSuccess: 'blueprintLibraryReplaceSuccess', exportSuccess: 'blueprintLibraryExportSuccess', shareSuccess: 'blueprintLibraryShareSuccess', clipboardReadFailed: 'blueprintLibraryClipboardReadFailed', clipboardWriteFailed: 'blueprintLibraryClipboardWriteFailed', statusDismiss: 'blueprintLibraryStatusDismiss'
+		})
 		const SCROLLBAR_VISIBLE_CLASS = 'cattail-world-editor-library__scrollbar-visible'
 		const MODAL_DESIGN_SIZE = Object.freeze({ width: 1280, height: 792, gutter: 32 })
 		const SURFACE_EVENT_TYPES = Object.freeze([
@@ -65,6 +73,9 @@ ModLoader.register({
 		let toolbarSaveButton = null
 		let cardSaveButton = null
 		let interactionDialog = null
+		let statusMessage = null
+		let statusToken = 0
+		let statusTimer = null
 		let stopLibrary = null
 		let stopRuntime = null
 		let stopSession = null
@@ -89,7 +100,7 @@ ModLoader.register({
 		})
 
 		const service = Object.freeze({
-			version: '0.5.0',
+			version: '0.5.1',
 			open,
 			close,
 			isInputBlocked,
@@ -352,6 +363,7 @@ ModLoader.register({
 			primaryActions.className = 'cattail-world-editor-library__toolbar-group cattail-world-editor-library__toolbar-group--actions'
 			appendSeparated(primaryActions, [
 				actionButton(label(game, 'save'), function () { void saveCurrentInteractive().catch(showError) }, !session?.snapshot?.().sourceBlueprint || !state?.ready || state.busy),
+				actionButton(label(game, 'import'), function () { void importInteractive().catch(showError) }, !state?.ready || state.busy),
 				actionButton(label(game, 'refresh'), function () { void controller.refresh('ui-refresh').catch(showError) }),
 				actionButton(label(game, 'folder'), function () { void controller.openFolder({ area: model.area === 'problems' ? 'active' : model.area }).catch(showError) })
 			])
@@ -397,7 +409,7 @@ ModLoader.register({
 			appendSeparated(toolbar, [primaryActions, viewOptions, preferences])
 			const toolbarRule = document.createElement('div')
 			toolbarRule.className = 'cattail-world-editor-library__toolbar-rule'
-			root.append(toolbar, toolbarRule)
+			root.append(toolbar, toolbarRule, renderStatus())
 
 			const layout = document.createElement('div')
 			layout.className = 'cattail-world-editor-library__layout'
@@ -455,6 +467,7 @@ ModLoader.register({
 			item.type = 'button'
 			item.className = 'cattail-world-editor-library__item'
 			item.dataset.selected = entryKey(entry) === model.selected ? 'true' : 'false'
+			if (item.dataset.selected === 'true') item.dataset.librarySelectedEntry = ''
 			const image = document.createElement('img')
 			image.alt = ''
 			const thumbnails = globalThis[Symbol.for('cattail.world-editor.blueprint-thumbnail')]
@@ -502,7 +515,9 @@ ModLoader.register({
 					actionButton(label(game, 'load'), function () { void loadInteractive(entry).catch(showError) }),
 					actionButton(label(game, 'rename'), function () { void renameInteractive(entry).catch(showError) }),
 					actionButton(label(game, 'duplicate'), function () { void controller.duplicate(entry).catch(showError) }),
-					actionButton(label(game, 'trashAction'), function () { void trashInteractive(entry).catch(showError) })
+					actionButton(label(game, 'trashAction'), function () { void trashInteractive(entry).catch(showError) }),
+					actionButton(label(game, 'exportFile'), function () { void exportInteractive(entry).catch(showError) }),
+					actionButton(label(game, 'copyShareText'), function () { void copyShareInteractive(entry).catch(showError) })
 				])
 			} else if (entry.area === 'active') {
 				appendSeparated(actions, [
@@ -520,6 +535,197 @@ ModLoader.register({
 			}
 			panel.append(actions)
 			return panel
+		}
+
+		function renderStatus() {
+			const region = document.createElement('div')
+			region.className = 'cattail-world-editor-library__status'
+			region.setAttribute('aria-live', statusMessage?.kind === 'error' ? 'assertive' : 'polite')
+			region.setAttribute('aria-atomic', 'true')
+			region.setAttribute('role', statusMessage?.kind === 'error' ? 'alert' : 'status')
+			region.hidden = !statusMessage
+			if (!statusMessage) return region
+			region.dataset.kind = statusMessage.kind
+			const text = document.createElement('span')
+			text.textContent = statusMessage.text
+			region.append(text)
+			if (statusMessage.kind === 'error') {
+				const dismiss = actionButton('×', function () { clearStatus(true) })
+				dismiss.className = 'cattail-world-editor-library__status-dismiss'
+				dismiss.title = label(game, 'statusDismiss')
+				dismiss.setAttribute('aria-label', label(game, 'statusDismiss'))
+				region.append(dismiss)
+			}
+			return region
+		}
+
+		async function importInteractive() {
+			beginStatusOperation()
+			const source = await requestImportSource()
+			if (!source) return false
+			let candidate
+			if (source === 'file') {
+				candidate = await controller.pickImport({ title: label(game, 'importFileTitle') })
+				if (candidate?.canceled) return false
+			} else {
+				let text
+				try {
+					if (typeof globalThis.navigator?.clipboard?.readText !== 'function') throw new Error(label(game, 'clipboardReadFailed'))
+					text = await globalThis.navigator.clipboard.readText()
+				} catch (clipboardError) {
+					throw libraryUiError('CLIPBOARD_READ_FAILED', label(game, 'clipboardReadFailed'))
+				}
+				candidate = await controller.prepareImportText(text, { source: 'clipboard' })
+			}
+			const result = candidate.conflict
+				? await resolveImportConflict(candidate)
+				: await controller.commitImport(candidate, 'import')
+			if (!result || result.canceled) return false
+			selectImportedEntry(result.entry)
+			setStatus('success', formatLabel(result.replaced ? 'replaceSuccess' : 'importSuccess', {
+				name: result.entry?.envelope?.displayName || candidate.envelope.displayName
+			}), true)
+			return true
+		}
+
+		async function exportInteractive(entry) {
+			beginStatusOperation()
+			const result = await controller.exportItem(entry, { title: label(game, 'exportFileTitle') })
+			if (result?.canceled) return false
+			setStatus('success', formatLabel('exportSuccess', { name: result?.fileName || entry.envelope.displayName }), true)
+			return true
+		}
+
+		async function copyShareInteractive(entry) {
+			beginStatusOperation()
+			const shared = await controller.shareText(entry)
+			try {
+				if (typeof globalThis.navigator?.clipboard?.writeText !== 'function') throw new Error(label(game, 'clipboardWriteFailed'))
+				await globalThis.navigator.clipboard.writeText(shared.text)
+			} catch (clipboardError) {
+				throw libraryUiError('CLIPBOARD_WRITE_FAILED', label(game, 'clipboardWriteFailed'))
+			}
+			setStatus('success', formatLabel('shareSuccess', { name: shared.envelope.displayName }), true)
+			return true
+		}
+
+		function requestImportSource() {
+			const dialogs = globalThis[DIALOG_KEY]
+			if (!dialogs || typeof dialogs.create !== 'function') return Promise.reject(new Error(label(game, 'dialogUnavailable')))
+			interactionDialog?.close?.('blueprint-import-source-replaced', true)
+			return new Promise(function (resolve) {
+				let settled = false
+				const finish = function (value, reason) {
+					if (settled) return
+					settled = true
+					resolve(value)
+					dialog.close(reason, true)
+				}
+				const dialog = dialogs.create({
+					id: 'cattail-world-editor-blueprint-import-source-dialog',
+					theme: game?.plane ? 'void' : 'reality',
+					kind: 'blueprint-library-import-source',
+					title: label(game, 'importTitle'),
+					onClose() {
+						if (interactionDialog === dialog) interactionDialog = null
+						if (!settled) { settled = true; resolve(null) }
+					}
+				})
+				interactionDialog = dialog
+				const file = dialog.createButton(label(game, 'chooseFile'), { primary: true })
+				const paste = dialog.createButton(label(game, 'pasteShareText'))
+				const cancel = dialog.createButton(label(game, 'cancel'))
+				file.addEventListener('click', function () { finish('file', 'blueprint-import-file-selected') })
+				paste.addEventListener('click', function () { finish('clipboard', 'blueprint-import-paste-selected') })
+				cancel.addEventListener('click', function () { finish(null, 'blueprint-import-cancelled') })
+				appendSeparated(dialog.actions, [file, paste, cancel])
+				dialog.mount(file)
+			})
+		}
+
+		function resolveImportConflict(candidate) {
+			const dialogs = globalThis[DIALOG_KEY]
+			if (!dialogs || typeof dialogs.create !== 'function') return Promise.reject(new Error(label(game, 'dialogUnavailable')))
+			interactionDialog?.close?.('blueprint-import-conflict-replaced', true)
+			return new Promise(function (resolve) {
+				let settled = false
+				const finish = function (value, reason) {
+					if (settled) return
+					settled = true
+					resolve(value)
+					dialog.close(reason, true)
+				}
+				const dialog = dialogs.create({
+					id: 'cattail-world-editor-blueprint-import-conflict-dialog',
+					theme: game?.plane ? 'void' : 'reality',
+					kind: 'blueprint-library-import-conflict',
+					title: label(game, 'conflictTitle'),
+					message: label(game, 'conflictMessage'),
+					onClose() {
+						if (interactionDialog === dialog) interactionDialog = null
+						if (!settled) { settled = true; resolve(null) }
+					}
+				})
+				interactionDialog = dialog
+				dialog.content.append(
+					renderImportSummary(label(game, 'sourceHeading'), candidate.envelope, candidate.metadata, candidate.bytes),
+					renderImportSummary(label(game, 'existingHeading'), candidate.conflict.envelope, candidate.conflict.metadata, candidate.conflict.info?.size)
+				)
+				const copy = dialog.createButton(label(game, 'importAsCopy'), { primary: true })
+				const replace = dialog.createButton(label(game, 'importReplace'), { danger: true })
+				const cancel = dialog.createButton(label(game, 'cancel'))
+				const commit = async function (resolution) {
+					dialog.setBusy(true)
+					dialog.clearError()
+					try {
+						finish(await controller.commitImport(candidate, resolution), 'blueprint-import-conflict-resolved')
+					} catch (error) {
+						dialog.setBusy(false)
+						dialog.showError(error)
+						setStatus('error', String(error?.message || label(game, 'unavailable')))
+					}
+				}
+				copy.addEventListener('click', function () { void commit('copy') })
+				replace.addEventListener('click', function () { void commit('replace') })
+				cancel.addEventListener('click', function () { finish(null, 'blueprint-import-conflict-cancelled') })
+				appendSeparated(dialog.actions, [copy, replace, cancel])
+				dialog.mount(copy)
+			})
+		}
+
+		function renderImportSummary(heading, envelope, metadata, bytes) {
+			const section = document.createElement('section')
+			section.className = 'cattail-world-editor-library-import-summary'
+			const title = document.createElement('h3')
+			title.textContent = heading
+			const name = document.createElement('strong')
+			name.textContent = envelope?.displayName || ''
+			const details = document.createElement('dl')
+			for (const pair of [
+				[label(game, 'mode'), metadata?.mode || envelope?.blueprint?.mode || '—'],
+				[label(game, 'dimensions'), String(metadata?.width || 0) + '×' + String(metadata?.height || 0)],
+				[label(game, 'modified'), formatTime(envelope?.modifiedAt)],
+				[label(game, 'bytes'), Number.isFinite(Number(bytes)) ? formatBytes(bytes) : '—']
+			]) {
+				const term = document.createElement('dt')
+				term.textContent = pair[0]
+				const value = document.createElement('dd')
+				value.textContent = pair[1]
+				details.append(term, value)
+			}
+			section.append(title, name, details)
+			return section
+		}
+
+		function selectImportedEntry(entry) {
+			model.area = 'active'
+			model.selected = entryKey(entry)
+			refreshLibrarySurfaces()
+			setTimeout(function () {
+				for (const element of document.querySelectorAll?.('[data-library-selected-entry]') || []) {
+					element.scrollIntoView?.({ block: 'nearest', inline: 'nearest' })
+				}
+			}, 0)
 		}
 
 		async function loadInteractive(entry) {
@@ -758,24 +964,72 @@ ModLoader.register({
 			return metadata.width + '×' + metadata.height + ' · ' + metadata.entityCount + ' buildings · ' + metadata.blockCount + ' cubes · ' + metadata.surgeCount + ' surges · schema ' + metadata.schemaVersion + ' · R' + transform.rotation + '°' + mirror
 		}
 
+		function formatTime(value) {
+			const date = new Date(value || 0)
+			return Number.isFinite(date.getTime()) ? date.toLocaleString() : '—'
+		}
+
+		function formatBytes(value) {
+			const bytes = Math.max(0, Number(value) || 0)
+			if (bytes < 1024) return bytes + ' B'
+			if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KiB'
+			return (bytes / (1024 * 1024)).toFixed(1) + ' MiB'
+		}
+
 		function defaultName() {
 			const date = new Date()
 			return label(game, 'blueprint') + ' ' + date.toLocaleString()
 		}
 
+		function beginStatusOperation() {
+			clearStatus(true)
+		}
+
+		function setStatus(kind, text, temporary) {
+			statusToken += 1
+			const token = statusToken
+			if (statusTimer !== null) clearTimeout(statusTimer)
+			statusTimer = null
+			statusMessage = Object.freeze({ kind: kind === 'error' ? 'error' : 'success', text: String(text || '') })
+			refreshLibrarySurfaces()
+			if (temporary) {
+				statusTimer = setTimeout(function () {
+					if (statusToken === token) clearStatus(true)
+				}, 4500)
+			}
+		}
+
+		function clearStatus(refresh) {
+			statusToken += 1
+			if (statusTimer !== null) clearTimeout(statusTimer)
+			statusTimer = null
+			const changed = !!statusMessage
+			statusMessage = null
+			if (changed && refresh) refreshLibrarySurfaces()
+		}
+
+		function refreshLibrarySurfaces() {
+			if (modal) renderModalBody()
+			if (api.ui?.pages?.isActive?.(PAGE_ID)) api.ui.pages.refresh(PAGE_ID)
+		}
+
+		function formatLabel(key, values) {
+			return label(game, key).replace(/\{([a-zA-Z0-9_]+)\}/g, function (match, name) {
+				return Object.prototype.hasOwnProperty.call(values || {}, name) ? String(values[name]) : match
+			})
+		}
+
 		function showError(error) {
 			console.warn('[Cattail World Editor] Blueprint library UI operation failed.', error)
-			if (!showMessageDialog({
-				title: label(game, 'errorTitle'),
-				message: String(error?.message || label(game, 'unavailable'))
-			})) {
-				console.warn('[Cattail World Editor] The in-game error dialog is unavailable.')
-			}
+			const message = String(error?.message || label(game, 'unavailable'))
+			setStatus('error', message)
+			if (!modal && !api.ui?.pages?.isActive?.(PAGE_ID)) showMessageDialog({ title: label(game, 'errorTitle'), message })
 		}
 
 		function dispose(reason) {
 			if (disposed) return false
 			disposed = true
+			clearStatus(false)
 			interactionDialog?.close?.(reason || 'blueprint-library-ui-disposed', true)
 			interactionDialog = null
 			stopSurfaceScroll('page')
@@ -813,6 +1067,9 @@ ModLoader.register({
 		}
 
 		function label(source, key) {
+			const textKey = LIBRARY_TEXT_KEYS[key]
+			const i18n = globalThis[I18N_KEY]
+			if (textKey && typeof i18n?.t === 'function') return i18n.t(source, textKey)
 			const en = {
 				library: 'Blueprint Library', close: 'Close', save: 'Save to Library', refresh: 'Refresh', folder: 'Open Folder',
 				active: 'Blueprints', problems: 'Problems', trash: 'Trash', quarantine: 'Quarantine', list: 'List', grid: 'Grid', details: 'Show details',
@@ -830,6 +1087,13 @@ ModLoader.register({
 				saveTitle: '保存蓝图', renameTitle: '重命名蓝图', trashTitle: '把蓝图移到回收站', removeTitle: '永久删除蓝图', replaceTitle: '替换已保存蓝图', errorTitle: '蓝图库错误', nameMessage: '请输入这份蓝图的名称。', nameLabel: '蓝图名称', saveConfirm: '保存', renameConfirm: '重命名', replaceConfirm: '替换内容', cancel: '取消', dialogUnavailable: '世界编辑器对话框服务不可用。', blueprint: '蓝图'
 			}
 			return (isChinese(source) ? zh : en)[key] || key
+		}
+
+		function libraryUiError(code, message) {
+			const error = new Error(message)
+			error.name = 'WorldEditorBlueprintLibraryUiError'
+			error.code = code
+			return error
 		}
 
 		function installStyle() {
@@ -975,7 +1239,7 @@ ModLoader.register({
 				.cattail-world-editor-library {
 					box-sizing: border-box;
 					display: grid;
-					grid-template-rows: auto auto minmax(0, 1fr);
+					grid-template-rows: auto auto auto minmax(0, 1fr);
 					height: 100%;
 					min-height: 0;
 					overflow: hidden;
@@ -1003,6 +1267,26 @@ ModLoader.register({
 					align-items: center;
 					flex-wrap: wrap;
 					gap: 0;
+				}
+				.cattail-world-editor-library__status {
+					display: flex;
+					align-items: center;
+					justify-content: space-between;
+					gap: 12px;
+					margin: 0 0 8px;
+					padding: 8px 10px;
+					border: 1px solid rgba(255, 255, 255, .18);
+					color: rgba(255, 255, 255, .9);
+				}
+				.cattail-world-editor-library__status[hidden] { display: none; }
+				.cattail-world-editor-library__status[data-kind="error"] { border-color: #ff8f8f; color: #ffd0d0; }
+				.cattail-world-editor-library__status-dismiss {
+					min-width: 30px;
+					height: 30px;
+					border: 0;
+					background: transparent;
+					color: inherit;
+					font-size: 22px;
 				}
 				.cattail-world-editor-library__toolbar button,
 				.cattail-world-editor-library__toolbar select {
@@ -1420,6 +1704,26 @@ ModLoader.register({
 					z-index: 100050;
 				}
 				.cattail-world-editor-dialog[data-kind^="blueprint-library-"] .cattail-world-editor-library__separator { display: none; }
+				.cattail-world-editor-library-import-summary {
+					display: grid;
+					gap: 7px;
+					margin: 0 0 14px;
+					padding: 12px;
+					border: 1px solid var(--world-editor-dialog-border);
+					border-radius: 7px;
+					background: var(--world-editor-dialog-control);
+				}
+				.cattail-world-editor-library-import-summary h3 { margin: 0; font-size: 14px; }
+				.cattail-world-editor-library-import-summary strong { overflow-wrap: anywhere; }
+				.cattail-world-editor-library-import-summary dl {
+					display: grid;
+					grid-template-columns: max-content minmax(0, 1fr);
+					gap: 4px 12px;
+					margin: 0;
+					font-size: 12px;
+				}
+				.cattail-world-editor-library-import-summary dt { color: var(--world-editor-dialog-muted); }
+				.cattail-world-editor-library-import-summary dd { margin: 0; overflow-wrap: anywhere; }
 				.cattail-world-editor-library-name-form { display: grid; gap: 8px; }
 				.cattail-world-editor-library-name-form__field {
 					display: grid;

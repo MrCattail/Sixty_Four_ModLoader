@@ -413,7 +413,7 @@ ModLoader.register({
 
 				function snapshot() {
 					return Object.freeze({
-						version: '0.5.0',
+						version: '0.5.1',
 						mode,
 						includeBlocks: mode === 'full' && includeBlocks,
 						includeSurges: mode === 'full' && includeSurges,
@@ -691,7 +691,7 @@ ModLoader.register({
 				}
 
 				const session = Object.freeze({
-					version: '0.5.0',
+					version: '0.5.1',
 					game: sessionGame,
 					schemaVersion: 6,
 					snapshot,

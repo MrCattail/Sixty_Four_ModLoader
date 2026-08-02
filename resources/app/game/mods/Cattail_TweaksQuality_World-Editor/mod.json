@@ -2,8 +2,8 @@
   "id": "Cattail_TweaksQuality_World-Editor",
   "uniqueId": "Cattail_TweaksQuality_World-Editor",
   "name": "World Editor",
-  "version": "0.5.0",
-  "loaderVersion": ">=0.3.0",
+  "version": "0.5.1",
+  "loaderVersion": ">=0.3.1",
   "languageSupport": {
     "gameLanguage": true
   },
@@ -49,6 +49,7 @@
     "blueprints": {
       "directory": "blueprints",
       "extensions": [
+        ".64schem",
         ".cattail-blueprint.json"
       ],
       "maxFileBytes": 16777216,

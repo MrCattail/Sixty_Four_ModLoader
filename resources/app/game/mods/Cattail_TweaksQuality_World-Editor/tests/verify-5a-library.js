@@ -71,7 +71,7 @@ async function createEnvironment(options = {}) {
 	const hooks = new Map()
 	const cleanups = []
 	const handle = new MemoryLibraryHandle({
-		extension: '.cattail-blueprint.json',
+		extensions: ['.64schem', '.cattail-blueprint.json'],
 		watchEnabled: options.watchEnabled !== false
 	})
 	let uuidSequence = 0
@@ -111,7 +111,7 @@ async function createEnvironment(options = {}) {
 	const api = {
 		storage: {
 			libraries: {
-				version: '1.0.0',
+				version: '1.1.0',
 				open(id) {
 					assert.equal(id, 'blueprints')
 					return handle
@@ -170,7 +170,7 @@ async function expectCode(code, operation) {
 
 async function testFormatAndExplicitSave() {
 	const env = await createEnvironment({ defaultTransform: { rotation: 90, mirrorU: true, mirrorV: false } })
-	assert.equal(env.controller.version, '0.5.0')
+	assert.equal(env.controller.version, '0.5.1')
 	assert.equal(env.format.librarySchemaVersion, 2)
 	assert.equal(env.controller.snapshot().active.length, 0)
 	assert.equal(env.handle.operations.length, 0, 'capture/session creation must not write a library file')
@@ -188,7 +188,7 @@ async function testFormatAndExplicitSave() {
 	assert.equal(saved.metadata.width, 1)
 	assert.equal(saved.metadata.height, 3)
 	assert.deepEqual(clone(saved.metadata.defaultTransform), { rotation: 90, mirrorU: true, mirrorV: false })
-	assert.match(saved.name, /^Pump Cube Surge__[0-9a-f]{32}\.cattail-blueprint\.json$/)
+	assert.match(saved.name, /^Pump Cube Surge__[0-9a-f]{32}\.64schem$/)
 	assert.equal(env.session.snapshot().dirty, false)
 	assert.equal(env.session.snapshot().origin.id, saved.envelope.id)
 	assert.equal(env.handle.operations.filter(entry => entry.kind === 'write').length, 1)

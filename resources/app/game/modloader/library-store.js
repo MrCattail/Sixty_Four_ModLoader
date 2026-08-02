@@ -524,6 +524,9 @@ class LibraryStore {
 		if (area !== 'active') throw new LibraryStoreError('PERMISSION_DENIED', safeMessageForCode('PERMISSION_DENIED'))
 		const expectedRevision = normalizeExpectedRevision(request?.expectedRevision, true)
 		const record = await this.read(context, { area, name: request?.name, expectedRevision })
+		const exportPayload = request?.data === undefined
+			? record.payload
+			: normalizePayload(request.data, declaration.maxFileBytes).bytes
 		const suggestedName = this._name(request?.suggestedName || record.info.name, declaration.extensions)
 		const selected = await selectFile({
 			title: this._dialogTitle(request?.title, 'Export library item'),
@@ -549,8 +552,8 @@ class LibraryStore {
 		if (existing && (existing.isSymbolicLink() || !existing.isFile())) {
 			throw new LibraryStoreError('PATH_INVALID', safeMessageForCode('PATH_INVALID'))
 		}
-		await this._publishExternalFile(targetPath, record.payload)
-		return { canceled: false, fileName, bytes: record.payload.length }
+		await this._publishExternalFile(targetPath, exportPayload)
+		return { canceled: false, fileName, bytes: exportPayload.length }
 	}
 
 	async list(context, request) {
