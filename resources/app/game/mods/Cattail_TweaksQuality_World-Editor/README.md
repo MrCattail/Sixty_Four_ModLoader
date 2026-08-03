@@ -1,281 +1,281 @@
 # Cattail World Editor
 
-> 为《Sixty Four》提供选区编辑、安全拆解、蓝图复制、完整复刻、撤销/重做与本地蓝图库的游戏内 World Editor。
+> An in-game World Editor for *Sixty Four* with area selection, safe disassembly, blueprint copying, complete replication, undo/redo, and a local blueprint library.
 
-当前开发版本：`0.5.1`。功能主体已经完成，目前仍处于界面打磨与玩家验收阶段。涉及重要存档时，仍建议先保留可恢复的手动存档。
+Current development version: `0.5.1`. The main feature set is complete, while interface polish and player acceptance testing are still in progress. Keep a recoverable manual save before using the editor on an important world.
 
-## World Editor 能做什么
+## What World Editor Can Do
 
-Cattail World Editor 让玩家直接在游戏世界中框选区域、查看建筑和生产信息、生成或剪切蓝图，并在其他位置安全预览、旋转、镜像和放置。蓝图可以保存为本地 `.64schem` 文件，在同一游戏安装中的不同存档之间重复使用，也可以导入、导出或复制为分享文本。
+Cattail World Editor lets you select areas directly in the game world, inspect buildings and production data, generate or cut blueprints, and safely preview, rotate, mirror, and place them elsewhere. Blueprints can be saved as local `.64schem` files, reused across saves in the same game installation, imported, exported, or copied as share text.
 
-主要功能包括：
+Main features include:
 
-- 在现实层和虚空层直接建立、移动、缩放和叠加多个矩形选区。
-- 用选区卡查看面积、占用、建筑、Cube、跳过内容和实际生产信息。
-- 从多个选区生成一个完整源蓝图，并自动去重重叠建筑和多格建筑。
-- 在普通模式放置安全的 Standard Build，在创造模式放置带安全状态的 Complete Replica。
-- 独立控制 Include Cubes、Include Surges 和 Include Cells。
-- 用四色预览区分可建造、已满足、可替换冲突和受保护内容。
-- 安全拆解选中建筑，或将选区 Cut 为蓝图后再拆解可移除内容。
-- 对 World Editor 的放置、拆解和剪切操作执行撤销与重做。
-- 将蓝图保存到安装级蓝图库，并使用 List/Grid、缩略图、Details、回收站、隔离区和 Problems 管理文件。
-- 在创造模式中免费执行编辑器经济操作，并选择直接启用当前存档或创建一个独立创造副本。
-- 跟随游戏当前语言，提供 20 种原版语言的按钮、状态、提示和对话框文本。
+- Create, move, resize, and overlap multiple rectangular selections in both the Reality and Void planes.
+- Inspect area, occupancy, buildings, Cubes, skipped content, and actual production through the selection card.
+- Generate one complete source blueprint from multiple selections while deduplicating overlaps and multi-cell buildings.
+- Place a safe Standard Build in normal mode or a state-aware Complete Replica in Creative Mode.
+- Control Include Cubes, Include Surges, and Include Cells independently.
+- Use four preview states to distinguish buildable cells, already-satisfied cells, replaceable conflicts, and protected content.
+- Safely disassemble selected buildings, or Cut a selection into a blueprint before removing eligible content.
+- Undo and redo World Editor placement, disassembly, and cut transactions.
+- Save blueprints to an installation-wide library with List/Grid views, thumbnails, Details, Trash, Quarantine, and Problems management.
+- Perform editor economy operations for free in Creative Mode, either in the current save or in a separate creative copy.
+- Follow the current game language with buttons, statuses, messages, and dialogs localized into all 20 original game languages.
 
-## 安装与启用
+## Installation and Activation
 
-1. 安装兼容的 Cattail ModLoader；World Editor 当前要求 ModLoader `0.3.1` 或更高版本。
-2. 将 Mod 文件夹放入：
+1. Install a compatible Cattail ModLoader. World Editor currently requires ModLoader `0.3.1` or later.
+2. Place the Mod folder at:
 
    ```text
    resources/app/game/mods/Cattail_TweaksQuality_World-Editor
    ```
 
-3. 在 ModLoader 中启用 `Cattail_TweaksQuality_World-Editor`，然后完整启动或重载游戏。
-4. 进入一个存档，单独按 `V` 打开 World Editor。
+3. Enable `Cattail_TweaksQuality_World-Editor` in ModLoader, then fully start or reload the game.
+4. Enter a save and press `V` by itself to open World Editor.
 
-创建独立创造副本需要 Better UIs 提供 Save Slots Service，并至少保留一个空手动存档格。Dynamic Details 不是基础编辑功能的必需项；安装后，选区卡和蓝图卡可以显示更完整的实际/理论生产数据。
+Creating a separate creative copy requires the Save Slots Service from Better UIs and at least one empty manual save slot. Dynamic Details is optional: the core editor works without it, while installing it allows selection and blueprint cards to show richer actual and theoretical production data.
 
-## 快速开始
+## Quick Start
 
-一个最常见的蓝图流程是：
+A typical blueprint workflow is:
 
-1. 按 `V` 进入 World Editor。
-2. 在地图上确定矩形选区的起点和终点；需要追加更多区域时，在新选区第一次点击时按住 `Ctrl`。
-3. 点击工具栏的 Generate Blueprint，或按 `Ctrl+C`。
-4. 移动鼠标查看蓝图预览；点击地图固定/解除固定位置，或按住 `Alt` 临时固定。
-5. 选择 Standard Build 或创造模式下的 Complete Replica，并按需开启 Include Cubes、Include Surges、Include Cells。
-6. 使用工具栏或快捷键旋转、镜像蓝图。
-7. 点击蓝图卡的 Place，或把鼠标移到目标格后按 `Ctrl+V`。
-8. 如需长期保存，点击 Save to Library；如需管理、导入或分享，打开 Blueprint Library。
+1. Press `V` to enter World Editor.
+2. Choose the first and second corners of a rectangular selection. Hold `Ctrl` on the first click of a new selection to add another area.
+3. Select Generate Blueprint on the toolbar, or press `Ctrl+C`.
+4. Move the cursor to preview the blueprint. Click the map to pin or unpin its target, or hold `Alt` for a temporary pin.
+5. Choose Standard Build or, in Creative Mode, Complete Replica. Enable Include Cubes, Include Surges, or Include Cells as needed.
+6. Rotate or mirror the blueprint with the toolbar or keyboard shortcuts.
+7. Select Place on the blueprint card, or hover the destination cell and press `Ctrl+V`.
+8. Select Save to Library for long-term storage, or open Blueprint Library to manage, import, export, or share it.
 
-## 按键速查
+## Keyboard and Mouse Reference
 
-| 按键 / 操作 | 功能 |
+| Input | Action |
 | --- | --- |
-| `V` | 打开或关闭 World Editor |
-| 左键选择起点、终点 | 建立矩形选区 |
-| `Ctrl` + 新选区第一次点击 | 把新选区追加到现有多选 |
-| 在选区内长按或拖动 | 只移动选区边界，不移动世界建筑 |
-| 拖动 8 个选区手柄 | 缩放主选区 |
-| 在手柄或选区边缘上滚轮 | 逐格微调选区大小或位置 |
-| 右键拖动 | 保留原版地图平移；顶部 UI 和卡片会按需穿透 |
-| `Backspace` | 只移除当前主选区，不拆解建筑 |
-| `Delete` | 打开 Disassemble Selection 安全确认 |
+| `V` | Open or close World Editor |
+| Left-click the first and second corners | Create a rectangular selection |
+| `Ctrl` + first click of a new selection | Add a new area to the current multi-selection |
+| Hold or drag inside a selection | Move only the selection boundary, not world buildings |
+| Drag one of the 8 selection handles | Resize the primary selection |
+| Wheel over a handle or selection edge | Adjust its size or position one cell at a time |
+| Right-drag | Keep the original map-pan behavior; top UI and cards pass input through when needed |
+| `Backspace` | Remove only the primary selection without disassembling buildings |
+| `Delete` | Open the Disassemble Selection safety confirmation |
 | `Ctrl+C` | Generate Blueprint |
-| `Ctrl+X` | Cut：先生成蓝图，再安全拆解可移除内容 |
-| `Ctrl+V` | 在当前悬停格规划并放置活动蓝图 |
-| `R` / `Shift+R` | 顺时针 / 逆时针旋转蓝图 |
-| `M` / `Shift+M` | U / V 方向镜像蓝图 |
-| `Ctrl+Z` | 撤销最近一项 World Editor 世界事务 |
-| `Ctrl+Y` / `Ctrl+Shift+Z` | 重做 |
-| 按住 `Alt` | 临时固定当前蓝图目标；松开后恢复跟随 |
-| 卡片上 `Z` + 滚轮 | 以 10% 步进调整该卡片组透明度，范围 25%–100% |
-| 卡片上中键 | 切换“内容随背景淡出 / 只淡出背景” |
-| `H` | 跟随原版 HUD 一起隐藏或恢复 World Editor UI |
-| `Esc` | 按层级取消当前操作、清除选区或退出编辑器 |
+| `Ctrl+X` | Cut: generate a blueprint, then safely disassemble eligible content |
+| `Ctrl+V` | Plan and place the active blueprint at the hovered cell |
+| `R` / `Shift+R` | Rotate the blueprint clockwise / counterclockwise |
+| `M` / `Shift+M` | Mirror the blueprint on the U / V axis |
+| `Ctrl+Z` | Undo the latest World Editor world transaction |
+| `Ctrl+Y` / `Ctrl+Shift+Z` | Redo |
+| Hold `Alt` | Temporarily pin the current blueprint target; release to resume following |
+| `Z` + wheel over a card | Adjust that card group's opacity in 10% steps, from 25% to 100% |
+| Middle-click a card | Toggle between fading all content and fading only the background |
+| `H` | Hide or restore World Editor UI together with the original HUD |
+| `Esc` | Cancel the current layer, clear selections, or exit the editor |
 
-`Esc` 不会在任何情况下都直接退出。它会先关闭最上层对话框或菜单、取消正在进行的选区/拖动/缩放/蓝图预览；没有临时操作但仍有选区时，第一次 `Esc` 清除全部选区并保留 World Editor；只有已经没有选区时，下一次 `Esc` 才退出 World Editor。
+`Esc` does not always exit immediately. It first closes the topmost dialog or menu and cancels an active selection, drag, resize, or blueprint preview. If no temporary operation remains but selections still exist, the first `Esc` clears all selections while keeping World Editor open. Only the next `Esc` exits once no selection remains.
 
-## 状态栏与工具栏
+## Status Bar and Toolbar
 
-World Editor 顶部由两个独立玻璃浮层组成。
+The top of World Editor contains two separate glass panels.
 
-状态栏用于显示：
+The status bar shows:
 
-- World Editor 名称。
-- 当前现场模式：Selection Mode、Standard Build 或 Complete Replica。
-- 当前选区数量。
-- `Esc` 退出提示。
-- 紧凑工具栏与大卡片工具栏的显示模式切换。
+- The World Editor name.
+- The current scene mode: Selection Mode, Standard Build, or Complete Replica.
+- The number of active selections.
+- The `Esc` exit hint.
+- The switch between compact and large-card toolbar layouts.
 
-只有现场确实存在活动蓝图预览时，状态栏才显示 Standard Build 或 Complete Replica；蓝图只保存在会话或蓝图库中、尚未进入现场预览时仍显示 Selection Mode。创造模式开启后，当前模式文字会变为 Hell Gem 深绿色并发出对应绿光。
+Standard Build or Complete Replica appears only while an active blueprint preview actually exists in the world. A blueprint that is stored only in the current session or library, without a live preview, leaves the status at Selection Mode. When Creative Mode is enabled, the current mode text becomes deep Hell Gem green and emits a matching green glow.
 
-工具栏按功能分组：
+The toolbar is divided into functional groups:
 
-- 选区：Clear All Selections、Disassemble Selection、Cut。
-- 历史：Undo、Redo。
-- 蓝图内容：Standard Build、Complete Replica、Include Cubes、Include Surges、Include Cells、Clear Active Blueprint。
-- 蓝图库：Generate Blueprint、Save to Library、Blueprint Library。
-- 变换：顺/逆旋转、U/V 镜像、重置。
-- 创造模式：开启、关闭或创建创造副本。
+- Selection: Clear All Selections, Disassemble Selection, and Cut.
+- History: Undo and Redo.
+- Blueprint Content: Standard Build, Complete Replica, Include Cubes, Include Surges, Include Cells, and Clear Active Blueprint.
+- Blueprint Library: Generate Blueprint, Save to Library, and Blueprint Library.
+- Transform: rotate clockwise/counterclockwise, mirror on U/V, and reset.
+- Creative Mode: enable, disable, or create a creative copy.
 
-紧凑模式使用统一的方形图标按钮；大卡片模式显示更易读的图标与本地化文字，并在卡片较多时提供横向惯性滚动。普通按钮使用淡灰圆角 hover 和原版粉色图标反馈；活动的 Include、创造模式和危险确认等资源主题按钮使用带反光、透光和同色发光的玻璃反馈。
+Compact mode uses consistently sized square icon buttons. Large-card mode adds readable localized labels and supports horizontal inertial scrolling when the cards exceed the available width. Standard controls use a rounded pale-gray hover background with the game's original pink icon feedback. Active Include controls, Creative Mode controls, and dangerous confirmations use reflective, translucent glass with a matching colored glow.
 
-右键从游戏画布开始拖动，或尚未固定的蓝图仍跟随鼠标时，状态栏和工具栏保持可见但会暂时让鼠标穿透，避免挡住地图操作。原版资源 HUD 在 World Editor 开启时会等比例缩小并靠左上显示，不会被顶部两栏强制下移。
+When a right-drag begins on the game canvas, or an unpinned blueprint is still following the cursor, the status bar and toolbar remain visible but temporarily pass pointer input through to the world. While World Editor is open, the original resource HUD scales down proportionally and stays aligned to the upper-left without being pushed below the two top panels.
 
-## 选区
+## Selections
 
-### 建立与管理选区
+### Creating and Managing Selections
 
-- 普通框选会在提交时替换旧选区；在新框选第一次点击时按住 `Ctrl`，会把它追加为新的选区。
-- 多个选区可以重叠。最后创建或最后激活的选区是主选区；主选区显示蓝/橙端点、8 个缩放手柄和选区卡，副选区使用较低强调轮廓。
-- 点击副选区可把它提升为主选区。
-- 在主选区内部长按或拖动可以移动该选区边界。此操作只改变选择范围，不会移动建筑、Cube 或任何世界实体。
-- 拖动四角和四边中点的 8 个手柄可以缩放主选区；手柄允许越过对边，起点和终点身份仍保持稳定。
-- 把鼠标放在手柄或选区边缘上滚动，可逐格调整大小或位置；停止后自动提交，`Esc` 可取消并恢复原范围。
-- Clear All Selections 一次清除全部选区；`Backspace` 只移除主选区，并把最近激活的剩余选区提升为新的主选区。
+- Committing a normal selection replaces the previous selection set. Hold `Ctrl` on the first click of a new selection to add it instead.
+- Multiple selections may overlap. The most recently created or activated selection becomes the primary selection, with blue/orange endpoints, eight resize handles, and the selection card. Secondary selections use a less prominent outline.
+- Click a secondary selection to promote it to primary.
+- Hold or drag inside the primary selection to move its boundary. This changes only the selected area; it never moves buildings, Cubes, or other world entities.
+- Drag the four corner handles or four edge-center handles to resize the primary selection. Handles may cross the opposite side while the start/end identities remain stable.
+- Use the wheel over a handle or selection edge to adjust the area one cell at a time. The change commits after settling; press `Esc` to cancel and restore the previous boundary.
+- Clear All Selections removes every selection. `Backspace` removes only the primary selection and promotes the most recently active remaining selection.
 
-### 选区卡
+### Selection Card
 
-选区卡会跟随主选区显示，并根据屏幕空间自动选择右、左、下、上的安全位置。它可以显示：
+The selection card follows the primary selection and automatically chooses a safe position to its right, left, bottom, or top. It can show:
 
-- U/V 坐标、宽高、面积和格数。
-- 已占用格、空格、建筑、Cube 与跨边界内容。
-- 捕获或安全操作时会被保护、跳过的内容。
-- 各建筑类型和资源图标。
-- Dynamic Details 可用时的实际总产量、资源输出、消耗和净值，以及按建筑类型分类的产量副卡。
+- U/V coordinates, width, height, area, and cell count.
+- Occupied cells, empty cells, buildings, Cubes, and cross-boundary content.
+- Content that will be protected or skipped during capture and safe operations.
+- Building types and original game resource icons.
+- With Dynamic Details, actual total production, resource outputs, consumption, net values, and per-building production companion cards.
 
-卡片通常在变化后显示约 3 秒。点击卡片背景可切换常驻显示；绿色边框和绿光表示“卡片常驻”，不表示蓝图目标已经固定。鼠标悬停会暂停自动隐藏倒计时。选区移动、缩放、蓝图跟随或右键拖图时，卡片会自动穿透，避免抢走地图输入。
+The card normally remains visible for about three seconds after a change. Click its background to keep it visible. A green border and glow mean that the card is persistent, not that the blueprint target is pinned. Hovering pauses the auto-hide timer. During selection movement, resizing, blueprint following, or right-drag map panning, cards automatically pass pointer input through instead of capturing world controls.
 
-## 蓝图
+## Blueprints
 
-### Generate Blueprint 与 Cut
+### Generate Blueprint and Cut
 
-Generate Blueprint 会把当前平面全部选区的精确并集捕获为一个完整源蓝图：
+Generate Blueprint captures the exact union of all selections on the current plane as one complete source blueprint:
 
-- 重叠格、重复实体和多格建筑会自动去重。
-- 只要建筑任一占格碰到选区，就按完整建筑捕获，并记录跨选区边界数量。
-- 普通可购买建筑会保存结构数据；安全白名单允许的运行状态、稳定 Cube、独立 Surge 和真实空格会保留在完整源中。
-- 自然物体、临时对象、未知或不安全的 Mod 实体、不可序列化状态等会被跳过或标记为受保护，不会把运行时对象引用写入蓝图。
-- 生成成功后，活动蓝图保存在当前会话，并把格式化蓝图 JSON 写入系统剪贴板。
+- Overlapping cells, duplicate entities, and multi-cell buildings are deduplicated.
+- If any occupied cell of a building touches a selection, the complete building is captured and counted as cross-boundary where applicable.
+- Standard purchasable buildings retain structural data. Safelisted persistent state, stable Cubes, independent Surges, and verified empty cells remain available in the complete source.
+- Natural objects, temporary objects, unknown or unsafe Mod entities, and unserializable state are skipped or marked as protected. Runtime object references are never written into the blueprint.
+- After a successful capture, the active blueprint remains in the current session and formatted blueprint JSON is written to the system clipboard.
 
-Cut 使用相同的完整源捕获结果，但会在确认后安全拆解选区中允许移除的内容。系统剪贴板写入成功后才会开始世界事务；受保护内容继续留在世界中。取消、资源不足、目标变化或事务失败不会悄悄换一套拆解目标。
+Cut uses the same complete-source capture, then safely disassembles eligible content after confirmation. The world transaction does not begin until the clipboard write succeeds, and protected content remains in the world. Cancellation, insufficient resources, target changes, or transaction failure never silently substitute a different disassembly target.
 
-### Standard Build 与 Complete Replica
+### Standard Build and Complete Replica
 
-- Standard Build 是安全的结构执行视图，只放置建筑结构和稳定配置，不复制内部运行状态、Cube 或 Surge。普通模式和创造模式都可使用。
-- Complete Replica 是创造模式专用的完整执行视图，可以恢复经过白名单归一化的安全持久状态，并按工具栏开关加入稳定 Cube 和安全 Surge。
-- 新生成、剪切或保存的蓝图保留完整源。普通模式加载完整源时不会报废文件，而是自动投影为 Standard Build；回到创造模式后仍可使用 Complete Replica。
+- Standard Build is the safe structural execution view. It places building structures and stable configuration without copying internal operating state, Cubes, or Surges. It is available in both normal and Creative Mode.
+- Complete Replica is a Creative Mode-only complete execution view. It can restore safelisted, normalized persistent state and may include stable Cubes and safe Surges through the toolbar toggles.
+- Newly generated, cut, or saved blueprints retain their complete source. Loading a complete source in normal mode does not invalidate the file; World Editor projects it to Standard Build and keeps Complete Replica available when Creative Mode is enabled again.
 
-### Include 开关
+### Include Toggles
 
-- Include Cubes：加入 `state === 2` 的稳定 Cube；生长、过渡、爆炸或仍连接 Pump 的活动 Cube 不会被复制。
-- Include Surges：加入蓝图中的安全独立 Surge。
-- Include Cells：同步蓝图记录的真实空格；目标中可安全拆解的建筑会进入拆除预览，受保护对象不会被强制清除。
+- Include Cubes: adds stable Cubes with `state === 2`. Growing, transitional, exploding, or Pump-connected active Cubes are not copied.
+- Include Surges: adds safe independent Surges stored in the blueprint.
+- Include Cells: synchronizes verified empty cells recorded by the blueprint. Safely removable buildings in those destinations enter the disassembly preview, while protected objects are never forcibly cleared.
 
-三个开关都是当前会话、当前放置流程的临时选择，默认关闭。加载、捕获、剪切新蓝图或完成一次放置流程后会恢复关闭；它们不会写入蓝图文件、设置、存档或 Steam Cloud。
+All three toggles are temporary choices for the current session and placement flow, and default to off. Loading, capturing, or cutting a new blueprint—or completing a placement flow—turns them off again. They are not written to blueprint files, settings, saves, or Steam Cloud.
 
-### 预览、固定与放置
+### Preview, Pinning, and Placement
 
-生成或加载蓝图后，预览会跟随鼠标悬停格。状态不仅依赖颜色，也使用轮廓和符号：
+After a blueprint is generated or loaded, its preview follows the hovered cell. Status is communicated with both color and outlines/symbols:
 
-- 绿色：可以建造。
-- 黄色：目标已经满足，无需重复建造。
-- 红色：存在可安全替换的冲突。
-- 紫色：唯一建筑、Cube、不可破坏对象、未知内容或其他受保护冲突。
+- Green: can be built.
+- Yellow: already satisfied; no duplicate build is required.
+- Red: contains a conflict that can be safely replaced.
+- Purple: blocked by a unique building, Cube, indestructible object, unknown content, or another protected conflict.
 
-鼠标移动时，上一份准确预览会以轻微透明度跟随；停止移动或固定目标后再发布新的精确计划，避免大型蓝图逐格闪烁。点击地图可永久固定或解除目标；按住 `Alt` 可临时固定，松开后恢复跟随。卡片背景点击只控制卡片常驻，不控制蓝图目标。
+While the cursor moves, the last accurate preview remains visible at reduced opacity. A new exact plan is published after the cursor settles or the target is pinned, preventing large blueprints from flickering cell by cell. Click the map to permanently pin or unpin the target. Hold `Alt` for a temporary pin and release it to resume following. Clicking a card background controls only card persistence, not blueprint pinning.
 
-放置前会重新扫描目标、资源、价格、存档和平面状态，不直接信任旧预览。红色冲突只在确实存在可替换建筑时打开确认；玩家可以保留冲突，也可以拆除并替换全部安全冲突。Include Cells 命中的安全拆除、冲突替换、临时 Surge 清理和建筑放置会合并为一条原子事务。
+Before placement, World Editor rescans the target, resources, prices, save identity, and plane instead of trusting an old preview. A red-conflict confirmation appears only when replaceable buildings actually exist. The player may preserve conflicts or disassemble and replace all safe conflicts. Safe removals from Include Cells, conflict replacement, temporary Surge cleanup, and building placement are combined into one atomic transaction.
 
-### 旋转、镜像与清除
+### Rotation, Mirroring, and Clearing
 
-蓝图可顺/逆旋转、沿 U/V 轴镜像或恢复默认变换。变换同时作用于建筑、完整足迹、稳定 Cube、Surge、空格掩码和选区边界。
+A blueprint can rotate clockwise or counterclockwise, mirror on the U or V axis, or return to its default transform. Transformations apply to buildings, complete footprints, stable Cubes, Surges, the empty-cell mask, and selection bounds.
 
-Clear Active Blueprint 会清除当前蓝图源、预览、变换、卡片结果和临时 Include 状态，但不会清除已经提交的选区，也不会退出 World Editor。单独按 `Esc` 退出现场预览后，内部蓝图仍可能保留；此时 Clear Active Blueprint 仍可用于彻底清空会话蓝图。
+Clear Active Blueprint removes the current blueprint source, preview, transform, card result, and temporary Include state. It does not clear committed selections or exit World Editor. Pressing `Esc` by itself may leave the internal blueprint available after closing its live preview; Clear Active Blueprint can then remove the session blueprint completely.
 
-## 卡片与生产信息
+## Cards and Production Information
 
-World Editor 主要有两组悬浮卡片：选区卡组和蓝图卡组。两组的常驻状态、透明度和内容模式彼此独立。
+World Editor uses two main floating card groups: the selection cards and the blueprint cards. Their persistence, opacity, and content-fade modes are independent.
 
-蓝图卡可以显示：
+The blueprint card can show:
 
-- 来源平面、执行模式、选区数量、面积和跨边界数量。
-- 捕获、跳过和保护的实体类型与原版图标。
-- 当前预览的可建造、已满足、冲突和阻止数量。
-- 建造成本、玩家现有资源和 Build Plan。
-- 理论总产量、捕获时实际产量及按建筑类型分类的生产副卡。
-- Place、Save to Library、旋转、镜像、重置和 Clear 等操作。
+- Source plane, execution mode, number of selections, area, and cross-boundary count.
+- Captured, skipped, and protected entity types with original game icons.
+- Buildable, already-satisfied, conflicting, and blocked counts for the current preview.
+- Build cost, the player's available resources, and the Build Plan.
+- Theoretical total production, capture-time actual production, and per-building production companion cards.
+- Place, Save to Library, rotate, mirror, reset, and Clear actions.
 
-卡片内的 Captured Types、Build Plan 和生产分类可以折叠，也可以拖动上下调高线改变可见高度。内容过高时使用细滚动条；空间允许时，主卡和生产副卡会自动排列为双列。
+Captured Types, Build Plan, and production categories can be collapsed. Their resize dividers can be dragged up or down to change the visible height. Tall content uses a narrow scrollbar, and the main card plus production companion cards automatically form a two-column layout when space allows.
 
-## 蓝图库
+## Blueprint Library
 
-蓝图库是安装级本地蓝图管理器。它使用游戏安装根下的 `blueprints/` 文件夹，而不是某个存档的内部数据，因此同一安装中的不同存档可以共用蓝图。
+Blueprint Library is an installation-wide local blueprint manager. It uses the `blueprints/` folder at the game installation root instead of data inside a particular save, so different saves in the same installation can share blueprints.
 
-可以从两个位置打开：
+Open it from either:
 
-- World Editor 顶部工具栏的 Blueprint Library。
-- ModLoader Pages 中的蓝图库页面。
+- Blueprint Library on the World Editor toolbar.
+- The Blueprint Library page in ModLoader Pages.
 
-蓝图库提供：
+Blueprint Library provides:
 
-- List / Grid 两种视图及各自独立的 Show Details 偏好。
-- 建筑缩略图、Cube/Surge 空间标记和建筑数量摘要。
-- 右侧固定 Details：Area、Buildings、Cubes、Surges、Rotate、Mirror、Schema。
-- 保存当前蓝图、加载、改名、创建副本、移到回收站、恢复和永久删除。
-- Active、Problems、Trash、Quarantine 四个区域。
-- 损坏文件隔离、Problems 重试、手动刷新和打开蓝图文件夹。
-- `.64schem` 导入与导出；兼容读取旧 `.cattail-blueprint.json`，新导出统一写为 `.64schem`。
-- 复制分享文本、粘贴分享文本，以及遇到名称/ID 冲突时选择创建副本、替换或取消。
+- List and Grid views with independent Show Details preferences.
+- Building thumbnails, spatial Cube/Surge markers, and building-count summaries.
+- A fixed right-side Details panel listing Area, Buildings, Cubes, Surges, Rotate, Mirror, and Schema.
+- Save Current Blueprint, load, rename, duplicate, move to Trash, restore, and delete permanently.
+- Active, Problems, Trash, and Quarantine sections.
+- Corrupt-file quarantine, Problems retry, manual refresh, and Open Blueprint Folder.
+- `.64schem` import and export. Legacy `.cattail-blueprint.json` files can still be read, while new exports always use `.64schem`.
+- Copy Share Text, Paste Share Text, and conflict choices to create a copy, replace, or cancel when names or IDs collide.
 
-蓝图文件只会在玩家明确点击 Save to Library、确认导入、改名、复制、恢复或其他蓝图库操作时改变。缩略图是可重新生成的派生缓存；缓存失败不会损坏 `.64schem`。永久删除使用 Beta-Pylene 危险玻璃确认按钮，默认焦点仍是 Cancel。
+Blueprint files change only after the player explicitly selects Save to Library, confirms an import, renames, duplicates, restores, or performs another library action. Thumbnails are rebuildable derived caches; a cache failure does not damage a `.64schem` file. Delete Permanently uses a Beta-Pylene danger-glass confirmation button, while Cancel remains the default focus.
 
-蓝图库不会自动写入 Steam Cloud，也不会改动原游戏的 Cloud 存档。Library 中的蓝图、回收站、隔离区和缩略图都属于当前游戏安装的本地文件。
+Blueprint Library does not automatically write to Steam Cloud and does not modify the original game's Cloud saves. Blueprints, Trash, Quarantine, and thumbnail caches are local to the current game installation.
 
-## 创造模式
+## Creative Mode
 
-工具栏末尾的创造模式按钮提供两种开启方式：
+The Creative Mode control at the end of the toolbar offers two activation paths:
 
-- Enable in Current Save：直接在当前活动存档中开启 World Editor 创造状态。
-- Create Creative Copy：使用一个空手动槽，只创建并激活一个独立创造模式副本；不会再额外创建一个普通模式备份副本。
+- Enable in Current Save: enables World Editor creative state directly in the active save.
+- Create Creative Copy: consumes one empty manual slot and creates and activates exactly one separate creative copy. It does not create an additional non-creative backup copy.
 
-创造模式开启后：
+While Creative Mode is enabled:
 
-- World Editor 的购买、拆解、剪切和蓝图放置不消耗或返还正常资源。
-- 可使用 Complete Replica、Include Cubes 和 Include Surges。
-- 状态栏当前模式使用 Hell Gem 深绿色文字与绿光。
-- 工具栏创造状态与相关确认使用 Hell Gem 玻璃；Enable in Current Save 使用 Elmerine 玻璃；危险操作使用 Beta-Pylene 玻璃。
+- World Editor purchase, disassembly, cut, and blueprint-placement operations neither consume nor refund normal resources.
+- Complete Replica, Include Cubes, and Include Surges become available.
+- The current mode in the status bar uses deep Hell Gem green text and a matching glow.
+- Creative toolbar state and related confirmations use Hell Gem glass; Enable in Current Save uses Elmerine glass; dangerous actions use Beta-Pylene glass.
 
-关闭创造模式会恢复正常材料消耗，但不会删除已存在的建筑或当前蓝图。完整蓝图源不会被降级；普通模式只会使用其 Standard Build 投影。
+Disabling Creative Mode restores normal material costs, but does not delete existing buildings or the active blueprint. The complete blueprint source is not downgraded; normal mode simply uses its Standard Build projection.
 
-## 撤销、快照与安全边界
+## Undo, Snapshots, and Safety Boundaries
 
-World Editor 对会修改世界的操作采用保守流程：
+World Editor uses a conservative process for operations that modify the world:
 
-1. 根据当前选区或蓝图生成只读计划。
-2. 在确认时重新检查目标、资源、价格、平面、创造状态和存档身份。
-3. 在实际写入前创建物理恢复快照。
-4. 将拆解、替换、临时层处理和建造合并为一条事务。
-5. 写入后验证结果；失败时尝试完整回滚。
-6. 成功后加入当前会话最多 50 项的 Undo/Redo 历史。
+1. Build a read-only plan from the current selection or blueprint.
+2. Recheck the target, resources, prices, plane, Creative Mode state, and save identity at confirmation time.
+3. Create a physical recovery snapshot immediately before writing.
+4. Combine disassembly, replacement, temporary-layer handling, and construction into one transaction.
+5. Verify the result after writing and attempt a complete rollback on failure.
+6. Add successful operations to the current session's Undo/Redo history, up to 50 entries.
 
-安全保护包括：
+Safety protections include:
 
-- 未知 Mod 实体、不可序列化对象和不支持的动态状态默认跳过或保护。
-- 不可破坏对象、活动 Cube、带活动 Cube 的 Pump 等不会被普通替换路径强制删除。
-- 会导致最后一个 Pump/Gradient 家族消失的操作受到保护。
-- 多格建筑按整栋处理，并在跨选区/空格边界时明确提示。
-- 目标、价格、资源或世界状态在确认期间变化时，会刷新或拒绝旧计划，不静默使用过期确认。
-- 危险确认默认把焦点放在 Cancel，`Esc` 或点击遮罩也可取消。
+- Unknown Mod entities, unserializable objects, and unsupported dynamic states are skipped or protected by default.
+- Indestructible objects, active Cubes, Pumps with active Cubes, and similar content are never forcibly removed through normal replacement paths.
+- Operations that would remove the last member of a Pump/Gradient family are protected.
+- Multi-cell buildings are handled as complete buildings, with explicit warnings when they cross selection or empty-cell boundaries.
+- If targets, prices, resources, or world state change during confirmation, the old plan is refreshed or rejected instead of being silently reused.
+- Dangerous confirmations focus Cancel by default and can also be cancelled with `Esc` or by clicking the backdrop.
 
-Undo/Redo 只回放该 World Editor 事务记录的世界、资源、统计和限制状态，不回滚系统剪贴板、活动蓝图、卡片设置或工具栏临时 Include 开关。会话历史在重载后不会继续保留；物理快照和事务回滚也不能替代玩家自己的重要存档备份。
+Undo/Redo replays only the world, resource, statistics, and restriction state recorded by that World Editor transaction. It does not roll back the system clipboard, active blueprint, card preferences, or temporary Include toggles. Session history does not survive a reload, and physical snapshots or transaction rollback do not replace the player's own important save backups.
 
-## 界面与可访问性
+## Interface and Accessibility
 
-- 现实层使用亮色主题，虚空层使用暗色主题；字体和资源图标尽量复用原版资源。
-- Elmerine、Hell Gem 和 Beta-Pylene 按钮使用对应游戏资源三色的反光、透光玻璃与同色发光。
-- 工具栏、卡片和蓝图库会根据窗口与游戏画布连续缩放，并在窄窗口中重新排列。
-- 世界内蓝图库和确认框会独占键盘输入，限制 Tab 焦点，并让 `Esc` 优先关闭最上层界面，避免快捷键误操作世界。
-- 颜色状态同时配合轮廓、符号、文字、`aria-pressed`、`aria-selected` 和本地化辅助名称，不只依赖颜色区分。
-- 英语 UI 使用标题式大小写，其他语言使用自然本地化；运行时切换游戏语言会同步刷新 World Editor 文本。
+- Reality uses a light theme and Void uses a dark theme. Typography and resource icons reuse original game assets where possible.
+- Elmerine, Hell Gem, and Beta-Pylene buttons use reflective, translucent glass and colored glows derived from the corresponding game resources.
+- The toolbar, cards, and Blueprint Library scale continuously with the game canvas and window, and reflow on narrow windows.
+- The in-world Blueprint Library and confirmations own keyboard input, contain Tab focus, and let `Esc` close the topmost interface before any shortcut can affect the world.
+- Color states are reinforced with outlines, symbols, text, `aria-pressed`, `aria-selected`, and localized accessible names instead of relying on color alone.
+- English UI uses title case while other languages use natural localization. Changing the game language at runtime refreshes World Editor text.
 
-## 当前限制与数据说明
+## Current Limitations and Data Notes
 
-- 当前版本仍在打磨阶段；自动测试通过不等于所有硬件、分辨率和存档都已完成游戏内验收。
-- 一次只维护一个活动会话蓝图；生成、剪切或加载新蓝图会替换当前活动蓝图。
-- Mod/未知实体不会被完整复制；安全性优先于“强制复制一切”。
-- Complete Replica 只在创造模式执行；普通模式始终使用 Standard Build 投影。
-- 蓝图库是当前安装的本地共享目录，不属于 Steam Cloud，不会自动同步到另一台电脑。
-- Include 开关和卡片常驻属于临时 UI/会话状态；卡片透明度与内容模式保存在本机 `localStorage`。
-- World Editor 不会自动创建蓝图文件；只有明确的保存、导入或蓝图库管理操作才会写入 `blueprints/`。
+- This version is still being polished. Automated checks do not mean every hardware configuration, resolution, and save has completed in-game acceptance testing.
+- Only one active session blueprint is maintained at a time. Generating, cutting, or loading another blueprint replaces it.
+- Mod and unknown entities are not copied completely. Safety takes priority over forcing every object into a blueprint.
+- Complete Replica can execute only in Creative Mode. Normal mode always uses the Standard Build projection.
+- Blueprint Library is a local shared folder for the current installation. It is not part of Steam Cloud and does not automatically synchronize to another computer.
+- Include toggles and card persistence are temporary UI/session state. Card opacity and content mode are stored in local `localStorage`.
+- World Editor never creates blueprint files automatically. Files are written to `blueprints/` only after explicit save, import, or library-management actions.
 
 ---
 
-## 开发者技术参考
+## Developer Technical Reference
 
-以下内容保留按开发阶段整理的实现合同、调试入口和回归边界，供维护与排错使用。
+The implementation contracts, debugging entry points, and regression boundaries below are preserved in their original maintainer language for continuity.
 
 ## 模块路线
 
