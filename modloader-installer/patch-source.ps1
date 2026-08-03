@@ -66,6 +66,22 @@ function Apply-Optional {
 	return $Text
 }
 
+function Insert-BeforeStandaloneLine {
+	param(
+		[string]$Text,
+		[string]$Line,
+		[string]$Insertion,
+		[string]$Description
+	)
+
+	$pattern = '(?m)^' + [regex]::Escape($Line) + '$'
+	$match = [regex]::Match($Text, $pattern)
+	if (-not $match.Success) {
+		throw "Could not patch $Description. The game file may have changed or was edited by another tool."
+	}
+	return $Text.Insert($match.Index, $Insertion)
+}
+
 function Update-TextFile {
 	param(
 		[string]$RelativePath,
@@ -350,10 +366,31 @@ ipcMain.on(`gameError`, (e,d)=>{
 		$Text = Apply-Required $Text $oldGameError $newGameError 'game error runtime log hook'
 	}
 
-	if (-not $Text.Contains('ModLoaderMainProcess.attachWindow(win)')) {
+	if (-not [regex]::IsMatch($Text, 'ModLoaderMainProcess\.attachWindow\(win(?:\s*,|\s*\))')) {
 		$oldAttach = '  if (!options.fullscreen) win.setFullScreen(false)'
 		$newAttach = "  if (!options.fullscreen) win.setFullScreen(false)`n  ModLoaderMainProcess.attachWindow(win)"
 		$Text = Apply-Required $Text $oldAttach $newAttach 'main window attachment'
+	}
+
+	$badDevToolsInlineBlock = @'
+  // win.webContents.openDevTools()ipcMain.on(`modloader:toggle-devtools`, ()=>{
+  win?.webContents?.toggleDevTools()
+})
+//1111111111111111
+'@
+	$fixedDevToolsInlineBlock = @'
+  // win.webContents.openDevTools()//1111111111111111
+'@
+	$Text = $Text.Replace($badDevToolsInlineBlock, $fixedDevToolsInlineBlock)
+
+	if (-not [regex]::IsMatch($Text, '(?m)^ipcMain\.on\(`modloader:toggle-devtools`,')) {
+		$devToolsIpcBlock = @'
+ipcMain.on(`modloader:toggle-devtools`, ()=>{
+  if (win && win.webContents) win.webContents.toggleDevTools()
+})
+
+'@
+		$Text = Insert-BeforeStandaloneLine $Text '//1111111111111111' $devToolsIpcBlock 'DevTools renderer IPC'
 	}
 
 	if (-not $Text.Contains('toggleDevTools')) {
@@ -412,7 +449,9 @@ Assert-Contains -RelativePath 'resources\app\game\scripts\game.js' -Pattern 'Mod
 Assert-Contains -RelativePath 'resources\app\game\scripts\game.js' -Pattern 'ModLoader?.applySoundList' -Description 'sound list hook'
 Assert-Contains -RelativePath 'resources\app\game\scripts\sprites.js' -Pattern 'ModLoader?.resolveAsset' -Description 'sprite asset hook'
 Assert-Contains -RelativePath 'resources\app\game\scripts\ui.js' -Pattern 'ModLoader?.resolveAsset' -Description 'shop icon asset hook'
-Assert-Contains -RelativePath 'resources\app\main.js' -Pattern 'ModLoaderMainProcess.attachWindow(win)' -Description 'main process bridge'
+Assert-Contains -RelativePath 'resources\app\main.js' -Pattern 'ModLoaderMainProcess.attachWindow(win' -Description 'main process bridge'
 Assert-Contains -RelativePath 'resources\app\game\modloader\main-process.js' -Pattern 'module.exports' -Description 'main process module'
+Assert-Contains -RelativePath 'resources\app\game\modloader\main-process.js' -Pattern 'modloader:libraries:runtime' -Description 'Library API v1 main process bridge'
+Assert-Contains -RelativePath 'resources\app\game\modloader\library-store.js' -Pattern "const API_VERSION = '1.0.0'" -Description 'Library store v1 module'
 
 Write-Host 'ModLoader source hooks are installed.'

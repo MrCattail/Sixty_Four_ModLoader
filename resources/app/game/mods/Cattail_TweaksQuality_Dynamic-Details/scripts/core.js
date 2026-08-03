@@ -53,6 +53,25 @@ ModLoader.register({
 		const resourceSourceGpuLineModeStorageKey = 'cattailDynamicResourceSourceGpuLineMode'
 		const resourceSourceLineChartModeStorageKey = 'cattailDynamicResourceSourceLineChartMode'
 		const resourceSourceWindowMs = 30000
+		const productionTelemetryKey = Symbol.for('cattail.dynamic-details.production-telemetry')
+		const productionTelemetryApiVersion = 1
+		const productionTelemetrySnapshotSchemaVersion = 1
+		const productionTelemetryCanonicalUnit = 'perSecond'
+		const productionActualOutputNames = new Set([
+			'pump',
+			'pump2',
+			'consumer',
+			'converter32',
+			'converter13',
+			'converter41',
+			'converter76',
+			'converter64',
+			'gradient',
+			'annihilator',
+			'hollow',
+			'fruit',
+			'voidsculpture'
+		])
 		const pumpSurgeDisplayMs = 2000
 		const resourceSourceMinAmount = 0.0001
 		const resourceSourceSummaryCacheMs = 350
@@ -119,7 +138,12 @@ ModLoader.register({
 		const buildCountdownRateSmoothFall = 0.2
 		const rates = new WeakMap()
 		const events = new WeakMap()
+		const productionEntityStartedAt = new WeakMap()
+		const productionEntitySourceCache = new WeakMap()
+		const productionConverterOutputCache = new WeakMap()
 		let lastGame = null
+		let productionTelemetryStartedAt = null
+		let productionTelemetryStartedAtEpoch = null
 		let coordinateTeleportPanel = null
 		let zPressed = false
 		let hintOpacity = 1
@@ -150,11 +174,18 @@ ModLoader.register({
 			if (namespace.resourceSourcesInstalled) return
 			if (typeof Game === 'undefined') return
 			namespace.resourceSourcesInstalled = true
+			installResourceSourceTelemetry()
 			installDetailToggle()
 			installOpacityControls()
 			patchTransientCubeHints()
 			registerResourceSourceRenderApiLayers()
-			installResourceSourceTracking()
+			installResourceSourceInterface()
+		}
+
+		namespace.installProductionTelemetry = function () {
+			if (typeof Game === 'undefined') return null
+			installResourceSourceTelemetry()
+			return installProductionTelemetryApi()
 		}
 
 		namespace.installCoordinateOverlay = function () {
@@ -2106,7 +2137,7 @@ ModLoader.register({
 			}
 		}
 
-		function getConverterInfo(entity) {
+		function getConverterInfo(entity, includeOutputPerSecond = true) {
 			let multiplier = 1
 			for (const preheater of entity.preheaters || []) {
 				if (preheater?.state === 2) multiplier += preheater.multiplicator || 0
@@ -2114,13 +2145,31 @@ ModLoader.register({
 			if (entity.name === 'converter64') multiplier *= (1 + (entity.reflectorCount || 0) / 8)
 			const blocked = entity.name === 'converter64' && entity.alone === false
 			const progressPerSecond = blocked ? 0 : (entity.baseConversionSpeed || 0) * 1000 * multiplier
-			const output = typeof entity.getConversionOutput === 'function' ? entity.getConversionOutput() : []
+			const output = getProductionConverterOutput(entity)
 			return {
 				multiplier,
 				progressPerSecond,
 				outputOnce: output,
-				outputPerSecond: output.map((value) => value * progressPerSecond)
+				outputPerSecond: includeOutputPerSecond
+					? output.map((value) => value * progressPerSecond)
+					: null
 			}
+		}
+
+		function getProductionConverterOutput(entity) {
+			if (typeof entity?.getConversionOutput !== 'function') return []
+			const reflectorCount = entity.name === 'converter64' ? Number(entity.reflectorCount) || 0 : 0
+			const method = entity.getConversionOutput
+			const cached = productionConverterOutputCache.get(entity)
+			if (cached && cached.method === method && cached.reflectorCount === reflectorCount) return cached.output
+			const current = method.call(entity)
+			const output = Array.isArray(current) ? current : []
+			productionConverterOutputCache.set(entity, {
+				method,
+				reflectorCount,
+				output: output.slice()
+			})
+			return productionConverterOutputCache.get(entity).output
 		}
 
 		function getConductorTransfers(entity) {
@@ -2611,52 +2660,68 @@ ModLoader.register({
 			return Math.round(number * 10000) / 10000
 		}
 
+		function installProductionTelemetryApi() {
+			const current = namespace.productionTelemetryController
+			if (current?.status?.().disposed === false) return current
 
-		function installResourceSourceTracking() {
+			const previous = globalThis[productionTelemetryKey]
+			if (previous && previous !== current && typeof previous.dispose === 'function') {
+				previous.dispose('replaced')
+			}
+
+			let disposed = false
+			let disposedReason = null
+			const capabilities = deepFreezeProductionValue({
+				aggregate: true,
+				actual: true,
+				theoretical: true,
+				selectiveMetrics: true,
+				entitySampleWindows: true,
+				dataQuality: true,
+				supplementalMetrics: ['pumpMining']
+			})
+			const controller = {
+				apiVersion: productionTelemetryApiVersion,
+				snapshotSchemaVersion: productionTelemetrySnapshotSchemaVersion,
+				canonicalUnit: productionTelemetryCanonicalUnit,
+				sampleWindowMs: resourceSourceWindowMs,
+				capabilities,
+				status() {
+					return getProductionTelemetryStatus(disposed, disposedReason)
+				},
+				snapshotEntity(entity, options) {
+					return createProductionTelemetrySnapshot([entity], disposed ? disposedReason || 'disposed' : null, options)
+				},
+				snapshotEntities(entities, options) {
+					return createProductionTelemetrySnapshot(entities, disposed ? disposedReason || 'disposed' : null, options)
+				},
+				dispose(reason) {
+					if (disposed) return false
+					disposed = true
+					disposedReason = String(reason || 'disposed')
+					if (globalThis[productionTelemetryKey] === controller) delete globalThis[productionTelemetryKey]
+					if (namespace.productionTelemetryController === controller) namespace.productionTelemetryController = null
+					return true
+				}
+			}
+			Object.freeze(controller)
+			namespace.productionTelemetryController = controller
+			globalThis[productionTelemetryKey] = controller
+			return controller
+		}
+
+		function installResourceSourceTelemetry() {
 			if (typeof Game === 'undefined' || !Game.prototype) return
+			if (namespace.resourceSourceTelemetryInstalled) return
+			namespace.resourceSourceTelemetryInstalled = true
+			productionTelemetryStartedAt = performance.now()
+			productionTelemetryStartedAtEpoch = Date.now()
 
-			installResourceSourceGpuLineToggle()
-			installResourceSourceLineChartWheelToggle()
-			installResourceSourceProfilerToggle()
+			patchProductionEntityStarts()
 			patchCubeResourceSourceAttribution()
 			patchMinedCubeResourceSourceAttribution()
 			patchGeneralDecayResourceSourceAttribution()
 			patchResourceSourceProducerContexts()
-
-			if (typeof Splash !== 'undefined' && Splash.prototype && !Splash.prototype._cattailDynamicResourceSourceShowPatched) {
-				Splash.prototype._cattailDynamicResourceSourceShowPatched = true
-				api.patch(Splash.prototype, 'show', function (original) {
-					return function (...args) {
-						clearResourceSourceGpuLines(this.master)
-						return original.apply(this, args)
-					}
-				})
-			}
-
-			api.patch(Game.prototype, 'switchPlane', function (original) {
-				return function (...args) {
-					clearResourceSourceGpuLines(this)
-					const result = original.apply(this, args)
-					clearResourceSourceGpuLines(this)
-					return result
-				}
-			})
-
-			api.patch(Game.prototype, 'watchCredits', function (original) {
-				return function (...args) {
-					clearResourceSourceGpuLines(this)
-					return original.apply(this, args)
-				}
-			})
-
-			api.patch(Game.prototype, 'addEntity', function (original) {
-				return function (name, ...args) {
-					if (name === 'pinhole') clearResourceSourceGpuLines(this)
-					const result = original.apply(this, arguments)
-					if (name === 'pinhole') clearResourceSourceGpuLines(this)
-					return result
-				}
-			})
 
 			api.patch(Game.prototype, 'createResourceTransfer', function (original) {
 				return function (resources, source, destination, onfinish, visibility, skip) {
@@ -2709,6 +2774,72 @@ ModLoader.register({
 					if (result && !skip) {
 						recordResourceSourceEvent(this, 'consume', diffConsumedResources(before, this.resources || []), identifyResourceSourceFromCell(this, destination))
 					}
+					return result
+				}
+			})
+		}
+
+		function patchProductionEntityStarts() {
+			if (Game.prototype._cattailDynamicProductionEntityStartPatched) return
+			Game.prototype._cattailDynamicProductionEntityStartPatched = true
+			api.patch(Game.prototype, 'addEntity', function (original) {
+				return function (...args) {
+					const entity = original.apply(this, args)
+					if (entity && typeof entity === 'object') rememberProductionEntityStart(entity)
+					return entity
+				}
+			})
+		}
+
+		function rememberProductionEntityStart(entity, now = performance.now()) {
+			if (!entity || typeof entity !== 'object') return 0
+			const existing = productionEntityStartedAt.get(entity)
+			if (Number.isFinite(existing)) return existing
+			const startedAt = Number.isFinite(now) ? now : performance.now()
+			productionEntityStartedAt.set(entity, startedAt)
+			return startedAt
+		}
+
+		function installResourceSourceInterface() {
+			if (typeof Game === 'undefined' || !Game.prototype) return
+			if (namespace.resourceSourceInterfaceInstalled) return
+			namespace.resourceSourceInterfaceInstalled = true
+
+			installResourceSourceGpuLineToggle()
+			installResourceSourceLineChartWheelToggle()
+			installResourceSourceProfilerToggle()
+
+			if (typeof Splash !== 'undefined' && Splash.prototype && !Splash.prototype._cattailDynamicResourceSourceShowPatched) {
+				Splash.prototype._cattailDynamicResourceSourceShowPatched = true
+				api.patch(Splash.prototype, 'show', function (original) {
+					return function (...args) {
+						clearResourceSourceGpuLines(this.master)
+						return original.apply(this, args)
+					}
+				})
+			}
+
+			api.patch(Game.prototype, 'switchPlane', function (original) {
+				return function (...args) {
+					clearResourceSourceGpuLines(this)
+					const result = original.apply(this, args)
+					clearResourceSourceGpuLines(this)
+					return result
+				}
+			})
+
+			api.patch(Game.prototype, 'watchCredits', function (original) {
+				return function (...args) {
+					clearResourceSourceGpuLines(this)
+					return original.apply(this, args)
+				}
+			})
+
+			api.patch(Game.prototype, 'addEntity', function (original) {
+				return function (name, ...args) {
+					if (name === 'pinhole') clearResourceSourceGpuLines(this)
+					const result = original.apply(this, arguments)
+					if (name === 'pinhole') clearResourceSourceGpuLines(this)
 					return result
 				}
 			})
@@ -3257,19 +3388,45 @@ ModLoader.register({
 		}
 
 		function getResourceSourceState(game) {
-			if (!game) return { events: [], startedAt: performance.now(), eventBuckets: new Map() }
-			initializeResourceSourcePreferences(game)
+			const now = performance.now()
+			const defaultStartedAt = Number.isFinite(productionTelemetryStartedAt) ? productionTelemetryStartedAt : now
+			const defaultStartedAtEpoch = Number.isFinite(productionTelemetryStartedAtEpoch) ? productionTelemetryStartedAtEpoch : Date.now()
+			if (!game) {
+				return {
+					events: [],
+					startedAt: defaultStartedAt,
+					startedAtEpoch: defaultStartedAtEpoch,
+					eventBuckets: new Map(),
+					productionTotals: new Map(),
+					droppedEvents: 0,
+					truncatedUntil: 0
+				}
+			}
+			lastGame = game
 			if (!game[resourceSourceStateKey]) {
 				Object.defineProperty(game, resourceSourceStateKey, {
 					configurable: true,
-					value: { events: [], startedAt: performance.now(), summaryCache: Object.create(null), eventBuckets: new Map() }
+					value: {
+						events: [],
+						startedAt: defaultStartedAt,
+						startedAtEpoch: defaultStartedAtEpoch,
+						summaryCache: Object.create(null),
+						eventBuckets: new Map(),
+						productionTotals: new Map(),
+						droppedEvents: 0,
+						truncatedUntil: 0
+					}
 				})
 			}
 			const state = game[resourceSourceStateKey]
 			if (!Array.isArray(state.events)) state.events = []
-			if (!state.startedAt) state.startedAt = performance.now()
+			if (!Number.isFinite(state.startedAt)) state.startedAt = defaultStartedAt
+			if (!Number.isFinite(state.startedAtEpoch)) state.startedAtEpoch = defaultStartedAtEpoch
 			if (!state.summaryCache) state.summaryCache = Object.create(null)
 			if (!(state.eventBuckets instanceof Map)) state.eventBuckets = new Map()
+			if (!(state.productionTotals instanceof Map)) state.productionTotals = buildProductionResourceTotals(state.events)
+			if (!Number.isFinite(state.droppedEvents)) state.droppedEvents = 0
+			if (!Number.isFinite(state.truncatedUntil)) state.truncatedUntil = 0
 			return state
 		}
 
@@ -3294,6 +3451,7 @@ ModLoader.register({
 			const existing = state.eventBuckets.get(bucketKey)
 			if (existing) {
 				existing.amount += amount
+				updateProductionResourceTotal(state, existing, amount, 0)
 				return
 			}
 			const event = {
@@ -3306,6 +3464,7 @@ ModLoader.register({
 			}
 			state.events.push(event)
 			state.eventBuckets.set(bucketKey, event)
+			updateProductionResourceTotal(state, event, amount, 1)
 		}
 
 		function trimResourceSourceEvents(state, now) {
@@ -3315,16 +3474,50 @@ ModLoader.register({
 			while (removeCount < state.events.length && state.events[removeCount].time < cutoff) removeCount++
 			if (removeCount) removeResourceSourceEvents(state, removeCount)
 			const overflow = state.events.length - resourceSourceMaxEvents
-			if (overflow > 0) removeResourceSourceEvents(state, overflow)
+			if (overflow > 0) removeResourceSourceEvents(state, overflow, now)
 		}
 
-		function removeResourceSourceEvents(state, count) {
+		function removeResourceSourceEvents(state, count, overflowNow) {
 			const removed = state.events.splice(0, count)
+			if (Number.isFinite(overflowNow) && removed.length) {
+				state.droppedEvents = (Number(state.droppedEvents) || 0) + removed.length
+				for (const event of removed) {
+					const eventTime = Number(event?.time)
+					if (!Number.isFinite(eventTime)) continue
+					state.truncatedUntil = Math.max(Number(state.truncatedUntil) || 0, eventTime + resourceSourceWindowMs)
+				}
+			}
 			if (state.eventBuckets instanceof Map) {
 				for (const event of removed) {
 					if (event?.bucketKey) state.eventBuckets.delete(event.bucketKey)
+					updateProductionResourceTotal(state, event, -event.amount, -1)
 				}
 			}
+		}
+
+		function buildProductionResourceTotals(sourceEvents) {
+			const totals = new Map()
+			const state = { productionTotals: totals }
+			for (const event of sourceEvents || []) updateProductionResourceTotal(state, event, event?.amount, 1)
+			return totals
+		}
+
+		function updateProductionResourceTotal(state, event, amountDelta, eventDelta) {
+			if (!(state?.productionTotals instanceof Map)) return
+			if (event?.type !== 'gain' && event?.type !== 'consume') return
+			const sourceKey = event?.source?.instanceKey
+			const resourceId = Number(event?.resourceId)
+			const amount = Number(amountDelta)
+			if (!sourceKey || !Number.isInteger(resourceId) || resourceId < 0 || !Number.isFinite(amount)) return
+			let total = state.productionTotals.get(sourceKey)
+			if (!total) {
+				if (amount <= 0) return
+				total = { gain: [], consume: [], events: 0 }
+				state.productionTotals.set(sourceKey, total)
+			}
+			total[event.type][resourceId] = Math.max(0, (Number(total[event.type][resourceId]) || 0) + amount)
+			total.events = Math.max(0, (Number(total.events) || 0) + (Number(eventDelta) || 0))
+			if (total.events === 0) state.productionTotals.delete(sourceKey)
 		}
 
 		function patchCubeResourceSourceAttribution() {
@@ -4724,7 +4917,21 @@ ModLoader.register({
 		}
 
 		function getResourceSourceSeconds(state, now = performance.now()) {
-			return Math.max(1, Math.min(resourceSourceWindowMs, now - (state?.startedAt || now)) / 1000)
+			const startedAt = Number.isFinite(state?.startedAt) ? state.startedAt : now
+			return Math.max(1, Math.min(resourceSourceWindowMs, now - startedAt) / 1000)
+		}
+
+		function getProductionEntitySampleMs(entity, state, now = performance.now()) {
+			let startedAt = productionEntityStartedAt.get(entity)
+			if (!Number.isFinite(startedAt)) {
+				startedAt = Number.isFinite(state?.startedAt) ? state.startedAt : now
+				productionEntityStartedAt.set(entity, startedAt)
+			}
+			return Math.max(0, Math.min(resourceSourceWindowMs, now - startedAt))
+		}
+
+		function getProductionEntitySampleSeconds(entity, state, now = performance.now()) {
+			return Math.max(1, getProductionEntitySampleMs(entity, state, now) / 1000)
 		}
 
 		function getRecentEntityResourceSourceRate(entity, type = 'gain') {
@@ -4735,7 +4942,7 @@ ModLoader.register({
 			const state = getResourceSourceState(game)
 			const now = performance.now()
 			trimResourceSourceEvents(state, now)
-			const seconds = getResourceSourceSeconds(state, now)
+			const seconds = getProductionEntitySampleSeconds(entity, state, now)
 			const source = normalizeResourceSource(game, { kind: 'entity', entity })
 			if (!source?.instanceKey) return resources
 
@@ -4747,6 +4954,467 @@ ModLoader.register({
 			}
 
 			return resources.map((amount) => amount / seconds)
+		}
+
+		function getProductionTelemetryStatus(disposed, disposedReason) {
+			const now = performance.now()
+			const state = lastGame?.[resourceSourceStateKey] || null
+			if (state) trimResourceSourceEvents(state, now)
+			const truncated = !!(state && Number(state.truncatedUntil) > now)
+			const startedAt = Number.isFinite(state?.startedAt) ? state.startedAt : productionTelemetryStartedAt
+			const collecting = Number.isFinite(startedAt) && now - startedAt < resourceSourceWindowMs
+			return deepFreezeProductionValue({
+				ready: !disposed && namespace.resourceSourceTelemetryInstalled === true,
+				disposed: !!disposed,
+				reason: disposed ? String(disposedReason || 'disposed') : null,
+				apiVersion: productionTelemetryApiVersion,
+				snapshotSchemaVersion: productionTelemetrySnapshotSchemaVersion,
+				canonicalUnit: productionTelemetryCanonicalUnit,
+				sampleWindowMs: resourceSourceWindowMs,
+				trackingStartedAt: Number.isFinite(state?.startedAtEpoch)
+					? state.startedAtEpoch
+					: Number.isFinite(productionTelemetryStartedAtEpoch) ? productionTelemetryStartedAtEpoch : null,
+				quality: truncated ? 'truncated' : collecting ? 'collecting' : 'complete',
+				eventCount: Array.isArray(state?.events) ? state.events.length : 0,
+				droppedEvents: Number(state?.droppedEvents) || 0
+			})
+		}
+
+		function createProductionTelemetrySnapshot(entities, unavailableReason, options) {
+			const now = performance.now()
+			const sampledAt = Date.now()
+			const metrics = normalizeProductionSnapshotOptions(options)
+			const collected = collectProductionEntities(entities)
+			const game = collected.game
+			const size = resourceCountSize(game)
+			const totals = {
+				theoretical: createProductionFlow(size),
+				actual: createProductionFlow(size)
+			}
+			const state = game ? getResourceSourceState(game) : null
+			if (state) trimResourceSourceEvents(state, now)
+			const selectedAmounts = new Map()
+			let matchedEvents = 0
+			for (const record of collected.records) {
+				const amounts = state?.productionTotals?.get(record.instanceKey)
+				if (!amounts) continue
+				selectedAmounts.set(record.instanceKey, amounts)
+				matchedEvents += Number(amounts.events) || 0
+			}
+			const sourceEvents = Array.isArray(state?.events) ? state.events : []
+			const byType = new Map()
+			const unsupported = {
+				theoretical: 0,
+				actualOutput: 0,
+				actualConsume: 0
+			}
+			const notRequestedProduction = unsupportedProductionFlow(size, 'not-requested')
+			let sampleMinMs = Number.POSITIVE_INFINITY
+			let sampleMaxMs = 0
+			let collectingEntities = 0
+
+			for (const record of collected.records) {
+				const entity = record.entity
+				const sampleMs = getProductionEntitySampleMs(entity, state, now)
+				const sampleSeconds = Math.max(1, sampleMs / 1000)
+				sampleMinMs = Math.min(sampleMinMs, sampleMs)
+				sampleMaxMs = Math.max(sampleMaxMs, sampleMs)
+				if (sampleMs < resourceSourceWindowMs) collectingEntities++
+
+				const needsSupplemental = metrics.supplemental && (entity.name === 'pump' || entity.name === 'pump2')
+				let production
+				try {
+					production = metrics.theoretical || needsSupplemental
+						? getEntityTheoreticalProduction(entity, size)
+						: notRequestedProduction
+				} catch (error) {
+					production = unsupportedProductionFlow(size, 'theoretical-error')
+				}
+				const theoretical = metrics.theoretical
+					? production
+					: notRequestedProduction
+				const actualOutputSupported = productionActualOutputNames.has(entity.name)
+				const actualConsumeSupported = true
+				if (metrics.theoretical && !theoretical.supported) unsupported.theoretical++
+				if (!actualOutputSupported) unsupported.actualOutput++
+				if (!actualConsumeSupported) unsupported.actualConsume++
+				const amounts = selectedAmounts.get(record.instanceKey)
+				const actualOutput = actualOutputSupported ? amounts?.gain : null
+				const actualConsume = actualConsumeSupported ? amounts?.consume : null
+
+				let type = byType.get(entity.name)
+				if (!type) {
+					type = createProductionTypeBucket(entity.name, size)
+					byType.set(entity.name, type)
+				}
+				type.count++
+				recordProductionSupport(type.support.theoretical, theoretical.supported, theoretical.reason)
+				recordProductionSupport(type.support.actualOutput, actualOutputSupported, actualOutputSupported ? null : 'unsupported-actual-output')
+				recordProductionSupport(type.support.actualConsume, actualConsumeSupported, actualConsumeSupported ? null : 'unsupported-actual-consume')
+				if (theoretical.supported) {
+					accumulateProductionEntity(type, theoretical, actualOutput, actualConsume, 1 / sampleSeconds)
+				} else {
+					accumulateActualProduction(type.actual, actualOutput, actualConsume, 1 / sampleSeconds)
+				}
+				type.sampleMinMs = Math.min(type.sampleMinMs, sampleMs)
+				type.sampleMaxMs = Math.max(type.sampleMaxMs, sampleMs)
+				if (sampleMs < resourceSourceWindowMs) type.collectingEntities++
+
+				if (metrics.supplemental && production.pumpMining) {
+					addScaledProductionVector(type.pumpMining, production.pumpMining, production.pumpMiningScale)
+				}
+			}
+
+			for (const type of byType.values()) {
+				addScaledProductionFlow(totals.theoretical, type.theoretical.output, type.theoretical.consume)
+				addScaledProductionFlow(totals.actual, type.actual.output, type.actual.consume)
+			}
+
+			const truncated = !!(state && Number(state.truncatedUntil) > now)
+			const quality = truncated ? 'truncated' : collectingEntities > 0 ? 'collecting' : 'complete'
+			const ready = !unavailableReason && namespace.resourceSourceTelemetryInstalled === true
+			const snapshot = {
+				ready,
+				reason: unavailableReason ? String(unavailableReason) : null,
+				schemaVersion: productionTelemetrySnapshotSchemaVersion,
+				sampledAt,
+				canonicalUnit: productionTelemetryCanonicalUnit,
+				sampleWindowMs: resourceSourceWindowMs,
+				metrics,
+				quality,
+				sampleDuration: {
+					minMs: Number.isFinite(sampleMinMs) ? sampleMinMs : 0,
+					maxMs: sampleMaxMs,
+					collectingEntities
+				},
+				entities: {
+					requested: collected.requested,
+					included: collected.records.length,
+					duplicates: collected.duplicates,
+					invalid: collected.invalid,
+					stale: collected.stale,
+					unsupported
+				},
+				events: {
+					scanned: sourceEvents.length,
+					matched: matchedEvents,
+					dropped: Number(state?.droppedEvents) || 0,
+					truncated
+				},
+				totals: {
+					theoretical: finalizeProductionFlow(totals.theoretical),
+					actual: finalizeProductionFlow(totals.actual)
+				},
+				byType: Array.from(byType.values())
+					.sort((left, right) => left.name < right.name ? -1 : left.name > right.name ? 1 : 0)
+					.map(finalizeProductionTypeBucket)
+			}
+			return deepFreezeProductionValue(snapshot)
+		}
+
+		function normalizeProductionSnapshotOptions(options) {
+			return {
+				theoretical: options?.theoretical !== false,
+				actual: true,
+				supplemental: options?.supplemental !== false
+			}
+		}
+
+		function collectProductionEntities(input) {
+			const entities = Array.isArray(input) ? input : []
+			const records = []
+			const seenEntities = new Set()
+			const seenKeys = new Set()
+			let game = null
+			let stuffSet = null
+			let duplicates = 0
+			let invalid = 0
+			let stale = 0
+
+			for (const entity of entities) {
+				if (!entity || typeof entity !== 'object' || !entity.name || !entity.master) {
+					invalid++
+					continue
+				}
+				if (seenEntities.has(entity)) {
+					duplicates++
+					continue
+				}
+				seenEntities.add(entity)
+				if (!game) {
+					game = entity.master
+					stuffSet = Array.isArray(game?.stuff) ? new Set(game.stuff) : null
+				} else if (entity.master !== game) {
+					invalid++
+					continue
+				}
+				if (stuffSet && !stuffSet.has(entity)) {
+					stale++
+					continue
+				}
+				const instanceKey = getProductionEntityInstanceKey(game, entity)
+				if (!instanceKey) {
+					invalid++
+					continue
+				}
+				if (seenKeys.has(instanceKey)) {
+					duplicates++
+					continue
+				}
+				seenKeys.add(instanceKey)
+				records.push({
+					entity,
+					name: entity.name,
+					instanceKey
+				})
+			}
+
+			return {
+				game,
+				records,
+				requested: entities.length,
+				duplicates,
+				invalid,
+				stale
+			}
+		}
+
+		function getProductionEntityInstanceKey(game, entity) {
+			const position = Array.isArray(entity?.position) ? entity.position : null
+			const u = position?.[0]
+			const v = position?.[1]
+			if (entity?.name !== 'cube') {
+				const cached = productionEntitySourceCache.get(entity)
+				if (cached && cached.name === entity.name && cached.u === u && cached.v === v) return cached.instanceKey
+			}
+			const source = normalizeResourceSource(game, { kind: 'entity', entity })
+			if (!source?.instanceKey || source.kind !== 'entity') return null
+			if (entity?.name !== 'cube') {
+				productionEntitySourceCache.set(entity, {
+					name: entity.name,
+					u,
+					v,
+					instanceKey: source.instanceKey
+				})
+			}
+			return source.instanceKey
+		}
+
+		function getEntityTheoreticalProduction(entity, size) {
+			if (entity.name === 'pump' || entity.name === 'pump2') {
+				const flow = getPumpFlow(entity)
+				const distribution = getPumpDistribution(entity)
+				return supportedProductionFlow(
+					distribution,
+					null,
+					flow.theoreticalResourcesPerSecond,
+					0,
+					distribution,
+					flow.miningResourcesPerSecond
+				)
+			}
+			if (entity.name === 'gradient') {
+				const flow = getGradientFlow(entity)
+				const output = typeof entity.getDiscrete === 'function'
+					? entity.getDiscrete(flow.periodicPowerPerSecond)
+					: []
+				return supportedProductionFlow(output, null)
+			}
+			if (isConverter(entity)) {
+				const info = getConverterInfo(entity, false)
+				return supportedProductionFlow(
+					info.outputOnce,
+					entity.fuel || [],
+					info.progressPerSecond,
+					info.progressPerSecond
+				)
+			}
+			return unsupportedProductionFlow(size, 'unsupported-theoretical')
+		}
+
+		function supportedProductionFlow(output, consume, outputScale = 1, consumeScale = 1, pumpMining, pumpMiningScale = 0) {
+			return {
+				supported: true,
+				reason: null,
+				output,
+				consume,
+				outputScale: normalizeProductionRate(outputScale),
+				consumeScale: normalizeProductionRate(consumeScale),
+				pumpMining,
+				pumpMiningScale: normalizeProductionRate(pumpMiningScale)
+			}
+		}
+
+		function unsupportedProductionFlow(size, reason) {
+			return {
+				supported: false,
+				reason,
+				output: null,
+				consume: null,
+				outputScale: 0,
+				consumeScale: 0,
+				pumpMining: null,
+				pumpMiningScale: 0
+			}
+		}
+
+		function createProductionTypeBucket(name, size) {
+			return {
+				name,
+				count: 0,
+				support: {
+					theoretical: createProductionSupportBucket(),
+					actualOutput: createProductionSupportBucket(),
+					actualConsume: createProductionSupportBucket()
+				},
+				theoretical: createProductionFlow(size),
+				actual: createProductionFlow(size),
+				sampleMinMs: Number.POSITIVE_INFINITY,
+				sampleMaxMs: 0,
+				collectingEntities: 0,
+				pumpMining: createProductionVector(size)
+			}
+		}
+
+		function finalizeProductionTypeBucket(type) {
+			const supplemental = []
+			if (hasProductionRate(type.pumpMining)) {
+				supplemental.push({
+					id: 'pumpMining',
+					basis: 'instantaneous',
+					resources: type.pumpMining.slice()
+				})
+			}
+			return {
+				name: type.name,
+				count: type.count,
+				support: {
+					theoretical: finalizeProductionSupport(type.support.theoretical),
+					actualOutput: finalizeProductionSupport(type.support.actualOutput),
+					actualConsume: finalizeProductionSupport(type.support.actualConsume)
+				},
+				theoretical: finalizeProductionFlow(type.theoretical),
+				actual: finalizeProductionFlow(type.actual),
+				sampleDuration: {
+					minMs: Number.isFinite(type.sampleMinMs) ? type.sampleMinMs : 0,
+					maxMs: type.sampleMaxMs,
+					collectingEntities: type.collectingEntities
+				},
+				supplemental
+			}
+		}
+
+		function createProductionSupportBucket() {
+			return {
+				supportedEntities: 0,
+				unsupportedEntities: 0,
+				reasons: new Set()
+			}
+		}
+
+		function recordProductionSupport(bucket, supported, reason) {
+			if (supported) {
+				bucket.supportedEntities++
+				return
+			}
+			bucket.unsupportedEntities++
+			if (reason) bucket.reasons.add(String(reason))
+		}
+
+		function finalizeProductionSupport(bucket) {
+			return {
+				supported: bucket.supportedEntities > 0 && bucket.unsupportedEntities === 0,
+				partial: bucket.supportedEntities > 0 && bucket.unsupportedEntities > 0,
+				supportedEntities: bucket.supportedEntities,
+				unsupportedEntities: bucket.unsupportedEntities,
+				reasons: Array.from(bucket.reasons).sort()
+			}
+		}
+
+		function createProductionFlow(size) {
+			return {
+				output: createProductionVector(size),
+				consume: createProductionVector(size)
+			}
+		}
+
+		function addScaledProductionFlow(flow, output, consume, outputScale = 1, consumeScale = 1) {
+			addScaledProductionVector(flow.output, output, outputScale)
+			addScaledProductionVector(flow.consume, consume, consumeScale)
+		}
+
+		function accumulateProductionEntity(type, theoretical, actualOutput, actualConsume, actualScale) {
+			for (let i = 0; i < type.actual.output.length; i++) {
+				type.theoretical.output[i] = normalizeProductionRate(
+					type.theoretical.output[i] + (Number(theoretical.output?.[i]) || 0) * theoretical.outputScale
+				)
+				type.theoretical.consume[i] = normalizeProductionRate(
+					type.theoretical.consume[i] + (Number(theoretical.consume?.[i]) || 0) * theoretical.consumeScale
+				)
+				type.actual.output[i] = normalizeProductionRate(
+					type.actual.output[i] + (Number(actualOutput?.[i]) || 0) * actualScale
+				)
+				type.actual.consume[i] = normalizeProductionRate(
+					type.actual.consume[i] + (Number(actualConsume?.[i]) || 0) * actualScale
+				)
+			}
+		}
+
+		function accumulateActualProduction(actual, output, consume, scale) {
+			for (let i = 0; i < actual.output.length; i++) {
+				actual.output[i] = normalizeProductionRate(
+					actual.output[i] + (Number(output?.[i]) || 0) * scale
+				)
+				actual.consume[i] = normalizeProductionRate(
+					actual.consume[i] + (Number(consume?.[i]) || 0) * scale
+				)
+			}
+		}
+
+		function finalizeProductionFlow(flow) {
+			const output = flow.output.map(normalizeProductionRate)
+			const consume = flow.consume.map(normalizeProductionRate)
+			return {
+				output,
+				consume,
+				net: output.map((value, index) => normalizeProductionSignedRate(value - consume[index]))
+			}
+		}
+
+		function createProductionVector(size) {
+			return new Array(Math.max(0, Number(size) || 0)).fill(0)
+		}
+
+		function addScaledProductionVector(target, source, multiplier = 1) {
+			const scale = normalizeProductionRate(multiplier)
+			if (scale <= 0 || !source) return target
+			for (let i = 0; i < target.length; i++) {
+				target[i] = normalizeProductionRate(target[i] + (Number(source[i]) || 0) * scale)
+			}
+			return target
+		}
+
+		function hasProductionRate(resources) {
+			return resources.some((value) => normalizeProductionRate(value) > 0)
+		}
+
+		function normalizeProductionRate(value) {
+			const number = Number(value)
+			if (!Number.isFinite(number) || number <= 0) return 0
+			return number
+		}
+
+		function normalizeProductionSignedRate(value) {
+			const number = Number(value)
+			if (!Number.isFinite(number) || Object.is(number, -0)) return 0
+			return number
+		}
+
+		function deepFreezeProductionValue(value, seen = new Set()) {
+			if (!value || typeof value !== 'object' || seen.has(value)) return value
+			seen.add(value)
+			for (const key of Reflect.ownKeys(value)) deepFreezeProductionValue(value[key], seen)
+			return Object.freeze(value)
 		}
 
 		function getResourceSourceSummary(game, resourceId) {

@@ -1259,7 +1259,7 @@
 				"description": {
 					"en": "An upgrade to stabilizer. Improves stability and performance.",
 					"sch": "稳定器升级。提高稳定性和性能。",
-					"modsch": "能量稳定器 LV1 的升级版。能提高稳定性和性能。"
+					"modsch": "能量稳定器 LV1 的升级版。能提高浪涌的稳定性和性能。"
 				}
 			},
 			"stabilizer3": {
@@ -1271,7 +1271,7 @@
 				"description": {
 					"en": "Anomalous upgrade. Improves performance and maximizes stability. There can only be one.",
 					"sch": "异常升级。提高性能并最大程度提高稳定性。只能有一个。",
-					"modsch": "异常的升级。能提高性能并最大程度提高稳定性。该建筑上限为1个。"
+					"modsch": "异常的升级。能提高浪涌的性能并永久稳定浪涌。该建筑上限为1个。"
 				}
 			},
 			"scan": {
@@ -1283,7 +1283,7 @@
 				"description": {
 					"en": "Knocks symbols off. Highlights potential puncture points. Spots get richer the farther you move from the center of the world.",
 					"sch": "敲掉符号。突出潜在的穿刺点。距离世界中心越远，点位越丰富。",
-					"modsch": "释放内核，能振动现实结构和周围完全发光的符号，并探测范围内的资源梯度。距离世界中心越远，资源梯度点位越丰富。"
+					"modsch": "释放内核并振动一定范围内的现实结构。能收集范围内完全发光的符号，并探测范围内的资源梯度。距离世界中心越远，资源梯度点位越丰富。"
 				}
 			},
 			"puncture": {
@@ -1295,7 +1295,7 @@
 				"description": {
 					"en": "Creates a gradient channel: a foundation for a gradient well. If a well is constructed on top, resource gains are doubled. Relocating the well removes this bonus. Feeding Reality into a raw puncture resets your position.",
 					"sch": "创造渐变通道：渐变井的地基。如果在其上建造一口井，资源收益将翻倍。迁移井位将消除此加成。将现实注入原始穿刺点将重置你的位置。",
-					"modsch": "建造一座梯度矿井的地基。如果在其上建造一做梯度矿井，资源收益将翻倍。移动梯度矿井的位置将消除此加成。将材料“现实”注入进隧穿洞会将你传送到现实中心点。"
+					"modsch": "一座梯度矿井的地基。如果在其上建造一做梯度矿井，资源收益将翻倍。移动梯度矿井的位置将消除此加成。将材料“现实”注入进隧穿洞会将你传送到现实中心点。"
 				}
 			},
 			"waypoint2": {
@@ -1355,12 +1355,12 @@
 			{
 				"en": "???",
 				"sch": "???",
-				"modsch": "???"
+				"modsch": "？？？"
 			},
 			{
 				"en": "A huge black cube. It's so smooth. I really wanna break it",
 				"sch": "一个巨大的黑色立方体。真是太光滑了。我真的很想敲碎它",
-				"modsch": "一个超大的黑色四方体。表面跟玻璃一样光滑，我很想打碎它。"
+				"modsch": "一个超大的黑色四方体升起来了。表面跟玻璃一样光滑，我有种要打碎它的冲动。"
 			},
 			{
 				"en": "Are you high?",
@@ -1370,7 +1370,7 @@
 			{
 				"en": "I now have 64 stones!",
 				"sch": "我现在有64块石头了！",
-				"modsch": "我现在有64个石头了！"
+				"modsch": "我现在有64块石头了！"
 			},
 			{
 				"en": "Well, okay then. Have fun with that.",
@@ -1380,22 +1380,22 @@
 			{
 				"en": "Hey, I found a yellow stone!",
 				"sch": "嘿，我找到一块黄色的石头！",
-				"modsch": "诶，还有黄色的石头！"
+				"modsch": "诶，我还找到一块黄色的石头！"
 			},
 			{
 				"en": "Good for you man!",
 				"sch": "好样的",
-				"modsch": "不错啊"
+				"modsch": "那你可太厉害了"
 			},
 			{
 				"en": "I think I can build machines now. I should build something to help break these cubes more easily. If a cube shows up in an adjacent cell, even diagonally, it should work.",
 				"sch": "我想我现在可以建造机器了。我应该建造一些东西来帮助更轻松地打破这些立方体。如果一个立方体出现在相邻的单元格中，即使是对角线，它也应该起作用。",
-				"modsch": "我现在好像可以建造一些机器出来。建一些能帮我更快地打碎这些立方体的机器。我发现只要放在相邻或者对角的位置就有效果了"
+				"modsch": "我现在好像可以搭建一些机器出来。建一些能帮我更快地打碎这些立方体的机器。我发现只要放在相邻或者对角的位置就有效果了"
 			},
 			{
 				"en": "Wait, are you playing some weird game? You're starting to creep me out",
 				"sch": "等等，你是在玩什么奇怪的游戏吗？别吓我",
-				"modsch": "等下，你是在玩什么新游戏而已吧？我都不知道你在说什么"
+				"modsch": "你是在玩什么新游戏吗？我都不知道你在说什么"
 			},
 			{
 				"en": "Now I just need to put a yellow stone inside this machine.",
@@ -1405,12 +1405,12 @@
 			{
 				"en": "Whatever makes you happy... Jokes aside, are you coming over today?",
 				"sch": "你开心就好……哦对了，你今天要过来吗？",
-				"modsch": "你怎么开心怎么来...不开玩笑了，你今天要来还是不来？"
+				"modsch": "你怎么开心怎么来...说正经的，你今天要来还是不来？"
 			},
 			{
 				"en": "Definitely! I'll be there in a few hours, just need to finish this up.",
 				"sch": "当然！几小时后到，只需先完成这个。",
-				"modsch": "来啊，几个小时之后吧，我先做完这些事"
+				"modsch": "当然来啊！几个小时之后吧，我先做完这些事"
 			},
 			{
 				"en": "What exactly are you doing?",
@@ -1440,7 +1440,7 @@
 			{
 				"en": "Where are you at?",
 				"sch": "你在哪？",
-				"modsch": "你在哪？"
+				"modsch": "你到哪了？"
 			},
 			{
 				"en": "We've been waiting for you for ages now.",
@@ -1450,22 +1450,22 @@
 			{
 				"en": "What do you mean? I'm still here.",
 				"sch": "你急什么？我还在这没动。",
-				"modsch": "你急什么？我还在这没动。"
+				"modsch": "你急什么？我还没动呢。"
 			},
 			{
 				"en": "WHERE???",
 				"sch": "哪里???",
-				"modsch": "哪里???"
+				"modsch": "你说什么？？？"
 			},
 			{
 				"en": "I've got a blue stone now. Or is it purple? It sounds like an antique brass candlestick. I think I could use it to remove misplaced machines.",
 				"sch": "我现在有一块蓝色，额也可能是紫色的石头了。 听起来像一个古董黄铜烛台。我想我可以用它来移除放错地方的机器。",
-				"modsch": "我现在有一块蓝色，额也可能是紫色的石头了。敲起来的声音像是在摇铃铛一样。我想我可以用它来删掉放错地方的机器。"
+				"modsch": "我现在有一块蓝色的石头了，额也有点偏紫色。敲起来的声音像是在摇铃铛一样。貌似它可以把放错地方的机器给删掉。"
 			},
 			{
 				"en": "Are you kidding me? I thought you said you were coming. What the hell?!",
 				"sch": "你在开玩笑吗？我以为你说你要来。到底怎么回事？！",
-				"modsch": "你在开玩笑吗？我以为你说你要来。到底怎么回事？！"
+				"modsch": "你在玩我吗？你明明说过你要来。到底怎么回事？！"
 			},
 			{
 				"en": "Chill man, I'll be there in a minute",
@@ -1475,7 +1475,7 @@
 			{
 				"en": "Wow, I can use [Q] to clone machines or destroy them if I click on a free cell first! And [Alt] helps to see behind tall machines.",
 				"sch": "哇，我可以使用[Q]来复制机器或先在空白方格点击然后摧毁它们！而且[Alt]可以帮助查看高大机器后面的情况。",
-				"modsch": "哇，我发现我可以对着机器按 [Q] 来复制出另一个机器，并且我还可以先对着空地按 [Q] ，然后将空格复制到机器上，就等于删除机器了！还有按着 [Alt] 并且用鼠标对准机器就能查看机器的详情信息了！"
+				"modsch": "哇，我发现我可以对着机器按 [Q] 来复制它，并且我还可以将空格复制到机器上，就能拆掉机器了！还能按着 [Alt] 并且用鼠标对准机器查看机器的详情信息！"
 			},
 			{
 				"en": "CHOP CHOP",
@@ -1515,12 +1515,12 @@
 			{
 				"en": "ARE YOU OKAY? WHERE ARE YOU?",
 				"sch": "你还好吗？你在哪里？",
-				"modsch": "兄弟，你人还好吗？你人在哪里？"
+				"modsch": "兄弟，你人还好吗？你 人 在 哪 里 ？?"
 			},
 			{
 				"en": "Chill man! I am ok, what's going on?",
 				"sch": "冷静点，兄弟！我没事，怎么了？",
-				"modsch": "冷静点，哥们，我很好啊。怎么问我这么多次？"
+				"modsch": "你冷静点！哥们，我什么事都没有。别大呼小叫的！"
 			},
 			{
 				"en": "You tell me! You've been ghosting me for two weeks now! I even went to your place a few times, but you weren't there. Just tell me where you are, that's it. Are you home right now?",
@@ -1535,7 +1535,7 @@
 			{
 				"en": "WHAT IS WRONG WITH YOU??? First you didn't show up, then you disappeared completely. And now you act like nothing happened!",
 				"sch": "你到底怎么了??? 你先是没有出现，然后彻底没影了。现在你却表现得像什么事都没发生一样！",
-				"modsch": "兄弟，你之前没来就算了，然后你就完全失踪了，现在你就跟失忆了一样！"
+				"modsch": "兄弟，你之前没来就算了，然后你就完全失踪了。现在你就跟失忆了一样！"
 			},
 			{
 				"en": "I am asking you a simple question",
@@ -1620,12 +1620,12 @@
 			{
 				"en": "It seems I don't know where I am",
 				"sch": "看来我不知道我在哪里",
-				"modsch": "貌似我根本不知道我在哪"
+				"modsch": "我根本不知道我在哪"
 			},
 			{
 				"en": "This is so weird. I mean, everything is fine with me. But I can't describe this place.",
 				"sch": "这太奇怪了。就是，我这个人一切都很好。但我无法形容这个地方。",
-				"modsch": "这里太怪了。我的意思是我人很好，但是我很难形容这里"
+				"modsch": "这里太怪了 我什么都好，但是这里就是说不上来的怪。"
 			},
 			{
 				"en": "It's like a dream, but then again it's not. Everything is white and there are these machines. And cubes. It doesn't make any sense.",

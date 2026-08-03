@@ -1,14 +1,75 @@
 ModLoader.register({
 	id: 'Cattail_TweaksQuality_Better-UIs',
 	init(api) {
-		if (api.config.get('enableSaveSlots', true) === false) return
+		const SERVICE_KEY = Symbol.for('cattail.better-uis.save-slots')
+		if (api.config.get('enableSaveSlots', true) === false) {
+			const previous = globalThis[SERVICE_KEY]
+			if (previous?.owner === api.id) delete globalThis[SERVICE_KEY]
+			return
+		}
 
+		const serviceVersion = 1
 		const manualSlotCount = 10
+		const maxNameLength = 64
 		const autoConfirmationIndex = 'auto'
+		const sourceMarkerMaxAge = 10 * 60 * 1000
+		const controlCharacterPattern = /[\u0000-\u001f\u007f]/
 		let activeSplash = null
+		let activeGame = null
 		let pendingConfirmation = null
 		let pendingImport = null
+		let transactionActive = false
+		let activationScheduled = false
+		let settlingGame = null
+		let settlingPromise = null
+		let verifiedSource = null
+		let lastSettleError = null
 		const pageShell = api.ui.pages
+
+		class SaveSlotsServiceError extends Error {
+			constructor(code, message) {
+				super(message)
+				this.name = 'SaveSlotsServiceError'
+				this.code = String(code || 'INVALID_ARGUMENT')
+			}
+		}
+
+		const service = Object.freeze({
+			owner: api.id,
+			version: serviceVersion,
+			capabilities() {
+				const state = serviceSnapshot()
+				return Object.freeze({
+					version: serviceVersion,
+					ready: state.ready,
+					manualSlotCount,
+					maxNameLength,
+					atomicBatch: true,
+					verifiedSource: true,
+					lineageFinalization: true,
+					createAndActivate: true
+				})
+			},
+			snapshot() {
+				return serviceSnapshot()
+			},
+			settle(options) {
+				return settleService(options?.game || activeGame)
+			},
+			createAndActivate(options) {
+				return createAndActivate(options)
+			}
+		})
+
+		const previousService = globalThis[SERVICE_KEY]
+		if (previousService && previousService !== service && previousService.owner !== api.id) {
+			console.warn('[Save Slots] Replacing an existing save-slot service.')
+		}
+		Object.defineProperty(globalThis, SERVICE_KEY, {
+			value: service,
+			configurable: true,
+			writable: true
+		})
 
 		pageShell.register({
 			id: 'saveSlots',
@@ -59,6 +120,495 @@ ModLoader.register({
 				}
 			})
 		})
+
+		api.on('afterGameInit', async function (payload, game) {
+			try {
+				await settleService(game)
+			} catch (error) {
+				console.warn('[Save Slots] Pending activation could not be finalized.', error)
+			}
+		})
+
+		function serviceSnapshot() {
+			if (!activeGame) {
+				return Object.freeze({
+					version: serviceVersion,
+					ready: false,
+					manualSlotCount,
+					maxNameLength,
+					emptyCount: 0,
+					emptyIndices: Object.freeze([]),
+					slots: Object.freeze([]),
+					source: null,
+					pendingActivation: false,
+					error: publicServiceError(lastSettleError)
+				})
+			}
+			const slots = readManualSlots(activeGame)
+			const emptyIndices = []
+			const summaries = slots.map(function (slot, index) {
+				if (!slot) {
+					emptyIndices.push(index)
+					return Object.freeze({ index, occupied: false, name: '', timestamp: null, pendingActivation: false })
+				}
+				return Object.freeze({
+					index,
+					occupied: true,
+					name: String(slot.name || ''),
+					timestamp: safeTimestamp(slot.timestamp || slot.updatedAt),
+					pendingActivation: !!slot.pendingActivation
+				})
+			})
+			return Object.freeze({
+				version: serviceVersion,
+				ready: !transactionActive && !activationScheduled && !lastSettleError && !slots.some(function (slot) {
+					return !!slot?.pendingActivation
+				}),
+				manualSlotCount,
+				maxNameLength,
+				emptyCount: emptyIndices.length,
+				emptyIndices: Object.freeze(emptyIndices),
+				slots: Object.freeze(summaries),
+				source: verifiedSource ? Object.freeze({ ...verifiedSource }) : null,
+				pendingActivation: slots.some(function (slot) { return !!slot?.pendingActivation }),
+				error: publicServiceError(lastSettleError)
+			})
+		}
+
+		function publicServiceError(error) {
+			if (!error) return null
+			return Object.freeze({
+				code: String(error.code || 'VERIFY_FAILED'),
+				message: String(error.message || 'Save-slot operation failed.')
+			})
+		}
+
+		function settleService(game) {
+			if (!game) return Promise.resolve(serviceSnapshot())
+			if (settlingPromise && settlingGame === game) return settlingPromise
+			if (activeGame !== game) {
+				verifiedSource = null
+				lastSettleError = null
+			}
+			activeGame = game
+			settlingGame = game
+			settlingPromise = Promise.resolve().then(function () {
+				lastSettleError = null
+				finalizePendingActivation(game)
+				consumeSourceMarker(game)
+				refreshOpenSlotsPage(game)
+				return serviceSnapshot()
+			}).catch(function (error) {
+				lastSettleError = normalizeServiceError(error, 'VERIFY_FAILED')
+				throw lastSettleError
+			}).finally(function () {
+				if (settlingGame === game) {
+					settlingGame = null
+					settlingPromise = null
+				}
+			})
+			return settlingPromise
+		}
+
+		async function createAndActivate(options) {
+			if (transactionActive || activationScheduled) {
+				throw new SaveSlotsServiceError('TRANSACTION_ACTIVE', 'A save-slot transaction is already active.')
+			}
+			transactionActive = true
+			let publishedRaw = null
+			let previousManualRaw = null
+			let previousAutoRaw = null
+			let previousPendingRaw = null
+			let previousPreventSaving = false
+			let game = null
+			try {
+				game = activeGame
+				if (!game) throw new SaveSlotsServiceError('NOT_READY', 'Save slots are not ready.')
+				await settleService(game)
+				if (game.preventSaving || game.preventCloud) {
+					throw new SaveSlotsServiceError('SAVING_BLOCKED', 'Saving is currently blocked.')
+				}
+				const entries = normalizeTransactionEntries(game, options?.entries)
+				const activateEntry = Number(options?.activateEntry)
+				if (!Number.isInteger(activateEntry) || activateEntry < 0 || activateEntry >= entries.length) {
+					throw new SaveSlotsServiceError('INVALID_ARGUMENT', 'activateEntry must identify one entry.')
+				}
+
+				previousManualRaw = localStorage.getItem(slotsKey(game))
+				previousAutoRaw = localStorage.getItem(autoKey(game))
+				previousPendingRaw = localStorage.getItem(pendingMarkerKey(game))
+				previousPreventSaving = !!game.preventSaving
+				const currentSlots = readManualSlots(game)
+				const emptyIndices = []
+				for (let index = 0; index < manualSlotCount; index++) {
+					if (!currentSlots[index]) emptyIndices.push(index)
+				}
+				if (emptyIndices.length < entries.length) {
+					throw new SaveSlotsServiceError('INSUFFICIENT_EMPTY_SLOTS', 'Not enough empty manual save slots are available.')
+				}
+				const occupiedNames = currentSlots.filter(Boolean).map(function (slot) { return String(slot.name || '').trim() })
+				const acceptedNames = occupiedNames.slice()
+				for (const entry of entries) {
+					if (entry.nameConflict === 'reject' && acceptedNames.includes(entry.name)) {
+						throw new SaveSlotsServiceError('NAME_CONFLICT', 'A save slot already uses this name.')
+					}
+					acceptedNames.push(entry.name)
+				}
+
+				const issuedAt = Date.now()
+				const activationToken = createActivationToken()
+				const nextSlots = currentSlots.slice()
+				const receipts = entries.map(function (entry, entryIndex) {
+					const index = emptyIndices[entryIndex]
+					const timestamp = safeTimestamp(entry.decoded?.timestamp) || issuedAt
+					const slot = {
+						name: entry.name,
+						data: entry.data,
+						timestamp,
+						createdAt: issuedAt,
+						updatedAt: issuedAt
+					}
+					if (entryIndex === activateEntry) {
+						slot.pendingActivation = {
+							schema: 1,
+							token: activationToken,
+							issuedAt
+						}
+					}
+					nextSlots[index] = slot
+					return { index, name: entry.name, timestamp }
+				})
+
+				publishedRaw = serializeManualSlots(nextSlots)
+				localStorage.setItem(slotsKey(game), publishedRaw)
+				if (localStorage.getItem(slotsKey(game)) !== publishedRaw) {
+					throw new SaveSlotsServiceError('WRITE_FAILED', 'Manual save slots could not be written.')
+				}
+				const verifiedSlots = readManualSlots(game)
+				for (let entryIndex = 0; entryIndex < entries.length; entryIndex++) {
+					const receipt = receipts[entryIndex]
+					const verified = verifiedSlots[receipt.index]
+					if (
+						!verified ||
+						verified.name !== entries[entryIndex].name ||
+						verified.data !== entries[entryIndex].data ||
+						!decodeSlot(game, verified.data)
+					) {
+						throw new SaveSlotsServiceError('VERIFY_FAILED', 'A newly written manual save slot could not be verified.')
+					}
+				}
+				const activeReceipt = receipts[activateEntry]
+				const activeSlot = verifiedSlots[activeReceipt.index]
+				if (activeSlot?.pendingActivation?.token !== activationToken) {
+					throw new SaveSlotsServiceError('VERIFY_FAILED', 'The pending activation token could not be verified.')
+				}
+
+				const pendingMarkerRaw = JSON.stringify({
+					schema: 1,
+					type: 'batch-activation',
+					token: activationToken,
+					steamId: String(game.steamId || ''),
+					index: activeReceipt.index,
+					name: activeReceipt.name,
+					issuedAt,
+					slotUpdatedAt: activeSlot.updatedAt
+				})
+				localStorage.setItem(pendingMarkerKey(game), pendingMarkerRaw)
+				if (localStorage.getItem(pendingMarkerKey(game)) !== pendingMarkerRaw) {
+					throw new SaveSlotsServiceError('WRITE_FAILED', 'The pending activation marker could not be written.')
+				}
+				game.preventSaving = true
+				localStorage.setItem(autoKey(game), activeSlot.data)
+				if (localStorage.getItem(autoKey(game)) !== activeSlot.data) {
+					throw new SaveSlotsServiceError('ACTIVATE_FAILED', 'The active save could not be written.')
+				}
+				try {
+					game.spaceport?.send?.('save', activeSlot.data)
+				} catch (error) {
+					throw new SaveSlotsServiceError('ACTIVATE_FAILED', 'The active save could not be dispatched.')
+				}
+				activationScheduled = true
+				setTimeout(function () {
+					try {
+						globalThis.location?.reload?.()
+					} catch (error) {
+						console.warn('[Save Slots] Reload could not be started.', error)
+					}
+				}, 100)
+				return Object.freeze({
+					activated: true,
+					entries: Object.freeze(receipts.map(function (receipt) { return Object.freeze({ ...receipt }) })),
+					activeIndex: activeReceipt.index,
+					reloadScheduled: true
+				})
+			} catch (error) {
+				const failure = normalizeServiceError(error, 'WRITE_FAILED')
+				if (publishedRaw !== null && game) {
+					try {
+						rollbackTransaction(game, {
+							publishedRaw,
+							previousManualRaw,
+							previousAutoRaw,
+							previousPendingRaw,
+							previousPreventSaving
+						})
+					} catch (rollbackError) {
+						transactionActive = false
+						activationScheduled = false
+						throw normalizeServiceError(rollbackError, 'ROLLBACK_FAILED')
+					}
+				}
+				transactionActive = false
+				activationScheduled = false
+				throw failure
+			}
+		}
+
+		function normalizeTransactionEntries(game, value) {
+			if (!Array.isArray(value) || !value.length || value.length > manualSlotCount) {
+				throw new SaveSlotsServiceError('INVALID_ARGUMENT', 'entries must be a non-empty array.')
+			}
+			return value.map(function (entry) {
+				if (!entry || typeof entry !== 'object' || Array.isArray(entry)) {
+					throw new SaveSlotsServiceError('INVALID_ARGUMENT', 'Each entry must be an object.')
+				}
+				const name = normalizeServiceName(entry.name)
+				const data = entry.data
+				if (typeof data !== 'string' || !data) {
+					throw new SaveSlotsServiceError('INVALID_SAVE', 'Each entry must contain an encoded save.')
+				}
+				const decoded = decodeSlot(game, data)
+				if (!decoded || typeof decoded !== 'object' || Array.isArray(decoded)) {
+					throw new SaveSlotsServiceError('INVALID_SAVE', 'An encoded save could not be decoded.')
+				}
+				const nameConflict = entry.nameConflict === 'allow' ? 'allow' : entry.nameConflict === 'reject' ? 'reject' : null
+				if (!nameConflict) {
+					throw new SaveSlotsServiceError('INVALID_ARGUMENT', 'nameConflict must be allow or reject.')
+				}
+				return { name, data, decoded, nameConflict }
+			})
+		}
+
+		function normalizeServiceName(value) {
+			if (typeof value !== 'string') throw new SaveSlotsServiceError('INVALID_NAME', 'Save-slot names must be strings.')
+			const name = value.trim()
+			if (!name || name.length > maxNameLength || controlCharacterPattern.test(name)) {
+				throw new SaveSlotsServiceError('INVALID_NAME', 'The save-slot name is invalid.')
+			}
+			return name
+		}
+
+		function rollbackTransaction(game, state) {
+			const currentManualRaw = localStorage.getItem(slotsKey(game))
+			if (currentManualRaw !== state.publishedRaw && currentManualRaw !== state.previousManualRaw) {
+				throw new SaveSlotsServiceError('ROLLBACK_FAILED', 'Manual save slots changed before rollback.')
+			}
+			if (currentManualRaw === state.publishedRaw) restoreStorageValue(slotsKey(game), state.previousManualRaw)
+			restoreStorageValue(autoKey(game), state.previousAutoRaw)
+			restoreStorageValue(pendingMarkerKey(game), state.previousPendingRaw)
+			game.preventSaving = !!state.previousPreventSaving
+			if (
+				localStorage.getItem(slotsKey(game)) !== state.previousManualRaw ||
+				localStorage.getItem(autoKey(game)) !== state.previousAutoRaw ||
+				localStorage.getItem(pendingMarkerKey(game)) !== state.previousPendingRaw ||
+				!!game.preventSaving !== !!state.previousPreventSaving
+			) {
+				throw new SaveSlotsServiceError('ROLLBACK_FAILED', 'The previous save-slot state could not be restored.')
+			}
+		}
+
+		function restoreStorageValue(key, value) {
+			if (value === null || value === undefined) localStorage.removeItem(key)
+			else localStorage.setItem(key, value)
+		}
+
+		function finalizePendingActivation(game) {
+			const raw = localStorage.getItem(pendingMarkerKey(game))
+			const slots = readManualSlots(game)
+			const pendingIndices = []
+			for (let index = 0; index < slots.length; index++) {
+				if (slots[index]?.pendingActivation) pendingIndices.push(index)
+			}
+			if (!raw) {
+				if (pendingIndices.length) {
+					throw new SaveSlotsServiceError('VERIFY_FAILED', 'A pending save slot has no activation marker.')
+				}
+				return false
+			}
+
+			let marker = null
+			try {
+				marker = JSON.parse(raw)
+			} catch (error) {
+				throw new SaveSlotsServiceError('VERIFY_FAILED', 'The pending activation marker is invalid.')
+			}
+			const age = Date.now() - Number(marker?.issuedAt)
+			if (
+				marker?.schema !== 1 ||
+				marker?.type !== 'batch-activation' ||
+				typeof marker?.token !== 'string' ||
+				!marker.token ||
+				String(marker?.steamId || '') !== String(game.steamId || '') ||
+				!Number.isInteger(marker?.index) ||
+				marker.index < 0 ||
+				marker.index >= manualSlotCount ||
+				!Number.isFinite(age) ||
+				age < -60000
+			) {
+				throw new SaveSlotsServiceError('VERIFY_FAILED', 'The pending activation marker failed validation.')
+			}
+			const slot = slots[marker.index]
+			if (!slot || slot.name !== String(marker.name || '')) {
+				throw new SaveSlotsServiceError('VERIFY_FAILED', 'The pending manual save slot changed before finalization.')
+			}
+			const activeData = localStorage.getItem(autoKey(game))
+			const activeDecoded = decodeSlot(game, activeData)
+			const saveInstanceId = normalizeSaveInstanceId(activeDecoded?.modloader?.saveInstanceId)
+			const activeCreativeIdentity = creativeForkIdentity(activeDecoded)
+			if (!activeData || !activeDecoded || !saveInstanceId || !activeCreativeIdentity) {
+				throw new SaveSlotsServiceError('VERIFY_FAILED', 'The active save has no persisted save identity.')
+			}
+			if (!slot.pendingActivation) {
+				if (
+					pendingIndices.length ||
+					slot.data !== activeData ||
+					normalizeSaveInstanceId(slot.decoded?.modloader?.saveInstanceId) !== saveInstanceId ||
+					creativeForkIdentity(slot.decoded) !== activeCreativeIdentity
+				) {
+					throw new SaveSlotsServiceError('VERIFY_FAILED', 'A completed activation marker could not be reconciled.')
+				}
+				removeVerifiedPendingMarker(game)
+				verifiedSource = { index: marker.index, name: slot.name, saveInstanceId }
+				return true
+			}
+			if (
+				pendingIndices.length !== 1 ||
+				pendingIndices[0] !== marker.index ||
+				slot.pendingActivation.token !== marker.token ||
+				safeTimestamp(slot.updatedAt) !== safeTimestamp(marker.slotUpdatedAt) ||
+				normalizeSaveInstanceId(slot.decoded?.modloader?.saveInstanceId) ||
+				creativeForkIdentity(slot.decoded) !== activeCreativeIdentity
+			) {
+				throw new SaveSlotsServiceError('VERIFY_FAILED', 'The active save does not match the pending creative copy.')
+			}
+
+			const now = Date.now()
+			const nextSlots = slots.slice()
+			nextSlots[marker.index] = {
+				name: slot.name,
+				data: activeData,
+				timestamp: safeTimestamp(activeDecoded.timestamp) || now,
+				createdAt: safeTimestamp(slot.createdAt) || now,
+				updatedAt: now
+			}
+			const nextRaw = serializeManualSlots(nextSlots)
+			localStorage.setItem(slotsKey(game), nextRaw)
+			const verified = readManualSlots(game)[marker.index]
+			if (
+				localStorage.getItem(slotsKey(game)) !== nextRaw ||
+				!verified ||
+				verified.data !== activeData ||
+				verified.pendingActivation ||
+				normalizeSaveInstanceId(verified.decoded?.modloader?.saveInstanceId) !== saveInstanceId ||
+				creativeForkIdentity(verified.decoded) !== activeCreativeIdentity
+			) {
+				throw new SaveSlotsServiceError('VERIFY_FAILED', 'The active save identity could not be written back to its manual slot.')
+			}
+			removeVerifiedPendingMarker(game)
+			verifiedSource = {
+				index: marker.index,
+				name: verified.name,
+				saveInstanceId
+			}
+			return true
+		}
+
+		function removeVerifiedPendingMarker(game) {
+			localStorage.removeItem(pendingMarkerKey(game))
+			if (localStorage.getItem(pendingMarkerKey(game)) !== null) {
+				throw new SaveSlotsServiceError('VERIFY_FAILED', 'The completed activation marker could not be removed.')
+			}
+		}
+
+		function creativeForkIdentity(decoded) {
+			const value = decoded?.modloader?.worldEditor
+			if (
+				!value ||
+				value.schema !== 1 ||
+				value.creativeMode !== true ||
+				value.entryMode !== 'forked'
+			) {
+				return ''
+			}
+			const createdAt = safeTimestamp(value.createdAt)
+			return createdAt ? String(createdAt) : ''
+		}
+
+		function normalizeSaveInstanceId(value) {
+			const saveInstanceId = String(value || '').trim().toLowerCase()
+			return /^[0-9a-f-]{16,128}$/i.test(saveInstanceId) ? saveInstanceId : ''
+		}
+
+		function consumeSourceMarker(game) {
+			const raw = localStorage.getItem(sourceMarkerKey(game))
+			if (!raw) return
+			localStorage.removeItem(sourceMarkerKey(game))
+			try {
+				const marker = JSON.parse(raw)
+				const age = Date.now() - Number(marker?.issuedAt)
+				const slot = readManualSlots(game)[marker?.index]
+				const current = decodeSlot(game, localStorage.getItem(autoKey(game)))
+				const currentId = normalizeSaveInstanceId(current?.modloader?.saveInstanceId)
+				const slotId = normalizeSaveInstanceId(slot?.decoded?.modloader?.saveInstanceId)
+				if (
+					marker?.schema !== 1 ||
+					String(marker?.steamId || '') !== String(game.steamId || '') ||
+					!Number.isFinite(age) ||
+					age < -60000 ||
+					age > sourceMarkerMaxAge ||
+					!slot ||
+					slot.name !== marker.name ||
+					safeTimestamp(slot.updatedAt) !== safeTimestamp(marker.slotUpdatedAt) ||
+					!currentId ||
+					currentId !== slotId ||
+					currentId !== normalizeSaveInstanceId(marker.saveInstanceId)
+				) {
+					return
+				}
+				verifiedSource = { index: marker.index, name: slot.name, saveInstanceId: currentId }
+			} catch (error) {
+				console.warn('[Save Slots] Source marker could not be verified.', error)
+			}
+		}
+
+		function writeSourceMarker(game, index, slot) {
+			const saveInstanceId = normalizeSaveInstanceId(slot?.decoded?.modloader?.saveInstanceId)
+			if (!Number.isInteger(index) || !slot || !saveInstanceId) {
+				localStorage.removeItem(sourceMarkerKey(game))
+				return
+			}
+			localStorage.setItem(sourceMarkerKey(game), JSON.stringify({
+				schema: 1,
+				steamId: String(game.steamId || ''),
+				index,
+				name: String(slot.name || ''),
+				slotUpdatedAt: safeTimestamp(slot.updatedAt),
+				saveInstanceId,
+				issuedAt: Date.now()
+			}))
+		}
+
+		function normalizeServiceError(error, fallbackCode) {
+			if (error instanceof SaveSlotsServiceError) return error
+			return new SaveSlotsServiceError(fallbackCode || 'WRITE_FAILED', String(error?.message || 'Save-slot operation failed.'))
+		}
+
+		function createActivationToken() {
+			try {
+				if (globalThis.crypto?.randomUUID) return globalThis.crypto.randomUUID().toLowerCase()
+			} catch (error) {}
+			return Date.now().toString(36) + '-' + Math.random().toString(36).slice(2) + '-' + Math.random().toString(36).slice(2)
+		}
 
 		function refreshOpenSlotsPage(game) {
 			if (!activeSplash || activeSplash.master !== game) return
@@ -141,14 +691,16 @@ ModLoader.register({
 			const actions = []
 			const confirmation = pendingConfirmation?.index === index ? pendingConfirmation : null
 			if (slot) {
-				if (confirmation) {
+				if (slot.pendingActivation) {
+					actions.push({ key: 'finalizing', disabled: true })
+				} else if (confirmation) {
 					actions.push({
 						key: confirmation.type,
 						confirm: true,
 						ok: function () {
 							if (confirmation.type === 'load') {
 								pendingConfirmation = null
-								loadSlot(splash.master, slot.data)
+								loadSlot(splash.master, slot.data, index, slot)
 								return
 							}
 							if (confirmation.type === 'overwrite') saveManualSlot(splash.master, slots, index, slot.name)
@@ -193,6 +745,7 @@ ModLoader.register({
 				title: slot ? slotTitle(splash.master, slot, index) : text(splash.master, 'emptySlot', { index: index + 1 }),
 				time: slot?.timestamp || slot?.updatedAt,
 				onPrimary: function () {
+					if (slot?.pendingActivation) return
 					if (slot) {
 						pendingConfirmation = { type: 'load', index }
 						renderSlotsPage(splash, page)
@@ -553,8 +1106,10 @@ ModLoader.register({
 			writeAutoSave(game)
 		}
 
-		function loadSlot(game, data) {
+		function loadSlot(game, data, index, slot) {
 			if (!data) return
+			if (Number.isInteger(index) && slot) writeSourceMarker(game, index, slot)
+			else localStorage.removeItem(sourceMarkerKey(game))
 			game.preventSaving = true
 			game.spaceport?.send('save', data)
 			localStorage.setItem(autoKey(game), data)
@@ -576,7 +1131,15 @@ ModLoader.register({
 					const slot = parsed[index]
 					if (!slot?.data) return null
 					const decoded = decodeSlot(game, slot.data)
-					return { name: typeof slot.name === 'string' ? slot.name : '', data: slot.data, decoded, timestamp: slot.timestamp || decoded?.timestamp || null, createdAt: slot.createdAt || slot.timestamp || decoded?.timestamp || null, updatedAt: slot.updatedAt || slot.timestamp || decoded?.timestamp || null }
+					return {
+						name: typeof slot.name === 'string' ? slot.name : '',
+						data: slot.data,
+						decoded,
+						timestamp: slot.timestamp || decoded?.timestamp || null,
+						createdAt: slot.createdAt || slot.timestamp || decoded?.timestamp || null,
+						updatedAt: slot.updatedAt || slot.timestamp || decoded?.timestamp || null,
+						pendingActivation: normalizePendingActivation(slot.pendingActivation)
+					}
 				})
 			} catch (error) {
 				console.warn('[Save Slots] Could not read save slots.', error)
@@ -585,12 +1148,48 @@ ModLoader.register({
 		}
 
 		function writeManualSlots(game, slots) {
-			localStorage.setItem(slotsKey(game), JSON.stringify(emptySlots().map(function (_, index) { return slots[index] || null })))
+			localStorage.setItem(slotsKey(game), serializeManualSlots(slots))
+		}
+
+		function serializeManualSlots(slots) {
+			return JSON.stringify(emptySlots().map(function (_, index) {
+				const slot = slots[index]
+				if (!slot?.data) return null
+				const persisted = {
+					name: typeof slot.name === 'string' ? slot.name.slice(0, maxNameLength) : '',
+					data: slot.data,
+					timestamp: safeTimestamp(slot.timestamp),
+					createdAt: safeTimestamp(slot.createdAt),
+					updatedAt: safeTimestamp(slot.updatedAt)
+				}
+				const pendingActivation = normalizePendingActivation(slot.pendingActivation)
+				if (pendingActivation) persisted.pendingActivation = pendingActivation
+				return persisted
+			}))
+		}
+
+		function normalizePendingActivation(value) {
+			if (
+				!value ||
+				value.schema !== 1 ||
+				typeof value.token !== 'string' ||
+				!value.token ||
+				!safeTimestamp(value.issuedAt)
+			) {
+				return null
+			}
+			return {
+				schema: 1,
+				token: value.token,
+				issuedAt: safeTimestamp(value.issuedAt)
+			}
 		}
 
 		function emptySlots() { return new Array(manualSlotCount).fill(null) }
 		function autoKey(game) { return `abstractv03${game.steamId}` }
 		function slotsKey(game) { return `abstractv03_saveSlots${game.steamId}` }
+		function pendingMarkerKey(game) { return `abstractv03_saveSlotsPendingActivation${game.steamId}` }
+		function sourceMarkerKey(game) { return `abstractv03_saveSlotsSource${game.steamId}` }
 		function decodeSlot(game, data) {
 			if (!data) return null
 			try { return game.decodeSave(data) } catch (error) { console.warn('[Save Slots] Could not decode save preview.', error); return null }
@@ -686,10 +1285,10 @@ ModLoader.register({
 		}
 
 		const EXTRA_LABELS = {
-			en: {back: 'Back', noTime: 'No save time', noResources: 'No resources', emptyResourceHint: 'Empty', exportSlots: 'Export all', importSlots: 'Import file', importConfirm: 'Import {count} manual slots?', importConfirmWithAuto: 'Import autosave and {count} manual slots?', importInvalid: 'This save-slot file could not be imported.'},
-			sch: {back: '返回', noTime: '没有存档时间', noResources: '没有资源', emptyResourceHint: '空', exportSlots: '导出全部', importSlots: '导入文件', importConfirm: '导入 {count} 个手动存档格？', importConfirmWithAuto: '导入自动存档和 {count} 个手动存档格？', importInvalid: '无法导入这个存档格文件。'},
-			modsch: {back: '返回', noTime: '没有存档时间', noResources: '没有资源', emptyResourceHint: '空', exportSlots: '导出全部', importSlots: '导入文件', importConfirm: '导入 {count} 个手动存档格？', importConfirmWithAuto: '导入自动存档和 {count} 个手动存档格？', importInvalid: '无法导入这个存档格文件。'},
-			tch: {back: '返回', noTime: '沒有存檔時間', noResources: '沒有資源', emptyResourceHint: '空', exportSlots: '匯出全部', importSlots: '匯入檔案', importConfirm: '匯入 {count} 個手動存檔格？', importConfirmWithAuto: '匯入自動存檔和 {count} 個手動存檔格？', importInvalid: '無法匯入這個存檔格檔案。'}
+			en: {back: 'Back', noTime: 'No save time', noResources: 'No resources', emptyResourceHint: 'Empty', exportSlots: 'Export all', importSlots: 'Import file', importConfirm: 'Import {count} manual slots?', importConfirmWithAuto: 'Import autosave and {count} manual slots?', importInvalid: 'This save-slot file could not be imported.', finalizing: 'Finalizing'},
+			sch: {back: '返回', noTime: '没有存档时间', noResources: '没有资源', emptyResourceHint: '空', exportSlots: '导出全部', importSlots: '导入文件', importConfirm: '导入 {count} 个手动存档格？', importConfirmWithAuto: '导入自动存档和 {count} 个手动存档格？', importInvalid: '无法导入这个存档格文件。', finalizing: '正在完成'},
+			modsch: {back: '返回', noTime: '没有存档时间', noResources: '没有资源', emptyResourceHint: '空', exportSlots: '导出全部', importSlots: '导入文件', importConfirm: '导入 {count} 个手动存档格？', importConfirmWithAuto: '导入自动存档和 {count} 个手动存档格？', importInvalid: '无法导入这个存档格文件。', finalizing: '正在完成'},
+			tch: {back: '返回', noTime: '沒有存檔時間', noResources: '沒有資源', emptyResourceHint: '空', exportSlots: '匯出全部', importSlots: '匯入檔案', importConfirm: '匯入 {count} 個手動存檔格？', importConfirmWithAuto: '匯入自動存檔和 {count} 個手動存檔格？', importInvalid: '無法匯入這個存檔格檔案。', finalizing: '正在完成'}
 		}
 
 		function text(game, key, values) {

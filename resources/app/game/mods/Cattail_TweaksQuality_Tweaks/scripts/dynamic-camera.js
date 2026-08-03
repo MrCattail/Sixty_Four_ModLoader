@@ -455,18 +455,32 @@
 	function drawDynamicPrism(game, position, size, height, triplet, original, args) {
 		const colors = triplet ? triplet : ['#FFC759', '#FFE86F', '#FF8F60']
 		const prismHeight = Number(height) || 0
-		const corners = getCellCorners(game, position, Number(size) || 1)
-		if (!corners) return original.apply(game, args)
-		const hy = prismHeight * game.unit
-		const top = corners.map(function (point) {
-			return [point[0], point[1] - hy]
-		})
+		const geometry = getPrismGeometry(game, position, Number(size) || 1, prismHeight)
+		if (!geometry) return original.apply(game, args)
 
 		game.ctx.save()
-		if (prismHeight) drawVisibleSides(game, corners, top, colors)
+		if (prismHeight) {
+			game.ctx.fillStyle = colors[1]
+			if (geometry.silhouette.length >= 3) drawCellPolygon(game.ctx, geometry.silhouette)
+			drawVisibleSides(game, geometry.bottom, geometry.top, colors)
+		}
 		game.ctx.fillStyle = colors[1]
-		drawCellPolygon(game.ctx, top)
+		drawCellPolygon(game.ctx, geometry.top)
 		game.ctx.restore()
+	}
+
+	function getPrismGeometry(game, position, size, prismHeight) {
+		const bottom = getCellCorners(game, position, size)
+		if (!bottom) return null
+		const hy = prismHeight * game.unit
+		const top = bottom.map(function (point) {
+			return [point[0], point[1] - hy]
+		})
+		return {
+			bottom,
+			top,
+			silhouette: prismHeight ? getConvexHull(bottom.concat(top)) : top
+		}
 	}
 
 	function getCellCorners(game, position, size) {
@@ -499,6 +513,34 @@
 		for (let i = 1; i < points.length; i++) ctx.lineTo(points[i][0], points[i][1])
 		ctx.closePath()
 		ctx.fill()
+	}
+
+	function getConvexHull(points) {
+		const sorted = points.filter(isFiniteScreenPoint).map(function (point) {
+			return [Number(point[0]), Number(point[1])]
+		}).sort(function (a, b) {
+			return Math.abs(a[0] - b[0]) < 1e-9 ? a[1] - b[1] : a[0] - b[0]
+		})
+		if (sorted.length <= 3) return sorted
+		const lower = []
+		for (let i = 0; i < sorted.length; i++) {
+			while (lower.length >= 2 && cross(lower[lower.length - 2], lower[lower.length - 1], sorted[i]) <= 0) lower.pop()
+			lower.push(sorted[i])
+		}
+		const upper = []
+		for (let i = sorted.length - 1; i >= 0; i--) {
+			while (upper.length >= 2 && cross(upper[upper.length - 2], upper[upper.length - 1], sorted[i]) <= 0) upper.pop()
+			upper.push(sorted[i])
+		}
+		return lower.slice(0, -1).concat(upper.slice(0, -1))
+	}
+
+	function cross(origin, a, b) {
+		return (a[0] - origin[0]) * (b[1] - origin[1]) - (a[1] - origin[1]) * (b[0] - origin[0])
+	}
+
+	function isFiniteScreenPoint(point) {
+		return Array.isArray(point) && Number.isFinite(Number(point[0])) && Number.isFinite(Number(point[1]))
 	}
 
 	function drawCornerBrackets(ctx, corners, drawTop) {

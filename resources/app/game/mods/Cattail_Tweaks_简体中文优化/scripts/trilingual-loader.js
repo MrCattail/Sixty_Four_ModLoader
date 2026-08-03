@@ -57,6 +57,27 @@
 		return result
 	}
 
+	const isBranch = function (value) {
+		return !!value && typeof value === 'object' && !Array.isArray(value)
+	}
+
+	const mergeModsch = function (target, patch) {
+		if (!isBranch(patch)) return patch
+
+		const result = isBranch(target) ? target : {}
+		for (const key of Object.keys(patch)) {
+			const value = patch[key]
+			if (isBranch(value)) {
+				result[key] = mergeModsch(result[key], value)
+			} else if (Array.isArray(value)) {
+				result[key] = value.slice()
+			} else {
+				result[key] = value
+			}
+		}
+		return result
+	}
+
 	ModLoader.register({
 		id: MOD_ID,
 		init(api) {
@@ -68,7 +89,7 @@
 			// Validate the complete source during mod initialization so malformed edits fail early.
 			extractModsch(source, '')
 			api.on('afterWords', function (words) {
-				words.modsch = extractModsch(source, '')
+				words.modsch = mergeModsch(words.modsch, extractModsch(source, ''))
 				return words
 			})
 		}

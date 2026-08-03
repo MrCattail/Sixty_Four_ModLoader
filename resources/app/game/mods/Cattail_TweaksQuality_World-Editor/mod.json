@@ -1,0 +1,454 @@
+{
+  "id": "Cattail_TweaksQuality_World-Editor",
+  "uniqueId": "Cattail_TweaksQuality_World-Editor",
+  "name": "World Editor",
+  "version": "0.5.1",
+  "loaderVersion": ">=0.3.1",
+  "languageSupport": {
+    "gameLanguage": true
+  },
+  "entry": [
+    "scripts/core/foundation.js",
+    "scripts/core/shared.js",
+    "scripts/core/editor-state.js",
+    "scripts/core/creative-mode.js",
+    "scripts/core/creative-economy.js",
+    "scripts/core/editor-transactions.js",
+    "scripts/core/selection-state.js",
+    "scripts/core/tool-state.js",
+    "scripts/core/selection-analysis.js",
+    "scripts/core/production-state.js",
+    "scripts/core/blueprint-state.js",
+    "scripts/core/blueprint-library-format.js",
+    "scripts/core/blueprint-transform.js",
+    "scripts/core/blueprint-preview-plan.js",
+    "scripts/core/blueprint-placement.js",
+    "scripts/core/selection-delete.js",
+    "scripts/core/input-controller.js",
+    "scripts/render/resize-handles.js",
+    "scripts/input/selection-controller.js",
+    "scripts/render/hover-overlay.js",
+    "scripts/render/selected-overlay.js",
+    "scripts/i18n/editor-text.js",
+    "scripts/ui/card-opacity.js",
+    "scripts/ui/dialog.js",
+    "scripts/ui/editor-shell.js",
+    "scripts/ui/selection-delete-ui.js",
+    "scripts/blueprint-session.js",
+    "scripts/core/blueprint-library.js",
+    "scripts/core/selection-cut.js",
+    "scripts/ui/selection-cut-ui.js",
+    "scripts/blueprint-preview.js",
+    "scripts/render/blueprint-thumbnail.js",
+    "scripts/ui/blueprint-library-ui.js",
+    "scripts/ui/selection-card.js",
+    "scripts/ui/production-cards.js"
+  ],
+  "description": "A Modular In-Game World Editor with Safe Selection Tools, Full Blueprints, and an Install-Wide Persistent Blueprint Library.",
+  "libraries": {
+    "blueprints": {
+      "directory": "blueprints",
+      "extensions": [
+        ".64schem",
+        ".cattail-blueprint.json"
+      ],
+      "maxFileBytes": 16777216,
+      "maxTotalBytes": 2147483648,
+      "maxEntries": 5000,
+      "cache": {
+        "directories": [
+          "thumbnails"
+        ],
+        "extensions": [
+          ".png"
+        ],
+        "maxBytes": 536870912
+      }
+    }
+  },
+  "config": {
+    "enabled": {
+      "type": "boolean",
+      "label": "Enable World Editor",
+      "default": true,
+      "description": "Controls Whether World Editor Features Are Active.",
+      "reloadPolicy": "hot"
+    },
+    "showCreativePurchaseCosts": {
+      "type": "boolean",
+      "label": "Show Creative-Mode Purchase Costs",
+      "default": false,
+      "description": "Shows Normal-Mode Reference Purchase Costs While Creative Mode Remains Free.",
+      "reloadPolicy": "hot"
+    },
+    "largeToolbarCards": {
+      "type": "boolean",
+      "label": "Use Large-Card Toolbar",
+      "default": false,
+      "description": "Uses Fixed Large Toolbar Cards with Horizontal Inertial Scrolling.",
+      "reloadPolicy": "hot"
+    }
+  },
+  "translations": {
+    "en": {
+      "name": "World Editor",
+      "description": "A Modular In-Game World Editor Developed in Small, Independently Validated Stages Without Modifying Vanilla Scripts.",
+      "config": {
+        "enabled": {
+          "label": "Enable World Editor",
+          "description": "Controls Whether World Editor Features Are Active."
+        },
+        "showCreativePurchaseCosts": {
+          "label": "Show Creative-Mode Purchase Costs",
+          "description": "Shows Normal-Mode Reference Purchase Costs While Creative Mode Remains Free."
+        },
+        "largeToolbarCards": {
+          "label": "Use Large-Card Toolbar",
+          "description": "Uses Fixed Large Toolbar Cards with Horizontal Inertial Scrolling."
+        }
+      }
+    },
+    "sch": {
+      "name": "世界编辑器",
+      "description": "模块化的游戏内世界编辑器，按可独立验证的小阶段逐步开发，且不修改原版脚本。",
+      "config": {
+        "enabled": {
+          "label": "启用世界编辑器",
+          "description": "控制世界编辑器功能是否启用。"
+        },
+        "showCreativePurchaseCosts": {
+          "label": "创造模式购买花费显示",
+          "description": "显示普通模式的参考购买花费；创造模式仍然免费。"
+        },
+        "largeToolbarCards": {
+          "label": "使用大卡片工具栏",
+          "description": "使用固定尺寸的大卡片工具栏，并支持横向惯性滚动。"
+        }
+      }
+    },
+    "modsch": {
+      "name": "世界编辑器",
+      "description": "模块化的游戏内世界编辑器，按可独立验证的小阶段逐步开发，且不修改原版脚本。",
+      "config": {
+        "enabled": {
+          "label": "启用世界编辑器",
+          "description": "控制世界编辑器功能是否启用。"
+        },
+        "showCreativePurchaseCosts": {
+          "label": "创造模式购买花费显示",
+          "description": "显示普通模式的参考购买花费；创造模式仍然免费。"
+        },
+        "largeToolbarCards": {
+          "label": "使用大卡片工具栏",
+          "description": "使用固定尺寸的大卡片工具栏，并支持横向惯性滚动。"
+        }
+      }
+    },
+    "ru": {
+      "name": "Редактор мира",
+      "description": "Модульный внутриигровой редактор мира, разрабатываемый небольшими независимо проверяемыми этапами без изменения оригинальных скриптов.",
+      "config": {
+        "enabled": {
+          "label": "Включить редактор мира",
+          "description": "Определяет, активны ли функции редактора мира."
+        },
+        "showCreativePurchaseCosts": {
+          "label": "Показывать цены в творческом режиме",
+          "description": "Показывает справочные цены обычного режима; творческий режим остается бесплатным."
+        },
+        "largeToolbarCards": {
+          "label": "Крупные карточки панели",
+          "description": "Использует фиксированные крупные карточки с горизонтальной инерционной прокруткой."
+        }
+      }
+    },
+    "de": {
+      "name": "Welteditor",
+      "description": "Ein modularer Welteditor im Spiel, der in kleinen, unabhängig geprüften Schritten entwickelt wird, ohne die Originalskripte zu verändern.",
+      "config": {
+        "enabled": {
+          "label": "Welteditor aktivieren",
+          "description": "Steuert, ob die Funktionen des Welteditors aktiv sind."
+        },
+        "showCreativePurchaseCosts": {
+          "label": "Kaufkosten im Kreativmodus anzeigen",
+          "description": "Zeigt die Referenzkosten des normalen Modus; der Kreativmodus bleibt kostenlos."
+        },
+        "largeToolbarCards": {
+          "label": "Große Werkzeugkarten verwenden",
+          "description": "Verwendet feste große Karten mit horizontalem Trägheitsscrollen."
+        }
+      }
+    },
+    "ptbr": {
+      "name": "Editor de mundo",
+      "description": "Um editor de mundo modular dentro do jogo, desenvolvido em pequenas etapas validadas de forma independente, sem modificar os scripts originais.",
+      "config": {
+        "enabled": {
+          "label": "Ativar Editor de Mundo",
+          "description": "Controla se os recursos do Editor de Mundo estão ativos."
+        },
+        "showCreativePurchaseCosts": {
+          "label": "Mostrar custos no Modo Criativo",
+          "description": "Mostra os custos de referência do modo normal; o Modo Criativo continua gratuito."
+        },
+        "largeToolbarCards": {
+          "label": "Usar cartões grandes",
+          "description": "Usa cartões grandes fixos com rolagem horizontal inercial."
+        }
+      }
+    },
+    "it": {
+      "name": "Editor del mondo",
+      "description": "Un editor del mondo modulare all'interno del gioco, sviluppato in piccole fasi convalidate in modo indipendente senza modificare gli script originali.",
+      "config": {
+        "enabled": {
+          "label": "Abilita Editor del mondo",
+          "description": "Controlla se le funzioni dell'Editor del mondo sono attive."
+        },
+        "showCreativePurchaseCosts": {
+          "label": "Mostra costi in modalità creativa",
+          "description": "Mostra i costi di riferimento della modalità normale; la modalità creativa resta gratuita."
+        },
+        "largeToolbarCards": {
+          "label": "Usa schede grandi",
+          "description": "Usa schede grandi fisse con scorrimento orizzontale inerziale."
+        }
+      }
+    },
+    "es": {
+      "name": "Editor del mundo",
+      "description": "Un editor de mundo modular dentro del juego, desarrollado en pequeñas fases validadas de forma independiente sin modificar los scripts originales.",
+      "config": {
+        "enabled": {
+          "label": "Activar Editor del mundo",
+          "description": "Controla si las funciones del Editor del mundo están activas."
+        },
+        "showCreativePurchaseCosts": {
+          "label": "Mostrar costes en modo creativo",
+          "description": "Muestra los costes de referencia del modo normal; el modo creativo sigue siendo gratuito."
+        },
+        "largeToolbarCards": {
+          "label": "Usar tarjetas grandes",
+          "description": "Usa tarjetas grandes fijas con desplazamiento horizontal inercial."
+        }
+      }
+    },
+    "fr": {
+      "name": "Éditeur de monde",
+      "description": "Un éditeur de monde modulaire intégré au jeu, développé par petites étapes validées indépendamment sans modifier les scripts d'origine.",
+      "config": {
+        "enabled": {
+          "label": "Activer l'Éditeur de monde",
+          "description": "Détermine si les fonctions de l'Éditeur de monde sont actives."
+        },
+        "showCreativePurchaseCosts": {
+          "label": "Afficher les coûts en mode créatif",
+          "description": "Affiche les coûts de référence du mode normal ; le mode créatif reste gratuit."
+        },
+        "largeToolbarCards": {
+          "label": "Utiliser de grandes cartes",
+          "description": "Utilise de grandes cartes fixes avec défilement horizontal inertiel."
+        }
+      }
+    },
+    "nl": {
+      "name": "Wereldeditor",
+      "description": "Een modulaire wereldeditor in het spel, ontwikkeld in kleine, afzonderlijk gevalideerde fasen zonder de originele scripts te wijzigen.",
+      "config": {
+        "enabled": {
+          "label": "Wereldeditor inschakelen",
+          "description": "Bepaalt of de functies van de Wereldeditor actief zijn."
+        },
+        "showCreativePurchaseCosts": {
+          "label": "Aankoopkosten in creatieve modus tonen",
+          "description": "Toont de referentiekosten van de normale modus; de creatieve modus blijft gratis."
+        },
+        "largeToolbarCards": {
+          "label": "Grote werkbalkkaarten",
+          "description": "Gebruikt vaste grote kaarten met horizontaal traagheidsscrollen."
+        }
+      }
+    },
+    "cz": {
+      "name": "Editor světa",
+      "description": "Modulární editor světa přímo ve hře, vyvíjený v malých samostatně ověřovaných etapách bez úprav původních skriptů.",
+      "config": {
+        "enabled": {
+          "label": "Zapnout Editor světa",
+          "description": "Určuje, zda jsou funkce Editoru světa aktivní."
+        },
+        "showCreativePurchaseCosts": {
+          "label": "Zobrazit ceny v kreativním režimu",
+          "description": "Zobrazuje referenční ceny normálního režimu; kreativní režim zůstává zdarma."
+        },
+        "largeToolbarCards": {
+          "label": "Použít velké karty",
+          "description": "Používá pevné velké karty s vodorovným setrvačným posouváním."
+        }
+      }
+    },
+    "pl": {
+      "name": "Edytor świata",
+      "description": "Modułowy edytor świata w grze, rozwijany w małych, niezależnie weryfikowanych etapach bez modyfikowania oryginalnych skryptów.",
+      "config": {
+        "enabled": {
+          "label": "Włącz Edytor świata",
+          "description": "Określa, czy funkcje Edytora świata są aktywne."
+        },
+        "showCreativePurchaseCosts": {
+          "label": "Pokaż koszty w trybie kreatywnym",
+          "description": "Pokazuje koszty referencyjne trybu normalnego; tryb kreatywny pozostaje bezpłatny."
+        },
+        "largeToolbarCards": {
+          "label": "Użyj dużych kart",
+          "description": "Używa stałych dużych kart z poziomym przewijaniem bezwładnościowym."
+        }
+      }
+    },
+    "jp": {
+      "name": "ワールドエディター",
+      "description": "バニラスクリプトを変更せず、個別に検証できる小さな段階ごとに開発する、モジュール式のゲーム内ワールドエディターです。",
+      "config": {
+        "enabled": {
+          "label": "ワールドエディターを有効化",
+          "description": "ワールドエディター機能を有効にするかを制御します。"
+        },
+        "showCreativePurchaseCosts": {
+          "label": "クリエイティブモードの購入費用を表示",
+          "description": "通常モードの参考購入費用を表示します。クリエイティブモードは無料のままです。"
+        },
+        "largeToolbarCards": {
+          "label": "大カードツールバーを使用",
+          "description": "固定サイズの大カードと横方向の慣性スクロールを使用します。"
+        }
+      }
+    },
+    "kr": {
+      "name": "월드 에디터",
+      "description": "원본 스크립트를 수정하지 않고 독립적으로 검증 가능한 작은 단계로 개발되는 모듈식 게임 내 월드 에디터입니다.",
+      "config": {
+        "enabled": {
+          "label": "월드 에디터 활성화",
+          "description": "월드 에디터 기능의 활성화 여부를 제어합니다."
+        },
+        "showCreativePurchaseCosts": {
+          "label": "크리에이티브 모드 구매 비용 표시",
+          "description": "일반 모드의 참고 구매 비용을 표시합니다. 크리에이티브 모드는 계속 무료입니다."
+        },
+        "largeToolbarCards": {
+          "label": "큰 카드 도구 모음 사용",
+          "description": "고정 크기 큰 카드와 가로 관성 스크롤을 사용합니다."
+        }
+      }
+    },
+    "tch": {
+      "name": "世界編輯器",
+      "description": "模組化的遊戲內世界編輯器，以可獨立驗證的小階段逐步開發，且不修改原版腳本。",
+      "config": {
+        "enabled": {
+          "label": "啟用世界編輯器",
+          "description": "控制世界編輯器功能是否啟用。"
+        },
+        "showCreativePurchaseCosts": {
+          "label": "顯示創造模式購買花費",
+          "description": "顯示普通模式的參考購買花費；創造模式仍然免費。"
+        },
+        "largeToolbarCards": {
+          "label": "使用大卡片工具列",
+          "description": "使用固定尺寸的大卡片工具列，並支援橫向慣性捲動。"
+        }
+      }
+    },
+    "thai": {
+      "name": "ตัวแก้ไขโลก",
+      "description": "เครื่องมือแก้ไขโลกแบบโมดูลภายในเกม พัฒนาเป็นขั้นตอนย่อยที่ตรวจสอบแยกกันได้ โดยไม่แก้ไขสคริปต์ดั้งเดิม",
+      "config": {
+        "enabled": {
+          "label": "เปิดใช้ตัวแก้ไขโลก",
+          "description": "ควบคุมว่าจะเปิดใช้ฟีเจอร์ของตัวแก้ไขโลกหรือไม่"
+        },
+        "showCreativePurchaseCosts": {
+          "label": "แสดงค่าใช้จ่ายซื้อในโหมดสร้างสรรค์",
+          "description": "แสดงค่าใช้จ่ายอ้างอิงของโหมดปกติ โดยโหมดสร้างสรรค์ยังคงฟรี"
+        },
+        "largeToolbarCards": {
+          "label": "ใช้แถบเครื่องมือการ์ดใหญ่",
+          "description": "ใช้การ์ดขนาดใหญ่คงที่พร้อมการเลื่อนแนวนอนแบบมีแรงเฉื่อย"
+        }
+      }
+    },
+    "hu": {
+      "name": "Világszerkesztő",
+      "description": "Moduláris, játékon belüli világszerkesztő, amely kis, önállóan ellenőrzött szakaszokban készül az eredeti szkriptek módosítása nélkül.",
+      "config": {
+        "enabled": {
+          "label": "Világszerkesztő engedélyezése",
+          "description": "A Világszerkesztő funkcióinak engedélyezését szabályozza."
+        },
+        "showCreativePurchaseCosts": {
+          "label": "Kreatív mód vásárlási költségeinek mutatása",
+          "description": "A normál mód referenciaárait mutatja; a kreatív mód továbbra is ingyenes."
+        },
+        "largeToolbarCards": {
+          "label": "Nagy kártyás eszköztár",
+          "description": "Rögzített nagy kártyákat használ vízszintes tehetetlenségi görgetéssel."
+        }
+      }
+    },
+    "lv": {
+      "name": "Pasaules redaktors",
+      "description": "Modulārs spēles pasaules redaktors, kas tiek izstrādāts nelielos, neatkarīgi pārbaudāmos posmos, nemainot oriģinālos skriptus.",
+      "config": {
+        "enabled": {
+          "label": "Iespējot Pasaules redaktoru",
+          "description": "Nosaka, vai Pasaules redaktora funkcijas ir iespējotas."
+        },
+        "showCreativePurchaseCosts": {
+          "label": "Rādīt radošā režīma pirkumu izmaksas",
+          "description": "Rāda parastā režīma atsauces izmaksas; radošais režīms paliek bezmaksas."
+        },
+        "largeToolbarCards": {
+          "label": "Lietot lielas kartītes",
+          "description": "Lieto fiksētas lielas kartītes ar horizontālu inerces ritināšanu."
+        }
+      }
+    },
+    "ro": {
+      "name": "Editor de lume",
+      "description": "Un editor de lume modular în joc, dezvoltat în etape mici și verificate independent, fără modificarea scripturilor originale.",
+      "config": {
+        "enabled": {
+          "label": "Activează Editorul de lume",
+          "description": "Controlează dacă funcțiile Editorului de lume sunt active."
+        },
+        "showCreativePurchaseCosts": {
+          "label": "Arată costurile în modul creativ",
+          "description": "Arată costurile de referință din modul normal; modul creativ rămâne gratuit."
+        },
+        "largeToolbarCards": {
+          "label": "Folosește carduri mari",
+          "description": "Folosește carduri mari fixe cu derulare orizontală inerțială."
+        }
+      }
+    },
+    "no": {
+      "name": "Verdensredigerer",
+      "description": "En modulær verdensredigerer i spillet, utviklet i små, uavhengig verifiserte trinn uten å endre originalskriptene.",
+      "config": {
+        "enabled": {
+          "label": "Aktiver Verdensredigerer",
+          "description": "Styrer om funksjonene i Verdensredigereren er aktive."
+        },
+        "showCreativePurchaseCosts": {
+          "label": "Vis kjøpskostnader i kreativ modus",
+          "description": "Viser referansekostnader fra normal modus; kreativ modus forblir gratis."
+        },
+        "largeToolbarCards": {
+          "label": "Bruk store verktøykort",
+          "description": "Bruker faste store kort med horisontal treghetsrulling."
+        }
+      }
+    }
+  }
+}

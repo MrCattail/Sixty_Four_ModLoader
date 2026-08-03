@@ -70,6 +70,183 @@ labels follow the current game language where ModLoader translations exist.
 The lower-left status line also shows the loader version, enabled mod count,
 and `Ctrl+M` reminder.
 
+## Storage Snapshot API
+
+ModLoader 0.2.0 exposes Storage API `1.0.0` to every bound Mod API. It stores
+opaque Mod-owned recovery data outside the game save without giving the Mod a
+filesystem path or a way to select another save:
+
+```js
+const snapshots = api.storage.snapshots
+
+const info = await snapshots.create({
+  data: JSON.stringify({ version: 1, selection }),
+  reason: 'before applying blueprint',
+  tags: { feature: 'world-editor' }
+})
+
+const newestFirst = await snapshots.list()
+const saved = await snapshots.read({ id: info.id })
+await snapshots.remove({ id: info.id })
+await snapshots.prune()
+```
+
+`data` accepts a UTF-8 string or `Uint8Array`; `read()` returns the same payload
+type. Each payload is limited to 16 MiB and each Mod/current-save namespace
+keeps at most 10 normal snapshots. `reason` is required and is limited to 128
+trimmed characters. Optional `tags` must be a small JSON-safe plain object.
+Call `snapshots.capabilities()` to discover the exact v1 limits and supported
+payload types.
+
+The active game save carries a stable `save.modloader.saveInstanceId`. ModLoader
+creates and persists it before enabling snapshot writes, binds it to the current
+trusted account or installation scope, and never accepts a save id from a Mod.
+A reset starts a new save lineage; older snapshots remain visible to the local
+administrator.
+
+Operations reject with `ModLoaderSnapshotError` and one of these stable codes:
+`UNAVAILABLE`, `NO_ACTIVE_SAVE`, `INVALID_PAYLOAD`, `TOO_LARGE`, `NOT_FOUND`,
+`CORRUPT`, `QUOTA`, or `IO`. Snapshot data is checksummed with SHA-256 and
+published atomically. Corrupt records are moved to a bounded quarantine area.
+Storage v1 deliberately provides no compression, encryption, streaming,
+automatic retry, import, or restore operation.
+
+Open `Ctrl+M` -> `Snapshots` to inspect every local Mod/save namespace, validate
+records, export a self-describing `.modloader-snapshot` file, or delete a record
+after confirmation. Quarantined data can be exported for forensic inspection.
+The page cannot import a file, restore a snapshot, or overwrite a Steam save.
+
+## Installation Library API
+
+ModLoader 0.3.1 exposes Library API `1.1.0` for persistent, install-wide,
+Mod-owned document collections. A Mod must declare each named library in its
+enabled `mod.json`; the main process validates the declaration and owns every
+filesystem operation:
+
+```json
+{
+  "id": "my-mod",
+  "loaderVersion": ">=0.3.1",
+  "libraries": {
+    "blueprints": {
+      "directory": "blueprints",
+      "extensions": [".cattail-blueprint.json"],
+      "maxFileBytes": 16777216,
+      "maxTotalBytes": 2147483648,
+      "maxEntries": 5000,
+      "cache": {
+        "directories": ["thumbnails"],
+        "extensions": [".png"],
+        "maxBytes": 536870912
+      }
+    }
+  }
+}
+```
+
+`directory` is one fixed, non-reserved folder directly below the current game
+installation root. Directory ownership is case-insensitively unique; conflicting
+declarations are rejected. File names are single safe names, not paths, and must
+end in a declared extension. The API never returns an absolute path or exposes
+Node `fs`. The configured limits may be lower than, but never exceed, 16 MiB per
+file, 2 GiB and 5,000 active-plus-trash files, and 512 MiB of cache.
+
+Open a bound handle and use its asynchronous methods:
+
+```js
+const library = api.storage.libraries.open('blueprints')
+const capabilities = await library.capabilities()
+
+const saved = await library.write({
+  name: 'Pump array__a1b2c3d4.cattail-blueprint.json',
+  data: JSON.stringify(blueprint)
+})
+
+const active = await library.list({ area: 'active' })
+const loaded = await library.read({
+  name: saved.info.name,
+  expectedRevision: saved.info.revision,
+  encoding: 'utf8'
+})
+
+const picked = await library.pickImport({
+  encoding: 'utf8',
+  title: 'Import blueprint'
+})
+
+const exported = await library.exportItem({
+  area: 'active',
+  name: saved.info.name,
+  expectedRevision: saved.info.revision,
+  suggestedName: saved.info.name,
+  title: 'Export blueprint',
+  data: JSON.stringify(canonicalBlueprint)
+})
+```
+
+`data` accepts a UTF-8 string or `Uint8Array`. Reads return `Uint8Array` unless
+`encoding: "utf8"` is requested. `list()` returns safe metadata including the
+SHA-256 `revision`; rename, trash, restore, quarantine, permanent removal, and
+replacement writes require that expected revision. A new write never silently
+overwrites an existing name. An explicitly revision-matched replacement moves
+the previous active file into `.trash/` before publishing the replacement.
+
+The active area is the library root. The managed areas `trash`, `quarantine`,
+and `cache` map to `.trash/`, `.quarantine/`, and a declared cache directory.
+Use `trash()` for recoverable deletion, `restore()` to return an item, and
+`remove()` only for trash, quarantine, or cache items; permanent deletion of an
+active item is denied. Cache writes are subject to their separate quota and may
+prune least-recently-used cache files. Active and trash files are never
+automatically evicted.
+
+Library API `1.1.0` adds `pickImport()` and `exportItem()` without exposing an
+absolute path. `pickImport()` opens a single-file picker filtered to the
+library's declared extensions, rejects symbolic links and files larger than the
+declared per-file limit before returning a safe `fileName`, byte count, and
+either `Uint8Array` data or UTF-8 text. Cancellation resolves to
+`{ canceled: true }`.
+
+`exportItem()` accepts only an active item with an exact `expectedRevision`,
+opens the system save/overwrite dialog, and publishes either the verified
+managed payload or an optional caller-supplied UTF-8 string / `Uint8Array`
+`data` payload through a flushed sibling temporary file and atomic replacement.
+The optional payload is limited by the library's declared per-file size and is
+validated before the save dialog opens; it supports canonicalized export without
+rewriting the managed item. The result contains only cancellation state, the
+safe output file name, and byte count. Cancellation or failure does not mutate
+the managed library, and the destination may not be inside that library.
+
+```js
+const deleted = await library.trash({
+  name: saved.info.name,
+  expectedRevision: saved.info.revision
+})
+await library.restore({
+  name: deleted.name,
+  expectedRevision: deleted.revision
+})
+
+const watcher = await library.watch(event => refreshLibrary(event))
+await watcher.close()
+await library.openFolder({ area: 'active' })
+```
+
+The main-process watcher combines filesystem events, waits for stable file
+size/mtime observations, ignores managed temporary/trash/quarantine/cache
+changes, and performs a periodic reconciliation. If native watching is not
+available, `watch()` rejects while `list()` remains available for manual
+refresh. `openFolder()` asks Electron to open a declared managed directory but
+still does not reveal its path to the Mod.
+
+Writes use a sibling temporary file, flush, close, SHA-256 verification, and an
+atomic rename. Stable Library API errors use `ModLoaderLibraryError` with one of
+these codes: `NOT_READY`, `PERMISSION_DENIED`, `PATH_INVALID`, `NAME_CONFLICT`,
+`REVISION_CONFLICT`, `TOO_LARGE`, `QUOTA_EXCEEDED`, `CORRUPT`, `NOT_FOUND`,
+`IO_FAILED`, or `WATCH_UNAVAILABLE`. Internal paths and operating-system error
+details are written only to ModLoader diagnostics. Installation libraries are
+player data inside the game folder, so players should back them up before game
+verification, updates, moves, or uninstall operations.
+
 ## Game HUD API
 
 Press `H` in game to hide or restore the game HUD. ModLoader handles vanilla

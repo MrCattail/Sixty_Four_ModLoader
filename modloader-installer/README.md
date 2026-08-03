@@ -74,6 +74,13 @@ The installer:
 - keeps an existing `mods/enabled.json`
 - runs `verify.ps1`
 
+ModLoader 0.3.0 also installs the main-process Library API v1 store module and
+verifies its IPC bridge. Manifest-declared installation libraries, such as a
+top-level `blueprints\` folder, are player data outside `modloader\`; the
+installer and updater do not create, replace, copy, or delete their contents.
+Back up those folders separately before verifying game files, moving the game,
+or uninstalling it.
+
 If ModLoader is already installed, add `-Force` to reinstall after backup:
 
 ```powershell

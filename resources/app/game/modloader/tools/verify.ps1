@@ -9,11 +9,23 @@ $checks = @(
 	[ordered]@{ file = 'scripts\game.js'; pattern = 'ModLoader?.applySoundList'; description = 'audio sample hook' },
 	[ordered]@{ file = 'scripts\sprites.js'; pattern = 'ModLoader?.resolveAsset'; description = 'sprite asset hook' },
 	[ordered]@{ file = 'scripts\ui.js'; pattern = 'ModLoader?.resolveAsset'; description = 'shop icon asset hook' },
-	[ordered]@{ file = '..\main.js'; pattern = 'ModLoaderMainProcess.attachWindow(win)'; description = 'main process bridge support' },
+	[ordered]@{ file = '..\main.js'; pattern = 'ModLoaderMainProcess.attachWindow(win, { accountId: STEAMID })'; description = 'main process bridge and trusted account scope' },
+	[ordered]@{ file = '..\main.js'; pattern = 'ModLoaderMainProcess.clearSnapshotContext(e.sender)'; description = 'reset clears active snapshot context' },
 	[ordered]@{ file = '..\main.js'; pattern = 'toggleDevTools'; description = 'DevTools shortcut/menu support' },
+	[ordered]@{ file = '..\main.js'; pattern = 'modloader:toggle-devtools'; description = 'DevTools menu button IPC support' },
 	[ordered]@{ file = 'modloader\main-process.js'; pattern = 'module.exports'; description = 'main process window module' },
 	[ordered]@{ file = 'modloader\main-process.js'; pattern = 'applyModloaderMainProcessManifests'; description = 'main process manifest support' },
-	[ordered]@{ file = 'modloader\loader.js'; pattern = 'window.ModLoader = api'; description = 'loader exports API' }
+	[ordered]@{ file = 'modloader\main-process.js'; pattern = 'modloader:snapshots:activate'; description = 'snapshot save-context IPC support' },
+	[ordered]@{ file = 'modloader\main-process.js'; pattern = 'modloader:snapshots:runtime'; description = 'snapshot runtime IPC support' },
+	[ordered]@{ file = 'modloader\main-process.js'; pattern = 'modloader:snapshots:admin'; description = 'snapshot administration IPC support' },
+	[ordered]@{ file = 'modloader\main-process.js'; pattern = 'modloader:libraries:runtime'; description = 'Library API 1.1 main-process IPC support' },
+	[ordered]@{ file = 'modloader\main-process.js'; pattern = 'collectLibraryDeclarations'; description = 'manifest-declared library discovery' },
+	[ordered]@{ file = 'modloader\loader.js'; pattern = 'window.ModLoader = api'; description = 'loader exports API' },
+	[ordered]@{ file = 'modloader\loader.js'; pattern = "version: '0.3.1'"; description = 'ModLoader 0.3.1 runtime version' },
+	[ordered]@{ file = 'modloader\loader.js'; pattern = "const SNAPSHOT_API_VERSION = '1.0.0'"; description = 'Storage Snapshot API v1 support' },
+	[ordered]@{ file = 'modloader\loader.js'; pattern = "const LIBRARY_API_VERSION = '1.1.0'"; description = 'Library API 1.1 renderer support' },
+	[ordered]@{ file = 'modloader\loader.js'; pattern = 'modloader.saveInstanceId = saveInstanceId'; description = 'snapshot save-lineage identity support' },
+	[ordered]@{ file = 'modloader\loader.js'; pattern = 'const renderSnapshotPanelPage'; description = 'snapshot management subpage support' }
 )
 
 $results = @()
@@ -48,20 +60,138 @@ $results += [ordered]@{
     ok = $languageChangeHookOk
 }
 
-$renderApiContractTestPath = Join-Path $PSScriptRoot 'render-api-v1-contract.test.js'
-$renderApiContractOk = $false
-if (Test-Path -LiteralPath $renderApiContractTestPath) {
-	& node $renderApiContractTestPath
-	$renderApiContractOk = $LASTEXITCODE -eq 0
-}
-$results += [ordered]@{
-	description = 'Render API v1 runtime contract'
-	file = 'modloader\tools\render-api-v1-contract.test.js'
-	pattern = 'version, capabilities, ownership, conflicts, scope restore, master switch'
-	ok = $renderApiContractOk
+$warnings = @()
+$nodeCommand = Get-Command node -ErrorAction SilentlyContinue
+
+$mainJsPath = Join-Path $GameRoot '..\main.js'
+if (Test-Path -LiteralPath $mainJsPath) {
+	if ($nodeCommand) {
+		& $nodeCommand.Source --check $mainJsPath
+		$results += [ordered]@{
+			description = 'main process JavaScript syntax'
+			file = '..\main.js'
+			pattern = 'node --check'
+			ok = $LASTEXITCODE -eq 0
+		}
+	} else {
+		$warnings += 'Node.js is not available; skipped main process JavaScript syntax check.'
+	}
 }
 
-$warnings = @()
+$modloaderJavaScriptFiles = @(
+	'modloader\loader.js',
+	'modloader\main-process.js',
+	'modloader\library-store.js',
+	'modloader\snapshot-container.js',
+	'modloader\snapshot-store.js'
+)
+foreach ($relativePath in $modloaderJavaScriptFiles) {
+	$javaScriptPath = Join-Path $GameRoot $relativePath
+	if (-not (Test-Path -LiteralPath $javaScriptPath)) {
+		$results += [ordered]@{
+			description = "$relativePath JavaScript syntax"
+			file = $relativePath
+			pattern = 'file exists'
+			ok = $false
+		}
+		continue
+	}
+	if ($nodeCommand) {
+		& $nodeCommand.Source --check $javaScriptPath
+		$results += [ordered]@{
+			description = "$relativePath JavaScript syntax"
+			file = $relativePath
+			pattern = 'node --check'
+			ok = $LASTEXITCODE -eq 0
+		}
+	} else {
+		$warnings += "Node.js is not available; skipped $relativePath JavaScript syntax check."
+	}
+}
+
+$renderApiContractTestPath = Join-Path $PSScriptRoot 'render-api-v1-contract.test.js'
+if (Test-Path -LiteralPath $renderApiContractTestPath) {
+	if ($nodeCommand) {
+		& $nodeCommand.Source $renderApiContractTestPath
+		$results += [ordered]@{
+			description = 'Render API v1 runtime contract'
+			file = 'modloader\tools\render-api-v1-contract.test.js'
+			pattern = 'version, capabilities, ownership, conflicts, scope restore, master switch'
+			ok = $LASTEXITCODE -eq 0
+		}
+	} else {
+		$warnings += 'Node.js is not available; skipped Render API v1 runtime contract check.'
+	}
+}
+
+$snapshotContractTests = @(
+	[ordered]@{ file = 'ui-page-menu-scroll-contract.test.js'; description = 'UI page menu scroll contract'; pattern = 'automatic max-height, inertial wheel, ModLoader scrollbar styling' },
+	[ordered]@{ file = 'snapshot-container-v1-contract.test.js'; description = 'Snapshot export container v1 contract'; pattern = 'binary framing, metadata, checksum, corruption rejection' },
+	[ordered]@{ file = 'snapshot-store-v1-contract.test.js'; description = 'Snapshot store v1 contract'; pattern = 'validation, isolation, queueing, rotation, quarantine, cleanup' },
+	[ordered]@{ file = 'snapshot-api-v1-contract.test.js'; description = 'Storage Snapshot API v1 runtime contract'; pattern = 'bound Mod API, data types, safe errors, save identity, admin UI boundary' },
+	[ordered]@{ file = 'library-store-v1-contract.test.js'; description = 'Library store v1 contract'; pattern = 'declarations, path isolation, atomic writes, revision conflicts, trash, quarantine, cache, watcher' },
+	[ordered]@{ file = 'library-api-v1-contract.test.js'; description = 'Library API 1.1 runtime contract'; pattern = 'bound named handle, safe dialogs, no path leakage, declared extensions, size and symlink rejection, atomic revision-matched export' }
+)
+foreach ($contract in $snapshotContractTests) {
+	$contractPath = Join-Path $PSScriptRoot $contract.file
+	if (-not (Test-Path -LiteralPath $contractPath)) {
+		$results += [ordered]@{
+			description = $contract.description
+			file = "modloader\tools\$($contract.file)"
+			pattern = 'file exists'
+			ok = $false
+		}
+		continue
+	}
+	if ($nodeCommand) {
+		& $nodeCommand.Source $contractPath
+		$results += [ordered]@{
+			description = $contract.description
+			file = "modloader\tools\$($contract.file)"
+			pattern = $contract.pattern
+			ok = $LASTEXITCODE -eq 0
+		}
+	} else {
+		$warnings += "Node.js is not available; skipped $($contract.description)."
+	}
+}
+
+$modFeatureContractTests = @(
+	[ordered]@{
+		path = 'mods\Cattail_TweaksQuality_Better-UIs\tests\verify-save-slots-service-v1.js'
+		description = 'Better UIs Save Slots Service v1 contract'
+		pattern = 'atomic batch creation, activation rollback, lineage finalization, name conflict'
+	},
+	[ordered]@{
+		path = 'mods\Cattail_TweaksQuality_World-Editor\tests\verify-4a-2a.js'
+		description = 'World Editor 4A-2a creative mode contract'
+		pattern = 'save persistence, in-place identity, fork identity removal, input and full-mode gates'
+	}
+)
+foreach ($contract in $modFeatureContractTests) {
+	$contractPath = Join-Path $GameRoot $contract.path
+	if (-not (Test-Path -LiteralPath $contractPath)) {
+		$results += [ordered]@{
+			description = $contract.description
+			file = $contract.path
+			pattern = 'file exists'
+			ok = $false
+		}
+		continue
+	}
+	if ($nodeCommand) {
+		& $nodeCommand.Source $contractPath
+		$results += [ordered]@{
+			description = $contract.description
+			file = $contract.path
+			pattern = $contract.pattern
+			ok = $LASTEXITCODE -eq 0
+		}
+	} else {
+		$warnings += "Node.js is not available; skipped $($contract.description)."
+	}
+}
+
 $enabledNames = @()
 $enabledPath = Join-Path $GameRoot 'mods\enabled.json'
 try {

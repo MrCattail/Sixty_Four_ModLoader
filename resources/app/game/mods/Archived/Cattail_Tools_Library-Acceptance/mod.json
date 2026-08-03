@@ -1,0 +1,51 @@
+{
+  "id": "Cattail_Tools_Library-Acceptance",
+  "uniqueId": "Cattail_Tools_Library-Acceptance",
+  "name": "[TEMP] Library API Acceptance",
+  "version": "0.1.0",
+  "loaderVersion": ">=0.3.0",
+  "reloadPolicy": "restart",
+  "languageSupport": {
+    "gameLanguage": true
+  },
+  "entry": "scripts/main.js",
+  "description": "Temporary, disabled-by-default in-game acceptance harness for ModLoader Library API 1.0.0. It only uses its own installation library and never writes world or save data.",
+  "libraries": {
+    "acceptance": {
+      "directory": "library-api-acceptance",
+      "extensions": [
+        ".cattail-library-test.json"
+      ],
+      "maxFileBytes": 1024,
+      "maxTotalBytes": 8192,
+      "maxEntries": 6,
+      "cache": {
+        "directories": [
+          "thumbnails"
+        ],
+        "extensions": [
+          ".png"
+        ],
+        "maxBytes": 64
+      }
+    }
+  },
+  "translations": {
+    "en": {
+      "name": "[TEMP] Library API Acceptance",
+      "description": "Temporary, disabled-by-default acceptance harness for Library API 1.0.0. Disable it after testing."
+    },
+    "sch": {
+      "name": "[临时] 蓝图库 API 验收工具",
+      "description": "默认不启用的 Library API 1.0.0 游戏内验收工具。测试结束后请禁用。"
+    },
+    "modsch": {
+      "name": "[临时] 蓝图库 API 验收工具",
+      "description": "默认不启用的 Library API 1.0.0 游戏内验收工具。测试结束后请禁用。"
+    },
+    "tch": {
+      "name": "[臨時] 藍圖庫 API 驗收工具",
+      "description": "預設不啟用的 Library API 1.0.0 遊戲內驗收工具。測試結束後請停用。"
+    }
+  }
+}
