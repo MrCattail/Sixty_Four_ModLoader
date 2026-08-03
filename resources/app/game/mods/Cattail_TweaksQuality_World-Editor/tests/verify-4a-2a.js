@@ -164,14 +164,14 @@ async function verifyInPlaceAndFork() {
 		snapshot() {
 			return {
 				ready: true,
-				emptyCount: 10,
+				emptyCount: 1,
 				slots: [],
 				source: { index: 0, name: '主存档' }
 			}
 		},
 		async createAndActivate(options) {
 			transactionOptions = options
-			return { activated: true, reloadScheduled: true, activeIndex: 1 }
+			return { activated: true, reloadScheduled: true, activeIndex: 0 }
 		}
 	}
 	const runtime = loadCreative(storage, slotsState)
@@ -200,13 +200,16 @@ async function verifyInPlaceAndFork() {
 	assert.equal(active.modloader.worldEditor.creativeMode, false)
 	assert.equal(active.modloader.saveInstanceId, saveId)
 
+	const sourceBeforeFork = storage.api.getItem(key)
 	await creative.createFork({ originalName: '主存档' })
 	assert.ok(transactionOptions)
-	assert.equal(transactionOptions.activateEntry, 1)
-	assert.equal(transactionOptions.entries[0].name, '主存档')
-	assert.equal(transactionOptions.entries[1].name, '主存档创造模式')
-	assert.equal(decode(transactionOptions.entries[0].data).modloader.saveInstanceId, saveId)
-	const forked = decode(transactionOptions.entries[1].data)
+	assert.equal(transactionOptions.activateEntry, 0)
+	assert.equal(transactionOptions.entries.length, 1)
+	assert.equal(transactionOptions.entries[0].name, '主存档创造模式')
+	assert.equal(transactionOptions.entries[0].nameConflict, 'reject')
+	assert.equal(transactionOptions.entries.some(entry => entry.name === '主存档'), false)
+	assert.equal(storage.api.getItem(key), sourceBeforeFork)
+	const forked = decode(transactionOptions.entries[0].data)
 	assert.equal(forked.modloader.saveInstanceId, undefined)
 	assert.equal(forked.modloader.worldEditor.creativeMode, true)
 	assert.equal(forked.modloader.worldEditor.entryMode, 'forked')
@@ -269,10 +272,18 @@ function verifyIntegrationSources() {
 	assert.match(dialog, /handle\.close\('dialog-backdrop'\)/)
 	assert.match(dialog, /releaseGameKeyboardState\(game\)/)
 	assert.match(dialog, /data-kind\^="creative-"/)
-	assert.match(dialog, /--world-editor-dialog-accent: #a6f246/)
-	assert.match(dialog, /--world-editor-dialog-accent: #e3fd43/)
+	assert.match(dialog, /--world-editor-dialog-accent: var\(--world-editor-hell-gem-1\)/)
+	assert.match(dialog, /--world-editor-dialog-accent: var\(--world-editor-hell-gem-2\)/)
+	assert.match(dialog, /--world-editor-dialog-primary-1: var\(--world-editor-hell-gem-1\)/)
+	assert.match(dialog, /--world-editor-dialog-primary-2: var\(--world-editor-hell-gem-2\)/)
+	assert.match(dialog, /button--primary \{[\s\S]*--world-editor-dialog-primary-glass:/)
+	assert.match(dialog, /button\[data-glass-theme="elmerine"\] \{[\s\S]*--world-editor-dialog-primary-1: var\(--world-editor-elmerine-1\)/)
+	assert.match(dialog, /button--danger \{[\s\S]*--world-editor-dialog-primary-1: var\(--world-editor-beta-pylene-1\)/)
+	assert.doesNotMatch(dialog, /--world-editor-dialog-accent: #d55a50/)
 	assert.match(shell, /createFork\(/)
+	assert.match(shell, /createDialogButton\(dialog, 'creativeEnableCurrent', true, 'elmerine'\)/)
 	assert.match(shell, /createDialogButton\(dialog, 'creativeCreateCopy', true\)/)
+	assert.match(shell, /Number\(slotsState\.emptyCount\) < 1/)
 	assert.match(shell, /\['input', 'change', 'keyup', 'compositionend'\]/)
 	assert.match(shell, /\['keydown', 'paste', 'cut'\]/)
 	assert.match(shell, /creativeDialog === dialog && !dialog\.busy/)
@@ -298,6 +309,10 @@ function verifyIntegrationSources() {
 	assert.match(shell, /--world-editor-shell-creative: rgba\(166, 242, 70, \.2\)/)
 	assert.match(shell, /--world-editor-shell-creative-border: rgba\(166, 242, 70, \.62\)/)
 	assert.match(shell, /--world-editor-shell-creative: rgba\(227, 253, 67, \.18\)/)
+	assert.match(shell, /game\?\.codex\?\.resources\?\.\[index\]\?\.triplet/)
+	assert.match(shell, /resourceTriplet\(game, 3, \['#F26F67', '#FFB68C', '#C02E63'\]\)/)
+	assert.match(shell, /resourceTriplet\(game, 4, \['#A6F246', '#E3FD43', '#4CB96B'\]\)/)
+	assert.match(shell, /--world-editor-hell-gem-glass-hover:/)
 	assert.match(shell, /box-shadow: 0 0 0 2px color-mix\(in srgb, var\(--world-editor-dialog-accent\) 24%, transparent\)/)
 	assert.doesNotMatch(shell, /pollCopyValidation|copyValidationFrame/)
 	assert.match(shared, /isWorldEditorInputBlocked/)
@@ -320,8 +335,8 @@ function verifyShellTemplateFormatting() {
 		'将创建：测试档创造模式'
 	)
 	assert.equal(
-		formatTemplate('至少需要两个空槽；当前有 {count} 个。', { count: 4 }),
-		'至少需要两个空槽；当前有 4 个。'
+		formatTemplate('至少需要一个空槽；当前有 {count} 个。', { count: 4 }),
+		'至少需要一个空槽；当前有 4 个。'
 	)
 	assert.equal(formatTemplate('保留 {unknown}', {}), '保留 {unknown}')
 }

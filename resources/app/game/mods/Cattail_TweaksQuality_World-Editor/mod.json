@@ -44,7 +44,7 @@
     "scripts/ui/selection-card.js",
     "scripts/ui/production-cards.js"
   ],
-  "description": "A modular in-game world editor with safe selection tools, full blueprints, and an install-wide persistent blueprint library.",
+  "description": "A Modular In-Game World Editor with Safe Selection Tools, Full Blueprints, and an Install-Wide Persistent Blueprint Library.",
   "libraries": {
     "blueprints": {
       "directory": "blueprints",
@@ -71,40 +71,40 @@
       "type": "boolean",
       "label": "Enable World Editor",
       "default": true,
-      "description": "Controls whether World Editor features are active.",
+      "description": "Controls Whether World Editor Features Are Active.",
       "reloadPolicy": "hot"
     },
     "showCreativePurchaseCosts": {
       "type": "boolean",
       "label": "Show Creative-Mode Purchase Costs",
       "default": false,
-      "description": "Shows normal-mode reference purchase costs while Creative Mode remains free.",
+      "description": "Shows Normal-Mode Reference Purchase Costs While Creative Mode Remains Free.",
       "reloadPolicy": "hot"
     },
     "largeToolbarCards": {
       "type": "boolean",
       "label": "Use Large-Card Toolbar",
       "default": false,
-      "description": "Uses fixed large toolbar cards with horizontal inertial scrolling.",
+      "description": "Uses Fixed Large Toolbar Cards with Horizontal Inertial Scrolling.",
       "reloadPolicy": "hot"
     }
   },
   "translations": {
     "en": {
       "name": "World Editor",
-      "description": "A modular in-game world editor developed in small, independently validated stages without modifying vanilla scripts.",
+      "description": "A Modular In-Game World Editor Developed in Small, Independently Validated Stages Without Modifying Vanilla Scripts.",
       "config": {
         "enabled": {
           "label": "Enable World Editor",
-          "description": "Controls whether World Editor features are active."
+          "description": "Controls Whether World Editor Features Are Active."
         },
         "showCreativePurchaseCosts": {
           "label": "Show Creative-Mode Purchase Costs",
-          "description": "Shows normal-mode reference purchase costs while Creative Mode remains free."
+          "description": "Shows Normal-Mode Reference Purchase Costs While Creative Mode Remains Free."
         },
         "largeToolbarCards": {
           "label": "Use Large-Card Toolbar",
-          "description": "Uses fixed large toolbar cards with horizontal inertial scrolling."
+          "description": "Uses Fixed Large Toolbar Cards with Horizontal Inertial Scrolling."
         }
       }
     },

@@ -393,7 +393,6 @@ ModLoader.register({
 				finishCameraDrag()
 				setTransformGuide(null, 'window-blur')
 				releaseTemporaryPin('window-blur', false)
-				if (active && !pinned && !commandLock) exit('window-blur')
 			}
 			const handleWindowMouseUp = function (event) {
 				if (event?.button === 2) finishCameraDrag()
@@ -708,7 +707,6 @@ ModLoader.register({
 				const next = normalizePosition(value)
 				if (!active || paused || isTargetPinned() || !next || samePosition(next, target)) return false
 				target = next
-				clearPlacementOverlay()
 				metrics.targetChanges += 1
 				planToken += 1
 				const planReason = reason || 'target-changed'
@@ -755,6 +753,7 @@ ModLoader.register({
 						}
 						throw previewError('world-changed')
 					}
+					if (placementOverlay && !samePosition(placementOverlay.target, candidate.target)) clearPlacementOverlay()
 					plan = candidate
 					calculating = false
 					planRetry = 0
@@ -1617,7 +1616,7 @@ ModLoader.register({
 				const scaleY = positive(renderLayerScale?.y, 1)
 				const offsetX = roundCss((targetPoint[0] - renderedPlanPoint[0]) * scaleX)
 				const offsetY = roundCss((targetPoint[1] - renderedPlanPoint[1]) * scaleY)
-				const provisional = calculating || !!pendingFollowPlan || !samePosition(plan.target, target)
+				const provisional = isVisualFollowProvisional()
 				const signature = [offsetX, offsetY, provisional ? 1 : 0].join(':')
 				syncGuideVisualFollow(renderGame, targetPoint)
 				if (signature === visualFollowSignature) return
@@ -1636,9 +1635,22 @@ ModLoader.register({
 				if (renderLayerCanvas?.style) {
 					const layerReady = active && !paused && !!blueprint
 					setStyleValue(renderLayerCanvas.style, 'transform', '')
-					applyVisualFollowStyles(false, layerReady || preserveTransition === true)
+					applyVisualFollowStyles(isVisualFollowProvisional(), layerReady || preserveTransition === true)
 				}
 				if (guideLayerCanvas?.style) setStyleValue(guideLayerCanvas.style, 'transform', '')
+			}
+
+			function isVisualFollowProvisional() {
+				return !!(
+					active &&
+					!paused &&
+					!isTargetPinned() &&
+					(
+						calculating ||
+						!!pendingFollowPlan ||
+						(!!plan && !!target && !samePosition(plan.target, target))
+					)
+				)
 			}
 
 			function setRenderLayerCanvas(nextCanvas) {

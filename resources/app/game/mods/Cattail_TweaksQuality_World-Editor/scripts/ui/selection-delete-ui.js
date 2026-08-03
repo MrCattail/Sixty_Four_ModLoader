@@ -253,6 +253,7 @@ ModLoader.register({
 						showStatus('deleteNothing', 'neutral', FAILURE_MS)
 						return
 					}
+					clearStatus()
 					openConfirmation(plan, input)
 				} catch (planError) {
 					markProbe('plan-failed', {
@@ -510,13 +511,13 @@ ModLoader.register({
 
 			const compactIcon = document.createElement('span')
 			compactIcon.className = 'cattail-world-editor-shell__compact-icon'
+			compactIcon.dataset.worldEditorToolbarIcon = 'pickaxe'
 			compactIcon.setAttribute('aria-hidden', 'true')
-			compactIcon.textContent = '⌦'
 			const cardIcon = document.createElement('span')
 			cardIcon.className = 'cattail-world-editor-shell__card-icon'
 			cardIcon.dataset.cardIcon = 'delete'
+			cardIcon.dataset.worldEditorToolbarIcon = 'pickaxe'
 			cardIcon.setAttribute('aria-hidden', 'true')
-			cardIcon.textContent = '⌦'
 			const cardLabel = document.createElement('span')
 			cardLabel.className = 'cattail-world-editor-shell__card-label'
 			cardLabel.dataset.worldEditorCardText = 'delete'
@@ -542,12 +543,6 @@ ModLoader.register({
 			style = document.createElement('style')
 			style.id = STYLE_ID
 			style.textContent = `
-				.cattail-world-editor-selection-delete__button {
-					--world-editor-delete-accent: #ff7d72;
-				}
-				.cattail-world-editor-shell[data-toolbar-style="compact"] .cattail-world-editor-selection-delete__button:not(:disabled):hover {
-					color: var(--world-editor-delete-accent);
-				}
 				.cattail-world-editor-selection-delete__status {
 					display: none;
 					align-items: center;

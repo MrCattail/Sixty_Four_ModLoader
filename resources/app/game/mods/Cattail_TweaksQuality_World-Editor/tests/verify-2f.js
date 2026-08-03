@@ -452,13 +452,13 @@ function testCardI18nManifestAndCompatibilityBoundary() {
 	const i18n = sandbox[I18N_KEY]
 	assert.equal(i18n.version, '0.5.1')
 	assert.equal(i18n.languages.length, 20)
-	assert.equal(i18n.keys.length, 252)
+	assert.equal(i18n.keys.length, 249)
 	assert.ok(i18n.keys.includes('wheelHint'))
 	for (const language of i18n.languages) {
 		assert.notEqual(i18n.t(language, 'wheelHint'), 'wheelHint')
 		assert.ok(i18n.t(language, 'wheelHint').trim())
 	}
-	assert.equal(i18n.t('en', 'wheelHint'), 'Scroll to adjust / pause to apply / Esc Cancel')
+	assert.equal(i18n.t('en', 'wheelHint'), 'Scroll to Adjust / Pause to Apply / Esc Cancel')
 	assert.equal(i18n.t('sch', 'wheelHint'), '滚动调整 / 停止后应用 / Esc 取消')
 	assert.equal(i18n.t('modsch', 'wheelHint'), '滚动调整 / 停止后应用 / Esc 取消')
 	assert.equal(i18n.t('tch', 'wheelHint'), '滾動調整 / 停止後套用 / Esc 取消')

@@ -42,6 +42,7 @@ ModLoader.register({
 			'input:not(:disabled)',
 			'select:not(:disabled)',
 			'textarea:not(:disabled)',
+			'summary',
 			'[href]',
 			'[tabindex]:not([tabindex="-1"])'
 		].join(', ')
@@ -144,7 +145,7 @@ ModLoader.register({
 		})
 
 		function mountToolbar() {
-			const slot = document.getElementById(SHELL_ID)?.querySelector?.('[data-world-editor-slot="blueprint"]')
+			const slot = document.getElementById(SHELL_ID)?.querySelector?.('[data-world-editor-slot="blueprint-library"]')
 			if (!slot || toolbarButton) return
 			toolbarButton = document.createElement('button')
 			toolbarButton.type = 'button'
@@ -307,6 +308,12 @@ ModLoader.register({
 			const key = String(event.key || '').toLowerCase()
 			if (key === 'escape' || event.keyCode === 27) {
 				event.preventDefault()
+				const openMenu = modal.querySelector?.('[data-library-menu][open]')
+				if (openMenu) {
+					openMenu.open = false
+					openMenu.querySelector?.('summary')?.focus?.()
+					return
+				}
 				close('escape')
 				return
 			}
@@ -314,7 +321,9 @@ ModLoader.register({
 		}
 
 		function trapModalFocus(event) {
-			const focusable = Array.from(modal?.querySelectorAll?.(FOCUSABLE_SELECTOR) || [])
+			const focusable = Array.from(modal?.querySelectorAll?.(FOCUSABLE_SELECTOR) || []).filter(function (element) {
+				return !element.hidden && Number(element.getClientRects?.().length || 0) > 0
+			})
 			if (!focusable.length) {
 				event.preventDefault()
 				return
@@ -369,29 +378,17 @@ ModLoader.register({
 			])
 			const viewOptions = document.createElement('div')
 			viewOptions.className = 'cattail-world-editor-library__toolbar-group cattail-world-editor-library__toolbar-group--view'
-			const areaSelect = document.createElement('select')
-			for (const area of ['active', 'problems', 'trash', 'quarantine']) {
-				const option = document.createElement('option')
-				option.value = area
-				option.textContent = label(game, area)
-				option.selected = model.area === area
-				areaSelect.append(option)
-			}
-			areaSelect.addEventListener('change', function () { model.area = areaSelect.value; model.selected = null; refreshSurface() })
-			const viewSelect = document.createElement('select')
-			for (const view of ['list', 'grid']) {
-				const option = document.createElement('option')
-				option.value = view
-				option.textContent = label(game, view)
-				option.selected = model.view === view
-				viewSelect.append(option)
-			}
-			viewSelect.addEventListener('change', function () {
-				model.view = viewSelect.value
+			const areaMenu = createMenuSelect('area', ['active', 'problems', 'trash', 'quarantine'], model.area, function (area) {
+				model.area = area
+				model.selected = null
+				refreshSurface()
+			})
+			const viewMenu = createMenuSelect('view', ['list', 'grid'], model.view, function (view) {
+				model.view = view
 				writePreference('view', model.view)
 				refreshSurface()
 			})
-			appendSeparated(viewOptions, [areaSelect, viewSelect])
+			appendSeparated(viewOptions, [areaMenu, viewMenu])
 			const preferences = document.createElement('div')
 			preferences.className = 'cattail-world-editor-library__toolbar-group cattail-world-editor-library__toolbar-group--preferences'
 			const details = document.createElement('label')
@@ -487,7 +484,7 @@ ModLoader.register({
 				text.append(error)
 			} else if (model.details[model.view]) {
 				const detail = document.createElement('small')
-				detail.textContent = detailText(entry.metadata)
+				detail.textContent = entryDetailText(entry.metadata)
 				text.append(detail)
 			}
 			item.append(image, text)
@@ -935,6 +932,80 @@ ModLoader.register({
 			return button
 		}
 
+		function createMenuSelect(name, values, currentValue, onChange) {
+			const menu = document.createElement('details')
+			menu.className = 'cattail-world-editor-library__menu'
+			menu.dataset.libraryMenu = name
+			const summary = document.createElement('summary')
+			summary.className = 'cattail-world-editor-library__menu-summary'
+			summary.textContent = label(game, currentValue)
+			summary.setAttribute('aria-haspopup', 'listbox')
+			summary.setAttribute('aria-expanded', 'false')
+			const popup = document.createElement('div')
+			popup.className = 'cattail-world-editor-library__menu-popup'
+			popup.setAttribute('role', 'listbox')
+			const options = []
+			for (const value of values) {
+				const option = document.createElement('button')
+				option.type = 'button'
+				option.className = 'cattail-world-editor-library__menu-option'
+				option.dataset.value = value
+				option.dataset.selected = value === currentValue ? 'true' : 'false'
+				option.setAttribute('role', 'option')
+				option.setAttribute('aria-selected', value === currentValue ? 'true' : 'false')
+				option.textContent = label(game, value)
+				option.addEventListener('click', function (event) {
+					event.preventDefault()
+					event.stopPropagation()
+					menu.open = false
+					if (value !== currentValue) onChange(value)
+					else summary.focus()
+				})
+				option.addEventListener('keydown', function (event) {
+					const index = options.indexOf(option)
+					let target = -1
+					if (event.key === 'ArrowDown') target = (index + 1) % values.length
+					else if (event.key === 'ArrowUp') target = (index - 1 + values.length) % values.length
+					else if (event.key === 'Home') target = 0
+					else if (event.key === 'End') target = values.length - 1
+					if (target < 0) return
+					event.preventDefault()
+					options[target]?.focus?.()
+				})
+				options.push(option)
+				popup.append(option)
+			}
+			menu.append(summary, popup)
+			menu.addEventListener('toggle', function () {
+				summary.setAttribute('aria-expanded', menu.open ? 'true' : 'false')
+				if (!menu.open) return
+				for (const sibling of menu.parentElement?.querySelectorAll?.('[data-library-menu][open]') || []) {
+					if (sibling !== menu) sibling.open = false
+				}
+			})
+			summary.addEventListener('keydown', function (event) {
+				if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return
+				event.preventDefault()
+				menu.open = true
+				const selected = Math.max(0, values.indexOf(currentValue))
+				const index = event.key === 'ArrowUp' ? Math.max(0, selected - 1) : selected
+				setTimeout(function () { options[index]?.focus?.() }, 0)
+			})
+			menu.addEventListener('keydown', function (event) {
+				if (event.key !== 'Escape') return
+				event.preventDefault()
+				event.stopPropagation()
+				menu.open = false
+				summary.focus()
+			})
+			menu.addEventListener('focusout', function () {
+				setTimeout(function () {
+					if (!menu.contains(document.activeElement)) menu.open = false
+				}, 0)
+			})
+			return menu
+		}
+
 		function appendSeparated(container, items) {
 			let appended = 0
 			for (const item of items || []) {
@@ -957,11 +1028,26 @@ ModLoader.register({
 
 		function entryKey(entry) { return entry.area + ':' + entry.name + ':' + entry.revision }
 
-		function detailText(metadata) {
+		function entryDetailText(metadata) {
 			if (!metadata) return ''
 			const transform = metadata.defaultTransform || { rotation: 0, mirrorU: false, mirrorV: false }
 			const mirror = (transform.mirrorU ? ' · M-U' : '') + (transform.mirrorV ? ' · M-V' : '')
-			return metadata.width + '×' + metadata.height + ' · ' + metadata.entityCount + ' buildings · ' + metadata.blockCount + ' cubes · ' + metadata.surgeCount + ' surges · schema ' + metadata.schemaVersion + ' · R' + transform.rotation + '°' + mirror
+			return metadata.width + '×' + metadata.height + ' · ' + metadata.entityCount + ' Buildings · ' + metadata.blockCount + ' Cubes · ' + metadata.surgeCount + ' Surges · Schema ' + metadata.schemaVersion + ' · R' + transform.rotation + '°' + mirror
+		}
+
+		function detailText(metadata) {
+			if (!metadata) return ''
+			const transform = metadata.defaultTransform || { rotation: 0, mirrorU: false, mirrorV: false }
+			const mirror = [transform.mirrorU ? 'U' : '', transform.mirrorV ? 'V' : ''].filter(Boolean).join('+') || 'None'
+			return [
+				'Area: ' + metadata.width + '×' + metadata.height,
+				'Buildings: ' + metadata.entityCount,
+				'Cubes: ' + metadata.blockCount,
+				'Surges: ' + metadata.surgeCount,
+				'Rotate: ' + transform.rotation + '°',
+				'Mirror: ' + mirror,
+				'Schema: ' + metadata.schemaVersion
+			].join('\n')
 		}
 
 		function formatTime(value) {
@@ -1263,10 +1349,13 @@ ModLoader.register({
 					background: rgba(255, 255, 255, .72);
 				}
 				.cattail-world-editor-library__toolbar {
+					position: relative;
+					z-index: 20;
 					display: flex;
 					align-items: center;
 					flex-wrap: wrap;
 					gap: 0;
+					overflow: visible;
 				}
 				.cattail-world-editor-library__status {
 					display: flex;
@@ -1318,6 +1407,112 @@ ModLoader.register({
 					display: inline-flex;
 					align-items: center;
 					gap: 0;
+				}
+				.cattail-world-editor-library__menu {
+					position: relative;
+					display: inline-flex;
+					align-items: center;
+					min-height: 40px;
+					color: inherit;
+				}
+				.cattail-world-editor-library__menu-summary {
+					position: relative;
+					box-sizing: border-box;
+					min-height: 40px;
+					padding: 9px 31px 8px 12px;
+					color: inherit;
+					font: 600 15px/1.35 Montserrat, Arial, sans-serif;
+					cursor: pointer;
+					list-style: none;
+					transition: color .18s ease;
+				}
+				.cattail-world-editor-library__menu-summary::-webkit-details-marker { display: none; }
+				.cattail-world-editor-library__menu-summary::after {
+					content: "";
+					position: absolute;
+					right: 12px;
+					top: 50%;
+					width: 7px;
+					height: 7px;
+					border-right: 2px solid currentColor;
+					border-bottom: 2px solid currentColor;
+					transform: translateY(-68%) rotate(45deg);
+					transition: transform .18s ease;
+				}
+				.cattail-world-editor-library__menu[open] > .cattail-world-editor-library__menu-summary::after {
+					transform: translateY(-30%) rotate(225deg);
+				}
+				.cattail-world-editor-library__menu-summary:hover,
+				.cattail-world-editor-library__menu[open] > .cattail-world-editor-library__menu-summary,
+				.cattail-world-editor-library__menu-summary:focus-visible {
+					outline: 0;
+					color: #b56b87;
+				}
+				.cattail-world-editor-library__menu-summary:focus-visible {
+					text-decoration: underline;
+					text-decoration-thickness: 1px;
+					text-underline-offset: 4px;
+				}
+				.cattail-world-editor-library__menu-popup {
+					position: absolute;
+					z-index: 100;
+					left: 4px;
+					top: calc(100% + 4px);
+					display: grid;
+					box-sizing: border-box;
+					width: max-content;
+					min-width: max(100%, 180px);
+					gap: 3px;
+					padding: 6px;
+					border: 1px solid var(--world-editor-library-border, rgba(255, 255, 255, .18));
+					border-radius: 8px;
+					background: var(--world-editor-library-bg, rgba(10, 12, 14, .96));
+					box-shadow: 0 12px 34px rgba(0, 0, 0, .34);
+					color: var(--world-editor-library-text, #fff);
+					backdrop-filter: blur(10px) saturate(1.1);
+				}
+				.cattail-world-editor-library__menu:not([open]) > .cattail-world-editor-library__menu-popup {
+					display: none;
+				}
+				.cattail-world-editor-library__menu[data-library-menu="view"] .cattail-world-editor-library__menu-popup {
+					min-width: max(100%, 140px);
+				}
+				.cattail-world-editor-library__toolbar .cattail-world-editor-library__menu-option {
+					position: relative;
+					box-sizing: border-box;
+					width: 100%;
+					min-height: 34px;
+					border: 0 !important;
+					border-radius: 6px !important;
+					padding: 7px 30px 7px 10px;
+					background: transparent !important;
+					box-shadow: none !important;
+					color: var(--world-editor-library-text, #fff) !important;
+					font: 500 14px/1.35 Montserrat, Arial, sans-serif;
+					text-align: left;
+					text-decoration: none !important;
+				}
+				.cattail-world-editor-library__toolbar .cattail-world-editor-library__menu-option:hover,
+				.cattail-world-editor-library__toolbar .cattail-world-editor-library__menu-option:focus-visible {
+					outline: 0;
+					background: var(--world-editor-library-hover, rgba(255, 255, 255, .1)) !important;
+					box-shadow: none !important;
+					color: #b56b87 !important;
+					text-decoration: none !important;
+				}
+				.cattail-world-editor-library__toolbar .cattail-world-editor-library__menu-option[data-selected="true"] {
+					background: var(--world-editor-library-active, rgba(181, 107, 135, .18)) !important;
+					box-shadow: inset 0 0 0 1px var(--world-editor-library-active-border, rgba(181, 107, 135, .42)) !important;
+					font-weight: 650;
+				}
+				.cattail-world-editor-library__menu-option[data-selected="true"]::after {
+					content: "✓";
+					position: absolute;
+					right: 10px;
+					top: 50%;
+					color: #b56b87;
+					font-weight: 700;
+					transform: translateY(-50%);
 				}
 				.cattail-world-editor-library__toolbar-group > button,
 				.cattail-world-editor-library__toolbar-group > select {
@@ -1469,7 +1664,11 @@ ModLoader.register({
 					scrollbar-color: #fffc #fff2;
 				}
 				.cattail-world-editor-library__details h3 { margin: 0 0 10px; font: 600 17px/1.35 Montserrat, Arial, sans-serif; }
-				.cattail-world-editor-library__details p { font-size: 14px; line-height: 1.55; }
+				.cattail-world-editor-library__details p {
+					font-size: 14px;
+					line-height: 1.55;
+					white-space: pre-line;
+				}
 				.cattail-world-editor-library__actions { display: flex; align-items: center; flex-wrap: wrap; gap: 0; }
 				.cattail-world-editor-library__actions > button {
 					min-height: 36px;
@@ -1511,17 +1710,6 @@ ModLoader.register({
 					color: #b56b87;
 				}
 				.cattail-world-editor-blueprint-card__save-library:disabled { cursor: default; opacity: .3; }
-				#cattail-world-editor-blueprint-card .cattail-world-editor-blueprint-card__place {
-					border: 0;
-					border-radius: 0;
-					background: transparent;
-					box-shadow: none;
-					color: var(--blueprint-card-text, rgba(18, 20, 22, .94));
-				}
-				#cattail-world-editor-blueprint-card .cattail-world-editor-blueprint-card__place:hover:not(:disabled) {
-					background: color-mix(in srgb, var(--blueprint-card-text, #121416) 8%, transparent);
-					color: #b56b87;
-				}
 				.cattail-world-editor-shell .cattail-world-editor-blueprint-library-button,
 				.cattail-world-editor-shell .cattail-world-editor-blueprint-save-button {
 					border: 0 !important;
@@ -1532,8 +1720,8 @@ ModLoader.register({
 				}
 				.cattail-world-editor-shell .cattail-world-editor-blueprint-library-button:hover:not(:disabled),
 				.cattail-world-editor-shell .cattail-world-editor-blueprint-save-button:hover:not(:disabled) {
-					background: rgba(255, 255, 255, .08) !important;
-					color: #b56b87 !important;
+					background: var(--world-editor-shell-hover-bg, rgba(150, 154, 160, .18)) !important;
+					color: var(--world-editor-shell-hover-color, #b56b87) !important;
 				}
 				.cattail-world-editor-shell[data-toolbar-style="compact"] .cattail-world-editor-blueprint-library-button,
 				.cattail-world-editor-shell[data-toolbar-style="compact"] .cattail-world-editor-blueprint-save-button,
@@ -1545,31 +1733,20 @@ ModLoader.register({
 				}
 				.cattail-world-editor-shell[data-toolbar-style="cards"] .cattail-world-editor-blueprint-library-button::after,
 				.cattail-world-editor-shell[data-toolbar-style="cards"] .cattail-world-editor-blueprint-save-button::after {
-					border-radius: 0 !important;
+					border-radius: 8px !important;
 					background: transparent !important;
 					box-shadow: none !important;
 				}
-				.cattail-world-editor-shell[data-toolbar-style="compact"] .cattail-world-editor-blueprint-library-button,
-				.cattail-world-editor-shell[data-toolbar-style="compact"] .cattail-world-editor-blueprint-save-button {
-					position: relative;
-				}
-				.cattail-world-editor-shell[data-toolbar-style="compact"] .cattail-world-editor-blueprint-library-button::before,
-				.cattail-world-editor-shell[data-toolbar-style="compact"] .cattail-world-editor-blueprint-save-button::before {
-					content: "";
-					position: absolute;
-					left: -3px;
-					top: 6px;
-					bottom: 6px;
-					width: 1px;
-					background: var(--world-editor-shell-border, rgba(0, 0, 0, .14));
-					pointer-events: none;
-				}
 				.cattail-world-editor-shell[data-toolbar-style="compact"] .cattail-world-editor-blueprint-library-button:hover:not(:disabled),
-				.cattail-world-editor-shell[data-toolbar-style="compact"] .cattail-world-editor-blueprint-save-button:hover:not(:disabled),
+				.cattail-world-editor-shell[data-toolbar-style="compact"] .cattail-world-editor-blueprint-save-button:hover:not(:disabled) {
+					border-radius: 5px !important;
+					background: var(--world-editor-shell-hover-bg, rgba(150, 154, 160, .18)) !important;
+					color: var(--world-editor-shell-hover-color, #b56b87) !important;
+				}
 				.cattail-world-editor-shell[data-toolbar-style="cards"] .cattail-world-editor-blueprint-library-button:hover:not(:disabled),
 				.cattail-world-editor-shell[data-toolbar-style="cards"] .cattail-world-editor-blueprint-save-button:hover:not(:disabled) {
-					background: rgba(255, 255, 255, .08) !important;
-					color: #b56b87 !important;
+					background: transparent !important;
+					color: var(--world-editor-shell-hover-color, #b56b87) !important;
 				}
 				/* The in-world modal follows the World Editor reality / void visual language. */
 				.cattail-world-editor-library-modal .cattail-world-editor-library[data-surface="modal"] {

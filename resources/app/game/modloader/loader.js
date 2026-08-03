@@ -2942,6 +2942,10 @@
 	let uiPagesCurrentGame = null
 	let uiPagesActivePage = null
 	let uiPagesActiveSplash = null
+	const UI_PAGE_MENU_INERTIAL_SCROLL_OPTIONS = Object.freeze({ friction: .88, directInfluence: .30, tailInfluence: .13, maxVelocity: 34, stopThreshold: .35 })
+	const UI_PAGE_MENU_MIN_HEIGHT = 128
+	const UI_PAGE_MENU_BOTTOM_MARGIN = 48
+	const UI_PAGE_MENU_MOBILE_BOTTOM_MARGIN = 24
 
 	const uiPageKey = function (modId, id) {
 		return `${modId || 'anonymous'}:${id || 'page'}`
@@ -3014,7 +3018,9 @@
 		installUiPageStyles()
 		patchUiPageSplash('init')
 		patchUiPageSplash('initMobile')
+		patchUiPageSplashShow()
 		window.addEventListener('keydown', handleUiPageEscape, true)
+		window.addEventListener('resize', handleUiPageMenuResize)
 		api.patch(Game.prototype, 'changeLanguage', function (original) {
 			return function (id) {
 				const openPageKey = uiPagesActivePage?.key
@@ -3043,9 +3049,69 @@
 		})
 	}
 
+	const patchUiPageSplashShow = function () {
+		api.patch(Splash.prototype, 'show', function (original) {
+			return function (...args) {
+				const result = original.apply(this, args)
+				uiPagesCurrentGame = this.master
+				scheduleUiPageMenuScrolling(this)
+				return result
+			}
+		})
+	}
+
 	const attachAllUiPages = function (splash) {
 		if (!splash?.element) return
 		for (const page of uiPages) attachUiPageButton(splash, page)
+		scheduleUiPageMenuScrolling(splash)
+	}
+
+	const scheduleUiPageMenuScrolling = function (splash) {
+		const menu = splash?.element?.querySelector?.('.menu')
+		if (!menu) return
+		syncUiPageMenuScrolling(splash)
+		const sync = function () { syncUiPageMenuScrolling(splash) }
+		if (typeof requestAnimationFrame === 'function') {
+			requestAnimationFrame(function () {
+				sync()
+				requestAnimationFrame(sync)
+			})
+		} else setTimeout(sync, 0)
+		setTimeout(sync, 90)
+	}
+
+	const syncUiPageMenuScrolling = function (splash) {
+		const menu = splash?.element?.querySelector?.('.menu')
+		if (!menu) return
+		const hasUiPageButtons = !!menu.querySelector('[data-modloader-ui-page-key]')
+		menu.classList.toggle('modloader-ui-menu-scroll', hasUiPageButtons)
+		if (!hasUiPageButtons) {
+			menu.classList.remove('modloader-ui-menu-scrollable', 'modloader-ui-page-scrollbar-visible', 'modloader-ui-menu-scrollbar-visible')
+			menu.style.removeProperty('--modloader-ui-menu-max-height')
+			return
+		}
+		if (!menu.__modloaderUiMenuScrollReady) {
+			installTransientScrollbar(menu, 'modloader-ui-menu-scrollbar-visible')
+			installInertialScroll(menu, UI_PAGE_MENU_INERTIAL_SCROLL_OPTIONS)
+			menu.__modloaderUiMenuScrollReady = true
+		}
+		updateUiPageMenuScrollLimit(splash, menu)
+	}
+
+	const updateUiPageMenuScrollLimit = function (splash, menu) {
+		if (!menu) return
+		const viewportHeight = Math.max(0, Number(window.innerHeight || document?.documentElement?.clientHeight || 720) || 720)
+		const rect = typeof menu.getBoundingClientRect === 'function' ? menu.getBoundingClientRect() : null
+		const top = Number.isFinite(rect?.top) ? rect.top : viewportHeight / 2
+		const mobile = !!(splash?.master?.isMobile || splash?.element?.classList?.contains?.('mobile'))
+		const bottomMargin = mobile ? UI_PAGE_MENU_MOBILE_BOTTOM_MARGIN : UI_PAGE_MENU_BOTTOM_MARGIN
+		const maxHeight = Math.max(UI_PAGE_MENU_MIN_HEIGHT, Math.floor(viewportHeight - top - bottomMargin))
+		menu.style.setProperty('--modloader-ui-menu-max-height', maxHeight + 'px')
+		const scrollHeight = Number(menu.scrollHeight) || 0
+		const clientHeight = Number(menu.clientHeight) || maxHeight
+		menu.classList.toggle('modloader-ui-menu-scrollable', scrollHeight > clientHeight + 1 || scrollHeight > maxHeight + 1)
+		const maxScrollTop = Math.max(0, scrollHeight - clientHeight)
+		if ((Number(menu.scrollTop) || 0) > maxScrollTop) menu.scrollTop = maxScrollTop
 	}
 
 	const attachUiPageButton = function (splash, page) {
@@ -3067,7 +3133,10 @@
 		}
 		button.classList.add(page.buttonClass)
 		updateUiPageButton(button, page, splash)
-		if (button.dataset.modloaderUiPageKey === page.key) return
+		if (button.dataset.modloaderUiPageKey === page.key) {
+			scheduleUiPageMenuScrolling(splash)
+			return
+		}
 		button.dataset.modloaderUiPageKey = page.key
 		const openPage = function (event) {
 			event?.preventDefault()
@@ -3076,6 +3145,7 @@
 		}
 		button.onclick = openPage
 		button.ontouchstart = openPage
+		scheduleUiPageMenuScrolling(splash)
 	}
 
 	const updateUiPageButton = function (button, page, splash) {
@@ -3221,6 +3291,10 @@
 		event.preventDefault()
 		event.stopImmediatePropagation()
 		hideUiPage(uiPagesActivePage, uiPagesActiveSplash)
+	}
+
+	const handleUiPageMenuResize = function () {
+		scheduleUiPageMenuScrolling(uiPagesCurrentGame?.splash)
 	}
 
 	const findUiPage = function (modId, id) {
@@ -3399,6 +3473,13 @@
 			.splash.modloader-ui-page-active .gloryButton,
 			.splash.modloader-ui-page-active > .headerBox,
 			.splash.modloader-ui-page-active > .sixtyFour { display:none !important; }
+			.splash .menu.modloader-ui-menu-scroll { box-sizing:border-box; max-height:var(--modloader-ui-menu-max-height,calc(50vh - 48px)); padding:0 18px; overflow-x:hidden; overflow-y:auto; overscroll-behavior:contain; scrollbar-width:thin; scrollbar-color:transparent transparent; transition:scrollbar-color .28s ease; outline:none; }
+			.splash .menu.modloader-ui-menu-scroll:hover, .splash .menu.modloader-ui-menu-scroll:active, .splash .menu.modloader-ui-menu-scroll.modloader-ui-page-scrollbar-visible, .splash .menu.modloader-ui-menu-scroll.modloader-ui-menu-scrollbar-visible { scrollbar-color:#fffc #fff2; }
+			.splash .menu.modloader-ui-menu-scroll::-webkit-scrollbar { width:10px; }
+			.splash .menu.modloader-ui-menu-scroll::-webkit-scrollbar-track { background:transparent; transition:background .28s ease; }
+			.splash .menu.modloader-ui-menu-scroll::-webkit-scrollbar-thumb { border:0; border-radius:0; background:transparent; transition:background .28s ease; }
+			.splash .menu.modloader-ui-menu-scroll:hover::-webkit-scrollbar-track, .splash .menu.modloader-ui-menu-scroll:active::-webkit-scrollbar-track, .splash .menu.modloader-ui-menu-scroll.modloader-ui-page-scrollbar-visible::-webkit-scrollbar-track, .splash .menu.modloader-ui-menu-scroll.modloader-ui-menu-scrollbar-visible::-webkit-scrollbar-track { background:linear-gradient(to right, transparent 4px, rgba(255,255,255,.16) 4px, rgba(255,255,255,.16) 6px, transparent 6px); }
+			.splash .menu.modloader-ui-menu-scroll:hover::-webkit-scrollbar-thumb, .splash .menu.modloader-ui-menu-scroll:active::-webkit-scrollbar-thumb, .splash .menu.modloader-ui-menu-scroll.modloader-ui-page-scrollbar-visible::-webkit-scrollbar-thumb, .splash .menu.modloader-ui-menu-scroll.modloader-ui-menu-scrollbar-visible::-webkit-scrollbar-thumb { background:linear-gradient(to right, transparent 4px, rgba(255,255,255,.78) 4px, rgba(255,255,255,.78) 6px, transparent 6px); }
 			.modloader-ui-page { position:absolute; inset:0; display:flex; flex-direction:column; justify-content:center; box-sizing:border-box; padding:clamp(16px,3vh,36px) max(36px,5vw) 18px; color:#fff; background:transparent; font-family:Montserrat,Arial,sans-serif; overflow:hidden; }
 			.modloader-ui-page-brand { display:flex; align-items:center; justify-content:center; gap:32px; margin:0 auto 14px; }
 			.modloader-ui-page-logo-mark { flex:0 0 auto; width:92px; height:92px; margin:0; background:url('img/logo/sheet.png'); background-size:400% 200%; }

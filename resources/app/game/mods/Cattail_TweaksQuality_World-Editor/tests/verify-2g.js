@@ -411,20 +411,28 @@ function testI18nManifestAndReadOnlyBoundary() {
 	const i18n = sandbox[I18N_KEY]
 	assert.equal(i18n.version, '0.5.1')
 	assert.equal(i18n.languages.length, 20)
-	assert.equal(i18n.keys.length, 252)
+	assert.equal(i18n.keys.length, 249)
 	assert.ok(i18n.keys.includes('removeSelection'))
 	for (const language of i18n.languages) {
 		const translated = i18n.t(language, 'removeSelection')
 		assert.notEqual(translated, 'removeSelection')
 		assert.ok(translated.trim())
 	}
-	assert.equal(i18n.t('sch', 'removeSelection'), '移除当前选区（Backspace）')
-	assert.equal(i18n.t('tch', 'removeSelection'), '移除目前選區（Backspace）')
+	assert.equal(i18n.t('sch', 'removeSelection'), '清除所有选区')
+	assert.equal(i18n.t('tch', 'removeSelection'), '清除所有選區')
 
 	const toolbarSource = fs.readFileSync(path.join(MOD_ROOT, 'scripts/ui/editor-shell.js'), 'utf8')
 	assert.match(toolbarSource, /data-world-editor-action="remove-selection"/)
 	assert.match(toolbarSource, /i18n\.t\(source,\s*'removeSelection'\)/)
-	assert.match(toolbarSource, /removePrimary\('toolbar-remove-primary'\)/)
+	assert.match(toolbarSource, /selection\.clear\('toolbar-clear-selections'\)/)
+	assert.match(toolbarSource, /const clearAvailable\s*=\s*typeof selection\.clear === 'function' && count > 0/)
+	assert.doesNotMatch(toolbarSource, /removePrimary\('toolbar-remove-primary'\)/)
+
+	const inputSource = fs.readFileSync(path.join(MOD_ROOT, 'scripts/core/input-controller.js'), 'utf8')
+	assert.match(inputSource, /const selectionCount\s*=\s*Number\(selection\?\.snapshot\?\.\(\)\.selectionCount\)\s*\|\|\s*0/)
+	assert.match(inputSource, /selection\.clear\('hotkey-escape'\)/)
+	assert.ok(inputSource.indexOf("cancelPending('hotkey-escape')") < inputSource.indexOf("selection.clear('hotkey-escape')"))
+	assert.ok(inputSource.indexOf("selection.clear('hotkey-escape')") < inputSource.indexOf("runtime.deactivate('hotkey-escape')"))
 
 	const controllerSource = fs.readFileSync(path.join(MOD_ROOT, 'scripts/input/selection-controller.js'), 'utf8')
 	assert.match(controllerSource, /event\?\.ctrlKey/)

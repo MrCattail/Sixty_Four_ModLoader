@@ -586,7 +586,7 @@ function testLocalizationManifestAndReadOnlyBoundary() {
 	const i18n = sandbox[I18N_KEY]
 	assert.equal(i18n.version, '0.5.1')
 	assert.equal(i18n.languages.length, 20)
-	assert.equal(i18n.keys.length, 252)
+	assert.equal(i18n.keys.length, 249)
 	for (const language of i18n.languages) {
 		for (const key of ['toolbarModeResize', 'toolResize', 'cardResizePreview', 'resizeHint']) {
 			assert.notEqual(i18n.t(language, key), key)
@@ -595,7 +595,7 @@ function testLocalizationManifestAndReadOnlyBoundary() {
 	}
 	assert.equal(i18n.t('sch', 'toolbarModeResize'), '缩放选区模式')
 	assert.equal(i18n.t('tch', 'cardResizePreview'), '縮放預覽')
-	assert.equal(i18n.t('en', 'resizeHint'), 'Release to resize / Esc Cancel')
+	assert.equal(i18n.t('en', 'resizeHint'), 'Release to Resize / Esc Cancel')
 
 	const manifest = JSON.parse(fs.readFileSync(path.join(MOD_ROOT, 'mod.json'), 'utf8'))
 	assert.equal(manifest.version, '0.5.1')

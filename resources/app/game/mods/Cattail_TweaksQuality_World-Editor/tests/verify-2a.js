@@ -315,6 +315,11 @@ function testTwoClickInput() {
 
 	const secondEscape = windowHub.dispatch('keydown', keyEvent({ key: 'Escape', keyCode: 27 }))
 	assert.equal(secondEscape.defaultPrevented, true)
+	assert.equal(selection.snapshot().selectionCount, 0)
+	assert.equal(runtime.isActive(), true)
+
+	const thirdEscape = windowHub.dispatch('keydown', keyEvent({ key: 'Escape', keyCode: 27 }))
+	assert.equal(thirdEscape.defaultPrevented, true)
 	assert.equal(runtime.isActive(), false)
 	runtime.runCleanups()
 }

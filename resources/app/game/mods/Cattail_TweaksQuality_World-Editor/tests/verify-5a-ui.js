@@ -116,7 +116,7 @@ async function testThumbnailCacheReadAndDeduplication() {
 			reads += 1
 			assert.equal(options.area, 'cache')
 			assert.equal(options.bucket, 'thumbnails')
-			assert.match(options.name, /^v3__10000000-0000-4000-8000-000000000001__abcdef1234\.png$/)
+			assert.match(options.name, /^v4__10000000-0000-4000-8000-000000000001__abcdef1234\.png$/)
 			return { data: Uint8Array.from([137, 80, 78, 71]) }
 		}
 	}
@@ -164,7 +164,7 @@ async function testThumbnailCacheReadAndDeduplication() {
 	assert.equal(reads, readsBeforeReload + 1, 'an evicted entry returns to the disk-backed load path')
 }
 
-async function testBuildingThumbnailRenderingAndV3Cache() {
+async function testBuildingThumbnailRenderingAndV4Cache() {
 	const definitions = []
 	const drawImages = []
 	const pathMoves = []
@@ -284,8 +284,8 @@ async function testBuildingThumbnailRenderingAndV3Cache() {
 					{ name: 'converter32', position: [0, 0] },
 					{ name: 'converter32', position: [2, 0] }
 				],
-				blocks: [],
-				surges: []
+				blocks: [{ position: [1, 0] }],
+				surges: [{ position: [1, 0] }]
 			}
 		}
 	}
@@ -294,13 +294,15 @@ async function testBuildingThumbnailRenderingAndV3Cache() {
 	assert.equal(result.placeholder, false)
 	assert.equal(written.area, 'cache')
 	assert.equal(written.bucket, 'thumbnails')
-	assert.equal(written.name, 'v3__10000000-0000-4000-8000-000000000001__abcdef1234.png')
+	assert.equal(written.name, 'v4__10000000-0000-4000-8000-000000000001__abcdef1234.png')
 	assert.ok(drawImages.some(function (args) { return args[0] === shopImage }), 'shop image is prepared')
 	assert.ok(drawImages.some(function (args) { return args[0] !== shopImage }), 'prepared building icon is drawn into the final thumbnail')
 	assert.ok(pathMoves[0][0] > pathMoves[1][0], '90-degree default transform changes the thumbnail layout before drawing')
 	assert.equal(fillRects.length, 0, 'the final thumbnail does not paint an opaque background')
 	assert.equal(strokeRects.length, 0, 'the final thumbnail does not paint a frame around the transparent canvas')
 	assert.equal(strokeTexts.length, 1, 'summary text receives a dark outline for both light and void surfaces')
+	assert.equal(strokeTexts[0][0], '2 Buildings', 'thumbnail summary keeps only the building count')
+	assert.doesNotMatch(strokeTexts[0][0], /Cubes|Surges/i, 'thumbnail summary omits cube and surge counts')
 }
 
 function testManifestAndStaticUiContracts() {
@@ -339,7 +341,8 @@ function testManifestAndStaticUiContracts() {
 	assert.match(ui, /api\.ui\?\.pages\?\.register\?\.\(\{[\s\S]*id:\s*PAGE_ID/)
 	assert.match(ui, /renderView\('page'/)
 	assert.match(ui, /renderView\('modal'/)
-	assert.match(ui, /data-world-editor-slot="blueprint"/)
+	assert.match(ui, /data-world-editor-slot="blueprint-library"/)
+	assert.match(ui, /slot\.append\(toolbarSaveButton,\s*toolbarButton\)/)
 	assert.match(ui, /worldEditorBlueprintLibrary/)
 	assert.match(ui, /open\('toolbar'\)/)
 	assert.match(ui, /isInputBlocked,/)
@@ -348,18 +351,24 @@ function testManifestAndStaticUiContracts() {
 	assert.match(ui, /releaseGameKeyboardState\(game\)[\s\S]*?for \(const type of KEY_EVENT_TYPES\) window\.addEventListener\(type, handleModalKeyEvent, true\)/)
 	assert.match(ui, /for \(const type of KEY_EVENT_TYPES\) window\.removeEventListener\(type, handleModalKeyEvent, true\)/)
 	assert.match(ui, /function handleModalKeyEvent\(event\) \{[\s\S]*?if \(!modal \|\| interactionDialog\) return[\s\S]*?event\.stopImmediatePropagation\(\)[\s\S]*?key === 'escape'[\s\S]*?close\('escape'\)/)
+	assert.match(ui, /const openMenu = modal\.querySelector\?\.\('\[data-library-menu\]\[open\]'\)[\s\S]*?openMenu\.open = false[\s\S]*?openMenu\.querySelector\?\.\('summary'\)\?\.focus\?\.\(\)[\s\S]*?return[\s\S]*?close\('escape'\)/)
 	assert.match(ui, /function trapModalFocus\(event\)/)
+	assert.match(ui, /'summary',[\s\S]*?function trapModalFocus\(event\)[\s\S]*?\.filter\(function \(element\)[\s\S]*?element\.getClientRects\?\.\(\)\.length/)
 	assert.match(ui, /function releaseGameKeyboardState\(currentGame\) \{[\s\S]*?currentGame\.translationMap\[index\] = 0[\s\S]*?delete currentGame\.keyboardMovementHappening[\s\S]*?currentGame\.altActive = false/)
 	assert.doesNotMatch(ui, /document\.(?:add|remove)EventListener\('keydown', handleEscape, true\)/)
-	assert.match(ui, /for \(const area of \['active', 'problems', 'trash', 'quarantine'\]\)/)
-	assert.match(ui, /for \(const view of \['list', 'grid'\]\)/)
+	assert.match(ui, /createMenuSelect\('area', \['active', 'problems', 'trash', 'quarantine'\]/)
+	assert.match(ui, /createMenuSelect\('view', \['list', 'grid'\]/)
 	assert.match(ui, /list:\s*readPreference\('details-list', 'true'\)/)
 	assert.match(ui, /grid:\s*readPreference\('details-grid', 'false'\)/)
 	assert.match(ui, /writePreference\('details-' \+ model\.view/)
-	assert.match(ui, /detailText\(entry\.metadata\)/)
+	assert.match(ui, /detail\.textContent = entryDetailText\(entry\.metadata\)/)
+	assert.match(ui, /description\.textContent = entry\.error \? entry\.error\.message : detailText\(entry\.metadata\)/)
 	assert.match(ui, /metadata\.width[\s\S]*metadata\.entityCount[\s\S]*metadata\.blockCount[\s\S]*metadata\.surgeCount[\s\S]*metadata\.schemaVersion/)
 	assert.match(ui, /metadata\.defaultTransform/)
-	assert.match(ui, /' · R' \+ transform\.rotation \+ '°'/)
+	assert.match(ui, /function entryDetailText\(metadata\)[\s\S]*metadata\.width \+ '×' \+ metadata\.height \+ ' · ' \+ metadata\.entityCount \+ ' Buildings · ' \+ metadata\.blockCount \+ ' Cubes · ' \+ metadata\.surgeCount \+ ' Surges · Schema ' \+ metadata\.schemaVersion \+ ' · R' \+ transform\.rotation \+ '°' \+ mirror/)
+	assert.match(ui, /'Area: ' \+ metadata\.width \+ '×' \+ metadata\.height[\s\S]*'Buildings: ' \+ metadata\.entityCount[\s\S]*'Cubes: ' \+ metadata\.blockCount[\s\S]*'Surges: ' \+ metadata\.surgeCount[\s\S]*'Rotate: ' \+ transform\.rotation \+ '°'[\s\S]*'Mirror: ' \+ mirror[\s\S]*'Schema: ' \+ metadata\.schemaVersion[\s\S]*\.join\('\\n'\)/)
+	assert.match(ui, /\.cattail-world-editor-library__item-text small \{ font-size: 11px; \}/)
+	assert.match(ui, /\.cattail-world-editor-library__details p \{[\s\S]*?white-space:\s*pre-line;/)
 	assert.match(ui, /addEventListener\('click',[\s\S]*model\.selected = entryKey\(entry\)/)
 	assert.match(ui, /addEventListener\('dblclick',[\s\S]*loadInteractive\(entry\)/)
 	assert.match(ui, /controller\.thumbnail\(entry\)/)
@@ -406,7 +415,8 @@ function testManifestAndStaticUiContracts() {
 	assert.match(ui, /confirmName\.setAttribute\('form', form\.id\)/)
 	assert.match(ui, /dialog\.mount\(input\)/)
 	assert.match(ui, /const accepted = await requestConfirmation\(\{[\s\S]*title: label\(game, 'replaceTitle'\)[\s\S]*confirm: label\(game, 'replaceConfirm'\)/)
-	assert.match(ui, /danger: true/)
+	assert.match(ui, /async function removeInteractive\(entry\)[\s\S]*confirm: label\(game, 'remove'\),[\s\S]*danger: true/)
+	assert.match(ui, /const confirmAction = dialog\.createButton\(options\?\.confirm, \{[\s\S]*primary: true,[\s\S]*danger: options\?\.danger === true/)
 	assert.match(ui, /showMessageDialog\(\{[\s\S]*title: label\(game, 'errorTitle'\)/)
 	assert.doesNotMatch(ui, /\b(?:prompt|confirm|alert)\s*\(/)
 	assert.match(ui, /font:\s*400 13px\/1\.45 Montserrat,\s*Arial,\s*sans-serif/)
@@ -445,6 +455,19 @@ function testManifestAndStaticUiContracts() {
 	assert.match(ui, /primaryActions\.className = 'cattail-world-editor-library__toolbar-group cattail-world-editor-library__toolbar-group--actions'/)
 	assert.match(ui, /viewOptions\.className = 'cattail-world-editor-library__toolbar-group cattail-world-editor-library__toolbar-group--view'/)
 	assert.match(ui, /preferences\.className = 'cattail-world-editor-library__toolbar-group cattail-world-editor-library__toolbar-group--preferences'/)
+	assert.doesNotMatch(ui, /document\.createElement\('select'\)/)
+	assert.match(ui, /const areaMenu = createMenuSelect\('area', \['active', 'problems', 'trash', 'quarantine'\], model\.area,/)
+	assert.match(ui, /const viewMenu = createMenuSelect\('view', \['list', 'grid'\], model\.view,/)
+	assert.match(ui, /function createMenuSelect\(name, values, currentValue, onChange\)[\s\S]*?document\.createElement\('details'\)[\s\S]*?document\.createElement\('summary'\)[\s\S]*?document\.createElement\('button'\)/)
+	assert.match(ui, /summary\.setAttribute\('aria-haspopup', 'listbox'\)[\s\S]*?summary\.setAttribute\('aria-expanded', 'false'\)[\s\S]*?popup\.setAttribute\('role', 'listbox'\)[\s\S]*?option\.setAttribute\('role', 'option'\)[\s\S]*?option\.setAttribute\('aria-selected',/)
+	assert.match(ui, /menu\.addEventListener\('toggle',[\s\S]*?summary\.setAttribute\('aria-expanded',[\s\S]*?querySelectorAll\?\.\('\[data-library-menu\]\[open\]'\)/)
+	assert.match(ui, /event\.key === 'ArrowDown'[\s\S]*?event\.key === 'ArrowUp'[\s\S]*?event\.key === 'Home'[\s\S]*?event\.key === 'End'/)
+	assert.match(ui, /event\.key !== 'Escape'[\s\S]*?menu\.open = false[\s\S]*?summary\.focus\(\)/)
+	assert.match(ui, /menu\.addEventListener\('focusout',[\s\S]*?!menu\.contains\(document\.activeElement\)[\s\S]*?menu\.open = false/)
+	assert.match(ui, /\.cattail-world-editor-library__menu-popup\s*\{[\s\S]*?position:\s*absolute;[\s\S]*?border:\s*1px solid var\(--world-editor-library-border,[\s\S]*?border-radius:\s*8px;[\s\S]*?background:\s*var\(--world-editor-library-bg,[\s\S]*?backdrop-filter:\s*blur\(10px\) saturate\(1\.1\);/)
+	assert.match(ui, /\.cattail-world-editor-library__menu:not\(\[open\]\) > \.cattail-world-editor-library__menu-popup\s*\{\s*display:\s*none;/)
+	assert.match(ui, /\.cattail-world-editor-library__toolbar \.cattail-world-editor-library__menu-option:hover,[\s\S]*?background:\s*var\(--world-editor-library-hover,[\s\S]*?color:\s*#b56b87 !important;/)
+	assert.match(ui, /\.cattail-world-editor-library__toolbar \.cattail-world-editor-library__menu-option\[data-selected="true"\]\s*\{[\s\S]*?background:\s*var\(--world-editor-library-active,[\s\S]*?box-shadow:\s*inset 0 0 0 1px var\(--world-editor-library-active-border,/)
 	assert.doesNotMatch(ui, /renderBeforeContent|renderPageRule|cattail-world-editor-library__page-rule/)
 	assert.match(ui, /toolbarRule\.className = 'cattail-world-editor-library__toolbar-rule'/)
 	assert.match(ui, /root\.append\(toolbar, toolbarRule, renderStatus\(\)\)[\s\S]*?const layout = document\.createElement\('div'\)/)
@@ -452,7 +475,7 @@ function testManifestAndStaticUiContracts() {
 	assert.match(ui, /setAttribute\('aria-live', statusMessage\?\.kind === 'error' \? 'assertive' : 'polite'\)/)
 	assert.match(ui, /\.cattail-world-editor-library__toolbar-rule\s*\{[\s\S]*?width:\s*100%;[\s\S]*?height:\s*1px;[\s\S]*?margin:\s*10px 0 8px;[\s\S]*?background:\s*rgba\(255, 255, 255, \.72\);/)
 	assert.match(ui, /appendSeparated\(primaryActions, \[/)
-	assert.match(ui, /appendSeparated\(viewOptions, \[areaSelect, viewSelect\]\)/)
+	assert.match(ui, /appendSeparated\(viewOptions, \[areaMenu, viewMenu\]\)/)
 	assert.match(ui, /appendSeparated\(toolbar, \[primaryActions, viewOptions, preferences\]\)/)
 	assert.match(ui, /appendSeparated\(actions, \[/)
 	assert.match(ui, /appendSeparated\(dialog\.actions, \[cancel, confirmName\]\)/)
@@ -499,9 +522,10 @@ function testManifestAndStaticUiContracts() {
 	assert.doesNotMatch(ui, /@media \(max-width: 760px\)[\s\S]*?\.cattail-world-editor-library\[data-surface="modal"\][\s\S]*?\n\s*\}/)
 	assert.match(ui, /\.cattail-world-editor-blueprint-card__save-library\s*\{[\s\S]*?border:\s*0;[\s\S]*?background:\s*transparent;[\s\S]*?color:\s*var\(--blueprint-card-text, rgba\(18, 20, 22, \.94\)\);/)
 	assert.match(ui, /\.cattail-world-editor-blueprint-card__save-library::after\s*\{[\s\S]*?height:\s*1px;[\s\S]*?background:\s*var\(--blueprint-card-border, rgba\(0, 0, 0, \.14\)\);/)
-	assert.match(ui, /#cattail-world-editor-blueprint-card \.cattail-world-editor-blueprint-card__place\s*\{[\s\S]*?border:\s*0;[\s\S]*?background:\s*transparent;[\s\S]*?color:\s*var\(--blueprint-card-text, rgba\(18, 20, 22, \.94\)\);/)
+	assert.doesNotMatch(ui, /#cattail-world-editor-blueprint-card \.cattail-world-editor-blueprint-card__place\s*\{/)
+	assert.match(session, /\.cattail-world-editor-blueprint-card__place\s*\{[\s\S]*?background:\s*var\(--world-editor-hell-gem-glass\);[\s\S]*?box-shadow:\s*var\(--world-editor-hell-gem-glass-shadow\);/)
 	assert.match(ui, /\.cattail-world-editor-shell \.cattail-world-editor-blueprint-library-button,[\s\S]*?border:\s*0 !important;[\s\S]*?color:\s*var\(--world-editor-shell-text, rgba\(18, 20, 22, \.94\)\) !important;/)
-	assert.match(ui, /\.cattail-world-editor-shell\[data-toolbar-style="compact"\] \.cattail-world-editor-blueprint-library-button::before,[\s\S]*?width:\s*1px;[\s\S]*?background:\s*var\(--world-editor-shell-border, rgba\(0, 0, 0, \.14\)\);/)
+	assert.doesNotMatch(ui, /\.cattail-world-editor-shell\[data-toolbar-style="compact"\] \.cattail-world-editor-blueprint-(?:library|save)-button::before/)
 	assert.match(ui, /\.cattail-world-editor-dialog\[data-kind\^="blueprint-library-"\]\s*\{\s*z-index:\s*100050;/)
 	assert.match(ui, /\.cattail-world-editor-dialog\[data-kind\^="blueprint-library-"\] \.cattail-world-editor-library__separator\s*\{\s*display:\s*none;/)
 	assert.doesNotMatch(ui, /\.cattail-world-editor-dialog\[data-kind\^="blueprint-library-"\]\s*\{[^}]*--world-editor-dialog-bg:/)
@@ -527,7 +551,9 @@ function testManifestAndStaticUiContracts() {
 	assert.match(format, /240 - utf8Length\(suffix\)/)
 	assert.match(thumbnail, /area:\s*'cache',\s*bucket:\s*'thumbnails'/)
 	assert.match(thumbnail, /handle\.write\(\{ area:\s*'cache',\s*bucket:\s*'thumbnails'/)
-	assert.match(thumbnail, /const CACHE_VERSION = 'v3'/)
+	assert.match(thumbnail, /const CACHE_VERSION = 'v4'/)
+	assert.match(thumbnail, /const summary = String\(\(blueprint\.entities \|\| \[\]\)\.length\) \+ ' Buildings'/)
+	assert.doesNotMatch(thumbnail, /length\) \+ ' cubes|length\) \+ ' surges'/i)
 	assert.doesNotMatch(thumbnail, /context\.fillStyle = '#14161b'[\s\S]*?context\.fillRect\(0, 0, canvas\.width, canvas\.height\)/)
 	assert.doesNotMatch(thumbnail, /context\.strokeRect\(\.5, \.5, canvas\.width - 1, canvas\.height - 1\)/)
 	assert.match(thumbnail, /context\.clearRect\(0, 0, canvas\.width, canvas\.height\)/)
@@ -568,16 +594,22 @@ function testManifestAndStaticUiContracts() {
 	assert.match(cutUi, /let removeSurges = false/)
 	assert.match(session, /session\.setIncludeBlocks\(false, 'placement-finished-default'\)/)
 	assert.match(session, /session\.setIncludeSurges\(false, 'placement-finished-default'\)/)
-	assert.match(session, /placementCubeOption/)
-	assert.match(session, /placementSurgeOption/)
+	assert.match(session, /session\.setSyncEmpty\(false, 'placement-finished-default'\)/)
+	assert.doesNotMatch(session, /confirmPlacementLayers|placementOptionsTitleFull|placementLayerMessage|placementCubeOption|placementSurgeOption/)
+	assert.match(session, /includeBlocks:\s*currentSession\.includeBlocks === true/)
+	assert.match(session, /includeSurges:\s*currentSession\.includeSurges === true/)
+	assert.match(session, /clearBlueprint\.dataset\.worldEditorBlueprintAction = 'clear'/)
+	assert.match(session, /controls\.clearBlueprint\.addEventListener\('click', handleClear\)/)
+	assert.match(session, /session\.clear\('ui-clear-active-blueprint'\)/)
+	assert.doesNotMatch(session, /toolbar-exit-blueprint|handleExitPreview/)
 }
 
 async function run() {
 	testPageRegistrationAndLanguageFallback()
 	await testThumbnailCacheReadAndDeduplication()
-	await testBuildingThumbnailRenderingAndV3Cache()
+	await testBuildingThumbnailRenderingAndV4Cache()
 	testManifestAndStaticUiContracts()
-	console.log('World Editor 5A UI verification passed: Pages API, toolbar and blueprint-card manual save entries, modal keyboard ownership and Escape/focus behavior, shared list/grid model with transparent v3 building thumbnails, game-native typography, details preferences, metadata with/without previews, CRUD/problem actions, non-blocking dialogs, overwrite-without-unsaved-guards, per-placement/per-cut layer defaults, and thumbnail cache contracts.')
+	console.log('World Editor 5A UI verification passed: Pages API, toolbar and blueprint-card manual save entries, modal keyboard ownership and Escape/focus behavior, shared list/grid model with transparent v4 building thumbnails, game-native typography, details preferences, metadata with/without previews, CRUD/problem actions, non-blocking dialogs, overwrite-without-unsaved-guards, per-placement/per-cut layer defaults, and thumbnail cache contracts.')
 }
 
 run().catch(error => {

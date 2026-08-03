@@ -967,6 +967,7 @@ function testLocalizationManifestUiAndDocumentation() {
 	assert.match(ui, /color: var\(--world-editor-dialog-muted\)/)
 	assert.match(ui, /markProbe\('confirmation-clicked'/)
 	assert.match(ui, /markProbe\('execute-returned'/)
+	assert.match(ui, /clearStatus\(\)\s*openConfirmation\(plan, input\)/)
 	assert.match(core, /const PROBE_EVENT_LIMIT = 160/)
 	assert.match(core, /diagnostics\(\)/)
 	assert.doesNotMatch(core, /\[4C-1a Probe\]/)

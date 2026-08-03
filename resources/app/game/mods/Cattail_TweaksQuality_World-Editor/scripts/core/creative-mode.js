@@ -182,7 +182,7 @@ ModLoader.register({
 				}
 				const slotsState = saveSlots.snapshot()
 				if (!slotsState?.ready) throw createError('SAVE_SLOTS_UNAVAILABLE', 'Better UIs save slots are not ready.')
-				if (Number(slotsState.emptyCount) < 2) throw createError('INSUFFICIENT_EMPTY_SLOTS', 'Two empty manual save slots are required.')
+				if (Number(slotsState.emptyCount) < 1) throw createError('INSUFFICIENT_EMPTY_SLOTS', 'One empty manual save slot is required.')
 				if (slotsState.slots?.some?.(function (slot) { return slot?.occupied && slot.name === creativeName })) {
 					throw createError('NAME_CONFLICT', 'A creative copy already uses this name.')
 				}
@@ -231,10 +231,9 @@ ModLoader.register({
 					}
 					const result = await saveSlots.createAndActivate({
 						entries: [
-							{ name: originalName, data: originalData, nameConflict: 'allow' },
 							{ name: creativeName, data: creativeData, nameConflict: 'reject' }
 						],
-						activateEntry: 1
+						activateEntry: 0
 					})
 					if (!result?.activated || !result?.reloadScheduled) {
 						throw createError('ACTIVATE_FAILED', 'The creative copy was not activated.')

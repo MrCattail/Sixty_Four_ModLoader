@@ -198,6 +198,7 @@ ModLoader.register({
 					clearTemporaryWindow()
 				}
 				refreshUi()
+				syncEmptyPlacementOverlay('session-sync-empty')
 			})
 			const stopCreativeSubscription = creative.subscribe(function (state) {
 				const wasCreative = !!currentCreative?.ready && !!currentCreative?.creativeMode
@@ -388,6 +389,9 @@ ModLoader.register({
 						) {
 							refreshCard()
 						}
+						if (interactionChanged || !previousState || previousState.plan !== state.plan) {
+							syncEmptyPlacementOverlay('preview-sync-empty')
+						}
 					})
 				}
 				refreshTransformUi()
@@ -399,6 +403,7 @@ ModLoader.register({
 				let mode = creative.snapshot?.().ready && creative.snapshot?.().creativeMode ? 'full' : 'structure'
 				let includeBlocks = false
 				let includeSurges = false
+				let syncEmpty = false
 				let sourceBlueprint = null
 				let blueprint = null
 				let dirty = false
@@ -417,6 +422,7 @@ ModLoader.register({
 						mode,
 						includeBlocks: mode === 'full' && includeBlocks,
 						includeSurges: mode === 'full' && includeSurges,
+						syncEmpty,
 						sourceBlueprint,
 						blueprint,
 						dirty,
@@ -458,6 +464,7 @@ ModLoader.register({
 					blueprint = executionBlueprint(normalized, mode)
 					includeBlocks = false
 					includeSurges = false
+					syncEmpty = false
 					dirty = options?.dirty === true
 					origin = options?.origin ? deepFreeze(jsonClone(options.origin)) : null
 					attemptId += 1
@@ -558,6 +565,9 @@ ModLoader.register({
 					}
 
 					const normalized = deepFreeze(jsonClone(candidate.blueprint))
+					includeBlocks = false
+					includeSurges = false
+					syncEmpty = false
 					sourceBlueprint = normalized
 					blueprint = executionBlueprint(normalized, mode)
 					dirty = true
@@ -638,6 +648,7 @@ ModLoader.register({
 					attemptId += 1
 					includeBlocks = false
 					includeSurges = false
+					syncEmpty = false
 					sourceBlueprint = candidate.blueprint
 					blueprint = executionBlueprint(sourceBlueprint, mode)
 					dirty = true
@@ -730,6 +741,16 @@ ModLoader.register({
 						if (reason) console.info('[Cattail World Editor] Blueprint surges ' + (next ? 'enabled' : 'disabled') + ' (' + reason + ').')
 						return true
 					},
+					setSyncEmpty(next, reason) {
+						if (disposed || !sourceBlueprint?.emptyCells?.length) return false
+						next = !!next
+						if (syncEmpty === next) return false
+						syncEmpty = next
+						revision += 1
+						notify()
+						if (reason) console.info('[Cattail World Editor] Blueprint empty-cell sync ' + (next ? 'enabled' : 'disabled') + ' (' + reason + ').')
+						return true
+					},
 					loadSource(nextSource, metadata, reason) {
 						if (disposed) throw new Error('blueprint-session-disposed')
 						const state = replaceSource(nextSource, { dirty: false, origin: metadata || null })
@@ -759,6 +780,7 @@ ModLoader.register({
 						origin = null
 						includeBlocks = false
 						includeSurges = false
+						syncEmpty = false
 						lastResult = null
 						revision += 1
 						notify()
@@ -1302,18 +1324,21 @@ ModLoader.register({
 			function mountUi() {
 				const shell = document.getElementById(SHELL_ID)
 				const blueprintSlot = shell?.querySelector?.('[data-world-editor-slot="blueprint"]')
+				const blueprintLibrarySlot = shell?.querySelector?.('[data-world-editor-slot="blueprint-library"]')
 				const transformSlot = shell?.querySelector?.('[data-world-editor-slot="transform"]')
-				if (!shell || !blueprintSlot || !transformSlot) {
+				if (!shell || !blueprintSlot || !blueprintLibrarySlot || !transformSlot) {
 					console.warn('[Cattail World Editor] Blueprint 3A could not find the grouped toolbar slots.')
 					return null
 				}
 				document.getElementById(CARD_ID)?.remove()
 				blueprintSlot.querySelector?.('[data-world-editor-blueprint-controls]')?.remove()
+				blueprintLibrarySlot.querySelector?.('[data-world-editor-blueprint-action="copy"]')?.remove()
 				transformSlot.querySelector?.('[data-world-editor-transform-controls="toolbar"]')?.remove()
 				const style = ensureStyle()
 				const controls = createControls()
 				const card = createCard()
 				blueprintSlot.append(controls.root)
+				blueprintLibrarySlot.prepend(controls.copy)
 				transformSlot.append(controls.transforms)
 				document.body.append(card)
 
@@ -1353,6 +1378,8 @@ ModLoader.register({
 				controls.full.addEventListener('click', handleFullMode)
 				controls.blocks.addEventListener('click', handleBlocksToggle)
 				controls.surges.addEventListener('click', handleSurgesToggle)
+				controls.syncEmpty.addEventListener('click', handleSyncEmptyToggle)
+				controls.clearBlueprint.addEventListener('click', handleClear)
 				controls.copy.addEventListener('click', handleCopy)
 				controls.transforms.addEventListener('click', handleTransformAction)
 				controls.transforms.addEventListener('pointerover', handleTransformGuidePointerOver)
@@ -1434,6 +1461,8 @@ ModLoader.register({
 				ui.controls.full.removeEventListener('click', handleFullMode)
 				ui.controls.blocks.removeEventListener('click', handleBlocksToggle)
 				ui.controls.surges.removeEventListener('click', handleSurgesToggle)
+				ui.controls.syncEmpty.removeEventListener('click', handleSyncEmptyToggle)
+				ui.controls.clearBlueprint.removeEventListener('click', handleClear)
 				ui.controls.copy.removeEventListener('click', handleCopy)
 				ui.controls.transforms.removeEventListener('click', handleTransformAction)
 				ui.controls.transforms.removeEventListener('pointerover', handleTransformGuidePointerOver)
@@ -1457,6 +1486,7 @@ ModLoader.register({
 				ui.worldDragControls?.release?.()
 				if (typeof ui.releaseHud === 'function') ui.releaseHud()
 				ui.controls.root.remove()
+				ui.controls.copy.remove()
 				ui.controls.transforms.remove()
 				ui.card.remove()
 				if (ui.style.isConnected && !document.getElementById(CARD_ID)) ui.style.remove()
@@ -1488,8 +1518,8 @@ ModLoader.register({
 				blocks.hidden = true
 				blocks.setAttribute('aria-hidden', 'true')
 				const cubeCanvas = document.createElement('canvas')
-				cubeCanvas.width = 24
-				cubeCanvas.height = 24
+				cubeCanvas.width = 48
+				cubeCanvas.height = 48
 				cubeCanvas.setAttribute('aria-hidden', 'true')
 				blocks.append(cubeCanvas)
 				appendToolbarCardLabel(blocks, 'cubes')
@@ -1503,11 +1533,38 @@ ModLoader.register({
 				surges.hidden = true
 				surges.setAttribute('aria-hidden', 'true')
 				const surgeIcon = document.createElement('span')
-				surgeIcon.className = 'cattail-world-editor-blueprint-copy-icon'
+				surgeIcon.className = 'cattail-world-editor-blueprint-surge-icon'
 				surgeIcon.setAttribute('aria-hidden', 'true')
-				surgeIcon.textContent = '⚡'
 				surges.append(surgeIcon)
 				appendToolbarCardLabel(surges, 'surges')
+
+				const syncEmpty = document.createElement('button')
+				syncEmpty.type = 'button'
+				syncEmpty.className = 'cattail-world-editor-blueprint-icon-button'
+				syncEmpty.dataset.worldEditorBlueprintAction = 'sync-empty'
+				syncEmpty.dataset.worldEditorToolbarCard = ''
+				syncEmpty.setAttribute('aria-pressed', 'false')
+				syncEmpty.hidden = true
+				syncEmpty.setAttribute('aria-hidden', 'true')
+				const syncEmptyIcon = document.createElement('span')
+				syncEmptyIcon.className = 'cattail-world-editor-blueprint-sync-empty-icon'
+				syncEmptyIcon.setAttribute('aria-hidden', 'true')
+				syncEmpty.append(syncEmptyIcon)
+				appendToolbarCardLabel(syncEmpty, 'sync-empty')
+
+				const clearBlueprint = document.createElement('button')
+				clearBlueprint.type = 'button'
+				clearBlueprint.className = 'cattail-world-editor-blueprint-icon-button'
+				clearBlueprint.dataset.worldEditorBlueprintAction = 'clear'
+				clearBlueprint.dataset.worldEditorToolbarCard = ''
+				clearBlueprint.hidden = true
+				clearBlueprint.setAttribute('aria-hidden', 'true')
+				const clearBlueprintIcon = document.createElement('span')
+				clearBlueprintIcon.className = 'cattail-world-editor-blueprint-clear-icon'
+				clearBlueprintIcon.setAttribute('aria-hidden', 'true')
+				clearBlueprintIcon.textContent = '\u00d7'
+				clearBlueprint.append(clearBlueprintIcon)
+				appendToolbarCardLabel(clearBlueprint, 'clear-blueprint')
 
 				const copy = document.createElement('button')
 				copy.type = 'button'
@@ -1517,13 +1574,13 @@ ModLoader.register({
 				const copyIcon = document.createElement('span')
 				copyIcon.className = 'cattail-world-editor-blueprint-copy-icon'
 				copyIcon.setAttribute('aria-hidden', 'true')
-				copyIcon.textContent = '⧉'
+				copyIcon.textContent = '+'
 				copy.append(copyIcon)
 				appendToolbarCardLabel(copy, 'copy')
 
 				const transforms = createTransformControls('toolbar')
-				root.append(modes, blocks, surges, copy)
-				return { root, modes, structure, full, blocks, surges, copy, transforms }
+				root.append(modes, blocks, surges, syncEmpty, clearBlueprint)
+				return { root, modes, structure, full, blocks, surges, syncEmpty, clearBlueprint, copy, transforms }
 			}
 
 			function createModeButton(mode) {
@@ -1801,6 +1858,7 @@ ModLoader.register({
 			}
 
 			function refreshToolbar() {
+				if (!ui) return
 				const state = currentSession
 				const creativeAvailable = !!currentCreative?.ready && !!currentCreative?.creativeMode
 				const selectionAvailable = !!(
@@ -1821,6 +1879,7 @@ ModLoader.register({
 				ui.controls.modes.dataset.columns = creativeAvailable ? '2' : '1'
 				const blocksAvailable = creativeAvailable && state.mode === 'full' && !!state.sourceBlueprint?.blocks?.length
 				const surgesAvailable = creativeAvailable && state.mode === 'full' && !!state.sourceBlueprint?.surges?.length
+				const syncEmptyAvailable = !!state.sourceBlueprint?.emptyCells?.length
 				ui.controls.blocks.hidden = !blocksAvailable
 				ui.controls.blocks.setAttribute('aria-hidden', blocksAvailable ? 'false' : 'true')
 				ui.controls.blocks.disabled = !blocksAvailable
@@ -1831,6 +1890,20 @@ ModLoader.register({
 				ui.controls.surges.disabled = !surgesAvailable
 				ui.controls.surges.dataset.active = state.includeSurges ? 'true' : 'false'
 				ui.controls.surges.setAttribute('aria-pressed', state.includeSurges ? 'true' : 'false')
+				ui.controls.syncEmpty.hidden = !syncEmptyAvailable
+				ui.controls.syncEmpty.setAttribute('aria-hidden', syncEmptyAvailable ? 'false' : 'true')
+				ui.controls.syncEmpty.disabled = !syncEmptyAvailable
+				ui.controls.syncEmpty.dataset.active = state.syncEmpty ? 'true' : 'false'
+				ui.controls.syncEmpty.setAttribute('aria-pressed', state.syncEmpty ? 'true' : 'false')
+				const clearBlueprintAvailable = !!(
+					state.sourceBlueprint ||
+					state.blueprint ||
+					state.lastResult ||
+					state.capturing
+				)
+				ui.controls.clearBlueprint.hidden = !clearBlueprintAvailable
+				ui.controls.clearBlueprint.setAttribute('aria-hidden', clearBlueprintAvailable ? 'false' : 'true')
+				ui.controls.clearBlueprint.disabled = !clearBlueprintAvailable
 				ui.controls.copy.disabled = !captureAvailable
 				ui.controls.copy.dataset.worldEditorLargeHidden = selectionAvailable && !!currentRuntime.active ? 'false' : 'true'
 				ui.controls.copy.dataset.worldEditorToolbarBusy = state.capturing ? 'true' : 'false'
@@ -1849,6 +1922,8 @@ ModLoader.register({
 				const fullText = i18n.t(source, 'blueprintModeFull')
 				const blocksText = i18n.t(source, 'blueprintIncludeBlocks')
 				const surgesText = i18n.t(source, 'blueprintIncludeSurges')
+				const syncEmptyText = i18n.t(source, 'blueprintSyncEmpty')
+				const clearBlueprintText = i18n.t(source, 'blueprintClear')
 				const copyText = i18n.t(source, 'blueprintCopy')
 				ui.controls.structure.querySelector('.cattail-world-editor-blueprint-compact-label').textContent = structureText
 				ui.controls.full.querySelector('.cattail-world-editor-blueprint-compact-label').textContent = fullText
@@ -1860,12 +1935,18 @@ ModLoader.register({
 				ui.controls.blocks.setAttribute('aria-label', blocksText)
 				ui.controls.surges.title = surgesText
 				ui.controls.surges.setAttribute('aria-label', surgesText)
+				ui.controls.syncEmpty.title = syncEmptyText
+				ui.controls.syncEmpty.setAttribute('aria-label', syncEmptyText)
+				ui.controls.clearBlueprint.title = clearBlueprintText
+				ui.controls.clearBlueprint.setAttribute('aria-label', clearBlueprintText)
 				ui.controls.copy.title = copyText
 				ui.controls.copy.setAttribute('aria-label', copyText)
 				setToolbarCardText(ui.controls.structure, i18n.t(source, 'toolbarCardStructure'))
 				setToolbarCardText(ui.controls.full, i18n.t(source, 'toolbarCardFull'))
 				setToolbarCardText(ui.controls.blocks, i18n.t(source, 'toolbarCardCubes'))
 				setToolbarCardText(ui.controls.surges, i18n.t(source, 'toolbarCardSurges'))
+				setToolbarCardText(ui.controls.syncEmpty, i18n.t(source, 'toolbarCardSyncEmpty'))
+				setToolbarCardText(ui.controls.clearBlueprint, clearBlueprintText)
 				setToolbarCardText(ui.controls.copy, i18n.t(source, 'toolbarCardCopy'))
 				refreshTransformText(source)
 				const clear = ui.card.querySelector('[data-world-editor-blueprint-action="clear"]')
@@ -2026,6 +2107,32 @@ ModLoader.register({
 					return globalThis[PREVIEW_KEY]?.snapshot?.() || null
 				} catch (error) {
 					return null
+				}
+			}
+
+			function syncEmptyPlacementOverlay(reason) {
+				connectPreviewController()
+				const controller = previewController || globalThis[PREVIEW_KEY]
+				if (!controller || typeof controller.setPlacementOverlay !== 'function') return false
+				if (Number(dialogs?.snapshot?.().openCount) > 0 || currentPlacement?.busy) return false
+				const state = currentPreview || controller.snapshot?.()
+				if (!currentSession.syncEmpty || !state?.active || state.paused || !state.plan) {
+					return controller.setPlacementOverlay(null, reason || 'sync-empty-disabled')
+				}
+				try {
+					const analysis = placement.analyze?.(state.plan)
+					const proposal = analysis?.variants?.['01'] || analysis?.variants?.['00']
+					if (!proposal) return controller.setPlacementOverlay(null, reason || 'sync-empty-unavailable')
+					return controller.setPlacementOverlay({
+						target: analysis.target,
+						replaceConflicts: false,
+						syncEmpty: true,
+						emptyCells: proposal.emptyCells || [],
+						removals: proposal.removals || [],
+						protectedTargets: proposal.protectedTargets || []
+					}, reason || 'sync-empty-toolbar')
+				} catch (error) {
+					return controller.setPlacementOverlay(null, reason || 'sync-empty-analysis-failed')
 				}
 			}
 
@@ -2637,6 +2744,11 @@ ModLoader.register({
 				session.setIncludeSurges(!currentSession.includeSurges, 'toolbar')
 			}
 
+			function handleSyncEmptyToggle(event) {
+				stopUiEvent(event)
+				session.setSyncEmpty(!currentSession.syncEmpty, 'toolbar')
+			}
+
 			function handleCopy(event) {
 				stopUiEvent(event)
 				if (!canCapture(currentSelection)) return
@@ -2690,6 +2802,7 @@ ModLoader.register({
 					await controller.releaseCommandTarget(token, 'blueprint-placement-complete')
 					session.setIncludeBlocks(false, 'placement-finished-default')
 					session.setIncludeSurges(false, 'placement-finished-default')
+					session.setSyncEmpty(false, 'placement-finished-default')
 					markPlacementProbe('target-lock.released', { input, target })
 				}
 			}
@@ -2707,16 +2820,6 @@ ModLoader.register({
 				if (!blueprintPlacementAllowed(blueprint) || !normalizePosition(target)) return null
 				let plan = controller?.snapshot?.().plan || null
 				if (!plan) return null
-				const sourceBlueprint = currentSession.sourceBlueprint
-				if (
-					blueprint.mode === 'full' &&
-					(sourceBlueprint?.blocks?.length || sourceBlueprint?.surges?.length)
-				) {
-					const layerChoice = await confirmPlacementLayers(controller, sourceBlueprint)
-					if (!layerChoice) return null
-					plan = layerChoice.plan
-					if (!plan) return null
-				}
 				markPlacementProbe('place.requested', {
 					input,
 					target,
@@ -2743,14 +2846,15 @@ ModLoader.register({
 					variants: placementVariantsProbe(analysis.variants)
 				})
 				let replaceConflicts = false
-				let syncEmpty = false
-				let confirmedProposal = analysis.variants?.['00'] || null
-				if (analysis.hasConflicts || analysis.hasEmptyTargets) {
+				let syncEmpty = currentSession.syncEmpty === true
+				let confirmedProposal = analysis.variants?.['0' + (syncEmpty ? '1' : '0')] || analysis.variants?.['00'] || null
+				if (analysis.hasConflicts) {
 					markPlacementProbe('options.required', {
 						hasConflicts: analysis.hasConflicts,
-						hasEmptyTargets: analysis.hasEmptyTargets
+						hasEmptyTargets: analysis.hasEmptyTargets,
+						syncEmpty
 					})
-					const choice = await confirmPlacementOptions(analysis, controller, plan)
+					const choice = await confirmPlacementOptions(analysis, controller, plan, syncEmpty)
 					if (!choice) {
 						markPlacementProbe('options.cancelled', { input, target })
 						await controller?.refreshNow?.('placement-cancelled')
@@ -2758,7 +2862,6 @@ ModLoader.register({
 						return null
 					}
 					replaceConflicts = choice.replaceConflicts === true
-					syncEmpty = choice.syncEmpty === true
 					confirmedProposal = choice.proposal
 				} else {
 					markPlacementProbe('options.skipped', {
@@ -2807,79 +2910,7 @@ ModLoader.register({
 				return result
 			}
 
-			function confirmPlacementLayers(controller, sourceBlueprint) {
-				if (!dialogs || dialogs.game !== game || typeof dialogs.create !== 'function') {
-					return Promise.resolve({
-						includeBlocks: currentSession.includeBlocks === true,
-						includeSurges: currentSession.includeSurges === true,
-						plan: controller?.snapshot?.().plan || null
-					})
-				}
-				return new Promise(function (resolve) {
-					let settled = false
-					let includeBlocks = currentSession.includeBlocks === true
-					let includeSurges = currentSession.includeSurges === true
-					const blockCount = Number(sourceBlueprint?.blocks?.length) || 0
-					const surgeCount = Number(sourceBlueprint?.surges?.length) || 0
-					const finish = function (value, dialog, reason) {
-						if (settled) return
-						settled = true
-						resolve(value)
-						dialog.close(reason || 'blueprint-placement-layers-choice', true)
-					}
-					creative.setDialogOpen?.(true, 'blueprint-placement-layers-opened')
-					const dialog = dialogs.create({
-						id: 'cattail-world-editor-blueprint-placement-layers-dialog',
-						theme: game.plane ? 'void' : 'reality',
-						kind: 'blueprint-placement-options',
-						onClose() {
-							creative.setDialogOpen?.(false, 'blueprint-placement-layers-closed')
-							if (!settled) { settled = true; resolve(null) }
-						}
-					})
-					dialog.title.textContent = i18n.t(game, 'placementOptionsTitleFull')
-					dialog.message.textContent = i18n.t(game, 'placementLayerMessage')
-					const list = document.createElement('div')
-					list.className = 'cattail-world-editor-blueprint-placement-options'
-					const blocks = dialog.createButton('', {})
-					const surges = dialog.createButton('', {})
-					blocks.classList.add('cattail-world-editor-blueprint-placement-option')
-					surges.classList.add('cattail-world-editor-blueprint-placement-option')
-					blocks.hidden = !blockCount
-					surges.hidden = !surgeCount
-					list.append(blocks, surges)
-					dialog.content.append(list)
-					const render = function () {
-						blocks.textContent = formatTemplate(i18n.t(game, 'placementCubeOption'), { count: blockCount })
-						surges.textContent = formatTemplate(i18n.t(game, 'placementSurgeOption'), { count: surgeCount })
-						for (const entry of [[blocks, includeBlocks], [surges, includeSurges]]) {
-							entry[0].classList.toggle('cattail-world-editor-blueprint-placement-option--active', entry[1])
-							entry[0].setAttribute('aria-pressed', entry[1] ? 'true' : 'false')
-						}
-					}
-					blocks.addEventListener('click', function () { includeBlocks = !includeBlocks; render() })
-					surges.addEventListener('click', function () { includeSurges = !includeSurges; render() })
-					const cancel = dialog.createButton(i18n.t(game, 'placementCancel'))
-					const confirm = dialog.createButton(i18n.t(game, 'placementConfirmAction'), { primary: true })
-					cancel.addEventListener('click', function () { finish(null, dialog, 'blueprint-placement-layers-cancelled') })
-					confirm.addEventListener('click', async function () {
-						confirm.disabled = true
-						if (blockCount) session.setIncludeBlocks(includeBlocks, 'placement-dialog')
-						if (surgeCount) session.setIncludeSurges(includeSurges, 'placement-dialog')
-						try {
-							const refreshedPlan = await controller?.refreshNow?.('placement-layers-confirm')
-							finish({ includeBlocks, includeSurges, plan: refreshedPlan || controller?.snapshot?.().plan }, dialog, 'blueprint-placement-layers-confirmed')
-						} catch (error) {
-							finish(null, dialog, 'blueprint-placement-layers-failed')
-						}
-					})
-					dialog.actions.append(cancel, confirm)
-					render()
-					dialog.mount(cancel)
-				})
-			}
-
-			function confirmPlacementOptions(analysis, controller, plan) {
+			function confirmPlacementOptions(analysis, controller, plan, syncEmpty) {
 				if (!dialogs || dialogs.game !== game || typeof dialogs.create !== 'function') {
 					return Promise.resolve(null)
 				}
@@ -2887,19 +2918,15 @@ ModLoader.register({
 				return new Promise(function (resolve) {
 					let settled = false
 					let replaceConflicts = false
-					let syncEmpty = false
+					syncEmpty = syncEmpty === true
 					let replaceCandidateCount = (
 						Number(analysis.variants?.['10']?.summary?.replaceCount) +
 						Number(analysis.variants?.['10']?.summary?.protectedCount)
 					) || 0
-					let syncCandidateCount = (
-						Number(analysis.variants?.['01']?.summary?.syncDeleteCount) +
-						Number(analysis.variants?.['01']?.summary?.protectedCount)
-					) || 0
 					markPlacementProbe('options.opened', {
 						target: analysis.target,
 						replaceCandidateCount,
-						syncCandidateCount,
+						syncEmpty,
 						variants: placementVariantsProbe(analysis.variants)
 					})
 					const finish = function (choice, dialog, reason) {
@@ -2922,12 +2949,7 @@ ModLoader.register({
 							}
 						}
 					})
-					dialog.title.textContent = i18n.t(
-						game,
-						currentTransform?.blueprint?.mode === 'full'
-							? 'placementOptionsTitleFull'
-							: 'placementOptionsTitle'
-					)
+					dialog.title.textContent = i18n.t(game, 'placementOptionsTitle')
 					dialog.message.textContent = i18n.t(game, 'placementOptionsMessage')
 
 					const optionList = document.createElement('div')
@@ -2935,10 +2957,7 @@ ModLoader.register({
 					const replace = dialog.createButton('', {})
 					replace.classList.add('cattail-world-editor-blueprint-placement-option')
 					replace.disabled = !replaceCandidateCount
-					const sync = dialog.createButton('', {})
-					sync.classList.add('cattail-world-editor-blueprint-placement-option')
-					sync.disabled = !syncCandidateCount
-					optionList.append(replace, sync)
+					optionList.append(replace)
 
 					const summary = document.createElement('p')
 					summary.className = 'cattail-world-editor-blueprint-placement-options__summary'
@@ -2956,13 +2975,8 @@ ModLoader.register({
 						replace.textContent = formatTemplate(i18n.t(game, 'placementReplaceOption'), {
 							count: replaceCandidateCount
 						})
-						sync.textContent = formatTemplate(i18n.t(game, 'placementSyncEmptyOption'), {
-							count: syncCandidateCount
-						})
-						for (const entry of [[replace, replaceConflicts], [sync, syncEmpty]]) {
-							entry[0].classList.toggle('cattail-world-editor-blueprint-placement-option--active', entry[1])
-							entry[0].setAttribute('aria-pressed', entry[1] ? 'true' : 'false')
-						}
+						replace.classList.toggle('cattail-world-editor-blueprint-placement-option--active', replaceConflicts)
+						replace.setAttribute('aria-pressed', replaceConflicts ? 'true' : 'false')
 						const detail = proposal?.summary || {}
 						summary.textContent = formatTemplate(i18n.t(game, 'placementOptionsSummary'), {
 							build: Number(detail.buildCount) || 0,
@@ -2998,12 +3012,6 @@ ModLoader.register({
 						if (replace.disabled) return
 						replaceConflicts = !replaceConflicts
 						markPlacementProbe('options.replace-toggled', { replaceConflicts, syncEmpty })
-						renderChoice()
-					})
-					sync.addEventListener('click', function () {
-						if (sync.disabled) return
-						syncEmpty = !syncEmpty
-						markPlacementProbe('options.sync-toggled', { replaceConflicts, syncEmpty })
 						renderChoice()
 					})
 					cancel.addEventListener('click', function () {
@@ -3043,18 +3051,12 @@ ModLoader.register({
 								Number(analysis.variants?.['10']?.summary?.replaceCount) +
 								Number(analysis.variants?.['10']?.summary?.protectedCount)
 							) || 0
-							syncCandidateCount = (
-								Number(analysis.variants?.['01']?.summary?.syncDeleteCount) +
-								Number(analysis.variants?.['01']?.summary?.protectedCount)
-							) || 0
 							replace.disabled = !replaceCandidateCount
-							sync.disabled = !syncCandidateCount
 							if (!replaceCandidateCount) replaceConflicts = false
-							if (!syncCandidateCount) syncEmpty = false
 							renderChoice()
 							markPlacementProbe('options.reconfirmation-required', {
 								replaceCandidateCount,
-								syncCandidateCount
+								syncEmpty
 							})
 							return
 						}
@@ -3215,7 +3217,7 @@ ModLoader.register({
 			function handleClear(event) {
 				stopUiEvent(event)
 				ui.pinned = false
-				session.clear('card-clear')
+				session.clear('ui-clear-active-blueprint')
 			}
 
 			function handleCardMouseEnter() {
@@ -3514,7 +3516,7 @@ ModLoader.register({
 						color: var(--world-editor-shell-muted);
 						font: 600 11px/1.2 Montserrat, Arial, sans-serif;
 						cursor: pointer;
-						transition: background .12s ease, color .12s ease, opacity .12s ease;
+						transition: background .12s ease, border-color .12s ease, box-shadow .12s ease, color .12s ease, opacity .12s ease, transform .08s ease;
 					}
 					.cattail-world-editor-blueprint-mode {
 						min-width: 54px;
@@ -3524,26 +3526,179 @@ ModLoader.register({
 					.cattail-world-editor-blueprint-mode:last-child {
 						border-right: 0;
 					}
-					.cattail-world-editor-blueprint-mode[data-active="true"],
+					.cattail-world-editor-blueprint-mode[data-active="true"] {
+						background: transparent;
+						color: var(--world-editor-shell-text);
+					}
 					.cattail-world-editor-blueprint-icon-button[data-active="true"] {
 						background: var(--world-editor-shell-active);
 						color: var(--world-editor-shell-text);
+					}
+					.cattail-world-editor-blueprint-icon-button[data-world-editor-blueprint-action="blocks"][data-active="true"],
+					.cattail-world-editor-blueprint-icon-button[data-world-editor-blueprint-action="surges"][data-active="true"],
+					.cattail-world-editor-blueprint-icon-button[data-world-editor-blueprint-action="sync-empty"][data-active="true"] {
+						border-color: color-mix(in srgb, rgba(255, 255, 255, .88) 54%, var(--world-editor-hell-gem-1, #A6F246));
+						background: var(--world-editor-hell-gem-glass);
+						background-blend-mode: screen, screen, screen, normal;
+						backdrop-filter: var(--world-editor-glass-backdrop);
+						-webkit-backdrop-filter: var(--world-editor-glass-backdrop);
+						box-shadow: var(--world-editor-hell-gem-glass-shadow);
+						color: #17200c;
+					}
+					.cattail-world-editor-blueprint-icon-button[data-world-editor-blueprint-action="blocks"][data-active="true"]:hover:not(:disabled),
+					.cattail-world-editor-blueprint-icon-button[data-world-editor-blueprint-action="surges"][data-active="true"]:hover:not(:disabled),
+					.cattail-world-editor-blueprint-icon-button[data-world-editor-blueprint-action="sync-empty"][data-active="true"]:hover:not(:disabled) {
+						border-color: color-mix(in srgb, rgba(255, 255, 255, .96) 68%, var(--world-editor-hell-gem-1, #A6F246));
+						background: var(--world-editor-hell-gem-glass-hover);
+						box-shadow: var(--world-editor-hell-gem-glass-shadow-hover);
+					}
+					.cattail-world-editor-blueprint-icon-button[data-world-editor-blueprint-action="blocks"][data-active="true"]:active:not(:disabled),
+					.cattail-world-editor-blueprint-icon-button[data-world-editor-blueprint-action="surges"][data-active="true"]:active:not(:disabled),
+					.cattail-world-editor-blueprint-icon-button[data-world-editor-blueprint-action="sync-empty"][data-active="true"]:active:not(:disabled) {
+						transform: translateY(1px);
+						box-shadow: var(--world-editor-hell-gem-glass-shadow-pressed);
+					}
+					.cattail-world-editor-blueprint-icon-button[data-world-editor-blueprint-action="blocks"][data-active="true"]:focus-visible:not(:disabled),
+					.cattail-world-editor-blueprint-icon-button[data-world-editor-blueprint-action="surges"][data-active="true"]:focus-visible:not(:disabled),
+					.cattail-world-editor-blueprint-icon-button[data-world-editor-blueprint-action="sync-empty"][data-active="true"]:focus-visible:not(:disabled) {
+						box-shadow: var(--world-editor-hell-gem-glass-shadow), 0 0 0 2px var(--world-editor-shell-text) !important;
+					}
+					.cattail-world-editor-blueprint-icon-button[data-world-editor-blueprint-action="blocks"][data-active="true"]:disabled,
+					.cattail-world-editor-blueprint-icon-button[data-world-editor-blueprint-action="surges"][data-active="true"]:disabled,
+					.cattail-world-editor-blueprint-icon-button[data-world-editor-blueprint-action="sync-empty"][data-active="true"]:disabled {
+						opacity: .38;
+						box-shadow: none !important;
+					}
+					.cattail-world-editor-shell[data-toolbar-style="compact"] .cattail-world-editor-blueprint-icon-button[data-world-editor-blueprint-action="blocks"][data-active="true"],
+					.cattail-world-editor-shell[data-toolbar-style="compact"] .cattail-world-editor-blueprint-icon-button[data-world-editor-blueprint-action="surges"][data-active="true"],
+					.cattail-world-editor-shell[data-toolbar-style="compact"] .cattail-world-editor-blueprint-icon-button[data-world-editor-blueprint-action="sync-empty"][data-active="true"] {
+						border: 1px solid color-mix(in srgb, rgba(255, 255, 255, .88) 54%, var(--world-editor-hell-gem-1, #A6F246)) !important;
+						background: var(--world-editor-hell-gem-glass) !important;
+						background-blend-mode: screen, screen, screen, normal !important;
+						backdrop-filter: var(--world-editor-glass-backdrop) !important;
+						-webkit-backdrop-filter: var(--world-editor-glass-backdrop) !important;
+						box-shadow: var(--world-editor-hell-gem-glass-shadow) !important;
+					}
+					.cattail-world-editor-shell[data-toolbar-style="compact"] .cattail-world-editor-blueprint-icon-button[data-world-editor-blueprint-action="blocks"][data-active="true"]:hover:not(:disabled),
+					.cattail-world-editor-shell[data-toolbar-style="compact"] .cattail-world-editor-blueprint-icon-button[data-world-editor-blueprint-action="surges"][data-active="true"]:hover:not(:disabled),
+					.cattail-world-editor-shell[data-toolbar-style="compact"] .cattail-world-editor-blueprint-icon-button[data-world-editor-blueprint-action="sync-empty"][data-active="true"]:hover:not(:disabled) {
+						border: 1px solid color-mix(in srgb, rgba(255, 255, 255, .96) 68%, var(--world-editor-hell-gem-1, #A6F246)) !important;
+						background: var(--world-editor-hell-gem-glass-hover) !important;
+						background-blend-mode: screen, screen, screen, normal !important;
+						backdrop-filter: var(--world-editor-glass-backdrop) !important;
+						-webkit-backdrop-filter: var(--world-editor-glass-backdrop) !important;
+						box-shadow: var(--world-editor-hell-gem-glass-shadow-hover) !important;
+						color: #17200c !important;
+					}
+					.cattail-world-editor-shell[data-toolbar-style="compact"] .cattail-world-editor-blueprint-icon-button[data-world-editor-blueprint-action="blocks"][data-active="true"]:hover:not(:disabled) canvas,
+					.cattail-world-editor-shell[data-toolbar-style="compact"] .cattail-world-editor-blueprint-icon-button[data-world-editor-blueprint-action="surges"][data-active="true"]:hover:not(:disabled) canvas {
+						filter: none !important;
+					}
+					.cattail-world-editor-shell[data-toolbar-style="cards"] .cattail-world-editor-blueprint-icon-button[data-world-editor-blueprint-action="blocks"][data-active="true"],
+					.cattail-world-editor-shell[data-toolbar-style="cards"] .cattail-world-editor-blueprint-icon-button[data-world-editor-blueprint-action="surges"][data-active="true"],
+					.cattail-world-editor-shell[data-toolbar-style="cards"] .cattail-world-editor-blueprint-icon-button[data-world-editor-blueprint-action="sync-empty"][data-active="true"] {
+						background: transparent;
+						box-shadow: none;
+						color: #17200c;
+					}
+					.cattail-world-editor-shell[data-toolbar-style="cards"] .cattail-world-editor-blueprint-icon-button[data-world-editor-blueprint-action="blocks"][data-active="true"]::after,
+					.cattail-world-editor-shell[data-toolbar-style="cards"] .cattail-world-editor-blueprint-icon-button[data-world-editor-blueprint-action="surges"][data-active="true"]::after,
+					.cattail-world-editor-shell[data-toolbar-style="cards"] .cattail-world-editor-blueprint-icon-button[data-world-editor-blueprint-action="sync-empty"][data-active="true"]::after {
+						background: var(--world-editor-hell-gem-glass);
+						background-blend-mode: screen, screen, screen, normal;
+						backdrop-filter: var(--world-editor-glass-backdrop);
+						-webkit-backdrop-filter: var(--world-editor-glass-backdrop);
+						box-shadow: var(--world-editor-hell-gem-glass-shadow);
+					}
+					.cattail-world-editor-shell[data-toolbar-style="cards"] .cattail-world-editor-blueprint-icon-button[data-world-editor-blueprint-action="blocks"][data-active="true"]:hover:not(:disabled),
+					.cattail-world-editor-shell[data-toolbar-style="cards"] .cattail-world-editor-blueprint-icon-button[data-world-editor-blueprint-action="surges"][data-active="true"]:hover:not(:disabled),
+					.cattail-world-editor-shell[data-toolbar-style="cards"] .cattail-world-editor-blueprint-icon-button[data-world-editor-blueprint-action="sync-empty"][data-active="true"]:hover:not(:disabled),
+					.cattail-world-editor-shell[data-toolbar-style="cards"] .cattail-world-editor-blueprint-icon-button[data-world-editor-blueprint-action="surges"][data-active="true"]:hover:not(:disabled) .cattail-world-editor-blueprint-surge-icon,
+					.cattail-world-editor-shell[data-toolbar-style="cards"] .cattail-world-editor-blueprint-icon-button[data-world-editor-blueprint-action="sync-empty"][data-active="true"]:hover:not(:disabled) .cattail-world-editor-blueprint-sync-empty-icon {
+						color: #17200c !important;
+					}
+					.cattail-world-editor-shell[data-toolbar-style="cards"] .cattail-world-editor-blueprint-icon-button[data-world-editor-blueprint-action="blocks"][data-active="true"]:hover:not(:disabled) canvas,
+					.cattail-world-editor-shell[data-toolbar-style="cards"] .cattail-world-editor-blueprint-icon-button[data-world-editor-blueprint-action="surges"][data-active="true"]:hover:not(:disabled) canvas {
+						filter: none !important;
+					}
+					.cattail-world-editor-shell[data-toolbar-style="cards"] .cattail-world-editor-blueprint-icon-button[data-world-editor-blueprint-action="blocks"][data-active="true"]:hover:not(:disabled)::after,
+					.cattail-world-editor-shell[data-toolbar-style="cards"] .cattail-world-editor-blueprint-icon-button[data-world-editor-blueprint-action="surges"][data-active="true"]:hover:not(:disabled)::after,
+					.cattail-world-editor-shell[data-toolbar-style="cards"] .cattail-world-editor-blueprint-icon-button[data-world-editor-blueprint-action="sync-empty"][data-active="true"]:hover:not(:disabled)::after {
+						background: var(--world-editor-hell-gem-glass-hover) !important;
+						background-blend-mode: screen, screen, screen, normal !important;
+						backdrop-filter: var(--world-editor-glass-backdrop) !important;
+						-webkit-backdrop-filter: var(--world-editor-glass-backdrop) !important;
+						box-shadow: var(--world-editor-hell-gem-glass-shadow-hover) !important;
+					}
+					.cattail-world-editor-shell[data-toolbar-style="cards"] .cattail-world-editor-blueprint-icon-button[data-world-editor-blueprint-action="blocks"][data-active="true"]:disabled::after,
+					.cattail-world-editor-shell[data-toolbar-style="cards"] .cattail-world-editor-blueprint-icon-button[data-world-editor-blueprint-action="surges"][data-active="true"]:disabled::after,
+					.cattail-world-editor-shell[data-toolbar-style="cards"] .cattail-world-editor-blueprint-icon-button[data-world-editor-blueprint-action="sync-empty"][data-active="true"]:disabled::after {
+						box-shadow: none;
 					}
 					.cattail-world-editor-blueprint-icon-button {
 						display: inline-grid;
 						width: 30px;
 						min-width: 30px;
+						padding: 0;
 						place-items: center;
 						border: 1px solid var(--world-editor-shell-border);
 						border-radius: 6px;
 					}
 					.cattail-world-editor-blueprint-icon-button canvas {
+						display: block;
 						width: 24px;
 						height: 24px;
+						place-self: center;
+						margin: 0;
 					}
 					.cattail-world-editor-blueprint-copy-icon {
 						font-size: 20px;
 						line-height: 1;
+					}
+					.cattail-world-editor-blueprint-clear-icon {
+						display: block;
+						place-self: center;
+						font-size: 22px;
+						font-weight: 700;
+						line-height: 1;
+						color: currentColor;
+						pointer-events: none;
+					}
+					.cattail-world-editor-blueprint-surge-icon {
+						position: relative;
+						display: block;
+						box-sizing: border-box;
+						width: 16px;
+						height: 20px;
+						place-self: center;
+						margin: 0;
+						color: currentColor;
+						pointer-events: none;
+					}
+					.cattail-world-editor-blueprint-surge-icon::before {
+						content: '';
+						position: absolute;
+						inset: 0;
+						background: currentColor;
+						clip-path: polygon(58% 0, 10% 55%, 40% 55%, 27% 100%, 90% 38%, 58% 38%);
+					}
+					.cattail-world-editor-blueprint-sync-empty-icon {
+						position: relative;
+						display: block;
+						box-sizing: border-box;
+						width: 18px;
+						height: 18px;
+						place-self: center;
+						margin: 0;
+						color: currentColor;
+						pointer-events: none;
+					}
+					.cattail-world-editor-blueprint-sync-empty-icon::before {
+						content: '';
+						position: absolute;
+						inset: 4px 0;
+						background: currentColor;
+						clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%);
 					}
 					.cattail-world-editor-transform-controls {
 						display: inline-flex;
@@ -3878,18 +4033,36 @@ ModLoader.register({
 					}
 					.cattail-world-editor-blueprint-card__place {
 						min-height: 34px;
-						border: 1px solid color-mix(in srgb, #09a943 62%, var(--blueprint-card-border));
+						border: 1px solid color-mix(in srgb, rgba(255, 255, 255, .88) 54%, var(--world-editor-hell-gem-1, #A6F246));
 						border-radius: 6px;
 						padding: 7px 10px;
-						background: color-mix(in srgb, rgba(9, 169, 67, .20) var(--world-editor-card-shell-percent), transparent);
-						color: var(--blueprint-card-text);
+						background: var(--world-editor-hell-gem-glass);
+						background-blend-mode: screen, screen, screen, normal;
+						backdrop-filter: var(--world-editor-glass-backdrop);
+						-webkit-backdrop-filter: var(--world-editor-glass-backdrop);
+						box-shadow: var(--world-editor-hell-gem-glass-shadow);
+						color: #17200c;
 						font: 700 11px/1.25 Montserrat, Arial, sans-serif;
 						cursor: pointer;
 						outline: none;
+						transition: background .12s ease, border-color .12s ease, box-shadow .12s ease, opacity .12s ease, transform .08s ease;
+					}
+					.cattail-world-editor-blueprint-card__place:hover:not(:disabled) {
+						border-color: color-mix(in srgb, rgba(255, 255, 255, .96) 68%, var(--world-editor-hell-gem-1, #A6F246));
+						background: var(--world-editor-hell-gem-glass-hover);
+						box-shadow: var(--world-editor-hell-gem-glass-shadow-hover);
+					}
+					.cattail-world-editor-blueprint-card__place:active:not(:disabled) {
+						transform: translateY(1px);
+						box-shadow: var(--world-editor-hell-gem-glass-shadow-pressed);
+					}
+					.cattail-world-editor-blueprint-card__place:focus-visible:not(:disabled) {
+						box-shadow: var(--world-editor-hell-gem-glass-shadow), 0 0 0 2px var(--blueprint-card-text);
 					}
 					.cattail-world-editor-blueprint-card__place:disabled {
-						opacity: .36;
+						opacity: .38;
 						cursor: default;
+						box-shadow: none;
 					}
 					.cattail-world-editor-blueprint-card__placement-state {
 						color: var(--blueprint-card-muted);
@@ -3899,11 +4072,15 @@ ModLoader.register({
 						overflow-wrap: anywhere;
 					}
 					.cattail-world-editor-dialog[data-kind="blueprint-placement-options"] {
-						--world-editor-blueprint-option-green: #a6f246;
+						--world-editor-blueprint-option-green: var(--world-editor-hell-gem-1, #A6F246);
+						--world-editor-blueprint-option-green-highlight: var(--world-editor-hell-gem-2, #E3FD43);
+						--world-editor-blueprint-option-green-shadow: var(--world-editor-hell-gem-3, #4CB96B);
 						--world-editor-blueprint-option-green-text: #17200c;
 					}
 					.cattail-world-editor-dialog[data-theme="void"][data-kind="blueprint-placement-options"] {
-						--world-editor-blueprint-option-green: #e3fd43;
+						--world-editor-blueprint-option-green: var(--world-editor-hell-gem-2, #E3FD43);
+						--world-editor-blueprint-option-green-highlight: var(--world-editor-hell-gem-1, #A6F246);
+						--world-editor-blueprint-option-green-shadow: var(--world-editor-hell-gem-3, #4CB96B);
 						--world-editor-blueprint-option-green-text: #171a05;
 					}
 					.cattail-world-editor-blueprint-placement-options {
@@ -3925,13 +4102,61 @@ ModLoader.register({
 						transform: translateY(1px);
 					}
 					.cattail-world-editor-blueprint-placement-option--active:not(:disabled) {
-						border-color: color-mix(in srgb, var(--world-editor-blueprint-option-green) 78%, #26331d);
-						background: var(--world-editor-blueprint-option-green);
+						border-color: color-mix(in srgb, rgba(255, 255, 255, .88) 54%, var(--world-editor-blueprint-option-green));
+						background:
+							radial-gradient(ellipse 92% 72% at 50% -18%, rgba(255, 255, 255, .72) 0%, rgba(255, 255, 255, .22) 46%, transparent 72%),
+							linear-gradient(180deg, rgba(255, 255, 255, .28) 0%, rgba(255, 255, 255, .06) 34%, rgba(255, 255, 255, .03) 60%, rgba(255, 255, 255, .3) 100%),
+							linear-gradient(112deg, transparent 8%, rgba(255, 255, 255, .46) 24%, rgba(255, 255, 255, .09) 43%, transparent 59%),
+							linear-gradient(145deg, color-mix(in srgb, var(--world-editor-blueprint-option-green-highlight) 24%, transparent), color-mix(in srgb, var(--world-editor-blueprint-option-green) 16%, transparent) 54%, color-mix(in srgb, var(--world-editor-blueprint-option-green-shadow) 22%, transparent));
+						background-blend-mode: screen, screen, screen, normal;
+						backdrop-filter: var(--world-editor-glass-backdrop);
+						-webkit-backdrop-filter: var(--world-editor-glass-backdrop);
 						box-shadow:
-							0 0 0 1px color-mix(in srgb, var(--world-editor-blueprint-option-green) 72%, transparent),
-							0 0 11px color-mix(in srgb, var(--world-editor-blueprint-option-green) 72%, transparent),
-							0 0 24px color-mix(in srgb, var(--world-editor-blueprint-option-green) 38%, transparent);
+							inset 0 0 0 1px rgba(255, 255, 255, .62),
+							inset 0 1px 1px rgba(255, 255, 255, .92),
+							inset 0 -1px 1px rgba(255, 255, 255, .68),
+							inset 1px 0 1px rgba(255, 255, 255, .38),
+							inset -1px 0 1px color-mix(in srgb, var(--world-editor-blueprint-option-green-highlight) 34%, transparent),
+							inset 0 -6px 12px color-mix(in srgb, var(--world-editor-blueprint-option-green-shadow) 18%, transparent),
+							0 5px 12px rgba(10, 16, 24, .16),
+							0 0 12px color-mix(in srgb, var(--world-editor-blueprint-option-green) 42%, transparent),
+							0 0 26px color-mix(in srgb, var(--world-editor-blueprint-option-green-highlight) 22%, transparent);
 						color: var(--world-editor-blueprint-option-green-text);
+					}
+					.cattail-world-editor-blueprint-placement-option--active:not(:disabled):hover {
+						border-color: color-mix(in srgb, rgba(255, 255, 255, .96) 68%, var(--world-editor-blueprint-option-green));
+						background:
+							radial-gradient(ellipse 96% 78% at 50% -18%, rgba(255, 255, 255, .84) 0%, rgba(255, 255, 255, .32) 48%, transparent 74%),
+							linear-gradient(180deg, rgba(255, 255, 255, .36) 0%, rgba(255, 255, 255, .08) 34%, rgba(255, 255, 255, .05) 60%, rgba(255, 255, 255, .42) 100%),
+							linear-gradient(108deg, transparent 6%, rgba(255, 255, 255, .58) 24%, rgba(255, 255, 255, .14) 44%, transparent 61%),
+							linear-gradient(145deg, color-mix(in srgb, var(--world-editor-blueprint-option-green-highlight) 30%, transparent), color-mix(in srgb, var(--world-editor-blueprint-option-green) 22%, transparent) 54%, color-mix(in srgb, var(--world-editor-blueprint-option-green-shadow) 28%, transparent));
+						box-shadow:
+							inset 0 0 0 1px rgba(255, 255, 255, .76),
+							inset 0 1px 1px rgba(255, 255, 255, .98),
+							inset 0 -2px 2px rgba(255, 255, 255, .78),
+							inset 1px 0 1px rgba(255, 255, 255, .5),
+							inset -1px 0 1px color-mix(in srgb, var(--world-editor-blueprint-option-green-highlight) 42%, transparent),
+							inset 0 -7px 14px color-mix(in srgb, var(--world-editor-blueprint-option-green-shadow) 22%, transparent),
+							0 6px 14px rgba(10, 16, 24, .18),
+							0 0 16px color-mix(in srgb, var(--world-editor-blueprint-option-green) 54%, transparent),
+							0 0 32px color-mix(in srgb, var(--world-editor-blueprint-option-green-highlight) 30%, transparent);
+					}
+					.cattail-world-editor-blueprint-placement-option--active:not(:disabled):active {
+						box-shadow:
+							inset 0 0 0 1px rgba(255, 255, 255, .58),
+							inset 0 1px 1px rgba(255, 255, 255, .74),
+							inset 0 4px 9px color-mix(in srgb, var(--world-editor-blueprint-option-green-shadow) 24%, transparent),
+							inset 0 -1px 1px rgba(255, 255, 255, .54),
+							0 2px 7px rgba(10, 16, 24, .16),
+							0 0 10px color-mix(in srgb, var(--world-editor-blueprint-option-green) 38%, transparent),
+							0 0 20px color-mix(in srgb, var(--world-editor-blueprint-option-green-highlight) 20%, transparent);
+					}
+					.cattail-world-editor-blueprint-placement-option--active:focus-visible:not(:disabled) {
+						box-shadow: var(--world-editor-hell-gem-glass-shadow), 0 0 0 2px var(--world-editor-dialog-text);
+					}
+					.cattail-world-editor-blueprint-placement-option--active:disabled {
+						opacity: .38;
+						box-shadow: none;
 					}
 					.cattail-world-editor-blueprint-placement-options__summary,
 					.cattail-world-editor-blueprint-placement-options__economy {
@@ -4173,7 +4398,7 @@ ModLoader.register({
 				const context = canvas?.getContext?.('2d')
 				if (!context) return
 				context.clearRect(0, 0, canvas.width, canvas.height)
-				drawIsometricCube(context, canvas.width, canvas.height, ['#edf1f2', '#aebbc0', '#78898f'])
+				drawEquilateralToolbarCube(context, canvas.width, canvas.height, ['#edf1f2', '#aebbc0', '#78898f'])
 			}
 
 			function drawNeutralBuilding(canvas) {
@@ -4191,6 +4416,43 @@ ModLoader.register({
 				context.fill()
 				context.fillStyle = '#78898f'
 				context.fillRect(14, 18, 5, 8)
+			}
+
+			function drawEquilateralToolbarCube(context, width, height, colors) {
+				const inset = Math.max(2, Math.min(width, height) * .08)
+				const halfFaceHeight = Math.min(
+					(height - inset * 2) / 4,
+					(width - inset * 2) / (2 * Math.sqrt(3))
+				)
+				const halfFaceWidth = halfFaceHeight * Math.sqrt(3)
+				const cx = width / 2
+				const top = (height - halfFaceHeight * 4) / 2
+				const upper = top + halfFaceHeight
+				const center = top + halfFaceHeight * 2
+				const lower = top + halfFaceHeight * 3
+				const bottom = top + halfFaceHeight * 4
+				const left = cx - halfFaceWidth
+				const right = cx + halfFaceWidth
+				context.save()
+				context.strokeStyle = 'rgba(20, 24, 28, .38)'
+				context.lineWidth = Math.max(1, Math.min(width, height) / 32)
+				context.lineJoin = 'round'
+				fillFace(colors[0], [[cx, top], [right, upper], [cx, center], [left, upper]])
+				fillFace(colors[1], [[left, upper], [cx, center], [cx, bottom], [left, lower]])
+				fillFace(colors[2], [[right, upper], [cx, center], [cx, bottom], [right, lower]])
+				context.restore()
+
+				function fillFace(color, points) {
+					context.fillStyle = color
+					context.beginPath()
+					context.moveTo(points[0][0], points[0][1])
+					for (let index = 1; index < points.length; index += 1) {
+						context.lineTo(points[index][0], points[index][1])
+					}
+					context.closePath()
+					context.fill()
+					context.stroke()
+				}
 			}
 
 			function drawIsometricCube(context, width, height, colors) {

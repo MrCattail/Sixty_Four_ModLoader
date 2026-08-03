@@ -6,12 +6,16 @@ const vm = require('node:vm')
 const MOD_ROOT = path.resolve(__dirname, '..')
 const SHELL_PATH = path.join(MOD_ROOT, 'scripts/ui/editor-shell.js')
 const BLUEPRINT_PATH = path.join(MOD_ROOT, 'scripts/blueprint-session.js')
+const CUT_UI_PATH = path.join(MOD_ROOT, 'scripts/ui/selection-cut-ui.js')
+const DELETE_UI_PATH = path.join(MOD_ROOT, 'scripts/ui/selection-delete-ui.js')
 const I18N_PATH = path.join(MOD_ROOT, 'scripts/i18n/editor-text.js')
 const MANIFEST_PATH = path.join(MOD_ROOT, 'mod.json')
 const README_PATH = path.join(MOD_ROOT, 'README.md')
 
 const shellSource = fs.readFileSync(SHELL_PATH, 'utf8')
 const blueprintSource = fs.readFileSync(BLUEPRINT_PATH, 'utf8')
+const cutUiSource = fs.readFileSync(CUT_UI_PATH, 'utf8')
+const deleteUiSource = fs.readFileSync(DELETE_UI_PATH, 'utf8')
 const i18nSource = fs.readFileSync(I18N_PATH, 'utf8')
 const manifest = JSON.parse(fs.readFileSync(MANIFEST_PATH, 'utf8'))
 const readme = fs.readFileSync(README_PATH, 'utf8')
@@ -21,7 +25,7 @@ function testManifestAndLocalization() {
 		type: 'boolean',
 		label: 'Use Large-Card Toolbar',
 		default: false,
-		description: 'Uses fixed large toolbar cards with horizontal inertial scrolling.',
+		description: 'Uses Fixed Large Toolbar Cards with Horizontal Inertial Scrolling.',
 		reloadPolicy: 'hot'
 	})
 	const languages = Object.keys(manifest.translations)
@@ -52,6 +56,7 @@ function testManifestAndLocalization() {
 		'toolbarCardFull',
 		'toolbarCardCubes',
 		'toolbarCardSurges',
+		'toolbarCardSyncEmpty',
 		'toolbarCardCopy',
 		'toolbarCardRotateClockwise',
 		'toolbarCardRotateCounterclockwise',
@@ -65,6 +70,94 @@ function testManifestAndLocalization() {
 		'toolbarCardCut'
 	]
 	assert.equal(i18n.languages.length, 20)
+	const expectedSelectionActions = {
+		en: ['Disassemble Selection', 'Cut'],
+		ru: ['Разобрать выделение', 'Вырезать'],
+		de: ['Auswahl demontieren', 'Ausschneiden'],
+		ptbr: ['Desmontar seleção', 'Recortar'],
+		it: ['Smantella selezione', 'Taglia'],
+		es: ['Desmontar selección', 'Cortar'],
+		fr: ['Démonter la sélection', 'Couper'],
+		nl: ['Selectie ontmantelen', 'Knippen'],
+		cz: ['Rozebrat výběr', 'Vyjmout'],
+		pl: ['Rozmontuj zaznaczenie', 'Wytnij'],
+		jp: ['選択範囲を解体', '切り取り'],
+		kr: ['선택 영역 해체', '잘라내기'],
+		sch: ['拆解选区', '剪切'],
+		tch: ['拆解選區', '剪下'],
+		thai: ['รื้อถอนพื้นที่เลือก', 'ตัด'],
+		hu: ['Kijelölés szétszerelése', 'Kivágás'],
+		lv: ['Demontēt atlasi', 'Izgriezt'],
+		ro: ['Demontează selecția', 'Decupare'],
+		no: ['Demonter utvalg', 'Klipp ut'],
+		modsch: ['拆解选区', '剪切']
+	}
+	const expectedDisassembleTooltips = {
+		en: 'Disassemble Selected Building',
+		ru: 'Разобрать выбранное здание',
+		de: 'Ausgewähltes Gebäude demontieren',
+		ptbr: 'Desmontar construção selecionada',
+		it: 'Smantella edificio selezionato',
+		es: 'Desmontar edificio seleccionado',
+		fr: 'Démonter le bâtiment sélectionné',
+		nl: 'Geselecteerd gebouw ontmantelen',
+		cz: 'Rozebrat vybranou budovu',
+		pl: 'Rozmontuj wybrany budynek',
+		jp: '選択した建物を解体',
+		kr: '선택한 건물 해체',
+		sch: '拆解选中建筑',
+		tch: '拆解選取建築',
+		thai: 'รื้อถอนสิ่งก่อสร้างที่เลือก',
+		hu: 'Kijelölt épület szétszerelése',
+		lv: 'Demontēt atlasīto ēku',
+		ro: 'Demontează clădirea selectată',
+		no: 'Demonter valgt bygning',
+		modsch: '拆解选中建筑'
+	}
+	const expectedPolishLabels = {
+		en: ['Clear All Selections', 'Clear', 'Standard Build', 'Complete Replica', 'Generate Blueprint (Ctrl+C)', 'Generate Blueprint'],
+		ru: ['Очистить все области', 'Очистить', 'Обычная постройка', 'Полная копия', 'Создать чертёж (Ctrl+C)', 'Создать чертёж'],
+		de: ['Alle Auswahlen löschen', 'Leeren', 'Normaler Bau', 'Vollständige Replik', 'Bauplan erstellen (Ctrl+C)', 'Bauplan erstellen'],
+		ptbr: ['Limpar todas as seleções', 'Limpar', 'Construção normal', 'Réplica completa', 'Gerar planta (Ctrl+C)', 'Gerar planta'],
+		it: ['Cancella tutte le selezioni', 'Cancella', 'Costruzione normale', 'Replica completa', 'Genera progetto (Ctrl+C)', 'Genera progetto'],
+		es: ['Borrar todas las selecciones', 'Borrar', 'Construcción normal', 'Réplica completa', 'Generar plano (Ctrl+C)', 'Generar plano'],
+		fr: ['Effacer toutes les sélections', 'Effacer', 'Construction normale', 'Réplique complète', 'Générer le plan (Ctrl+C)', 'Générer le plan'],
+		nl: ['Alle selecties wissen', 'Wissen', 'Normale bouw', 'Volledige replica', 'Blauwdruk maken (Ctrl+C)', 'Blauwdruk maken'],
+		cz: ['Vymazat všechny výběry', 'Vymazat', 'Běžná stavba', 'Úplná replika', 'Vytvořit plán (Ctrl+C)', 'Vytvořit plán'],
+		pl: ['Wyczyść wszystkie zaznaczenia', 'Wyczyść', 'Zwykła budowa', 'Pełna replika', 'Utwórz plan (Ctrl+C)', 'Utwórz plan'],
+		jp: ['すべての選択範囲を解除', '解除', '通常建築', '完全再現', '設計図を生成 (Ctrl+C)', '設計図を生成'],
+		kr: ['모든 선택 영역 지우기', '지우기', '일반 건설', '완전 복제', '청사진 생성 (Ctrl+C)', '청사진 생성'],
+		sch: ['清除所有选区', '清除', '普通建造', '完整复刻', '生成蓝图（Ctrl+C）', '生成蓝图'],
+		tch: ['清除所有選區', '清除', '一般建造', '完整復刻', '生成藍圖（Ctrl+C）', '生成藍圖'],
+		thai: ['ล้างพื้นที่ที่เลือกทั้งหมด', 'ล้าง', 'สร้างปกติ', 'จำลองครบถ้วน', 'สร้างพิมพ์เขียว (Ctrl+C)', 'สร้างพิมพ์เขียว'],
+		hu: ['Összes kijelölés törlése', 'Törlés', 'Normál építés', 'Teljes másolat', 'Tervrajz létrehozása (Ctrl+C)', 'Tervrajz létrehozása'],
+		lv: ['Notīrīt visas atlases', 'Notīrīt', 'Parasta būve', 'Pilna kopija', 'Izveidot rasējumu (Ctrl+C)', 'Izveidot rasējumu'],
+		ro: ['Șterge toate selecțiile', 'Șterge', 'Construcție normală', 'Replică completă', 'Generează planul (Ctrl+C)', 'Generează planul'],
+		no: ['Tøm alle valg', 'Tøm', 'Vanlig bygging', 'Full kopi', 'Generer blåkopi (Ctrl+C)', 'Generer blåkopi'],
+		modsch: ['清除所有选区', '清除', '普通建造', '完整复刻', '生成蓝图（Ctrl+C）', '生成蓝图']
+	}
+	const expectedLayerLabels = {
+		en: ['Include Surges', 'Include Cells', 'Cells'],
+		ru: ['Включать Surge', 'Включать клетки', 'Клетки'],
+		de: ['Surges einbeziehen', 'Zellen einbeziehen', 'Zellen'],
+		ptbr: ['Incluir Surges', 'Incluir células', 'Células'],
+		it: ['Includi Surge', 'Includi celle', 'Celle'],
+		es: ['Incluir Surges', 'Incluir celdas', 'Celdas'],
+		fr: ['Inclure les Surges', 'Inclure les cases', 'Cases'],
+		nl: ['Surges meenemen', 'Cellen meenemen', 'Cellen'],
+		cz: ['Zahrnout Surge', 'Zahrnout pole', 'Pole'],
+		pl: ['Uwzględnij Surge', 'Uwzględnij pola', 'Pola'],
+		jp: ['Surgeを含める', 'セルを含める', 'セル'],
+		kr: ['Surge 포함', '셀 포함', '셀'],
+		sch: ['包含 Surge', '包含格子', '格子'],
+		tch: ['包含 Surge', '包含格子', '格子'],
+		thai: ['รวม Surge', 'รวมช่อง', 'ช่อง'],
+		hu: ['Surge-ok felvétele', 'Cellák felvétele', 'Cellák'],
+		lv: ['Iekļaut Surge', 'Iekļaut šūnas', 'Šūnas'],
+		ro: ['Include Surge', 'Include celule', 'Celule'],
+		no: ['Inkluder Surges', 'Inkluder celler', 'Celler'],
+		modsch: ['包含 Surge', '包含格子', '格子']
+	}
 	assert.deepEqual(
 		new Set(i18n.toolbarKeys),
 		new Set(cardKeys.concat(['toolbarStyleCompact', 'toolbarStyleLargeCards']))
@@ -75,7 +168,50 @@ function testManifestAndLocalization() {
 			assert.notEqual(translated, key, language + '.' + key)
 			assert.ok(translated.trim(), language + '.' + key)
 		}
+		assert.deepEqual(
+			[i18n.t(language, 'toolbarCardDelete'), i18n.t(language, 'toolbarCardCut')],
+			expectedSelectionActions[language],
+			language + ' selection action labels'
+		)
+		assert.equal(
+			i18n.t(language, 'deleteSelectionContents'),
+			expectedDisassembleTooltips[language],
+			language + ' disassemble tooltip'
+		)
+		assert.deepEqual(
+			[
+				i18n.t(language, 'removeSelection'),
+				i18n.t(language, 'toolbarCardRemove'),
+				i18n.t(language, 'blueprintModeStructure'),
+				i18n.t(language, 'blueprintModeFull'),
+				i18n.t(language, 'blueprintCopy'),
+				i18n.t(language, 'toolbarCardCopy')
+			],
+			expectedPolishLabels[language],
+			language + ' polish labels'
+		)
+		assert.deepEqual(
+			[
+				i18n.t(language, 'blueprintIncludeSurges'),
+				i18n.t(language, 'blueprintSyncEmpty'),
+				i18n.t(language, 'toolbarCardSyncEmpty')
+			],
+			expectedLayerLabels[language],
+			language + ' include-layer labels'
+		)
 	}
+	assert.equal(i18n.t('en', 'cardPinAction'), 'Click to Keep Visible')
+	assert.equal(i18n.t('en', 'placementCtrlVHint'), 'Ctrl+V Places at the Hovered Cell')
+	assert.equal(i18n.t('en', 'blueprintClear'), 'Clear Active Blueprint')
+	assert.equal(i18n.t('en', 'blueprintLibrarySave'), 'Save to Library')
+	assert.equal(i18n.t('en', 'blueprintLibraryChooseFile'), 'Choose .64schem File')
+	assert.equal(
+		i18n.t('en', 'creativeEnableMessage'),
+		'Choose Whether to Change This Save Directly or Create One Separate Creative Copy. The Current Save Remains Unchanged When Creating a Copy.'
+	)
+	assert.equal(i18n.t('en', 'creativeCopyNeedsSlots'), 'One Empty Manual Slot Is Required. Available: {count}.')
+	assert.equal(i18n.t('sch', 'creativeCopyReady'), '创造副本将占用一个空手动存档格，当前存档保持不变。')
+	assert.doesNotMatch(i18nSource, /'Delete Contents'|'Delete Selection Contents'|'Delete Selection'|'Cut Contents'/)
 }
 
 function testSourceContracts() {
@@ -90,8 +226,63 @@ function testSourceContracts() {
 	assert.match(shellSource, /createHistoryButton\('undo',\s*'↶'\)/)
 	assert.match(shellSource, /createHistoryButton\('redo',\s*'↷'\)/)
 	assert.match(shellSource, /historyGroup\.append\(undoButton,\s*redoButton\)/)
+	assert.match(shellSource, /const blueprintLibraryGroup\s*=\s*createToolbarGroup\('blueprint-library'\)/)
+	assert.match(shellSource, /blueprintLibraryGroup\.dataset\.worldEditorSlot\s*=\s*'blueprint-library'/)
+	assert.match(shellSource, /actions\.append\(selectionGroup,\s*historyGroup,\s*blueprintGroup,\s*blueprintLibraryGroup,\s*transformGroup,\s*creativeGroup\)/)
 	assert.match(shellSource, /layout\.append\(statusBar,\s*toolbarBar\)/)
 	assert.match(shellSource, /layout\.append\(historyStatus\)/)
+	assert.match(shellSource, /Symbol\.for\('cattail\.world-editor\.blueprint-preview'\)/)
+	assert.match(shellSource, /const hasVisibleBlueprintPreview\s*=\s*!!\([^)]*currentBlueprintPreview\?\.active[^)]*!currentBlueprintPreview\?\.paused[^)]*currentBlueprintPreview\?\.target[^)]*currentBlueprintPreview\?\.blueprint[^)]*\)/s)
+	assert.match(shellSource, /blueprintMode\s*=\s*currentBlueprintPreview\?\.blueprint\?\.mode\s*===\s*'full'\s*\?\s*'full'\s*:\s*'structure'/)
+	assert.match(shellSource, /blueprintMode\s*===\s*'full'\s*\?\s*'blueprintModeFull'\s*:\s*'blueprintModeStructure'/)
+	assert.match(shellSource, /shell\.dataset\.mode\s*=\s*hasVisibleBlueprintPreview\s*\?\s*'blueprint-'\s*\+\s*blueprintMode\s*:\s*'select'/)
+	assert.match(shellSource, /modeElement\.dataset\.creative\s*=\s*currentCreative\?\.ready\s*&&\s*currentCreative\?\.creativeMode\s*\?\s*'true'\s*:\s*'false'/)
+	assert.match(shellSource, /stopBlueprintPreviewSubscription\s*=\s*blueprintPreview\.subscribe\(function \(state\)/)
+	assert.match(shellSource, /blueprintPreviewAttachTimer\s*=\s*globalThis\.setTimeout\?\.\(attachBlueprintPreview,\s*0\)/)
+	assert.match(shellSource, /if \(typeof stopBlueprintPreviewSubscription === 'function'\) stopBlueprintPreviewSubscription\(\)/)
+	assert.match(shellSource, /selection\.clear\('toolbar-clear-selections'\)/)
+	assert.doesNotMatch(shellSource, /createToolButton\('select'/)
+	assert.doesNotMatch(shellSource, /handleSelectClick|toolbar-select|data-world-editor-text="tool-select"/)
+	assert.doesNotMatch(shellSource, /Symbol\.for\('cattail\.world-editor\.tool'\)/)
+	assert.match(shellSource, /selectionGroup\.append\(removeButton\)/)
+	assert.match(shellSource, /--world-editor-shell-hover-bg:\s*rgba\(150, 154, 160, \.18\)/)
+	assert.match(shellSource, /--world-editor-shell-hover-color:\s*#b56b87/)
+	assert.match(shellSource, /--world-editor-shell-hover-filter:\s*brightness\(0\)/)
+	assert.match(shellSource, /createIconButton\('remove-selection',\s*'',\s*'remove',\s*'',\s*'eraser'\)/)
+	assert.match(shellSource, /\[data-world-editor-toolbar-icon="eraser"\]::before/)
+	assert.match(shellSource, /\[data-world-editor-toolbar-icon="pickaxe"\]::after/)
+	assert.match(deleteUiSource, /compactIcon\.dataset\.worldEditorToolbarIcon\s*=\s*'pickaxe'/)
+	assert.match(deleteUiSource, /cardIcon\.dataset\.worldEditorToolbarIcon\s*=\s*'pickaxe'/)
+	assert.match(blueprintSource, /copyIcon\.textContent\s*=\s*'\+'/)
+	assert.match(blueprintSource, /cubeCanvas\.width\s*=\s*48/)
+	assert.match(blueprintSource, /drawEquilateralToolbarCube\(context,\s*canvas\.width,\s*canvas\.height/)
+	assert.match(blueprintSource, /halfFaceWidth\s*=\s*halfFaceHeight\s*\*\s*Math\.sqrt\(3\)/)
+	assert.match(blueprintSource, /surgeIcon\.className\s*=\s*'cattail-world-editor-blueprint-surge-icon'/)
+	assert.doesNotMatch(blueprintSource, /surgeIcon\.textContent\s*=/)
+	assert.match(blueprintSource, /\.cattail-world-editor-blueprint-icon-button\s*\{[^}]*padding:\s*0;/s)
+	assert.match(blueprintSource, /\.cattail-world-editor-blueprint-icon-button canvas\s*\{[^}]*display:\s*block;[^}]*place-self:\s*center;[^}]*margin:\s*0;/s)
+	assert.match(blueprintSource, /\.cattail-world-editor-blueprint-surge-icon\s*\{[^}]*display:\s*block;[^}]*place-self:\s*center;[^}]*color:\s*currentColor;/s)
+	assert.match(blueprintSource, /\.cattail-world-editor-blueprint-surge-icon::before\s*\{[^}]*background:\s*currentColor;[^}]*clip-path:\s*polygon\(/s)
+	assert.match(blueprintSource, /blueprint-action="surges"\]\[data-active="true"\]:hover:not\(:disabled\) \.cattail-world-editor-blueprint-surge-icon,\s*[^\n]*blueprint-action="sync-empty"\]\[data-active="true"\]:hover:not\(:disabled\) \.cattail-world-editor-blueprint-sync-empty-icon\s*\{\s*color:\s*#17200c !important;/)
+	assert.match(blueprintSource, /\.cattail-world-editor-blueprint-sync-empty-icon\s*\{[^}]*display:\s*block;[^}]*width:\s*18px;[^}]*height:\s*18px;[^}]*place-self:\s*center;/s)
+	assert.match(blueprintSource, /\.cattail-world-editor-blueprint-sync-empty-icon::before\s*\{[^}]*inset:\s*4px 0;[^}]*background:\s*currentColor;[^}]*clip-path:\s*polygon\(50% 0, 100% 50%, 50% 100%, 0 50%\);/s)
+	assert.doesNotMatch(blueprintSource, /\.cattail-world-editor-blueprint-sync-empty-icon::after/)
+	assert.match(shellSource, /data-toolbar-style="compact"[^}]*\.cattail-world-editor-blueprint-icon-button:hover:not\(:disabled\)[^}]*color:\s*var\(--world-editor-shell-hover-color\)\s*!important;/s)
+	assert.match(shellSource, /data-toolbar-style="cards"[^}]*:hover[^}]*\.cattail-world-editor-blueprint-surge-icon[^}]*color:\s*var\(--world-editor-shell-hover-color\)\s*!important;/s)
+	assert.match(shellSource, /data-toolbar-style="cards"[^}]*\.cattail-world-editor-blueprint-sync-empty-icon,[^}]*position:\s*absolute;[^}]*z-index:\s*1;[^}]*opacity:\s*\.12 !important;/s)
+	assert.match(shellSource, /data-toolbar-style="cards"[^}]*\.cattail-world-editor-blueprint-sync-empty-icon::before\s*\{\s*inset:\s*10px 0;/)
+	assert.match(shellSource, /data-toolbar-style="cards"[^}]*\[data-world-editor-toolbar-group="blueprint-library"\] > \[data-world-editor-toolbar-card\]::before\s*\{\s*display:\s*none;/)
+	assert.match(blueprintSource, /const blueprintLibrarySlot\s*=\s*shell\?\.querySelector\?\.\('\[data-world-editor-slot="blueprint-library"\]'\)/)
+	assert.match(blueprintSource, /blueprintLibrarySlot\.prepend\(controls\.copy\)/)
+	assert.match(blueprintSource, /root\.append\(modes,\s*blocks,\s*surges,\s*syncEmpty,\s*clearBlueprint\)/)
+	assert.doesNotMatch(blueprintSource, /root\.append\([^)]*copy/)
+	assert.match(blueprintSource, /const clearBlueprintAvailable = !!\([\s\S]*state\.sourceBlueprint \|\|[\s\S]*state\.blueprint \|\|[\s\S]*state\.lastResult \|\|[\s\S]*state\.capturing[\s\S]*\)/)
+	assert.match(blueprintSource, /ui\.controls\.clearBlueprint\.hidden = !clearBlueprintAvailable/)
+	assert.match(blueprintSource, /controls\.clearBlueprint\.addEventListener\('click', handleClear\)/)
+	assert.match(blueprintSource, /session\.clear\('ui-clear-active-blueprint'\)/)
+	assert.doesNotMatch(blueprintSource, /toolbar-exit-blueprint|handleExitPreview|blueprintExitPreview|toolbarCardExitPreview/)
+	assert.match(blueprintSource, /\.cattail-world-editor-blueprint-clear-icon\s*\{[^}]*place-self:\s*center;[^}]*color:\s*currentColor;/s)
+	assert.match(shellSource, /data-toolbar-style="cards"[^}]*\.cattail-world-editor-blueprint-clear-icon,[^}]*color:\s*var\(--world-editor-shell-hover-color\)\s*!important;/s)
 	assert.match(shellSource, /historyStatus\.setAttribute\('role',\s*'status'\)/)
 	assert.match(shellSource, /historyStatus\.setAttribute\('aria-live',\s*'polite'\)/)
 	assert.match(shellSource, /button\.setAttribute\('aria-disabled',\s*'true'\)/)
@@ -129,7 +320,7 @@ function testSourceContracts() {
 	assert.match(shellSource, /transform:\s*translate3d\(var\(--world-editor-large-toolbar-scroll-residual,\s*0px\),\s*0,\s*0\)/)
 	assert.match(
 		shellSource,
-		/\[data-toolbar-style="compact"\]\s+\.cattail-world-editor-shell__group\s*\{[^}]*gap:\s*0;[^}]*border:\s*0;[^}]*border-radius:\s*0;[^}]*background:\s*transparent;/s
+		/\[data-toolbar-style="compact"\]\s+\.cattail-world-editor-shell__group\s*\{[^}]*gap:\s*4px;[^}]*border:\s*0;[^}]*border-radius:\s*0;[^}]*background:\s*transparent;/s
 	)
 	assert.match(
 		shellSource,
@@ -144,7 +335,12 @@ function testSourceContracts() {
 		shellSource,
 		/\[data-toolbar-style="compact"\]\s+\.cattail-world-editor-shell__tool,[^}]*border:\s*0 !important;[^}]*background:\s*transparent !important;[^}]*box-shadow:\s*none !important;/s
 	)
-	assert.match(shellSource, /\[data-toolbar-style="compact"\]\s+\.cattail-world-editor-blueprint-modes\s*\{\s*border:\s*0;\s*border-radius:\s*0;\s*overflow:\s*visible;/)
+	assert.match(shellSource, /\[data-toolbar-style="compact"\]\s+\.cattail-world-editor-blueprint-controls,[^}]*gap:\s*4px;/s)
+	assert.match(shellSource, /\[data-toolbar-style="compact"\]\s+\.cattail-world-editor-blueprint-modes\s*\{\s*gap:\s*4px;\s*border:\s*0;\s*border-radius:\s*0;\s*overflow:\s*visible;/)
+	assert.match(shellSource, /\[data-toolbar-style="compact"\]\s+\.cattail-world-editor-blueprint-mode\s*\{[^}]*width:\s*30px;[^}]*min-width:\s*30px !important;[^}]*place-items:\s*center;/s)
+	assert.match(shellSource, /\[data-toolbar-style="compact"\][^{]*\.cattail-world-editor-blueprint-mode \.cattail-world-editor-blueprint-compact-label\s*\{\s*display:\s*none;/)
+	assert.match(shellSource, /\[data-toolbar-style="compact"\][^{]*\.cattail-world-editor-blueprint-mode \.cattail-world-editor-blueprint-card-icon\s*\{[^}]*display:\s*inline-block;[^}]*font:\s*700 20px\/1/s)
+	assert.match(shellSource, /\[data-toolbar-style="compact"\][^{]*\.cattail-world-editor-blueprint-mode\[data-active="true"\]\s*\{[^}]*background:\s*transparent !important;[^}]*box-shadow:\s*inset 0 -3px 0 var\(--world-editor-hell-gem-3, #4CB96B\) !important;/s)
 	assert.match(shellSource, /\[data-toolbar-style="compact"\][^{]*\.cattail-world-editor-transform-button\[data-active="true"\]\s*\{[^}]*background:\s*var\(--world-editor-shell-active\) !important;/s)
 	assert.match(shellSource, /toolbarBar\.dataset\.scrolling\s*=\s*'true'/)
 	assert.match(shellSource, /toolbarBar\.dataset\.scrolling\s*=\s*'false'/)
@@ -176,16 +372,29 @@ function testSourceContracts() {
 	)
 	assert.match(
 		shellSource,
-		/\[data-world-editor-toolbar-card\]:hover:not\(:disabled\):not\(\[aria-disabled="true"\]\)::after\s*\{\s*background:\s*var\(--world-editor-shell-chip\);/
+		/\[data-world-editor-toolbar-card\]:hover:not\(:disabled\):not\(\[aria-disabled="true"\]\)::after\s*\{[^}]*background:\s*var\(--world-editor-shell-hover-bg\) !important;[^}]*box-shadow:\s*none !important;/s
 	)
+	assert.match(shellSource, /\[data-toolbar-style="compact"\][^{]*\.cattail-world-editor-transform-button:hover:not\(:disabled\)\s*\{[^}]*border-radius:\s*5px;[^}]*background:\s*var\(--world-editor-shell-hover-bg\) !important;[^}]*color:\s*var\(--world-editor-shell-hover-color\) !important;/s)
+	assert.match(shellSource, /\[data-toolbar-style="cards"\][^{]*\[data-world-editor-toolbar-card\]:hover:not\(:disabled\):not\(\[aria-disabled="true"\]\)\s*\{[^}]*color:\s*var\(--world-editor-shell-hover-color\) !important;/s)
+	assert.match(shellSource, /\.cattail-world-editor-shell__style-button\[data-active="true"\]:hover\s*\{[^}]*background:\s*var\(--world-editor-shell-hover-bg\);[^}]*color:\s*var\(--world-editor-shell-hover-color\);/s)
+	assert.match(shellSource, /blueprint-mode\[data-active="true"\]:hover:not\(:disabled\)::after\s*\{[^}]*background:\s*var\(--world-editor-shell-hover-bg\) !important;[^}]*box-shadow:\s*inset 0 -3px 0 var\(--world-editor-hell-gem-3, #4CB96B\) !important;/s)
+	assert.match(shellSource, /tool--creative\[data-creative="true"\]:hover:not\(:disabled\):not\(\[aria-disabled="true"\]\)::after\s*\{[^}]*background:\s*var\(--world-editor-hell-gem-glass-hover\) !important;[^}]*backdrop-filter:\s*var\(--world-editor-glass-backdrop\) !important;[^}]*box-shadow:\s*var\(--world-editor-hell-gem-glass-shadow-hover\) !important;/s)
+	assert.doesNotMatch(shellSource, /tool--creative\[data-creative="true"\]:hover[^}]*background:\s*var\(--world-editor-shell-hover-bg\)/s)
+	assert.match(blueprintSource, /data-toolbar-style="compact"[^}]*blueprint-action="blocks"\]\[data-active="true"\]:hover:not\(:disabled\)[\s\S]*?background:\s*var\(--world-editor-hell-gem-glass-hover\) !important;[\s\S]*?color:\s*#17200c !important;/)
+	assert.doesNotMatch(blueprintSource, /blueprint-action="blocks"\]\[data-active="true"\]:hover[^}]*background:\s*var\(--world-editor-shell-hover-bg\)/s)
+	assert.doesNotMatch(cutUiSource, /--world-editor-cut-accent/)
+	assert.doesNotMatch(deleteUiSource, /--world-editor-delete-accent/)
 	assert.match(
 		shellSource,
-		/\[data-scrolling="true"\]\s+\[data-world-editor-toolbar-card\]:hover:not\(:disabled\):not\(\[aria-disabled="true"\]\):not\(\[data-active="true"\]\)::after\s*\{[^}]*background:\s*transparent;[^}]*transition:\s*none;/s
+		/\[data-scrolling="true"\]\s+\[data-world-editor-toolbar-card\]:hover:not\(:disabled\):not\(\[aria-disabled="true"\]\):not\(\[data-active="true"\]\)::after\s*\{[^}]*background:\s*transparent !important;[^}]*box-shadow:\s*none !important;[^}]*transition:\s*none;/s
 	)
 	assert.match(
 		shellSource,
 		/\[data-world-editor-toolbar-card\]\[data-active="true"\]::after\s*\{\s*background:\s*var\(--world-editor-shell-active\);/
 	)
+	assert.match(shellSource, /\[data-toolbar-style="cards"\][^{]*\.cattail-world-editor-blueprint-mode\[data-active="true"\]::after\s*\{[^}]*background:\s*transparent;[^}]*box-shadow:\s*inset 0 -3px 0 var\(--world-editor-hell-gem-3, #4CB96B\);/s)
+	assert.match(shellSource, /\.cattail-world-editor-shell__mode\s*\{[^}]*text-shadow:\s*none;[^}]*transition:\s*color \.18s ease, text-shadow \.18s ease;/s)
+	assert.match(shellSource, /\.cattail-world-editor-shell__mode\[data-creative="true"\]\s*\{[^}]*color:\s*var\(--world-editor-hell-gem-3, #4CB96B\);[^}]*text-shadow:[^}]*var\(--world-editor-hell-gem-1, #A6F246\)[^}]*var\(--world-editor-hell-gem-2, #E3FD43\)[^}]*var\(--world-editor-hell-gem-3, #4CB96B\)/s)
 	assert.doesNotMatch(shellSource, /border-left:\s*1px solid var\(--world-editor-shell-border\) !important/)
 	assert.match(shellSource, /Math\.round\(\(Number\(value\)\s*\|\|\s*0\)\s*\/\s*LARGE_TOOLBAR_CARD_WIDTH\)/)
 	assert.match(shellSource, /requestAnimationFrame/)
@@ -222,6 +431,7 @@ function testSourceContracts() {
 	assert.match(blueprintSource, /location\s*===\s*'toolbar'\)\s*button\.dataset\.worldEditorToolbarCard/)
 	assert.match(blueprintSource, /toolbarCardRotateCounterclockwise/)
 	assert.match(blueprintSource, /cattail:world-editor-toolbar-layout/)
+	assert.match(blueprintSource, /cardIcon\.textContent\s*=\s*mode\s*===\s*'full'\s*\?\s*'▦'\s*:\s*'▤'/)
 
 	assert.match(readme, /largeToolbarCards/)
 	assert.match(readme, /120 × 112 CSS px/)
@@ -244,6 +454,26 @@ function testSourceContracts() {
 	assert.match(readme, /周期性的 `blueprint-transform` 刷新/)
 	assert.match(readme, /布局签名/)
 	assert.match(readme, /data-scrolling="true"/)
+	assert.match(readme, /普通建造 \/ 完整复刻/)
+	assert.match(readme, /绿色底线/)
+	assert.match(readme, /Hell Gem 第三深绿色/)
+	assert.match(readme, /状态栏模式只跟随现场实际可见的活动蓝图预览/)
+	assert.match(readme, /active && !paused && target && blueprint/)
+	assert.match(readme, /仅会话或蓝图库中保存着蓝图.*显示 Selection Mode/)
+	assert.match(readme, /工具栏“生成蓝图”按钮/)
+	assert.match(readme, /该按钮一次清除全部已提交选区/)
+	assert.match(readme, /临时操作 → 已提交选区 → 编辑器/)
+	assert.match(readme, /Include Surges 使用 `currentColor` 绘制的单色闪电/)
+	assert.match(readme, /未开启 Include Surges 时沿用普通图标颜色及淡灰底\/粉色图标 hover/)
+	assert.match(readme, /Include Cells 使用 Include Cubes 顶面比例的单个等轴菱形/)
+	assert.match(readme, /Clear Active Blueprint/)
+	assert.match(readme, /蓝图库组包含 Generate Blueprint、Save to Library 与 Blueprint Library/)
+	assert.match(readme, /三项内部同样只有 `4px` 间隙而没有短分隔线/)
+	assert.match(readme, /蓝图库组三项之间的选项短线/)
+	assert.match(readme, /英语玩家可见 i18n 输出统一使用标题式首字母大写/)
+	assert.match(readme, /Disassemble Selected Building/)
+	assert.match(readme, /Disassemble Selection/)
+	assert.match(readme, /不再显示 `Place stable Cubes` \/ `Place safe Surges` 选项或相关说明/)
 }
 
 function testStyleModeIsolation() {

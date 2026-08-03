@@ -1324,7 +1324,7 @@ function testLocalizationAndIntegrationContract() {
 	]
 
 	assert.equal(i18n.languages.length, 20)
-	assert.equal(i18n.keys.length, 252)
+	assert.equal(i18n.keys.length, 249)
 	for (const language of i18n.languages) {
 		for (const key of transformKeys) {
 			const translated = i18n.t(language, key)
@@ -1399,6 +1399,7 @@ function testLocalizationAndIntegrationContract() {
 	assert.match(previewSource, /window\.addEventListener\('keydown',\s*handleTemporaryPinKeydown,\s*true\)/)
 	assert.match(previewSource, /window\.addEventListener\('keyup',\s*handleTemporaryPinKeyup,\s*true\)/)
 	assert.match(previewSource, /releaseTemporaryPin\('window-blur',\s*false\)/)
+	assert.doesNotMatch(previewSource, /exit\('window-blur'\)/)
 	assert.match(previewSource, /temporaryPinned,\s*\n\s*effectivePinned:\s*isTargetPinned\(\)/)
 	assert.match(previewSource, /code === 'KeyR'/)
 	assert.match(previewSource, /code === 'KeyM'/)
@@ -1463,10 +1464,11 @@ function testLocalizationAndIntegrationContract() {
 	assert.match(shellSource, /toolbarBar\.className = 'cattail-world-editor-shell__toolbar-bar'/)
 	assert.match(shellSource, /historyGroup\.dataset\.worldEditorSlot = 'history'/)
 	assert.match(shellSource, /blueprintGroup\.dataset\.worldEditorSlot = 'blueprint'/)
+	assert.match(shellSource, /blueprintLibraryGroup\.dataset\.worldEditorSlot = 'blueprint-library'/)
 	assert.match(shellSource, /transformGroup\.dataset\.worldEditorSlot = 'transform'/)
 	assert.match(
 		shellSource,
-		/actions\.append\(selectionGroup,\s*historyGroup,\s*blueprintGroup,\s*transformGroup,\s*creativeGroup\)/
+		/actions\.append\(selectionGroup,\s*historyGroup,\s*blueprintGroup,\s*blueprintLibraryGroup,\s*transformGroup,\s*creativeGroup\)/
 	)
 	assert.match(shellSource, /statusBar\.append\(identity,\s*divider,\s*status,\s*hint\)/)
 	assert.match(shellSource, /toolbarBar\.append\(actions\)/)
@@ -1507,11 +1509,15 @@ function testLocalizationAndIntegrationContract() {
 	assert.doesNotMatch(shellSource, /data-world-editor-slot="actions"/)
 	assert.doesNotMatch(shellSource, /createIconButton\('(?:undo|redo)'/)
 	assert.match(sessionSource, /const blueprintSlot = shell\?\.querySelector\?\.\('\[data-world-editor-slot="blueprint"\]'\)/)
+	assert.match(sessionSource, /const blueprintLibrarySlot = shell\?\.querySelector\?\.\('\[data-world-editor-slot="blueprint-library"\]'\)/)
 	assert.match(sessionSource, /const transformSlot = shell\?\.querySelector\?\.\('\[data-world-editor-slot="transform"\]'\)/)
 	assert.match(sessionSource, /blueprintSlot\.append\(controls\.root\)/)
+	assert.match(sessionSource, /blueprintLibrarySlot\.prepend\(controls\.copy\)/)
 	assert.match(sessionSource, /transformSlot\.append\(controls\.transforms\)/)
-	assert.match(sessionSource, /root\.append\(modes,\s*blocks,\s*surges,\s*copy\)/)
+	assert.match(sessionSource, /root\.append\(modes,\s*blocks,\s*surges,\s*syncEmpty,\s*clearBlueprint\)/)
+	assert.doesNotMatch(sessionSource, /root\.append\([^)]*copy/)
 	assert.doesNotMatch(sessionSource, /root\.append\(modes,\s*blocks,\s*copy,\s*transforms\)/)
+	assert.match(sessionSource, /ui\.controls\.copy\.remove\(\)/)
 	assert.match(sessionSource, /ui\.controls\.transforms\.remove\(\)/)
 	assert.match(
 		sessionSource,

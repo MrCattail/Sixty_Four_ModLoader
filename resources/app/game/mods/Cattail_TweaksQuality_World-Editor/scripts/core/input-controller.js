@@ -79,6 +79,10 @@ ModLoader.register({
 						selection.cancelPreview('hotkey-escape')
 						return
 					}
+					const selectionCount = Number(selection?.snapshot?.().selectionCount) || 0
+					if (selectionCount > 0 && typeof selection?.clear === 'function' && selection.clear('hotkey-escape')) {
+						return
+					}
 					runtime.deactivate('hotkey-escape')
 				}
 			}

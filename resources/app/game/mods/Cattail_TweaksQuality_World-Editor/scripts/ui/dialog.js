@@ -299,14 +299,29 @@ ModLoader.register({
 			const style = document.createElement('style')
 			style.id = STYLE_ID
 			style.textContent = `
+				:root {
+					--world-editor-elmerine-1: #FFC759;
+					--world-editor-elmerine-2: #FFE86F;
+					--world-editor-elmerine-3: #FF8F60;
+					--world-editor-beta-pylene-1: #F26F67;
+					--world-editor-beta-pylene-2: #FFB68C;
+					--world-editor-beta-pylene-3: #C02E63;
+					--world-editor-hell-gem-1: #A6F246;
+					--world-editor-hell-gem-2: #E3FD43;
+					--world-editor-hell-gem-3: #4CB96B;
+				}
 				.cattail-world-editor-dialog {
 					--world-editor-dialog-bg: rgba(248, 248, 246, .97);
 					--world-editor-dialog-text: rgba(18, 20, 22, .94);
 					--world-editor-dialog-muted: rgba(18, 20, 22, .66);
 					--world-editor-dialog-border: rgba(0, 0, 0, .16);
 					--world-editor-dialog-control: rgba(18, 20, 22, .06);
-					--world-editor-dialog-accent: #d6a92c;
+					--world-editor-dialog-accent: var(--world-editor-elmerine-1);
 					--world-editor-dialog-accent-text: #15130c;
+					--world-editor-dialog-primary-1: var(--world-editor-elmerine-1);
+					--world-editor-dialog-primary-2: var(--world-editor-elmerine-2);
+					--world-editor-dialog-primary-3: var(--world-editor-elmerine-3);
+					--world-editor-dialog-glass-backdrop: blur(10px) saturate(1.2) brightness(1.05);
 					position: fixed;
 					inset: 0;
 					z-index: 80;
@@ -330,12 +345,22 @@ ModLoader.register({
 					--world-editor-dialog-accent-text: #17150b;
 				}
 				.cattail-world-editor-dialog[data-kind^="creative-"] {
-					--world-editor-dialog-accent: #a6f246;
+					--world-editor-dialog-accent: var(--world-editor-hell-gem-1);
 					--world-editor-dialog-accent-text: #17200c;
+					--world-editor-dialog-primary-1: var(--world-editor-hell-gem-1);
+					--world-editor-dialog-primary-2: var(--world-editor-hell-gem-2);
+					--world-editor-dialog-primary-3: var(--world-editor-hell-gem-3);
 				}
 				.cattail-world-editor-dialog[data-theme="void"][data-kind^="creative-"] {
-					--world-editor-dialog-accent: #e3fd43;
+					--world-editor-dialog-accent: var(--world-editor-hell-gem-2);
 					--world-editor-dialog-accent-text: #171a05;
+				}
+				.cattail-world-editor-dialog__button[data-glass-theme="elmerine"] {
+					--world-editor-dialog-accent: var(--world-editor-elmerine-1);
+					--world-editor-dialog-accent-text: #15130c;
+					--world-editor-dialog-primary-1: var(--world-editor-elmerine-1);
+					--world-editor-dialog-primary-2: var(--world-editor-elmerine-2);
+					--world-editor-dialog-primary-3: var(--world-editor-elmerine-3);
 				}
 				.cattail-world-editor-dialog__box {
 					width: min(620px, calc(100vw - 32px));
@@ -388,19 +413,80 @@ ModLoader.register({
 					font: 600 13px/1.2 Montserrat, Arial, sans-serif;
 					cursor: pointer;
 					outline: none;
+					transition: background .12s ease, border-color .12s ease, box-shadow .12s ease, color .12s ease, opacity .12s ease, transform .08s ease;
 				}
 				.cattail-world-editor-dialog__button--primary {
-					border-color: color-mix(in srgb, var(--world-editor-dialog-accent) 76%, #000);
-					background: var(--world-editor-dialog-accent);
+					--world-editor-dialog-primary-glass:
+						radial-gradient(ellipse 92% 72% at 50% -18%, rgba(255, 255, 255, .72) 0%, rgba(255, 255, 255, .22) 46%, transparent 72%),
+						linear-gradient(180deg, rgba(255, 255, 255, .28) 0%, rgba(255, 255, 255, .06) 34%, rgba(255, 255, 255, .03) 60%, rgba(255, 255, 255, .3) 100%),
+						linear-gradient(112deg, transparent 8%, rgba(255, 255, 255, .46) 24%, rgba(255, 255, 255, .09) 43%, transparent 59%),
+						linear-gradient(145deg, color-mix(in srgb, var(--world-editor-dialog-primary-2) 24%, transparent), color-mix(in srgb, var(--world-editor-dialog-primary-1) 16%, transparent) 54%, color-mix(in srgb, var(--world-editor-dialog-primary-3) 22%, transparent));
+					--world-editor-dialog-primary-glass-hover:
+						radial-gradient(ellipse 96% 78% at 50% -18%, rgba(255, 255, 255, .84) 0%, rgba(255, 255, 255, .32) 48%, transparent 74%),
+						linear-gradient(180deg, rgba(255, 255, 255, .36) 0%, rgba(255, 255, 255, .08) 34%, rgba(255, 255, 255, .05) 60%, rgba(255, 255, 255, .42) 100%),
+						linear-gradient(108deg, transparent 6%, rgba(255, 255, 255, .58) 24%, rgba(255, 255, 255, .14) 44%, transparent 61%),
+						linear-gradient(145deg, color-mix(in srgb, var(--world-editor-dialog-primary-2) 30%, transparent), color-mix(in srgb, var(--world-editor-dialog-primary-1) 22%, transparent) 54%, color-mix(in srgb, var(--world-editor-dialog-primary-3) 28%, transparent));
+					--world-editor-dialog-primary-glass-shadow:
+						inset 0 0 0 1px rgba(255, 255, 255, .62),
+						inset 0 1px 1px rgba(255, 255, 255, .92),
+						inset 0 -1px 1px rgba(255, 255, 255, .68),
+						inset 1px 0 1px rgba(255, 255, 255, .38),
+						inset -1px 0 1px color-mix(in srgb, var(--world-editor-dialog-primary-2) 34%, transparent),
+						inset 0 -6px 12px color-mix(in srgb, var(--world-editor-dialog-primary-3) 18%, transparent),
+						0 5px 12px rgba(10, 16, 24, .16),
+						0 0 12px color-mix(in srgb, var(--world-editor-dialog-primary-1) 42%, transparent),
+						0 0 26px color-mix(in srgb, var(--world-editor-dialog-primary-2) 22%, transparent);
+					--world-editor-dialog-primary-glass-shadow-hover:
+						inset 0 0 0 1px rgba(255, 255, 255, .76),
+						inset 0 1px 1px rgba(255, 255, 255, .98),
+						inset 0 -2px 2px rgba(255, 255, 255, .78),
+						inset 1px 0 1px rgba(255, 255, 255, .5),
+						inset -1px 0 1px color-mix(in srgb, var(--world-editor-dialog-primary-2) 42%, transparent),
+						inset 0 -7px 14px color-mix(in srgb, var(--world-editor-dialog-primary-3) 22%, transparent),
+						0 6px 14px rgba(10, 16, 24, .18),
+						0 0 16px color-mix(in srgb, var(--world-editor-dialog-primary-1) 54%, transparent),
+						0 0 32px color-mix(in srgb, var(--world-editor-dialog-primary-2) 30%, transparent);
+					--world-editor-dialog-primary-glass-shadow-pressed:
+						inset 0 0 0 1px rgba(255, 255, 255, .58),
+						inset 0 1px 1px rgba(255, 255, 255, .74),
+						inset 0 4px 9px color-mix(in srgb, var(--world-editor-dialog-primary-3) 24%, transparent),
+						inset 0 -1px 1px rgba(255, 255, 255, .54),
+						0 2px 7px rgba(10, 16, 24, .16),
+						0 0 10px color-mix(in srgb, var(--world-editor-dialog-primary-1) 38%, transparent),
+						0 0 20px color-mix(in srgb, var(--world-editor-dialog-primary-2) 20%, transparent);
+					border-color: color-mix(in srgb, rgba(255, 255, 255, .88) 54%, var(--world-editor-dialog-primary-1));
+					background: var(--world-editor-dialog-primary-glass);
+					background-blend-mode: screen, screen, screen, normal;
+					backdrop-filter: var(--world-editor-dialog-glass-backdrop);
+					-webkit-backdrop-filter: var(--world-editor-dialog-glass-backdrop);
+					box-shadow: var(--world-editor-dialog-primary-glass-shadow);
 					color: var(--world-editor-dialog-accent-text);
 				}
+				.cattail-world-editor-dialog__button--primary:hover:not(:disabled) {
+					border-color: color-mix(in srgb, rgba(255, 255, 255, .96) 68%, var(--world-editor-dialog-primary-1));
+					background: var(--world-editor-dialog-primary-glass-hover);
+					box-shadow: var(--world-editor-dialog-primary-glass-shadow-hover);
+				}
+				.cattail-world-editor-dialog__button--primary:active:not(:disabled) {
+					transform: translateY(1px);
+					box-shadow: var(--world-editor-dialog-primary-glass-shadow-pressed);
+				}
+				.cattail-world-editor-dialog__button--primary:focus-visible {
+					box-shadow: var(--world-editor-dialog-primary-glass-shadow), 0 0 0 2px var(--world-editor-dialog-text);
+				}
 				.cattail-world-editor-dialog__button--danger {
-					--world-editor-dialog-accent: #d55a50;
-					--world-editor-dialog-accent-text: #fff;
+					--world-editor-dialog-accent: var(--world-editor-beta-pylene-1);
+					--world-editor-dialog-accent-text: #2b0d18;
+					--world-editor-dialog-primary-1: var(--world-editor-beta-pylene-1);
+					--world-editor-dialog-primary-2: var(--world-editor-beta-pylene-2);
+					--world-editor-dialog-primary-3: var(--world-editor-beta-pylene-3);
 				}
 				.cattail-world-editor-dialog__button:disabled {
 					cursor: default;
 					opacity: .38;
+				}
+				.cattail-world-editor-dialog__button--primary:disabled {
+					box-shadow: none;
 				}
 				.cattail-world-editor-dialog[data-busy="true"] {
 					cursor: progress;

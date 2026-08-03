@@ -968,11 +968,14 @@ async function testFollowThrottleUiAndMetrics() {
 	const document = createMiniDocument()
 	const env = createRuntimeEnvironment({ document })
 	const structure = blueprint([record(1, 'silo', [0, 0], { config: { fill: 3 } })])
-	env.session.set({
+	const sessionState = {
 		attemptId: 1,
 		blueprint: structure,
-		lastResult: { attemptId: 1, status: 'captured' }
-	})
+		lastResult: { attemptId: 1, status: 'captured' },
+		includeBlocks: false,
+		includeSurges: false
+	}
+	env.session.set(sessionState)
 	await flushMicrotasks()
 	env.runFrame()
 
@@ -1055,6 +1058,42 @@ async function testFollowThrottleUiAndMetrics() {
 	assert.equal(env.context.canvas.style.opacity, '1')
 	assert.equal(env.context.canvas.style.transition, 'opacity 80ms linear')
 	assert.equal(env.context.canvas.style.willChange, 'transform')
+
+	const pinnedBaseline = env.controller.snapshot().performance
+	env.session.set(Object.assign({}, sessionState, { includeBlocks: true }))
+	assert.equal(env.controller.snapshot().calculating, true)
+	env.getFrame()({ game: env.game })
+	assert.equal(env.context.canvas.style.opacity, '1')
+	await flushMicrotasks()
+	env.runFrame()
+	assert.equal(env.controller.snapshot().performance.planRequests, pinnedBaseline.planRequests + 1)
+	assert.equal(env.context.canvas.style.opacity, '1')
+
+	assert.equal(env.controller.setPlacementOverlay({
+		target: [50, 20],
+		syncEmpty: true,
+		emptyCells: [[50, 20]],
+		removals: [],
+		protectedTargets: []
+	}, 'test-follow-overlay'), true)
+	env.runFrame()
+	assert.deepEqual(plain(env.controller.snapshot().placementOverlay.target), [50, 20])
+	env.controller.setPinned(false, 'test-follow-overlay')
+	env.game.hoveredCell = [51, 20]
+	env.canvas.dispatch('mousemove', {
+		buttons: 0,
+		offsetX: 41,
+		offsetY: 20
+	})
+	env.runFrame()
+	assert.deepEqual(plain(env.controller.snapshot().target), [51, 20])
+	assert.deepEqual(plain(env.controller.snapshot().placementOverlay.target), [50, 20])
+	assert.equal(env.context.canvas.style.transform, 'translate3d(12px, 0px, 0)')
+	assert.equal(env.context.canvas.style.opacity, '.85')
+	env.advanceTime(100)
+	await flushMicrotasks()
+	assert.deepEqual(plain(env.controller.snapshot().plan.target), [51, 20])
+	assert.equal(env.controller.snapshot().placementOverlay, null)
 
 	env.runtime.runCleanups()
 	assert.equal(env.context.canvas.style.transform, '')
@@ -1193,7 +1232,7 @@ function testManifestLocalizationAndStaticContracts() {
 	const i18n = loadI18n()
 	assert.equal(i18n.version, '0.5.1')
 	assert.equal(i18n.languages.length, 20)
-	assert.equal(i18n.keys.length, 252)
+	assert.equal(i18n.keys.length, 249)
 	for (const language of i18n.languages) {
 		for (const key of previewKeys) {
 			const translated = i18n.t(language, key)
@@ -1263,6 +1302,9 @@ function testManifestLocalizationAndStaticContracts() {
 	assert.match(previewSource, /setStyleValue\(style,\s*'opacity',\s*layerReady\s*\?\s*\(provisional\s*\?\s*PENDING_PREVIEW_OPACITY\s*:\s*'1'\)\s*:\s*''\)/)
 	assert.match(previewSource, /PENDING_PREVIEW_TRANSITION\s*=\s*'opacity 80ms linear'/)
 	assert.doesNotMatch(previewSource.match(/PENDING_PREVIEW_TRANSITION\s*=\s*'([^']+)'/)?.[1] || '', /transform/)
+	assert.match(previewSource, /function isVisualFollowProvisional\(\)[\s\S]*?!isTargetPinned\(\)/)
+	const targetSource = previewSource.match(/function setTarget\(value, reason\)[\s\S]*?\n\s*function requestPlan\(/)?.[0] || ''
+	assert.doesNotMatch(targetSource, /clearPlacementOverlay\(\)/)
 	assert.match(previewSource, /api\.render\.markDirty\(RENDER_LAYER_ID,\s*game\)/)
 	assert.match(plannerSource, /schemaVersion\s*!==\s*1\s*&&\s*schemaVersion\s*!==\s*2\s*&&\s*schemaVersion\s*!==\s*3/)
 	assert.match(previewSource, /space:\s*'screen'/)
@@ -1299,7 +1341,7 @@ async function run() {
 	await testPreviewPublishesStateWithoutMountingCard()
 	await testTemporaryAltPinLifecycle()
 	testManifestLocalizationAndStaticContracts()
-	console.log('3B verification passed: four-state planning, only-one precedence, deterministic build-plan costs, detailed read-only guards and resource-only cost refresh, cancellation/retry contracts, structure/full lifecycle, pin/follow input ownership, cached dirty-only centered rendering, CSS visual following with provisional opacity, 100 ms idle/fixed final planning, no duplicate preview card, 20-language UI, manifest order, and 100/500/2000 synthetic benchmark.')
+	console.log('3B verification passed: four-state planning, only-one precedence, deterministic build-plan costs, detailed read-only guards and resource-only cost refresh, cancellation/retry contracts, structure/full lifecycle, pin/follow input ownership, cached dirty-only centered rendering, pinned-stable and provisional CSS following with continuous placement overlays, 100 ms idle/fixed final planning, no duplicate preview card, 20-language UI, manifest order, and 100/500/2000 synthetic benchmark.')
 }
 
 run().catch(error => {

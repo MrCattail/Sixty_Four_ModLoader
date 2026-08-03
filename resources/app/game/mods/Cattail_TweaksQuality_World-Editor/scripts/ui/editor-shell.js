@@ -8,11 +8,11 @@ ModLoader.register({
 		const TRANSACTIONS_KEY = Symbol.for('cattail.world-editor.transactions')
 		const BLUEPRINT_PREVIEW_KEY = Symbol.for('cattail.world-editor.blueprint-preview')
 		const SELECTION_KEY = Symbol.for('cattail.world-editor.selection')
-		const TOOL_KEY = Symbol.for('cattail.world-editor.tool')
 		const CREATIVE_KEY = Symbol.for('cattail.world-editor.creative-mode')
 		const CREATIVE_ECONOMY_KEY = Symbol.for('cattail.world-editor.creative-economy')
 		const DIALOGS_KEY = Symbol.for('cattail.world-editor.dialogs')
 		const TOOLBAR_SCROLL_PROBE_KEY = Symbol.for('cattail.world-editor.toolbar-scroll-probe')
+		const RESOURCE_HUD_PROBE_KEY = Symbol.for('cattail.world-editor.resource-hud-probe')
 		const SAVE_SLOTS_KEY = Symbol.for('cattail.better-uis.save-slots')
 		const SHELL_ID = 'cattail-world-editor-shell'
 		const ECONOMY_STATUS_ID = 'cattail-world-editor-economy-status'
@@ -35,6 +35,11 @@ ModLoader.register({
 		const LARGE_TOOLBAR_STOP_VELOCITY = .01
 		const HISTORY_SUCCESS_MS = 3000
 		const HISTORY_FAILURE_MS = 6000
+		const RESOURCE_HUD_ANIMATION_MS = 180
+		const RESOURCE_HUD_MIN_SCALE = .48
+		const RESOURCE_HUD_MAX_SCALE = .64
+		const RESOURCE_HUD_LEFT_MARGIN_CSS = 20
+		const RESOURCE_HUD_TOP_MARGIN_CSS = 16
 		const HISTORY_WARNING_CODES = new Set([
 			'PLANE_CHANGED',
 			'SAVE_CHANGED',
@@ -79,7 +84,6 @@ ModLoader.register({
 			let shared = globalThis[SHARED_KEY]
 			let transactions = globalThis[TRANSACTIONS_KEY]
 			const selection = globalThis[SELECTION_KEY]
-			const tool = globalThis[TOOL_KEY]
 			const dialogs = globalThis[DIALOGS_KEY]
 			let creative = globalThis[CREATIVE_KEY]
 			let creativeEconomy = globalThis[CREATIVE_ECONOMY_KEY]
@@ -118,10 +122,6 @@ ModLoader.register({
 				console.warn('[Cattail World Editor] Toolbar 2G could not find the selection state.')
 				return
 			}
-			if (!tool || typeof tool.subscribe !== 'function' || typeof tool.setMode !== 'function') {
-				console.warn('[Cattail World Editor] Toolbar 2E could not find the tool state.')
-				return
-			}
 			if (!dialogs || dialogs.game !== game || typeof dialogs.create !== 'function') {
 				console.warn('[Cattail World Editor] Toolbar 4B-1a could not find the shared dialog service.')
 				return
@@ -148,10 +148,16 @@ ModLoader.register({
 			const rootStyle = document.documentElement?.style
 			const previousScale = readStyleProperty(rootStyle, '--world-editor-ui-scale')
 			const previousToolbarWidth = readStyleProperty(rootStyle, '--world-editor-toolbar-layout-width')
+			const resourceThemeProperties = createResourceThemeProperties(game)
+			const previousResourceThemeProperties = new Map()
+			for (const [property, value] of Object.entries(resourceThemeProperties)) {
+				previousResourceThemeProperties.set(property, readStyleProperty(rootStyle, property))
+				writeStyleProperty(rootStyle, property, value)
+			}
 
 			let currentState = runtime.snapshot()
 			let currentSelection = selection.snapshot()
-			let currentTool = tool.snapshot()
+			let currentBlueprintPreview = null
 			let currentCreative = creative.snapshot()
 			let currentCreativeEconomy = creativeEconomy.snapshot()
 			let currentTransactions = transactions.snapshot()
@@ -161,20 +167,26 @@ ModLoader.register({
 			let historyUiBusy = false
 			let historyStatusTimer = 0
 			let historyStatusState = null
-			const selectButton = shell.querySelector('[data-world-editor-action="select"]')
+			let blueprintPreview = null
+			let stopBlueprintPreviewSubscription = null
+			let blueprintPreviewAttachTimer = null
 			const removeButton = shell.querySelector('[data-world-editor-action="remove-selection"]')
 			const undoButton = shell.querySelector('[data-world-editor-action="undo"]')
 			const redoButton = shell.querySelector('[data-world-editor-action="redo"]')
 			const historyStatus = shell.querySelector('[data-world-editor-action="history-status"]')
 			const creativeButton = shell.querySelector('[data-world-editor-action="creative-mode"]')
-			const actions = (selectButton.parentElement || selectButton.parentNode)?.parentElement ||
-				(selectButton.parentElement || selectButton.parentNode)?.parentNode
+			const actions = (removeButton.parentElement || removeButton.parentNode)?.parentElement ||
+				(removeButton.parentElement || removeButton.parentNode)?.parentNode
 			const toolbarBar = actions?.parentElement || actions?.parentNode
 			const compactStyleButton = shell.querySelector('[data-world-editor-action="toolbar-style-compact"]')
 			const largeStyleButton = shell.querySelector('[data-world-editor-action="toolbar-style-cards"]')
 			const toolbarScroller = createLargeToolbarScroller(shell, toolbarBar, actions)
+			const shellPassThrough = createShellPassThroughController(game, shell)
+			const resourceHud = createResourceHudController(game)
 			const previousToolbarScrollProbe = globalThis[TOOLBAR_SCROLL_PROBE_KEY]
 			globalThis[TOOLBAR_SCROLL_PROBE_KEY] = toolbarScroller.probe
+			const previousResourceHudProbe = globalThis[RESOURCE_HUD_PROBE_KEY]
+			globalThis[RESOURCE_HUD_PROBE_KEY] = resourceHud.probe
 			let largeToolbarCards = api.config?.get?.(LARGE_TOOLBAR_CONFIG_KEY, false) === true
 			const accessibleText = {
 				brand: '',
@@ -324,14 +336,9 @@ ModLoader.register({
 				const source = languageGame || game
 				const brand = i18n.t(source, 'brand')
 				shell.querySelector('[data-world-editor-text="brand"]').textContent = brand
-				const selectText = i18n.t(source, 'toolSelect')
-				shell.querySelector('[data-world-editor-text="tool-select"]').textContent = selectText
-				selectButton.title = selectText
-				selectButton.setAttribute('aria-label', selectText)
 				const removeText = i18n.t(source, 'removeSelection')
 				removeButton.title = removeText
 				removeButton.setAttribute('aria-label', removeText)
-				setCardText(selectButton, i18n.t(source, 'toolbarCardSelect'))
 				setCardText(removeButton, i18n.t(source, 'toolbarCardRemove'))
 				setCardText(creativeButton, i18n.t(source, 'toolbarCardCreative'))
 				const compactStyleText = i18n.t(source, 'toolbarStyleCompact')
@@ -350,17 +357,47 @@ ModLoader.register({
 				refreshHint(source)
 				refreshSelectionCount(source)
 				refreshAccessibility()
+				resourceHud.refreshLayout('text')
 			}
 
 			const refreshTool = function (languageGame) {
 				const source = languageGame || game
-				const mode = i18n.t(source, 'toolbarModeArea')
-				shell.dataset.mode = 'select'
-				shell.querySelector('[data-world-editor-text="mode"]').textContent = mode
-				selectButton.setAttribute('aria-pressed', 'true')
-				selectButton.dataset.active = 'true'
+				const hasVisibleBlueprintPreview = !!(
+					currentBlueprintPreview?.active &&
+					!currentBlueprintPreview?.paused &&
+					currentBlueprintPreview?.target &&
+					currentBlueprintPreview?.blueprint
+				)
+				const blueprintMode = currentBlueprintPreview?.blueprint?.mode === 'full' ? 'full' : 'structure'
+				const modeKey = hasVisibleBlueprintPreview
+					? blueprintMode === 'full' ? 'blueprintModeFull' : 'blueprintModeStructure'
+					: 'toolbarModeArea'
+				const mode = i18n.t(source, modeKey)
+				const modeElement = shell.querySelector('[data-world-editor-text="mode"]')
+				shell.dataset.mode = hasVisibleBlueprintPreview ? 'blueprint-' + blueprintMode : 'select'
+				modeElement.textContent = mode
+				modeElement.dataset.creative = currentCreative?.ready && currentCreative?.creativeMode ? 'true' : 'false'
 				accessibleText.mode = mode
 				refreshAccessibility()
+			}
+
+			const attachBlueprintPreview = function () {
+				blueprintPreviewAttachTimer = null
+				const next = globalThis[BLUEPRINT_PREVIEW_KEY]
+				if (next === blueprintPreview) return
+				if (typeof stopBlueprintPreviewSubscription === 'function') stopBlueprintPreviewSubscription()
+				stopBlueprintPreviewSubscription = null
+				blueprintPreview = next && typeof next.snapshot === 'function' && typeof next.subscribe === 'function'
+					? next
+					: null
+				currentBlueprintPreview = blueprintPreview ? blueprintPreview.snapshot() : null
+				if (blueprintPreview) {
+					stopBlueprintPreviewSubscription = blueprintPreview.subscribe(function (state) {
+						currentBlueprintPreview = state
+						refreshTool(game)
+					})
+				}
+				refreshTool(game)
 			}
 
 			const refreshHint = function (languageGame) {
@@ -378,12 +415,9 @@ ModLoader.register({
 					: isRange(currentSelection?.previewRange) || isRange(currentSelection?.selectedRange) ? 1 : 0
 				const countText = formatCount(i18n.t(source, 'selectionCount'), count)
 				shell.querySelector('[data-world-editor-text="selection-count"]').textContent = countText
-				const removeAvailable = (
-					typeof selection.removePrimary === 'function' &&
-					Number.isInteger(currentSelection?.primaryId)
-				)
-				removeButton.disabled = !removeAvailable || isRange(currentSelection?.previewRange)
-				removeButton.dataset.worldEditorLargeHidden = removeAvailable ? 'false' : 'true'
+				const clearAvailable = typeof selection.clear === 'function' && count > 0
+				removeButton.disabled = !clearAvailable || isRange(currentSelection?.previewRange)
+				removeButton.dataset.worldEditorLargeHidden = clearAvailable ? 'false' : 'true'
 				toolbarScroller.refresh('selection')
 				accessibleText.count = countText
 				refreshAccessibility()
@@ -478,12 +512,14 @@ ModLoader.register({
 				)
 				shell.dataset.uiScale = String(roundedScale)
 				toolbarScroller.refresh('ui-scale')
+				resourceHud.refreshLayout('ui-scale')
 			}
 
 			const stopStateSubscription = runtime.subscribe(function (state) {
 				currentState = state
 				if (!state.active && creativeDialog && !currentCreative?.busy) closeCreativeDialog('editor-inactive')
 				refreshVisibility()
+				resourceHud.setActive(!!state.active, 'editor-state')
 			})
 
 			const stopSelectionSubscription = selection.subscribe(function (state) {
@@ -492,13 +528,10 @@ ModLoader.register({
 				refreshTool(game)
 			})
 
-			const stopToolSubscription = tool.subscribe(function (state) {
-				currentTool = state
-				refreshTool(game)
-			})
 			const stopCreativeSubscription = creative.subscribe(function (state) {
 				currentCreative = state
 				refreshCreative(game)
+				refreshTool(game)
 			})
 			const stopCreativeEconomySubscription = creativeEconomy.subscribe(function (state) {
 				currentCreativeEconomy = state
@@ -646,19 +679,12 @@ ModLoader.register({
 				void runHistory(direction, 'keyboard')
 			}
 
-			const handleSelectClick = function (event) {
-				event?.preventDefault?.()
-				event?.stopPropagation?.()
-				if (selection.hasPreview()) selection.cancelPreview('toolbar-select')
-				tool.setMode('select', 'toolbar-select')
-			}
-
 			const handleRemoveClick = function (event) {
 				event?.preventDefault?.()
 				event?.stopPropagation?.()
 				if (selection.hasPreview()) return
-				if (typeof selection.removePrimary === 'function') {
-					selection.removePrimary('toolbar-remove-primary')
+				if (typeof selection.clear === 'function') {
+					selection.clear('toolbar-clear-selections')
 				}
 			}
 
@@ -680,6 +706,7 @@ ModLoader.register({
 				toolbarScroller.cancel(reason || 'toolbar-style')
 				actions.scrollLeft = 0
 				toolbarScroller.refresh(reason || 'toolbar-style')
+				resourceHud.refreshLayout(reason || 'toolbar-style')
 			}
 
 			const setToolbarStyle = function (large, reason) {
@@ -713,13 +740,14 @@ ModLoader.register({
 			const handleToolbarLayoutChange = function (event) {
 				if (event?.detail?.modId && event.detail.modId !== MOD_ID) return
 				toolbarScroller.refresh(event?.detail?.reason || 'toolbar-content')
+				resourceHud.refreshLayout(event?.detail?.reason || 'toolbar-content')
 			}
 
 			function openEnableCreativeDialog() {
 				closeCreativeDialog('replace-dialog', true)
 				creative.setDialogOpen(true, 'enable-dialog-opened')
 				const dialog = createCreativeDialog('enable')
-				const enableCurrent = createDialogButton(dialog, 'creativeEnableCurrent', true)
+				const enableCurrent = createDialogButton(dialog, 'creativeEnableCurrent', true, 'elmerine')
 				const createCopy = createDialogButton(dialog, 'creativeCreateCopy', true)
 				const cancel = createDialogButton(dialog, 'creativeCancel', false)
 				dialog.actions.append(enableCurrent, createCopy, cancel)
@@ -802,7 +830,7 @@ ModLoader.register({
 					} else if (!slotsState?.ready || typeof saveSlots?.createAndActivate !== 'function') {
 						statusKey = 'creativeCopyUnavailable'
 						available = false
-					} else if (Number(slotsState.emptyCount) < 2) {
+					} else if (Number(slotsState.emptyCount) < 1) {
 						copyStatus.textContent = formatTemplate(i18n.t(game, 'creativeCopyNeedsSlots'), {
 							count: Number(slotsState.emptyCount) || 0
 						})
@@ -924,9 +952,10 @@ ModLoader.register({
 				return dialog
 			}
 
-			function createDialogButton(dialog, textKey, primary) {
+			function createDialogButton(dialog, textKey, primary, glassTheme) {
 				const button = dialog.createButton('', { primary })
 				button.dataset.creativeText = textKey
+				if (glassTheme) button.dataset.glassTheme = glassTheme
 				return button
 			}
 
@@ -957,7 +986,6 @@ ModLoader.register({
 				return dialog.close(reason || 'dialog-closed', force)
 			}
 
-			selectButton.addEventListener('click', handleSelectClick)
 			removeButton.addEventListener('click', handleRemoveClick)
 			undoButton.addEventListener('click', handleUndoClick)
 			redoButton.addEventListener('click', handleRedoClick)
@@ -983,6 +1011,7 @@ ModLoader.register({
 			window.addEventListener('cattail:world-editor-toolbar-layout', handleToolbarLayoutChange)
 			window.addEventListener('keydown', handleHistoryKeydown, true)
 			window.addEventListener('resize', refreshUiScale)
+			blueprintPreviewAttachTimer = globalThis.setTimeout?.(attachBlueprintPreview, 0) ?? null
 			const uiScaleObserver = createUiScaleObserver(game, refreshUiScale)
 			const releaseHud = api.ui.hud.register({
 				id: 'world-editor-shell',
@@ -1003,6 +1032,7 @@ ModLoader.register({
 			refreshTheme(game)
 			refreshUiScale()
 			refreshVisibility()
+			resourceHud.setActive(!!currentState.active, 'initial-state')
 
 			runtime.addCleanup(function () {
 				if (refreshMountedText === refreshText) refreshMountedText = null
@@ -1016,19 +1046,29 @@ ModLoader.register({
 				window.removeEventListener('resize', refreshUiScale)
 				if (historyStatusTimer) clearTimeout(historyStatusTimer)
 				historyStatusTimer = 0
+				if (blueprintPreviewAttachTimer !== null) globalThis.clearTimeout?.(blueprintPreviewAttachTimer)
+				blueprintPreviewAttachTimer = null
+				if (typeof stopBlueprintPreviewSubscription === 'function') stopBlueprintPreviewSubscription()
+				stopBlueprintPreviewSubscription = null
+				blueprintPreview = null
+				currentBlueprintPreview = null
 				uiScaleObserver?.disconnect?.()
+				shellPassThrough.dispose()
+				resourceHud.dispose()
 				toolbarScroller.dispose()
 				if (globalThis[TOOLBAR_SCROLL_PROBE_KEY] === toolbarScroller.probe) {
 					if (previousToolbarScrollProbe === undefined) delete globalThis[TOOLBAR_SCROLL_PROBE_KEY]
 					else globalThis[TOOLBAR_SCROLL_PROBE_KEY] = previousToolbarScrollProbe
 				}
+				if (globalThis[RESOURCE_HUD_PROBE_KEY] === resourceHud.probe) {
+					if (previousResourceHudProbe === undefined) delete globalThis[RESOURCE_HUD_PROBE_KEY]
+					else globalThis[RESOURCE_HUD_PROBE_KEY] = previousResourceHudProbe
+				}
 				if (typeof stopStateSubscription === 'function') stopStateSubscription()
 				if (typeof stopSelectionSubscription === 'function') stopSelectionSubscription()
-				if (typeof stopToolSubscription === 'function') stopToolSubscription()
 				if (typeof stopCreativeSubscription === 'function') stopCreativeSubscription()
 				if (typeof stopCreativeEconomySubscription === 'function') stopCreativeEconomySubscription()
 				if (typeof stopTransactionSubscription === 'function') stopTransactionSubscription()
-				selectButton.removeEventListener('click', handleSelectClick)
 				removeButton.removeEventListener('click', handleRemoveClick)
 				undoButton.removeEventListener('click', handleUndoClick)
 				redoButton.removeEventListener('click', handleRedoClick)
@@ -1039,6 +1079,9 @@ ModLoader.register({
 				if (typeof releaseEconomyHud === 'function') releaseEconomyHud()
 				writeStyleProperty(rootStyle, '--world-editor-ui-scale', previousScale)
 				writeStyleProperty(rootStyle, '--world-editor-toolbar-layout-width', previousToolbarWidth)
+				for (const [property, value] of previousResourceThemeProperties) {
+					writeStyleProperty(rootStyle, property, value)
+				}
 				shell.remove()
 				economyStatus.remove()
 				if (style.isConnected && !document.getElementById(SHELL_ID)) style.remove()
@@ -1093,8 +1136,7 @@ ModLoader.register({
 
 			const actions = document.createElement('span')
 			actions.className = 'cattail-world-editor-shell__actions'
-			const selectButton = createToolButton('select', 'tool-select', 'select', '⌗')
-			const removeButton = createIconButton('remove-selection', '×', 'remove', '×')
+			const removeButton = createIconButton('remove-selection', '', 'remove', '', 'eraser')
 			const undoButton = createHistoryButton('undo', '↶')
 			const redoButton = createHistoryButton('redo', '↷')
 			const creativeButton = createToolButton('creative-mode', 'creative-mode', 'creative', '✦')
@@ -1105,15 +1147,17 @@ ModLoader.register({
 			const selectionGroup = createToolbarGroup('selection')
 			const historyGroup = createToolbarGroup('history')
 			const blueprintGroup = createToolbarGroup('blueprint')
+			const blueprintLibraryGroup = createToolbarGroup('blueprint-library')
 			const transformGroup = createToolbarGroup('transform')
 			const creativeGroup = createToolbarGroup('creative')
 			historyGroup.dataset.worldEditorSlot = 'history'
 			blueprintGroup.dataset.worldEditorSlot = 'blueprint'
+			blueprintLibraryGroup.dataset.worldEditorSlot = 'blueprint-library'
 			transformGroup.dataset.worldEditorSlot = 'transform'
-			selectionGroup.append(selectButton, removeButton)
+			selectionGroup.append(removeButton)
 			historyGroup.append(undoButton, redoButton)
 			creativeGroup.append(creativeButton)
-			actions.append(selectionGroup, historyGroup, blueprintGroup, transformGroup, creativeGroup)
+			actions.append(selectionGroup, historyGroup, blueprintGroup, blueprintLibraryGroup, transformGroup, creativeGroup)
 
 			const hint = document.createElement('span')
 			hint.className = 'cattail-world-editor-shell__hint'
@@ -1158,8 +1202,8 @@ ModLoader.register({
 			button.className = 'cattail-world-editor-shell__tool'
 			button.dataset.worldEditorAction = action
 			button.dataset.worldEditorToolbarCard = ''
-			button.dataset.active = action === 'select' ? 'true' : 'false'
-			button.setAttribute('aria-pressed', action === 'select' ? 'true' : 'false')
+			button.dataset.active = 'false'
+			button.setAttribute('aria-pressed', 'false')
 			const label = document.createElement('span')
 			label.className = 'cattail-world-editor-shell__compact-label'
 			label.dataset.worldEditorText = textKey
@@ -1168,7 +1212,7 @@ ModLoader.register({
 			return button
 		}
 
-		function createIconButton(action, symbol, cardKey, cardIcon) {
+		function createIconButton(action, symbol, cardKey, cardIcon, iconKind) {
 			const button = document.createElement('button')
 			button.type = 'button'
 			button.className = 'cattail-world-editor-shell__tool cattail-world-editor-shell__tool--icon'
@@ -1177,10 +1221,11 @@ ModLoader.register({
 			button.disabled = true
 			const icon = document.createElement('span')
 			icon.className = 'cattail-world-editor-shell__compact-icon'
+			if (iconKind) icon.dataset.worldEditorToolbarIcon = iconKind
 			icon.setAttribute('aria-hidden', 'true')
 			icon.textContent = symbol
 			button.append(icon)
-			appendCardDecoration(button, cardKey, cardIcon)
+			appendCardDecoration(button, cardKey, cardIcon, iconKind)
 			return button
 		}
 
@@ -1192,10 +1237,11 @@ ModLoader.register({
 			return button
 		}
 
-		function appendCardDecoration(button, cardKey, symbol) {
+		function appendCardDecoration(button, cardKey, symbol, iconKind) {
 			const icon = document.createElement('span')
 			icon.className = 'cattail-world-editor-shell__card-icon'
 			icon.dataset.cardIcon = cardKey
+			if (iconKind) icon.dataset.worldEditorToolbarIcon = iconKind
 			icon.setAttribute('aria-hidden', 'true')
 			icon.textContent = symbol
 			const label = document.createElement('span')
@@ -1724,6 +1770,454 @@ ModLoader.register({
 			return status
 		}
 
+		function createResourceThemeProperties(game) {
+			const elmerine = resourceTriplet(game, 1, ['#FFC759', '#FFE86F', '#FF8F60'])
+			const betaPylene = resourceTriplet(game, 3, ['#F26F67', '#FFB68C', '#C02E63'])
+			const hellGem = resourceTriplet(game, 4, ['#A6F246', '#E3FD43', '#4CB96B'])
+			return Object.freeze({
+				'--world-editor-elmerine-1': elmerine[0],
+				'--world-editor-elmerine-2': elmerine[1],
+				'--world-editor-elmerine-3': elmerine[2],
+				'--world-editor-beta-pylene-1': betaPylene[0],
+				'--world-editor-beta-pylene-2': betaPylene[1],
+				'--world-editor-beta-pylene-3': betaPylene[2],
+				'--world-editor-hell-gem-1': hellGem[0],
+				'--world-editor-hell-gem-2': hellGem[1],
+				'--world-editor-hell-gem-3': hellGem[2]
+			})
+		}
+
+		function resourceTriplet(game, index, fallback) {
+			const source = game?.codex?.resources?.[index]?.triplet
+			return fallback.map(function (value, colorIndex) {
+				const candidate = source?.[colorIndex]
+				return typeof candidate === 'string' && candidate.trim() ? candidate.trim() : value
+			})
+		}
+
+		function createShellPassThroughController(game, shell) {
+			let disposed = false
+			let rightDragFromCanvas = false
+			let previewFollowing = false
+			let previewAttachTimer = null
+			let stopPreviewSubscription = null
+
+			function refresh(reason) {
+				if (disposed) return false
+				const active = rightDragFromCanvas || previewFollowing
+				const wasActive = shell.dataset.inputPassThrough === 'true'
+				shell.dataset.inputPassThrough = active ? 'true' : 'false'
+				shell.dataset.passThroughReason = active
+					? rightDragFromCanvas && previewFollowing
+						? 'world-drag+blueprint-follow'
+						: rightDragFromCanvas ? 'world-drag' : 'blueprint-follow'
+					: String(reason || 'inactive')
+				if (active && !wasActive) {
+					const focused = document.activeElement
+					if (focused && shell.contains?.(focused)) focused.blur?.()
+				}
+				return active
+			}
+
+			function handleRightMouseDown(event) {
+				if (event?.button !== 2) return
+				rightDragFromCanvas = event.target === game?.canvas
+				refresh('right-mousedown')
+			}
+
+			function handleRightMouseUp(event) {
+				if (event?.button !== 2) return
+				rightDragFromCanvas = false
+				refresh('right-mouseup')
+			}
+
+			function handleWindowBlur() {
+				rightDragFromCanvas = false
+				refresh('window-blur')
+			}
+
+			function attachPreview() {
+				previewAttachTimer = null
+				if (disposed) return
+				const preview = globalThis[BLUEPRINT_PREVIEW_KEY]
+				if (preview?.game !== game || typeof preview.subscribe !== 'function') return
+				stopPreviewSubscription = preview.subscribe(function (state) {
+					previewFollowing = !!state?.active && !state.effectivePinned
+					refresh('blueprint-preview')
+				})
+			}
+
+			window.addEventListener('mousedown', handleRightMouseDown, true)
+			window.addEventListener('mouseup', handleRightMouseUp, true)
+			window.addEventListener('blur', handleWindowBlur, true)
+			previewAttachTimer = globalThis.setTimeout?.(attachPreview, 0) ?? null
+			refresh('created')
+
+			return Object.freeze({
+				dispose() {
+					if (disposed) return false
+					disposed = true
+					window.removeEventListener('mousedown', handleRightMouseDown, true)
+					window.removeEventListener('mouseup', handleRightMouseUp, true)
+					window.removeEventListener('blur', handleWindowBlur, true)
+					if (previewAttachTimer !== null) globalThis.clearTimeout?.(previewAttachTimer)
+					previewAttachTimer = null
+					if (typeof stopPreviewSubscription === 'function') stopPreviewSubscription()
+					stopPreviewSubscription = null
+					rightDragFromCanvas = false
+					previewFollowing = false
+					delete shell.dataset.inputPassThrough
+					delete shell.dataset.passThroughReason
+					return true
+				}
+			})
+		}
+
+		function createResourceHudController(game) {
+			const methodNames = [
+				'setResourceHomes',
+				'setResourceHomesMobile',
+				'renderResources',
+				'renderDarkResources',
+				'updateMouseData',
+				'processMousemove2'
+			]
+			const methodBackups = new Map()
+			const originalHomesDescriptor = Object.getOwnPropertyDescriptor(game, 'resourceHomes')
+			let baseHomes = cloneResourceHomes(game?.resourceHomes)
+			const visualHomes = cloneResourceHomes(baseHomes)
+			let disposed = false
+			let active = false
+			let belowShell = false
+			let animationHandle = null
+			let animationHandleKind = ''
+			let animationStartTime = 0
+			let animationStart = identityResourceTransform()
+			let currentTransform = identityResourceTransform()
+			let targetTransform = identityResourceTransform()
+			let lastReason = 'created'
+
+			function setResourceHomesValue(value) {
+				try {
+					game.resourceHomes = value
+				} catch (error) {
+					console.warn('[Cattail World Editor] Resource HUD could not update resource homes.', error)
+				}
+			}
+
+			function captureBaseHomes(value) {
+				baseHomes = cloneResourceHomes(value)
+				while (visualHomes.length > baseHomes.length) visualHomes.pop()
+				while (visualHomes.length < baseHomes.length) visualHomes.push([0, 0])
+			}
+
+			function applyVisualHomes() {
+				for (let index = 0; index < baseHomes.length; index += 1) {
+					const base = baseHomes[index]
+					const home = visualHomes[index] || (visualHomes[index] = [0, 0])
+					home[0] = currentTransform.offsetX + base[0] * currentTransform.scale
+					home[1] = currentTransform.offsetY + base[1] * currentTransform.scale
+				}
+				setResourceHomesValue(visualHomes)
+			}
+
+			function installMethod(name) {
+				const original = game?.[name]
+				if (typeof original !== 'function') return
+				const descriptor = Object.getOwnPropertyDescriptor(game, name)
+				const wrapper = name === 'setResourceHomes' || name === 'setResourceHomesMobile'
+					? function (...args) {
+						if (this !== game || disposed) return original.apply(this, args)
+						const result = original.apply(this, args)
+						captureBaseHomes(this.resourceHomes)
+						recomputeTarget(name)
+						return result
+					}
+					: name === 'renderResources' || name === 'renderDarkResources'
+						? function (...args) {
+							if (this !== game || disposed || isIdentityResourceTransform(currentTransform)) {
+								return original.apply(this, args)
+							}
+							const context = this.ctx
+							let saved = false
+							setResourceHomesValue(baseHomes)
+							try {
+								if (context?.save && context?.translate && context?.scale) {
+									context.save()
+									saved = true
+									context.translate(currentTransform.offsetX, currentTransform.offsetY)
+									context.scale(currentTransform.scale, currentTransform.scale)
+								}
+								return original.apply(this, args)
+							} finally {
+								if (saved) context.restore?.()
+								setResourceHomesValue(visualHomes)
+							}
+						}
+						: function (...args) {
+							const result = original.apply(this, args)
+							if (this === game && !disposed) reconcileHoveredResource()
+							return result
+						}
+				try {
+					Object.defineProperty(game, name, {
+						value: wrapper,
+						configurable: true,
+						enumerable: descriptor?.enumerable === true,
+						writable: true
+					})
+					methodBackups.set(name, { descriptor })
+				} catch (error) {
+					console.warn('[Cattail World Editor] Resource HUD skipped method wrapper: ' + name + '.', error)
+				}
+			}
+
+			function reconcileHoveredResource() {
+				if (!Array.isArray(game?.mouse?.xy)) return
+				game.hoveredResource = false
+				const delta = finitePositive(game.screenUnit, 0) * .3 * currentTransform.scale
+				for (let index = 0; index < visualHomes.length; index += 1) {
+					const home = visualHomes[index]
+					if (
+						game.mouse.xy[0] > home[0] - delta &&
+						game.mouse.xy[0] < home[0] + delta &&
+						game.mouse.xy[1] > home[1] - delta &&
+						game.mouse.xy[1] < home[1] + delta
+					) {
+						game.hoveredResource = index
+						break
+					}
+				}
+			}
+
+			function computeTarget() {
+				if (!active || !baseHomes.length) {
+					belowShell = false
+					return identityResourceTransform()
+				}
+				const viewport = resourceHudViewport(game)
+				const xValues = baseHomes.map(function (home) { return home[0] })
+				const minX = Math.min(...xValues)
+				const maxX = Math.max(...xValues)
+				const unit = finitePositive(game.screenUnit, Math.max(1, maxX - minX) / Math.max(1, baseHomes.length - 1))
+				const radius = unit * .4
+				const groupWidth = Math.max(unit * .8, maxX - minX + radius * 2)
+				const leftMargin = RESOURCE_HUD_LEFT_MARGIN_CSS * viewport.scaleX
+				const topMargin = RESOURCE_HUD_TOP_MARGIN_CSS * viewport.scaleY
+				const leftEdge = leftMargin
+				const available = Math.max(1, viewport.width - leftMargin * 2)
+				belowShell = false
+				const scale = Math.min(
+					RESOURCE_HUD_MAX_SCALE,
+					Math.max(RESOURCE_HUD_MIN_SCALE, available / groupWidth)
+				)
+				const centerY = topMargin + radius * scale
+				return {
+					scale,
+					offsetX: leftEdge - (minX - radius) * scale,
+					offsetY: centerY - baseHomes[0][1] * scale
+				}
+			}
+
+			function recomputeTarget(reason) {
+				if (disposed) return false
+				lastReason = String(reason || 'layout')
+				animateTo(computeTarget())
+				return true
+			}
+
+			function animateTo(next) {
+				const now = resourceAnimationNow()
+				updateAnimation(now)
+				if (resourceTransformsClose(targetTransform, next) && animationHandle !== null) return
+				animationStart = cloneResourceTransform(currentTransform)
+				targetTransform = cloneResourceTransform(next)
+				animationStartTime = now
+				if (resourceTransformsClose(animationStart, targetTransform)) {
+					currentTransform = cloneResourceTransform(targetTransform)
+					cancelAnimation()
+					applyVisualHomes()
+					return
+				}
+				cancelAnimation()
+				scheduleAnimation()
+			}
+
+			function scheduleAnimation() {
+				if (disposed || animationHandle !== null) return
+				if (typeof globalThis.requestAnimationFrame === 'function') {
+					animationHandleKind = 'frame'
+					animationHandle = globalThis.requestAnimationFrame(handleAnimationFrame)
+				} else {
+					animationHandleKind = 'timer'
+					animationHandle = globalThis.setTimeout?.(function () {
+						handleAnimationFrame(resourceAnimationNow())
+					}, 16) ?? null
+				}
+			}
+
+			function handleAnimationFrame(timestamp) {
+				animationHandle = null
+				animationHandleKind = ''
+				if (disposed) return
+				const done = updateAnimation(Number.isFinite(Number(timestamp)) ? Number(timestamp) : resourceAnimationNow())
+				if (!done) scheduleAnimation()
+			}
+
+			function updateAnimation(now) {
+				if (resourceTransformsClose(currentTransform, targetTransform) && animationHandle === null) return true
+				const progress = Math.min(1, Math.max(0, (now - animationStartTime) / RESOURCE_HUD_ANIMATION_MS))
+				const eased = 1 - Math.pow(1 - progress, 3)
+				currentTransform = {
+					scale: interpolateNumber(animationStart.scale, targetTransform.scale, eased),
+					offsetX: interpolateNumber(animationStart.offsetX, targetTransform.offsetX, eased),
+					offsetY: interpolateNumber(animationStart.offsetY, targetTransform.offsetY, eased)
+				}
+				applyVisualHomes()
+				return progress >= 1
+			}
+
+			function cancelAnimation() {
+				if (animationHandle === null) return
+				if (animationHandleKind === 'frame' && typeof globalThis.cancelAnimationFrame === 'function') {
+					globalThis.cancelAnimationFrame(animationHandle)
+				} else {
+					globalThis.clearTimeout?.(animationHandle)
+				}
+				animationHandle = null
+				animationHandleKind = ''
+			}
+
+			function snapshot() {
+				return Object.freeze({
+					active,
+					belowShell,
+					animationMs: RESOURCE_HUD_ANIMATION_MS,
+					minScale: RESOURCE_HUD_MIN_SCALE,
+					maxScale: RESOURCE_HUD_MAX_SCALE,
+					current: Object.freeze(cloneResourceTransform(currentTransform)),
+					target: Object.freeze(cloneResourceTransform(targetTransform)),
+					baseHomes: Object.freeze(cloneResourceHomes(baseHomes).map(Object.freeze)),
+					visualHomes: Object.freeze(cloneResourceHomes(visualHomes).map(Object.freeze)),
+					lastReason,
+					disposed
+				})
+			}
+
+			function restoreMethodsAndHomes() {
+				for (const name of methodNames.slice().reverse()) {
+					const backup = methodBackups.get(name)
+					if (!backup) continue
+					try {
+						if (backup.descriptor) Object.defineProperty(game, name, backup.descriptor)
+						else delete game[name]
+					} catch (error) {
+						console.warn('[Cattail World Editor] Resource HUD could not restore method: ' + name + '.', error)
+					}
+				}
+				const restoredHomes = cloneResourceHomes(baseHomes)
+				try {
+					if (originalHomesDescriptor) {
+						const descriptor = Object.assign({}, originalHomesDescriptor)
+						if (Object.hasOwn(descriptor, 'value')) descriptor.value = restoredHomes
+						Object.defineProperty(game, 'resourceHomes', descriptor)
+					} else {
+						delete game.resourceHomes
+						if (restoredHomes.length) game.resourceHomes = restoredHomes
+					}
+				} catch (error) {
+					console.warn('[Cattail World Editor] Resource HUD could not restore resource homes.', error)
+				}
+			}
+
+			for (const name of methodNames) installMethod(name)
+			applyVisualHomes()
+
+			const probe = Object.freeze({ snapshot })
+			return Object.freeze({
+				probe,
+				setActive(next, reason) {
+					if (disposed) return false
+					const value = next === true
+					if (active === value) {
+						if (value) recomputeTarget(reason || 'active-refresh')
+						return false
+					}
+					active = value
+					recomputeTarget(reason || (active ? 'entered' : 'exited'))
+					return true
+				},
+				refreshLayout(reason) {
+					if (!active || disposed) return false
+					return recomputeTarget(reason || 'layout')
+				},
+				dispose() {
+					if (disposed) return false
+					disposed = true
+					cancelAnimation()
+					currentTransform = identityResourceTransform()
+					targetTransform = identityResourceTransform()
+					restoreMethodsAndHomes()
+					return true
+				}
+			})
+		}
+
+		function resourceHudViewport(game) {
+			const canvas = game?.canvas
+			const rect = canvas?.getBoundingClientRect?.()
+			const width = finitePositive(game?.w, finitePositive(canvas?.width, rect?.width || UI_SCALE_BASE_WIDTH))
+			const height = finitePositive(game?.h, finitePositive(canvas?.height, rect?.height || UI_SCALE_BASE_HEIGHT))
+			const cssWidth = finitePositive(rect?.width, typeof window !== 'undefined' ? window.innerWidth : width)
+			const cssHeight = finitePositive(rect?.height, typeof window !== 'undefined' ? window.innerHeight : height)
+			return {
+				width,
+				height,
+				scaleX: width / cssWidth,
+				scaleY: height / cssHeight,
+				canvasLeft: Number(rect?.left) || 0,
+				canvasTop: Number(rect?.top) || 0
+			}
+		}
+
+		function cloneResourceHomes(value) {
+			if (!Array.isArray(value)) return []
+			return value.map(function (home) {
+				return [Number(home?.[0]) || 0, Number(home?.[1]) || 0]
+			})
+		}
+
+		function identityResourceTransform() {
+			return { scale: 1, offsetX: 0, offsetY: 0 }
+		}
+
+		function cloneResourceTransform(value) {
+			return {
+				scale: Number(value?.scale) || 1,
+				offsetX: Number(value?.offsetX) || 0,
+				offsetY: Number(value?.offsetY) || 0
+			}
+		}
+
+		function isIdentityResourceTransform(value) {
+			return resourceTransformsClose(value, identityResourceTransform())
+		}
+
+		function resourceTransformsClose(left, right) {
+			return Math.abs((Number(left?.scale) || 0) - (Number(right?.scale) || 0)) < .000001 &&
+				Math.abs((Number(left?.offsetX) || 0) - (Number(right?.offsetX) || 0)) < .001 &&
+				Math.abs((Number(left?.offsetY) || 0) - (Number(right?.offsetY) || 0)) < .001
+		}
+
+		function interpolateNumber(start, end, progress) {
+			return start + (end - start) * progress
+		}
+
+		function resourceAnimationNow() {
+			const value = Number(globalThis.performance?.now?.())
+			return Number.isFinite(value) ? value : Date.now()
+		}
+
 		function unavailableSharedGuards() {
 			return Object.freeze({
 				isEditableEvent() { return false },
@@ -1835,6 +2329,63 @@ ModLoader.register({
 			const style = document.createElement('style')
 			style.id = STYLE_ID
 			style.textContent = `
+				:root {
+					--world-editor-elmerine-1: #FFC759;
+					--world-editor-elmerine-2: #FFE86F;
+					--world-editor-elmerine-3: #FF8F60;
+					--world-editor-hell-gem-1: #A6F246;
+					--world-editor-hell-gem-2: #E3FD43;
+					--world-editor-hell-gem-3: #4CB96B;
+					--world-editor-glass-backdrop: blur(10px) saturate(1.2) brightness(1.05);
+					--world-editor-elmerine-glass:
+						radial-gradient(ellipse 92% 72% at 50% -18%, rgba(255, 255, 255, .72) 0%, rgba(255, 255, 255, .22) 46%, transparent 72%),
+						linear-gradient(180deg, rgba(255, 255, 255, .28) 0%, rgba(255, 255, 255, .06) 34%, rgba(255, 255, 255, .03) 60%, rgba(255, 255, 255, .3) 100%),
+						linear-gradient(112deg, transparent 8%, rgba(255, 255, 255, .46) 24%, rgba(255, 255, 255, .09) 43%, transparent 59%),
+						linear-gradient(145deg, color-mix(in srgb, var(--world-editor-elmerine-2) 24%, transparent), color-mix(in srgb, var(--world-editor-elmerine-1) 16%, transparent) 54%, color-mix(in srgb, var(--world-editor-elmerine-3) 22%, transparent));
+					--world-editor-elmerine-glass-hover:
+						radial-gradient(ellipse 96% 78% at 50% -18%, rgba(255, 255, 255, .84) 0%, rgba(255, 255, 255, .32) 48%, transparent 74%),
+						linear-gradient(180deg, rgba(255, 255, 255, .36) 0%, rgba(255, 255, 255, .08) 34%, rgba(255, 255, 255, .05) 60%, rgba(255, 255, 255, .42) 100%),
+						linear-gradient(108deg, transparent 6%, rgba(255, 255, 255, .58) 24%, rgba(255, 255, 255, .14) 44%, transparent 61%),
+						linear-gradient(145deg, color-mix(in srgb, var(--world-editor-elmerine-2) 30%, transparent), color-mix(in srgb, var(--world-editor-elmerine-1) 22%, transparent) 54%, color-mix(in srgb, var(--world-editor-elmerine-3) 28%, transparent));
+					--world-editor-hell-gem-glass:
+						radial-gradient(ellipse 92% 72% at 50% -18%, rgba(255, 255, 255, .72) 0%, rgba(255, 255, 255, .22) 46%, transparent 72%),
+						linear-gradient(180deg, rgba(255, 255, 255, .28) 0%, rgba(255, 255, 255, .06) 34%, rgba(255, 255, 255, .03) 60%, rgba(255, 255, 255, .3) 100%),
+						linear-gradient(112deg, transparent 8%, rgba(255, 255, 255, .46) 24%, rgba(255, 255, 255, .09) 43%, transparent 59%),
+						linear-gradient(145deg, color-mix(in srgb, var(--world-editor-hell-gem-2) 24%, transparent), color-mix(in srgb, var(--world-editor-hell-gem-1) 16%, transparent) 54%, color-mix(in srgb, var(--world-editor-hell-gem-3) 22%, transparent));
+					--world-editor-hell-gem-glass-hover:
+						radial-gradient(ellipse 96% 78% at 50% -18%, rgba(255, 255, 255, .84) 0%, rgba(255, 255, 255, .32) 48%, transparent 74%),
+						linear-gradient(180deg, rgba(255, 255, 255, .36) 0%, rgba(255, 255, 255, .08) 34%, rgba(255, 255, 255, .05) 60%, rgba(255, 255, 255, .42) 100%),
+						linear-gradient(108deg, transparent 6%, rgba(255, 255, 255, .58) 24%, rgba(255, 255, 255, .14) 44%, transparent 61%),
+						linear-gradient(145deg, color-mix(in srgb, var(--world-editor-hell-gem-2) 30%, transparent), color-mix(in srgb, var(--world-editor-hell-gem-1) 22%, transparent) 54%, color-mix(in srgb, var(--world-editor-hell-gem-3) 28%, transparent));
+					--world-editor-hell-gem-glass-shadow:
+						inset 0 0 0 1px rgba(255, 255, 255, .62),
+						inset 0 1px 1px rgba(255, 255, 255, .92),
+						inset 0 -1px 1px rgba(255, 255, 255, .68),
+						inset 1px 0 1px rgba(255, 255, 255, .38),
+						inset -1px 0 1px color-mix(in srgb, var(--world-editor-hell-gem-2) 34%, transparent),
+						inset 0 -6px 12px color-mix(in srgb, var(--world-editor-hell-gem-3) 18%, transparent),
+						0 5px 12px rgba(10, 16, 24, .16),
+						0 0 12px color-mix(in srgb, var(--world-editor-hell-gem-1) 42%, transparent),
+						0 0 26px color-mix(in srgb, var(--world-editor-hell-gem-2) 22%, transparent);
+					--world-editor-hell-gem-glass-shadow-hover:
+						inset 0 0 0 1px rgba(255, 255, 255, .76),
+						inset 0 1px 1px rgba(255, 255, 255, .98),
+						inset 0 -2px 2px rgba(255, 255, 255, .78),
+						inset 1px 0 1px rgba(255, 255, 255, .5),
+						inset -1px 0 1px color-mix(in srgb, var(--world-editor-hell-gem-2) 42%, transparent),
+						inset 0 -7px 14px color-mix(in srgb, var(--world-editor-hell-gem-3) 22%, transparent),
+						0 6px 14px rgba(10, 16, 24, .18),
+						0 0 16px color-mix(in srgb, var(--world-editor-hell-gem-1) 54%, transparent),
+						0 0 32px color-mix(in srgb, var(--world-editor-hell-gem-2) 30%, transparent);
+					--world-editor-hell-gem-glass-shadow-pressed:
+						inset 0 0 0 1px rgba(255, 255, 255, .58),
+						inset 0 1px 1px rgba(255, 255, 255, .74),
+						inset 0 4px 9px color-mix(in srgb, var(--world-editor-hell-gem-3) 24%, transparent),
+						inset 0 -1px 1px rgba(255, 255, 255, .54),
+						0 2px 7px rgba(10, 16, 24, .16),
+						0 0 10px color-mix(in srgb, var(--world-editor-hell-gem-1) 38%, transparent),
+						0 0 20px color-mix(in srgb, var(--world-editor-hell-gem-2) 20%, transparent);
+				}
 				.cattail-world-editor-shell {
 					--world-editor-shell-bg: rgba(248, 248, 246, .88);
 					--world-editor-shell-text: rgba(18, 20, 22, .94);
@@ -1842,6 +2393,9 @@ ModLoader.register({
 					--world-editor-shell-border: rgba(0, 0, 0, .12);
 					--world-editor-shell-dot: rgba(18, 20, 22, .82);
 					--world-editor-shell-chip: rgba(18, 20, 22, .07);
+					--world-editor-shell-hover-bg: rgba(150, 154, 160, .18);
+					--world-editor-shell-hover-color: #b56b87;
+					--world-editor-shell-hover-filter: brightness(0) saturate(100%) invert(48%) sepia(19%) saturate(1118%) hue-rotate(286deg) brightness(94%) contrast(87%);
 					--world-editor-shell-group: rgba(18, 20, 22, .035);
 					--world-editor-shell-active: rgba(113, 79, 163, .16);
 					--world-editor-shell-active-border: rgba(113, 79, 163, .34);
@@ -1892,6 +2446,10 @@ ModLoader.register({
 					opacity: 1;
 					transform: translateY(0);
 					transition-delay: 0s;
+				}
+				.cattail-world-editor-shell[data-input-pass-through="true"],
+				.cattail-world-editor-shell[data-input-pass-through="true"] * {
+					pointer-events: none !important;
 				}
 				.cattail-world-editor-shell__layout {
 					display: flex;
@@ -1960,6 +2518,15 @@ ModLoader.register({
 					color: var(--world-editor-shell-text);
 					font-size: 18px;
 					font-weight: 600;
+					text-shadow: none;
+					transition: color .18s ease, text-shadow .18s ease;
+				}
+				.cattail-world-editor-shell__mode[data-creative="true"] {
+					color: var(--world-editor-hell-gem-3, #4CB96B);
+					text-shadow:
+						0 0 5px color-mix(in srgb, var(--world-editor-hell-gem-1, #A6F246) 78%, transparent),
+						0 0 12px color-mix(in srgb, var(--world-editor-hell-gem-2, #E3FD43) 64%, transparent),
+						0 0 22px color-mix(in srgb, var(--world-editor-hell-gem-3, #4CB96B) 52%, transparent);
 				}
 				.cattail-world-editor-shell__status {
 					display: inline-flex;
@@ -2000,10 +2567,17 @@ ModLoader.register({
 					cursor: pointer;
 				}
 				.cattail-world-editor-shell__style-button:last-child { border-right: 0; }
-				.cattail-world-editor-shell__style-button:hover,
+				.cattail-world-editor-shell__style-button:hover {
+					background: var(--world-editor-shell-hover-bg);
+					color: var(--world-editor-shell-hover-color);
+				}
 				.cattail-world-editor-shell__style-button[data-active="true"] {
 					background: var(--world-editor-shell-active);
 					color: var(--world-editor-shell-text);
+				}
+				.cattail-world-editor-shell__style-button[data-active="true"]:hover {
+					background: var(--world-editor-shell-hover-bg);
+					color: var(--world-editor-shell-hover-color);
 				}
 				.cattail-world-editor-shell__actions {
 					display: flex;
@@ -2041,7 +2615,7 @@ ModLoader.register({
 					color: var(--world-editor-shell-muted);
 					font: 600 12px/1.2 Montserrat, Arial, sans-serif;
 					cursor: pointer;
-					transition: background .12s ease, border-color .12s ease, color .12s ease, opacity .12s ease;
+					transition: background .12s ease, border-color .12s ease, box-shadow .12s ease, color .12s ease, opacity .12s ease, transform .08s ease;
 				}
 				.cattail-world-editor-shell__tool--icon {
 					width: 30px;
@@ -2052,8 +2626,60 @@ ModLoader.register({
 					font-size: 20px;
 					line-height: 1;
 				}
+				[data-world-editor-toolbar-icon] {
+					position: relative;
+					display: inline-block;
+					width: 1em;
+					height: 1em;
+					font-size: 20px;
+					line-height: 1;
+					pointer-events: none;
+				}
+				[data-world-editor-toolbar-icon]::before,
+				[data-world-editor-toolbar-icon]::after {
+					position: absolute;
+					box-sizing: border-box;
+					content: '';
+				}
+				[data-world-editor-toolbar-icon="eraser"]::before {
+					left: .16em;
+					top: .29em;
+					width: .68em;
+					height: .38em;
+					border: .075em solid currentColor;
+					border-radius: .07em;
+					background: linear-gradient(90deg, currentColor 0 38%, transparent 38% 100%);
+					transform: rotate(-38deg);
+				}
+				[data-world-editor-toolbar-icon="eraser"]::after {
+					left: .19em;
+					bottom: .12em;
+					width: .62em;
+					height: .065em;
+					border-radius: 999px;
+					background: currentColor;
+					opacity: .5;
+				}
+				[data-world-editor-toolbar-icon="pickaxe"]::before {
+					left: .455em;
+					top: .24em;
+					width: .11em;
+					height: .68em;
+					border-radius: .055em;
+					background: currentColor;
+					transform: rotate(28deg);
+					transform-origin: 50% 8%;
+				}
+				[data-world-editor-toolbar-icon="pickaxe"]::after {
+					left: .07em;
+					top: .1em;
+					width: .86em;
+					height: .34em;
+					background: currentColor;
+					clip-path: polygon(0 58%, 9% 29%, 34% 8%, 59% 7%, 82% 27%, 100% 67%, 91% 63%, 77% 43%, 58% 31%, 35% 32%, 12% 50%);
+				}
 				.cattail-world-editor-shell__tool:hover:not(:disabled) {
-					color: var(--world-editor-shell-text);
+					color: var(--world-editor-shell-hover-color);
 				}
 				.cattail-world-editor-shell__tool[data-active="true"] {
 					border-color: var(--world-editor-shell-active-border);
@@ -2061,13 +2687,34 @@ ModLoader.register({
 					color: var(--world-editor-shell-text);
 				}
 				.cattail-world-editor-shell__tool--creative[data-creative="true"] {
-					border-color: var(--world-editor-shell-creative-border);
-					background: var(--world-editor-shell-creative);
-					color: var(--world-editor-shell-creative-text);
+					border-color: color-mix(in srgb, rgba(255, 255, 255, .88) 54%, var(--world-editor-hell-gem-1));
+					background: var(--world-editor-hell-gem-glass);
+					background-blend-mode: screen, screen, screen, normal;
+					backdrop-filter: var(--world-editor-glass-backdrop);
+					-webkit-backdrop-filter: var(--world-editor-glass-backdrop);
+					box-shadow: var(--world-editor-hell-gem-glass-shadow);
+					color: #17200c;
+				}
+				.cattail-world-editor-shell__tool--creative[data-creative="true"]:hover:not(:disabled):not([aria-disabled="true"]) {
+					border-color: color-mix(in srgb, rgba(255, 255, 255, .96) 68%, var(--world-editor-hell-gem-1));
+					background: var(--world-editor-hell-gem-glass-hover);
+					box-shadow: var(--world-editor-hell-gem-glass-shadow-hover);
+					color: #17200c;
+				}
+				.cattail-world-editor-shell__tool--creative[data-creative="true"]:active:not(:disabled):not([aria-disabled="true"]) {
+					transform: translateY(1px);
+					box-shadow: var(--world-editor-hell-gem-glass-shadow-pressed);
+				}
+				.cattail-world-editor-shell__tool--creative[data-creative="true"]:focus-visible:not(:disabled) {
+					box-shadow: var(--world-editor-hell-gem-glass-shadow), 0 0 0 2px var(--world-editor-shell-text);
 				}
 				.cattail-world-editor-shell__tool:disabled {
 					opacity: .38;
 					cursor: default;
+				}
+				.cattail-world-editor-shell__tool--creative[data-creative="true"]:disabled,
+				.cattail-world-editor-shell__tool--creative[data-creative="true"][aria-disabled="true"] {
+					box-shadow: none;
 				}
 				.cattail-world-editor-shell__tool[aria-disabled="true"] {
 					opacity: .38;
@@ -2127,7 +2774,7 @@ ModLoader.register({
 				}
 				.cattail-world-editor-shell[data-toolbar-style="compact"] .cattail-world-editor-shell__group {
 					position: relative;
-					gap: 0;
+					gap: 4px;
 					padding: 3px 4px;
 					border: 0;
 					border-radius: 0;
@@ -2145,12 +2792,33 @@ ModLoader.register({
 				}
 				.cattail-world-editor-shell[data-toolbar-style="compact"] .cattail-world-editor-blueprint-controls,
 				.cattail-world-editor-shell[data-toolbar-style="compact"] .cattail-world-editor-transform-controls[data-world-editor-transform-controls="toolbar"] {
-					gap: 0;
+					gap: 4px;
 				}
 				.cattail-world-editor-shell[data-toolbar-style="compact"] .cattail-world-editor-blueprint-modes {
+					gap: 4px;
 					border: 0;
 					border-radius: 0;
 					overflow: visible;
+				}
+				.cattail-world-editor-shell[data-toolbar-style="compact"] .cattail-world-editor-blueprint-mode {
+					display: inline-grid;
+					width: 30px;
+					min-width: 30px !important;
+					padding: 0 !important;
+					place-items: center;
+				}
+				.cattail-world-editor-shell[data-toolbar-style="compact"] .cattail-world-editor-blueprint-mode .cattail-world-editor-blueprint-compact-label {
+					display: none;
+				}
+				.cattail-world-editor-shell[data-toolbar-style="compact"] .cattail-world-editor-blueprint-mode .cattail-world-editor-blueprint-card-icon {
+					position: relative;
+					z-index: 1;
+					display: inline-block;
+					width: auto;
+					height: auto;
+					color: var(--world-editor-shell-muted);
+					font: 700 20px/1 Montserrat, Arial, sans-serif;
+					pointer-events: none;
 				}
 				.cattail-world-editor-shell[data-toolbar-style="compact"] .cattail-world-editor-shell__tool,
 				.cattail-world-editor-shell[data-toolbar-style="compact"] .cattail-world-editor-blueprint-mode,
@@ -2167,8 +2835,17 @@ ModLoader.register({
 				.cattail-world-editor-shell[data-toolbar-style="compact"] .cattail-world-editor-blueprint-icon-button:hover:not(:disabled),
 				.cattail-world-editor-shell[data-toolbar-style="compact"] .cattail-world-editor-transform-button:hover:not(:disabled) {
 					border-radius: 5px;
-					background: var(--world-editor-shell-chip) !important;
-					color: var(--world-editor-shell-text);
+					border: 0 !important;
+					background: var(--world-editor-shell-hover-bg) !important;
+					box-shadow: none !important;
+					color: var(--world-editor-shell-hover-color) !important;
+				}
+				.cattail-world-editor-shell[data-toolbar-style="compact"] [data-world-editor-toolbar-card]:hover:not(:disabled):not([aria-disabled="true"]) .cattail-world-editor-blueprint-card-icon {
+					color: var(--world-editor-shell-hover-color) !important;
+				}
+				.cattail-world-editor-shell[data-toolbar-style="compact"] [data-world-editor-toolbar-card]:hover:not(:disabled):not([aria-disabled="true"]) canvas,
+				.cattail-world-editor-shell[data-toolbar-style="compact"] [data-world-editor-toolbar-card]:hover:not(:disabled):not([aria-disabled="true"]) .cattail-world-editor-transform-icon[data-asset="true"] img {
+					filter: var(--world-editor-shell-hover-filter);
 				}
 				.cattail-world-editor-shell[data-toolbar-style="compact"] .cattail-world-editor-shell__tool[data-active="true"],
 				.cattail-world-editor-shell[data-toolbar-style="compact"] .cattail-world-editor-blueprint-mode[data-active="true"],
@@ -2178,10 +2855,37 @@ ModLoader.register({
 					background: var(--world-editor-shell-active) !important;
 					color: var(--world-editor-shell-text);
 				}
+				.cattail-world-editor-shell[data-toolbar-style="compact"] .cattail-world-editor-blueprint-mode[data-active="true"] {
+					background: transparent !important;
+					box-shadow: inset 0 -3px 0 var(--world-editor-hell-gem-3, #4CB96B) !important;
+					color: var(--world-editor-shell-text);
+				}
+				.cattail-world-editor-shell[data-toolbar-style="compact"] .cattail-world-editor-blueprint-mode[data-active="true"]:hover:not(:disabled) {
+					background: var(--world-editor-shell-hover-bg) !important;
+					box-shadow: inset 0 -3px 0 var(--world-editor-hell-gem-3, #4CB96B) !important;
+					color: var(--world-editor-shell-hover-color) !important;
+				}
 				.cattail-world-editor-shell[data-toolbar-style="compact"] .cattail-world-editor-shell__tool--creative[data-creative="true"] {
 					border-radius: 5px;
-					background: var(--world-editor-shell-creative) !important;
-					color: var(--world-editor-shell-creative-text);
+					border: 1px solid color-mix(in srgb, rgba(255, 255, 255, .88) 54%, var(--world-editor-hell-gem-1)) !important;
+					background: var(--world-editor-hell-gem-glass) !important;
+					background-blend-mode: screen, screen, screen, normal !important;
+					backdrop-filter: var(--world-editor-glass-backdrop) !important;
+					-webkit-backdrop-filter: var(--world-editor-glass-backdrop) !important;
+					box-shadow: var(--world-editor-hell-gem-glass-shadow) !important;
+					color: #17200c;
+				}
+				.cattail-world-editor-shell[data-toolbar-style="compact"] .cattail-world-editor-shell__tool--creative[data-creative="true"]:hover:not(:disabled):not([aria-disabled="true"]) {
+					border: 1px solid color-mix(in srgb, rgba(255, 255, 255, .96) 68%, var(--world-editor-hell-gem-1)) !important;
+					background: var(--world-editor-hell-gem-glass-hover) !important;
+					background-blend-mode: screen, screen, screen, normal !important;
+					backdrop-filter: var(--world-editor-glass-backdrop) !important;
+					-webkit-backdrop-filter: var(--world-editor-glass-backdrop) !important;
+					box-shadow: var(--world-editor-hell-gem-glass-shadow-hover) !important;
+					color: #17200c !important;
+				}
+				.cattail-world-editor-shell[data-toolbar-style="compact"] .cattail-world-editor-shell__tool--creative[data-creative="true"]:focus-visible:not(:disabled):not([aria-disabled="true"]) {
+					box-shadow: var(--world-editor-hell-gem-glass-shadow), 0 0 0 2px var(--world-editor-shell-text) !important;
 				}
 				.cattail-world-editor-shell[data-toolbar-style="cards"] .cattail-world-editor-shell__toolbar-bar {
 					position: relative;
@@ -2323,18 +3027,39 @@ ModLoader.register({
 					clip-path: polygon(50% 0, 100% 34%, 100% 66%, 50% 100%, 0 66%, 0 34%);
 					pointer-events: none;
 				}
+				.cattail-world-editor-shell[data-toolbar-style="cards"] [data-world-editor-toolbar-group="blueprint-library"] > [data-world-editor-toolbar-card]::before {
+					display: none;
+				}
 				.cattail-world-editor-shell[data-toolbar-style="cards"] [data-world-editor-toolbar-card]:hover:not(:disabled):not([aria-disabled="true"]) {
 					background: transparent;
-					color: var(--world-editor-shell-text);
+					color: var(--world-editor-shell-hover-color) !important;
 				}
 				.cattail-world-editor-shell[data-toolbar-style="cards"] [data-world-editor-toolbar-card]:hover:not(:disabled):not([aria-disabled="true"])::after {
-					background: var(--world-editor-shell-chip);
+					background: var(--world-editor-shell-hover-bg) !important;
+					background-blend-mode: normal !important;
+					backdrop-filter: none !important;
+					-webkit-backdrop-filter: none !important;
+					box-shadow: none !important;
+				}
+				.cattail-world-editor-shell[data-toolbar-style="cards"] [data-world-editor-toolbar-card]:hover:not(:disabled):not([aria-disabled="true"]) .cattail-world-editor-shell__card-icon,
+				.cattail-world-editor-shell[data-toolbar-style="cards"] [data-world-editor-toolbar-card]:hover:not(:disabled):not([aria-disabled="true"]) .cattail-world-editor-blueprint-card-icon,
+				.cattail-world-editor-shell[data-toolbar-style="cards"] [data-world-editor-toolbar-card]:hover:not(:disabled):not([aria-disabled="true"]) .cattail-world-editor-blueprint-copy-icon,
+				.cattail-world-editor-shell[data-toolbar-style="cards"] [data-world-editor-toolbar-card]:hover:not(:disabled):not([aria-disabled="true"]) .cattail-world-editor-blueprint-clear-icon,
+				.cattail-world-editor-shell[data-toolbar-style="cards"] [data-world-editor-toolbar-card]:hover:not(:disabled):not([aria-disabled="true"]) .cattail-world-editor-blueprint-surge-icon,
+				.cattail-world-editor-shell[data-toolbar-style="cards"] [data-world-editor-toolbar-card]:hover:not(:disabled):not([aria-disabled="true"]) .cattail-world-editor-blueprint-sync-empty-icon,
+				.cattail-world-editor-shell[data-toolbar-style="cards"] [data-world-editor-toolbar-card]:hover:not(:disabled):not([aria-disabled="true"]) .cattail-world-editor-transform-icon {
+					color: var(--world-editor-shell-hover-color) !important;
+				}
+				.cattail-world-editor-shell[data-toolbar-style="cards"] [data-world-editor-toolbar-card]:hover:not(:disabled):not([aria-disabled="true"]) canvas,
+				.cattail-world-editor-shell[data-toolbar-style="cards"] [data-world-editor-toolbar-card]:hover:not(:disabled):not([aria-disabled="true"]) .cattail-world-editor-transform-icon[data-asset="true"] img {
+					filter: var(--world-editor-shell-hover-filter);
 				}
 				.cattail-world-editor-shell[data-toolbar-style="cards"] .cattail-world-editor-shell__toolbar-bar[data-scrolling="true"] [data-world-editor-toolbar-card]:hover:not(:disabled):not([aria-disabled="true"]):not([data-active="true"]) {
-					color: var(--world-editor-shell-muted);
+					color: var(--world-editor-shell-muted) !important;
 				}
 				.cattail-world-editor-shell[data-toolbar-style="cards"] .cattail-world-editor-shell__toolbar-bar[data-scrolling="true"] [data-world-editor-toolbar-card]:hover:not(:disabled):not([aria-disabled="true"]):not([data-active="true"])::after {
-					background: transparent;
+					background: transparent !important;
+					box-shadow: none !important;
 					transition: none;
 				}
 				.cattail-world-editor-shell[data-toolbar-style="cards"] [data-world-editor-toolbar-card][data-active="true"] {
@@ -2344,14 +3069,43 @@ ModLoader.register({
 				.cattail-world-editor-shell[data-toolbar-style="cards"] [data-world-editor-toolbar-card][data-active="true"]::after {
 					background: var(--world-editor-shell-active);
 				}
+				.cattail-world-editor-shell[data-toolbar-style="cards"] .cattail-world-editor-blueprint-mode[data-active="true"]::after {
+					background: transparent;
+					box-shadow: inset 0 -3px 0 var(--world-editor-hell-gem-3, #4CB96B);
+				}
+				.cattail-world-editor-shell[data-toolbar-style="cards"] .cattail-world-editor-blueprint-mode[data-active="true"]:hover:not(:disabled)::after {
+					background: var(--world-editor-shell-hover-bg) !important;
+					box-shadow: inset 0 -3px 0 var(--world-editor-hell-gem-3, #4CB96B) !important;
+				}
 				.cattail-world-editor-shell[data-toolbar-style="cards"] .cattail-world-editor-shell__tool--creative[data-creative="true"] {
 					background: transparent;
-					color: var(--world-editor-shell-creative-text);
+					color: #17200c;
 					box-shadow: none;
 				}
 				.cattail-world-editor-shell[data-toolbar-style="cards"] .cattail-world-editor-shell__tool--creative[data-creative="true"]::after {
-					background: var(--world-editor-shell-creative);
-					box-shadow: inset 0 0 0 1px var(--world-editor-shell-creative-border);
+					background: var(--world-editor-hell-gem-glass);
+					background-blend-mode: screen, screen, screen, normal;
+					backdrop-filter: var(--world-editor-glass-backdrop);
+					-webkit-backdrop-filter: var(--world-editor-glass-backdrop);
+					box-shadow: var(--world-editor-hell-gem-glass-shadow);
+				}
+				.cattail-world-editor-shell[data-toolbar-style="cards"] .cattail-world-editor-shell__tool--creative[data-creative="true"]:hover:not(:disabled):not([aria-disabled="true"]),
+				.cattail-world-editor-shell[data-toolbar-style="cards"] .cattail-world-editor-shell__tool--creative[data-creative="true"]:hover:not(:disabled):not([aria-disabled="true"]) .cattail-world-editor-shell__card-icon {
+					color: #17200c !important;
+				}
+				.cattail-world-editor-shell[data-toolbar-style="cards"] .cattail-world-editor-shell__tool--creative[data-creative="true"]:hover:not(:disabled):not([aria-disabled="true"])::after {
+					background: var(--world-editor-hell-gem-glass-hover) !important;
+					background-blend-mode: screen, screen, screen, normal !important;
+					backdrop-filter: var(--world-editor-glass-backdrop) !important;
+					-webkit-backdrop-filter: var(--world-editor-glass-backdrop) !important;
+					box-shadow: var(--world-editor-hell-gem-glass-shadow-hover) !important;
+				}
+				.cattail-world-editor-shell[data-toolbar-style="cards"] .cattail-world-editor-shell__tool--creative[data-creative="true"]:disabled::after,
+				.cattail-world-editor-shell[data-toolbar-style="cards"] .cattail-world-editor-shell__tool--creative[data-creative="true"][aria-disabled="true"]::after {
+					box-shadow: none;
+				}
+				.cattail-world-editor-shell[data-toolbar-style="cards"] .cattail-world-editor-shell__tool--creative[data-creative="true"]:focus-visible:not(:disabled):not([aria-disabled="true"])::after {
+					box-shadow: var(--world-editor-hell-gem-glass-shadow), 0 0 0 2px var(--world-editor-shell-text);
 				}
 				.cattail-world-editor-shell[data-toolbar-style="cards"] .cattail-world-editor-shell__compact-label,
 				.cattail-world-editor-shell[data-toolbar-style="cards"] .cattail-world-editor-shell__compact-icon,
@@ -2373,6 +3127,9 @@ ModLoader.register({
 				.cattail-world-editor-shell[data-toolbar-style="cards"] .cattail-world-editor-shell__card-icon,
 				.cattail-world-editor-shell[data-toolbar-style="cards"] .cattail-world-editor-blueprint-card-icon,
 				.cattail-world-editor-shell[data-toolbar-style="cards"] .cattail-world-editor-blueprint-copy-icon,
+				.cattail-world-editor-shell[data-toolbar-style="cards"] .cattail-world-editor-blueprint-clear-icon,
+				.cattail-world-editor-shell[data-toolbar-style="cards"] .cattail-world-editor-blueprint-surge-icon,
+				.cattail-world-editor-shell[data-toolbar-style="cards"] .cattail-world-editor-blueprint-sync-empty-icon,
 				.cattail-world-editor-shell[data-toolbar-style="cards"] .cattail-world-editor-transform-icon,
 				.cattail-world-editor-shell[data-toolbar-style="cards"] .cattail-world-editor-blueprint-icon-button canvas {
 					position: absolute;
@@ -2388,6 +3145,9 @@ ModLoader.register({
 					opacity: .12 !important;
 					transform: translate(-50%, -50%);
 					pointer-events: none;
+				}
+				.cattail-world-editor-shell[data-toolbar-style="cards"] .cattail-world-editor-blueprint-sync-empty-icon::before {
+					inset: 10px 0;
 				}
 				.cattail-world-editor-shell[data-toolbar-style="cards"] .cattail-world-editor-transform-icon[data-icon="rotate-counterclockwise"] {
 					transform: translate(-50%, -50%) scaleX(-1);

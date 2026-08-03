@@ -554,12 +554,6 @@ ModLoader.register({
 			style = document.createElement('style')
 			style.id = STYLE_ID
 			style.textContent = `
-				.cattail-world-editor-selection-cut__button {
-					--world-editor-cut-accent: #f2cc60;
-				}
-				.cattail-world-editor-shell[data-toolbar-style="compact"] .cattail-world-editor-selection-cut__button:not(:disabled):hover {
-					color: var(--world-editor-cut-accent);
-				}
 				.cattail-world-editor-selection-cut__status {
 					display: none;
 					align-items: center;
@@ -608,9 +602,29 @@ ModLoader.register({
 					text-align: left;
 				}
 				.cattail-world-editor-selection-cut__layer-option[data-active="true"] {
-					border-color: rgba(166, 242, 70, .75);
-					background: rgba(166, 242, 70, .14);
-					color: #dfff9c;
+					border-color: color-mix(in srgb, rgba(255, 255, 255, .88) 54%, var(--world-editor-hell-gem-1, #A6F246));
+					background: var(--world-editor-hell-gem-glass);
+					background-blend-mode: screen, screen, screen, normal;
+					backdrop-filter: var(--world-editor-glass-backdrop);
+					-webkit-backdrop-filter: var(--world-editor-glass-backdrop);
+					box-shadow: var(--world-editor-hell-gem-glass-shadow);
+					color: #17200c;
+				}
+				.cattail-world-editor-selection-cut__layer-option[data-active="true"]:hover:not(:disabled) {
+					border-color: color-mix(in srgb, rgba(255, 255, 255, .96) 68%, var(--world-editor-hell-gem-1, #A6F246));
+					background: var(--world-editor-hell-gem-glass-hover);
+					box-shadow: var(--world-editor-hell-gem-glass-shadow-hover);
+				}
+				.cattail-world-editor-selection-cut__layer-option[data-active="true"]:active:not(:disabled) {
+					transform: translateY(1px);
+					box-shadow: var(--world-editor-hell-gem-glass-shadow-pressed);
+				}
+				.cattail-world-editor-selection-cut__layer-option[data-active="true"]:focus-visible {
+					box-shadow: var(--world-editor-hell-gem-glass-shadow), 0 0 0 2px var(--world-editor-dialog-text);
+				}
+				.cattail-world-editor-selection-cut__layer-option[data-active="true"]:disabled {
+					opacity: .38;
+					box-shadow: none;
 				}
 			`
 			document.head.append(style)

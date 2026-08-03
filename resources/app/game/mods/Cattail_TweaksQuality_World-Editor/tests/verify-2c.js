@@ -581,11 +581,11 @@ function testUnifiedToolbarAndLocalization() {
 	const resizeButton = shell.querySelector('[data-world-editor-action="resize"]')
 	assert.equal(i18n.version, '0.5.1')
 	assert.equal(i18n.languages.length, 20)
-	assert.equal(i18n.keys.length, 252)
+	assert.equal(i18n.keys.length, 249)
 	assert.equal(shell.getAttribute('role'), 'toolbar')
+	assert.equal(selectButton, null)
 	assert.equal(moveButton, null)
 	assert.equal(resizeButton, null)
-	assert.equal(selectButton.getAttribute('aria-pressed'), 'true')
 	assert.equal(tool.snapshot().mode, 'select')
 	assert.equal(shell.dataset.mode, 'select')
 	assert.equal(shell.querySelector('[data-world-editor-text="mode"]').textContent, '选择模式')
@@ -594,18 +594,8 @@ function testUnifiedToolbarAndLocalization() {
 	selection.emit({ plane: 0, selectedRange: selected, previewRange: null, previewKind: null })
 	assert.equal(tool.snapshot().mode, 'select')
 
-	selection.emit({
-		plane: 0,
-		selectedRange: selected,
-		previewRange: range([8, 8], [9, 9]),
-		previewKind: 'selection'
-	})
-	selectButton.dispatch('click', mouseEvent())
-	assert.equal(selection.hasPreview(), false)
-
 	game.language = 'en'
 	api.emit('afterWords', {}, game)
-	assert.equal(selectButton.querySelector('[data-world-editor-text="tool-select"]').textContent, 'Select')
 	assert.equal(shell.querySelector('[data-world-editor-text="mode"]').textContent, 'Selection Mode')
 
 	runtime.runCleanups()
@@ -693,4 +683,4 @@ testMoveInputAndCancellation()
 testMoveAnalysisReuseAndRestore()
 testUnifiedToolbarAndLocalization()
 testManifestAndReadOnlyBoundary()
-console.log('2C verification passed: move state, drag input, cancellation, statistics reuse, toolbar modes, i18n, manifest, and read-only boundary.')
+console.log('2C verification passed: move state, drag input, cancellation, statistics reuse, implicit selection tool, i18n, manifest, and read-only boundary.')

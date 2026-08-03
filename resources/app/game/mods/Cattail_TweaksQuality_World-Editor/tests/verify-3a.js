@@ -361,6 +361,9 @@ async function testSchema4EmptyMaskCaptureAndCut() {
 	assert.equal(env.session.snapshot().sourceBlueprint.schemaVersion, 6)
 	assert.deepEqual(plain(captured.anchor.position), [2, 0])
 	assert.deepEqual(plain(captured.emptyCells), [[0, 0]])
+	assert.equal(env.session.snapshot().syncEmpty, false)
+	assert.equal(env.session.setSyncEmpty(true, 'test-structure-sync-empty'), true)
+	assert.equal(env.session.snapshot().syncEmpty, true)
 	assert.deepEqual(plain(captured.entities.map(entity => entity.name)), ['silo'])
 	assert.deepEqual(
 		plain(captured.summary.skippedTypes.map(entry => [entry.name, entry.reason])),
@@ -695,11 +698,12 @@ function testLanguagesManifestUiAndReadOnlyBoundary() {
 	const i18n = i18nSandbox[I18N_KEY]
 	assert.equal(i18n.version, '0.5.1')
 	assert.equal(i18n.languages.length, 20)
-	assert.equal(i18n.keys.length, 252)
+	assert.equal(i18n.keys.length, 249)
 	const blueprintKeys = [
 		'blueprintModeStructure',
 		'blueprintModeFull',
 		'blueprintIncludeBlocks',
+		'blueprintSyncEmpty',
 		'blueprintCopy',
 		'blueprintCardTitle',
 		'blueprintClear',

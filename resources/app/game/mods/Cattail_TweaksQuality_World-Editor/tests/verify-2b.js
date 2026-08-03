@@ -481,7 +481,7 @@ function testSelectionCard() {
 	sandbox[RUNTIME_KEY] = runtime
 	sandbox[SELECTION_KEY] = selection
 	sandbox[ANALYSIS_KEY] = analysis
-	assert.equal(sandbox[I18N_KEY].keys.length, 252)
+	assert.equal(sandbox[I18N_KEY].keys.length, 249)
 	api.emit('afterGameInit', {}, game)
 
 	const card = document.getElementById('cattail-world-editor-selection-card')

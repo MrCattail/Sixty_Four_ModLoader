@@ -492,7 +492,7 @@ function testManifestLocalizationUiAndReadOnlyContracts() {
 	]
 	assert.equal(i18n.version, '0.5.1')
 	assert.equal(i18n.languages.length, 20)
-	assert.equal(i18n.keys.length, 252)
+	assert.equal(i18n.keys.length, 249)
 	for (const language of i18n.languages) {
 		for (const key of productionKeys) {
 			const translated = i18n.t(language, key)

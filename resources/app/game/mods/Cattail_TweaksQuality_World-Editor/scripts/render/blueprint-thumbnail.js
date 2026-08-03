@@ -3,7 +3,7 @@ ModLoader.register({
 	init(api) {
 		const THUMBNAIL_KEY = Symbol.for('cattail.world-editor.blueprint-thumbnail')
 		const SHARED_KEY = Symbol.for('cattail.world-editor.shared')
-		const CACHE_VERSION = 'v3'
+		const CACHE_VERSION = 'v4'
 		const RESOLVED_CACHE_LIMIT = 128
 		const previous = globalThis[THUMBNAIL_KEY]
 		previous?.dispose?.('blueprint-thumbnail-replaced')
@@ -124,11 +124,7 @@ ModLoader.register({
 				if (icon) drawEntityIcon(context, point, iconSize, icon)
 				else drawEntityFallback(context, point, iconSize, record.name)
 			}
-			const summary = (
-				String((blueprint.entities || []).length) + ' buildings  ·  ' +
-				String((blueprint.blocks || []).length) + ' cubes  ·  ' +
-				String((blueprint.surges || []).length) + ' surges'
-			)
+			const summary = String((blueprint.entities || []).length) + ' Buildings'
 			context.font = '600 12px Montserrat, Arial, sans-serif'
 			context.lineWidth = 3
 			context.lineJoin = 'round'

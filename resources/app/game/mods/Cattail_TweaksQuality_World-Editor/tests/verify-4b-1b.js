@@ -31,7 +31,7 @@ function testSourceContracts() {
 	assert.match(shellSource, /createHistoryButton\('undo',\s*'↶'\)/)
 	assert.match(shellSource, /createHistoryButton\('redo',\s*'↷'\)/)
 	assert.match(shellSource, /historyGroup\.append\(undoButton,\s*redoButton\)/)
-	assert.match(shellSource, /actions\.append\(selectionGroup,\s*historyGroup,\s*blueprintGroup,\s*transformGroup,\s*creativeGroup\)/)
+	assert.match(shellSource, /actions\.append\(selectionGroup,\s*historyGroup,\s*blueprintGroup,\s*blueprintLibraryGroup,\s*transformGroup,\s*creativeGroup\)/)
 	assert.match(shellSource, /button\.disabled\s*=\s*false/)
 	assert.match(shellSource, /definition\.button\.setAttribute\('aria-disabled',\s*reason\s*\?\s*'true'\s*:\s*'false'\)/)
 	assert.match(shellSource, /worldEditorToolbarBusy\s*=\s*reason\s*===\s*'BUSY'/)
@@ -592,7 +592,7 @@ async function testMountedBehavior() {
 	assert.equal(redo.getAttribute('aria-disabled'), 'true')
 	assert.equal(redo.dataset.historyBlockedReason, 'NO_REDO')
 	assert.match(undo.title, /Undo \(Ctrl\+Z\)/)
-	assert.match(redo.title, /Nothing to redo/)
+	assert.match(redo.title, /Nothing to Redo/)
 	assert.equal(status.getAttribute('role'), 'status')
 	assert.equal(status.getAttribute('aria-live'), 'polite')
 	assert.equal(status.dataset.active, 'false')
@@ -619,7 +619,7 @@ async function testMountedBehavior() {
 	assert.equal(redo.getAttribute('aria-disabled'), 'true')
 	assert.equal(undo.dataset.worldEditorToolbarBusy, 'true')
 	assert.equal(redo.dataset.worldEditorToolbarBusy, 'true')
-	assert.equal(status.textContent, 'History operation in progress…')
+	assert.equal(status.textContent, 'History Operation in Progress…')
 	redo.dispatch('click', event({ detail: 1 }))
 	assert.equal(transactions.calls.length, 1, 'busy input must not queue a second operation')
 	releaseUndo()
@@ -630,7 +630,7 @@ async function testMountedBehavior() {
 	assert.deepEqual(refreshReasons, ['transaction-undo-complete'])
 	assert.equal(undo.getAttribute('aria-disabled'), 'true')
 	assert.equal(redo.getAttribute('aria-disabled'), 'false')
-	assert.equal(status.textContent, 'Change undone.')
+	assert.equal(status.textContent, 'Change Undone.')
 	assert.equal(status.dataset.kind, 'success')
 	assert.ok(Array.from(timers.values()).some(timer => timer.delay === 3000))
 
@@ -639,7 +639,7 @@ async function testMountedBehavior() {
 	assert.equal(blockedUndo.prevented, true)
 	assert.equal(blockedUndo.immediate, true)
 	assert.equal(transactions.calls.length, 1)
-	assert.equal(status.textContent, 'Nothing to undo.')
+	assert.equal(status.textContent, 'Nothing to Undo.')
 
 	const keyboardRedo = event({ key: 'y', ctrlKey: true })
 	window.dispatch('keydown', keyboardRedo)
@@ -650,7 +650,7 @@ async function testMountedBehavior() {
 	assert.deepEqual(transactions.calls[1], { direction: 'redo', input: 'keyboard' })
 	assert.equal(refreshCount, 2)
 	assert.equal(refreshReasons[1], 'transaction-redo-complete')
-	assert.equal(status.textContent, 'Change redone.')
+	assert.equal(status.textContent, 'Change Redone.')
 
 	for (const guarded of [
 		event({ key: 'z', ctrlKey: true, repeat: true }),
@@ -694,7 +694,7 @@ async function testMountedBehavior() {
 	await flush()
 	assert.deepEqual(transactions.calls[2], { direction: 'undo', input: 'keyboard' })
 	assert.equal(refreshCount, 3)
-	assert.equal(status.textContent, 'The operation completed, but the blueprint preview could not refresh.')
+	assert.equal(status.textContent, 'The Operation Completed, but the Blueprint Preview Could Not Refresh.')
 	assert.equal(status.dataset.kind, 'warning')
 	assert.ok(Array.from(timers.values()).some(timer => timer.delay === 6000))
 
@@ -712,7 +712,7 @@ async function testMountedBehavior() {
 	await flush()
 	await flush()
 	assert.equal(refreshCount, refreshBeforeFailure, 'failed operations must not refresh the preview')
-	assert.equal(status.textContent, 'The operation failed; the previous state was restored.')
+	assert.equal(status.textContent, 'The Operation Failed; the Previous State Was Restored.')
 	assert.equal(status.dataset.kind, 'error')
 
 	sandbox[PREVIEW_KEY].snapshot = function () {
@@ -721,7 +721,7 @@ async function testMountedBehavior() {
 	redo.dispatch('click', event({ detail: 1 }))
 	await flush()
 	await flush()
-	assert.equal(status.textContent, 'The operation completed, but the blueprint preview could not refresh.')
+	assert.equal(status.textContent, 'The Operation Completed, but the Blueprint Preview Could Not Refresh.')
 	assert.equal(status.dataset.kind, 'warning')
 	assert.equal(refreshCount, refreshBeforeFailure)
 
@@ -729,7 +729,7 @@ async function testMountedBehavior() {
 	assert.equal(undo.getAttribute('aria-disabled'), 'true')
 	assert.equal(redo.getAttribute('aria-disabled'), 'true')
 	assert.equal(undo.dataset.worldEditorToolbarBusy, 'false')
-	assert.equal(status.textContent, 'Recovery failed. Reload the game before editing again.')
+	assert.equal(status.textContent, 'Recovery Failed. Reload the Game Before Editing Again.')
 	assert.equal(status.dataset.kind, 'terminal')
 	const callsBeforeTerminal = transactions.calls.length
 	const terminalShortcut = event({ key: 'z', ctrlKey: true })
