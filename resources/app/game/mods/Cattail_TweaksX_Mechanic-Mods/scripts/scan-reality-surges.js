@@ -3,14 +3,14 @@
 	const DEFAULT_SURGE_COUNT = 8
 	const DEFAULT_SURGE_RADIUS = 8
 	const MAX_SURGE_COUNT = 64
-	const MAX_SURGE_RADIUS = 64
+	const MAX_SURGE_RADIUS = 256
 	const RESOURCE_COUNT = 10
 	const SCAN_RADIUS_KEY = '__cattailScanRealitySliderRadius'
 	const SCAN_REALITY_KEY = '__cattailScanRealitySliderReality'
 	const VANILLA_DIAMETER = 32
 	const VANILLA_REALITY = 256
 	const MIN_DIAMETER = 8
-	const MAX_DIAMETER = 256
+	const MAX_DIAMETER = 1024
 	const DIAMETER_STEP = 8
 	const DIAMETER_PER_REALITY_DOUBLE = 8
 

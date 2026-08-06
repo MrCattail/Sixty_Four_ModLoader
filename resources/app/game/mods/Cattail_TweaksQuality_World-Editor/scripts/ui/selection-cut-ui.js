@@ -122,9 +122,10 @@ ModLoader.register({
 			}
 
 			function renderButton() {
+				const selectionAvailable = Number(currentSelection?.selectionCount) > 0
 				const blocked = (
 					!currentRuntime?.active ||
-					!Number(currentSelection?.selectionCount) ||
+					!selectionAvailable ||
 					selectionBusy() ||
 					uiBusy ||
 					!!currentDialog ||
@@ -147,6 +148,7 @@ ModLoader.register({
 					currentDeletion?.busy ||
 					currentTransactions?.busy
 				) ? 'true' : 'false'
+				cutButton.dataset.worldEditorLargeHidden = selectionAvailable ? 'false' : 'true'
 				cutButton.dataset.active = 'false'
 				dispatchToolbarLayout('selection-cut-state')
 			}

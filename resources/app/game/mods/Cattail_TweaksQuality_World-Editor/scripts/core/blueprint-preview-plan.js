@@ -172,7 +172,7 @@ ModLoader.register({
 
 			if (
 				(Number(blueprint.schemaVersion) === 4 && blueprint.mode === 'structure') ||
-				((Number(blueprint.schemaVersion) === 5 || Number(blueprint.schemaVersion) === 6) && blueprint.mode === 'full')
+				((Number(blueprint.schemaVersion) === 5 || Number(blueprint.schemaVersion) === 6 || Number(blueprint.schemaVersion) === 7) && blueprint.mode === 'full')
 			) {
 				const seenEmptyCells = new Set()
 				for (const relativeValue of blueprint.emptyCells || []) {

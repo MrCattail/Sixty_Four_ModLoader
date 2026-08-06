@@ -11,10 +11,36 @@
   "languageSupport": {
     "gameLanguage": true
   },
+  "languages": [
+    "sch",
+    "modsch",
+    "en",
+    "ru",
+    "de",
+    "ptbr",
+    "it",
+    "es",
+    "fr",
+    "nl",
+    "cz",
+    "pl",
+    "jp",
+    "kr",
+    "tch",
+    "thai",
+    "hu",
+    "lv",
+    "ro",
+    "no"
+  ],
   "entries": [
     "scripts/shift-ctrl-zoom-disable.js",
     "scripts/view-distance.js",
+    "scripts/window-size-presets.js",
+    "scripts/mouse-anchored-camera.js",
+    "scripts/origin-arrow-tip-anchor.js",
     "scripts/void-return-fade-skip.js",
+    "scripts/waypoint-teleport-fade-skip.js",
     "scripts/stabilizer-surge-flash-reduction.js",
     "scripts/gradient-lightning-flash-disable.js",
     "scripts/idle-splash-disable.js",
@@ -22,6 +48,7 @@
     "scripts/resource-glow-colors.js",
     "scripts/explainer-fix.js",
     "scripts/ending-skip.js",
+    "scripts/floor-color-override.js",
     "scripts/accessibility-buttons.js",
     "scripts/reduced-flashes-layering.js",
     "scripts/chasm-line-renderer.js",
@@ -68,8 +95,47 @@
       "type": "boolean",
       "label": "Accessibility buttons",
       "default": true,
-      "description": "Show the bottom accessibility control bar and reality-floor color palette.",
+      "description": "Show the bottom accessibility control bar.",
       "section": "accessibilityButtons"
+    },
+    "enableFloorColorOverride": {
+      "type": "boolean",
+      "label": "Reality floor color override",
+      "default": true,
+      "description": "Replace the reality floor background color with a configurable color.",
+      "reloadPolicy": "hot",
+      "section": "floorColorOverride",
+      "sectionLabel": {
+        "sch": "地板颜色覆盖",
+        "modsch": "地板颜色覆盖",
+        "en": "Floor color override",
+        "ru": "Podmena tsveta pola",
+        "de": "Bodenfarbe ersetzen",
+        "ptbr": "Substituir cor do piso",
+        "it": "Sostituzione colore pavimento",
+        "es": "Sustituir color del suelo",
+        "fr": "Remplacement couleur sol",
+        "nl": "Vloerkleur vervangen",
+        "cz": "Prepsani barvy podlahy",
+        "pl": "Zastepowanie koloru podlogi",
+        "jp": "床色オーバーライド",
+        "kr": "바닥 색상 덮어쓰기",
+        "tch": "地板顏色覆蓋",
+        "thai": "แทนที่สีพื้น",
+        "hu": "Padloszin feluliras",
+        "lv": "Gridas krasas aizvietosana",
+        "ro": "Inlocuire culoare podea",
+        "no": "Overstyr gulvfarge"
+      }
+    },
+    "floorColorOverrideRealityColor": {
+      "type": "color",
+      "label": "Reality floor color",
+      "default": "#FFFFFF",
+      "defaultColor": "#FFFFFF",
+      "description": "Color used for the reality floor background while the override is enabled.",
+      "reloadPolicy": "hot",
+      "section": "floorColorOverride"
     },
     "enableResourceLayersAboveReducedFlashes": {
       "type": "boolean",
@@ -326,6 +392,14 @@
       "description": "When returning from the void to reality, remove the long white recovery fade and show the clear view immediately.",
       "reloadPolicy": "hot",
       "section": "voidReturnFadeSkip"
+    },
+    "enableWaypointTeleportFadeSkip": {
+      "type": "boolean",
+      "label": "Skip waypoint teleport fade",
+      "default": true,
+      "description": "When using Waypoint LV1 or LV2, remove the black recovery fade after teleporting.",
+      "reloadPolicy": "hot",
+      "section": "waypointTeleportFadeSkip"
     },
     "enableResourceGlowColors": {
       "type": "boolean",
@@ -1202,9 +1276,532 @@
       "step": 0.01,
       "description": "Used when the saved zoom value is missing or invalid.",
       "section": "viewDistance"
+    },
+    "enableWindowSizePresets": {
+      "type": "boolean",
+      "label": {
+        "sch": "窗口大小预设",
+        "modsch": "窗口大小预设",
+        "en": "Window size presets",
+        "ru": "Предустановки размера окна",
+        "de": "Fenstergrößen-Voreinstellungen",
+        "ptbr": "Predefinições de tamanho da janela",
+        "it": "Preset dimensione finestra",
+        "es": "Preajustes de tamaño de ventana",
+        "fr": "Préréglages de taille de fenêtre",
+        "nl": "Venstergrootte-presets",
+        "cz": "Předvolby velikosti okna",
+        "pl": "Presety rozmiaru okna",
+        "jp": "ウィンドウサイズプリセット",
+        "kr": "창 크기 프리셋",
+        "tch": "視窗大小預設",
+        "thai": "ชุดขนาดหน้าต่าง",
+        "hu": "Ablakméret-előbeállítások",
+        "lv": "Loga izmēra sākotnējie iestatījumi",
+        "ro": "Presetări dimensiune fereastră",
+        "no": "Forhåndsvalg for vindusstørrelse"
+      },
+      "default": true,
+      "description": {
+        "sch": "根据主显示器分辨率提供全屏、无边框和窗口大小预设。",
+        "modsch": "根据主显示器分辨率提供全屏、无边框和窗口大小预设。",
+        "en": "Offer fullscreen, borderless, and windowed size presets based on the primary display resolution.",
+        "ru": "Предлагает полноэкранный, безрамочный и оконный режимы с размерами по разрешению основного дисплея.",
+        "de": "Bietet Vollbild-, rahmenlose und Fenstergrößen nach der Auflösung des Hauptbildschirms an.",
+        "ptbr": "Oferece tela cheia, sem borda e tamanhos em janela com base na resolução da tela principal.",
+        "it": "Offre schermo intero, senza bordi e preset finestra in base alla risoluzione dello schermo principale.",
+        "es": "Ofrece pantalla completa, sin bordes y tamaños de ventana según la resolución de la pantalla principal.",
+        "fr": "Propose le plein écran, le sans bordure et des tailles de fenêtre selon la résolution de l’écran principal.",
+        "nl": "Biedt volledig scherm, randloos en venstergroottes op basis van de resolutie van het hoofdscherm.",
+        "cz": "Nabízí celou obrazovku, bezrámečkový režim a velikosti okna podle rozlišení hlavního displeje.",
+        "pl": "Oferuje pełny ekran, tryb bez ramki i rozmiary okna według rozdzielczości głównego monitora.",
+        "jp": "メインディスプレイの解像度に合わせて、フルスクリーン、ボーダーレス、ウィンドウのサイズ候補を表示します。",
+        "kr": "주 디스플레이 해상도에 맞춰 전체 화면, 테두리 없음, 창 크기 프리셋을 제공합니다.",
+        "tch": "根據主要顯示器解析度提供全螢幕、無邊框和視窗大小預設。",
+        "thai": "เสนอขนาดสำหรับเต็มจอ ไร้ขอบ และหน้าต่างตามความละเอียดของจอหลัก",
+        "hu": "Teljes képernyős, keret nélküli és ablakos méreteket kínál a fő kijelző felbontása alapján.",
+        "lv": "Piedāvā pilnekrāna, bezmalu un loga izmērus pēc galvenā displeja izšķirtspējas.",
+        "ro": "Oferă ecran complet, fără bordură și dimensiuni de fereastră după rezoluția ecranului principal.",
+        "no": "Tilbyr fullskjerm, kantløs og vindusstørrelser basert på oppløsningen til hovedskjermen."
+      },
+      "reloadPolicy": "hot",
+      "section": "windowSizePresets",
+      "sectionLabel": {
+        "sch": "窗口大小预设",
+        "modsch": "窗口大小预设",
+        "en": "Window size presets",
+        "ru": "Предустановки размера окна",
+        "de": "Fenstergrößen-Voreinstellungen",
+        "ptbr": "Predefinições de tamanho da janela",
+        "it": "Preset dimensione finestra",
+        "es": "Preajustes de tamaño de ventana",
+        "fr": "Préréglages de taille de fenêtre",
+        "nl": "Venstergrootte-presets",
+        "cz": "Předvolby velikosti okna",
+        "pl": "Presety rozmiaru okna",
+        "jp": "ウィンドウサイズプリセット",
+        "kr": "창 크기 프리셋",
+        "tch": "視窗大小預設",
+        "thai": "ชุดขนาดหน้าต่าง",
+        "hu": "Ablakméret-előbeállítások",
+        "lv": "Loga izmēra sākotnējie iestatījumi",
+        "ro": "Presetări dimensiune fereastră",
+        "no": "Forhåndsvalg for vindusstørrelse"
+      }
+    },
+    "windowPresentationMode": {
+      "type": "select",
+      "label": {
+        "sch": "窗口形式",
+        "modsch": "窗口形式",
+        "en": "Window form",
+        "ru": "Режим окна",
+        "de": "Fensterform",
+        "ptbr": "Forma da janela",
+        "it": "Forma finestra",
+        "es": "Forma de ventana",
+        "fr": "Forme de fenêtre",
+        "nl": "Venstervorm",
+        "cz": "Forma okna",
+        "pl": "Forma okna",
+        "jp": "ウィンドウ形式",
+        "kr": "창 형태",
+        "tch": "視窗形式",
+        "thai": "รูปแบบหน้าต่าง",
+        "hu": "Ablakforma",
+        "lv": "Loga forma",
+        "ro": "Formă fereastră",
+        "no": "Vindusform"
+      },
+      "default": "fullscreen",
+      "description": {
+        "sch": "选择全屏、无边框或普通窗口模式。无边框会在下次启动游戏后移除系统标题栏。",
+        "modsch": "选择全屏、无边框或普通窗口模式。无边框会在下次启动游戏后移除系统标题栏。",
+        "en": "Choose fullscreen, borderless, or normal window mode. Borderless removes the system title bar after the next game launch.",
+        "ru": "Выберите полноэкранный, безрамочный или обычный оконный режим. Безрамочный режим убирает системный заголовок после следующего запуска игры.",
+        "de": "Wählt Vollbild, rahmenlos oder normales Fenster. Rahmenlos entfernt die Systemtitelleiste nach dem nächsten Spielstart.",
+        "ptbr": "Escolha tela cheia, sem borda ou janela normal. Sem borda remove a barra de título do sistema após a próxima abertura do jogo.",
+        "it": "Scegli schermo intero, senza bordi o finestra normale. Senza bordi rimuove la barra del titolo al prossimo avvio del gioco.",
+        "es": "Elige pantalla completa, sin bordes o ventana normal. Sin bordes quita la barra de título del sistema al iniciar el juego de nuevo.",
+        "fr": "Choisissez plein écran, sans bordure ou fenêtre normale. Sans bordure retire la barre de titre système au prochain lancement du jeu.",
+        "nl": "Kies volledig scherm, randloos of normaal venster. Randloos verwijdert de systeemtitelbalk na de volgende start van het spel.",
+        "cz": "Vyber celou obrazovku, bez rámečku nebo běžné okno. Bez rámečku odstraní systémový titulek po příštím spuštění hry.",
+        "pl": "Wybierz pełny ekran, bez ramki albo zwykłe okno. Tryb bez ramki usuwa systemowy pasek tytułu po następnym uruchomieniu gry.",
+        "jp": "フルスクリーン、ボーダーレス、通常ウィンドウを選びます。ボーダーレスは次回起動後にシステムのタイトルバーを消します。",
+        "kr": "전체 화면, 테두리 없음, 일반 창 모드를 선택합니다. 테두리 없음은 다음 게임 실행 후 시스템 제목 표시줄을 제거합니다.",
+        "tch": "選擇全螢幕、無邊框或一般視窗模式。無邊框會在下次啟動遊戲後移除系統標題列。",
+        "thai": "เลือกเต็มจอ ไร้ขอบ หรือหน้าต่างปกติ โหมดไร้ขอบจะลบแถบชื่อระบบหลังเปิดเกมครั้งถัดไป",
+        "hu": "Válassz teljes képernyőt, keret nélküli vagy normál ablakot. A keret nélküli mód a következő indítás után eltávolítja a rendszer címsorát.",
+        "lv": "Izvēlies pilnekrānu, bezmalu vai parastu logu. Bezmalu režīms pēc nākamās spēles palaišanas noņem sistēmas virsraksta joslu.",
+        "ro": "Alege ecran complet, fără bordură sau fereastră normală. Fără bordură elimină bara de titlu a sistemului după următoarea pornire a jocului.",
+        "no": "Velg fullskjerm, kantløs eller vanlig vindu. Kantløs fjerner systemtittellinjen etter neste spillstart."
+      },
+      "reloadPolicy": "hot",
+      "section": "windowSizePresets",
+      "options": [
+        {
+          "value": "fullscreen",
+          "label": {
+            "sch": "全屏",
+            "modsch": "全屏",
+            "en": "Fullscreen",
+            "ru": "Полный экран",
+            "de": "Vollbild",
+            "ptbr": "Tela cheia",
+            "it": "Schermo intero",
+            "es": "Pantalla completa",
+            "fr": "Plein écran",
+            "nl": "Volledig scherm",
+            "cz": "Celá obrazovka",
+            "pl": "Pełny ekran",
+            "jp": "フルスクリーン",
+            "kr": "전체 화면",
+            "tch": "全螢幕",
+            "thai": "เต็มจอ",
+            "hu": "Teljes képernyő",
+            "lv": "Pilnekrāns",
+            "ro": "Ecran complet",
+            "no": "Fullskjerm"
+          }
+        },
+        {
+          "value": "borderless",
+          "label": {
+            "sch": "无边框",
+            "modsch": "无边框",
+            "en": "Borderless",
+            "ru": "Без рамки",
+            "de": "Rahmenlos",
+            "ptbr": "Sem borda",
+            "it": "Senza bordi",
+            "es": "Sin bordes",
+            "fr": "Sans bordure",
+            "nl": "Randloos",
+            "cz": "Bez rámečku",
+            "pl": "Bez ramki",
+            "jp": "ボーダーレス",
+            "kr": "테두리 없음",
+            "tch": "無邊框",
+            "thai": "ไร้ขอบ",
+            "hu": "Keret nélküli",
+            "lv": "Bez malām",
+            "ro": "Fără bordură",
+            "no": "Kantløs"
+          }
+        },
+        {
+          "value": "window",
+          "label": {
+            "sch": "窗口",
+            "modsch": "窗口",
+            "en": "Window",
+            "ru": "Окно",
+            "de": "Fenster",
+            "ptbr": "Janela",
+            "it": "Finestra",
+            "es": "Ventana",
+            "fr": "Fenêtre",
+            "nl": "Venster",
+            "cz": "Okno",
+            "pl": "Okno",
+            "jp": "ウィンドウ",
+            "kr": "창",
+            "tch": "視窗",
+            "thai": "หน้าต่าง",
+            "hu": "Ablak",
+            "lv": "Logs",
+            "ro": "Fereastră",
+            "no": "Vindu"
+          }
+        }
+      ],
+      "valueLabels": {
+        "fullscreen": {
+          "sch": "全屏",
+          "modsch": "全屏",
+          "en": "Fullscreen",
+          "ru": "Полный экран",
+          "de": "Vollbild",
+          "ptbr": "Tela cheia",
+          "it": "Schermo intero",
+          "es": "Pantalla completa",
+          "fr": "Plein écran",
+          "nl": "Volledig scherm",
+          "cz": "Celá obrazovka",
+          "pl": "Pełny ekran",
+          "jp": "フルスクリーン",
+          "kr": "전체 화면",
+          "tch": "全螢幕",
+          "thai": "เต็มจอ",
+          "hu": "Teljes képernyő",
+          "lv": "Pilnekrāns",
+          "ro": "Ecran complet",
+          "no": "Fullskjerm"
+        },
+        "borderless": {
+          "sch": "无边框",
+          "modsch": "无边框",
+          "en": "Borderless",
+          "ru": "Без рамки",
+          "de": "Rahmenlos",
+          "ptbr": "Sem borda",
+          "it": "Senza bordi",
+          "es": "Sin bordes",
+          "fr": "Sans bordure",
+          "nl": "Randloos",
+          "cz": "Bez rámečku",
+          "pl": "Bez ramki",
+          "jp": "ボーダーレス",
+          "kr": "테두리 없음",
+          "tch": "無邊框",
+          "thai": "ไร้ขอบ",
+          "hu": "Keret nélküli",
+          "lv": "Bez malām",
+          "ro": "Fără bordură",
+          "no": "Kantløs"
+        },
+        "window": {
+          "sch": "窗口",
+          "modsch": "窗口",
+          "en": "Window",
+          "ru": "Окно",
+          "de": "Fenster",
+          "ptbr": "Janela",
+          "it": "Finestra",
+          "es": "Ventana",
+          "fr": "Fenêtre",
+          "nl": "Venster",
+          "cz": "Okno",
+          "pl": "Okno",
+          "jp": "ウィンドウ",
+          "kr": "창",
+          "tch": "視窗",
+          "thai": "หน้าต่าง",
+          "hu": "Ablak",
+          "lv": "Logs",
+          "ro": "Fereastră",
+          "no": "Vindu"
+        }
+      }
+    },
+    "windowAspectRatio": {
+      "type": "select",
+      "label": {
+        "sch": "窗口比例",
+        "modsch": "窗口比例",
+        "en": "Window aspect ratio",
+        "ru": "Соотношение окна",
+        "de": "Fenster-Seitenverhältnis",
+        "ptbr": "Proporção da janela",
+        "it": "Proporzioni finestra",
+        "es": "Relación de ventana",
+        "fr": "Format de fenêtre",
+        "nl": "Vensterverhouding",
+        "cz": "Poměr stran okna",
+        "pl": "Proporcje okna",
+        "jp": "ウィンドウ比率",
+        "kr": "창 비율",
+        "tch": "視窗比例",
+        "thai": "สัดส่วนหน้าต่าง",
+        "hu": "Ablak képaránya",
+        "lv": "Loga malu attiecība",
+        "ro": "Raport fereastră",
+        "no": "Vindusforhold"
+      },
+      "default": "16:9",
+      "description": {
+        "sch": "控制可选的窗口分辨率。21:9 和 32:9 只会在屏幕足够宽时出现。",
+        "modsch": "控制可选的窗口分辨率。21:9 和 32:9 只会在屏幕足够宽时出现。",
+        "en": "Controls which window resolutions are offered. 21:9 and 32:9 only appear on wide enough displays.",
+        "ru": "Управляет доступными разрешениями окна. 21:9 и 32:9 появляются только на достаточно широких дисплеях.",
+        "de": "Steuert, welche Fensterauflösungen angeboten werden. 21:9 und 32:9 erscheinen nur auf ausreichend breiten Bildschirmen.",
+        "ptbr": "Controla quais resoluções de janela são oferecidas. 21:9 e 32:9 só aparecem em telas largas o bastante.",
+        "it": "Controlla quali risoluzioni finestra sono offerte. 21:9 e 32:9 appaiono solo su schermi abbastanza larghi.",
+        "es": "Controla qué resoluciones de ventana se ofrecen. 21:9 y 32:9 solo aparecen en pantallas lo bastante anchas.",
+        "fr": "Contrôle les résolutions de fenêtre proposées. 21:9 et 32:9 n’apparaissent que sur les écrans assez larges.",
+        "nl": "Bepaalt welke vensterresoluties worden aangeboden. 21:9 en 32:9 verschijnen alleen op schermen die breed genoeg zijn.",
+        "cz": "Určuje nabízená rozlišení okna. 21:9 a 32:9 se zobrazí jen na dostatečně širokých displejích.",
+        "pl": "Określa dostępne rozdzielczości okna. 21:9 i 32:9 pojawiają się tylko na wystarczająco szerokich ekranach.",
+        "jp": "表示されるウィンドウ解像度を切り替えます。21:9 と 32:9 は十分に横長の画面でのみ表示されます。",
+        "kr": "제공할 창 해상도를 정합니다. 21:9와 32:9는 충분히 넓은 디스플레이에서만 나타납니다.",
+        "tch": "控制可選的視窗解析度。21:9 和 32:9 只會在螢幕足夠寬時出現。",
+        "thai": "กำหนดความละเอียดหน้าต่างที่มีให้เลือก 21:9 และ 32:9 จะแสดงเฉพาะเมื่อจอกว้างพอ",
+        "hu": "Meghatározza a felkínált ablakfelbontásokat. A 21:9 és 32:9 csak elég széles kijelzőn jelenik meg.",
+        "lv": "Nosaka, kādas loga izšķirtspējas tiek piedāvātas. 21:9 un 32:9 parādās tikai pietiekami platos displejos.",
+        "ro": "Controlează ce rezoluții de fereastră sunt oferite. 21:9 și 32:9 apar doar pe ecrane suficient de late.",
+        "no": "Styrer hvilke vindusoppløsninger som tilbys. 21:9 og 32:9 vises bare på skjermer som er brede nok."
+      },
+      "reloadPolicy": "hot",
+      "section": "windowSizePresets",
+      "options": [
+        {
+          "value": "1:1",
+          "label": "1:1"
+        },
+        {
+          "value": "4:3",
+          "label": "4:3"
+        },
+        {
+          "value": "16:9",
+          "label": "16:9"
+        }
+      ],
+      "valueLabels": {
+        "1:1": {
+          "sch": "1:1",
+          "modsch": "1:1",
+          "en": "1:1",
+          "ru": "1:1",
+          "de": "1:1",
+          "ptbr": "1:1",
+          "it": "1:1",
+          "es": "1:1",
+          "fr": "1:1",
+          "nl": "1:1",
+          "cz": "1:1",
+          "pl": "1:1",
+          "jp": "1:1",
+          "kr": "1:1",
+          "tch": "1:1",
+          "thai": "1:1",
+          "hu": "1:1",
+          "lv": "1:1",
+          "ro": "1:1",
+          "no": "1:1"
+        },
+        "4:3": {
+          "sch": "4:3",
+          "modsch": "4:3",
+          "en": "4:3",
+          "ru": "4:3",
+          "de": "4:3",
+          "ptbr": "4:3",
+          "it": "4:3",
+          "es": "4:3",
+          "fr": "4:3",
+          "nl": "4:3",
+          "cz": "4:3",
+          "pl": "4:3",
+          "jp": "4:3",
+          "kr": "4:3",
+          "tch": "4:3",
+          "thai": "4:3",
+          "hu": "4:3",
+          "lv": "4:3",
+          "ro": "4:3",
+          "no": "4:3"
+        },
+        "16:9": {
+          "sch": "16:9",
+          "modsch": "16:9",
+          "en": "16:9",
+          "ru": "16:9",
+          "de": "16:9",
+          "ptbr": "16:9",
+          "it": "16:9",
+          "es": "16:9",
+          "fr": "16:9",
+          "nl": "16:9",
+          "cz": "16:9",
+          "pl": "16:9",
+          "jp": "16:9",
+          "kr": "16:9",
+          "tch": "16:9",
+          "thai": "16:9",
+          "hu": "16:9",
+          "lv": "16:9",
+          "ro": "16:9",
+          "no": "16:9"
+        },
+        "21:9": {
+          "sch": "21:9",
+          "modsch": "21:9",
+          "en": "21:9",
+          "ru": "21:9",
+          "de": "21:9",
+          "ptbr": "21:9",
+          "it": "21:9",
+          "es": "21:9",
+          "fr": "21:9",
+          "nl": "21:9",
+          "cz": "21:9",
+          "pl": "21:9",
+          "jp": "21:9",
+          "kr": "21:9",
+          "tch": "21:9",
+          "thai": "21:9",
+          "hu": "21:9",
+          "lv": "21:9",
+          "ro": "21:9",
+          "no": "21:9"
+        },
+        "32:9": {
+          "sch": "32:9",
+          "modsch": "32:9",
+          "en": "32:9",
+          "ru": "32:9",
+          "de": "32:9",
+          "ptbr": "32:9",
+          "it": "32:9",
+          "es": "32:9",
+          "fr": "32:9",
+          "nl": "32:9",
+          "cz": "32:9",
+          "pl": "32:9",
+          "jp": "32:9",
+          "kr": "32:9",
+          "tch": "32:9",
+          "thai": "32:9",
+          "hu": "32:9",
+          "lv": "32:9",
+          "ro": "32:9",
+          "no": "32:9"
+        }
+      }
+    },
+    "windowSizePreset": {
+      "type": "select",
+      "label": {
+        "sch": "窗口分辨率",
+        "modsch": "窗口分辨率",
+        "en": "Window resolution",
+        "ru": "Разрешение окна",
+        "de": "Fensterauflösung",
+        "ptbr": "Resolução da janela",
+        "it": "Risoluzione finestra",
+        "es": "Resolución de ventana",
+        "fr": "Résolution de fenêtre",
+        "nl": "Vensterresolutie",
+        "cz": "Rozlišení okna",
+        "pl": "Rozdzielczość okna",
+        "jp": "ウィンドウ解像度",
+        "kr": "창 해상도",
+        "tch": "視窗解析度",
+        "thai": "ความละเอียดหน้าต่าง",
+        "hu": "Ablakfelbontás",
+        "lv": "Loga izšķirtspēja",
+        "ro": "Rezoluție fereastră",
+        "no": "Vindusoppløsning"
+      },
+      "default": "1280x720",
+      "description": {
+        "sch": "会立即应用到窗口和无边框形式，并在下次启动时记忆。可选大小跟随当前窗口比例。",
+        "modsch": "会立即应用到窗口和无边框形式，并在下次启动时记忆。可选大小跟随当前窗口比例。",
+        "en": "Applies immediately in Window and Borderless forms and is remembered for the next launch. Available sizes follow the selected aspect ratio.",
+        "ru": "Применяется сразу в оконном и безрамочном режимах и запоминается для следующего запуска. Размеры зависят от выбранного соотношения.",
+        "de": "Wird in Fenster- und rahmenlosem Modus sofort angewendet und für den nächsten Start gemerkt. Die Größen folgen dem gewählten Verhältnis.",
+        "ptbr": "Aplica imediatamente nos modos Janela e Sem borda e é lembrada na próxima abertura. Os tamanhos seguem a proporção escolhida.",
+        "it": "Si applica subito in modalità Finestra e Senza bordi e viene ricordata al prossimo avvio. Le dimensioni seguono le proporzioni scelte.",
+        "es": "Se aplica al instante en Ventana y Sin bordes y se recuerda para el próximo inicio. Los tamaños siguen la relación elegida.",
+        "fr": "S’applique aussitôt en mode Fenêtre et Sans bordure et reste mémorisée au prochain lancement. Les tailles suivent le format choisi.",
+        "nl": "Wordt meteen toegepast in Venster en Randloos en onthouden voor de volgende start. Groottes volgen de gekozen verhouding.",
+        "cz": "Použije se ihned v režimu Okno a Bez rámečku a zapamatuje se pro příští spuštění. Velikosti sledují vybraný poměr.",
+        "pl": "Stosuje się od razu w trybie Okno i Bez ramki oraz zostaje zapamiętane na następne uruchomienie. Rozmiary zależą od wybranych proporcji.",
+        "jp": "ウィンドウ形式とボーダーレス形式ではすぐに適用され、次回起動にも記憶されます。候補サイズは選択中の比率に従います。",
+        "kr": "창 및 테두리 없음 형태에서 즉시 적용되고 다음 실행에도 기억됩니다. 선택 가능한 크기는 현재 창 비율을 따릅니다.",
+        "tch": "會立即套用到視窗和無邊框形式，並在下次啟動時記憶。可選大小跟隨目前視窗比例。",
+        "thai": "ใช้ทันทีในรูปแบบหน้าต่างและไร้ขอบ และจำไว้สำหรับการเปิดครั้งถัดไป ขนาดที่มีจะตามสัดส่วนที่เลือก",
+        "hu": "Azonnal érvényesül Ablak és Keret nélküli módban, és a következő indításra is megmarad. A méretek a választott képarányt követik.",
+        "lv": "Tiek lietota uzreiz Loga un Bezmalu formā un atcerēta nākamajai palaišanai. Izmēri seko izvēlētajai attiecībai.",
+        "ro": "Se aplică imediat în formele Fereastră și Fără bordură și este memorată pentru următoarea pornire. Dimensiunile urmează raportul ales.",
+        "no": "Brukes umiddelbart i Vindu og Kantløs form og huskes til neste oppstart. Størrelsene følger valgt forhold."
+      },
+      "reloadPolicy": "hot",
+      "section": "windowSizePresets",
+      "options": [
+        {
+          "value": "1280x720",
+          "label": "1280 x 720"
+        }
+      ]
+    },
+    "enableMouseAnchoredZoom": {
+      "type": "boolean",
+      "label": "Mouse-position zoom",
+      "default": true,
+      "description": "When using Shift/Ctrl + mouse wheel to zoom, keep the world point under the mouse instead of zooming around the screen center.",
+      "reloadPolicy": "hot",
+      "section": "mouseAnchoredCamera"
+    },
+    "enableMouseAnchoredWaypointTeleport": {
+      "type": "boolean",
+      "label": "Mouse-position waypoint teleport",
+      "default": true,
+      "description": "After using Waypoint LV1 or LV2, place the destination waypoint under the mouse instead of the screen center.",
+      "reloadPolicy": "hot",
+      "section": "mouseAnchoredCamera"
+    },
+    "enableOriginArrowTipAnchor": {
+      "type": "boolean",
+      "label": "Origin arrow tip anchor",
+      "default": true,
+      "description": "Anchor the distant-origin cursor arrow tip at the mouse position instead of centering the arrow over the mouse.",
+      "reloadPolicy": "hot",
+      "section": "mouseAnchoredCamera"
     }
   },
-  "description": "Combines view distance limits, dynamic camera projection, ending skip, accessibility buttons, reduced-flashes layer preference, stabilizer surge flash reduction, gradient mine flash suppression, offline earnings simulation control, void return fade skip, resource glow colors, chasm line rendering, floor grid outlines, play-time counter, Shift/Ctrl zoom shortcut control, and explainer fixes into one multi-entry quality mod.",
+  "description": "Combines view distance limits, window size presets, dynamic camera projection, mouse-position camera controls, ending skip, accessibility buttons, reduced-flashes layer preference, stabilizer surge flash reduction, gradient mine flash suppression, offline earnings simulation control, void return fade skip, waypoint teleport fade skip, resource glow colors, chasm line rendering, floor grid outlines, play-time counter, Shift/Ctrl zoom shortcut control, and explainer fixes into one multi-entry quality mod.",
   "reloadOnConfigChange": true,
   "translations": {
     "sch": {
@@ -1217,7 +1814,7 @@
         },
         "enableAccessibilityButtons": {
           "label": "游戏内设置按钮",
-          "description": "鼠标移动到底部中间时会弹出设置按钮。"
+          "description": "显示底部辅助按钮栏。"
         },
         "enableStabilizerSurgeFlashReduction": {
           "label": "禁用稳定器触发浪涌时的闪烁",
@@ -1260,6 +1857,18 @@
           "label": "默认缩放",
           "description": "当保存的缩放值缺失或无效时使用。"
         },
+        "enableMouseAnchoredZoom": {
+          "label": "按鼠标位置缩放",
+          "description": "使用 Shift/Ctrl + 鼠标滚轮缩放时，保持鼠标下的世界点不变，而不是围绕屏幕中心缩放。"
+        },
+        "enableMouseAnchoredWaypointTeleport": {
+          "label": "按鼠标位置传送点定位",
+          "description": "使用传送点 LV1 或 LV2 后，将目标传送点放到鼠标位置，而不是屏幕中心。"
+        },
+        "enableOriginArrowTipAnchor": {
+          "label": "原点箭头尖端锚定",
+          "description": "将远离原点时的光标箭头尖端固定在鼠标位置，而不是让箭头居中遮住鼠标。"
+        },
         "enableChasmLineRenderer": {
           "label": "逆裂缝绘线渲染模式切换",
           "description": "新增并可切换WebGL逆裂缝绘线的渲染方式，以提升性能。"
@@ -1292,6 +1901,10 @@
           "label": "禁用回到现实白屏淡出效果",
           "description": "从虚空维度返回现实维度时，移除长时间的白色淡出效果，直接显示清晰画面。"
         },
+        "enableWaypointTeleportFadeSkip": {
+          "label": "跳过传送点黑屏恢复",
+          "description": "使用传送点 LV1 或 LV2 后，移除传送后的黑屏恢复效果。"
+        },
         "enableExplainerFix": {
           "label": "提示句修复",
           "description": "修复提示语在切换语言后不刷新，并让虚空世界里的提示文字变成亮色以便看清。"
@@ -1319,6 +1932,14 @@
         "disableIdleSplash": {
           "label": "禁用离线收益模拟",
           "description": "读取存档时跳过离线收益模拟。离开游戏期间不会获得任何离线资源，也不会产生其他模拟进度。"
+        },
+        "enableFloorColorOverride": {
+          "label": "现实地板颜色覆盖",
+          "description": "用可配置颜色替换现实维度的地板背景色。"
+        },
+        "floorColorOverrideRealityColor": {
+          "label": "现实地板颜色",
+          "description": "启用覆盖时用于现实维度地板背景的颜色。"
         }
       }
     },
@@ -1332,7 +1953,7 @@
         },
         "enableAccessibilityButtons": {
           "label": "辅助按钮",
-          "description": "鼠标移动到底部中间时会弹出设置按钮。"
+          "description": "显示底部辅助按钮栏。"
         },
         "enableStabilizerSurgeFlashReduction": {
           "label": "禁用稳定器触发浪涌时的闪烁",
@@ -1375,6 +1996,18 @@
           "label": "默认缩放",
           "description": "当保存的缩放值缺失或无效时使用。"
         },
+        "enableMouseAnchoredZoom": {
+          "label": "按鼠标位置缩放",
+          "description": "使用 Shift/Ctrl + 鼠标滚轮缩放时，保持鼠标下的世界点不变，而不是围绕屏幕中心缩放。"
+        },
+        "enableMouseAnchoredWaypointTeleport": {
+          "label": "按鼠标位置传送点定位",
+          "description": "使用传送点 LV1 或 LV2 后，将目标传送点放到鼠标位置，而不是屏幕中心。"
+        },
+        "enableOriginArrowTipAnchor": {
+          "label": "原点箭头尖端锚定",
+          "description": "将远离原点时的光标箭头尖端固定在鼠标位置，而不是让箭头居中遮住鼠标。"
+        },
         "enableChasmLineRenderer": {
           "label": "逆裂缝绘线渲染模式切换",
           "description": "新增并可切换WebGL逆裂缝绘线的渲染方式，以提升性能。"
@@ -1407,6 +2040,10 @@
           "label": "禁用回到现实白屏淡出效果",
           "description": "从虚空维度返回现实维度时，移除长时间的白色淡出效果，直接显示清晰画面。"
         },
+        "enableWaypointTeleportFadeSkip": {
+          "label": "跳过传送点黑屏恢复",
+          "description": "使用传送点 LV1 或 LV2 后，移除传送后的黑屏恢复效果。"
+        },
         "enableExplainerFix": {
           "label": "提示句修复",
           "description": "修复提示语在切换语言后不刷新，并让虚空世界里的提示文字变成亮色以便看清。"
@@ -1434,6 +2071,14 @@
         "disableIdleSplash": {
           "label": "禁用离线收益模拟",
           "description": "读取存档时跳过离线收益模拟。离开游戏期间不会获得任何离线资源，也不会产生其他模拟进度。"
+        },
+        "enableFloorColorOverride": {
+          "label": "现实地板颜色覆盖",
+          "description": "用可配置颜色替换现实维度的地板背景色。"
+        },
+        "floorColorOverrideRealityColor": {
+          "label": "现实地板颜色",
+          "description": "启用覆盖时用于现实维度地板背景的颜色。"
         }
       }
     },
@@ -1446,7 +2091,7 @@
         },
         "enableAccessibilityButtons": {
           "label": "Accessibility buttons",
-          "description": "Show the bottom accessibility control bar and reality-floor color palette."
+          "description": "Show the bottom accessibility control bar."
         },
         "enableStabilizerSurgeFlashReduction": {
           "label": "Stabilizer surge flash reduction",
@@ -1489,6 +2134,18 @@
           "label": "Fallback zoom",
           "description": "Used when the saved zoom value is missing or invalid."
         },
+        "enableMouseAnchoredZoom": {
+          "label": "Mouse-position zoom",
+          "description": "When using Shift/Ctrl + mouse wheel to zoom, keep the world point under the mouse instead of zooming around the screen center."
+        },
+        "enableMouseAnchoredWaypointTeleport": {
+          "label": "Mouse-position waypoint teleport",
+          "description": "After using Waypoint LV1 or LV2, place the destination waypoint under the mouse instead of the screen center."
+        },
+        "enableOriginArrowTipAnchor": {
+          "label": "Origin arrow tip anchor",
+          "description": "Anchor the distant-origin cursor arrow tip at the mouse position instead of centering the arrow over the mouse."
+        },
         "enableChasmLineRenderer": {
           "label": "Chasm line renderer",
           "description": "Allow this mod to replace the chasm-to-resource lines with the selected renderer."
@@ -1521,6 +2178,10 @@
           "label": "Skip void return fade",
           "description": "When returning from the void to reality, remove the long white recovery fade and show the clear view immediately."
         },
+        "enableWaypointTeleportFadeSkip": {
+          "label": "Skip waypoint teleport fade",
+          "description": "When using Waypoint LV1 or LV2, remove the black recovery fade after teleporting."
+        },
         "enableExplainerFix": {
           "label": "Explainer fix",
           "description": "Refresh pulsing explainer hints after language changes and use readable light text in the void."
@@ -1548,6 +2209,14 @@
         "disableIdleSplash": {
           "label": "Disable offline earnings simulation",
           "description": "Skip the offline earnings simulation when loading a save. Time spent away will grant no offline resources or other simulated progress."
+        },
+        "enableFloorColorOverride": {
+          "label": "Reality floor color override",
+          "description": "Replace the reality floor background color with a configurable color."
+        },
+        "floorColorOverrideRealityColor": {
+          "label": "Reality floor color",
+          "description": "Color used for the reality floor background while the override is enabled."
         }
       },
       "description": "Combines view distance limits, ending skip, accessibility buttons, stabilizer surge flash reduction, void return fade skip, resource glow colors, chasm line rendering, floor grid outlines, play-time counter, and explainer fixes into one multi-entry quality mod."
@@ -1559,7 +2228,8 @@
           "label": "Пропуск концовки"
         },
         "enableAccessibilityButtons": {
-          "label": "Кнопки доступности"
+          "label": "Кнопки доступности",
+          "description": "Pokazyvaet nizhnyuyu panel knopok dostupnosti."
         },
         "enableStabilizerSurgeFlashReduction": {
           "label": "Снижение вспышек стабилизатора"
@@ -1594,6 +2264,18 @@
         "fallbackZoom": {
           "label": "Запасной масштаб"
         },
+        "enableMouseAnchoredZoom": {
+          "label": "Masshtab po pozitsii myshi",
+          "description": "Pri Shift/Ctrl + koleso myshi uderzhivaet tochku mira pod myshyu vmesto masshtaba ot tsentra ekrana."
+        },
+        "enableMouseAnchoredWaypointTeleport": {
+          "label": "Teleport-tochka pod myshyu",
+          "description": "Posle Waypoint LV1 ili LV2 stavit punkt naznacheniya pod mysh, a ne v tsentr ekrana."
+        },
+        "enableOriginArrowTipAnchor": {
+          "label": "Privyazka konchika strelki k nachalu",
+          "description": "Zakreplyaet konchik kursornoi strelki daleko ot nachala v pozitsii myshi vmesto tsentrirovaniya strelki poverh myshi."
+        },
         "enableChasmLineRenderer": {
           "label": "Render lines chasm",
           "description": "Allow the mod to replace chasm-to-resource lines with the selected renderer."
@@ -1626,6 +2308,10 @@
           "label": "Propusk belogo zatuhaniya iz pustoty",
           "description": "Pri vozvrate iz pustoty v realnost ubiraet dolgoe beloe vosstanovlenie i srazu pokazyvaet chetkiy vid."
         },
+        "enableWaypointTeleportFadeSkip": {
+          "label": "Propusk zatmeneni teleport-tochki",
+          "description": "Pri ispolzovanii Waypoint LV1 ili LV2 ubiraet chernoe vosstanovlenie ekrana posle teleportatsii."
+        },
         "enableExplainerFix": {
           "label": "Ispravlenie podskazok",
           "description": "Obnovlyaet pulsiruyushchie podskazki posle smeny yazyka i delaet tekst svetlym v pustote."
@@ -1653,6 +2339,14 @@
         "disableIdleSplash": {
           "label": "Otklyuchit simulyatsiyu oflayn-dokhoda",
           "description": "Pri zagruzke sokhraneniya propuskaet simulyatsiyu oflayn-dokhoda. Za vremya vne igry ne budut nachisleny resursy ili drugoy smodelirovannyy progress."
+        },
+        "enableFloorColorOverride": {
+          "label": "Podmena tsveta pola realnosti",
+          "description": "Zamenyaet fon pola v realnosti nastroyennym tsvetom."
+        },
+        "floorColorOverrideRealityColor": {
+          "label": "Tsvet pola realnosti",
+          "description": "Tsvet fona pola realnosti, kogda podmena vklyuchena."
         }
       }
     },
@@ -1663,7 +2357,8 @@
           "label": "Ende überspringen"
         },
         "enableAccessibilityButtons": {
-          "label": "Bedienhilfen-Schaltflächen"
+          "label": "Bedienhilfen-Schaltflächen",
+          "description": "Zeigt die untere Leiste mit Bedienhilfen-Schaltflaechen."
         },
         "enableStabilizerSurgeFlashReduction": {
           "label": "Stabilisator-Blitzreduktion"
@@ -1698,6 +2393,18 @@
         "fallbackZoom": {
           "label": "Fallback-Zoom"
         },
+        "enableMouseAnchoredZoom": {
+          "label": "Zoom an Mausposition",
+          "description": "Bei Shift/Ctrl + Mausrad bleibt der Weltpunkt unter der Maus erhalten statt um die Bildschirmmitte zu zoomen."
+        },
+        "enableMouseAnchoredWaypointTeleport": {
+          "label": "Wegpunkt zur Maus teleportieren",
+          "description": "Nach Nutzung von Wegpunkt LV1 oder LV2 landet der Zielwegpunkt unter der Maus statt in der Bildschirmmitte."
+        },
+        "enableOriginArrowTipAnchor": {
+          "label": "Spitze des Ursprungspfeils verankern",
+          "description": "Verankert die Spitze des Fern-Ursprung-Cursorpfeils an der Mausposition, statt den Pfeil ueber der Maus zu zentrieren."
+        },
         "enableChasmLineRenderer": {
           "label": "Risslinien-Renderer",
           "description": "Erlaubt dem Mod, die Linien zwischen Riss und Ressourcen mit dem gewaehlten Renderer zu ersetzen."
@@ -1730,6 +2437,10 @@
           "label": "Rueckkehr-Fade aus der Leere ueberspringen",
           "description": "Beim Zurueckkehren aus der Leere zur Realitaet wird die lange weisse Aufhellung entfernt."
         },
+        "enableWaypointTeleportFadeSkip": {
+          "label": "Wegpunkt-Teleport-Fade ueberspringen",
+          "description": "Entfernt nach Nutzung von Wegpunkt LV1 oder LV2 die schwarze Erholungsblende."
+        },
         "enableExplainerFix": {
           "label": "Hinweis-Fix",
           "description": "Aktualisiert pulsierende Hinweise nach Sprachwechseln und nutzt gut lesbaren hellen Text in der Leere."
@@ -1757,6 +2468,14 @@
         "disableIdleSplash": {
           "label": "Offline-Ertragssimulation deaktivieren",
           "description": "Überspringt beim Laden eines Spielstands die Offline-Ertragssimulation. Für die Zeit außerhalb des Spiels werden weder Ressourcen noch anderer simulierter Fortschritt gewährt."
+        },
+        "enableFloorColorOverride": {
+          "label": "Bodenfarbe der Realitaet ersetzen",
+          "description": "Ersetzt die Hintergrundfarbe des Realitaetsbodens durch eine konfigurierbare Farbe."
+        },
+        "floorColorOverrideRealityColor": {
+          "label": "Bodenfarbe Realitaet",
+          "description": "Farbe fuer den Hintergrund des Realitaetsbodens, solange die Ersetzung aktiv ist."
         }
       }
     },
@@ -1767,7 +2486,8 @@
           "label": "Pular final"
         },
         "enableAccessibilityButtons": {
-          "label": "Botões de acessibilidade"
+          "label": "Botões de acessibilidade",
+          "description": "Mostra a barra inferior de botoes de acessibilidade."
         },
         "enableStabilizerSurgeFlashReduction": {
           "label": "Redução de flashes do estabilizador"
@@ -1802,6 +2522,18 @@
         "fallbackZoom": {
           "label": "Zoom reserva"
         },
+        "enableMouseAnchoredZoom": {
+          "label": "Zoom na posicao do mouse",
+          "description": "Ao usar Shift/Ctrl + roda do mouse, mantem o ponto do mundo sob o mouse em vez de ampliar pelo centro da tela."
+        },
+        "enableMouseAnchoredWaypointTeleport": {
+          "label": "Waypoint sob o mouse",
+          "description": "Depois de usar Waypoint LV1 ou LV2, coloca o waypoint de destino sob o mouse em vez do centro da tela."
+        },
+        "enableOriginArrowTipAnchor": {
+          "label": "Ancorar ponta da seta de origem",
+          "description": "Ancora a ponta da seta do cursor longe da origem na posicao do mouse, em vez de centralizar a seta sobre o mouse."
+        },
         "enableChasmLineRenderer": {
           "label": "Renderizador das linhas da fenda",
           "description": "Permite trocar as linhas entre a fenda e os recursos pelo renderizador escolhido."
@@ -1834,6 +2566,10 @@
           "label": "Pular fade ao voltar do vazio",
           "description": "Ao voltar do vazio para a realidade, remove o longo fade branco e mostra a tela nitida imediatamente."
         },
+        "enableWaypointTeleportFadeSkip": {
+          "label": "Pular fade do teleporte",
+          "description": "Ao usar Waypoint LV1 ou LV2, remove o fade preto de recuperacao apos o teleporte."
+        },
         "enableExplainerFix": {
           "label": "Correcao dos avisos",
           "description": "Atualiza avisos pulsantes apos mudar o idioma e usa texto claro legivel no vazio."
@@ -1861,6 +2597,14 @@
         "disableIdleSplash": {
           "label": "Desativar simulação de ganhos offline",
           "description": "Ignora a simulação de ganhos offline ao carregar um jogo salvo. O tempo fora do jogo não concederá recursos nem outro progresso simulado."
+        },
+        "enableFloorColorOverride": {
+          "label": "Substituir cor do piso da realidade",
+          "description": "Substitui a cor de fundo do piso da realidade por uma cor configuravel."
+        },
+        "floorColorOverrideRealityColor": {
+          "label": "Cor do piso da realidade",
+          "description": "Cor usada no fundo do piso da realidade enquanto a substituicao esta ativa."
         }
       }
     },
@@ -1871,7 +2615,8 @@
           "label": "Salta finale"
         },
         "enableAccessibilityButtons": {
-          "label": "Pulsanti accessibilità"
+          "label": "Pulsanti accessibilità",
+          "description": "Mostra la barra inferiore dei pulsanti di accessibilita."
         },
         "enableStabilizerSurgeFlashReduction": {
           "label": "Riduzione lampeggi stabilizzatore"
@@ -1906,6 +2651,18 @@
         "fallbackZoom": {
           "label": "Zoom di riserva"
         },
+        "enableMouseAnchoredZoom": {
+          "label": "Zoom alla posizione mouse",
+          "description": "Con Shift/Ctrl + rotella, mantiene il punto del mondo sotto il mouse invece di zoomare dal centro schermo."
+        },
+        "enableMouseAnchoredWaypointTeleport": {
+          "label": "Waypoint sotto il mouse",
+          "description": "Dopo Waypoint LV1 o LV2, mette il waypoint di destinazione sotto il mouse invece che al centro schermo."
+        },
+        "enableOriginArrowTipAnchor": {
+          "label": "Ancora punta freccia origine",
+          "description": "Ancora la punta della freccia del cursore lontano dall origine alla posizione del mouse, invece di centrare la freccia sul mouse."
+        },
         "enableChasmLineRenderer": {
           "label": "Renderer linee fenditura",
           "description": "Permette al mod di sostituire le linee tra fenditura e risorse con il renderer scelto."
@@ -1938,6 +2695,10 @@
           "label": "Salta dissolvenza ritorno dal vuoto",
           "description": "Quando torni dal vuoto alla realta, rimuove la lunga dissolvenza bianca e mostra subito la vista chiara."
         },
+        "enableWaypointTeleportFadeSkip": {
+          "label": "Salta fade teletrasporto waypoint",
+          "description": "Quando usi Waypoint LV1 o LV2, rimuove il fade nero di recupero dopo il teletrasporto."
+        },
         "enableExplainerFix": {
           "label": "Correzione suggerimenti",
           "description": "Aggiorna i suggerimenti pulsanti dopo il cambio lingua e usa testo chiaro leggibile nel vuoto."
@@ -1965,6 +2726,14 @@
         "disableIdleSplash": {
           "label": "Disattiva simulazione guadagni offline",
           "description": "Salta la simulazione dei guadagni offline quando carichi un salvataggio. Il tempo trascorso fuori dal gioco non fornirà risorse né altri progressi simulati."
+        },
+        "enableFloorColorOverride": {
+          "label": "Sostituisci colore pavimento realta",
+          "description": "Sostituisce il colore di sfondo del pavimento della realta con un colore configurabile."
+        },
+        "floorColorOverrideRealityColor": {
+          "label": "Colore pavimento realta",
+          "description": "Colore usato per lo sfondo del pavimento della realta quando la sostituzione e attiva."
         }
       }
     },
@@ -1975,7 +2744,8 @@
           "label": "Saltar final"
         },
         "enableAccessibilityButtons": {
-          "label": "Botones de accesibilidad"
+          "label": "Botones de accesibilidad",
+          "description": "Muestra la barra inferior de botones de accesibilidad."
         },
         "enableStabilizerSurgeFlashReduction": {
           "label": "Reducción de destellos del estabilizador"
@@ -2010,6 +2780,18 @@
         "fallbackZoom": {
           "label": "Zoom de reserva"
         },
+        "enableMouseAnchoredZoom": {
+          "label": "Zoom en posicion del raton",
+          "description": "Con Shift/Ctrl + rueda, mantiene el punto del mundo bajo el raton en vez de hacer zoom desde el centro."
+        },
+        "enableMouseAnchoredWaypointTeleport": {
+          "label": "Waypoint bajo el raton",
+          "description": "Despues de usar Waypoint LV1 o LV2, coloca el waypoint destino bajo el raton en vez del centro."
+        },
+        "enableOriginArrowTipAnchor": {
+          "label": "Anclar punta de flecha al origen",
+          "description": "Ancla la punta de la flecha del cursor lejos del origen en la posicion del mouse, en vez de centrar la flecha sobre el mouse."
+        },
         "enableChasmLineRenderer": {
           "label": "Renderizador de lineas de grieta",
           "description": "Permite reemplazar las lineas entre la grieta y los recursos con el renderizador elegido."
@@ -2042,6 +2824,10 @@
           "label": "Omitir fundido al volver del vacio",
           "description": "Al volver del vacio a la realidad, elimina el largo fundido blanco y muestra la vista clara de inmediato."
         },
+        "enableWaypointTeleportFadeSkip": {
+          "label": "Saltar fade de teletransporte",
+          "description": "Al usar Waypoint LV1 o LV2, elimina el fade negro de recuperacion tras el teletransporte."
+        },
         "enableExplainerFix": {
           "label": "Correccion de avisos",
           "description": "Actualiza los avisos pulsantes tras cambiar idioma y usa texto claro legible en el vacio."
@@ -2069,6 +2855,14 @@
         "disableIdleSplash": {
           "label": "Desactivar simulación de ganancias offline",
           "description": "Omite la simulación de ganancias offline al cargar una partida. El tiempo fuera del juego no otorgará recursos ni otros progresos simulados."
+        },
+        "enableFloorColorOverride": {
+          "label": "Sustituir color del suelo de realidad",
+          "description": "Sustituye el color de fondo del suelo de realidad por un color configurable."
+        },
+        "floorColorOverrideRealityColor": {
+          "label": "Color del suelo de realidad",
+          "description": "Color usado para el fondo del suelo de realidad mientras la sustitucion esta activa."
         }
       }
     },
@@ -2079,7 +2873,8 @@
           "label": "Sauter la fin"
         },
         "enableAccessibilityButtons": {
-          "label": "Boutons d’accessibilité"
+          "label": "Boutons d’accessibilité",
+          "description": "Affiche la barre inferieure des boutons d accessibilite."
         },
         "enableStabilizerSurgeFlashReduction": {
           "label": "Réduction des flashs du stabilisateur"
@@ -2114,6 +2909,18 @@
         "fallbackZoom": {
           "label": "Zoom de secours"
         },
+        "enableMouseAnchoredZoom": {
+          "label": "Zoom sur position souris",
+          "description": "Avec Shift/Ctrl + molette, garde le point du monde sous la souris au lieu de zoomer depuis le centre."
+        },
+        "enableMouseAnchoredWaypointTeleport": {
+          "label": "Waypoint sous la souris",
+          "description": "Apres Waypoint LV1 ou LV2, place le waypoint de destination sous la souris plutot qu au centre."
+        },
+        "enableOriginArrowTipAnchor": {
+          "label": "Ancrer pointe fleche origine",
+          "description": "Ancre la pointe de la fleche du curseur loin de l origine sur la position de la souris, au lieu de centrer la fleche sur la souris."
+        },
         "enableChasmLineRenderer": {
           "label": "Rendu des lignes de faille",
           "description": "Permet de remplacer les lignes entre la faille et les ressources par le rendu choisi."
@@ -2146,6 +2953,10 @@
           "label": "Ignorer le fondu de retour du vide",
           "description": "Au retour du vide vers la realite, supprime le long fondu blanc et affiche tout de suite une vue nette."
         },
+        "enableWaypointTeleportFadeSkip": {
+          "label": "Ignorer fondu waypoint",
+          "description": "Lors de l utilisation de Waypoint LV1 ou LV2, supprime le fondu noir de recuperation apres la teleportation."
+        },
         "enableExplainerFix": {
           "label": "Correctif des indices",
           "description": "Actualise les indices pulses apres les changements de langue et utilise un texte clair lisible dans le vide."
@@ -2173,6 +2984,14 @@
         "disableIdleSplash": {
           "label": "Désactiver la simulation des gains hors ligne",
           "description": "Ignore la simulation des gains hors ligne lors du chargement d'une sauvegarde. Le temps passé hors du jeu n'accordera aucune ressource ni autre progression simulée."
+        },
+        "enableFloorColorOverride": {
+          "label": "Remplacement couleur sol realite",
+          "description": "Remplace la couleur de fond du sol de realite par une couleur configurable."
+        },
+        "floorColorOverrideRealityColor": {
+          "label": "Couleur du sol de realite",
+          "description": "Couleur utilisee pour le fond du sol de realite lorsque le remplacement est actif."
         }
       }
     },
@@ -2183,7 +3002,8 @@
           "label": "Einde overslaan"
         },
         "enableAccessibilityButtons": {
-          "label": "Toegankelijkheidsknoppen"
+          "label": "Toegankelijkheidsknoppen",
+          "description": "Toont de onderste balk met toegankelijkheidsknoppen."
         },
         "enableStabilizerSurgeFlashReduction": {
           "label": "Flitsreductie stabilisator"
@@ -2218,6 +3038,18 @@
         "fallbackZoom": {
           "label": "Reservezoom"
         },
+        "enableMouseAnchoredZoom": {
+          "label": "Zoomen op muispositie",
+          "description": "Bij Shift/Ctrl + muiswiel blijft het wereldpunt onder de muis staan in plaats van zoomen rond het schermmidden."
+        },
+        "enableMouseAnchoredWaypointTeleport": {
+          "label": "Waypoint onder muis",
+          "description": "Na Waypoint LV1 of LV2 komt het doel-waypoint onder de muis in plaats van in het schermmidden."
+        },
+        "enableOriginArrowTipAnchor": {
+          "label": "Punt van oorsprongspijl vastzetten",
+          "description": "Zet de punt van de cursorpijl ver van de oorsprong vast op de muispositie, in plaats van de pijl over de muis te centreren."
+        },
         "enableChasmLineRenderer": {
           "label": "Klooflijnen-renderer",
           "description": "Laat de mod de lijnen tussen kloof en grondstoffen vervangen door de gekozen renderer."
@@ -2250,6 +3082,10 @@
           "label": "Witte fade na leegte overslaan",
           "description": "Bij terugkeer uit de leegte naar realiteit wordt de lange witte fade verwijderd."
         },
+        "enableWaypointTeleportFadeSkip": {
+          "label": "Waypoint-teleportfade overslaan",
+          "description": "Verwijdert na gebruik van Waypoint LV1 of LV2 de zwarte herstelfade na teleporteren."
+        },
         "enableExplainerFix": {
           "label": "Hint-fix",
           "description": "Vernieuwt pulserende hints na taalwijzigingen en gebruikt leesbare lichte tekst in de leegte."
@@ -2277,6 +3113,14 @@
         "disableIdleSplash": {
           "label": "Offline-opbrengstsimulatie uitschakelen",
           "description": "Slaat de offline-opbrengstsimulatie over bij het laden van een opgeslagen spel. Tijd buiten het spel levert geen grondstoffen of andere gesimuleerde voortgang op."
+        },
+        "enableFloorColorOverride": {
+          "label": "Vloerkleur realiteit vervangen",
+          "description": "Vervangt de achtergrondkleur van de realiteitsvloer door een instelbare kleur."
+        },
+        "floorColorOverrideRealityColor": {
+          "label": "Vloerkleur realiteit",
+          "description": "Kleur voor de achtergrond van de realiteitsvloer wanneer vervanging actief is."
         }
       }
     },
@@ -2287,7 +3131,8 @@
           "label": "Přeskočení konce"
         },
         "enableAccessibilityButtons": {
-          "label": "Tlačítka přístupnosti"
+          "label": "Tlačítka přístupnosti",
+          "description": "Zobrazi spodni listu tlacitek pristupnosti."
         },
         "enableStabilizerSurgeFlashReduction": {
           "label": "Omezení záblesků stabilizátoru"
@@ -2322,6 +3167,18 @@
         "fallbackZoom": {
           "label": "Záložní zoom"
         },
+        "enableMouseAnchoredZoom": {
+          "label": "Priblizeni podle mysi",
+          "description": "Pri Shift/Ctrl + kolecko drzi bod sveta pod mysi misto priblizovani od stredu obrazovky."
+        },
+        "enableMouseAnchoredWaypointTeleport": {
+          "label": "Waypoint pod mysi",
+          "description": "Po pouziti Waypoint LV1 nebo LV2 umisti cilovy waypoint pod mys misto do stredu obrazovky."
+        },
+        "enableOriginArrowTipAnchor": {
+          "label": "Ukotvit spicku sipky k pocatku",
+          "description": "Ukotvi spicku kurzorove sipky daleko od pocatku na pozici mysi misto vycentrovani sipky pres mys."
+        },
         "enableChasmLineRenderer": {
           "label": "Vykreslovani car prurvy",
           "description": "Umoznuje modu nahradit cary mezi prurvou a surovinami zvolenym rendererem."
@@ -2354,6 +3211,10 @@
           "label": "Preskocit bile blednuti z prazdnoty",
           "description": "Pri navratu z prazdnoty do reality odstrani dlouhe bile dozneni a hned ukaze cisty obraz."
         },
+        "enableWaypointTeleportFadeSkip": {
+          "label": "Preskocit fade teleportu",
+          "description": "Pri pouziti Waypoint LV1 nebo LV2 odstrani cerny obnovovaci fade po teleportaci."
+        },
         "enableExplainerFix": {
           "label": "Oprava napoved",
           "description": "Obnovuje pulzujici napovedy po zmene jazyka a v prazdnote pouziva citelny svetly text."
@@ -2381,6 +3242,14 @@
         "disableIdleSplash": {
           "label": "Vypnout simulaci offline výdělků",
           "description": "Při načítání uložené hry přeskočí simulaci offline výdělků. Za čas mimo hru nezískáš žádné suroviny ani jiný simulovaný postup."
+        },
+        "enableFloorColorOverride": {
+          "label": "Prepsat barvu podlahy reality",
+          "description": "Nahradi barvu pozadi podlahy reality nastavitelnou barvou."
+        },
+        "floorColorOverrideRealityColor": {
+          "label": "Barva podlahy reality",
+          "description": "Barva pouzita pro pozadi podlahy reality, kdyz je prepsani aktivni."
         }
       }
     },
@@ -2391,7 +3260,8 @@
           "label": "Pomijanie zakończenia"
         },
         "enableAccessibilityButtons": {
-          "label": "Przyciski dostępności"
+          "label": "Przyciski dostępności",
+          "description": "Pokazuje dolny pasek przyciskow dostepnosci."
         },
         "enableStabilizerSurgeFlashReduction": {
           "label": "Redukcja błysków stabilizatora"
@@ -2426,6 +3296,18 @@
         "fallbackZoom": {
           "label": "Zapasowy zoom"
         },
+        "enableMouseAnchoredZoom": {
+          "label": "Zoom pod kursorem",
+          "description": "Przy Shift/Ctrl + rolka utrzymuje punkt swiata pod kursorem zamiast skalowac od srodka ekranu."
+        },
+        "enableMouseAnchoredWaypointTeleport": {
+          "label": "Waypoint pod kursorem",
+          "description": "Po uzyciu Waypoint LV1 lub LV2 ustawia docelowy waypoint pod kursorem zamiast na srodku ekranu."
+        },
+        "enableOriginArrowTipAnchor": {
+          "label": "Zakotwicz grot strzalki poczatku",
+          "description": "Zakotwicza grot strzalki kursora daleko od poczatku w pozycji myszy, zamiast centrowac strzalke nad mysza."
+        },
         "enableChasmLineRenderer": {
           "label": "Renderer linii szczeliny",
           "description": "Pozwala modowi zastapic linie miedzy szczelina i zasobami wybranym rendererem."
@@ -2458,6 +3340,10 @@
           "label": "Pomin biale zanikanie po pustce",
           "description": "Po powrocie z pustki do rzeczywistosci usuwa dlugie biale zanikanie i od razu pokazuje czysty obraz."
         },
+        "enableWaypointTeleportFadeSkip": {
+          "label": "Pomin fade teleportu",
+          "description": "Po uzyciu Waypoint LV1 lub LV2 usuwa czarne przejscie odzyskiwania po teleportacji."
+        },
         "enableExplainerFix": {
           "label": "Poprawka podpowiedzi",
           "description": "Odswieza pulsujace podpowiedzi po zmianie jezyka i uzywa jasnego tekstu w pustce."
@@ -2485,6 +3371,14 @@
         "disableIdleSplash": {
           "label": "Wyłącz symulację zysków offline",
           "description": "Pomija symulację zysków offline podczas wczytywania zapisu. Czas poza grą nie zapewni zasobów ani innych symulowanych postępów."
+        },
+        "enableFloorColorOverride": {
+          "label": "Zastap kolor podlogi rzeczywistosci",
+          "description": "Zastepuje kolor tla podlogi rzeczywistosci konfigurowalnym kolorem."
+        },
+        "floorColorOverrideRealityColor": {
+          "label": "Kolor podlogi rzeczywistosci",
+          "description": "Kolor tla podlogi rzeczywistosci, gdy zastepowanie jest wlaczone."
         }
       }
     },
@@ -2495,7 +3389,8 @@
           "label": "エンディングスキップ"
         },
         "enableAccessibilityButtons": {
-          "label": "アクセシビリティボタン"
+          "label": "アクセシビリティボタン",
+          "description": "下部のアクセシビリティボタンバーを表示します。"
         },
         "enableStabilizerSurgeFlashReduction": {
           "label": "安定器サージ点滅軽減"
@@ -2530,6 +3425,18 @@
         "fallbackZoom": {
           "label": "予備ズーム"
         },
+        "enableMouseAnchoredZoom": {
+          "label": "マウス位置ズーム",
+          "description": "Shift/Ctrl + マウスホイールでズームするとき、画面中心ではなくマウス下の世界点を保ちます。"
+        },
+        "enableMouseAnchoredWaypointTeleport": {
+          "label": "マウス位置 Waypoint テレポート",
+          "description": "Waypoint LV1 または LV2 使用後、目的地の Waypoint を画面中心ではなくマウス位置に置きます。"
+        },
+        "enableOriginArrowTipAnchor": {
+          "label": "原点矢印の先端を固定",
+          "description": "原点から離れたときのカーソル矢印をマウス中央に重ねず、矢印の先端をマウス位置に固定します。"
+        },
         "enableChasmLineRenderer": {
           "label": "Chasm line renderer",
           "description": "Chasm to resource lines can use the selected renderer."
@@ -2562,6 +3469,10 @@
           "label": "Skip void return fade",
           "description": "Remove the long white recovery fade when returning from the void to reality."
         },
+        "enableWaypointTeleportFadeSkip": {
+          "label": "Waypoint テレポートフェードをスキップ",
+          "description": "Waypoint LV1 または LV2 使用後の黒い復帰フェードを取り除きます。"
+        },
         "enableExplainerFix": {
           "label": "Explainer fix",
           "description": "Refresh explainer hints after language changes and use light text in the void."
@@ -2589,6 +3500,14 @@
         "disableIdleSplash": {
           "label": "オフライン収益シミュレーションを無効化",
           "description": "セーブデータの読み込み時にオフライン収益シミュレーションをスキップします。ゲームを離れていた時間による資源やその他の進行は得られません。"
+        },
+        "enableFloorColorOverride": {
+          "label": "現実の床色オーバーライド",
+          "description": "現実の床背景色を設定した色に置き換えます。"
+        },
+        "floorColorOverrideRealityColor": {
+          "label": "現実の床色",
+          "description": "オーバーライド有効時に現実の床背景へ使う色。"
         }
       }
     },
@@ -2599,7 +3518,8 @@
           "label": "엔딩 건너뛰기"
         },
         "enableAccessibilityButtons": {
-          "label": "접근성 버튼"
+          "label": "접근성 버튼",
+          "description": "하단 접근성 버튼 막대를 표시합니다."
         },
         "enableStabilizerSurgeFlashReduction": {
           "label": "안정기 서지 점멸 감소"
@@ -2634,6 +3554,18 @@
         "fallbackZoom": {
           "label": "대체 줌"
         },
+        "enableMouseAnchoredZoom": {
+          "label": "마우스 위치 줌",
+          "description": "Shift/Ctrl + 마우스 휠로 줌할 때 화면 중앙이 아니라 마우스 아래의 세계 지점을 유지합니다."
+        },
+        "enableMouseAnchoredWaypointTeleport": {
+          "label": "마우스 위치 Waypoint 순간이동",
+          "description": "Waypoint LV1 또는 LV2 사용 후 목적지 Waypoint를 화면 중앙이 아니라 마우스 위치에 둡니다."
+        },
+        "enableOriginArrowTipAnchor": {
+          "label": "원점 화살표 끝 고정",
+          "description": "원점에서 멀 때 커서 화살표를 마우스 위에 가운데 정렬하지 않고, 화살표 끝을 마우스 위치에 고정합니다."
+        },
         "enableChasmLineRenderer": {
           "label": "Chasm line renderer",
           "description": "Chasm to resource lines can use the selected renderer."
@@ -2666,6 +3598,10 @@
           "label": "Skip void return fade",
           "description": "Remove the long white recovery fade when returning from the void to reality."
         },
+        "enableWaypointTeleportFadeSkip": {
+          "label": "Waypoint 순간이동 페이드 건너뛰기",
+          "description": "Waypoint LV1 또는 LV2 사용 후 검은 화면 복귀 페이드를 제거합니다."
+        },
         "enableExplainerFix": {
           "label": "Explainer fix",
           "description": "Refresh explainer hints after language changes and use light text in the void."
@@ -2693,6 +3629,14 @@
         "disableIdleSplash": {
           "label": "오프라인 수익 시뮬레이션 비활성화",
           "description": "저장 파일을 불러올 때 오프라인 수익 시뮬레이션을 건너뜁니다. 게임을 떠나 있던 시간 동안 자원이나 기타 진행도를 얻지 않습니다."
+        },
+        "enableFloorColorOverride": {
+          "label": "현실 바닥 색상 덮어쓰기",
+          "description": "현실 바닥 배경색을 설정한 색상으로 바꿉니다."
+        },
+        "floorColorOverrideRealityColor": {
+          "label": "현실 바닥 색상",
+          "description": "덮어쓰기가 켜져 있을 때 현실 바닥 배경에 사용할 색상입니다."
         }
       }
     },
@@ -2703,7 +3647,8 @@
           "label": "結局跳過"
         },
         "enableAccessibilityButtons": {
-          "label": "輔助按鈕"
+          "label": "輔助按鈕",
+          "description": "顯示底部輔助按鈕列。"
         },
         "enableStabilizerSurgeFlashReduction": {
           "label": "穩定器浪湧閃爍削弱"
@@ -2738,6 +3683,18 @@
         "fallbackZoom": {
           "label": "預設縮放"
         },
+        "enableMouseAnchoredZoom": {
+          "label": "按滑鼠位置縮放",
+          "description": "使用 Shift/Ctrl + 滑鼠滾輪縮放時，保持滑鼠下的世界點不變，而不是围繞螢幕中心縮放。"
+        },
+        "enableMouseAnchoredWaypointTeleport": {
+          "label": "按滑鼠位置傳送點定位",
+          "description": "使用傳送點 LV1 或 LV2 後，將目標傳送點放到滑鼠位置，而不是螢幕中心。"
+        },
+        "enableOriginArrowTipAnchor": {
+          "label": "原點箭頭尖端錨定",
+          "description": "將遠離原點時的游標箭頭尖端固定在滑鼠位置，而不是讓箭頭置中遮住滑鼠。"
+        },
         "enableChasmLineRenderer": {
           "label": "逆裂縫連線渲染",
           "description": "允許本 mod 用選擇的渲染器替換逆裂縫和資源之間的連線。"
@@ -2770,6 +3727,10 @@
           "label": "跳過虛空返回白色恢復效果",
           "description": "從虛空世界返回現實世界時，移除長時間白色恢復淡出，直接顯示清晰畫面。"
         },
+        "enableWaypointTeleportFadeSkip": {
+          "label": "跳過傳送點黑屏恢復",
+          "description": "使用傳送點 LV1 或 LV2 後，移除傳送後的黑屏恢復效果。"
+        },
         "enableExplainerFix": {
           "label": "提示修復",
           "description": "修復提示語在切換語言後不刷新，並讓虛空世界裡的提示文字變成亮色以便看清。"
@@ -2797,6 +3758,14 @@
         "disableIdleSplash": {
           "label": "停用離線收益模擬",
           "description": "讀取存檔時跳過離線收益模擬。離開遊戲期間不會獲得任何離線資源，也不會產生其他模擬進度。"
+        },
+        "enableFloorColorOverride": {
+          "label": "現實地板顏色覆蓋",
+          "description": "用可設定顏色替換現實維度的地板背景色。"
+        },
+        "floorColorOverrideRealityColor": {
+          "label": "現實地板顏色",
+          "description": "啟用覆蓋時用於現實維度地板背景的顏色。"
         }
       }
     },
@@ -2807,7 +3776,8 @@
           "label": "ข้ามตอนจบ"
         },
         "enableAccessibilityButtons": {
-          "label": "ปุ่มช่วยใช้งาน"
+          "label": "ปุ่มช่วยใช้งาน",
+          "description": "แสดงแถบปุ่มช่วยใช้งานด้านล่าง"
         },
         "enableStabilizerSurgeFlashReduction": {
           "label": "ลดแฟลชจากตัวเสถียร"
@@ -2842,6 +3812,18 @@
         "fallbackZoom": {
           "label": "ซูมสำรอง"
         },
+        "enableMouseAnchoredZoom": {
+          "label": "ซูมตามตำแหน่งเมาส์",
+          "description": "เมื่อใช้ Shift/Ctrl + ล้อเมาส์ จะรักษาจุดในโลกใต้เมาส์แทนการซูมจากกลางจอ"
+        },
+        "enableMouseAnchoredWaypointTeleport": {
+          "label": "Waypoint ไปที่ตำแหน่งเมาส์",
+          "description": "หลังใช้ Waypoint LV1 หรือ LV2 จะวาง Waypoint ปลายทางไว้ใต้เมาส์แทนกลางจอ"
+        },
+        "enableOriginArrowTipAnchor": {
+          "label": "ยึดปลายลูกศรต้นทาง",
+          "description": "ยึดปลายลูกศรไว้ที่ตำแหน่งเมาส์"
+        },
         "enableChasmLineRenderer": {
           "label": "Chasm line renderer",
           "description": "Chasm to resource lines can use the selected renderer."
@@ -2874,6 +3856,10 @@
           "label": "Skip void return fade",
           "description": "Remove the long white recovery fade when returning from the void to reality."
         },
+        "enableWaypointTeleportFadeSkip": {
+          "label": "ข้ามเฟดเทเลพอร์ต Waypoint",
+          "description": "เมื่อใช้ Waypoint LV1 หรือ LV2 จะลบเฟดหน้าจอดำหลังเทเลพอร์ต"
+        },
         "enableExplainerFix": {
           "label": "Explainer fix",
           "description": "Refresh explainer hints after language changes and use light text in the void."
@@ -2901,6 +3887,14 @@
         "disableIdleSplash": {
           "label": "ปิดการจำลองรายได้ออฟไลน์",
           "description": "ข้ามการจำลองรายได้ออฟไลน์เมื่อโหลดเซฟ เวลาที่ไม่ได้เล่นจะไม่ให้ทรัพยากรหรือความคืบหน้าอื่นจากการจำลอง"
+        },
+        "enableFloorColorOverride": {
+          "label": "แทนที่สีพื้นโลกความจริง",
+          "description": "แทนที่สีพื้นหลังของพื้นโลกความจริงด้วยสีที่ตั้งค่าได้"
+        },
+        "floorColorOverrideRealityColor": {
+          "label": "สีพื้นโลกความจริง",
+          "description": "สีที่ใช้กับพื้นหลังของพื้นโลกความจริงเมื่อเปิดการแทนที่"
         }
       }
     },
@@ -2911,7 +3905,8 @@
           "label": "Befejezés átugrása"
         },
         "enableAccessibilityButtons": {
-          "label": "Akadálymentes gombok"
+          "label": "Akadálymentes gombok",
+          "description": "Megjeleniti az also akadalymentessegi gombsavot."
         },
         "enableStabilizerSurgeFlashReduction": {
           "label": "Stabilizátor villanáscsökkentés"
@@ -2946,6 +3941,18 @@
         "fallbackZoom": {
           "label": "Tartalék nagyítás"
         },
+        "enableMouseAnchoredZoom": {
+          "label": "Nagyitas az egernel",
+          "description": "Shift/Ctrl + egergorgo eseten az eger alatti vilagpont marad helyben, nem a kepernyo kozepe koruli nagyitas tortenik."
+        },
+        "enableMouseAnchoredWaypointTeleport": {
+          "label": "Waypoint az eger ala",
+          "description": "Waypoint LV1 vagy LV2 utan a cel-waypoint az eger ala kerul, nem a kepernyo kozepebe."
+        },
+        "enableOriginArrowTipAnchor": {
+          "label": "Origonyil csucsanak rogzitese",
+          "description": "A tavoli origonyil csucsat az eger poziciojahoz rogzit, ahelyett hogy a nyilat az egerre kozepelne."
+        },
         "enableChasmLineRenderer": {
           "label": "Hasadekvonal-renderelo",
           "description": "A mod a hasadek es eroforrasok vonalait a valasztott renderelovel rajzolhatja."
@@ -2978,6 +3985,10 @@
           "label": "Urbeli visszateres feher fade kihagyasa",
           "description": "Az urbol a valosagba visszaterve eltavolitja a hosszu feher atmenetet."
         },
+        "enableWaypointTeleportFadeSkip": {
+          "label": "Teleport-pont fade kihagyasa",
+          "description": "Waypoint LV1 vagy LV2 hasznalatakor eltavolitja a teleportalas utani fekete visszateresi fade-et."
+        },
         "enableExplainerFix": {
           "label": "Tipp javitas",
           "description": "Nyelvvaltas utan frissiti a pulzalo tippeket, es az urben vilagos, olvashato szoveget hasznal."
@@ -3005,6 +4016,14 @@
         "disableIdleSplash": {
           "label": "Offline bevételszimuláció kikapcsolása",
           "description": "Mentés betöltésekor kihagyja az offline bevételszimulációt. A játékon kívül töltött időért nem jár erőforrás vagy más szimulált előrehaladás."
+        },
+        "enableFloorColorOverride": {
+          "label": "Valosag padloszin felulirasa",
+          "description": "A valosag padlo hatterszinet egy beallithato szinre csereli."
+        },
+        "floorColorOverrideRealityColor": {
+          "label": "Valosag padloszin",
+          "description": "A valosag padlo hatterszine, amikor a feluliras aktiv."
         }
       }
     },
@@ -3015,7 +4034,8 @@
           "label": "Beigu izlaišana"
         },
         "enableAccessibilityButtons": {
-          "label": "Pieejamības pogas"
+          "label": "Pieejamības pogas",
+          "description": "Parada apaksejo pieejamibas pogu joslu."
         },
         "enableStabilizerSurgeFlashReduction": {
           "label": "Stabilizatora zibšņu mazināšana"
@@ -3050,6 +4070,18 @@
         "fallbackZoom": {
           "label": "Rezerves tālummaiņa"
         },
+        "enableMouseAnchoredZoom": {
+          "label": "Talummaina pie peles",
+          "description": "Ar Shift/Ctrl + peles riteniti pasaule punkts zem peles paliek vieta, nevis talummaina notiek ap ekrana centru."
+        },
+        "enableMouseAnchoredWaypointTeleport": {
+          "label": "Waypoint zem peles",
+          "description": "Pec Waypoint LV1 vai LV2 merkis nonak zem peles, nevis ekrana centra."
+        },
+        "enableOriginArrowTipAnchor": {
+          "label": "Piesiet sakuma bultas galu",
+          "description": "Piestiprina kursora bultas galu talu no sakuma pie peles pozicijas, nevis centre bultu virs peles."
+        },
         "enableChasmLineRenderer": {
           "label": "Plaisas liniju renderetajs",
           "description": "Mods var aizstat plaisas un resursu linijas ar izveleto renderetaju."
@@ -3082,6 +4114,10 @@
           "label": "Izlaist balto atgriesanos no tuksuma",
           "description": "Atgriezoties no tuksuma realitate, nonem ilgo balto parpludumu un uzreiz rada skaidru skatu."
         },
+        "enableWaypointTeleportFadeSkip": {
+          "label": "Izlaist Waypoint teleportesanas fade",
+          "description": "Lietojot Waypoint LV1 vai LV2, nonem melno atgriesanas fade pec teleportesanas."
+        },
         "enableExplainerFix": {
           "label": "Padomu labojums",
           "description": "Atsvaidzina pulsojosus padomus pec valodas mainas un tuksumaa izmanto gaisu, salasamu tekstu."
@@ -3109,6 +4145,14 @@
         "disableIdleSplash": {
           "label": "Atspējot bezsaistes ienākumu simulāciju",
           "description": "Ielādējot saglabātu spēli, izlaiž bezsaistes ienākumu simulāciju. Par laiku ārpus spēles netiks piešķirti resursi vai cits simulēts progress."
+        },
+        "enableFloorColorOverride": {
+          "label": "Realitates gridas krasas aizvietosana",
+          "description": "Aizvieto realitates gridas fona krasu ar iestatamu krasu."
+        },
+        "floorColorOverrideRealityColor": {
+          "label": "Realitates gridas krasa",
+          "description": "Krasa realitates gridas fonam, kad aizvietosana ir ieslegta."
         }
       }
     },
@@ -3119,7 +4163,8 @@
           "label": "Sari peste final"
         },
         "enableAccessibilityButtons": {
-          "label": "Butoane accesibilitate"
+          "label": "Butoane accesibilitate",
+          "description": "Afiseaza bara inferioara cu butoane de accesibilitate."
         },
         "enableStabilizerSurgeFlashReduction": {
           "label": "Reducere flash stabilizator"
@@ -3154,6 +4199,18 @@
         "fallbackZoom": {
           "label": "Zoom de rezervă"
         },
+        "enableMouseAnchoredZoom": {
+          "label": "Zoom la pozitia mouse-ului",
+          "description": "Cu Shift/Ctrl + rotita mouse-ului, pastreaza punctul lumii de sub mouse in loc sa faca zoom din centrul ecranului."
+        },
+        "enableMouseAnchoredWaypointTeleport": {
+          "label": "Waypoint sub mouse",
+          "description": "Dupa Waypoint LV1 sau LV2, pune waypoint-ul destinatie sub mouse in locul centrului ecranului."
+        },
+        "enableOriginArrowTipAnchor": {
+          "label": "Ancoreaza varful sagetii originii",
+          "description": "Ancoreaza varful sagetii cursorului departe de origine la pozitia mouse-ului, in loc sa centreze sageata peste mouse."
+        },
         "enableChasmLineRenderer": {
           "label": "Randare linii fisura",
           "description": "Permite modului sa inlocuiasca liniile dintre fisura si resurse cu randarea aleasa."
@@ -3186,6 +4243,10 @@
           "label": "Sari peste fade-ul din vid",
           "description": "La revenirea din vid in realitate, elimina estomparea alba lunga si arata imediat imaginea clara."
         },
+        "enableWaypointTeleportFadeSkip": {
+          "label": "Sari fade teleport Waypoint",
+          "description": "Cand folosesti Waypoint LV1 sau LV2, elimina fade-ul negru de revenire dupa teleportare."
+        },
         "enableExplainerFix": {
           "label": "Corectie indicii",
           "description": "Actualizeaza indiciile pulsante dupa schimbarea limbii si foloseste text luminos in vid."
@@ -3213,6 +4274,14 @@
         "disableIdleSplash": {
           "label": "Dezactivează simularea câștigurilor offline",
           "description": "Omite simularea câștigurilor offline la încărcarea unei salvări. Timpul petrecut în afara jocului nu va acorda resurse sau alt progres simulat."
+        },
+        "enableFloorColorOverride": {
+          "label": "Inlocuire culoare podea realitate",
+          "description": "Inlocuieste culoarea de fundal a podelei din realitate cu o culoare configurabila."
+        },
+        "floorColorOverrideRealityColor": {
+          "label": "Culoare podea realitate",
+          "description": "Culoarea folosita pentru fundalul podelei din realitate cand inlocuirea este activa."
         }
       }
     },
@@ -3223,7 +4292,8 @@
           "label": "Hopp over slutt"
         },
         "enableAccessibilityButtons": {
-          "label": "Tilgjengelighetsknapper"
+          "label": "Tilgjengelighetsknapper",
+          "description": "Viser den nedre linjen med tilgjengelighetsknapper."
         },
         "enableStabilizerSurgeFlashReduction": {
           "label": "Reduser stabilisatorblink"
@@ -3258,6 +4328,18 @@
         "fallbackZoom": {
           "label": "Reservezoom"
         },
+        "enableMouseAnchoredZoom": {
+          "label": "Zoom ved museposisjon",
+          "description": "Med Shift/Ctrl + musehjul beholdes verdenspunktet under musen i stedet for zoom rundt skjermsenteret."
+        },
+        "enableMouseAnchoredWaypointTeleport": {
+          "label": "Waypoint under musen",
+          "description": "Etter Waypoint LV1 eller LV2 plasseres maal-waypoint under musen i stedet for skjermsenteret."
+        },
+        "enableOriginArrowTipAnchor": {
+          "label": "Fest spissen pa opprinnelsespilen",
+          "description": "Fester spissen pa markorpilen langt fra opprinnelsen til museposisjonen, i stedet for a sentrere pilen over musen."
+        },
         "enableChasmLineRenderer": {
           "label": "Kløftlinje-renderer",
           "description": "Lar modden erstatte linjene mellom kloften og ressursene med valgt renderer."
@@ -3290,6 +4372,10 @@
           "label": "Hopp over hvit fade fra tomrom",
           "description": "Nar du gar fra tomrommet tilbake til virkeligheten, fjernes den lange hvite faden."
         },
+        "enableWaypointTeleportFadeSkip": {
+          "label": "Hopp over waypoint-fade",
+          "description": "Nar du bruker Waypoint LV1 eller LV2, fjernes den svarte gjenopprettingsfaden etter teleportering."
+        },
         "enableExplainerFix": {
           "label": "Hint-fiks",
           "description": "Oppdaterer pulserende hint etter sprakbytte og bruker lys, lesbar tekst i tomrommet."
@@ -3317,6 +4403,14 @@
         "disableIdleSplash": {
           "label": "Deaktiver simulering av offline-inntekter",
           "description": "Hopper over simuleringen av offline-inntekter når et lagret spill lastes. Tid borte fra spillet gir ingen ressurser eller annen simulert fremgang."
+        },
+        "enableFloorColorOverride": {
+          "label": "Overstyr gulvfarge i virkelighet",
+          "description": "Erstatter bakgrunnsfargen paa gulvet i virkelighet med en konfigurerbar farge."
+        },
+        "floorColorOverrideRealityColor": {
+          "label": "Gulvfarge i virkelighet",
+          "description": "Fargen brukt paa gulvbakgrunnen i virkelighet mens overstyring er aktiv."
         }
       }
     }

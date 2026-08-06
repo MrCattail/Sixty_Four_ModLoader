@@ -137,26 +137,26 @@ function testManifestAndLocalization() {
 		modsch: ['清除所有选区', '清除', '普通建造', '完整复刻', '生成蓝图（Ctrl+C）', '生成蓝图']
 	}
 	const expectedLayerLabels = {
-		en: ['Include Surges', 'Include Cells', 'Cells'],
-		ru: ['Включать Surge', 'Включать клетки', 'Клетки'],
-		de: ['Surges einbeziehen', 'Zellen einbeziehen', 'Zellen'],
-		ptbr: ['Incluir Surges', 'Incluir células', 'Células'],
-		it: ['Includi Surge', 'Includi celle', 'Celle'],
-		es: ['Incluir Surges', 'Incluir celdas', 'Celdas'],
-		fr: ['Inclure les Surges', 'Inclure les cases', 'Cases'],
-		nl: ['Surges meenemen', 'Cellen meenemen', 'Cellen'],
-		cz: ['Zahrnout Surge', 'Zahrnout pole', 'Pole'],
-		pl: ['Uwzględnij Surge', 'Uwzględnij pola', 'Pola'],
-		jp: ['Surgeを含める', 'セルを含める', 'セル'],
-		kr: ['Surge 포함', '셀 포함', '셀'],
-		sch: ['包含 Surge', '包含格子', '格子'],
-		tch: ['包含 Surge', '包含格子', '格子'],
-		thai: ['รวม Surge', 'รวมช่อง', 'ช่อง'],
-		hu: ['Surge-ok felvétele', 'Cellák felvétele', 'Cellák'],
-		lv: ['Iekļaut Surge', 'Iekļaut šūnas', 'Šūnas'],
-		ro: ['Include Surge', 'Include celule', 'Celule'],
-		no: ['Inkluder Surges', 'Inkluder celler', 'Celler'],
-		modsch: ['包含 Surge', '包含格子', '格子']
+		en: ['Include Surges', 'Surges', 'Surge', 'Include Cells', 'Cells'],
+		ru: ['Включать выбросы', 'Выбросы', 'Выброс', 'Включать клетки', 'Клетки'],
+		de: ['Stromstöße einbeziehen', 'Stromstöße', 'Stromstoß', 'Zellen einbeziehen', 'Zellen'],
+		ptbr: ['Incluir sobrecargas de corrente', 'Sobrecargas de corrente', 'Sobrecarga de corrente', 'Incluir células', 'Células'],
+		it: ['Includi sovratensioni', 'Sovratensioni', 'Sovratensione', 'Includi celle', 'Celle'],
+		es: ['Incluir sobrecargas', 'Sobrecargas', 'Sobrecarga', 'Incluir celdas', 'Celdas'],
+		fr: ['Inclure les surtensions', 'Surtensions', 'Surtension', 'Inclure les cases', 'Cases'],
+		nl: ['Spanningspieken meenemen', 'Spanningspieken', 'Spanningspiek', 'Cellen meenemen', 'Cellen'],
+		cz: ['Zahrnout proudové přívaly', 'Proudové přívaly', 'Proudový příval', 'Zahrnout pole', 'Pole'],
+		pl: ['Uwzględnij przypływy mocy', 'Przypływy mocy', 'Przypływ mocy', 'Uwzględnij pola', 'Pola'],
+		jp: ['電流の急増を含める', '電流の急増', '電流の急増', 'セルを含める', 'セル'],
+		kr: ['전류 급증 포함', '전류 급증', '전류 급증', '셀 포함', '셀'],
+		sch: ['包含电流浪涌', '电流浪涌', '电流浪涌', '包含格子', '格子'],
+		tch: ['包含電流波動', '電流波動', '電流波動', '包含格子', '格子'],
+		thai: ['รวมคลื่นพลัง', 'คลื่นพลัง', 'คลื่นพลัง', 'รวมช่อง', 'ช่อง'],
+		hu: ['Túlfeszültségek felvétele', 'Túlfeszültségek', 'Túlfeszültség', 'Cellák felvétele', 'Cellák'],
+		lv: ['Iekļaut pārspriegumus', 'Pārspriegumi', 'Pārspriegums', 'Iekļaut šūnas', 'Šūnas'],
+		ro: ['Include valuri de curent', 'Valuri de curent', 'Val de curent', 'Include celule', 'Celule'],
+		no: ['Inkluder overspenninger', 'Overspenninger', 'Overspenning', 'Inkluder celler', 'Celler'],
+		modsch: ['包含电流浪涌', '电流浪涌', '电流浪涌', '包含格子', '格子']
 	}
 	assert.deepEqual(
 		new Set(i18n.toolbarKeys),
@@ -193,12 +193,25 @@ function testManifestAndLocalization() {
 		assert.deepEqual(
 			[
 				i18n.t(language, 'blueprintIncludeSurges'),
+				i18n.t(language, 'toolbarCardSurges'),
+				i18n.t(language, 'blueprintSurge'),
 				i18n.t(language, 'blueprintSyncEmpty'),
 				i18n.t(language, 'toolbarCardSyncEmpty')
 			],
 			expectedLayerLabels[language],
 			language + ' include-layer labels'
 		)
+		if (language !== 'en') {
+			assert.doesNotMatch(
+				[
+					i18n.t(language, 'blueprintIncludeSurges'),
+					i18n.t(language, 'toolbarCardSurges'),
+					i18n.t(language, 'blueprintSurge')
+				].join(' '),
+				/\bSurges?\b/i,
+				language + ' must use the original localized surge term'
+			)
+		}
 	}
 	assert.equal(i18n.t('en', 'cardPinAction'), 'Click to Keep Visible')
 	assert.equal(i18n.t('en', 'placementCtrlVHint'), 'Ctrl+V Places at the Hovered Cell')
@@ -243,7 +256,6 @@ function testSourceContracts() {
 	assert.match(shellSource, /selection\.clear\('toolbar-clear-selections'\)/)
 	assert.doesNotMatch(shellSource, /createToolButton\('select'/)
 	assert.doesNotMatch(shellSource, /handleSelectClick|toolbar-select|data-world-editor-text="tool-select"/)
-	assert.doesNotMatch(shellSource, /Symbol\.for\('cattail\.world-editor\.tool'\)/)
 	assert.match(shellSource, /selectionGroup\.append\(removeButton\)/)
 	assert.match(shellSource, /--world-editor-shell-hover-bg:\s*rgba\(150, 154, 160, \.18\)/)
 	assert.match(shellSource, /--world-editor-shell-hover-color:\s*#b56b87/)
@@ -253,6 +265,10 @@ function testSourceContracts() {
 	assert.match(shellSource, /\[data-world-editor-toolbar-icon="pickaxe"\]::after/)
 	assert.match(deleteUiSource, /compactIcon\.dataset\.worldEditorToolbarIcon\s*=\s*'pickaxe'/)
 	assert.match(deleteUiSource, /cardIcon\.dataset\.worldEditorToolbarIcon\s*=\s*'pickaxe'/)
+	assert.match(deleteUiSource, /const selectionAvailable\s*=\s*Number\(currentSelection\?\.selectionCount\)\s*>\s*0/)
+	assert.match(deleteUiSource, /deleteButton\.dataset\.worldEditorLargeHidden\s*=\s*selectionAvailable\s*\?\s*'false'\s*:\s*'true'/)
+	assert.match(cutUiSource, /const selectionAvailable\s*=\s*Number\(currentSelection\?\.selectionCount\)\s*>\s*0/)
+	assert.match(cutUiSource, /cutButton\.dataset\.worldEditorLargeHidden\s*=\s*selectionAvailable\s*\?\s*'false'\s*:\s*'true'/)
 	assert.match(blueprintSource, /copyIcon\.textContent\s*=\s*'\+'/)
 	assert.match(blueprintSource, /cubeCanvas\.width\s*=\s*48/)
 	assert.match(blueprintSource, /drawEquilateralToolbarCube\(context,\s*canvas\.width,\s*canvas\.height/)
@@ -360,6 +376,13 @@ function testSourceContracts() {
 	assert.match(shellSource, /padding:\s*6px/)
 	assert.match(shellSource, /max-width:\s*calc\(var\(--world-editor-toolbar-layout-width/)
 	assert.match(shellSource, /border-radius:\s*12px/)
+	assert.match(shellSource, /width \.22s cubic-bezier\(\.22, \.75, \.24, 1\)/)
+	assert.match(shellSource, /flex-basis \.22s cubic-bezier\(\.22, \.75, \.24, 1\)/)
+	assert.match(shellSource, /transform:\s*translateY\(-8px\) scale\(\.9\)/)
+	assert.match(shellSource, /visibility 0s linear \.22s/)
+	assert.match(shellSource, /group\[data-large-empty="true"\]\s*\{[^}]*opacity:\s*0;[^}]*visibility:\s*hidden;[^}]*pointer-events:\s*none;/s)
+	assert.doesNotMatch(shellSource, /group\[data-large-empty="true"\]\s*\{[^}]*display:\s*none;/s)
+	assert.match(shellSource, /@media \(prefers-reduced-motion:\s*reduce\)\s*\{[^}]*toolbar-bar,[^}]*__group,[^}]*\[data-world-editor-toolbar-card\][^}]*transition:\s*none !important;/s)
 	assert.match(shellSource, /top:\s*8px;\s*\n\s*bottom:\s*8px/)
 	assert.match(
 		shellSource,

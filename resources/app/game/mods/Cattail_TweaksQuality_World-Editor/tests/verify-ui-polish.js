@@ -367,7 +367,7 @@ function testResourceHudGeometryRenderingHoverAndRestore() {
 
 function testSourceStyleScopeAndDocumentation() {
 	assert.equal(manifest.version, '0.5.1')
-	assert.equal(manifest.entry.length, 35)
+	assert.equal(manifest.entry.length, 36)
 	assert.equal(manifest.entry.includes('scripts/ui/resource-hud.js'), false)
 	assert.match(shellSource, /resourceTriplet\(game, 1, \['#FFC759', '#FFE86F', '#FF8F60'\]\)/)
 	assert.match(shellSource, /resourceTriplet\(game, 3, \['#F26F67', '#FFB68C', '#C02E63'\]\)/)

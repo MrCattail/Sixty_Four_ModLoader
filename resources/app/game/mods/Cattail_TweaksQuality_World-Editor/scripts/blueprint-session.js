@@ -981,11 +981,12 @@ ModLoader.register({
 				const production = typeof productionState?.captureEntities === 'function'
 					? productionState.captureEntities(capturedEntities)
 					: null
+				const schemaVersion = 6
 				return deepFreeze({
 					schema: 1,
 					cutToken: String(planValue.signature),
 					blueprint: {
-						schemaVersion: 6,
+						schemaVersion,
 						mode: 'full',
 						sourcePlane,
 						anchor: {
@@ -1296,9 +1297,10 @@ ModLoader.register({
 				const production = typeof productionState?.captureEntities === 'function'
 					? productionState.captureEntities(capturedEntities)
 					: null
+				const schemaVersion = 6
 				return {
 					blueprint: {
-						schemaVersion: 6,
+						schemaVersion,
 						mode: 'full',
 						sourcePlane: source.sourcePlane,
 						anchor: {

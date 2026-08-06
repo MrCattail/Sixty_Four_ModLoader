@@ -1335,7 +1335,7 @@ function testLocalizationAndIntegrationContract() {
 
 	assert.equal(manifest.version, '0.5.1')
 	assert.equal(manifest.languageSupport.gameLanguage, true)
-	assert.equal(manifest.entry.length, 35)
+	assert.equal(manifest.entry.length, 36)
 	assert.equal(
 		manifest.entry.indexOf(SHARED_SOURCE),
 		manifest.entry.indexOf('scripts/core/foundation.js') + 1

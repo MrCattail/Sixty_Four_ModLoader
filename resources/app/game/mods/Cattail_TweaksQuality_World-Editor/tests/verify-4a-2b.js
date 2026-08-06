@@ -161,6 +161,18 @@ class Widget2 extends Entity {
 	}
 }
 
+class Scan extends Entity {
+	constructor(master) {
+		super(master, 'scan')
+	}
+}
+
+class Puncture extends Entity {
+	constructor(master) {
+		super(master, 'puncture')
+	}
+}
+
 class Shop {
 	constructor(master) {
 		this.master = master
@@ -209,6 +221,8 @@ class Game {
 			entities: {
 				widget: { class: Widget, canPurchase: true, onlyone: false },
 				widget2: { class: Widget2, canPurchase: true, onlyone: false, isUpgradeTo: 'widget' },
+				scan: { class: Scan, canPurchase: true, onlyone: true, isDark: true },
+				puncture: { class: Puncture, canPurchase: true, onlyone: false, isDark: true },
 				eraser: { canPurchase: true },
 				eventThing: { canPurchase: false }
 			}
@@ -611,6 +625,53 @@ async function verifyRuntimeContract() {
 	assert.equal(runtime.snapshots.created.length, snapshotsBeforeNormal)
 	creative.setActive(true)
 
+	game.plane = 1
+	game.hoveredCell = [40, 41]
+	game.hoveredEntity = null
+	game.pickupItem('scan')
+	const createsBeforeVoidScan = runtime.snapshots.created.length
+	const buildsBeforeVoidScan = game.builds.length
+	game.processClick()
+	await waitForAsyncWork()
+	assert.equal(runtime.snapshots.created.length, createsBeforeVoidScan + 1)
+	assert.equal(runtime.snapshots.created.at(-1).reason, 'creative-shop-before-build')
+	assert.equal(runtime.snapshots.created.at(-1).tags.plane, 'void')
+	assert.equal(runtime.snapshots.created.at(-1).tags.entity, 'scan')
+	assert.equal(game.builds.length, buildsBeforeVoidScan + 1)
+	assert.equal(game.builds.at(-1).name, 'scan')
+
+	game.hoveredCell = [42, 43]
+	game.pickupItem('puncture')
+	const createsBeforeVoidPuncture = runtime.snapshots.created.length
+	const buildsBeforeVoidPuncture = game.builds.length
+	game.processClick()
+	await waitForAsyncWork()
+	assert.equal(runtime.snapshots.created.length, createsBeforeVoidPuncture + 1)
+	assert.equal(runtime.snapshots.created.at(-1).tags.plane, 'void')
+	assert.equal(runtime.snapshots.created.at(-1).tags.entity, 'puncture')
+	assert.equal(game.builds.length, buildsBeforeVoidPuncture + 1)
+	assert.equal(game.builds.at(-1).name, 'puncture')
+
+	game.hoveredCell = [44, 45]
+	game.pickupItem('widget')
+	const createsBeforeInvalidVoidBuild = runtime.snapshots.created.length
+	const buildsBeforeInvalidVoidBuild = game.builds.length
+	game.processClick()
+	await waitForAsyncWork()
+	assert.equal(runtime.snapshots.created.length, createsBeforeInvalidVoidBuild)
+	assert.equal(game.builds.length, buildsBeforeInvalidVoidBuild)
+
+	game.hoveredCell = [46, 47]
+	game.hoveredEntity = new Scan(game)
+	game.pickupItem('puncture')
+	const createsBeforeOccupiedVoidBuild = runtime.snapshots.created.length
+	game.processClick()
+	await waitForAsyncWork()
+	assert.equal(runtime.snapshots.created.length, createsBeforeOccupiedVoidBuild)
+	assert.equal(game.builds.length, buildsBeforeInvalidVoidBuild)
+	game.plane = 0
+	game.hoveredEntity = null
+
 	runtime.snapshots.create = null
 	game.resources[0] = 10
 	game.hoveredCell = [2, 3]
@@ -887,7 +948,9 @@ function verifyStaticIntegration() {
 		"snapshots.remove({ id })",
 		"patchListenerRegistration('setListenersTouch', true)",
 		"withInputSource('gamepad'",
-		"withInputSource('touch'"
+		"withInputSource('touch'",
+		'isSupportedCreativePlane(game.plane)',
+		'definition?.isDark !== true'
 	]) {
 		assert.ok(economy.includes(text), text)
 	}

@@ -732,7 +732,7 @@ function testLanguagesManifestUiAndReadOnlyBoundary() {
 	const manifest = JSON.parse(fs.readFileSync(path.join(MOD_ROOT, 'mod.json'), 'utf8'))
 	assert.equal(manifest.version, '0.5.1')
 	assert.equal(manifest.languageSupport.gameLanguage, true)
-	assert.equal(manifest.entry.length, 35)
+	assert.equal(manifest.entry.length, 36)
 	assert.ok(manifest.entry.includes(BLUEPRINT_SOURCE))
 	assert.ok(
 		manifest.entry.indexOf('scripts/ui/editor-shell.js') <

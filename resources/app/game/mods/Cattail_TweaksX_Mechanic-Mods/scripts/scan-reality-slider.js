@@ -9,129 +9,175 @@
 	const SHARED_DIAMETER_KEY = '__cattailScanRealitySliderDiameter'
 	const SHARED_ENABLED_KEY = '__cattailScanRealitySliderEnabled'
 	const STYLE_ID = 'cattail-scan-reality-slider-style'
+	const SCANNER_WEBGL_OVERLAY_ID = 'cattail-scan-reality-slider-scanner-webgl'
 
 	const VANILLA_DIAMETER = 32
 	const VANILLA_RADIUS = 16
 	const VANILLA_REALITY = 256
 	const MIN_DIAMETER = 8
-	const MAX_DIAMETER = 256
+	const MAX_DIAMETER = 1024
 	const DIAMETER_STEP = 8
 	const DIAMETER_PER_REALITY_DOUBLE = 8
+	const SCANNER_INITIAL_BUILD_BUDGET_MS = 2.5
+	const SCANNER_FRAME_BUILD_BUDGET_MS = 4
+	const SCANNER_BUILD_TIME_CHECK_INTERVAL = 128
 
 	let previewDiameter = null
+	let scannerWebgl = null
+	let scannerWebglUnavailable = false
+	let pendingShopRefresh = null
+	let pendingShopRefreshTimer = null
 
 	const UI_TEXT = {
 		en: {
 			diameter: 'Range diameter',
+			diameterShort: 'Diameter',
 			reality: 'Reality infusion',
+			realityShort: 'Infusion',
 			reset: 'Reset',
 			title: 'Supercritical kernel tuning'
 		},
 		ru: {
 			diameter: 'Диаметр области',
+			diameterShort: 'Диаметр',
 			reality: 'Вливание Reality',
+			realityShort: 'Reality',
 			reset: 'Сброс',
 			title: 'Настройка сверхкритического ядра'
 		},
 		de: {
 			diameter: 'Reichweitendurchmesser',
+			diameterShort: 'Durchmesser',
 			reality: 'Reality-Infusion',
+			realityShort: 'Infusion',
 			reset: 'Zurücksetzen',
 			title: 'Abstimmung des superkritischen Kerns'
 		},
 		ptbr: {
 			diameter: 'Diâmetro do alcance',
+			diameterShort: 'Diâmetro',
 			reality: 'Infusão de Reality',
+			realityShort: 'Infusão',
 			reset: 'Redefinir',
 			title: 'Ajuste do núcleo supercrítico'
 		},
 		it: {
 			diameter: 'Diametro raggio',
+			diameterShort: 'Diametro',
 			reality: 'Infusione Reality',
+			realityShort: 'Infusione',
 			reset: 'Ripristina',
 			title: 'Regolazione nucleo supercritico'
 		},
 		es: {
 			diameter: 'Diámetro de alcance',
+			diameterShort: 'Diámetro',
 			reality: 'Inyección de Reality',
+			realityShort: 'Inyección',
 			reset: 'Restablecer',
 			title: 'Ajuste del núcleo supercrítico'
 		},
 		fr: {
 			diameter: 'Diamètre de portée',
+			diameterShort: 'Diamètre',
 			reality: 'Injection de Reality',
+			realityShort: 'Injection',
 			reset: 'Réinitialiser',
 			title: 'Réglage du noyau supercritique'
 		},
 		nl: {
 			diameter: 'Bereikdiameter',
+			diameterShort: 'Diameter',
 			reality: 'Reality-injectie',
+			realityShort: 'Injectie',
 			reset: 'Reset',
 			title: 'Afstelling superkritische kern'
 		},
 		cz: {
 			diameter: 'Průměr dosahu',
+			diameterShort: 'Průměr',
 			reality: 'Vložení Reality',
+			realityShort: 'Reality',
 			reset: 'Reset',
 			title: 'Ladění superkritického jádra'
 		},
 		pl: {
 			diameter: 'Średnica zasięgu',
+			diameterShort: 'Średnica',
 			reality: 'Wlew Reality',
+			realityShort: 'Reality',
 			reset: 'Reset',
 			title: 'Strojenie superkrytycznego jądra'
 		},
 		jp: {
 			diameter: '範囲直径',
+			diameterShort: '範囲直径',
 			reality: 'Reality注入',
+			realityShort: 'Reality',
 			reset: 'リセット',
 			title: '超臨界コア調整'
 		},
 		kr: {
 			diameter: '범위 지름',
+			diameterShort: '지름',
 			reality: 'Reality 주입',
+			realityShort: 'Reality',
 			reset: '초기화',
 			title: '초임계 핵 조정'
 		},
 		sch: {
 			diameter: '\u8303\u56f4\u76f4\u5f84',
+			diameterShort: '\u76f4\u5f84',
 			reality: '\u73b0\u5b9e\u6ce8\u5165',
+			realityShort: '\u6ce8\u5165',
 			reset: '\u91cd\u7f6e',
 			title: '\u8d85\u4e34\u754c\u5185\u6838\u8c03\u6574'
 		},
 		tch: {
 			diameter: '\u7bc4\u570d\u76f4\u5f91',
+			diameterShort: '\u76f4\u5f91',
 			reality: '\u73fe\u5be6\u6ce8\u5165',
+			realityShort: '\u6ce8\u5165',
 			reset: '\u91cd\u7f6e',
 			title: '\u8d85\u81e8\u754c\u6838\u5fc3\u8abf\u6574'
 		},
 		thai: {
 			diameter: 'เส้นผ่านศูนย์กลางระยะ',
+			diameterShort: 'ระยะ',
 			reality: 'เติม Reality',
+			realityShort: 'Reality',
 			reset: 'รีเซ็ต',
 			title: 'ปรับแกนเหนือวิกฤต'
 		},
 		hu: {
 			diameter: 'Hatótáv átmérő',
+			diameterShort: 'Átmérő',
 			reality: 'Reality-betöltés',
+			realityShort: 'Reality',
 			reset: 'Visszaállítás',
 			title: 'Szuperkritikus mag hangolása'
 		},
 		lv: {
 			diameter: 'Diapazona diametrs',
+			diameterShort: 'Diametrs',
 			reality: 'Reality ieplūde',
+			realityShort: 'Reality',
 			reset: 'Atiestatīt',
 			title: 'Superkritiskā kodola regulēšana'
 		},
 		ro: {
 			diameter: 'Diametru rază',
+			diameterShort: 'Diametru',
 			reality: 'Infuzie Reality',
+			realityShort: 'Infuzie',
 			reset: 'Resetare',
 			title: 'Reglaj nucleu supercritic'
 		},
 		no: {
 			diameter: 'Rekkeviddediameter',
+			diameterShort: 'Diameter',
 			reality: 'Reality-infusjon',
+			realityShort: 'Infusjon',
 			reset: 'Tilbakestill',
 			title: 'Justering av superkritisk kjerne'
 		}
@@ -150,6 +196,7 @@
 				patchScanPlacement(api)
 				patchScanUpdate(api)
 				patchScanCreation(api)
+				patchScannerWebglOverlay(api)
 				patchShop(api)
 			})
 		}
@@ -210,6 +257,15 @@
 
 				this.vfx.push(new CattailScaledScannerMap(this, { source: args[0], radius: radius }))
 				return undefined
+			}
+		})
+	}
+
+	function patchScannerWebglOverlay(api) {
+		api.patch(Game.prototype, 'renderloop', function (original) {
+			return function (...args) {
+				hideScannerWebgl()
+				return original.apply(this, args)
 			}
 		})
 	}
@@ -305,7 +361,7 @@
 		range.type = 'range'
 		range.min = String(MIN_DIAMETER)
 		range.max = String(MAX_DIAMETER)
-		range.step = '1'
+		range.step = String(DIAMETER_STEP)
 
 		const reality = document.createElement('div')
 		reality.className = 'cattail-scan-slider-value cattail-scan-slider-reality'
@@ -356,9 +412,10 @@
 	}
 
 	function setCurrentDiameter(value, shop, api, options = {}) {
-		const diameter = options.light ? clampVisualDiameter(value) : clampDiameter(value)
+		const diameter = clampDiameter(value)
 		if (options.light) {
 			previewDiameter = diameter
+			publishSharedDiameter(diameter, true)
 			syncScanControls(shop, api)
 			return
 		}
@@ -366,8 +423,8 @@
 		previewDiameter = null
 		writeStoredDiameter(diameter)
 		publishSharedScanTuning(api, diameter)
-		syncScanControls(shop, api)
-		refreshShopPrices(shop)
+		syncScanControls(shop, api, { skipPrice: true })
+		scheduleShopRefresh(shop)
 	}
 
 	function finishSliderDrag(shop, api) {
@@ -377,8 +434,8 @@
 		previewDiameter = null
 		writeStoredDiameter(diameter)
 		publishSharedScanTuning(api, diameter)
-		syncScanControls(shop, api)
-		refreshShopPrices(shop)
+		syncScanControls(shop, api, { skipPrice: true })
+		scheduleShopRefresh(shop)
 	}
 
 	function refreshShopPrices(shop) {
@@ -388,8 +445,26 @@
 		refreshHeldScanPrice(shop.master)
 	}
 
+	function scheduleShopRefresh(shop) {
+		if (!shop) return
+		pendingShopRefresh = shop
+		if (pendingShopRefreshTimer) return
+		const run = function () {
+			const nextShop = pendingShopRefresh
+			pendingShopRefresh = null
+			pendingShopRefreshTimer = null
+			refreshShopPrices(nextShop)
+		}
+		if (typeof requestAnimationFrame === 'function') {
+			pendingShopRefreshTimer = requestAnimationFrame(function () {
+				setTimeout(run, 0)
+			})
+		} else {
+			pendingShopRefreshTimer = setTimeout(run, 0)
+		}
+	}
 
-	function syncScanControls(shop, api) {
+	function syncScanControls(shop, api, options = {}) {
 		if (!shop?.vessel) return
 		if (!isFeatureEnabled(api)) {
 			publishSharedScanTuning(api, null, false)
@@ -402,7 +477,7 @@
 		for (const control of shop.vessel.querySelectorAll('.cattail-scan-reality-slider')) {
 			syncOneControl(control, shop.master)
 		}
-		if (!isDraggingPreview) refreshHeldScanPrice(shop.master)
+		if (!isDraggingPreview && options.skipPrice !== true) refreshHeldScanPrice(shop.master)
 	}
 
 	function syncOneControl(control, game) {
@@ -417,10 +492,12 @@
 		const progressText = progress.toFixed(2) + '%'
 		const labelShift = progress <= 4 ? '0' : progress >= 96 ? '-100%' : '-50%'
 		const labelAlign = progress <= 4 ? 'left' : progress >= 96 ? 'right' : 'center'
+		const labelMaxWidth = progress <= 4 ? (100 - progress).toFixed(2) + '%' : progress >= 96 ? progress.toFixed(2) + '%' : '92%'
 
 		control.style.setProperty('--cattail-scan-slider-progress', progressText)
 		control.style.setProperty('--cattail-scan-slider-label-shift', labelShift)
 		control.style.setProperty('--cattail-scan-slider-label-align', labelAlign)
+		control.style.setProperty('--cattail-scan-slider-label-max-width', labelMaxWidth)
 
 		if (range) {
 			range.value = String(visualDiameter)
@@ -428,13 +505,29 @@
 			range.setAttribute('aria-label', text.title)
 			range.style.setProperty('--cattail-scan-slider-progress', progressText)
 		}
-		if (diameter) diameter.textContent = text.diameter + ' ' + formatNumber(game, tuning.diameter)
-		if (reality) reality.textContent = text.reality + ' ' + formatNumber(game, tuning.reality)
+		if (diameter) setSliderValueText(diameter, text.diameterShort || text.diameter, formatNumber(game, tuning.diameter), text.diameter)
+		if (reality) setSliderValueText(reality, text.realityShort || text.reality, formatNumber(game, tuning.reality), text.reality)
 		if (reset) {
 			reset.textContent = text.reset
 			reset.title = text.reset
 			reset.setAttribute('aria-label', text.reset)
 		}
+	}
+
+	function setSliderValueText(element, label, value, fullLabel) {
+		let labelNode = element.querySelector('.cattail-scan-slider-value-label')
+		let valueNode = element.querySelector('.cattail-scan-slider-value-number')
+		if (!labelNode || !valueNode) {
+			labelNode = document.createElement('span')
+			labelNode.className = 'cattail-scan-slider-value-label'
+			valueNode = document.createElement('span')
+			valueNode.className = 'cattail-scan-slider-value-number'
+			element.replaceChildren(labelNode, valueNode)
+		}
+		labelNode.textContent = label
+		valueNode.textContent = value
+		element.title = (fullLabel || label) + ' ' + value
+		element.setAttribute('aria-label', (fullLabel || label) + ' ' + value)
 	}
 
 	function removeScanControls(shop) {
@@ -463,6 +556,7 @@
 	function applyTuningToScan(scan) {
 		const tuning = getCurrentTuning()
 		publishSharedDiameter(tuning.diameter, true)
+		warmScannerWebgl(scan.master)
 		scan[SCAN_RADIUS_KEY] = tuning.radius
 		scan[SCAN_REALITY_KEY] = tuning.reality
 	}
@@ -532,31 +626,31 @@
 			this.radius = Math.max(1, Math.round(Number(payload?.radius) || VANILLA_RADIUS))
 			this.radius2 = this.radius ** 2
 			this.cells = []
+			this.webglVertexData = new Float32Array(0)
+			this.webglVertexFloats = 0
+			this.webglUploadedFloats = 0
+			this.webglBuffer = null
+			this.webglBufferCapacityFloats = 0
+			this.webglMetricsCache = Object.create(null)
 			this.source = payload.source
-
-			for (let dx = -this.radius; dx < this.radius; dx++) {
-				for (let dy = -this.radius; dy < this.radius; dy++) {
-					const p = [dx + this.source[0], dy + this.source[1]]
-					const e = this.master.entityAtCoordinates(p)
-					if (e) e.ondarkhover()
-
-					const d2 = dx ** 2 + dy ** 2
-					if (d2 > this.radius2) continue
-					const map = this.master.getResourceNodeValues(p[0], p[1])
-					if (!map.length) continue
-					this.cells.push({
-						p,
-						values: map,
-						f2: d2 / this.radius2
-					})
-				}
-			}
+			this.buildRing = 0
+			this.buildPhase = 0
+			this.buildOffset = 0
+			this.buildDone = false
 
 			this.maxEndTime = 20000
 			this.time = 0
+			processScannerBuildBudget(this, SCANNER_INITIAL_BUILD_BUDGET_MS)
+		}
+
+		update(dt) {
+			super.update(dt)
+			if (!this.terminate) processScannerBuildBudget(this, SCANNER_FRAME_BUILD_BUDGET_MS)
+			if (this.terminate) hideScannerWebgl()
 		}
 
 		render() {
+			if (renderScannerMapWebgl(this)) return
 			const ctx = this.master.ctx
 			const f = this.time / (this.maxEndTime * .12)
 			const opacity = 1 - this.time / this.maxEndTime
@@ -583,6 +677,437 @@
 		}
 	}
 
+	function processScannerBuildBudget(scanner, budgetMs) {
+		if (!scanner || scanner.buildDone) return
+		const start = now()
+		let iterations = 0
+		while (!scanner.buildDone) {
+			const relative = getNextScannerBuildCell(scanner)
+			if (!relative) break
+			addScannerMapCell(scanner, relative[0], relative[1])
+			iterations++
+			if (iterations % SCANNER_BUILD_TIME_CHECK_INTERVAL === 0 && now() - start >= budgetMs) break
+		}
+	}
+
+	function getNextScannerBuildCell(scanner) {
+		while (!scanner.buildDone) {
+			const ring = scanner.buildRing
+			if (ring > scanner.radius) {
+				scanner.buildDone = true
+				return null
+			}
+			if (ring === 0) {
+				scanner.buildRing = 1
+				scanner.buildPhase = 0
+				scanner.buildOffset = 0
+				return [0, 0]
+			}
+
+			const phaseLength = getScannerRingPhaseLength(ring, scanner.buildPhase)
+			if (phaseLength <= 0 || scanner.buildOffset >= phaseLength) {
+				scanner.buildPhase++
+				scanner.buildOffset = 0
+				if (scanner.buildPhase > 3) {
+					scanner.buildRing++
+					scanner.buildPhase = 0
+				}
+				continue
+			}
+
+			const cell = getScannerRingPhaseCell(ring, scanner.buildPhase, scanner.buildOffset)
+			scanner.buildOffset++
+			if (cell[0] < -scanner.radius || cell[0] >= scanner.radius || cell[1] < -scanner.radius || cell[1] >= scanner.radius) continue
+			return cell
+		}
+		return null
+	}
+
+	function getScannerRingPhaseLength(ring, phase) {
+		if (phase === 0 || phase === 1) return ring * 2 + 1
+		return Math.max(0, ring * 2 - 1)
+	}
+
+	function getScannerRingPhaseCell(ring, phase, offset) {
+		if (phase === 0) return [-ring + offset, -ring]
+		if (phase === 1) return [-ring + offset, ring]
+		if (phase === 2) return [-ring, -ring + 1 + offset]
+		return [ring, -ring + 1 + offset]
+	}
+
+	function addScannerMapCell(scanner, dx, dy) {
+		const d2 = dx ** 2 + dy ** 2
+		if (d2 > scanner.radius2) return
+		const p = [dx + scanner.source[0], dy + scanner.source[1]]
+		const e = scanner.master.entityAtCoordinates(p)
+		if (e) e.ondarkhover()
+		const map = scanner.master.getResourceNodeValues(p[0], p[1])
+		if (!hasDrawableResourceNodeValue(map)) return
+		const cell = {
+			p,
+			values: map,
+			f2: d2 / scanner.radius2
+		}
+		scanner.cells.push(cell)
+		appendScannerWebglEntries(scanner, cell)
+	}
+
+	function hasDrawableResourceNodeValue(map) {
+		if (!Array.isArray(map)) return false
+		for (let i = 0; i < map.length; i++) {
+			if (map[i]?.rid !== 0) return true
+		}
+		return false
+	}
+
+	function appendScannerWebglEntries(scanner, cell) {
+		for (let i = 0; i < cell.values.length; i++) {
+			const value = cell.values[i]
+			if (!value || value.rid === 0) continue
+			appendScannerWebglEntry(scanner, {
+				uv: [cell.p[0] - scanner.source[0], cell.p[1] - scanner.source[1]],
+				resourceId: value.rid,
+				f2: cell.f2,
+				value: Number(value.v) || 0,
+				noise: deterministicNoise(cell.p[0], cell.p[1], value.rid) * .02
+			})
+		}
+	}
+
+	function renderScannerMapWebgl(scanner) {
+		if (!scanner?.webglVertexFloats) {
+			hideScannerWebgl()
+			return false
+		}
+		const renderer = getScannerWebgl(scanner.master)
+		if (!renderer) {
+			hideScannerWebgl()
+			return false
+		}
+		const bufferEntry = getScannerWebglBuffer(renderer, scanner)
+		if (!bufferEntry?.vertexCount) {
+			hideScannerWebgl()
+			return false
+		}
+
+		const gl = renderer.gl
+		syncScannerWebglCanvas(scanner.master, renderer.canvas)
+		gl.viewport(0, 0, renderer.canvas.width, renderer.canvas.height)
+		gl.clearColor(0, 0, 0, 0)
+		gl.clear(gl.COLOR_BUFFER_BIT)
+		gl.useProgram(renderer.program)
+		gl.bindBuffer(gl.ARRAY_BUFFER, bufferEntry.buffer)
+		gl.enableVertexAttribArray(renderer.aUv)
+		gl.vertexAttribPointer(renderer.aUv, 2, gl.FLOAT, false, renderer.stride, 0)
+		gl.enableVertexAttribArray(renderer.aLocal)
+		gl.vertexAttribPointer(renderer.aLocal, 2, gl.FLOAT, false, renderer.stride, 8)
+		gl.enableVertexAttribArray(renderer.aTexcoord)
+		gl.vertexAttribPointer(renderer.aTexcoord, 2, gl.FLOAT, false, renderer.stride, 16)
+		gl.enableVertexAttribArray(renderer.aMeta)
+		gl.vertexAttribPointer(renderer.aMeta, 4, gl.FLOAT, false, renderer.stride, 24)
+		const texture = getScannerWebglTexture(renderer, scanner.master)
+		if (!texture) {
+			hideScannerWebgl()
+			return false
+		}
+		gl.activeTexture(gl.TEXTURE0)
+		gl.bindTexture(gl.TEXTURE_2D, texture)
+		gl.uniform1i(renderer.uImage, 0)
+		const sourceXY = scanner.master.uvToXYUntranslated(scanner.source)
+		gl.uniform2f(renderer.uResolution, renderer.canvas.width, renderer.canvas.height)
+		gl.uniform2f(renderer.uSourceScreen, sourceXY[0], sourceXY[1])
+		gl.uniform1f(renderer.uUnit, scanner.master.unit)
+		gl.uniform1f(renderer.uReveal, scanner.time / (scanner.maxEndTime * .12))
+		gl.uniform1f(renderer.uOpacity, Math.max(0, 1 - scanner.time / scanner.maxEndTime))
+		gl.drawArrays(gl.TRIANGLES, 0, bufferEntry.vertexCount)
+		return true
+	}
+
+	function getScannerWebgl(master) {
+		if (scannerWebglUnavailable) return null
+		if (scannerWebgl && !scannerWebgl.lost) return scannerWebgl
+		const canvas = getOrCreateScannerWebglCanvas(master)
+		if (!canvas) return null
+		const gl = canvas.getContext('webgl2', getScannerWebglOptions()) || canvas.getContext('webgl', getScannerWebglOptions())
+		if (!gl) {
+			scannerWebglUnavailable = true
+			return null
+		}
+		const program = createScannerWebglProgram(gl)
+		if (!program) {
+			scannerWebglUnavailable = true
+			return null
+		}
+		scannerWebgl = {
+			canvas,
+			gl,
+			program,
+			stride: 10 * 4,
+			buffers: Object.create(null),
+			textures: Object.create(null),
+			lost: false,
+			aUv: gl.getAttribLocation(program, 'a_uv'),
+			aLocal: gl.getAttribLocation(program, 'a_local'),
+			aTexcoord: gl.getAttribLocation(program, 'a_texcoord'),
+			aMeta: gl.getAttribLocation(program, 'a_meta'),
+			uResolution: gl.getUniformLocation(program, 'u_resolution'),
+			uSourceScreen: gl.getUniformLocation(program, 'u_sourceScreen'),
+			uUnit: gl.getUniformLocation(program, 'u_unit'),
+			uReveal: gl.getUniformLocation(program, 'u_reveal'),
+			uOpacity: gl.getUniformLocation(program, 'u_opacity'),
+			uImage: gl.getUniformLocation(program, 'u_image')
+		}
+		canvas.addEventListener('webglcontextlost', function (event) {
+			try { event.preventDefault() } catch (error) {}
+			if (scannerWebgl) scannerWebgl.lost = true
+		})
+		canvas.addEventListener('webglcontextrestored', function () {
+			scannerWebgl = null
+			scannerWebglUnavailable = false
+		})
+		gl.enable(gl.BLEND)
+		gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA)
+		gl.disable(gl.DEPTH_TEST)
+		gl.disable(gl.CULL_FACE)
+		return scannerWebgl
+	}
+
+	function warmScannerWebgl(master) {
+		if (!master || scannerWebglUnavailable) return
+		const renderer = getScannerWebgl(master)
+		if (!renderer) return
+		getScannerWebglTexture(renderer, master)
+	}
+
+	function getScannerWebglOptions() {
+		return {
+			alpha: true,
+			antialias: false,
+			depth: false,
+			stencil: false,
+			premultipliedAlpha: true,
+			preserveDrawingBuffer: false
+		}
+	}
+
+	function getOrCreateScannerWebglCanvas(master) {
+		if (typeof document === 'undefined') return null
+		let canvas = document.getElementById(SCANNER_WEBGL_OVERLAY_ID)
+		if (!canvas) {
+			canvas = document.createElement('canvas')
+			canvas.id = SCANNER_WEBGL_OVERLAY_ID
+			canvas.style.position = 'fixed'
+			canvas.style.left = '0'
+			canvas.style.top = '0'
+			canvas.style.width = '100%'
+			canvas.style.height = '100%'
+			canvas.style.margin = '0'
+			canvas.style.padding = '0'
+			canvas.style.border = '0'
+			canvas.style.pointerEvents = 'none'
+			canvas.style.userSelect = 'none'
+			canvas.style.display = 'none'
+			canvas.style.zIndex = '1'
+			const parent = master?.canvas?.parentNode || document.body
+			parent.appendChild(canvas)
+		}
+		return canvas
+	}
+
+	function createScannerWebglProgram(gl) {
+		const vertexShader = compileScannerWebglShader(gl, gl.VERTEX_SHADER, [
+			'precision highp float;',
+			'attribute vec2 a_uv;',
+			'attribute vec2 a_local;',
+			'attribute vec2 a_texcoord;',
+			'attribute vec4 a_meta;',
+			'uniform vec2 u_resolution;',
+			'uniform vec2 u_sourceScreen;',
+			'uniform float u_unit;',
+			'uniform float u_reveal;',
+			'uniform float u_opacity;',
+			'varying vec2 v_texcoord;',
+			'varying float v_alpha;',
+			'void main() {',
+			'	float f2 = a_meta.x;',
+			'	float value = a_meta.y;',
+			'	float noise = a_meta.z;',
+			'	float maskWidth = a_meta.w;',
+			'	float rmult = f2 < u_reveal ? 1.0 : 0.0;',
+			'	float edge = abs(u_reveal - f2);',
+			'	if (edge < 0.2) rmult += (0.2 - edge) * 5.0;',
+			'	float scale = u_unit * 1.737 / maskWidth * (0.6 * value * rmult + noise);',
+			'	vec2 projected = u_sourceScreen + vec2((a_uv.x * 0.866 - a_uv.y * 0.866) * u_unit, (a_uv.x * 0.5 + a_uv.y * 0.5) * u_unit);',
+			'	vec2 screen = projected + a_local * scale;',
+			'	vec2 clip = screen / u_resolution * 2.0 - 1.0;',
+			'	gl_Position = vec4(clip * vec2(1.0, -1.0), 0.0, 1.0);',
+			'	v_texcoord = a_texcoord;',
+			'	v_alpha = u_opacity;',
+			'}'
+		].join('\n'))
+		const fragmentShader = compileScannerWebglShader(gl, gl.FRAGMENT_SHADER, [
+			'precision mediump float;',
+			'varying vec2 v_texcoord;',
+			'varying float v_alpha;',
+			'uniform sampler2D u_image;',
+			'void main() {',
+			'	vec4 color = texture2D(u_image, v_texcoord);',
+			'	gl_FragColor = vec4(color.rgb, color.a * v_alpha);',
+			'}'
+		].join('\n'))
+		if (!vertexShader || !fragmentShader) return null
+		const program = gl.createProgram()
+		gl.attachShader(program, vertexShader)
+		gl.attachShader(program, fragmentShader)
+		gl.linkProgram(program)
+		if (!gl.getProgramParameter(program, gl.LINK_STATUS)) return null
+		return program
+	}
+
+	function compileScannerWebglShader(gl, type, source) {
+		const shader = gl.createShader(type)
+		gl.shaderSource(shader, source)
+		gl.compileShader(shader)
+		if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) return null
+		return shader
+	}
+
+	function getScannerWebglBuffer(renderer, scanner) {
+		if (!scanner.webglVertexFloats) return null
+		const gl = renderer.gl
+		if (!scanner.webglBuffer) {
+			scanner.webglBuffer = gl.createBuffer()
+			scanner.webglBufferCapacityFloats = 0
+			scanner.webglUploadedFloats = 0
+		}
+		gl.bindBuffer(gl.ARRAY_BUFFER, scanner.webglBuffer)
+		if (scanner.webglVertexData.length > scanner.webglBufferCapacityFloats) {
+			gl.bufferData(gl.ARRAY_BUFFER, scanner.webglVertexData, gl.DYNAMIC_DRAW)
+			scanner.webglBufferCapacityFloats = scanner.webglVertexData.length
+			scanner.webglUploadedFloats = scanner.webglVertexFloats
+		} else if (scanner.webglUploadedFloats < scanner.webglVertexFloats) {
+			gl.bufferSubData(gl.ARRAY_BUFFER, scanner.webglUploadedFloats * 4, scanner.webglVertexData.subarray(scanner.webglUploadedFloats, scanner.webglVertexFloats))
+			scanner.webglUploadedFloats = scanner.webglVertexFloats
+		}
+		return { buffer: scanner.webglBuffer, vertexCount: scanner.webglVertexFloats / 10 }
+	}
+
+	function appendScannerWebglEntry(scanner, entry) {
+		const corners = [
+			[0, 0], [1, 0], [1, 1],
+			[0, 0], [1, 1], [0, 1]
+		]
+		const floatsPerEntry = corners.length * 10
+		ensureScannerVertexCapacity(scanner, scanner.webglVertexFloats + floatsPerEntry)
+		const metrics = scanner.webglMetricsCache[entry.resourceId] || (scanner.webglMetricsCache[entry.resourceId] = getScannerSpriteMetrics(entry.resourceId))
+		for (let j = 0; j < corners.length; j++) {
+			const corner = corners[j]
+			scanner.webglVertexData[scanner.webglVertexFloats++] = entry.uv[0]
+			scanner.webglVertexData[scanner.webglVertexFloats++] = entry.uv[1]
+			scanner.webglVertexData[scanner.webglVertexFloats++] = corner[0] * metrics.mask[2] - metrics.origin[0]
+			scanner.webglVertexData[scanner.webglVertexFloats++] = corner[1] * metrics.mask[3] - metrics.origin[1]
+			scanner.webglVertexData[scanner.webglVertexFloats++] = metrics.u0 + (metrics.u1 - metrics.u0) * corner[0]
+			scanner.webglVertexData[scanner.webglVertexFloats++] = metrics.v0 + (metrics.v1 - metrics.v0) * corner[1]
+			scanner.webglVertexData[scanner.webglVertexFloats++] = entry.f2
+			scanner.webglVertexData[scanner.webglVertexFloats++] = entry.value
+			scanner.webglVertexData[scanner.webglVertexFloats++] = entry.noise
+			scanner.webglVertexData[scanner.webglVertexFloats++] = metrics.mask[2]
+		}
+	}
+
+	function ensureScannerVertexCapacity(scanner, neededFloats) {
+		if (scanner.webglVertexData.length >= neededFloats) return
+		const nextCapacity = Math.max(neededFloats, Math.max(1024, scanner.webglVertexData.length * 2))
+		const next = new Float32Array(nextCapacity)
+		next.set(scanner.webglVertexData.subarray(0, scanner.webglVertexFloats))
+		scanner.webglVertexData = next
+		scanner.webglBufferCapacityFloats = 0
+	}
+
+	function getScannerWebglTexture(renderer, master) {
+		const sprite = master?.resourcesSprites?.[1] || master?.resourcesSprites?.[0]
+		const image = sprite?.img
+		if (!image) return null
+		const key = image.src || 'resources'
+		const existing = renderer.textures[key]
+		if (existing) return existing
+		const gl = renderer.gl
+		const texture = gl.createTexture()
+		gl.bindTexture(gl.TEXTURE_2D, texture)
+		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE)
+		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE)
+		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR)
+		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR)
+		gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([255, 255, 255, 0]))
+		renderer.textures[key] = texture
+		if (isImageReady(image)) uploadScannerWebglTexture(gl, texture, image)
+		else {
+			image.addEventListener('load', function () {
+				uploadScannerWebglTexture(gl, texture, image)
+			}, { once: true })
+		}
+		return texture
+	}
+
+	function uploadScannerWebglTexture(gl, texture, image) {
+		gl.bindTexture(gl.TEXTURE_2D, texture)
+		gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false)
+		gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, image)
+	}
+
+	function isImageReady(image) {
+		return image.complete && (image.naturalWidth || image.width) && (image.naturalHeight || image.height)
+	}
+
+	function getScannerSpriteMetrics(resourceId) {
+		const fallbackWidth = 1080
+		const fallbackHeight = 120
+		const sprite = window.game?.resourcesSprites?.[resourceId]
+		const frameId = sprite?.sequences?.[sprite.currentSequence || 0]?.[sprite.currentFrame || 0] || 0
+		const mask = sprite?.frames?.[frameId] || [resourceId * 108, 0, 104, 120]
+		const origin = sprite?.origins?.[frameId] || [52, 60]
+		const image = sprite?.img
+		const imageWidth = Number(image?.naturalWidth || image?.width || fallbackWidth) || fallbackWidth
+		const imageHeight = Number(image?.naturalHeight || image?.height || fallbackHeight) || fallbackHeight
+		return {
+			mask,
+			origin,
+			u0: mask[0] / imageWidth,
+			v0: mask[1] / imageHeight,
+			u1: (mask[0] + mask[2]) / imageWidth,
+			v1: (mask[1] + mask[3]) / imageHeight
+		}
+	}
+
+	function syncScannerWebglCanvas(master, canvas) {
+		if (!canvas || !master) return
+		canvas.width = master.w
+		canvas.height = master.h
+		const rect = master.canvas && typeof master.canvas.getBoundingClientRect === 'function' ? master.canvas.getBoundingClientRect() : null
+		if (rect && rect.width && rect.height) {
+			canvas.style.left = rect.left + 'px'
+			canvas.style.top = rect.top + 'px'
+			canvas.style.width = rect.width + 'px'
+			canvas.style.height = rect.height + 'px'
+		}
+		canvas.style.display = ''
+	}
+
+	function hideScannerWebgl() {
+		const canvas = scannerWebgl?.canvas || (typeof document !== 'undefined' ? document.getElementById(SCANNER_WEBGL_OVERLAY_ID) : null)
+		if (!canvas) return
+		canvas.style.display = 'none'
+	}
+
+	function deterministicNoise(u, v, resourceId) {
+		const value = Math.sin((u * 127.1 + v * 311.7 + resourceId * 74.7) * 12.9898) * 43758.5453
+		return value - Math.floor(value)
+	}
+
+	function now() {
+		return typeof performance !== 'undefined' && typeof performance.now === 'function' ? performance.now() : Date.now()
+	}
+
 	function installStyles() {
 		if (document.getElementById(STYLE_ID)) return
 		const style = document.createElement('style')
@@ -593,7 +1118,7 @@
 	position: relative;
 	width: 90%;
 	margin: calc(var(--unit) * .3) auto calc(var(--unit) * .26);
-	padding: calc(var(--unit) * 1.2) 0 calc(var(--unit) * .24);
+	padding: calc(var(--unit) * 1.3) 0 calc(var(--unit) * .24);
 	color: #111;
 	font: inherit;
 	user-select: none;
@@ -602,31 +1127,46 @@
 .cattail-scan-reality-slider-category {
 	margin-top: calc(var(--unit) * .18);
 	margin-bottom: calc(var(--unit) * .3);
-	padding-top: calc(var(--unit) * 1.16);
+	padding-top: calc(var(--unit) * 1.3);
 }
 .cattail-scan-slider-value {
 	position: absolute;
 	left: var(--cattail-scan-slider-progress, 10%);
-	max-width: 46%;
+	display: flex;
+	align-items: baseline;
+	justify-content: center;
+	gap: calc(var(--unit) * .16);
+	max-width: var(--cattail-scan-slider-label-max-width, 92%);
 	min-height: calc(var(--unit) * .18);
 	color: #b6aeae;
 	font: inherit;
 	font-size: calc(var(--unit) * .54);
 	font-weight: 400;
-	line-height: 1.1;
+	line-height: 1.05;
 	text-align: var(--cattail-scan-slider-label-align, center);
 	letter-spacing: 0;
 	white-space: nowrap;
 	overflow: hidden;
-	text-overflow: ellipsis;
+	text-overflow: clip;
 	pointer-events: none;
 	transform: translateX(var(--cattail-scan-slider-label-shift, -50%));
+}
+.cattail-scan-slider-value-label {
+	flex: 0 1 auto;
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: clip;
+	white-space: nowrap;
+}
+.cattail-scan-slider-value-number {
+	flex: 0 0 auto;
+	white-space: nowrap;
 }
 .cattail-scan-slider-diameter {
 	top: calc(var(--unit) * .08);
 }
 .cattail-scan-slider-reality {
-	top: calc(var(--unit) * 1.86);
+	top: calc(var(--unit) * 1.92);
 }
 .cattail-scan-slider-input {
 	appearance: none;

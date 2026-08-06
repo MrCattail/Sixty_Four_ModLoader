@@ -760,7 +760,7 @@ ModLoader.register({
 		}
 
 		function captureIntent(game, input, touchAction) {
-			if (!game || game.plane) return null
+			if (!game || !isSupportedCreativePlane(game.plane)) return null
 			if (touchAction && touchAction !== 'erase' && game.mouse?.positionChanged) return null
 			const cell = normalizeCell(game.hoveredCell)
 			if (!cell) return null
@@ -784,7 +784,7 @@ ModLoader.register({
 		}
 
 		function classifyOperation(game, touchAction) {
-			if (!game || game.plane || !normalizeCell(game.hoveredCell)) return null
+			if (!game || !isSupportedCreativePlane(game.plane) || !normalizeCell(game.hoveredCell)) return null
 			if (touchAction && !['erase', 'build', 'relocate'].includes(touchAction)) return null
 
 			if ((!touchAction || touchAction === 'relocate') && game.transportedEntity && game.itemInHand) {
@@ -804,6 +804,11 @@ ModLoader.register({
 
 			if (touchAction === 'erase' || item.eraser) return null
 			if (definition?.canPurchase === false) return null
+			if (Number(game.plane) === 1) {
+				if (touchAction && touchAction !== 'build') return null
+				if (game.hoveredEntity || definition?.isDark !== true) return null
+				return 'build'
+			}
 
 			if ((!touchAction || touchAction === 'build') && !game.hoveredEntity) {
 				const upgradeTarget = definition?.isUpgradeTo
@@ -1021,6 +1026,11 @@ ModLoader.register({
 			const u = Number(value[0])
 			const v = Number(value[1])
 			return Number.isFinite(u) && Number.isFinite(v) ? [u, v] : null
+		}
+
+		function isSupportedCreativePlane(value) {
+			const plane = Number(value) || 0
+			return plane === 0 || plane === 1
 		}
 
 		function normalizeInput(value) {

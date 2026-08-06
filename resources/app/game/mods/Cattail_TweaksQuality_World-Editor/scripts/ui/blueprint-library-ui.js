@@ -134,12 +134,18 @@ ModLoader.register({
 			})
 			stopSession = session.subscribe(function () { refreshSaveButtons() })
 			stopRuntime = globalThis[RUNTIME_KEY]?.subscribe?.(function (state) {
+				const toolbarHidden = !state.active
+				const toolbarVisibilityChanged = !!(
+					(toolbarButton && toolbarButton.hidden !== toolbarHidden) ||
+					(toolbarSaveButton && toolbarSaveButton.hidden !== toolbarHidden)
+				)
 				if (!state.active) {
 					interactionDialog?.close?.('editor-inactive', true)
 					close('editor-inactive')
 				}
-				if (toolbarButton) toolbarButton.hidden = !state.active
-				if (toolbarSaveButton) toolbarSaveButton.hidden = !state.active
+				if (toolbarButton) toolbarButton.hidden = toolbarHidden
+				if (toolbarSaveButton) toolbarSaveButton.hidden = toolbarHidden
+				if (toolbarVisibilityChanged) notifyToolbarLayout('library-runtime-visibility')
 			})
 			globalThis[RUNTIME_KEY]?.addCleanup?.(function () { service.dispose('runtime-disposed') })
 		})

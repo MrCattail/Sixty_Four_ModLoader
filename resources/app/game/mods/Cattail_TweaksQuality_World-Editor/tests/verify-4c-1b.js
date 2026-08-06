@@ -422,7 +422,7 @@ function testI18nManifestUiAndBoundaries() {
 
 	const manifest = JSON.parse(source('mod.json'))
 	assert.equal(manifest.version, '0.5.1')
-	assert.equal(manifest.entry.length, 35)
+	assert.equal(manifest.entry.length, 36)
 	for (const entry of [CUT_SOURCE, CUT_UI_SOURCE]) assert.ok(manifest.entry.includes(entry))
 	const blueprintIndex = manifest.entry.indexOf(BLUEPRINT_SOURCE)
 	const cutIndex = manifest.entry.indexOf(CUT_SOURCE)

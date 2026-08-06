@@ -1,0 +1,10 @@
+# Local-only placeholders. Copy to .dev.vars manually when authorized.
+# Never commit real TURN or internal service secrets.
+INTERNAL_AUTH=replace-with-a-random-local-secret
+ALPHA_INVITE_SIGNING_SECRET=replace-with-a-separate-random-signing-secret
+ALLOWED_ORIGINS=null,file://,http://127.0.0.1:8787
+SERVICE_DISABLED=false
+ALPHA_INVITE_REQUIRED=false
+TURN_DISABLED=true
+TURN_KEY_ID=
+TURN_KEY_API_TOKEN=

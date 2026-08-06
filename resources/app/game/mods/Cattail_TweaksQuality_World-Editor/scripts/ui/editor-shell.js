@@ -553,7 +553,6 @@ ModLoader.register({
 					clearHistoryStatus(true)
 				}
 			})
-
 			const runHistory = async function (direction, input) {
 				const blocked = historyBlockedReason(direction)
 				if (blocked) {
@@ -2895,6 +2894,12 @@ ModLoader.register({
 					padding: 6px;
 					border-radius: 12px;
 					overflow: visible;
+					transition:
+						width .22s cubic-bezier(.22, .75, .24, 1),
+						background .18s ease,
+						border-color .18s ease,
+						color .18s ease,
+						box-shadow .18s ease;
 				}
 				.cattail-world-editor-shell[data-toolbar-style="cards"] .cattail-world-editor-shell__toolbar-bar::before,
 				.cattail-world-editor-shell[data-toolbar-style="cards"] .cattail-world-editor-shell__toolbar-bar::after {
@@ -2948,11 +2953,17 @@ ModLoader.register({
 					border: 0;
 					border-radius: 0;
 					background: transparent;
+					opacity: 1;
 					transform: translate3d(var(--world-editor-large-toolbar-scroll-residual, 0px), 0, 0);
+					visibility: visible;
 					will-change: transform;
+					transition: opacity .16s ease, visibility 0s linear 0s;
 				}
 				.cattail-world-editor-shell[data-toolbar-style="cards"] .cattail-world-editor-shell__group[data-large-empty="true"] {
-					display: none;
+					opacity: 0;
+					visibility: hidden;
+					pointer-events: none;
+					transition: opacity .16s ease, visibility 0s linear .22s;
 				}
 				.cattail-world-editor-shell[data-toolbar-style="cards"] .cattail-world-editor-shell__group:not([data-world-editor-toolbar-group="selection"])::before {
 					content: "";
@@ -2999,6 +3010,18 @@ ModLoader.register({
 					font: 650 15px/1.25 Montserrat, Arial, sans-serif;
 					text-align: center;
 					white-space: normal;
+					opacity: 1;
+					transform: translateY(0) scale(1);
+					visibility: visible;
+					transition:
+						flex-basis .22s cubic-bezier(.22, .75, .24, 1),
+						width .22s cubic-bezier(.22, .75, .24, 1),
+						min-width .22s cubic-bezier(.22, .75, .24, 1),
+						max-width .22s cubic-bezier(.22, .75, .24, 1),
+						padding .22s cubic-bezier(.22, .75, .24, 1),
+						opacity .16s ease,
+						transform .22s cubic-bezier(.22, .75, .24, 1),
+						visibility 0s linear 0s;
 				}
 				.cattail-world-editor-shell[data-toolbar-style="cards"] [data-world-editor-toolbar-card]::after {
 					content: "";
@@ -3161,10 +3184,55 @@ ModLoader.register({
 				}
 				.cattail-world-editor-shell[data-toolbar-style="cards"] [data-world-editor-large-hidden="true"],
 				.cattail-world-editor-shell[data-toolbar-style="cards"] [data-world-editor-toolbar-card][aria-disabled="true"]:not([data-world-editor-toolbar-busy="true"]) {
-					display: none !important;
+					display: inline-grid !important;
+					flex: 0 0 0;
+					width: 0 !important;
+					min-width: 0 !important;
+					max-width: 0;
+					padding-left: 0 !important;
+					padding-right: 0 !important;
+					opacity: 0;
+					transform: translateY(-8px) scale(.9);
+					visibility: hidden;
+					pointer-events: none;
+					transition:
+						flex-basis .22s cubic-bezier(.22, .75, .24, 1),
+						width .22s cubic-bezier(.22, .75, .24, 1),
+						min-width .22s cubic-bezier(.22, .75, .24, 1),
+						max-width .22s cubic-bezier(.22, .75, .24, 1),
+						padding .22s cubic-bezier(.22, .75, .24, 1),
+						opacity .16s ease,
+						transform .22s cubic-bezier(.22, .75, .24, 1),
+						visibility 0s linear .22s;
 				}
 				.cattail-world-editor-shell[data-toolbar-style="cards"] [data-world-editor-toolbar-card][hidden] {
-					display: none !important;
+					display: inline-grid !important;
+					flex: 0 0 0;
+					width: 0 !important;
+					min-width: 0 !important;
+					max-width: 0;
+					padding-left: 0 !important;
+					padding-right: 0 !important;
+					opacity: 0;
+					transform: translateY(-8px) scale(.9);
+					visibility: hidden;
+					pointer-events: none;
+					transition:
+						flex-basis .22s cubic-bezier(.22, .75, .24, 1),
+						width .22s cubic-bezier(.22, .75, .24, 1),
+						min-width .22s cubic-bezier(.22, .75, .24, 1),
+						max-width .22s cubic-bezier(.22, .75, .24, 1),
+						padding .22s cubic-bezier(.22, .75, .24, 1),
+						opacity .16s ease,
+						transform .22s cubic-bezier(.22, .75, .24, 1),
+						visibility 0s linear .22s;
+				}
+				@media (prefers-reduced-motion: reduce) {
+					.cattail-world-editor-shell[data-toolbar-style="cards"] .cattail-world-editor-shell__toolbar-bar,
+					.cattail-world-editor-shell[data-toolbar-style="cards"] .cattail-world-editor-shell__group,
+					.cattail-world-editor-shell[data-toolbar-style="cards"] [data-world-editor-toolbar-card] {
+						transition: none !important;
+					}
 				}
 				.cattail-world-editor-economy-status {
 					--world-editor-economy-bg: rgba(248, 248, 246, .94);

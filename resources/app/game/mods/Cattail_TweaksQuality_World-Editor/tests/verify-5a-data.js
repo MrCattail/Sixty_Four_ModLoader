@@ -282,7 +282,7 @@ function testStaticCaptureAndCutContracts() {
 	const session = source('scripts/blueprint-session.js')
 	const cut = source('scripts/core/selection-cut.js')
 	const deletion = source('scripts/core/selection-delete.js')
-	assert.match(session, /schemaVersion:\s*6/)
+	assert.match(session, /const schemaVersion = 6/)
 	assert.match(session, /mode:\s*'full'/)
 	assert.match(session, /surges:\s*surgeRecords/)
 	assert.match(cut, /success-retained-layers/)

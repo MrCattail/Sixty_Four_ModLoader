@@ -1,0 +1,33 @@
+{
+  "id": "cattail.p2p-multiplayer",
+  "uniqueId": "cattail.p2p-multiplayer",
+  "name": "P2P Multiplayer",
+  "version": "0.2.1",
+  "loaderVersion": ">=0.3.1",
+  "languageSupport": {
+    "gameLanguage": true
+  },
+  "entry": [
+    "scripts/protocol.js",
+    "scripts/safe-mode.js",
+    "scripts/signaling.js",
+    "scripts/transport.js",
+    "scripts/ui.js",
+    "scripts/main.js"
+  ],
+  "description": "Phase 2 private-alpha WebRTC room, signaling, reconnect and diagnostics prototype. It does not synchronize the game world yet.",
+  "translations": {
+    "en": {
+      "name": "P2P Multiplayer",
+      "description": "Phase 2 private-alpha WebRTC room, signaling, reconnect and diagnostics prototype. It does not synchronize the game world yet."
+    },
+    "sch": {
+      "name": "P2P 多人联机",
+      "description": "Phase 2 私人 Alpha WebRTC 房间、信令、重连与诊断原型；目前尚不同步游戏世界。"
+    },
+    "modsch": {
+      "name": "P2P 多人联机",
+      "description": "Phase 2 私人 Alpha WebRTC 房间、信令、重连与诊断原型；目前尚不同步游戏世界。"
+    }
+  }
+}

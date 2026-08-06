@@ -1,0 +1,26 @@
+{
+  "name": "cattail-p2p-signaling",
+  "version": "0.2.1",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "check": "node --check src/contracts.js && node --check src/invite-token.js && node --check src/admission-model.js && node --check src/room-model.js && node --check src/index.js",
+    "test:core": "node --test test/room-model.test.js test/invite-token.test.js test/admission-model.test.js",
+    "test:worker": "vitest run",
+    "test:worker-alpha": "vitest run --config vitest.alpha.config.js",
+    "test:worker-disabled": "vitest run --config vitest.disabled.config.js",
+    "test": "npm run check && npm run test:core && npm run test:worker && npm run test:worker-alpha && npm run test:worker-disabled",
+    "dev": "wrangler dev --local",
+    "invite:create": "node tools/create-alpha-invite.mjs",
+    "check:alpha-config": "wrangler deploy --dry-run --config wrangler.alpha.jsonc",
+    "deploy": "node -e \"throw new Error('Cloud deployment requires a separate explicit authorization.')\""
+  },
+  "devDependencies": {
+    "@cloudflare/vitest-pool-workers": "0.20.1",
+    "vitest": "4.1.10",
+    "wrangler": "4.118.0"
+  },
+  "overrides": {
+    "undici": "7.29.0"
+  }
+}

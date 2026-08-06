@@ -564,7 +564,6 @@ ModLoader.register({
 					clearWheelLatch()
 				}
 			})
-
 			canvas.addEventListener('mousedown', handleMouseDown, true)
 			canvas.addEventListener('mousemove', handleMouseMove, true)
 			canvas.addEventListener('mouseup', handleMouseUp, true)

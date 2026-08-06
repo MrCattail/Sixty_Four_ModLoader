@@ -108,13 +108,14 @@ ModLoader.register({
 			refreshMountedText = refreshText
 
 			function renderButton() {
+				const selectionAvailable = Number(currentSelection?.selectionCount) > 0
 				const previewActive = !!currentSelection?.previewRange ||
 					selection.hasPreview?.() ||
 					selection.isMoving?.() ||
 					selection.isResizing?.()
 				const blocked = (
 					!currentRuntime?.active ||
-					!Number(currentSelection?.selectionCount) ||
+					!selectionAvailable ||
 					previewActive ||
 					uiBusy ||
 					!!currentDialog ||
@@ -132,6 +133,7 @@ ModLoader.register({
 					currentDeletion?.busy ||
 					currentTransactions?.busy
 				) ? 'true' : 'false'
+				deleteButton.dataset.worldEditorLargeHidden = selectionAvailable ? 'false' : 'true'
 				deleteButton.dataset.active = 'false'
 				dispatchToolbarLayout('selection-delete-state')
 			}

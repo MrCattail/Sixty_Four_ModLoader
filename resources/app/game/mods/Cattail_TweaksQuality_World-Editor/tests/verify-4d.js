@@ -379,7 +379,7 @@ function testManifestI18nAndStaticContracts() {
 		}
 	}
 	const sessionSource = source(SESSION_SOURCE)
-	assert.match(sessionSource, /schemaVersion:\s*6/)
+	assert.match(sessionSource, /const schemaVersion = 6/)
 	assert.match(sessionSource, /emptyCells:\s*normalizedEmptyCells/)
 	assert.match(sessionSource, /waypointOrder/)
 	assert.match(source(PLACEMENT_SOURCE), /label:\s*plan\.mode === 'full' \? 'Full blueprint placement'/)

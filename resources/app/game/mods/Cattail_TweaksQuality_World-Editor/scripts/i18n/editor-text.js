@@ -4140,9 +4140,6 @@ ModLoader.register({
 			en: {
 				previewFullUnavailable: 'Full source projected to structure outside Creative Mode',
 				blueprintFullSummary: 'Stable Cubes {cubes} · empty cells {empty} · normalized {normalized}',
-				blueprintIncludeSurges: 'Include Surges',
-				blueprintSurge: 'Surge',
-				toolbarCardSurges: 'Surges',
 				cutLayerMessage: 'Creative Mode can remove captured transient layers in the same safe cut transaction. Both choices apply only to this cut and default to off.',
 				cutCubeOption: 'Also remove the {count} captured stable Cube(s). Recommended only when the source Cubes should move with this blueprint.',
 				cutSurgeOption: 'Also remove the {count} captured safe Surge(s). Recommended only when the source Surges should move with this blueprint.'
@@ -4150,9 +4147,6 @@ ModLoader.register({
 			sch: {
 				previewFullUnavailable: '非创造模式会把完整源蓝图按结构规格预览和放置',
 				blueprintFullSummary: '稳定 Cube {cubes} · 空格 {empty} · 已归一化 {normalized}',
-				blueprintIncludeSurges: '包含 Surge',
-				blueprintSurge: 'Surge',
-				toolbarCardSurges: 'Surge',
 				cutLayerMessage: '创造模式可以在同一条安全剪切事务中移除已捕获的临时层；两个选项都只对本次剪切生效，并且默认关闭。',
 				cutCubeOption: '同时移除已捕获的 {count} 个稳定 Cube；仅当这些 Cube 应随蓝图一起移动时建议启用。',
 				cutSurgeOption: '同时移除已捕获的 {count} 个安全 Surge；仅当这些 Surge 应随蓝图一起移动时建议启用。'
@@ -4160,9 +4154,6 @@ ModLoader.register({
 			modsch: {
 				previewFullUnavailable: '非创造模式会把完整源蓝图按结构规格预览和放置',
 				blueprintFullSummary: '稳定 Cube {cubes} · 空格 {empty} · 已归一化 {normalized}',
-				blueprintIncludeSurges: '包含 Surge',
-				blueprintSurge: 'Surge',
-				toolbarCardSurges: 'Surge',
 				cutLayerMessage: '创造模式可以在同一条安全剪切事务中移除已捕获的临时层；两个选项都只对本次剪切生效，并且默认关闭。',
 				cutCubeOption: '同时移除已捕获的 {count} 个稳定 Cube；仅当这些 Cube 应随蓝图一起移动时建议启用。',
 				cutSurgeOption: '同时移除已捕获的 {count} 个安全 Surge；仅当这些 Surge 应随蓝图一起移动时建议启用。'
@@ -4170,9 +4161,6 @@ ModLoader.register({
 			tch: {
 				previewFullUnavailable: '非創造模式會把完整來源藍圖按結構規格預覽和放置',
 				blueprintFullSummary: '穩定 Cube {cubes} · 空格 {empty} · 已正規化 {normalized}',
-				blueprintIncludeSurges: '包含 Surge',
-				blueprintSurge: 'Surge',
-				toolbarCardSurges: 'Surge',
 				cutLayerMessage: '創造模式可以在同一筆安全剪下交易中移除已擷取的暫態層；兩個選項都只對本次剪下生效，並且預設關閉。',
 				cutCubeOption: '同時移除已擷取的 {count} 個穩定 Cube；僅當這些 Cube 應隨藍圖一起移動時建議啟用。',
 				cutSurgeOption: '同時移除已擷取的 {count} 個安全 Surge；僅當這些 Surge 應隨藍圖一起移動時建議啟用。'
@@ -4180,25 +4168,69 @@ ModLoader.register({
 		}
 		const INCLUDE_SURGES_TEXT = Object.freeze({
 			en: 'Include Surges',
-			ru: 'Включать Surge',
-			de: 'Surges einbeziehen',
-			ptbr: 'Incluir Surges',
-			it: 'Includi Surge',
-			es: 'Incluir Surges',
-			fr: 'Inclure les Surges',
-			nl: 'Surges meenemen',
-			cz: 'Zahrnout Surge',
-			pl: 'Uwzględnij Surge',
-			jp: 'Surgeを含める',
-			kr: 'Surge 포함',
-			sch: '包含 Surge',
-			tch: '包含 Surge',
-			thai: 'รวม Surge',
-			hu: 'Surge-ok felvétele',
-			lv: 'Iekļaut Surge',
-			ro: 'Include Surge',
-			no: 'Inkluder Surges',
-			modsch: '包含 Surge'
+			ru: 'Включать выбросы',
+			de: 'Stromstöße einbeziehen',
+			ptbr: 'Incluir sobrecargas de corrente',
+			it: 'Includi sovratensioni',
+			es: 'Incluir sobrecargas',
+			fr: 'Inclure les surtensions',
+			nl: 'Spanningspieken meenemen',
+			cz: 'Zahrnout proudové přívaly',
+			pl: 'Uwzględnij przypływy mocy',
+			jp: '電流の急増を含める',
+			kr: '전류 급증 포함',
+			sch: '包含电流浪涌',
+			tch: '包含電流波動',
+			thai: 'รวมคลื่นพลัง',
+			hu: 'Túlfeszültségek felvétele',
+			lv: 'Iekļaut pārspriegumus',
+			ro: 'Include valuri de curent',
+			no: 'Inkluder overspenninger',
+			modsch: '包含电流浪涌'
+		})
+		const SURGE_NAME_TEXT = Object.freeze({
+			en: 'Surge',
+			ru: 'Выброс',
+			de: 'Stromstoß',
+			ptbr: 'Sobrecarga de corrente',
+			it: 'Sovratensione',
+			es: 'Sobrecarga',
+			fr: 'Surtension',
+			nl: 'Spanningspiek',
+			cz: 'Proudový příval',
+			pl: 'Przypływ mocy',
+			jp: '電流の急増',
+			kr: '전류 급증',
+			sch: '电流浪涌',
+			tch: '電流波動',
+			thai: 'คลื่นพลัง',
+			hu: 'Túlfeszültség',
+			lv: 'Pārspriegums',
+			ro: 'Val de curent',
+			no: 'Overspenning',
+			modsch: '电流浪涌'
+		})
+		const SURGE_TOOLBAR_TEXT = Object.freeze({
+			en: 'Surges',
+			ru: 'Выбросы',
+			de: 'Stromstöße',
+			ptbr: 'Sobrecargas de corrente',
+			it: 'Sovratensioni',
+			es: 'Sobrecargas',
+			fr: 'Surtensions',
+			nl: 'Spanningspieken',
+			cz: 'Proudové přívaly',
+			pl: 'Przypływy mocy',
+			jp: '電流の急増',
+			kr: '전류 급증',
+			sch: '电流浪涌',
+			tch: '電流波動',
+			thai: 'คลื่นพลัง',
+			hu: 'Túlfeszültségek',
+			lv: 'Pārspriegumi',
+			ro: 'Valuri de curent',
+			no: 'Overspenninger',
+			modsch: '电流浪涌'
 		})
 		const SYNC_EMPTY_TEXT = {
 			en: { blueprintSyncEmpty: 'Include Cells', toolbarCardSyncEmpty: 'Cells' },
@@ -4326,6 +4358,10 @@ ModLoader.register({
 				PLACEMENT_TEXT[language] || PLACEMENT_TEXT.en,
 				FULL_BLUEPRINT_TEXT[language] || FULL_BLUEPRINT_TEXT.en,
 				{ blueprintIncludeSurges: INCLUDE_SURGES_TEXT[language] || INCLUDE_SURGES_TEXT.en },
+				{
+					blueprintSurge: SURGE_NAME_TEXT[language] || SURGE_NAME_TEXT.en,
+					toolbarCardSurges: SURGE_TOOLBAR_TEXT[language] || SURGE_TOOLBAR_TEXT.en
+				},
 				SYNC_EMPTY_TEXT[language] || SYNC_EMPTY_TEXT.en,
 				LIBRARY_TEXT[language],
 				{ toolbarCardCut: CUT_TOOLBAR_TEXT[language] || CUT_TOOLBAR_TEXT.en }

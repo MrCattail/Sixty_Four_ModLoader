@@ -1276,6 +1276,7 @@ function testManifestLocalizationAndStaticContracts() {
 		'scripts/core/selection-cut.js',
 		'scripts/ui/selection-cut-ui.js',
 		'scripts/blueprint-preview.js',
+		'scripts/render/selection-cursor.js',
 		'scripts/render/blueprint-thumbnail.js',
 		'scripts/ui/blueprint-library-ui.js',
 		'scripts/ui/selection-card.js',

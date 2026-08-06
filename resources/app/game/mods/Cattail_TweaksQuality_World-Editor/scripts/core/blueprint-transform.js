@@ -378,7 +378,7 @@ ModLoader.register({
 			const supportsEmptyCells = (
 				Number(value.schemaVersion) === 4 && value.mode === 'structure'
 			) || (
-				(Number(value.schemaVersion) === 5 || Number(value.schemaVersion) === 6) && value.mode === 'full'
+				(Number(value.schemaVersion) === 5 || Number(value.schemaVersion) === 6 || Number(value.schemaVersion) === 7) && value.mode === 'full'
 			)
 			const emptyCells = supportsEmptyCells && Array.isArray(value.emptyCells)
 				? value.emptyCells.map(function (position) {

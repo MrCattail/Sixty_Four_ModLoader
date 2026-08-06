@@ -201,6 +201,7 @@ function setupInput() {
 		runtime,
 		selection: sandbox[SELECTION_KEY],
 		timers,
+		tool: sandbox[TOOL_KEY],
 		windowHub
 	}
 }
@@ -443,7 +444,7 @@ function testI18nManifestAndReadOnlyBoundary() {
 	const manifest = JSON.parse(fs.readFileSync(path.join(MOD_ROOT, 'mod.json'), 'utf8'))
 	assert.equal(manifest.version, '0.5.1')
 	assert.equal(manifest.languageSupport.gameLanguage, true)
-	assert.equal(manifest.entry.length, 35)
+	assert.equal(manifest.entry.length, 36)
 
 	const scriptText = manifest.entry
 		.map(relativePath => fs.readFileSync(path.join(MOD_ROOT, relativePath), 'utf8'))
