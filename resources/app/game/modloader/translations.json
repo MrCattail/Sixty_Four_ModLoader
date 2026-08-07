@@ -125,7 +125,10 @@
         "translationImportSkipMods": "Do not write",
         "translationImportWriteModsResult": "Mod write-back: {written} written, {unchanged} already current, {failed} failed.",
         "translationImportNoMatchingMods": "No installed mod.json matched the imported mod entries.",
-        "translationImportModFailures": "Failures: {failures}"
+        "translationImportModFailures": "Failures: {failures}",
+        "descriptionDisplayMode": "Description display",
+        "descriptionDisplayHover": "Hover",
+        "descriptionDisplayInline": "Inline"
       },
       "mods": {
         "Cattail_Tweaks_简体中文优化": {
@@ -447,7 +450,10 @@
         "translationImportSkipMods": "不写入 mod",
         "translationImportWriteModsResult": "mod 写回：已写入 {written}，已是最新 {unchanged}，失败 {failed}。",
         "translationImportNoMatchingMods": "没有已安装的 mod.json 匹配导入文件中的 mod 条目。",
-        "translationImportModFailures": "失败：{failures}"
+        "translationImportModFailures": "失败：{failures}",
+        "descriptionDisplayMode": "提示显示",
+        "descriptionDisplayHover": "悬浮",
+        "descriptionDisplayInline": "直接显示"
       },
       "mods": {
         "Cattail_Tweaks_简体中文优化": {
@@ -765,7 +771,10 @@
         "translationImportSkipMods": "不写入 mod",
         "translationImportWriteModsResult": "mod 写回：已写入 {written}，已是最新 {unchanged}，失败 {failed}。",
         "translationImportNoMatchingMods": "没有已安装的 mod.json 匹配导入文件中的 mod 条目。",
-        "translationImportModFailures": "失败：{failures}"
+        "translationImportModFailures": "失败：{failures}",
+        "descriptionDisplayMode": "提示显示",
+        "descriptionDisplayHover": "悬浮",
+        "descriptionDisplayInline": "直接显示"
       },
       "mods": {
         "Cattail_Tweaks_简体中文优化": {
@@ -1083,7 +1092,10 @@
         "translationImportSkipMods": "不寫入 mod",
         "translationImportWriteModsResult": "mod 寫回：已寫入 {written}，已是最新 {unchanged}，失敗 {failed}。",
         "translationImportNoMatchingMods": "沒有已安裝的 mod.json 符合匯入檔案中的 mod 條目。",
-        "translationImportModFailures": "失敗：{failures}"
+        "translationImportModFailures": "失敗：{failures}",
+        "descriptionDisplayMode": "提示顯示",
+        "descriptionDisplayHover": "懸浮",
+        "descriptionDisplayInline": "直接顯示"
       },
       "mods": {
         "Cattail_Tweaks_简体中文优化": {
@@ -1279,7 +1291,10 @@
         "translationImportSkipMods": "Do not write",
         "translationImportWriteModsResult": "Mod write-back: {written} written, {unchanged} already current, {failed} failed.",
         "translationImportNoMatchingMods": "No installed mod.json matched the imported mod entries.",
-        "translationImportModFailures": "Failures: {failures}"
+        "translationImportModFailures": "Failures: {failures}",
+        "descriptionDisplayMode": "Показ описаний",
+        "descriptionDisplayHover": "При наведении",
+        "descriptionDisplayInline": "В строке"
       },
       "mods": {
         "Cattail_Tweaks_简体中文优化": {
@@ -1475,7 +1490,10 @@
         "translationImportSkipMods": "Nicht schreiben",
         "translationImportWriteModsResult": "Mod-Rueckschreiben: {written} geschrieben, {unchanged} bereits aktuell, {failed} fehlgeschlagen.",
         "translationImportNoMatchingMods": "Keine installierte mod.json passt zu den importierten Mod-Eintraegen.",
-        "translationImportModFailures": "Fehler: {failures}"
+        "translationImportModFailures": "Fehler: {failures}",
+        "descriptionDisplayMode": "Beschreibungen",
+        "descriptionDisplayHover": "Bei Hover",
+        "descriptionDisplayInline": "Inline"
       },
       "mods": {
         "Cattail_Tweaks_简体中文优化": {
@@ -1671,7 +1689,10 @@
         "translationImportSkipMods": "Nao gravar",
         "translationImportWriteModsResult": "Gravacao em mods: {written} gravados, {unchanged} ja atualizados, {failed} falharam.",
         "translationImportNoMatchingMods": "Nenhum mod.json instalado corresponde aos mods importados.",
-        "translationImportModFailures": "Falhas: {failures}"
+        "translationImportModFailures": "Falhas: {failures}",
+        "descriptionDisplayMode": "Exibir descrições",
+        "descriptionDisplayHover": "Ao passar",
+        "descriptionDisplayInline": "Em linha"
       },
       "mods": {
         "Cattail_Tweaks_简体中文优化": {
@@ -1867,7 +1888,10 @@
         "translationImportSkipMods": "Non scrivere",
         "translationImportWriteModsResult": "Scrittura nei mod: {written} scritti, {unchanged} gia aggiornati, {failed} non riusciti.",
         "translationImportNoMatchingMods": "Nessun mod.json installato corrisponde alle voci mod importate.",
-        "translationImportModFailures": "Errori: {failures}"
+        "translationImportModFailures": "Errori: {failures}",
+        "descriptionDisplayMode": "Mostra descrizioni",
+        "descriptionDisplayHover": "Al passaggio",
+        "descriptionDisplayInline": "In linea"
       },
       "mods": {
         "Cattail_Tweaks_简体中文优化": {
@@ -2063,7 +2087,10 @@
         "translationImportSkipMods": "No escribir",
         "translationImportWriteModsResult": "Escritura en mods: {written} escritos, {unchanged} ya actualizados, {failed} fallidos.",
         "translationImportNoMatchingMods": "Ningun mod.json instalado coincide con las entradas de mod importadas.",
-        "translationImportModFailures": "Fallos: {failures}"
+        "translationImportModFailures": "Fallos: {failures}",
+        "descriptionDisplayMode": "Mostrar descripciones",
+        "descriptionDisplayHover": "Al pasar",
+        "descriptionDisplayInline": "En línea"
       },
       "mods": {
         "Cattail_Tweaks_简体中文优化": {
@@ -2259,7 +2286,10 @@
         "translationImportSkipMods": "Ne pas ecrire",
         "translationImportWriteModsResult": "Ecriture dans les mods : {written} ecrits, {unchanged} deja a jour, {failed} echoues.",
         "translationImportNoMatchingMods": "Aucun mod.json installe ne correspond aux entrees de mod importees.",
-        "translationImportModFailures": "Echecs : {failures}"
+        "translationImportModFailures": "Echecs : {failures}",
+        "descriptionDisplayMode": "Affichage descriptions",
+        "descriptionDisplayHover": "Au survol",
+        "descriptionDisplayInline": "En ligne"
       },
       "mods": {
         "Cattail_Tweaks_简体中文优化": {
@@ -2455,7 +2485,10 @@
         "translationImportSkipMods": "Niet schrijven",
         "translationImportWriteModsResult": "Mod-terugschrijven: {written} geschreven, {unchanged} al actueel, {failed} mislukt.",
         "translationImportNoMatchingMods": "Geen geinstalleerde mod.json komt overeen met de geimporteerde mod-items.",
-        "translationImportModFailures": "Fouten: {failures}"
+        "translationImportModFailures": "Fouten: {failures}",
+        "descriptionDisplayMode": "Beschrijvingen",
+        "descriptionDisplayHover": "Bij aanwijzen",
+        "descriptionDisplayInline": "Inline"
       },
       "mods": {
         "Cattail_Tweaks_简体中文优化": {
@@ -2651,7 +2684,10 @@
         "translationImportSkipMods": "Nezapisovat",
         "translationImportWriteModsResult": "Zapis do modu: {written} zapsano, {unchanged} jiz aktualni, {failed} selhalo.",
         "translationImportNoMatchingMods": "Zadny nainstalovany mod.json neodpovida importovanym polozkam modu.",
-        "translationImportModFailures": "Selhani: {failures}"
+        "translationImportModFailures": "Selhani: {failures}",
+        "descriptionDisplayMode": "Zobrazení popisů",
+        "descriptionDisplayHover": "Při najetí",
+        "descriptionDisplayInline": "V řádku"
       },
       "mods": {
         "Cattail_Tweaks_简体中文优化": {
@@ -2847,7 +2883,10 @@
         "translationImportSkipMods": "Nie zapisuj",
         "translationImportWriteModsResult": "Zapis do modow: {written} zapisano, {unchanged} juz aktualne, {failed} niepowodzen.",
         "translationImportNoMatchingMods": "Zaden zainstalowany mod.json nie pasuje do importowanych wpisow modow.",
-        "translationImportModFailures": "Bledy: {failures}"
+        "translationImportModFailures": "Bledy: {failures}",
+        "descriptionDisplayMode": "Wyświetlanie opisów",
+        "descriptionDisplayHover": "Po najechaniu",
+        "descriptionDisplayInline": "W linii"
       },
       "mods": {
         "Cattail_Tweaks_简体中文优化": {
@@ -3043,7 +3082,10 @@
         "translationImportSkipMods": "Do not write",
         "translationImportWriteModsResult": "Mod write-back: {written} written, {unchanged} already current, {failed} failed.",
         "translationImportNoMatchingMods": "No installed mod.json matched the imported mod entries.",
-        "translationImportModFailures": "Failures: {failures}"
+        "translationImportModFailures": "Failures: {failures}",
+        "descriptionDisplayMode": "Aprakstu rādīšana",
+        "descriptionDisplayHover": "Uzvedot peli",
+        "descriptionDisplayInline": "Rindā"
       },
       "mods": {
         "Cattail_Tweaks_简体中文优化": {
@@ -3239,7 +3281,10 @@
         "translationImportSkipMods": "Do not write",
         "translationImportWriteModsResult": "Mod write-back: {written} written, {unchanged} already current, {failed} failed.",
         "translationImportNoMatchingMods": "No installed mod.json matched the imported mod entries.",
-        "translationImportModFailures": "Failures: {failures}"
+        "translationImportModFailures": "Failures: {failures}",
+        "descriptionDisplayMode": "การแสดงคำอธิบาย",
+        "descriptionDisplayHover": "เมื่อวางเมาส์",
+        "descriptionDisplayInline": "แสดงใต้รายการ"
       },
       "mods": {
         "Cattail_Tweaks_简体中文优化": {
@@ -3435,7 +3480,10 @@
         "translationImportSkipMods": "Do not write",
         "translationImportWriteModsResult": "Mod write-back: {written} written, {unchanged} already current, {failed} failed.",
         "translationImportNoMatchingMods": "No installed mod.json matched the imported mod entries.",
-        "translationImportModFailures": "Failures: {failures}"
+        "translationImportModFailures": "Failures: {failures}",
+        "descriptionDisplayMode": "설명 표시",
+        "descriptionDisplayHover": "호버",
+        "descriptionDisplayInline": "바로 표시"
       },
       "mods": {
         "Cattail_Tweaks_简体中文优化": {
@@ -3631,7 +3679,10 @@
         "translationImportSkipMods": "Ne irja",
         "translationImportWriteModsResult": "Mod visszairas: {written} irva, {unchanged} mar aktualis, {failed} sikertelen.",
         "translationImportNoMatchingMods": "Nincs telepitett mod.json, amely illeszkedik az importalt mod bejegyzesekhez.",
-        "translationImportModFailures": "Hibak: {failures}"
+        "translationImportModFailures": "Hibak: {failures}",
+        "descriptionDisplayMode": "Leírás megjelenítése",
+        "descriptionDisplayHover": "Rámutatáskor",
+        "descriptionDisplayInline": "Sorban"
       },
       "mods": {
         "Cattail_Tweaks_简体中文优化": {
@@ -3827,7 +3878,10 @@
         "translationImportSkipMods": "Do not write",
         "translationImportWriteModsResult": "Mod write-back: {written} written, {unchanged} already current, {failed} failed.",
         "translationImportNoMatchingMods": "No installed mod.json matched the imported mod entries.",
-        "translationImportModFailures": "Failures: {failures}"
+        "translationImportModFailures": "Failures: {failures}",
+        "descriptionDisplayMode": "説明表示",
+        "descriptionDisplayHover": "ホバー",
+        "descriptionDisplayInline": "直接表示"
       },
       "mods": {
         "Cattail_Tweaks_简体中文优化": {
@@ -4023,7 +4077,10 @@
         "translationImportSkipMods": "Nu scrie",
         "translationImportWriteModsResult": "Scriere in moduri: {written} scrise, {unchanged} deja actuale, {failed} esuate.",
         "translationImportNoMatchingMods": "Niciun mod.json instalat nu se potriveste cu intrarile de mod importate.",
-        "translationImportModFailures": "Erori: {failures}"
+        "translationImportModFailures": "Erori: {failures}",
+        "descriptionDisplayMode": "Afișare descrieri",
+        "descriptionDisplayHover": "La trecere",
+        "descriptionDisplayInline": "În linie"
       },
       "mods": {
         "Cattail_Tweaks_简体中文优化": {
@@ -4219,7 +4276,10 @@
         "translationImportSkipMods": "Ikke skriv",
         "translationImportWriteModsResult": "Mod-tilbakeskriving: {written} skrevet, {unchanged} allerede oppdatert, {failed} feilet.",
         "translationImportNoMatchingMods": "Ingen installert mod.json samsvarer med de importerte mod-oppforingene.",
-        "translationImportModFailures": "Feil: {failures}"
+        "translationImportModFailures": "Feil: {failures}",
+        "descriptionDisplayMode": "Vis beskrivelser",
+        "descriptionDisplayHover": "Ved peking",
+        "descriptionDisplayInline": "Inline"
       },
       "mods": {
         "Cattail_Tweaks_简体中文优化": {

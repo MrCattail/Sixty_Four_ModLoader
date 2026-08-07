@@ -126,6 +126,7 @@ if (Test-Path -LiteralPath $renderApiContractTestPath) {
 
 $snapshotContractTests = @(
 	[ordered]@{ file = 'ui-page-menu-scroll-contract.test.js'; description = 'UI page menu scroll contract'; pattern = 'automatic max-height, inertial wheel, ModLoader scrollbar styling' },
+	[ordered]@{ file = 'panel-description-display-mode-contract.test.js'; description = 'Panel description display mode contract'; pattern = 'hover default, inline descriptions, translated settings' },
 	[ordered]@{ file = 'snapshot-container-v1-contract.test.js'; description = 'Snapshot export container v1 contract'; pattern = 'binary framing, metadata, checksum, corruption rejection' },
 	[ordered]@{ file = 'snapshot-store-v1-contract.test.js'; description = 'Snapshot store v1 contract'; pattern = 'validation, isolation, queueing, rotation, quarantine, cleanup' },
 	[ordered]@{ file = 'snapshot-api-v1-contract.test.js'; description = 'Storage Snapshot API v1 runtime contract'; pattern = 'bound Mod API, data types, safe errors, save identity, admin UI boundary' },

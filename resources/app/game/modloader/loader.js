@@ -40,7 +40,7 @@
 		panelPreferredHideEdge: null,
 		panelModOrder: [],
 		panelConfigSectionOrder: {},
-		panelSettings: { theme: 'dark', hideMode: 'auto', autoHideSeconds: 3, hideMenuDetails: false, hideModFileDetails: false, sortConfigSections: true, renderApiEnabled: true },
+		panelSettings: { theme: 'dark', hideMode: 'auto', autoHideSeconds: 3, hideMenuDetails: false, hideModFileDetails: false, descriptionDisplayMode: 'hover', sortConfigSections: true, renderApiEnabled: true },
 		panelSettingsOpen: false,
 		panelStateLoaded: false,
 		panelAutoHideTimer: null,
@@ -265,6 +265,7 @@
 	const showStatus = function () {
 		if (!document.body) return
 		ensureStatusStyle()
+		ensurePanelStyle()
 
 		let el = document.getElementById('modloader-status')
 		if (!el) {
@@ -274,7 +275,8 @@
 		}
 
 		const names = state.mods.map(function (mod) { return getLocalizedModName(mod) || mod.path || mod.id }).join(', ') || 'No mods'
-		el.title = `Cattail's ModLoader ${state.version} | mod: ${state.mods.length} | Ctrl+M | ${names}`
+		setPanelTooltipText(el, `Cattail's ModLoader ${state.version} | mod: ${state.mods.length} | Ctrl+M | ${names}`)
+		installPanelTooltips(el)
 		installStatusDrag(el)
 		if (!state.statusDragging) applyStatusCorner(el, readStatusCorner())
 		el.innerHTML = ''
@@ -3532,6 +3534,20 @@
 		return el
 	}
 
+	const setPanelTooltipText = function (target, text, options) {
+		if (!target?.dataset) return target
+		const value = String(text || '').trim()
+		if (value) {
+			target.dataset.modloaderPanelTooltip = value
+			if (options?.kind) target.dataset.modloaderPanelTooltipKind = String(options.kind)
+			else delete target.dataset.modloaderPanelTooltipKind
+		} else {
+			delete target.dataset.modloaderPanelTooltip
+			delete target.dataset.modloaderPanelTooltipKind
+		}
+		return target
+	}
+
 	const panelRow = function (label, value) {
 		const row = element('div', 'modloader-panel-row')
 		row.appendChild(element('span', 'modloader-panel-label', label))
@@ -3586,7 +3602,10 @@
 		snapshotReason: 'Reason',
 		snapshotTags: 'Tags',
 		snapshotNoReason: 'No reason metadata',
-		snapshotDetectedReason: 'Detected issue'
+		snapshotDetectedReason: 'Detected issue',
+		descriptionDisplayMode: 'Description display',
+		descriptionDisplayHover: 'Hover',
+		descriptionDisplayInline: 'Inline'
 	})
 	Object.assign(PANEL_TEXT.sch, {
 		devTools: 'DevTools',
@@ -3639,7 +3658,10 @@
 		snapshotReason: '\u539f\u56e0',
 		snapshotTags: '\u6807\u7b7e',
 		snapshotNoReason: '\u65e0\u539f\u56e0\u5143\u6570\u636e',
-		snapshotDetectedReason: '\u68c0\u6d4b\u5230\u7684\u95ee\u9898'
+		snapshotDetectedReason: '\u68c0\u6d4b\u5230\u7684\u95ee\u9898',
+		descriptionDisplayMode: '\u63d0\u793a\u663e\u793a',
+		descriptionDisplayHover: '\u60ac\u6d6e',
+		descriptionDisplayInline: '\u76f4\u63a5\u663e\u793a'
 	})
 	PANEL_TEXT.modsch = PANEL_TEXT.sch
 	PANEL_TEXT.tch = PANEL_TEXT.sch
@@ -3909,6 +3931,9 @@
 			#modloader-panel .modloader-panel-settings-number { box-sizing: border-box; width: 66px; border: 1px solid var(--modloader-input-border); border-radius: 5px; padding: 4px 6px; background: var(--modloader-input-bg); color: var(--modloader-input-text); text-align: right; outline: none; }
 			#modloader-panel .modloader-panel-settings-number:focus { border-color: var(--modloader-focus-border); }
 			#modloader-panel .modloader-panel-settings-unit { font-size: 12px; }
+			#modloader-panel-tooltip { position: fixed; left: 0; top: 0; z-index: 2147483647; box-sizing: border-box; max-width: min(340px, calc(100vw - 20px)); border: 1px solid rgba(255,255,255,.13); border-radius: 999px; padding: 5px 11px; background: rgba(18, 20, 23, .26); color: rgba(255,255,255,.9); box-shadow: 0 8px 22px rgba(0,0,0,.24), inset 0 1px 0 rgba(255,255,255,.1); font: 11px/1.32 Montserrat, Arial, sans-serif; letter-spacing: 0; text-align: left; overflow-wrap: anywhere; pointer-events: none; opacity: 0; transform: translateY(-2px) scale(.985); transition: opacity .1s ease, transform .12s ease; backdrop-filter: blur(12px) saturate(1.25); -webkit-backdrop-filter: blur(12px) saturate(1.25); }
+			#modloader-panel-tooltip.active { opacity: 1; transform: translateY(0) scale(1); }
+			#modloader-panel-tooltip.modloader-panel-tooltip-light { border-color: rgba(18,20,22,.12); background: rgba(255,255,255,.34); color: rgba(18,20,22,.82); box-shadow: 0 8px 22px rgba(0,0,0,.16), inset 0 1px 0 rgba(255,255,255,.62); }
 			#modloader-panel.modloader-panel-theme-light { --modloader-panel-bg: rgba(248,248,246,.96); --modloader-panel-text: rgba(18,20,22,.94); --modloader-text-strong: rgba(18,20,22,.9); --modloader-text: rgba(30,32,34,.68); --modloader-text-muted: rgba(18,20,22,.58); --modloader-text-subtle: rgba(18,20,22,.46); --modloader-border: rgba(0,0,0,.1); --modloader-border-strong: rgba(0,0,0,.14); --modloader-surface: rgba(0,0,0,.035); --modloader-surface-hover: rgba(0,0,0,.06); --modloader-surface-active: rgba(0,0,0,.09); --modloader-control-bg: rgba(0,0,0,.055); --modloader-control-bg-hover: rgba(0,0,0,.09); --modloader-control-border: rgba(0,0,0,.12); --modloader-control-border-hover: rgba(0,0,0,.18); --modloader-control-text: rgba(18,20,22,.78); --modloader-control-text-hover: rgba(18,20,22,.92); --modloader-input-bg: rgba(0,0,0,.045); --modloader-input-border: rgba(0,0,0,.14); --modloader-input-text: rgba(18,20,22,.92); --modloader-focus-border: rgba(18,20,22,.32); --modloader-panel-shadow: 0 12px 36px rgba(0,0,0,.18); --modloader-primary-bg: rgba(18,20,22,.9); --modloader-primary-text: #fff; --modloader-danger-bg: rgba(155,31,45,.1); --modloader-danger-border: rgba(155,31,45,.24); --modloader-danger-text: #9b1f2d; --modloader-warning-text: rgba(120,78,0,.9); --modloader-error-text: #9b1f2d; --modloader-ok-text: rgba(18,20,22,.62); --modloader-slider-fill-color: rgba(18,20,22,.52); --modloader-slider-track-color: rgba(0,0,0,.12); --modloader-slider-track-shadow: inset 0 1px 2px rgba(0,0,0,.18); }
 			#modloader-panel.modloader-panel-theme-light h3, #modloader-panel.modloader-panel-theme-light .modloader-panel-note, #modloader-panel.modloader-panel-theme-light .modloader-panel-label, #modloader-panel.modloader-panel-theme-light .modloader-panel-settings-row, #modloader-panel.modloader-panel-theme-light .modloader-select-all-control { color: var(--modloader-text); }
 			#modloader-panel.modloader-panel-theme-light .modloader-panel-settings-title, #modloader-panel.modloader-panel-theme-light .modloader-panel-value, #modloader-panel.modloader-panel-theme-light .modloader-mod-path, #modloader-panel.modloader-panel-theme-light .modloader-mod-label, #modloader-panel.modloader-panel-theme-light .modloader-mod-config-title, #modloader-panel.modloader-panel-theme-light .modloader-config-label { color: var(--modloader-text-strong); }
@@ -3926,8 +3951,8 @@
 			#modloader-panel.modloader-panel-theme-light .modloader-import-title { color: var(--modloader-text-strong); }
 			#modloader-panel.modloader-panel-theme-light .modloader-import-detail { color: var(--modloader-text-muted); }
 			#modloader-panel.modloader-panel-theme-light .modloader-import-status { color: var(--modloader-ok-text); }
-			#modloader-panel.modloader-panel-theme-light .modloader-mod-name, #modloader-panel.modloader-panel-theme-light .modloader-mod-version, #modloader-panel.modloader-panel-theme-light .modloader-mod-meta, #modloader-panel.modloader-panel-theme-light .modloader-config-meta { color: var(--modloader-text-muted); }
-			#modloader-panel.modloader-panel-theme-light input.modloader-config-input:not([type="checkbox"]), #modloader-panel.modloader-panel-theme-light textarea.modloader-config-input, #modloader-panel.modloader-panel-theme-light select.modloader-config-input, #modloader-panel.modloader-panel-theme-light .modloader-panel-settings-number, #modloader-panel.modloader-panel-theme-light .modloader-resource-color-text, #modloader-panel.modloader-panel-theme-light .modloader-color-text { background: var(--modloader-input-bg); border-color: var(--modloader-input-border); color: var(--modloader-input-text); }
+			#modloader-panel.modloader-panel-theme-light .modloader-mod-name, #modloader-panel.modloader-panel-theme-light .modloader-mod-version, #modloader-panel.modloader-panel-theme-light .modloader-mod-description, #modloader-panel.modloader-panel-theme-light .modloader-mod-meta, #modloader-panel.modloader-panel-theme-light .modloader-config-meta { color: var(--modloader-text-muted); }
+			#modloader-panel.modloader-panel-theme-light input.modloader-config-input:not([type="checkbox"]), #modloader-panel.modloader-panel-theme-light textarea.modloader-config-input, #modloader-panel.modloader-panel-theme-light select.modloader-config-input, #modloader-panel.modloader-panel-theme-light .modloader-select-control, #modloader-panel.modloader-panel-theme-light .modloader-panel-settings-number, #modloader-panel.modloader-panel-theme-light .modloader-resource-color-text, #modloader-panel.modloader-panel-theme-light .modloader-color-text { background: var(--modloader-input-bg); border-color: var(--modloader-input-border); color: var(--modloader-input-text); }
 			#modloader-panel.modloader-panel-theme-light .modloader-config-slider-number { background: var(--modloader-input-bg); border-color: var(--modloader-input-border); color: var(--modloader-input-text); }
 			#modloader-panel.modloader-panel-theme-light .modloader-config-slider-labels, #modloader-panel.modloader-panel-theme-light .modloader-config-slider-value { color: var(--modloader-text-muted); }
 			#modloader-panel.modloader-panel-theme-light .modloader-config-slider-range::-webkit-slider-runnable-track { background: linear-gradient(90deg, var(--modloader-slider-fill-color) 0 var(--modloader-slider-fill, 0%), var(--modloader-slider-track-color) var(--modloader-slider-fill, 0%) 100%); box-shadow: var(--modloader-slider-track-shadow); }
@@ -4047,6 +4072,7 @@
 			#modloader-panel.modloader-panel-theme-light .modloader-mod-sort:hover { color: var(--modloader-control-text-hover); background: var(--modloader-surface-hover); }
 			#modloader-panel.modloader-panel-theme-light .modloader-mod-index { color: var(--modloader-text-subtle); }
 			#modloader-panel .modloader-mod-name { color: var(--modloader-text); overflow-wrap: anywhere; }
+			#modloader-panel .modloader-mod-description { margin-top: var(--modloader-row-meta-gap); color: var(--modloader-text-muted); font-size: 12px; overflow-wrap: anywhere; }
 			#modloader-panel .modloader-mod-meta { margin-top: var(--modloader-row-meta-gap); color: var(--modloader-text-muted); overflow-wrap: anywhere; }
 			#modloader-panel .modloader-mod-warning { display: none; margin-top: var(--modloader-row-warning-gap); color: var(--modloader-warning-text); overflow-wrap: anywhere; }
 			#modloader-panel .modloader-mod-warning.active { display: block; }
@@ -4083,7 +4109,30 @@
 			#modloader-panel .modloader-config-text { min-width: 0; }
 			#modloader-panel .modloader-config-label { display: block; color: var(--modloader-text-strong); overflow-wrap: anywhere; }
 			#modloader-panel .modloader-config-meta { display: block; font-size: 11px; color: var(--modloader-text-subtle); overflow-wrap: anywhere; }
+			#modloader-panel .modloader-config-description { color: var(--modloader-text-muted); }
 			#modloader-panel input.modloader-config-input:not([type="checkbox"]), #modloader-panel textarea.modloader-config-input, #modloader-panel select.modloader-config-input { box-sizing: border-box; width: 100%; min-width: 0; border: 1px solid var(--modloader-input-border); border-radius: 5px; padding: 5px 6px; background: var(--modloader-input-bg); color: var(--modloader-input-text); outline: none; }
+			#modloader-panel .modloader-select-control { position: relative; box-sizing: border-box; width: 100%; min-width: 0; border: 1px solid var(--modloader-input-border); border-radius: 5px; background: rgba(8,12,10,.28); color: var(--modloader-input-text); outline: none; box-shadow: inset 0 1px 0 rgba(255,255,255,.08), 0 0 0 1px rgba(145,255,113,.06); backdrop-filter: blur(10px) saturate(1.16); -webkit-backdrop-filter: blur(10px) saturate(1.16); transition: border-color .15s ease, box-shadow .15s ease, background-color .15s ease; }
+			#modloader-panel .modloader-select-control:hover { border-color: rgba(190,255,126,.34); background: rgba(20,34,24,.34); box-shadow: inset 0 1px 0 rgba(255,255,255,.1), 0 0 10px rgba(160,255,90,.12); }
+			#modloader-panel .modloader-select-control.open, #modloader-panel .modloader-select-control:focus-within { border-color: rgba(190,255,126,.66); box-shadow: inset 0 1px 0 rgba(255,255,255,.12), 0 0 0 1px rgba(190,255,126,.22), 0 0 14px rgba(164,255,74,.32), 0 0 28px rgba(65,190,104,.18); }
+			#modloader-panel .modloader-select-control[data-disabled=true] { opacity: .52; }
+			#modloader-panel .modloader-select-button { position: relative; display: block; box-sizing: border-box; width: 100%; min-width: 0; border: 0; border-radius: 5px; padding: 5px 28px 5px 7px; background: transparent; color: inherit; text-align: left; cursor: pointer; outline: none; }
+			#modloader-panel .modloader-select-button:after { content: ''; position: absolute; right: 11px; top: 50%; width: 0; height: 0; border-left: 6px solid transparent; border-right: 6px solid transparent; border-top: 6px solid rgba(205,255,126,.9); transform: translateY(-35%); filter: drop-shadow(0 0 5px rgba(166,242,70,.42)); pointer-events: none; }
+			#modloader-panel .modloader-select-value { display: block; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+			#modloader-panel .modloader-select-button:disabled { cursor: default; }
+			.modloader-select-menu { position: fixed; z-index: 2147483647; box-sizing: border-box; display: grid; gap: 2px; max-height: min(220px, 42vh); overflow: auto; padding: 4px; border: 1px solid rgba(190,255,126,.38); border-radius: 6px; background: rgba(8,12,10,.76); color: rgba(255,255,255,.93); box-shadow: 0 14px 32px rgba(0,0,0,.42), 0 0 18px rgba(166,242,70,.18), inset 0 1px 0 rgba(255,255,255,.1); font: 13px/1.45 Montserrat, Arial, sans-serif; backdrop-filter: blur(14px) saturate(1.22); -webkit-backdrop-filter: blur(14px) saturate(1.22); scrollbar-width: thin; scrollbar-color: rgba(190,255,126,.44) transparent; }
+			.modloader-select-menu::-webkit-scrollbar { width: 4px; }
+			.modloader-select-menu::-webkit-scrollbar-track { background: transparent; }
+			.modloader-select-menu::-webkit-scrollbar-thumb { border-radius: 999px; background: rgba(190,255,126,.44); }
+			.modloader-select-option { box-sizing: border-box; width: 100%; min-width: 0; border: 0; border-radius: 5px; padding: 5px 7px; background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer; outline: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+			.modloader-select-option:hover, .modloader-select-option.focused { background: rgba(166,242,70,.14); color: rgba(255,255,255,.98); box-shadow: inset 0 0 0 1px rgba(190,255,126,.14); }
+			.modloader-select-option.selected { background: linear-gradient(135deg, rgba(222,255,69,.94), rgba(90,205,103,.88)); color: #111; box-shadow: 0 0 12px rgba(164,255,74,.32), inset 0 1px 0 rgba(255,255,255,.34); }
+			#modloader-panel.modloader-panel-theme-light .modloader-select-control { background: rgba(255,255,255,.38); box-shadow: inset 0 1px 0 rgba(255,255,255,.68), 0 0 0 1px rgba(145,255,113,.08); }
+			#modloader-panel.modloader-panel-theme-light .modloader-select-control:hover { border-color: rgba(102,190,78,.32); background: rgba(255,255,255,.5); box-shadow: inset 0 1px 0 rgba(255,255,255,.78), 0 0 10px rgba(102,190,78,.14); }
+			#modloader-panel.modloader-panel-theme-light .modloader-select-control.open, #modloader-panel.modloader-panel-theme-light .modloader-select-control:focus-within { border-color: rgba(102,190,78,.58); box-shadow: inset 0 1px 0 rgba(255,255,255,.82), 0 0 0 1px rgba(102,190,78,.2), 0 0 14px rgba(102,190,78,.22); }
+			#modloader-panel.modloader-panel-theme-light .modloader-select-button:after { border-top-color: rgba(80,172,72,.88); filter: drop-shadow(0 0 5px rgba(102,190,78,.3)); }
+			.modloader-select-menu-light { border-color: rgba(102,190,78,.3); background: rgba(250,252,247,.78); color: rgba(18,20,22,.86); box-shadow: 0 14px 30px rgba(0,0,0,.18), 0 0 18px rgba(102,190,78,.14), inset 0 1px 0 rgba(255,255,255,.72); }
+			.modloader-select-menu-light .modloader-select-option:hover, .modloader-select-menu-light .modloader-select-option.focused { background: rgba(102,190,78,.14); color: rgba(18,20,22,.94); box-shadow: inset 0 0 0 1px rgba(102,190,78,.12); }
+			.modloader-select-menu-light .modloader-select-option.selected { background: linear-gradient(135deg, rgba(224,255,87,.9), rgba(96,202,105,.82)); color: #111; box-shadow: 0 0 12px rgba(102,190,78,.22), inset 0 1px 0 rgba(255,255,255,.58); }
 			#modloader-panel .modloader-config-number { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 5px; align-items: center; min-width: 0; }
 			#modloader-panel .modloader-config-number-reset, #modloader-panel .modloader-config-slider-reset { border: 1px solid var(--modloader-control-border); border-radius: 5px; padding: 5px 7px; background: var(--modloader-control-bg); color: var(--modloader-control-text); cursor: pointer; }
 			#modloader-panel .modloader-config-number-reset:hover:not(:disabled), #modloader-panel .modloader-config-slider-reset:hover:not(:disabled) { background: var(--modloader-control-bg-hover); border-color: var(--modloader-control-border-hover); color: var(--modloader-control-text-hover); }
@@ -5142,6 +5191,11 @@
 		return isSliderConfigType(type) || item.slider === true || control === 'slider' || control === 'range'
 	}
 
+	const isSelectConfigItem = function (item, type) {
+		const control = getConfigControl(item)
+		return type === 'select' || type === 'choice' || type === 'enum' || control === 'select' || control === 'choice' || Array.isArray(item?.options) || Array.isArray(item?.choices)
+	}
+
 	const getNumberConfigType = function (item, type) {
 		const valueType = String(item.valueType || item.numberType || item.numericType || '').toLowerCase()
 		if (isNumberConfigType(valueType)) return valueType
@@ -5198,7 +5252,9 @@
 	}
 
 	const readConfigForPanel = function (mod) {
-		const schema = normalizeConfigSchema(mod.manifest.config).map(function (item) {
+		const liveConfig = state.configs[mod.id]
+		const schemaSource = liveConfig?.schema?.length ? liveConfig.schema : normalizeConfigSchema(mod.manifest.config)
+		const schema = schemaSource.map(function (item) {
 			item = clone(item)
 			const localizedValueLabels = getLocalizedConfigValueLabels(mod.manifest, item)
 			if (localizedValueLabels) item.valueLabels = clone(localizedValueLabels)
@@ -5207,7 +5263,10 @@
 		})
 		const values = {}
 		for (const item of schema) {
-			values[item.key] = parseStoredConfig(localStorage.getItem(storageKey(mod.id, item.key)), item.default)
+			const liveValue = liveConfig?.values ? liveConfig.values[item.key] : undefined
+			values[item.key] = liveValue === undefined
+				? parseStoredConfig(localStorage.getItem(storageKey(mod.id, item.key)), item.default)
+				: cloneConfigValue(liveValue)
 		}
 		return { schema, values }
 	}
@@ -5478,7 +5537,7 @@
 			const canvas = element('canvas', className || 'modloader-color-icon')
 			canvas.classList.add('modloader-color-icon-procedural')
 			canvas.setAttribute('aria-hidden', 'true')
-			if (iconModel.title) canvas.title = iconModel.title
+			if (iconModel.title) setPanelTooltipText(canvas, iconModel.title)
 			const stop = startProceduralColorIconAnimation(canvas, iconModel, options || {})
 			if (typeof options?.addCleanup === 'function') options.addCleanup(stop)
 			else canvas.__modloaderCleanup = stop
@@ -5489,7 +5548,7 @@
 			icon.style.visibility = 'hidden'
 			return icon
 		}
-		if (iconModel.title) icon.title = iconModel.title
+		if (iconModel.title) setPanelTooltipText(icon, iconModel.title)
 		if (iconModel.type === 'resource') {
 			icon.classList.add('modloader-color-icon-resource')
 			icon.style.backgroundPosition = '-' + (iconModel.index * 36) + 'px 0'
@@ -5651,10 +5710,10 @@
 		const tools = element('div', 'modloader-resource-color-tools')
 		const exportButton = element('button', 'modloader-resource-color-share-button', getInlineLocalizedText(CONFIG_INLINE_TEXT.exportColors))
 		exportButton.type = 'button'
-		exportButton.title = getInlineLocalizedText(CONFIG_INLINE_TEXT.exportColorsTitle)
+		setPanelTooltipText(exportButton, getInlineLocalizedText(CONFIG_INLINE_TEXT.exportColorsTitle))
 		const importButton = element('button', 'modloader-resource-color-share-button', getInlineLocalizedText(CONFIG_INLINE_TEXT.importColors))
 		importButton.type = 'button'
-		importButton.title = getInlineLocalizedText(CONFIG_INLINE_TEXT.importColorsTitle)
+		setPanelTooltipText(importButton, getInlineLocalizedText(CONFIG_INLINE_TEXT.importColorsTitle))
 		const status = element('span', 'modloader-resource-color-share-status')
 		exportButton.addEventListener('click', async function (event) {
 			event.preventDefault()
@@ -5697,7 +5756,7 @@
 			const picker = element('input', 'modloader-resource-color-picker')
 			picker.type = 'color'
 			picker.value = resource.color
-			picker.title = resource.name
+			setPanelTooltipText(picker, resource.name)
 
 			const textInput = element('input', 'modloader-resource-color-text')
 			textInput.type = 'text'
@@ -5714,7 +5773,7 @@
 
 			const reset = element('button', 'modloader-resource-color-reset', getInlineLocalizedText(CONFIG_INLINE_TEXT.reset))
 			reset.type = 'button'
-			reset.title = getInlineLocalizedText(CONFIG_INLINE_TEXT.resetTitle)
+			setPanelTooltipText(reset, getInlineLocalizedText(CONFIG_INLINE_TEXT.resetTitle))
 
 			picker.addEventListener('input', function () {
 				textInput.value = picker.value.toUpperCase()
@@ -5933,7 +5992,7 @@
 
 		const reset = element('button', 'modloader-config-slider-reset', getInlineLocalizedText(CONFIG_INLINE_TEXT.reset))
 		reset.type = 'button'
-		reset.title = getInlineLocalizedText(CONFIG_INLINE_TEXT.reset)
+		setPanelTooltipText(reset, getInlineLocalizedText(CONFIG_INLINE_TEXT.reset))
 		reset.setAttribute('aria-label', getInlineLocalizedText(CONFIG_INLINE_TEXT.reset))
 
 		const labels = element('div', 'modloader-config-slider-labels')
@@ -6084,7 +6143,7 @@
 
 		const reset = element('button', 'modloader-color-reset', getInlineLocalizedText(CONFIG_INLINE_TEXT.reset))
 		reset.type = 'button'
-		reset.title = getInlineLocalizedText(CONFIG_INLINE_TEXT.resetTitle)
+		setPanelTooltipText(reset, getInlineLocalizedText(CONFIG_INLINE_TEXT.resetTitle))
 
 		const getAutoPlaceholder = function () {
 			return pickLocalizedText(item?.autoLabel, getLocaleCandidates()) || displayDefault
@@ -6188,7 +6247,7 @@
 
 		const reset = element('button', 'modloader-config-number-reset', getInlineLocalizedText(CONFIG_INLINE_TEXT.reset))
 		reset.type = 'button'
-		reset.title = getInlineLocalizedText(CONFIG_INLINE_TEXT.resetTitle)
+		setPanelTooltipText(reset, getInlineLocalizedText(CONFIG_INLINE_TEXT.resetTitle))
 		reset.setAttribute('aria-label', getInlineLocalizedText(CONFIG_INLINE_TEXT.resetTitle))
 		reset.addEventListener('click', function (event) {
 			event.preventDefault()
@@ -6213,11 +6272,270 @@
 		return root
 	}
 
+	const getSelectConfigOptions = function (item, value) {
+		const source = item?.options || item?.choices || item?.values || item?.entries || []
+		const raw = Array.isArray(source)
+			? source
+			: (isObject(source) ? Object.keys(source).map(function (key) { return { value: key, label: source[key] } }) : [])
+		const options = []
+		const seen = new Set()
+		const addOption = function (entry) {
+			const optionValue = isObject(entry) ? (entry.value ?? entry.id ?? entry.key ?? entry.name) : entry
+			if (optionValue === undefined || optionValue === null) return
+			const textValue = String(optionValue)
+			if (seen.has(textValue)) return
+			seen.add(textValue)
+			const labelSource = isObject(entry) ? (entry.label ?? entry.text ?? entry.title ?? entry.name ?? entry.id ?? entry.key) : entry
+			options.push({
+				value: textValue,
+				label: pickLocalizedText(labelSource, getLocaleCandidates()) || String(labelSource ?? textValue)
+			})
+		}
+		raw.forEach(addOption)
+		const textValue = value === undefined || value === null ? '' : String(value)
+		if (textValue && !seen.has(textValue)) options.unshift({ value: textValue, label: textValue })
+		return options
+	}
+
+	const createSelectConfigInput = function (item, value, options) {
+		const root = element('div', 'modloader-select-control modloader-config-input')
+		const button = element('button', 'modloader-select-button')
+		const valueLabel = element('span', 'modloader-select-value')
+		const menu = element('div', 'modloader-select-menu')
+		let selectOptions = []
+		let selectedValue = value === undefined || value === null ? String(item?.default ?? '') : String(value)
+		let open = false
+		let focusedIndex = -1
+
+		button.type = 'button'
+		button.setAttribute('aria-haspopup', 'listbox')
+		button.setAttribute('aria-expanded', 'false')
+		button.appendChild(valueLabel)
+		menu.setAttribute('role', 'listbox')
+
+		const normalizeOptions = function (source) {
+			const normalized = []
+			const seen = new Set()
+			for (const option of source || []) {
+				const optionValue = String(option?.value ?? '')
+				if (!optionValue || seen.has(optionValue)) continue
+				seen.add(optionValue)
+				normalized.push({ value: optionValue, label: String(option?.label || optionValue) })
+			}
+			return normalized
+		}
+
+		const getSelectedOption = function () {
+			return selectOptions.find(function (option) { return option.value === selectedValue }) || null
+		}
+
+		const syncSelectedState = function () {
+			const selected = getSelectedOption()
+			valueLabel.textContent = selected?.label || selectedValue
+			for (const optionButton of Array.from(menu.children)) {
+				const isSelected = optionButton.dataset.value === selectedValue
+				optionButton.classList.toggle('selected', isSelected)
+				optionButton.setAttribute('aria-selected', isSelected ? 'true' : 'false')
+			}
+		}
+
+		const focusOption = function (index) {
+			if (!selectOptions.length) return
+			focusedIndex = Math.max(0, Math.min(index, selectOptions.length - 1))
+			for (const optionButton of Array.from(menu.children)) {
+				optionButton.classList.toggle('focused', Number(optionButton.dataset.index) === focusedIndex)
+			}
+			const target = menu.children[focusedIndex]
+			if (target) {
+				target.focus({ preventScroll: true })
+				target.scrollIntoView({ block: 'nearest' })
+			}
+		}
+
+		const setValue = function (nextValue, emit) {
+			selectedValue = String(nextValue ?? '')
+			if (selectOptions.length && !selectOptions.some(function (option) { return option.value === selectedValue })) {
+				selectedValue = selectOptions[0].value
+			}
+			syncSelectedState()
+			if (emit) root.dispatchEvent(new Event('input', { bubbles: true }))
+		}
+
+		const placeMenu = function () {
+			if (!open) return
+			const rect = root.getBoundingClientRect()
+			const gap = 4
+			const viewportPad = 8
+			const width = Math.max(120, Math.min(rect.width, window.innerWidth - viewportPad * 2))
+			const left = Math.max(viewportPad, Math.min(rect.left, window.innerWidth - width - viewportPad))
+			const below = window.innerHeight - rect.bottom - gap - viewportPad
+			const above = rect.top - gap - viewportPad
+			const openAbove = below < 118 && above > below
+			const maxHeight = Math.max(88, Math.min(220, openAbove ? above : below))
+			menu.style.left = left + 'px'
+			menu.style.width = width + 'px'
+			menu.style.maxHeight = maxHeight + 'px'
+			if (openAbove) {
+				menu.style.top = ''
+				menu.style.bottom = (window.innerHeight - rect.top + gap) + 'px'
+			} else {
+				menu.style.top = (rect.bottom + gap) + 'px'
+				menu.style.bottom = ''
+			}
+		}
+
+		const onWindowCloseRequest = function (event) {
+			if (event?.target && menu.contains(event.target)) return
+			closeMenu(false)
+		}
+
+		const closeMenu = function (focusButton) {
+			if (!open) return
+			open = false
+			root.classList.remove('open')
+			button.setAttribute('aria-expanded', 'false')
+			if (menu.parentNode) menu.parentNode.removeChild(menu)
+			document.removeEventListener('pointerdown', onDocumentPointerDown, true)
+			window.removeEventListener('resize', onWindowCloseRequest)
+			window.removeEventListener('scroll', onWindowCloseRequest, true)
+			if (focusButton) button.focus({ preventScroll: true })
+		}
+
+		const openMenu = function () {
+			if (root.disabled || open) return
+			document.dispatchEvent(new CustomEvent('modloader:select-close', { detail: root }))
+			open = true
+			root.classList.add('open')
+			button.setAttribute('aria-expanded', 'true')
+			const panel = root.closest('#modloader-panel')
+			const light = panel?.classList.contains('modloader-panel-theme-light')
+			menu.classList.toggle('modloader-select-menu-light', !!light)
+			document.body.appendChild(menu)
+			placeMenu()
+			document.addEventListener('pointerdown', onDocumentPointerDown, true)
+			window.addEventListener('resize', onWindowCloseRequest)
+			window.addEventListener('scroll', onWindowCloseRequest, true)
+			requestAnimationFrame(placeMenu)
+			const selectedIndex = Math.max(0, selectOptions.findIndex(function (option) { return option.value === selectedValue }))
+			focusOption(selectedIndex)
+		}
+
+		const renderOptions = function () {
+			menu.textContent = ''
+			selectOptions.forEach(function (option, index) {
+				const optionButton = element('button', 'modloader-select-option', option.label)
+				optionButton.type = 'button'
+				optionButton.dataset.value = option.value
+				optionButton.dataset.index = String(index)
+				optionButton.setAttribute('role', 'option')
+				optionButton.tabIndex = -1
+				optionButton.addEventListener('click', function (event) {
+					event.preventDefault()
+					event.stopPropagation()
+					setValue(option.value, true)
+					closeMenu(true)
+				})
+				menu.appendChild(optionButton)
+			})
+			syncSelectedState()
+		}
+
+		const onDocumentPointerDown = function (event) {
+			if (root.contains(event.target) || menu.contains(event.target)) return
+			closeMenu(false)
+		}
+
+		const onExternalClose = function (event) {
+			if (event.detail !== root) closeMenu(false)
+		}
+		const onMenuMouseEnter = function () {
+			clearPanelAutoHideTimer()
+		}
+		const onMenuMouseLeave = function () {
+			const panel = document.getElementById('modloader-panel')
+			if (panel && !panel.matches(':hover')) schedulePanelAutoHide(panel)
+		}
+
+		button.addEventListener('click', function (event) {
+			event.preventDefault()
+			event.stopPropagation()
+			if (open) closeMenu(false)
+			else openMenu()
+		})
+		button.addEventListener('keydown', function (event) {
+			if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+				event.preventDefault()
+				if (!open) openMenu()
+				else focusOption(focusedIndex + (event.key === 'ArrowDown' ? 1 : -1))
+			} else if (event.key === 'Enter' || event.key === ' ') {
+				event.preventDefault()
+				if (open) closeMenu(false)
+				else openMenu()
+			} else if (event.key === 'Escape' && open) {
+				event.preventDefault()
+				closeMenu(true)
+			}
+		})
+		menu.addEventListener('keydown', function (event) {
+			if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+				event.preventDefault()
+				focusOption(focusedIndex + (event.key === 'ArrowDown' ? 1 : -1))
+			} else if (event.key === 'Enter' || event.key === ' ') {
+				event.preventDefault()
+				const option = selectOptions[focusedIndex]
+				if (option) setValue(option.value, true)
+				closeMenu(true)
+			} else if (event.key === 'Escape' || event.key === 'Tab') {
+				closeMenu(event.key === 'Escape')
+			}
+		})
+		document.addEventListener('modloader:select-close', onExternalClose)
+		menu.addEventListener('mouseenter', onMenuMouseEnter)
+		menu.addEventListener('mouseleave', onMenuMouseLeave)
+
+		root.setSelectOptions = function (nextOptions) {
+			selectOptions = normalizeOptions(nextOptions)
+			if (!selectOptions.some(function (option) { return option.value === selectedValue }) && selectOptions[0]) {
+				selectedValue = selectOptions[0].value
+			}
+			renderOptions()
+			if (open) placeMenu()
+		}
+		root.setSelectValue = function (nextValue) {
+			setValue(nextValue, false)
+		}
+		Object.defineProperty(root, 'value', {
+			get() { return selectedValue },
+			set(nextValue) { setValue(nextValue, false) }
+		})
+		Object.defineProperty(root, 'disabled', {
+			get() { return root.dataset.disabled === 'true' },
+			set(nextValue) {
+				const disabled = !!nextValue
+				root.dataset.disabled = disabled ? 'true' : 'false'
+				button.disabled = disabled
+				if (disabled) closeMenu(false)
+			}
+		})
+
+		if (typeof options?.addCleanup === 'function') {
+			options.addCleanup(function () {
+				closeMenu(false)
+				document.removeEventListener('modloader:select-close', onExternalClose)
+			})
+		}
+		root.appendChild(button)
+		root.setSelectOptions(getSelectConfigOptions(item, value))
+		root.setSelectValue(selectedValue)
+		return root
+	}
+
 	const createConfigInput = function (item, value, options) {
 		const type = getConfigType(item)
 		if (isColorPaletteConfigItem(item, type)) return createColorPaletteConfigInput(item, value, options)
 		if (isColorConfigType(type)) return createColorConfigInput(item, value, options)
 		if (isSliderConfigItem(item, type)) return createSliderConfigInput(item, value, type)
+		if (isSelectConfigItem(item, type)) return createSelectConfigInput(item, value, options)
 		const input = element(type === 'array' || type === 'object' ? 'textarea' : 'input', 'modloader-config-input')
 		if (type === 'boolean') {
 			input.type = 'checkbox'
@@ -6241,6 +6559,7 @@
 		if (isColorPaletteConfigItem(item, type)) return input.readConfigValue()
 		if (isColorConfigType(type)) return input.readConfigValue()
 		if (isSliderConfigItem(item, type)) return input.readConfigValue()
+		if (isSelectConfigItem(item, type)) return input.value
 		if (type === 'boolean') return !!input.checked
 		if (isNumberConfigType(type)) return readNumberConfigValue(item, input.value, type)
 		if (type === 'array' || type === 'object') {
@@ -6268,7 +6587,7 @@
 	const createPanelActionButton = function (icon, label, title) {
 		const button = element('button', 'modloader-action-button')
 		button.type = 'button'
-		button.title = title || label
+		setPanelTooltipText(button, title || label)
 		button.setAttribute('aria-label', title || label)
 		button.appendChild(element('span', 'modloader-action-icon modloader-action-icon-' + icon))
 		button.appendChild(element('span', '', label))
@@ -6552,6 +6871,7 @@
 	const PANEL_AUTO_HIDE_SECONDS_MIN = 0.5
 	const PANEL_AUTO_HIDE_SECONDS_MAX = 60
 	const PANEL_STATE_STORAGE_KEY = 'modloader:panelState'
+	const PANEL_TOOLTIP_OFFSET = 10
 	const PANEL_THEME_TOKEN_NAMES = Object.freeze([
 		'--modloader-panel-bg',
 		'--modloader-panel-text',
@@ -6598,6 +6918,18 @@
 
 	const isValidPanelHideMode = function (value) {
 		return value === 'auto' || value === 'manual'
+	}
+
+	const isValidPanelDescriptionDisplayMode = function (value) {
+		return value === 'hover' || value === 'inline'
+	}
+
+	const getPanelDescriptionDisplayMode = function () {
+		return isValidPanelDescriptionDisplayMode(state.panelSettings.descriptionDisplayMode) ? state.panelSettings.descriptionDisplayMode : 'hover'
+	}
+
+	const shouldShowPanelDescriptionsInline = function () {
+		return getPanelDescriptionDisplayMode() === 'inline'
 	}
 
 	const normalizePanelThemeTokenName = function (name) {
@@ -6735,6 +7067,7 @@
 				state.panelSettings.autoHideSeconds = normalizePanelAutoHideSeconds(stored.settings.autoHideSeconds)
 				state.panelSettings.hideMenuDetails = stored.settings.hideMenuDetails === true
 				state.panelSettings.hideModFileDetails = stored.settings.hideModFileDetails === true
+				if (isValidPanelDescriptionDisplayMode(stored.settings.descriptionDisplayMode)) state.panelSettings.descriptionDisplayMode = stored.settings.descriptionDisplayMode
 				state.panelSettings.sortConfigSections = stored.settings.sortConfigSections !== false
 				state.panelSettings.renderApiEnabled = stored.settings.renderApiEnabled !== false
 			}
@@ -6949,6 +7282,7 @@
 	const applyPanelSettings = function (panel) {
 		panel.classList.toggle('modloader-panel-theme-light', state.panelSettings.theme === 'light')
 		panel.classList.toggle('modloader-panel-manual-hide', !isPanelAutoHideEnabled())
+		panel.classList.toggle('modloader-panel-description-inline', shouldShowPanelDescriptionsInline())
 		syncPanelSettingsPageState(panel)
 		if (!isPanelAutoHideEnabled()) clearPanelAutoHideTimer()
 	}
@@ -6963,6 +7297,137 @@
 		if (!state.panelSettingsOpen) return
 		state.panelSettingsOpen = false
 		syncPanelSettingsPageState(panel)
+	}
+
+	const getPanelTooltipElement = function () {
+		let tooltip = document.getElementById('modloader-panel-tooltip')
+		if (!tooltip) {
+			tooltip = element('div')
+			tooltip.id = 'modloader-panel-tooltip'
+			tooltip.setAttribute('role', 'tooltip')
+			tooltip.setAttribute('aria-hidden', 'true')
+			document.body.appendChild(tooltip)
+		}
+		return tooltip
+	}
+
+	const hidePanelTooltip = function () {
+		const tooltip = document.getElementById('modloader-panel-tooltip')
+		if (!tooltip) return
+		tooltip.classList.remove('active')
+		tooltip.setAttribute('aria-hidden', 'true')
+	}
+
+	const positionPanelTooltip = function (tooltip, target, point) {
+		if (!tooltip || !target?.getBoundingClientRect) return
+		const rect = target.getBoundingClientRect()
+		const viewportWidth = window.innerWidth || document.documentElement.clientWidth || 0
+		const viewportHeight = window.innerHeight || document.documentElement.clientHeight || 0
+		const margin = 10
+		const tooltipRect = tooltip.getBoundingClientRect()
+		const width = tooltipRect.width || Math.min(340, Math.max(150, viewportWidth - margin * 2))
+		const height = tooltipRect.height || 26
+		const anchorX = Number.isFinite(point?.x) ? point.x : rect.left + rect.width / 2
+		const anchorY = Number.isFinite(point?.y) ? point.y : rect.bottom
+		let x = anchorX + PANEL_TOOLTIP_OFFSET
+		let y = anchorY + PANEL_TOOLTIP_OFFSET
+		if (viewportWidth > 0 && x + width + margin > viewportWidth) x = anchorX - width - PANEL_TOOLTIP_OFFSET
+		if (viewportHeight > 0 && y + height + margin > viewportHeight) y = anchorY - height - PANEL_TOOLTIP_OFFSET
+		if (viewportWidth > 0) x = clampNumber(x, margin, Math.max(margin, viewportWidth - width - margin))
+		if (viewportHeight > 0) y = clampNumber(y, margin, Math.max(margin, viewportHeight - height - margin))
+		tooltip.style.left = Math.round(x) + 'px'
+		tooltip.style.top = Math.round(y) + 'px'
+	}
+
+	const showPanelTooltip = function (target, point) {
+		const text = String(target?.dataset?.modloaderPanelTooltip || '').trim()
+		const isDescription = target?.dataset?.modloaderPanelTooltipKind === 'description'
+		if (!text || (isDescription && shouldShowPanelDescriptionsInline())) return hidePanelTooltip()
+		const panel = target.closest?.('#modloader-panel')
+		const tooltip = getPanelTooltipElement()
+		tooltip.textContent = text
+		tooltip.classList.toggle('modloader-panel-tooltip-light', !!panel?.classList?.contains('modloader-panel-theme-light'))
+		tooltip.setAttribute('aria-hidden', 'false')
+		tooltip.classList.add('active')
+		positionPanelTooltip(tooltip, target, point)
+	}
+
+	const getPanelTooltipTarget = function (target, root) {
+		const element = target?.closest?.('[data-modloader-panel-tooltip]')
+		return element && root.contains(element) ? element : null
+	}
+
+	const installPanelTooltips = function (root, addCleanup) {
+		if (!root) return
+		if (root.__modloaderPanelTooltipCleanup) root.__modloaderPanelTooltipCleanup()
+		let activeTarget = null
+		let activePoint = null
+		let frame = 0
+		const clearFrame = function () {
+			if (!frame) return
+			cancelAnimationFrame(frame)
+			frame = 0
+		}
+		const sync = function (target) {
+			clearFrame()
+			frame = requestAnimationFrame(function () {
+				frame = 0
+				if (activeTarget !== target) return
+				showPanelTooltip(target, activePoint)
+			})
+		}
+		const clear = function () {
+			activeTarget = null
+			activePoint = null
+			clearFrame()
+			hidePanelTooltip()
+		}
+		const pointFromEvent = function (event) {
+			if (!Number.isFinite(event?.clientX) || !Number.isFinite(event?.clientY)) return null
+			return { x: event.clientX, y: event.clientY }
+		}
+		const activate = function (event) {
+			const target = getPanelTooltipTarget(event.target, root)
+			if (!target) {
+				if (event.type === 'focusin') clear()
+				return
+			}
+			activeTarget = target
+			activePoint = pointFromEvent(event) || activePoint
+			sync(target)
+		}
+		const move = function (event) {
+			const target = getPanelTooltipTarget(event.target, root)
+			if (!target || target !== activeTarget) return
+			activePoint = pointFromEvent(event) || activePoint
+			sync(target)
+		}
+		const deactivate = function (event) {
+			if (!activeTarget) return
+			const next = getPanelTooltipTarget(event.relatedTarget, root)
+			if (next === activeTarget) return
+			clear()
+		}
+		root.addEventListener('pointerover', activate)
+		root.addEventListener('pointermove', move)
+		root.addEventListener('pointerout', deactivate)
+		root.addEventListener('focusin', activate)
+		root.addEventListener('focusout', deactivate)
+		root.addEventListener('scroll', clear, true)
+		window.addEventListener('resize', clear)
+		const cleanup = function () {
+			root.removeEventListener('pointerover', activate)
+			root.removeEventListener('pointermove', move)
+			root.removeEventListener('pointerout', deactivate)
+			root.removeEventListener('focusin', activate)
+			root.removeEventListener('focusout', deactivate)
+			root.removeEventListener('scroll', clear, true)
+			window.removeEventListener('resize', clear)
+			clear()
+			if (root.__modloaderPanelTooltipCleanup === cleanup) root.__modloaderPanelTooltipCleanup = null
+		}
+		root.__modloaderPanelTooltipCleanup = cleanup
+		if (typeof addCleanup === 'function') addCleanup(cleanup)
 	}
 
 	const applyPanelHiddenPosition = function (panel) {
@@ -7001,6 +7466,7 @@
 
 	const hidePanelToEdge = function (panel, useStoredTab) {
 		if (!isPanelAutoHideEnabled()) return
+		try { document.dispatchEvent(new CustomEvent('modloader:select-close')) } catch (error) {}
 		closePanelSettingsPage(panel)
 		const rect = panel.getBoundingClientRect()
 		const activeTab = normalizePanelTabPosition(state.panelTabPosition)
@@ -7027,7 +7493,7 @@
 		if (!isPanelAutoHideEnabled() || state.panelHidden) return
 		state.panelAutoHideTimer = setTimeout(function () {
 			state.panelAutoHideTimer = null
-			if (!document.body.contains(panel) || state.panelHidden || panel.matches(':hover')) return
+			if (!document.body.contains(panel) || state.panelHidden || panel.matches(':hover') || document.querySelector('.modloader-select-menu:hover, .modloader-select-menu:focus-within')) return
 			hidePanelToEdge(panel, true)
 		}, getPanelAutoHideDelayMs())
 	}
@@ -7345,7 +7811,7 @@
 
 		const tab = element('button', 'modloader-panel-tab')
 		tab.type = 'button'
-		tab.title = t('showFromEdge')
+		setPanelTooltipText(tab, t('showFromEdge'))
 		tab.setAttribute('aria-label', t('showFromEdge'))
 		const tabLogo = element('span', 'modloader-panel-tab-logo')
 		tabLogo.setAttribute('aria-hidden', 'true')
@@ -7362,7 +7828,7 @@
 		const controls = element('div', 'modloader-panel-controls')
 		const settings = element('button', 'modloader-panel-settings')
 		settings.type = 'button'
-		settings.title = t('menuSettings')
+		setPanelTooltipText(settings, t('menuSettings'))
 		settings.setAttribute('aria-label', t('menuSettings'))
 		settings.classList.toggle('active', state.panelSettingsOpen)
 		settings.onclick = function (event) {
@@ -7379,7 +7845,7 @@
 		}
 		const hide = element('button', 'modloader-panel-edge')
 		hide.type = 'button'
-		hide.title = t('hideToEdge')
+		setPanelTooltipText(hide, t('hideToEdge'))
 		hide.setAttribute('aria-label', t('hideToEdge'))
 		hide.disabled = !isPanelAutoHideEnabled()
 		hide.appendChild(element('span', 'modloader-panel-edge-icon', '\u2192|'))
@@ -7391,7 +7857,7 @@
 		}
 		const close = element('button', 'modloader-panel-close')
 		close.type = 'button'
-		close.title = t('close')
+		setPanelTooltipText(close, t('close'))
 		close.setAttribute('aria-label', t('close'))
 		close.onclick = function () {
 			state.panelHidden = false
@@ -7504,6 +7970,12 @@
 			{ value: false, label: t('show') },
 			{ value: true, label: t('hide') }
 		], state.panelSettings.hideModFileDetails, function (value) { state.panelSettings.hideModFileDetails = value })
+		addSettingsRow(t('descriptionDisplayMode'), [
+			{ value: 'hover', label: t('descriptionDisplayHover') },
+			{ value: 'inline', label: t('descriptionDisplayInline') }
+		], getPanelDescriptionDisplayMode(), function (value) {
+			state.panelSettings.descriptionDisplayMode = isValidPanelDescriptionDisplayMode(value) ? value : 'hover'
+		})
 		addSettingsRow(t('configSectionSorting'), [
 			{ value: true, label: t('configSectionSortingOn') },
 			{ value: false, label: t('configSectionSortingOff') }
@@ -7563,6 +8035,7 @@
 			panel.removeEventListener('mouseleave', panelMouseLeave)
 			clearPanelAutoHideTimer()
 		})
+		installPanelTooltips(panel, addCleanup)
 
 		if (state.snapshotPanelOpen) {
 			renderSnapshotPanelPage(panel)
@@ -7630,7 +8103,7 @@
 		const save = element('button', 'modloader-save-button', t('saveReload'))
 		const cancelChanges = element('button', 'modloader-action-button modloader-cancel-button', t('cancel'))
 		cancelChanges.type = 'button'
-		cancelChanges.title = t('cancel')
+		setPanelTooltipText(cancelChanges, t('cancel'))
 		cancelChanges.setAttribute('aria-label', t('cancel'))
 		const insert = createPanelActionButton('plus', t('insert'), t('insert'))
 		const folder = createPanelActionButton('folder', t('folder'), t('folder'))
@@ -8185,7 +8658,7 @@
 			list.classList.toggle('modloader-mod-manager-importing', active)
 			importZone.classList.toggle('active', active)
 			insert.classList.toggle('active', active)
-			insert.title = active ? t('importModeOff') : t('insert')
+			setPanelTooltipText(insert, active ? t('importModeOff') : t('insert'))
 			if (active) {
 				importStatus.textContent = t('importWaiting')
 				importZone.focus()
@@ -8330,6 +8803,7 @@
 			if (!keepMessage) message.textContent = ''
 		}
 
+		const inlineDescriptions = shouldShowPanelDescriptionsInline()
 		let modOrdinal = 0
 		for (const mod of mods) {
 			modOrdinal++
@@ -8351,10 +8825,11 @@
 			const main = element('div', 'modloader-mod-main')
 			const title = element('div', 'modloader-mod-title')
 			title.appendChild(element('span', 'modloader-mod-path', localizedModName))
-			if (localizedModDescription) title.title = localizedModDescription
+			if (localizedModDescription && !inlineDescriptions) setPanelTooltipText(title, localizedModDescription, { kind: 'description' })
 			if (mod.manifest.version) title.appendChild(element('span', 'modloader-mod-version', 'v' + mod.manifest.version))
 			if (localizedModName !== mod.path) title.appendChild(element('span', 'modloader-mod-name', mod.path))
 			main.appendChild(title)
+			if (localizedModDescription && inlineDescriptions) main.appendChild(element('div', 'modloader-mod-description', localizedModDescription))
 
 			const deps = resolveModRefs(mod.manifest.dependencies)
 			const conflicts = resolveModRefs(mod.manifest.conflicts)
@@ -8391,12 +8866,16 @@
 					const localizedConfigLabel = getLocalizedConfigText(mod.manifest, item, 'label', item.key)
 					const localizedConfigDescription = getLocalizedConfigText(mod.manifest, item, 'description', '')
 					const label = element('span', 'modloader-config-label', localizedConfigLabel || item.key)
-					if (localizedConfigDescription) label.title = localizedConfigDescription
 					text.appendChild(label)
-					if (localizedConfigDescription) text.title = localizedConfigDescription
+					if (localizedConfigDescription && inlineDescriptions) text.appendChild(element('span', 'modloader-config-meta modloader-config-description', localizedConfigDescription))
+					if (localizedConfigDescription && !inlineDescriptions) setPanelTooltipText(text, localizedConfigDescription, { kind: 'description' })
 					const controlLabel = isSliderConfigItem(item, type) && !isSliderConfigType(type) ? ' | slider' : ''
 					text.appendChild(element('span', 'modloader-config-meta', item.key + ' | ' + type + controlLabel))
 					const input = createConfigInput(item, value, { addCleanup, mod, item, key: item.key })
+					if (input?.dataset) {
+						input.dataset.modloaderModId = mod.id || ''
+						input.dataset.modloaderConfigKey = item.key || ''
+					}
 					const error = element('span', 'modloader-config-error')
 					const model = {
 						mod,
@@ -8453,7 +8932,7 @@
 							if (canSortConfigSections) {
 								const sectionSort = element('button', 'modloader-config-section-sort')
 								sectionSort.type = 'button'
-								sectionSort.title = t('sortConfigSection')
+								setPanelTooltipText(sectionSort, t('sortConfigSection'))
 								sectionSort.setAttribute('aria-label', t('sortConfigSection'))
 								sectionModel.handle = sectionSort
 								sectionHeader.appendChild(sectionSort)
@@ -8462,7 +8941,7 @@
 						} else if (canSortConfigSections) {
 							const sectionSort = element('button', 'modloader-config-section-sort modloader-config-section-sort-floating')
 							sectionSort.type = 'button'
-							sectionSort.title = t('sortConfigSection')
+							setPanelTooltipText(sectionSort, t('sortConfigSection'))
 							sectionSort.setAttribute('aria-label', t('sortConfigSection'))
 							sectionModel.handle = sectionSort
 							section.appendChild(sectionSort)
@@ -8480,7 +8959,7 @@
 
 			const deleteButton = element('button', 'modloader-mod-delete')
 			deleteButton.type = 'button'
-			deleteButton.title = t('deleteMod')
+			setPanelTooltipText(deleteButton, t('deleteMod'))
 			deleteButton.setAttribute('aria-label', t('deleteMod'))
 			deleteButton.onclick = async function (event) {
 				event.preventDefault()
@@ -8503,7 +8982,7 @@
 			}
 			const sortButton = element('button', 'modloader-mod-sort')
 			sortButton.type = 'button'
-			sortButton.title = t('sortMod')
+			setPanelTooltipText(sortButton, t('sortMod'))
 			sortButton.setAttribute('aria-label', t('sortMod'))
 			const index = element('span', 'modloader-mod-index', String(modOrdinal))
 			const rowActions = element('div', 'modloader-mod-actions')
