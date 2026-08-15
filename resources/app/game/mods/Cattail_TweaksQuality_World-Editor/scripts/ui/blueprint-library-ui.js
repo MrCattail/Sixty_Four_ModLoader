@@ -7,6 +7,7 @@ ModLoader.register({
 		const RUNTIME_KEY = Symbol.for('cattail.world-editor.runtime')
 		const DIALOG_KEY = Symbol.for('cattail.world-editor.dialogs')
 		const I18N_KEY = Symbol.for('cattail.world-editor.i18n')
+		const TRANSACTIONS_KEY = Symbol.for('cattail.world-editor.transactions')
 		const SHELL_ID = 'cattail-world-editor-shell'
 		const CARD_ID = 'cattail-world-editor-blueprint-card'
 		const STYLE_ID = 'cattail-world-editor-blueprint-library-style'
@@ -16,7 +17,7 @@ ModLoader.register({
 			active: 'blueprintLibraryActive', problems: 'blueprintLibraryProblems', trash: 'blueprintLibraryTrash', quarantine: 'blueprintLibraryQuarantine', list: 'blueprintLibraryList', grid: 'blueprintLibraryGrid', details: 'blueprintLibraryDetails',
 			unavailable: 'blueprintLibraryUnavailable', empty: 'blueprintLibraryEmpty', select: 'blueprintLibrarySelect', load: 'blueprintLibraryLoad', rename: 'blueprintLibraryRename', duplicate: 'blueprintLibraryDuplicate', trashAction: 'blueprintLibraryTrashAction', retry: 'blueprintLibraryRetry', quarantineAction: 'blueprintLibraryQuarantineAction', restore: 'blueprintLibraryRestore', remove: 'blueprintLibraryRemove',
 			confirmTrash: 'blueprintLibraryConfirmTrash', confirmRemove: 'blueprintLibraryConfirmRemove', confirmReplace: 'blueprintLibraryConfirmReplace', saveTitle: 'blueprintLibrarySaveTitle', renameTitle: 'blueprintLibraryRenameTitle', trashTitle: 'blueprintLibraryTrashTitle', removeTitle: 'blueprintLibraryRemoveTitle', replaceTitle: 'blueprintLibraryReplaceTitle', errorTitle: 'blueprintLibraryErrorTitle', nameMessage: 'blueprintLibraryNameMessage', nameLabel: 'blueprintLibraryNameLabel', saveConfirm: 'blueprintLibrarySaveConfirm', renameConfirm: 'blueprintLibraryRenameConfirm', replaceConfirm: 'blueprintLibraryReplaceConfirm', cancel: 'blueprintLibraryCancel', dialogUnavailable: 'blueprintLibraryDialogUnavailable', blueprint: 'blueprintLibraryBlueprint',
-			exportFile: 'blueprintLibraryExportFile', copyShareText: 'blueprintLibraryCopyShareText', importTitle: 'blueprintLibraryImportTitle', chooseFile: 'blueprintLibraryChooseFile', pasteShareText: 'blueprintLibraryPasteShareText', importFileTitle: 'blueprintLibraryImportFileTitle', exportFileTitle: 'blueprintLibraryExportFileTitle', conflictTitle: 'blueprintLibraryConflictTitle', conflictMessage: 'blueprintLibraryConflictMessage', sourceHeading: 'blueprintLibrarySourceHeading', existingHeading: 'blueprintLibraryExistingHeading', mode: 'blueprintLibraryMode', dimensions: 'blueprintLibraryDimensions', modified: 'blueprintLibraryModified', bytes: 'blueprintLibraryBytes', importAsCopy: 'blueprintLibraryImportAsCopy', importReplace: 'blueprintLibraryImportReplace', importSuccess: 'blueprintLibraryImportSuccess', replaceSuccess: 'blueprintLibraryReplaceSuccess', exportSuccess: 'blueprintLibraryExportSuccess', shareSuccess: 'blueprintLibraryShareSuccess', clipboardReadFailed: 'blueprintLibraryClipboardReadFailed', clipboardWriteFailed: 'blueprintLibraryClipboardWriteFailed', statusDismiss: 'blueprintLibraryStatusDismiss'
+			exportFile: 'blueprintLibraryExportFile', copyShareText: 'blueprintLibraryCopyShareText', importTitle: 'blueprintLibraryImportTitle', chooseFile: 'blueprintLibraryChooseFile', pasteShareText: 'blueprintLibraryPasteShareText', importFileTitle: 'blueprintLibraryImportFileTitle', exportFileTitle: 'blueprintLibraryExportFileTitle', conflictTitle: 'blueprintLibraryConflictTitle', conflictMessage: 'blueprintLibraryConflictMessage', sourceHeading: 'blueprintLibrarySourceHeading', existingHeading: 'blueprintLibraryExistingHeading', mode: 'blueprintLibraryMode', dimensions: 'blueprintLibraryDimensions', modified: 'blueprintLibraryModified', bytes: 'blueprintLibraryBytes', paintedCount: 'blueprintPaintedCount', paintedCompatibility: 'blueprintPaintedCompatibility', importAsCopy: 'blueprintLibraryImportAsCopy', importReplace: 'blueprintLibraryImportReplace', importSuccess: 'blueprintLibraryImportSuccess', replaceSuccess: 'blueprintLibraryReplaceSuccess', exportSuccess: 'blueprintLibraryExportSuccess', shareSuccess: 'blueprintLibraryShareSuccess', clipboardReadFailed: 'blueprintLibraryClipboardReadFailed', clipboardWriteFailed: 'blueprintLibraryClipboardWriteFailed', statusDismiss: 'blueprintLibraryStatusDismiss'
 		})
 		const SCROLLBAR_VISIBLE_CLASS = 'cattail-world-editor-library__scrollbar-visible'
 		const MODAL_DESIGN_SIZE = Object.freeze({ width: 1280, height: 792, gutter: 32 })
@@ -80,6 +81,7 @@ ModLoader.register({
 		let stopLibrary = null
 		let stopRuntime = null
 		let stopSession = null
+		let stopTransactions = null
 		const surfaceScroll = { page: null, modal: null }
 
 		installStyle()
@@ -133,6 +135,11 @@ ModLoader.register({
 				if (api.ui?.pages?.isActive?.(PAGE_ID)) api.ui.pages.refresh(PAGE_ID)
 			})
 			stopSession = session.subscribe(function () { refreshSaveButtons() })
+			stopTransactions = globalThis[TRANSACTIONS_KEY]?.subscribe?.(function () {
+				refreshSaveButtons()
+				if (modal) renderModalBody()
+				if (api.ui?.pages?.isActive?.(PAGE_ID)) api.ui.pages.refresh(PAGE_ID)
+			})
 			stopRuntime = globalThis[RUNTIME_KEY]?.subscribe?.(function (state) {
 				const toolbarHidden = !state.active
 				const toolbarVisibilityChanged = !!(
@@ -219,7 +226,7 @@ ModLoader.register({
 
 		function refreshSaveButtons() {
 			const libraryState = controller?.snapshot?.()
-			const disabled = !session?.snapshot?.().sourceBlueprint || !libraryState?.ready || libraryState.busy
+			const disabled = !session?.snapshot?.().sourceBlueprint || !libraryState?.ready || libraryState.busy || !!libraryState.writeBlockedReason
 			for (const button of [toolbarSaveButton, cardSaveButton]) {
 				if (!button) continue
 				button.disabled = !!disabled
@@ -367,6 +374,7 @@ ModLoader.register({
 		function renderView(surface, refreshSurface) {
 			stopSurfaceScroll(surface)
 			const state = controller?.snapshot?.()
+			const writesBlocked = !!state?.writeBlockedReason
 			const root = document.createElement('div')
 			root.className = 'cattail-world-editor-library'
 			root.dataset.surface = surface
@@ -377,8 +385,8 @@ ModLoader.register({
 			const primaryActions = document.createElement('div')
 			primaryActions.className = 'cattail-world-editor-library__toolbar-group cattail-world-editor-library__toolbar-group--actions'
 			appendSeparated(primaryActions, [
-				actionButton(label(game, 'save'), function () { void saveCurrentInteractive().catch(showError) }, !session?.snapshot?.().sourceBlueprint || !state?.ready || state.busy),
-				actionButton(label(game, 'import'), function () { void importInteractive().catch(showError) }, !state?.ready || state.busy),
+				actionButton(label(game, 'save'), function () { void saveCurrentInteractive().catch(showError) }, !session?.snapshot?.().sourceBlueprint || !state?.ready || state.busy || writesBlocked),
+				actionButton(label(game, 'import'), function () { void importInteractive().catch(showError) }, !state?.ready || state.busy || writesBlocked),
 				actionButton(label(game, 'refresh'), function () { void controller.refresh('ui-refresh').catch(showError) }),
 				actionButton(label(game, 'folder'), function () { void controller.openFolder({ area: model.area === 'problems' ? 'active' : model.area }).catch(showError) })
 			])
@@ -430,7 +438,7 @@ ModLoader.register({
 			const layoutRule = document.createElement('div')
 			layoutRule.className = 'cattail-world-editor-library__layout-rule'
 			layoutRule.setAttribute('aria-hidden', 'true')
-			const detailsPanel = renderDetails(selected, refreshSurface)
+			const detailsPanel = renderDetails(selected, refreshSurface, writesBlocked)
 			layout.append(collection, layoutRule, detailsPanel)
 			root.append(layout)
 			installSurfaceScroll(surface, [collection, detailsPanel])
@@ -493,13 +501,19 @@ ModLoader.register({
 				detail.textContent = entryDetailText(entry.metadata)
 				text.append(detail)
 			}
+			if (Number(entry.metadata?.paintedCubeCount) > 0) {
+				const badge = document.createElement('small')
+				badge.className = 'cattail-world-editor-library__painted-badge'
+				badge.textContent = label(game, 'paintedCompatibility')
+				text.append(badge)
+			}
 			item.append(image, text)
 			item.addEventListener('click', function () { model.selected = entryKey(entry); refreshSurface() })
 			item.addEventListener('dblclick', function () { if (entry.area === 'active' && !entry.error) void loadInteractive(entry).catch(showError) })
 			return item
 		}
 
-		function renderDetails(entry, refreshSurface) {
+		function renderDetails(entry, refreshSurface, writesBlocked) {
 			const panel = document.createElement('aside')
 			panel.className = 'cattail-world-editor-library__details'
 			if (!entry) {
@@ -516,9 +530,9 @@ ModLoader.register({
 			if (entry.area === 'active' && !entry.error) {
 				appendSeparated(actions, [
 					actionButton(label(game, 'load'), function () { void loadInteractive(entry).catch(showError) }),
-					actionButton(label(game, 'rename'), function () { void renameInteractive(entry).catch(showError) }),
-					actionButton(label(game, 'duplicate'), function () { void controller.duplicate(entry).catch(showError) }),
-					actionButton(label(game, 'trashAction'), function () { void trashInteractive(entry).catch(showError) }),
+					actionButton(label(game, 'rename'), function () { void renameInteractive(entry).catch(showError) }, writesBlocked),
+					actionButton(label(game, 'duplicate'), function () { void controller.duplicate(entry).catch(showError) }, writesBlocked),
+					actionButton(label(game, 'trashAction'), function () { void trashInteractive(entry).catch(showError) }, writesBlocked),
 					actionButton(label(game, 'exportFile'), function () { void exportInteractive(entry).catch(showError) }),
 					actionButton(label(game, 'copyShareText'), function () { void copyShareInteractive(entry).catch(showError) })
 				])
@@ -526,15 +540,15 @@ ModLoader.register({
 				appendSeparated(actions, [
 					actionButton(label(game, 'retry'), function () { void controller.retry(entry).catch(showError) }),
 					actionButton(label(game, 'quarantineAction'), function () { void controller.quarantine(entry).catch(showError) }),
-					actionButton(label(game, 'trashAction'), function () { void trashInteractive(entry).catch(showError) })
+					actionButton(label(game, 'trashAction'), function () { void trashInteractive(entry).catch(showError) }, writesBlocked)
 				])
 			} else if (entry.area === 'trash') {
 				appendSeparated(actions, [
-					actionButton(label(game, 'restore'), function () { void controller.restore(entry).catch(showError) }),
-					actionButton(label(game, 'remove'), function () { void removeInteractive(entry).catch(showError) })
+					actionButton(label(game, 'restore'), function () { void controller.restore(entry).catch(showError) }, writesBlocked),
+					actionButton(label(game, 'remove'), function () { void removeInteractive(entry).catch(showError) }, writesBlocked)
 				])
 			} else {
-				appendSeparated(actions, [actionButton(label(game, 'remove'), function () { void removeInteractive(entry).catch(showError) })])
+				appendSeparated(actions, [actionButton(label(game, 'remove'), function () { void removeInteractive(entry).catch(showError) }, writesBlocked)])
 			}
 			panel.append(actions)
 			return panel
@@ -704,12 +718,19 @@ ModLoader.register({
 			const name = document.createElement('strong')
 			name.textContent = envelope?.displayName || ''
 			const details = document.createElement('dl')
-			for (const pair of [
+			const pairs = [
 				[label(game, 'mode'), metadata?.mode || envelope?.blueprint?.mode || '—'],
 				[label(game, 'dimensions'), String(metadata?.width || 0) + '×' + String(metadata?.height || 0)],
 				[label(game, 'modified'), formatTime(envelope?.modifiedAt)],
 				[label(game, 'bytes'), Number.isFinite(Number(bytes)) ? formatBytes(bytes) : '—']
-			]) {
+			]
+			if (Number(metadata?.paintedCubeCount) > 0) {
+				pairs.splice(2, 0, [
+					formatLabel('paintedCount', { count: Number(metadata.paintedCubeCount) || 0 }),
+					label(game, 'paintedCompatibility')
+				])
+			}
+			for (const pair of pairs) {
 				const term = document.createElement('dt')
 				term.textContent = pair[0]
 				const value = document.createElement('dd')
@@ -1038,7 +1059,10 @@ ModLoader.register({
 			if (!metadata) return ''
 			const transform = metadata.defaultTransform || { rotation: 0, mirrorU: false, mirrorV: false }
 			const mirror = (transform.mirrorU ? ' · M-U' : '') + (transform.mirrorV ? ' · M-V' : '')
-			return metadata.width + '×' + metadata.height + ' · ' + metadata.entityCount + ' Buildings · ' + metadata.blockCount + ' Cubes · ' + metadata.surgeCount + ' Surges · Schema ' + metadata.schemaVersion + ' · R' + transform.rotation + '°' + mirror
+			const painted = Number(metadata.paintedCubeCount) > 0
+				? ' · ' + formatLabel('paintedCount', { count: metadata.paintedCubeCount }) + ' · ' + label(game, 'paintedCompatibility')
+				: ''
+			return metadata.width + '×' + metadata.height + ' · ' + metadata.entityCount + ' Buildings · ' + metadata.blockCount + ' Cubes · ' + metadata.surgeCount + ' Surges' + painted + ' · Schema ' + metadata.schemaVersion + ' · R' + transform.rotation + '°' + mirror
 		}
 
 		function detailText(metadata) {
@@ -1049,6 +1073,10 @@ ModLoader.register({
 				'Area: ' + metadata.width + '×' + metadata.height,
 				'Buildings: ' + metadata.entityCount,
 				'Cubes: ' + metadata.blockCount,
+				...(Number(metadata.paintedCubeCount) > 0 ? [
+					formatLabel('paintedCount', { count: metadata.paintedCubeCount }),
+					label(game, 'paintedCompatibility')
+				] : []),
 				'Surges: ' + metadata.surgeCount,
 				'Rotate: ' + transform.rotation + '°',
 				'Mirror: ' + mirror,
@@ -1130,6 +1158,7 @@ ModLoader.register({
 			stopLibrary?.()
 			stopRuntime?.()
 			stopSession?.()
+			stopTransactions?.()
 			toolbarButton?.remove()
 			toolbarButton = null
 			toolbarSaveButton?.remove()
@@ -1642,6 +1671,10 @@ ModLoader.register({
 					font-weight: 600;
 				}
 				.cattail-world-editor-library__item-text small { font-size: 11px; }
+				.cattail-world-editor-library__item-text .cattail-world-editor-library__painted-badge {
+					color: #78f0b3;
+					font-weight: 650;
+				}
 				.cattail-world-editor-library__empty {
 					padding: 28px;
 					font-size: 13px;

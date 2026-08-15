@@ -1,8 +1,8 @@
 # Cattail World Editor
 
-> An in-game World Editor for *Sixty Four* with area selection, safe disassembly, blueprint copying, complete replication, undo/redo, and a local blueprint library.
+> An in-game World Editor for *Sixty Four* with area selection, safe disassembly, palette-based painted-Cube Brush/Bucket/Eraser tools, blueprint copying, complete replication, undo/redo, and a local blueprint library.
 
-Current development version: `0.5.1`. The main feature set is complete, while interface polish and player acceptance testing are still in progress. Keep a recoverable manual save before using the editor on an important world.
+Current development version: `0.6.0`. The main feature set is complete, while interface polish and player acceptance testing are still in progress. Keep a recoverable manual save before using the editor on an important world.
 
 ## What World Editor Can Do
 
@@ -18,13 +18,14 @@ Main features include:
 - Use four preview states to distinguish buildable cells, already-satisfied cells, replaceable conflicts, and protected content.
 - Safely disassemble selected buildings, or Cut a selection into a blueprint before removing eligible content.
 - Undo and redo World Editor placement, disassembly, and cut transactions.
+- Enter Draw Mode to paint or flood-fill Cubes from a configurable ten-resource palette, or erase only Cubes previously painted by World Editor, with one atomic Undo/Redo entry per operation.
 - Save blueprints to an installation-wide library with List/Grid views, thumbnails, Details, Trash, Quarantine, and Problems management.
 - Perform editor economy operations for free in Creative Mode, either in the current save or in a separate creative copy.
 - Follow the current game language with buttons, statuses, messages, and dialogs localized into all 20 original game languages.
 
 ## Installation and Activation
 
-1. Install a compatible Cattail ModLoader. World Editor currently requires ModLoader `0.3.1` or later.
+1. Install a compatible Cattail ModLoader. World Editor currently requires ModLoader `0.4.0` or later.
 2. Place the Mod folder at:
 
    ```text
@@ -57,6 +58,8 @@ A typical blueprint workflow is:
 | Left-click the first and second corners | Create a rectangular selection |
 | `Ctrl` + first click of a new selection | Add a new area to the current multi-selection |
 | Hold or drag inside a selection | Move only the selection boundary, not world buildings |
+| Left-drag in Draw Mode | Paint or erase live while held; mouseup seals the continuous stroke as one Undo/Redo entry |
+| Left-click with Bucket selected | Fill one four-way connected region immediately, using the selection as a boundary when the click begins inside it |
 | Drag one of the 8 selection handles | Resize the primary selection |
 | Wheel over a handle or selection edge | Adjust its size or position one cell at a time |
 | Right-drag | Keep the original map-pan behavior; top UI and cards pass input through when needed |
@@ -98,11 +101,27 @@ The toolbar is divided into functional groups:
 - Blueprint Content: Standard Build, Complete Replica, Include Cubes, Include Surges, Include Cells, and Clear Active Blueprint.
 - Blueprint Library: Generate Blueprint, Save to Library, and Blueprint Library.
 - Transform: rotate clockwise/counterclockwise, mirror on U/V, and reset.
+- Draw: enter Draw Mode; while active, choose Brush, Bucket, or Eraser, select Stable or Grow, or open the painted-Cube Palette in the same toolbar group.
 - Creative Mode: enable, disable, or create a creative copy.
 
-Compact mode uses consistently sized square icon buttons. Large-card mode adds readable localized labels and supports horizontal inertial scrolling when the cards exceed the available width. Standard controls use a rounded pale-gray hover background with the game's original pink icon feedback. Active Include controls, Creative Mode controls, and dangerous confirmations use reflective, translucent glass with a matching colored glow.
+Compact mode uses consistently sized square icon buttons. Large-card mode adds readable localized labels and supports horizontal inertial scrolling when the cards exceed the available width. Standard controls use a rounded pale-gray hover background with the game's original pink icon feedback. Active Include controls, Creative Mode controls, active Draw Mode, and dangerous confirmations use reflective, translucent glass with a matching colored glow.
 
 When a right-drag begins on the game canvas, or an unpinned blueprint is still following the cursor, the status bar and toolbar remain visible but temporarily pass pointer input through to the world. While World Editor is open, the original resource HUD scales down proportionally and stays aligned to the upper-left without being pushed below the two top panels.
+
+### Draw Mode: Brush, Bucket, Eraser, Stable/Grow, and Palette
+
+Draw Mode is available on the Reality plane. Selecting Draw reveals Brush, Bucket, Eraser, Stable, Grow, and Palette beside it in the same toolbar group. The active Draw control uses pink reflective glass and glow in both compact and large-card layouts, while the active Brush/Bucket/Eraser, Stable/Grow, and Palette controls use the shared green underline language. Compact layout uses matching icons; large-card layout places localized labels over the same low-opacity backdrop icons used by the rest of the toolbar. The selected Brush/Bucket/Eraser subtool and Stable/Grow mode are remembered for the current game session; a full restart starts with Brush and Stable.
+
+- Palette opens a panel below the toolbar for all ten original resources, including Void and Reality. Each row uses the standard ModLoader slider with synchronized numeric input for its editable `0–100` relative weight; Palette shows neither a per-row Reset nor a `100%` shortcut, so weights are edited only through that standard control. The normalized percentage and the Cube's read-only resource-slot share are both shown as plain text without a field background or border; Slots use the `n/64` format. Tall resource lists use the ModLoader transient inertial scrollbar. Changes remain a draft until Apply; Cancel, `Esc`, clicking outside, changing subtools or modes, changing planes, or leaving the editor discards the draft. While the panel is open, drawing is blocked.
+- Apply stores the canonical recipe in World Editor's private ModLoader configuration. The recipe is shared across all saves and game restarts in the current installation/profile; it is not embedded as a preference in a save and is not a cross-machine or Steam Cloud setting. Malformed stored data safely falls back to `100%` Charonite.
+- Brush colors its Cube and crosshair from the active palette: faces use weighted blends of the original resource triplets and the outline uses the dominant resource color. Fast straight or diagonal movement fills a continuous deterministic cell path. The recipe is frozen at mousedown; eligible cells are painted live while the left button is held, and mouseup seals up to 512 unique written cells as one atomic transaction and one Undo/Redo entry. A standalone transient Surge is treated as replaceable empty terrain; painting over it captures its latest complete restorable state, and Undo restores it.
+- Bucket performs a four-way connected flood fill from one click and never repeats while dragging. An empty source matches contiguous empty cells and standalone transient Surges; a painted source matches only strict painted Cubes with the same canonical recipe and Stable/Grow type, ignoring Grow phase, progress, and duration while finding the source region. Buildings, ordinary Cubes, other recipes, malformed/future markers, and other objects are barriers. A Surge may seed an empty-region fill, is replaced by the painted Cube, and is restored by Undo. When the click begins inside any committed selection on the Reality plane, the union of those selections is both the search boundary and output mask; disconnected selection islands are not jumped. Outside a selection, the world region must be physically enclosed. Reaching a 4097th matching cell rejects the entire operation with no writes. Planning and writes yield in chunks, while one successful fill still creates exactly one physical Snapshot, one transaction, and one Undo/Redo entry.
+- Stable creates an immediately stable 64-slot Cube with the strict `worldEditorPaint` v2 marker. Grow creates a strict v3 Cube at the original Cube's empty `state 0`, continuously fills it, uses the original final reveal, and finishes as a stable no-reward v3 painted Cube. Grow is autonomous World Editor timing: it has no Pump, does not change Pump depth or statistics, and produces no resource reward. Its total duration is the native ModLoader **Grow Duration** slider (`1–20` seconds, `4` by default, `0.5`-second steps); each stroke freezes the value it started with.
+- Slot counts use largest-remainder allocation, always total exactly 64, and break equal remainders by resource ID. Slot order is deterministic from the cell and canonical recipe, so the same cell and recipe reproduce the same resources while different cells vary. Strict v1 Charonite and v2 Stable painted Cubes remain recognized; strict v1/v2/v3 painted Cubes may be replaced, and Undo restores the exact recorded durable state. Grow progress is a logical transaction identity: Undo can remove it at any stage, Redo restarts that Grow from zero, and saved progress resumes without advancing for offline time. Ordinary Cubes, buildings, malformed markers, and unknown future marker versions are protected and skipped.
+- Eraser displays an orange removal trail and removes only strict World Editor-painted Cubes live while the left button is held, including partially damaged ones. Mouseup seals the whole erasure as one Undo/Redo entry. It does not remove ordinary Cubes or Surges and never refunds or releases their resources.
+- Revisited cells count only once. Opening Palette, leaving the canvas, switching modes or planes, right-clicking, pressing `Esc`, or losing window focus cancels the live stroke and rolls back the cells it already wrote. Bucket planning is cancelled by `Esc`, a subtool/mode/plane change, opening Palette, or changing its frozen recipe; after its transaction starts, use Undo instead.
+- Painted Cubes are normal original-game `cube` entities saved in the normal game save. Their no-reward behavior and autonomous Grow progress require World Editor to remain loaded. An unfinished Grow opened without the Mod is an original Pump-less `state 0` Cube and can shrink away; opening and resaving stable painted Cubes without the Mod may treat them as ordinary Cubes and remove the unknown marker.
+- Render-side painted Cube diagnostics are opt-in and silent. In DevTools, run `CattailWorldEditorPaintCubeRenderDiagnostics.start({ frames: 300 })`, draw or pan the same scene, then read `CattailWorldEditorPaintCubeRenderDiagnostics.report()`. The report includes frame timing, `renderEntities` timing split into Cube render, visibility checks, and residual work, painted/ordinary `Cube.render`, painted/ordinary `drawResources`, `isVisible` counts, painted Cube counts, Tweaks cube-resource-cache stats when available, and dynamic-camera state when available.
 
 ## Selections
 
@@ -115,6 +134,7 @@ When a right-drag begins on the game canvas, or an unpinned blueprint is still f
 - Drag the four corner handles or four edge-center handles to resize the primary selection. Handles may cross the opposite side while the start/end identities remain stable.
 - Use the wheel over a handle or selection edge to adjust the area one cell at a time. The change commits after settling; press `Esc` to cancel and restore the previous boundary.
 - Clear All Selections removes every selection. `Backspace` removes only the primary selection and promotes the most recently active remaining selection.
+- Creative Mode Disassemble Selection automatically includes eligible ordinary Stable Cubes together with safe buildings and strict World Editor-painted Cubes. The confirmation lists building, ordinary Cube, and painted Cube counts separately. Ordinary Cubes remain protected in normal mode; active `state 0/1` Cubes, terminating Cubes, malformed markers, and unknown future markers remain protected in every mode.
 
 ### Selection Card
 
@@ -150,7 +170,7 @@ Cut uses the same complete-source capture, then safely disassembles eligible con
 
 ### Include Toggles
 
-- Include Cubes: adds stable Cubes with `state === 2`. Growing, transitional, exploding, or Pump-connected active Cubes are not copied.
+- Include Cubes: adds ordinary stable Cubes plus strict World Editor-painted Cubes. A Complete Replica containing painted Cubes uses blueprint schema 7; v1/v2 Stable state is preserved, stable v3 stays stable, and an in-progress v3 Grow restarts from zero with a fresh placement lineage. Pump-connected or non-painted active Cubes are not copied.
 - Include Surges: adds safe independent Surges stored in the blueprint.
 - Include Cells: synchronizes verified empty cells recorded by the blueprint. Safely removable buildings in those destinations enter the disassembly preview, while protected objects are never forcibly cleared.
 
@@ -171,7 +191,7 @@ Before placement, World Editor rescans the target, resources, prices, save ident
 
 ### Rotation, Mirroring, and Clearing
 
-A blueprint can rotate clockwise or counterclockwise, mirror on the U or V axis, or return to its default transform. Transformations apply to buildings, complete footprints, stable Cubes, Surges, the empty-cell mask, and selection bounds.
+A blueprint can rotate clockwise or counterclockwise, mirror on the U or V axis, or return to its default transform. Transformations apply to buildings, complete footprints, ordinary and painted Cubes, Surges, the empty-cell mask, and selection bounds. Painted Cube resources, recipe, generated seed, duration, and marker version remain exact while only position changes.
 
 Clear Active Blueprint removes the current blueprint source, preview, transform, card result, and temporary Include state. It does not clear committed selections or exit World Editor. Pressing `Esc` by itself may leave the internal blueprint available after closing its live preview; Clear Active Blueprint can then remove the session blueprint completely.
 
@@ -202,8 +222,8 @@ Open it from either:
 Blueprint Library provides:
 
 - List and Grid views with independent Show Details preferences.
-- Building thumbnails, spatial Cube/Surge markers, and building-count summaries.
-- A fixed right-side Details panel listing Area, Buildings, Cubes, Surges, Rotate, Mirror, and Schema.
+- Building thumbnails, depth-sorted adaptive three-face Cube miniatures, spatial Surge markers, and building-count summaries. Ordinary Cubes use a stable blue palette; painted Cubes use the original triplet of the resource that occupies the most saved slots.
+- A fixed right-side Details panel listing Area, Buildings, Cubes, Painted Cubes, Surges, Rotate, Mirror, and Schema. Schema 7 entries show an explicit Painted Cubes compatibility badge.
 - Save Current Blueprint, load, rename, duplicate, move to Trash, restore, and delete permanently.
 - Active, Problems, Trash, and Quarantine sections.
 - Corrupt-file quarantine, Problems retry, manual refresh, and Open Blueprint Folder.
@@ -290,7 +310,8 @@ scripts/
     tool-state.js        # 2G：单一选择工具状态和生命周期
     selection-analysis.js # 3F：可取消的分批只读统计与已完成实体只读视图
     production-state.js  # 3F：Dynamic Details 软依赖、选区实际产量刷新与蓝图生产快照
-    blueprint-state.js   # 5A：schema 6、状态白名单、Surge 安全归一化、结构投影与旧 schema 兼容
+    blueprint-painted.js # 5C-7：schema 7 paintedCubes 严格验证、逻辑比较、变换与 lineage 重映射
+    blueprint-state.js   # 5A/5C-7：schema 6/7、状态白名单、Surge/painted 安全归一化、结构投影与旧 schema 兼容
     blueprint-library-format.js # 5B：稳定 UUID 文件信封、.64schem 双读单写、名称与元数据合同
     blueprint-library.js # 5B：Library API CRUD、导入/导出/分享、revision、回收站、隔离、Watcher 与 Problems 控制器
     blueprint-transform.js # 5A：固定枢轴、有序旋转/镜像、完整源/结构投影、Cube/Surge 与空地掩码变换
@@ -316,7 +337,7 @@ scripts/
     selection-cut-ui.js  # 5A：完整源剪切确认与创造模式临时层选项
     selection-card.js    # 3F：主选区实时统计、右左下上定位、3 秒临时显示和点击锁定
     production-cards.js  # 3F：主卡总产量、选区/蓝图建筑明细副卡与自适应双列
-  blueprint-session.js   # 5A：schema 6 完整源捕获、执行投影、剪贴板、工具栏层开关/退出预览与蓝图卡片
+  blueprint-session.js   # 5A/5C-7：schema 6/7 完整源捕获、执行投影、剪贴板、工具栏层开关/退出预览与蓝图卡片
   blueprint-preview.js   # 5A：结构/完整状态预览、Cube/Surge、空地/拆除/保护叠层与只读渲染
 ```
 
@@ -677,8 +698,8 @@ globalThis[Symbol.for('cattail.better-uis.save-slots')]?.snapshot()
 
 - 创造模式下，原版商店的普通建造、升级、橡皮擦删除和搬迁均不消耗资源；升级与删除也不发放退款。普通模式继续使用原版同步结算。
 - 免费经济只存在于一次已经完成写前快照和目标重验的商店事务中。机器运行、资源补充、生产、Cube 操作、自动世界事件和其他非商店价格消费者保持原样。
-- 每次有效世界写入先用 `game.assembleSave(true)` 创建一份物理安全快照，再重验格子、实体、平面、创造状态、运行时和存档身份。快照失败或目标变化时不会执行世界写入。
-- 快照等待期间只阻止新的商店/编辑器写入；相机和非写入菜单仍可使用。快速重复输入不会排队，也不会创建第二份快照。
+- 每次有效世界写入先用 `game.assembleSave(true)` 创建一份物理安全快照，再重验点击时冻结的格子、实体、平面、创造状态、运行时和存档身份。快照等待期间可以把鼠标移到其他格；原版动作会临时在冻结格执行，完成后恢复并刷新当前鼠标悬停。冻结格真的变为占用、原目标实体被替换、手持工具变化或其他安全条件失效时仍不会执行世界写入。
+- 快照等待期间只阻止新的商店/编辑器写入；相机、鼠标移动和非写入菜单仍可使用。快速重复输入不会排队，也不会创建第二份快照；方案只保证已经接受的第一笔不会因鼠标移向下一格而被误取消。
 - 鼠标、游戏手柄、桌面触控和移动端独立触屏路径共用同一事务协调器；搬迁仍调用当前完整 `processClick()` 补丁链，以兼容 Gradient 搬迁修复。
 - 解锁、唯一建筑、不可破坏实体、Cube、平面、最后一个 Pump/Gradient 和搬迁类型等原版限制继续生效。
 - World Editor 配置 `创造模式购买花费显示` 默认关闭并支持 hot 预览：
@@ -902,6 +923,34 @@ globalThis[Symbol.for('cattail.world-editor.transactions')].snapshot()
 - active Details 提供“导出文件”和“复制分享文本”。两者始终序列化为完整 Library schema v2 envelope；旧 v1 resident 通过 Library API 的可选导出 payload 生成规范 v2 外部文件，但不会写回、改名、改变 revision 或产生 trash。游戏内原有裸蓝图复制/粘贴语义保持不变。文件对话框取消和冲突取消保持静默；导入成功会选中并滚动到新条目，替换保持目标选中；成功通过短暂 `aria-live` 状态提示，错误保留到玩家关闭或下一次操作。
 - 蓝图库新增文本键由全部 20 种原版语言表拥有；简体中文、Mod 简体中文和繁体中文使用中文文本，其余语言当前使用英文 fallback。自动完整性测试不等同于逐语言真实游戏验收。
 
+## 5C-7 schema 7 绘制矿方体蓝图
+
+- 只有至少包含一个严格 v1/v2/v3 `worldEditorPaint` 记录的完整蓝图升级为 `schemaVersion: 7`；不含绘制矿方体的完整蓝图继续保持 schema 6，结构投影继续保持 schema 4。
+- schema 7 使用独立 `paintedCubes` 层。绘制矿方体不重复写入普通 `blocks`，普通持久状态白名单也不加入 `worldEditorPaint`。任一未来版本、损坏字段、重复位置，或与 `blocks` / `surges` / `emptyCells` 重叠的记录都会拒绝整份蓝图，不会丢弃记录或降级成普通有奖励 Cube。
+- Library 文件继续使用 schema 2 信封和 `.64schem` 后缀，并继续受 16 MiB 单文件上限保护；schema 7 不增加绘制数量或总记录数量的隐藏上限，也不会批量迁移现有 schema 6 文件。旧版 World Editor 会明确拒绝 schema 7，而不是静默丢失无奖励语义。
+- 旋转与镜像只改变位置，64 槽资源顺序、recipe、generated seed、duration 和 marker 版本完整往返。一次原子放置内，相同来源 v3 lineage 映射到同一个新 lineage；再次放置会生成另一组 lineage。稳定 v3 保持稳定，growing/revealing v3 从零重新成长。
+- 绘制矿方体与建筑、普通 Cube、Surge 和空格同步共享一次 preflight、Snapshot、事务、回滚和 Undo/Redo。逻辑内容相同的目标显示为已满足；不同绘制/普通 Cube 可按既有红色冲突确认替换；建筑、不可破坏对象和其他不安全目标继续阻断。
+- 蓝图库列表/详情、导入摘要、捕获状态和放置确认会显示绘制矿方体数量与 schema 7 兼容标识。产品版本继续为 `0.6.0`；自动门禁不替代真实游戏中的捕获、往返、冲突、Undo/Redo、重复放置和大蓝图性能验收。
+- 蓝图库透明缩略图把普通与绘制 Cube 按投影深度合并排序并绘制为三面等轴立方体。普通 Cube 使用稳定蓝色，绘制 Cube 按记录内 64 个 `state.resources` 槽位的实际出现次数选择主资源（并列取较小 resource ID），按原版 `triplet[1]/[0]/[2]` 分别绘制顶/左/右面；缺失 triplet 时才回退绿色。立方体尺寸随变换后 U/V 投影网格间距缩放，完整绘制全部 Cube，不抽样或聚类。
+
+## 5C-8 安全、生命周期与大蓝图硬化
+
+- 外部 Library schema v1/v2 信封与蓝图 schema 1–7 在递归复制前执行非递归结构预检：文件根为深度 0，最大对象/数组深度为 32；任何层级的自有键 `__proto__`、`prototype` 或 `constructor` 都按 `CORRUPT` 拒绝。未来 Library 版本仍为 `INCOMPATIBLE`，导入大小仍由既有 16 MiB 上限返回 `TOO_LARGE`；不增加 painted 或总记录数量上限。
+- schema 1–7 的锚点、选择范围、content bounds、建筑 footprint、普通 Cube、Surge、painted Cube、空格与中性格坐标都必须是安全整数。中心、宽高、span、旋转、镜像和目标偏移涉及的加减乘结果也必须保持安全整数；任一直接或派生溢出会拒绝整份文件或整个操作，不钳制、不丢弃单条记录。无效导入在任何 Library 写入前结束；已有无效 active/trash 文件只显示在 Problems，不自动改写、移动或删除，手动 Quarantine 仍由玩家决定。
+- `Cube.onmousedown` 的绘制矿方体无奖励补丁与 `Game.switchPlane` 的笔画取消补丁保存各自的卸载函数；模块替换会先卸载旧补丁，旧 wrapper 通过 disposed guard 回到原版，避免热重载叠加。笔画和缩略图异步工作使用代际令牌；旧代际可以让已经开始的事务完成或回滚，但不能再发布状态、覆盖 `lastResult`、写缩略图缓存或影响新实例。
+- 事务引擎既有 `ROLLBACK_FAILED` 终态升级为统一写锁。锁定后拒绝世界变更、Undo/Redo、Brush/Bucket/Eraser、蓝图放置、选择删除/剪切/拆解、创造模式免费建造/删除/升级，以及 Library 保存/替换/导入/重命名/复制/回收/恢复/永久删除；仍允许退出和移动视角、浏览/加载预览、复制分享文本、导出现有文件与手动隔离问题文件。只有完整游戏/Mod runtime 重建会清除该锁。
+- 合法 Grow 绘制矿方体在保存捕获抛错或意外返回空值时，本次序列化会以稳定代码 `PAINT_GROW_SAVE_FAILED` 中止，并显示含格子坐标的 20 语言持久错误；它不会触发回滚写锁，修复异常后可在下一次保存重试。损坏或未来 marker 继续沿用原版路径且不会被注入保存。
+- v5 缩略图保持透明背景、颜色、缓存键和既有深度比较规则，继续完整绘制全部 Cube。记录收集、稳定归并排序和 canvas 绘制按约 8 ms 时间片让出主线程，优先使用 `requestAnimationFrame`，不可用时回退 `setTimeout(0)`；同一缓存键只运行一个任务，取消或替换后的旧任务不会写缓存。
+
+## 5C-9 专业绘画软件式油漆桶
+
+- 油漆桶只在 Reality 的 Draw 模式可用，与 Brush/Eraser 同组并按 Brush → Bucket → Eraser 排列。Compact 与大卡片共用本地 SVG 图标；全部按钮、ARIA 与状态提示由 World Editor 私有 20 语言表提供。当前会话记住子工具，完整重启仍默认 Brush；不增加快捷键或桶式擦除。
+- 搜索使用四向连通。独立 `surge` 浪涌按可替换空地处理：它可作为空地区域的起点，也与相邻空格互相连通；严格绘制矿方体仍只连接配方与 Stable/Grow 类型相同的严格绘制矿方体，Grow 的 duration、phase 与 progress 不参与来源匹配。建筑、原版 Cube、其他配方、损坏/未来 marker 与其他对象都是边界。
+- 点击任一当前位面已提交选区内时，全部选区并集同时作为搜索边界与输出 mask，选区边缘直接封闭区域；多个不连通选区不会跨空白跳转。没有选区或点击选区外时搜索真实世界连通区域，并要求区域物理封闭。找到第 4097 个来源格即整次零写入拒绝，不会只填前 4096 格。
+- 目标冻结当前 Palette、Stable/Grow 与 Grow Duration。Stable 同配方不重建；Grow 同配方、类型与 duration 不重启，duration 不同才替换并从 0 重新 Grow。规划、Snapshot 前后重检与实际写入均分片让出主线程；来源、目标、配置、位面或选区 revision 改变时写入前拒绝。
+- `paint-cube-fill.js` 只读规划区域，不拥有世界写入权。所有创建/替换继续由 `paint-cube-stroke.js` 完成，因此一次成功填充只有一个物理 Snapshot、一个 transaction 和一条 Undo/Redo 历史。Brush 上限继续是 512；4096 只属于 Bucket。产品版本、玩家存档 marker、蓝图 schema、ModLoader API、active translations 与 Steam Cloud 行为均不改变。
+- Brush/Bucket 覆盖独立浪涌时沿用蓝图放置的 transient Surge 恢复合同：事务在实际清除前捕获完整最新状态，Undo 恢复该浪涌，Redo 再次覆盖并重取状态。会话内实体身份 guard 允许同一浪涌的 life 等运行时字段推进，但原浪涌消失、换成另一浪涌或其他实体时仍在 Snapshot 重检阶段拒绝。Eraser 不删除浪涌，附着关系与其他受保护对象也不适用该例外。
+
 开发者控制台可检查：
 
 ```js
@@ -919,9 +968,21 @@ node tests/verify-5a-data.js
 node tests/verify-5a-library.js
 node tests/verify-5a-ui.js
 node tests/verify-5b-import-export.js
+node tests/verify-5c-blueprint-painted-format.js
+node tests/verify-5c-blueprint-painted-placement.js
+node tests/verify-5c-hardening.js
+node tests/verify-5c-paint-bucket.js
 ```
 
 自动门禁不能替代真实游戏验收。游戏内应分别验证：schema 6 捕获、普通模式结构投影、创造模式 Cube/Surge 放置和剪切撤销；跨存档手动保存/加载、无阻拦覆盖、revision、回收站/隔离与外部 Watcher；Pages 菜单、顶部工具栏与蓝图卡片保存入口、列表/网格详情偏好、缩略图及代表性语言显示。5A 不修改原版、ModLoader、Better UIs、其他 Mod、`enabled.json`、归档回归工具或玩家现有蓝图，也不授权暂存、提交、打包、推送或发布。
+
+## 5C 选区拆解与剪切兼容
+
+- “拆解选区”在普通与创造模式都会自动识别并删除严格合法的 v1/v2/v3 绘制矿方体；创造模式还会自动删除符合条件的原版 Stable 矿方体，不增加独立开关。确认窗口分别显示建筑、原版 Stable 矿方体和绘制矿方体数量；只有矿方体时继续使用“拆解选区”标题与确认按钮。普通模式中的原版矿方体，以及任意模式下的活动 `state 0/1`、正在终止、损坏 marker 和未来 marker 矿方体保持受保护且不改变。
+- 剪切沿用原有“同时移除 Cube”开关，并让它同时控制普通 Cube 与绘制矿方体；摘要显示总数及普通/绘制明细。开关默认关闭，关闭时 schema 6/7 蓝图仍会先完整复制 Cube 内容，但来源 Cube 会明确保留；Surge 开关继续独立且默认关闭。
+- 绘制矿方体与建筑共用原有 `selection-delete` Snapshot、事务、回滚锁和 Undo/Redo。删除绘制矿方体不会改变资源、火花、奖励、`machinesSold`、only-one 或其他经济状态；混合选区仍处理安全建筑和严格绘制矿方体，其余对象保持受保护。
+- v3 Grow 在计划、确认、物理 Snapshot 与实际删除之间可以按同一 version/recipe/seed/lineage/duration 单调推进 phase 与 elapsed；身份或配方变化仍按目标漂移零写入拒绝。实际删除会捕获当时最新的权威 Grow 状态，Undo 精确恢复该状态；恢复后继续成长再 Redo 时会重新捕获更新状态，因此下一次 Undo 仍恢复最新进度。蓝图放置继续从 0 重新 Grow 并生成新 lineage。
+- 兼容提示由 World Editor 私有 20 语言表提供，不修改 ModLoader 活跃翻译。产品版本保持 `0.6.0`；自动测试不能替代普通/创造模式中的混合拆解、剪切开关、Grow 等待、Undo/Redo 和异常 marker 实机验收。
 
 ## 界面打磨：穿透、资源色玻璃按钮与左上资源 HUD
 
@@ -931,6 +992,6 @@ node tests/verify-5b-import-export.js
 - 紧凑工具栏中的每个可见按钮使用统一的 `30 × 30 CSS px` 外框，普通建造/完整复刻不再使用较宽的 `34px` 特例；同组相邻按钮及蓝图/变换内部控件保留 `4 CSS px` 间隙。普通按钮之间不额外画短线；Generate Blueprint、Save to Library 与 Blueprint Library 位于同一个独立大类，三项内部同样只有 `4px` 间隙而没有短分隔线。该蓝图库组与左侧蓝图内容组、右侧变换组之间使用和其他大类一致的长分隔线；大卡片模式保持相同分组，并同样禁止蓝图库组三项之间的选项短线。大卡片尺寸和滚动物理不受影响。
 - 只在 World Editor active 时，原版 canvas 资源 HUD 保持左到右顺序并动画到左上安全区。左/上安全边距为 20/16 CSS px，整组统一比例按空间自适应并限制为 `.48–.64`。HUD 不测量也不避让顶部状态栏/工具栏，允许与两栏直接重叠且始终保持顶部对齐，不再下移。进入、退出和 resize 使用 180ms ease-out-cubic，从当前视觉状态连续过渡。
 - HUD 仍调用原版 `renderResources()` / `renderDarkResources()`，通过临时 base homes 和统一 canvas transform 同比例绘制图标、数量、hover 名称、速率及图表。活动的 `game.resourceHomes` 始终保存可见坐标，因此资源输送/VFX 端点、`updateMouseData()` 和 `processMousemove2()` 的 hover 命中同步移动并缩放。退出、异常或 Mod cleanup 会恢复原 homes、实例方法和属性描述符；不修改原版 `game.js`，不影响独立 Resource Watcher、ModLoader Pages 或其他 DOM HUD。
-- 蓝图库缩略图缓存现为 v4。透明 PNG 仍绘制建筑图标以及 Cube/Surge 的空间标记，但底部统计文字只显示 `n Buildings`，不再加入 `n Cubes` 或 `n Surges`；v4 缓存键会自然绕过旧 v3 图片，不删除蓝图文件或旧缓存。List/Grid 蓝图文件条目的 Show Details 保留原 `尺寸 · Buildings · Cubes · Surges · Schema · R角度 · M轴` 单行摘要与省略规则；只有右侧固定 Details 面板按 `Area → Buildings → Cubes → Surges → Rotate → Mirror → Schema` 七行竖排，使用 `Area: n×n`、`Rotate: n°` 与 `Mirror: None/U/V/U+V` 格式。
+- 蓝图库缩略图缓存现为 v5。透明 PNG 仍绘制建筑图标与 Surge 空间标记，并把普通/painted Cube 绘制为按深度排序、随 U/V 网格间距自适应的三面立方体；v5 缓存键自然绕过旧 v4 平面菱形图片，不删除蓝图文件或旧缓存。底部统计文字仍只显示 `n Buildings`，不加入 Cube、Painted Cube 或 Surge 数量。List/Grid 条目的 Show Details 保留单行摘要与省略规则；右侧固定 Details 面板继续列出 Area、Buildings、Cubes、Painted Cubes、Surges、Rotate、Mirror 与 Schema。
 - 英语玩家可见 i18n 输出统一使用标题式首字母大写；`a / an / and / as / at / but / by / for / from / in / nor / of / on / or / per / the / to / via / with / yet` 等短连接词在非段首保持小写，变量占位符、全大写缩写、快捷键和 `.64schem` 后缀保持原样。该规则覆盖按钮、卡片、Tooltip、ARIA、状态与对话框；例如 `Clear Active Blueprint`、`Save to Library`。选区拆解工具的完整提示改为 `Disassemble Selected Building`，大卡片短标签改为 `Disassemble Selection`，两项均同步全部 20 种语言；功能、镐子图标与 Delete 快捷键不变。
 - 专项验证入口为 `node tests/verify-ui-polish.js`。自动门禁不能代替实机检查；应覆盖 compact/cards 下普通剪切按钮、现实/虚空、未固定/已固定蓝图、右键拖图、不同窗口尺寸、资源与顶部两栏重叠、资源 hover/图表和退出恢复。本批不读写存档或 Steam Cloud。

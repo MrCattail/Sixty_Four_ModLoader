@@ -98,6 +98,96 @@ function fullBlueprint(entities = [], options = {}) {
 	}
 }
 
+function schemaEightLinkedBlueprint(stabilizerName = 'stabilizer') {
+	return {
+		schemaVersion: 8,
+		mode: 'full',
+		sourcePlane: 0,
+		anchor: { position: [0, 0], selectionIds: [1] },
+		selections: [{ id: 1, primary: true, min: [0, 0], max: [1, 0], width: 2, height: 1 }],
+		emptyCells: [],
+		contentBounds: { min: [0, 0], max: [1, 0], width: 2, height: 1 },
+		includeBlocks: true,
+		entities: [record(stabilizerName, [0, 0], {}, {
+			id: 1,
+			onlyOne: stabilizerName === 'stabilizer3'
+		})],
+		blocks: [],
+		paintedCubes: [],
+		surges: [{
+			kind: 'surge',
+			name: 'surge',
+			position: [1, 0],
+			stabilizer: { position: [0, 0] },
+			state: {
+				resources: [0, 10],
+				grade: 1,
+				type: 1,
+				rayNumber: 4,
+				colors: ['#ffffff'],
+				maxLife: 100,
+				life: 90
+			}
+		}],
+		production: null,
+		summary: { entityCount: 1, surgeCount: 1, paintedCubeCount: 0 }
+	}
+}
+
+function installStabilizerRuntime(game) {
+	const originalAdd = game.addEntity.bind(game)
+	const originalClear = game.clearCell.bind(game)
+	game.addEntity = function (name, position, misc, options) {
+		const entity = originalAdd(name, position, misc, options)
+		if (entity) entity.init = function () { initializeRelation(entity) }
+		return entity
+	}
+	game.clearCell = function (position) {
+		const entity = game.entityAtCoordinates(position)
+		disconnect(entity)
+		return originalClear(position)
+	}
+	game.getEntityString = function (entity) {
+		const par = JSON.parse(JSON.stringify(entity.par || {}))
+		for (const key of Object.keys(entity || {})) {
+			if (['name', 'position', 'entitySpan', 'par', 'init', 'surge', 'stabilizer'].includes(key)) continue
+			if (typeof entity[key] !== 'function') par[key] = JSON.parse(JSON.stringify(entity[key]))
+		}
+		if (entity?.name === 'surge' && entity.stabilizer) {
+			par.stabilizerPosition = entity.stabilizer.position.slice()
+		}
+		return { name: entity.name, position: entity.position.slice(), par }
+	}
+
+	function disconnect(entity) {
+		if (entity?.name === 'surge' && entity.stabilizer) {
+			if (entity.stabilizer.surge === entity) entity.stabilizer.surge = false
+			entity.stabilizer = false
+		}
+		if (['stabilizer', 'stabilizer2', 'stabilizer3'].includes(entity?.name) && entity.surge) {
+			if (entity.surge.stabilizer === entity) entity.surge.stabilizer = false
+			entity.surge = false
+		}
+	}
+
+	function connect(stabilizer, surge) {
+		disconnect(stabilizer)
+		disconnect(surge)
+		stabilizer.surge = surge
+		surge.stabilizer = stabilizer
+		delete surge.stabilizerPosition
+	}
+
+	function initializeRelation(entity) {
+		if (entity?.name === 'surge' && Array.isArray(entity.stabilizerPosition)) {
+			const stabilizer = game.entityAtCoordinates(entity.stabilizerPosition)
+			if (['stabilizer', 'stabilizer2', 'stabilizer3'].includes(stabilizer?.name) && !stabilizer.surge) {
+				connect(stabilizer, entity)
+			}
+		}
+	}
+}
+
 async function plan(runtime, value, target = [0, 0]) {
 	return runtime.planner.build(runtime.game, value, target, {
 		includeBlocks: value?.mode === 'full' && value?.includeBlocks === true,
@@ -337,9 +427,106 @@ async function testFullEmptySyncIgnoresNaturalResourceDrift() {
 	runtime.dispose()
 }
 
+async function testSchemaEightStabilizerLinkPlacementAndHistory() {
+	const game = createGame()
+	installStabilizerRuntime(game)
+	const runtime = loadRuntime({ game, creative: true })
+	const state = runtime.sandbox[STATE_KEY]
+	const source = schemaEightLinkedBlueprint()
+	const normalized = state.normalizeBlueprint(source)
+	assert.ok(normalized)
+	assert.equal(normalized.schemaVersion, 8)
+	assert.deepEqual(JSON.parse(JSON.stringify(normalized.surges[0].stabilizer)), { position: [0, 0] })
+	assert.equal(Object.hasOwn(normalized.surges[0].state, 'stabilizerPosition'), false)
+
+	const invalid = schemaEightLinkedBlueprint()
+	invalid.surges[0].stabilizer.position = [9, 9]
+	assert.equal(state.normalizeBlueprint(invalid), null)
+
+	const preview = await plan(runtime, normalized, [20, 20])
+	assert.equal(preview.schemaVersion, 8)
+	assert.equal(preview.statusCounts.buildable, 2)
+	const surgeRecord = preview.records.find(entry => entry.sourceKind === 'surge')
+	assert.deepEqual(JSON.parse(JSON.stringify(surgeRecord.stabilizerPosition)), [20, 20])
+	const proposal = runtime.placement.analyze(preview).variants['00']
+	const placed = await runtime.placement.place({
+		blueprint: normalized,
+		target: [20, 20],
+		includeSurges: true,
+		confirmedSignature: proposal.signature
+	})
+	assert.equal(placed.executed, true, JSON.stringify(placed))
+	let stabilizer = game.entityAtCoordinates([20, 20])
+	let surge = game.entityAtCoordinates([21, 20])
+	assert.strictEqual(stabilizer.surge, surge)
+	assert.strictEqual(surge.stabilizer, stabilizer)
+	assert.equal((await runtime.placement.undo('keyboard')).executed, true)
+	assert.equal(game.entityAtCoordinates([20, 20]), null)
+	assert.equal(game.entityAtCoordinates([21, 20]), null)
+	assert.equal((await runtime.placement.redo('keyboard')).executed, true)
+	stabilizer = game.entityAtCoordinates([20, 20])
+	surge = game.entityAtCoordinates([21, 20])
+	assert.strictEqual(stabilizer.surge, surge)
+	assert.strictEqual(surge.stabilizer, stabilizer)
+	runtime.dispose()
+
+	const shatteredGame = createGame()
+	shatteredGame.codex.entities.stabilizer3 = {
+		canPurchase: false,
+		price: [64, 1024],
+		priceExponent: 1
+	}
+	installStabilizerRuntime(shatteredGame)
+	const shatteredRuntime = loadRuntime({ game: shatteredGame, creative: true })
+	const shatteredSource = shatteredRuntime.sandbox[STATE_KEY].normalizeBlueprint(
+		schemaEightLinkedBlueprint('stabilizer3')
+	)
+	assert.ok(shatteredSource)
+	assert.equal(shatteredSource.entities[0].restricted.onlyOne, true)
+
+	const existing = shatteredGame.seed('stabilizer3', [2, 2])
+	const blockedPreview = await plan(shatteredRuntime, shatteredSource, [30, 30])
+	const blockedStabilizer = blockedPreview.records.find(entry => entry.name === 'stabilizer3')
+	assert.equal(blockedStabilizer.status, 'blocked')
+	assert.equal(blockedStabilizer.reason, 'only-one')
+	const blockedProposal = shatteredRuntime.placement.analyze(blockedPreview).variants['00']
+	assert.equal(blockedProposal.summary.changeCount, 0)
+
+	shatteredGame.clearCell(existing.position)
+	const shatteredPreview = await plan(shatteredRuntime, shatteredSource, [30, 30])
+	assert.equal(shatteredPreview.statusCounts.buildable, 2)
+	const shatteredProposal = shatteredRuntime.placement.analyze(shatteredPreview).variants['00']
+	const shatteredPlaced = await shatteredRuntime.placement.place({
+		blueprint: shatteredSource,
+		target: [30, 30],
+		includeSurges: true,
+		confirmedSignature: shatteredProposal.signature
+	})
+	assert.equal(shatteredPlaced.executed, true, JSON.stringify(shatteredPlaced))
+	let shattered = shatteredGame.entityAtCoordinates([30, 30])
+	let shatteredSurge = shatteredGame.entityAtCoordinates([31, 30])
+	assert.equal(shattered.name, 'stabilizer3')
+	assert.strictEqual(shattered.surge, shatteredSurge)
+	assert.strictEqual(shatteredSurge.stabilizer, shattered)
+	const shatteredIntruder = shatteredGame.seed('stabilizer3', [40, 40])
+	const blockedUndo = await shatteredRuntime.placement.undo('keyboard')
+	assert.equal(blockedUndo.executed, false)
+	assert.equal(blockedUndo.error.code, 'EXTERNAL_CHANGE')
+	assert.strictEqual(shatteredGame.entityAtCoordinates([30, 30]), shattered)
+	shatteredGame.clearCell(shatteredIntruder.position)
+	assert.equal((await shatteredRuntime.placement.undo('keyboard')).executed, true)
+	assert.equal(shatteredGame.entitiesInGame.stabilizer3, 0)
+	assert.equal((await shatteredRuntime.placement.redo('keyboard')).executed, true)
+	shattered = shatteredGame.entityAtCoordinates([30, 30])
+	shatteredSurge = shatteredGame.entityAtCoordinates([31, 30])
+	assert.strictEqual(shattered.surge, shatteredSurge)
+	assert.strictEqual(shatteredSurge.stabilizer, shattered)
+	shatteredRuntime.dispose()
+}
+
 function testManifestI18nAndStaticContracts() {
 	const manifest = JSON.parse(source('mod.json'))
-	assert.equal(manifest.version, '0.5.1')
+	assert.equal(manifest.version, '0.6.0')
 	assert.equal(
 		manifest.entry.indexOf(STATE_SOURCE),
 		manifest.entry.indexOf('scripts/core/production-state.js') + 1
@@ -369,7 +556,7 @@ function testManifestI18nAndStaticContracts() {
 	vm.runInContext(source(I18N_SOURCE), sandbox, { filename: I18N_SOURCE })
 	definitions[0].init()
 	const i18n = sandbox[I18N_KEY]
-	assert.equal(i18n.version, '0.5.1')
+	assert.equal(i18n.version, '0.6.0')
 	assert.equal(i18n.languages.length, 20)
 	for (const language of i18n.languages) {
 		for (const key of ['previewFullUnavailable', 'blueprintFullSummary', 'blueprintClear']) {
@@ -379,7 +566,7 @@ function testManifestI18nAndStaticContracts() {
 		}
 	}
 	const sessionSource = source(SESSION_SOURCE)
-	assert.match(sessionSource, /const schemaVersion = 6/)
+	assert.match(sessionSource, /const schemaVersion = stabilizerLinkCount \? 8 : paintedRecords\.length \? 7 : 6/)
 	assert.match(sessionSource, /emptyCells:\s*normalizedEmptyCells/)
 	assert.match(sessionSource, /waypointOrder/)
 	assert.match(source(PLACEMENT_SOURCE), /label:\s*plan\.mode === 'full' \? 'Full blueprint placement'/)
@@ -392,6 +579,7 @@ async function run() {
 	await testCreativeGateFullStateCubeWaypointUndoRedo()
 	await testFullReplacementRebaseEmptySyncAndLegacy()
 	await testFullEmptySyncIgnoresNaturalResourceDrift()
+	await testSchemaEightStabilizerLinkPlacementAndHistory()
 	testManifestI18nAndStaticContracts()
 	console.log(
 		'World Editor 4D verification passed: schema 5 normalization, full-state colors, stable Cube, Creative gating, Waypoint order, empty sync, live-state rebasing, undo/redo, legacy schema 3, 20 languages, and manifest scope.'

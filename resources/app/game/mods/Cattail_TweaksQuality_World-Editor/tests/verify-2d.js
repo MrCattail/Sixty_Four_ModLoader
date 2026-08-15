@@ -242,8 +242,8 @@ function testResizeStateAndEndpointIdentity() {
 	const tool = sandbox[TOOL_KEY]
 
 	assert.equal(selection.version, '0.2.6')
-	assert.equal(tool.version, '0.2.6')
-	assert.deepEqual(plain(tool.modes), ['select'])
+	assert.equal(tool.version, '0.6.0')
+	assert.deepEqual(plain(tool.modes), ['select', 'draw'])
 	assert.deepEqual(plain(selection.resizeHandles), [
 		'minU-minV',
 		'midU-minV',
@@ -584,9 +584,9 @@ function testLocalizationManifestAndReadOnlyBoundary() {
 	const api = createApi()
 	for (const definition of definitions) definition.init(api)
 	const i18n = sandbox[I18N_KEY]
-	assert.equal(i18n.version, '0.5.1')
+	assert.equal(i18n.version, '0.6.0')
 	assert.equal(i18n.languages.length, 20)
-	assert.equal(i18n.keys.length, 249)
+	assert.equal(i18n.keys.length, 267)
 	for (const language of i18n.languages) {
 		for (const key of ['toolbarModeResize', 'toolResize', 'cardResizePreview', 'resizeHint']) {
 			assert.notEqual(i18n.t(language, key), key)
@@ -598,7 +598,7 @@ function testLocalizationManifestAndReadOnlyBoundary() {
 	assert.equal(i18n.t('en', 'resizeHint'), 'Release to Resize / Esc Cancel')
 
 	const manifest = JSON.parse(fs.readFileSync(path.join(MOD_ROOT, 'mod.json'), 'utf8'))
-	assert.equal(manifest.version, '0.5.1')
+	assert.equal(manifest.version, '0.6.0')
 	assert.equal(manifest.languageSupport.gameLanguage, true)
 	assert.deepEqual(manifest.entry, [
 		'scripts/core/foundation.js',
@@ -609,6 +609,12 @@ function testLocalizationManifestAndReadOnlyBoundary() {
 		'scripts/core/editor-transactions.js',
 		'scripts/core/selection-state.js',
 		'scripts/core/tool-state.js',
+		'scripts/core/paint-cube-state.js',
+		'scripts/core/blueprint-painted.js',
+		'scripts/core/paint-cube-growth.js',
+		'scripts/core/paint-cube-stroke.js',
+		'scripts/core/paint-cube-fill.js',
+		'scripts/ui/paint-cube-ui.js',
 		'scripts/core/selection-analysis.js',
 		'scripts/core/production-state.js',
 		'scripts/core/blueprint-state.js',
@@ -619,6 +625,7 @@ function testLocalizationManifestAndReadOnlyBoundary() {
 		'scripts/core/selection-delete.js',
 		'scripts/core/input-controller.js',
 		'scripts/render/resize-handles.js',
+		'scripts/input/paint-cube-input.js',
 		'scripts/input/selection-controller.js',
 		'scripts/render/hover-overlay.js',
 		'scripts/render/selected-overlay.js',
@@ -633,6 +640,8 @@ function testLocalizationManifestAndReadOnlyBoundary() {
 		'scripts/ui/selection-cut-ui.js',
 		'scripts/blueprint-preview.js',
 		'scripts/render/selection-cursor.js',
+		'scripts/render/paint-cube-cursor.js',
+		'scripts/render/paint-cube-render-diagnostics.js',
 		'scripts/render/blueprint-thumbnail.js',
 		'scripts/ui/blueprint-library-ui.js',
 		'scripts/ui/selection-card.js',
@@ -645,10 +654,11 @@ function testLocalizationManifestAndReadOnlyBoundary() {
 	const libraryUiSource = fs.readFileSync(path.join(scriptRoot, 'ui', 'blueprint-library-ui.js'), 'utf8')
 	const placementSource = fs.readFileSync(path.join(scriptRoot, 'core', 'blueprint-placement.js'), 'utf8')
 	const selectionDeleteSource = fs.readFileSync(path.join(scriptRoot, 'core', 'selection-delete.js'), 'utf8')
+	const paintStrokeSource = fs.readFileSync(path.join(scriptRoot, 'core', 'paint-cube-stroke.js'), 'utf8')
 	const scriptSources = readScriptSources(scriptRoot)
 	const sources = scriptSources.join('\n')
 	const readOnlySources = scriptSources
-		.filter(source => source !== placementSource && source !== selectionDeleteSource)
+		.filter(source => source !== placementSource && source !== selectionDeleteSource && source !== paintStrokeSource)
 		.join('\n')
 	const stateFreeSources = scriptSources
 		.filter(source => source !== cardOpacitySource && source !== creativeModeSource && source !== libraryUiSource)

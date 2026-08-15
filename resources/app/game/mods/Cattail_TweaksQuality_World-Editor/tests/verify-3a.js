@@ -131,6 +131,9 @@ function createGame() {
 				silo: { canPurchase: true },
 				strange1: { canPurchase: true, onlyone: true },
 				pump: { canPurchase: true },
+				stabilizer: { canPurchase: true },
+				stabilizer3: { canPurchase: false },
+				surge: { canPurchase: false },
 				bad: { canPurchase: true },
 				hollow: { canPurchase: false },
 				modtower: { canPurchase: true }
@@ -550,6 +553,182 @@ async function testFullCaptureCubeRulesAndFailureRetention() {
 	assert.equal(failedClipboard.clipboard, 'failed')
 	assert.notStrictEqual(env.session.snapshot().sourceBlueprint, retainedSource)
 	assert.equal(env.session.snapshot().blueprint.entities[0].name, 'pump')
+
+	const paintedOnly = {
+		schemaVersion: 7,
+		mode: 'full',
+		sourcePlane: 0,
+		anchor: { position: [0, 0], selectionIds: [13] },
+		selections: [],
+		emptyCells: [],
+		contentBounds: { min: [0, 0], max: [0, 0], width: 1, height: 1 },
+		includeBlocks: true,
+		entities: [],
+		blocks: [],
+		paintedCubes: [{ kind: 'painted-cube', name: 'cube', position: [0, 0], state: {} }],
+		surges: [],
+		production: null,
+		summary: { paintedCubeCount: 1 }
+	}
+	env.session.loadSource(paintedOnly, null, 'test-painted-only')
+	assert.equal(env.session.snapshot().lastResult.includeBlocks, true)
+	assert.equal(env.session.snapshot().includeBlocks, false)
+	assert.equal(env.session.setIncludeBlocks(true, 'test-painted-only'), true)
+	assert.equal(env.session.snapshot().includeBlocks, true)
+}
+
+async function testStabilizerSurgeRelationshipCapture() {
+	const state = selectionState([
+		{ id: 21, primary: true, plane: 0, range: range([10, 10], [11, 10]) }
+	], 21)
+	const env = createEnvironment({ selection: state, creative: true })
+	const stabilizer = { name: 'stabilizer', position: [10, 10], entitySpan: 0, par: {} }
+	const surge = {
+		name: 'surge',
+		position: [11, 10],
+		entitySpan: 0,
+		lifeTimer: 90,
+		harvestProgression: 0,
+		par: {
+			resources: [0, 10],
+			grade: 1,
+			type: 1,
+			rayNumber: 4,
+			colors: ['#ffffff'],
+			maxLife: 100,
+			life: 90,
+			stabilizerPosition: [10, 10]
+		}
+	}
+	stabilizer.surge = surge
+	surge.stabilizer = stabilizer
+	env.game.setCell(10, 10, stabilizer)
+	env.game.setCell(11, 10, surge)
+
+	const captured = await env.session.capture('test-stabilizer-surge-link')
+	assert.equal(captured.status, 'captured')
+	const blueprint = env.session.snapshot().sourceBlueprint
+	assert.equal(blueprint.schemaVersion, 8)
+	assert.equal(blueprint.entities.length, 1)
+	assert.equal(blueprint.surges.length, 1)
+	assert.deepEqual(
+		plain(blueprint.surges[0].stabilizer),
+		{ position: plain(blueprint.entities[0].position) }
+	)
+	assert.equal(Object.hasOwn(blueprint.surges[0].state, 'stabilizerPosition'), false)
+
+	const cutCandidate = env.session.prepareCut({
+		schema: 1,
+		signature: 'linked-cut-candidate',
+		source: {
+			kind: 'selection',
+			plane: 0,
+			revision: 1,
+			ranges: [{ id: 21, primary: true, range: range([10, 10], [11, 10]) }]
+		},
+		summary: { sourceCellCount: 2 },
+		removals: [
+			{
+				name: 'stabilizer',
+				position: [10, 10],
+				footprint: { span: 0, minU: 10, maxU: 10, minV: 10, maxV: 10 }
+			},
+			{
+				name: 'surge',
+				position: [11, 10],
+				footprint: { span: 0, minU: 11, maxU: 11, minV: 10, maxV: 10 }
+			}
+		],
+		protectedTargets: []
+	})
+	assert.equal(cutCandidate.blueprint.schemaVersion, 8)
+	assert.deepEqual(
+		plain(cutCandidate.blueprint.surges[0].stabilizer),
+		{ position: plain(cutCandidate.blueprint.entities[0].position) }
+	)
+
+	env.selection.set(selectionState([
+		{ id: 22, primary: true, plane: 0, range: range([10, 10], [10, 10]) }
+	], 22))
+	const oneSided = await env.session.capture('test-stabilizer-only')
+	assert.equal(oneSided.status, 'captured')
+	assert.equal(env.session.snapshot().sourceBlueprint.schemaVersion, 6)
+	assert.equal(env.session.snapshot().sourceBlueprint.entities.length, 1)
+	assert.equal(env.session.snapshot().sourceBlueprint.surges.length, 0)
+	env.runtime.runCleanups()
+
+	const shatteredState = selectionState([
+		{ id: 23, primary: true, plane: 0, range: range([20, 20], [21, 20]) }
+	], 23)
+	const shatteredEnv = createEnvironment({ selection: shatteredState, creative: true })
+	const shattered = { name: 'stabilizer3', position: [20, 20], entitySpan: 0, par: {} }
+	const shatteredSurge = {
+		name: 'surge',
+		position: [21, 20],
+		entitySpan: 0,
+		lifeTimer: 90,
+		harvestProgression: 0,
+		par: {
+			resources: [0, 10],
+			grade: 1,
+			type: 9,
+			rayNumber: 4,
+			colors: ['#ffffff'],
+			maxLife: 100,
+			life: 90,
+			stabilizerPosition: [20, 20]
+		}
+	}
+	shattered.surge = shatteredSurge
+	shatteredSurge.stabilizer = shattered
+	shatteredEnv.game.setCell(20, 20, shattered)
+	shatteredEnv.game.setCell(21, 20, shatteredSurge)
+
+	const shatteredCapture = await shatteredEnv.session.capture('test-shattered-stabilizer-surge-link')
+	assert.equal(shatteredCapture.status, 'captured')
+	const shatteredBlueprint = shatteredEnv.session.snapshot().sourceBlueprint
+	assert.equal(shatteredBlueprint.schemaVersion, 8)
+	assert.equal(shatteredBlueprint.entities.length, 1)
+	assert.equal(shatteredBlueprint.entities[0].name, 'stabilizer3')
+	assert.equal(shatteredBlueprint.entities[0].restricted.onlyOne, true)
+	assert.deepEqual(
+		plain(shatteredBlueprint.surges[0].stabilizer),
+		{ position: plain(shatteredBlueprint.entities[0].position) }
+	)
+	const shatteredCutPlan = {
+		schema: 1,
+		signature: 'shattered-cut-candidate',
+		source: {
+			kind: 'selection',
+			plane: 0,
+			revision: 1,
+			ranges: [{ id: 23, primary: true, range: range([20, 20], [20, 20]) }]
+		},
+		summary: { sourceCellCount: 1, safeCount: 1, creative: true },
+		removals: [{
+			name: 'stabilizer3',
+			position: [20, 20],
+			footprint: { span: 0, minU: 20, maxU: 20, minV: 20, maxV: 20 }
+		}],
+		protectedTargets: []
+	}
+	const shatteredCut = shatteredEnv.session.prepareCut(shatteredCutPlan)
+	assert.deepEqual(plain(shatteredCut.blueprint.entities.map(entry => entry.name)), ['stabilizer3'])
+	assert.equal(shatteredCut.blueprint.entities[0].restricted.onlyOne, true)
+	shatteredEnv.runtime.runCleanups()
+
+	const nonCreativeShattered = createEnvironment({ selection: shatteredState, creative: false })
+	nonCreativeShattered.game.setCell(20, 20, {
+		name: 'stabilizer3',
+		position: [20, 20],
+		entitySpan: 0,
+		par: {}
+	})
+	assert.throws(
+		() => nonCreativeShattered.session.prepareCut(shatteredCutPlan),
+		/unsafe-cut-removal/
+	)
+	nonCreativeShattered.runtime.runCleanups()
 }
 
 async function testChunkCancellationHotkeyAndLifecycle() {
@@ -696,9 +875,9 @@ function testLanguagesManifestUiAndReadOnlyBoundary() {
 	vm.runInContext(fs.readFileSync(i18nFilename, 'utf8'), i18nSandbox, { filename: i18nFilename })
 	i18nDefinitions[0].init()
 	const i18n = i18nSandbox[I18N_KEY]
-	assert.equal(i18n.version, '0.5.1')
+	assert.equal(i18n.version, '0.6.0')
 	assert.equal(i18n.languages.length, 20)
-	assert.equal(i18n.keys.length, 249)
+	assert.equal(i18n.keys.length, 267)
 	const blueprintKeys = [
 		'blueprintModeStructure',
 		'blueprintModeFull',
@@ -730,9 +909,9 @@ function testLanguagesManifestUiAndReadOnlyBoundary() {
 	}
 
 	const manifest = JSON.parse(fs.readFileSync(path.join(MOD_ROOT, 'mod.json'), 'utf8'))
-	assert.equal(manifest.version, '0.5.1')
+	assert.equal(manifest.version, '0.6.0')
 	assert.equal(manifest.languageSupport.gameLanguage, true)
-	assert.equal(manifest.entry.length, 36)
+	assert.equal(manifest.entry.length, 45)
 	assert.ok(manifest.entry.includes(BLUEPRINT_SOURCE))
 	assert.ok(
 		manifest.entry.indexOf('scripts/ui/editor-shell.js') <
@@ -774,6 +953,7 @@ async function run() {
 	await testSchema4EmptyMaskCaptureAndCut()
 	await testVisualRightAnchorProjectionAndFallbacks()
 	await testFullCaptureCubeRulesAndFailureRetention()
+	await testStabilizerSurgeRelationshipCapture()
 	await testChunkCancellationHotkeyAndLifecycle()
 	await testCutCandidateClipboardAndOutcome()
 	testLanguagesManifestUiAndReadOnlyBoundary()

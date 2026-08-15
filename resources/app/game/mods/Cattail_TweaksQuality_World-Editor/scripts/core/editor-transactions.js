@@ -14,6 +14,14 @@ ModLoader.register({
 		})
 		const KIND_PATTERN = /^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$/
 		const DANGEROUS_KEYS = new Set(['__proto__', 'prototype', 'constructor'])
+		let loadedSaveIdentity = null
+		let loadedSaveGame = null
+
+		api.on('beforeSaveLoad', function (save, game) {
+			loadedSaveIdentity = normalizeSaveIdentity(save?.modloader?.saveInstanceId)
+			loadedSaveGame = game || null
+			return save
+		})
 
 		api.on('afterGameInit', function (payload, game) {
 			const previous = globalThis[TRANSACTIONS_KEY]
@@ -50,7 +58,7 @@ ModLoader.register({
 			let terminalBlockedReason = null
 			let operationToken = 0
 			let identifierSequence = 0
-			let boundSaveInstanceId = readCurrentSaveIdentity(game)
+			let boundSaveInstanceId = readKnownSaveIdentity(game) || readCurrentSaveIdentity(game)
 
 			function isReady() {
 				return !!(
@@ -92,6 +100,11 @@ ModLoader.register({
 					error: publicError(error),
 					disposed
 				})
+			}
+
+			function writeBlockedReason() {
+				if (disposed || disposeRequested) return 'NOT_READY'
+				return terminalBlockedReason
 			}
 
 			function notify(reason) {
@@ -172,16 +185,17 @@ ModLoader.register({
 				const adapter = adapters.get(kind)
 				if (!adapter) return rejectResult('forward', 'ADAPTER_UNAVAILABLE', 'No transaction adapter is registered for ' + kind + '.')
 
-				const saveEnvelope = readCurrentSaveEnvelope(game)
-				if (!saveEnvelope) {
+				const knownIdentity = readKnownSaveIdentity(game)
+				const currentIdentity = knownIdentity || boundSaveInstanceId
+				if (!currentIdentity) {
 					return rejectResult('forward', 'SAVE_IDENTITY_UNAVAILABLE', 'The active save identity is unavailable.')
 				}
-				if (boundSaveInstanceId && boundSaveInstanceId !== saveEnvelope.saveInstanceId) {
+				if (boundSaveInstanceId && boundSaveInstanceId !== currentIdentity) {
 					clearHistoryInternal()
-					boundSaveInstanceId = saveEnvelope.saveInstanceId
+					boundSaveInstanceId = currentIdentity
 					notify('transaction-save-identity-rebound')
 				} else if (!boundSaveInstanceId) {
-					boundSaveInstanceId = saveEnvelope.saveInstanceId
+					boundSaveInstanceId = currentIdentity
 					notify('transaction-save-identity-bound')
 				}
 
@@ -192,6 +206,7 @@ ModLoader.register({
 				let record = null
 				let snapshotRecord = null
 				let operationError = null
+				let saveEnvelope = null
 
 				try {
 					const prepared = await adapter.prepare(
@@ -200,6 +215,13 @@ ModLoader.register({
 					)
 					assertCurrent(token)
 					const normalizedPrepared = normalizePrepared(prepared)
+					saveEnvelope = readCurrentSaveEnvelope(game)
+					if (!saveEnvelope) {
+						throw createError('SAVE_IDENTITY_UNAVAILABLE', 'The active save identity is unavailable.')
+					}
+					if (saveEnvelope.saveInstanceId !== boundSaveInstanceId) {
+						throw createError('SAVE_CHANGED', 'The active save changed during the operation.')
+					}
 					record = createDraftRecord({
 						id: transactionId,
 						kind,
@@ -216,17 +238,17 @@ ModLoader.register({
 					})
 
 					setPhase('preflighting', 'transaction-forward-preflighting')
-					await validateOperationState(token, adapter, record, 'forward', input, null)
+					await validateOperationState(token, adapter, record, 'forward', input, null, saveEnvelope)
 					await requireAdapterApproval(adapter, 'preflight', token, record, 'forward', input, null)
 					const before = await captureGuard(adapter, token, record, 'forward', input, null)
 					record = createDraftRecord(Object.assign({}, record, { before }))
 
 					setPhase('snapshotting', 'transaction-forward-snapshotting')
-					snapshotRecord = await createPhysicalSnapshot(token, record, 'forward', input)
+					snapshotRecord = await createPhysicalSnapshot(token, record, 'forward', input, saveEnvelope)
 					record = createDraftRecord(Object.assign({}, record, { snapshotId: snapshotRecord.id }))
 
 					setPhase('revalidating', 'transaction-forward-revalidating')
-					await validateOperationState(token, adapter, record, 'forward', input, snapshotRecord.id)
+					await validateOperationState(token, adapter, record, 'forward', input, snapshotRecord.id, saveEnvelope)
 					await requireAdapterApproval(adapter, 'preflight', token, record, 'forward', input, snapshotRecord.id)
 					const currentBefore = await captureGuard(adapter, token, record, 'forward', input, snapshotRecord.id)
 					if (!plainEqual(before, currentBefore)) {
@@ -269,6 +291,168 @@ ModLoader.register({
 					})
 				} finally {
 					finishDisposeIfRequested()
+				}
+			}
+
+			async function beginApplied(request) {
+				if (disposed || disposeRequested) {
+					return rejectResult('forward', 'NOT_READY', 'The transaction engine is not available.')
+				}
+				if (terminalBlockedReason) {
+					return rejectResult('forward', terminalBlockedReason, 'The transaction engine is blocked until reload.')
+				}
+				if (busy) return rejectResult('forward', 'BUSY', 'The transaction engine is busy.')
+
+				let kind
+				let input
+				try {
+					if (!isPlainObject(request)) throw createError('INVALID_SPEC', 'A live transaction request object is required.')
+					kind = normalizeKind(request.kind)
+					input = normalizeInput(request.input)
+				} catch (requestError) {
+					return rejectErrorResult('forward', normalizeError(requestError, 'INVALID_SPEC'))
+				}
+
+				const adapter = adapters.get(kind)
+				if (!adapter) return rejectResult('forward', 'ADAPTER_UNAVAILABLE', 'No transaction adapter is registered for ' + kind + '.')
+
+				const knownIdentity = readKnownSaveIdentity(game)
+				const currentIdentity = knownIdentity || boundSaveInstanceId
+				if (!currentIdentity) {
+					return rejectResult('forward', 'SAVE_IDENTITY_UNAVAILABLE', 'The active save identity is unavailable.')
+				}
+				if (boundSaveInstanceId && boundSaveInstanceId !== currentIdentity) {
+					clearHistoryInternal()
+					boundSaveInstanceId = currentIdentity
+					notify('transaction-save-identity-rebound')
+				} else if (!boundSaveInstanceId) {
+					boundSaveInstanceId = currentIdentity
+					notify('transaction-save-identity-bound')
+				}
+
+				const transactionId = createIdentifier('transaction')
+				const operationId = createIdentifier('operation')
+				const plane = normalizePlane(game?.plane)
+				const token = beginOperation('forward', transactionId, operationId, 'snapshotting')
+				let snapshotRecord = null
+				let closed = false
+
+				try {
+					const saveEnvelope = readCurrentSaveEnvelope(game)
+					if (!saveEnvelope) {
+						throw createError('SAVE_IDENTITY_UNAVAILABLE', 'The active save payload or identity is unavailable.')
+					}
+					if (saveEnvelope.saveInstanceId !== boundSaveInstanceId) {
+						throw createError('SAVE_CHANGED', 'The active save changed before the live transaction snapshot.')
+					}
+					const draft = createDraftRecord({
+						id: transactionId,
+						kind,
+						input,
+						saveInstanceId: boundSaveInstanceId,
+						plane,
+						createdAt: Date.now(),
+						snapshotId: null,
+						summary: {},
+						scope: {},
+						payload: {},
+						before: null,
+						after: null
+					})
+					snapshotRecord = await createPhysicalSnapshot(token, draft, 'forward', input, saveEnvelope)
+					setPhase('applying', 'transaction-forward-live-applying')
+					applyStarted = true
+					return {
+						accepted: true,
+						begun: true,
+						transactionId,
+						operationId,
+						snapshotId: snapshotRecord.id,
+						isCurrent() {
+							return !closed && isOperationCurrent(token, false)
+						},
+						async commit(prepared) {
+							if (closed) return failureResult('forward', createError('INVALIDATED', 'The live transaction is already closed.'), snapshotRecord?.id || null, false)
+							closed = true
+							let record = null
+							try {
+								const normalizedPrepared = normalizePrepared(prepared)
+								const before = normalizePlain(prepared?.before, 'live transaction before state')
+								record = createDraftRecord({
+									id: transactionId,
+									kind,
+									input,
+									saveInstanceId: boundSaveInstanceId,
+									plane,
+									createdAt: Date.now(),
+									snapshotId: snapshotRecord.id,
+									summary: normalizedPrepared.summary,
+									scope: normalizedPrepared.scope,
+									payload: normalizedPrepared.payload,
+									before,
+									after: null
+								})
+								const currentEnvelope = readCurrentSaveEnvelope(game)
+								await validateOperationState(token, adapter, record, 'forward', input, snapshotRecord.id, currentEnvelope)
+								setPhase('verifying', 'transaction-forward-live-verifying')
+								const after = await captureGuard(adapter, token, record, 'forward', input, snapshotRecord.id, true)
+								record = createDraftRecord(Object.assign({}, record, { after }))
+								await requireAdapterApproval(adapter, 'verify', token, record, 'forward', input, snapshotRecord.id, after)
+								const finalRecord = freezeRecord(record)
+								undoStack.push(finalRecord)
+								trimUndoHistory()
+								redoStack.length = 0
+								lastTransaction = publicSummary(finalRecord)
+								const result = successResult('forward', finalRecord, snapshotRecord.id)
+								finishIdle('transaction-forward-complete', null)
+								return result
+							} catch (caughtError) {
+								const operationError = normalizePhaseError(caughtError, phase)
+								return await recoverOperation({
+									token,
+									adapter,
+									record,
+									direction: 'forward',
+									input,
+									snapshotRecord,
+									operationError,
+									rollbackTarget: 'before'
+								})
+							} finally {
+								finishDisposeIfRequested()
+							}
+						},
+						async cancel(reason) {
+							if (closed) return false
+							closed = true
+							if (snapshotRecord) await removeUnusedSnapshot(snapshotRecord)
+							finishIdle('transaction-forward-live-' + reasonForError(createError(reason || 'INVALIDATED')), null)
+							finishDisposeIfRequested()
+							return true
+						},
+						blockRollback(message) {
+							if (closed) return failureResult('forward', createError('ROLLBACK_FAILED', message), snapshotRecord?.id || null, true)
+							closed = true
+							const terminalError = createError('ROLLBACK_FAILED', String(message || 'The live transaction rollback failed.'))
+							terminalBlockedReason = 'ROLLBACK_FAILED'
+							error = terminalError
+							busy = false
+							applyStarted = false
+							direction = null
+							activeTransactionId = null
+							activeOperationId = null
+							setPhase('blocked', 'transaction-rollback-failed')
+							finishDisposeIfRequested()
+							return failureResult('forward', terminalError, snapshotRecord?.id || null, true)
+						}
+					}
+				} catch (caughtError) {
+					const operationError = normalizePhaseError(caughtError, phase)
+					if (snapshotRecord) await removeUnusedSnapshot(snapshotRecord)
+					const result = failureResult('forward', operationError, snapshotRecord?.id || null, true)
+					finishIdle('transaction-forward-' + reasonForError(operationError), operationError)
+					finishDisposeIfRequested()
+					return result
 				}
 			}
 
@@ -317,16 +501,18 @@ ModLoader.register({
 					return rejectResult(nextDirection, 'PLANE_CHANGED', 'Switch back to the transaction plane before continuing.')
 				}
 
-				const currentEnvelope = readCurrentSaveEnvelope(game)
-				if (!currentEnvelope) {
+				const knownIdentity = readKnownSaveIdentity(game)
+				let currentEnvelope = null
+				const currentIdentity = knownIdentity || boundSaveInstanceId
+				if (!currentIdentity) {
 					return rejectResult(nextDirection, 'SAVE_IDENTITY_UNAVAILABLE', 'The active save identity is unavailable.')
 				}
 				if (
-					currentEnvelope.saveInstanceId !== record.saveInstanceId ||
-					currentEnvelope.saveInstanceId !== boundSaveInstanceId
+					currentIdentity !== record.saveInstanceId ||
+					currentIdentity !== boundSaveInstanceId
 				) {
 					clearHistoryInternal()
-					boundSaveInstanceId = currentEnvelope.saveInstanceId
+					boundSaveInstanceId = currentIdentity
 					return rejectResult(nextDirection, 'SAVE_CHANGED', 'The active save changed, so transaction history was cleared.')
 				}
 
@@ -338,7 +524,17 @@ ModLoader.register({
 				let snapshotRecord = null
 
 				try {
-					await validateOperationState(token, adapter, record, nextDirection, input, null)
+					currentEnvelope = currentEnvelope || readCurrentSaveEnvelope(game)
+					if (!currentEnvelope) {
+						throw createError('SAVE_IDENTITY_UNAVAILABLE', 'The active save identity is unavailable.')
+					}
+					if (
+						currentEnvelope.saveInstanceId !== record.saveInstanceId ||
+						currentEnvelope.saveInstanceId !== boundSaveInstanceId
+					) {
+						throw createError('SAVE_CHANGED', 'The active save changed during the operation.')
+					}
+					await validateOperationState(token, adapter, record, nextDirection, input, null, currentEnvelope)
 					await requireAdapterApproval(adapter, 'preflight', token, record, nextDirection, input, null)
 					const current = await captureGuard(adapter, token, record, nextDirection, input, null)
 					if (!plainEqual(expectedCurrent, current)) {
@@ -346,10 +542,10 @@ ModLoader.register({
 					}
 
 					setPhase('snapshotting', 'transaction-' + nextDirection + '-snapshotting')
-					snapshotRecord = await createPhysicalSnapshot(token, record, nextDirection, input)
+					snapshotRecord = await createPhysicalSnapshot(token, record, nextDirection, input, currentEnvelope)
 
 					setPhase('revalidating', 'transaction-' + nextDirection + '-revalidating')
-					await validateOperationState(token, adapter, record, nextDirection, input, snapshotRecord.id)
+					await validateOperationState(token, adapter, record, nextDirection, input, snapshotRecord.id, currentEnvelope)
 					await requireAdapterApproval(adapter, 'preflight', token, record, nextDirection, input, snapshotRecord.id)
 					const revalidated = await captureGuard(adapter, token, record, nextDirection, input, snapshotRecord.id)
 					if (!plainEqual(expectedCurrent, revalidated)) {
@@ -511,7 +707,7 @@ ModLoader.register({
 				notify(reason)
 			}
 
-			async function validateOperationState(token, adapter, record, nextDirection, input, snapshotId) {
+			async function validateOperationState(token, adapter, record, nextDirection, input, snapshotId, operationEnvelope) {
 				assertCurrent(token)
 				if (adapters.get(record.kind) !== adapter) {
 					throw createError('ADAPTER_UNAVAILABLE', 'The transaction adapter changed during the operation.')
@@ -519,7 +715,7 @@ ModLoader.register({
 				if (normalizePlane(game?.plane) !== record.plane) {
 					throw createError('PLANE_CHANGED', 'The active world plane changed during the operation.')
 				}
-				const currentIdentity = readCurrentSaveIdentity(game)
+				const currentIdentity = readKnownSaveIdentity(game) || operationEnvelope?.saveInstanceId || null
 				if (!currentIdentity) {
 					throw createError('SAVE_IDENTITY_UNAVAILABLE', 'The active save identity is unavailable.')
 				}
@@ -621,7 +817,7 @@ ModLoader.register({
 				}
 			}
 
-			async function createPhysicalSnapshot(token, record, nextDirection, input) {
+			async function createPhysicalSnapshot(token, record, nextDirection, input, operationEnvelope) {
 				assertCurrent(token)
 				if (
 					typeof snapshots?.create !== 'function' ||
@@ -629,7 +825,7 @@ ModLoader.register({
 				) {
 					throw createError('SNAPSHOT_UNAVAILABLE', 'Snapshot storage is unavailable.')
 				}
-				const envelope = readCurrentSaveEnvelope(game)
+				const envelope = operationEnvelope
 				if (!envelope) {
 					throw createError('SAVE_IDENTITY_UNAVAILABLE', 'The active save payload or identity is unavailable.')
 				}
@@ -811,9 +1007,14 @@ ModLoader.register({
 				},
 				registerAdapter,
 				execute,
+				beginApplied,
 				undo,
 				redo,
 				clear,
+				writeBlockedReason,
+				isWriteBlocked() {
+					return writeBlockedReason() !== null
+				},
 				isBusy() {
 					return !disposed && busy
 				},
@@ -965,6 +1166,18 @@ ModLoader.register({
 
 		function readCurrentSaveIdentity(game) {
 			return readCurrentSaveEnvelope(game)?.saveInstanceId || null
+		}
+
+		function readKnownSaveIdentity(game) {
+			const direct = normalizeSaveIdentity(game?.saveInstanceId || game?.saveId)
+			if (direct) return direct
+			if (loadedSaveGame && loadedSaveGame !== game) return null
+			return loadedSaveIdentity
+		}
+
+		function normalizeSaveIdentity(value) {
+			const normalized = String(value || '').trim().toLowerCase()
+			return normalized || null
 		}
 
 		function normalizePlain(value, label) {

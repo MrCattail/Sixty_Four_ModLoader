@@ -177,6 +177,7 @@ async function testCreativeCutLayerTransaction() {
 		grade: 2,
 		colors: ['#def'],
 		type: 1,
+		maxLifeTimer: 99,
 		maxLife: 99,
 		life: 88
 	})
@@ -195,6 +196,13 @@ async function testCreativeCutLayerTransaction() {
 
 	const resourcesBefore = env.game.resources.slice()
 	const statsBefore = clone(env.game.stats)
+	surge.lifeTimer = 87
+	env.transactions.beforeSecondPreflight = function () {
+		surge.lifeTimer = 86
+	}
+	env.transactions.beforeApply = function () {
+		surge.lifeTimer = 85
+	}
 	const result = await env.deletion.execute(plan, 'cut', { origin: 'cut' })
 	assert.equal(result.executed, true, JSON.stringify(result))
 	assert.equal(env.game.entityAtCoordinates([0, 0]), null)
@@ -212,15 +220,26 @@ async function testCreativeCutLayerTransaction() {
 	assert.equal(restoredCube.state, 2)
 	assert.deepEqual(clone(restoredCube.resources), [5, 6])
 	assert.equal(restoredSurge.name, 'surge')
-	assert.equal(restoredSurge.life, 88)
+	assert.equal(restoredSurge.life, 85)
 	assert.equal(restoredSurge.rayNumber, 4)
 	assert.deepEqual(env.game.resources, resourcesBefore)
 	assert.deepEqual(clone(env.game.stats), statsBefore)
 
+	restoredSurge.lifeTimer = 84
+	restoredSurge.maxLifeTimer = 99
+	env.transactions.beforeSecondPreflight = function () {
+		restoredSurge.lifeTimer = 83
+	}
+	env.transactions.beforeApply = function () {
+		restoredSurge.lifeTimer = 82
+	}
 	const redo = await env.transactions.redo('test')
 	assert.equal(redo.executed, true, JSON.stringify(redo))
 	assert.equal(env.game.entityAtCoordinates([0, 0]), null)
 	assert.equal(env.game.entityAtCoordinates([1, 0]), null)
+	const secondUndo = await env.transactions.undo('test')
+	assert.equal(secondUndo.executed, true, JSON.stringify(secondUndo))
+	assert.equal(env.game.entityAtCoordinates([1, 0])?.life, 82)
 	env.dispose()
 
 	const unsafe = harness.createEnvironment({
@@ -237,6 +256,7 @@ async function testCreativeCutLayerTransaction() {
 		grade: 1,
 		colors: ['#fff'],
 		type: 0,
+		maxLifeTimer: 10,
 		maxLife: 10,
 		life: 0
 	})
@@ -270,8 +290,8 @@ function transientSave(entity) {
 				grade: entity.grade,
 				colors: clone(entity.colors),
 				type: entity.type,
-				maxLife: entity.maxLife,
-				life: entity.life
+				maxLife: entity.maxLifeTimer ?? entity.maxLife,
+				life: entity.lifeTimer ?? entity.life
 			}
 		}
 	}
@@ -282,9 +302,10 @@ function testStaticCaptureAndCutContracts() {
 	const session = source('scripts/blueprint-session.js')
 	const cut = source('scripts/core/selection-cut.js')
 	const deletion = source('scripts/core/selection-delete.js')
-	assert.match(session, /const schemaVersion = 6/)
+	assert.match(session, /const schemaVersion = stabilizerLinkCount \? 8 : paintedRecords\.length \? 7 : 6/)
 	assert.match(session, /mode:\s*'full'/)
 	assert.match(session, /surges:\s*surgeRecords/)
+	assert.match(session, /paintedCubes:\s*paintedRecords/)
 	assert.match(cut, /success-retained-layers/)
 	assert.match(cut, /removeCubes/)
 	assert.match(cut, /removeSurges/)

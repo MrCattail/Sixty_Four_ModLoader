@@ -5,6 +5,7 @@ ModLoader.register({
 		const TRANSACTIONS_KEY = Symbol.for('cattail.world-editor.transactions')
 		const PLAN_KEY = Symbol.for('cattail.world-editor.blueprint-preview-plan')
 		const STATE_KEY = Symbol.for('cattail.world-editor.blueprint-state')
+		const PAINTED_KEY = Symbol.for('cattail.world-editor.blueprint-painted')
 		const CREATIVE_KEY = Symbol.for('cattail.world-editor.creative-mode')
 		const PLACEMENT_KEY = Symbol.for('cattail.world-editor.blueprint-placement')
 		const TRANSACTION_KIND = 'blueprint-placement'
@@ -66,6 +67,7 @@ ModLoader.register({
 			'clicker3',
 			'stabilizer',
 			'stabilizer2',
+			'stabilizer3',
 			'cube'
 		])
 
@@ -282,6 +284,17 @@ ModLoader.register({
 							stage: 'affordability'
 						})
 					}
+					const identityBindings = Array.isArray(targetState.identityBindings)
+						? targetState.identityBindings
+						: []
+					for (const binding of identityBindings) assignIdentity(binding.entity, binding.identity)
+					if (identityBindings.length) {
+						traceProbe('adapter.preflight.identity-rebound', {
+							direction,
+							buildCount: identityBindings.length,
+							sourceKind: 'painted-cube'
+						})
+					}
 					traceProbe('adapter.preflight.ready', {
 						direction,
 						hasSnapshot: !!context?.snapshotId,
@@ -332,7 +345,7 @@ ModLoader.register({
 					})
 					return { ok: true }
 				},
-				async verify(context, record, direction) {
+				async verify(context, record, direction, observed) {
 					requireCurrent(context)
 					const state = operations.get(context.operationId)
 					traceProbe('adapter.verify.start', {
@@ -348,7 +361,7 @@ ModLoader.register({
 						)
 					}
 					const expectedAfter = direction !== 'undo'
-					const verification = verifyAppliedState(record.payload, state, expectedAfter)
+					const verification = verifyAppliedState(record.payload, state, expectedAfter, observed)
 					if (!verification.ok) {
 						return traceDenied('adapter.verify.denied', verification, {
 							direction,
@@ -684,6 +697,7 @@ ModLoader.register({
 				let buildRecords = (plan.records || []).filter(function (record) {
 					return record.status === 'buildable' || (replaceConflicts && record.status === 'conflict')
 				})
+				buildRecords = linkedBuildSubset(buildRecords)
 				const emptyMask = new Set((plan.emptyCells || []).map(cellKey))
 				const syncEntities = syncEmpty ? Array.from(new Set(plan.emptyEntities || [])) : []
 				const blockedEntities = new Set()
@@ -733,13 +747,14 @@ ModLoader.register({
 				for (const entry of sources.values()) {
 					const assessment = blockedEntities.has(entry.entity)
 						? assessmentResult(false, 'last-extractor')
-						: assessEntity(entry.entity, { blueprintMode: plan.mode })
+						: assessEntity(entry.entity, { blueprintMode: plan.mode, sourceKind: entry.sourceKind })
 					const footprint = entityFootprint(entry.entity, entry.entity.position)
 					const crossBoundary = entry.sync && footprintCrossesCellMask(footprint, emptyMask)
 					if (assessment.safe) {
 						removals.push(Object.assign(captureRestorableEntity(entry.entity), {
 							sourceConflict: entry.conflict,
 							sourceSync: entry.sync,
+							replacementSourceKind: String(entry.sourceKind || ''),
 							crossBoundary
 						}))
 					} else if (entry.sync || entry.conflict) {
@@ -756,6 +771,10 @@ ModLoader.register({
 				protectedTargets.sort(compareDescriptors)
 
 				const builds = buildRecords.map(function (record) {
+					const sourceKind = String(record.sourceKind || 'entity')
+					const stabilizerPosition = sourceKind === 'surge'
+						? normalizePosition(record.stabilizerPosition)
+						: null
 					const save = plan.mode === 'full'
 						? {
 							name: safeName(record.name),
@@ -763,6 +782,7 @@ ModLoader.register({
 							par: jsonClone(record.state || {})
 						}
 						: null
+					if (save && stabilizerPosition) save.par.stabilizerPosition = clonePosition(stabilizerPosition)
 					return {
 						identity: options?.transactionBuilds
 							? createIdentity('built')
@@ -773,8 +793,9 @@ ModLoader.register({
 						footprint: cloneFootprint(record.footprint),
 						config: jsonClone(record.config || {}),
 						save,
+						stabilizerPosition: stabilizerPosition ? clonePosition(stabilizerPosition) : null,
 						stateMeta: jsonClone(record.stateMeta || {}),
-						sourceKind: String(record.sourceKind || 'entity')
+						sourceKind
 					}
 				}).sort(compareDescriptors)
 				const removalIdentities = new Set(removals.map(function (entry) { return entry.identity }))
@@ -816,6 +837,7 @@ ModLoader.register({
 				const changeCount = builds.length + removals.length
 				const summary = {
 					buildCount: builds.length,
+					paintedBuildCount: builds.filter(function (entry) { return entry.sourceKind === 'painted-cube' }).length,
 					replaceCount,
 					syncDeleteCount,
 					deleteCount: removals.length,
@@ -851,9 +873,11 @@ ModLoader.register({
 					blueprintMode: plan.mode,
 					blueprintSchemaVersion: Number(plan.schemaVersion) || 0
 				})
+				if (options?.transactionBuilds) materializePaintedBuilds(builds)
 				const transactionSummary = {
 					label: plan.mode === 'full' ? 'Full blueprint placement' : 'Structure blueprint placement',
 					buildCount: builds.length,
+					paintedBuildCount: summary.paintedBuildCount,
 					replaceCount,
 					syncDeleteCount,
 					deleteCount: removals.length,
@@ -868,6 +892,7 @@ ModLoader.register({
 					target: clonePosition(plan.target),
 					cells: scopeCells,
 					buildCount: builds.length,
+					paintedBuildCount: summary.paintedBuildCount,
 					replaceCount,
 					syncDeleteCount,
 					deleteCount: removals.length,
@@ -918,7 +943,7 @@ ModLoader.register({
 
 			function collectRemovalSources(buildRecords, syncEntities) {
 				const sources = new Map()
-				function add(entity, kind) {
+				function add(entity, kind, sourceKind) {
 					if (!entity || typeof entity !== 'object') return
 					const identity = ensureIdentity(entity)
 					let entry = sources.get(identity)
@@ -928,18 +953,35 @@ ModLoader.register({
 							entity,
 							name: safeName(entity.name),
 							conflict: false,
-							sync: false
+							sync: false,
+							sourceKind: ''
 						}
 						sources.set(identity, entry)
 					}
 					entry[kind] = true
+					if (kind === 'conflict' && sourceKind) entry.sourceKind = String(sourceKind)
 				}
 				for (const record of buildRecords || []) {
 					if (record.status !== 'conflict') continue
-					for (const entity of record.conflicts || []) add(entity, 'conflict')
+					for (const entity of record.conflicts || []) add(entity, 'conflict', record.sourceKind)
 				}
 				for (const entity of syncEntities || []) add(entity, 'sync')
 				return sources
+			}
+
+			function linkedBuildSubset(records) {
+				const stabilizers = new Set((records || []).filter(function (record) {
+					return isStabilizerName(record?.name)
+				}).map(function (record) {
+					const position = normalizePosition(record?.position)
+					return position && cellKey(position)
+				}).filter(Boolean))
+				return (records || []).filter(function (record) {
+					const position = record?.sourceKind === 'surge'
+						? normalizePosition(record.stabilizerPosition)
+						: null
+					return !position || stabilizers.has(cellKey(position))
+				})
 			}
 
 			function captureProtectedEntity(entity, reason, sourceConflict, sourceSync, crossBoundary) {
@@ -973,6 +1015,11 @@ ModLoader.register({
 				return name === 'pump' || name === 'pump2' || name === 'gradient'
 			}
 
+			function isStabilizerName(value) {
+				const name = safeName(value)
+				return name === 'stabilizer' || name === 'stabilizer2' || name === 'stabilizer3'
+			}
+
 			function footprintCrossesCellMask(footprint, mask) {
 				for (let v = footprint.minV; v <= footprint.maxV; v += 1) {
 					for (let u = footprint.minU; u <= footprint.maxU; u += 1) {
@@ -992,10 +1039,16 @@ ModLoader.register({
 				if (!RESTORABLE_NAMES.has(name)) return assessment(false, 'unsupported-type')
 				if (name === 'cube') {
 					if (details?.blueprintMode !== 'full') return assessment(false, 'protected-cube')
-					if (Number(entity.state) !== 2) return assessment(false, 'unstable-cube')
+					if (Number(entity.state) !== 2) {
+						const replacePainted = details?.sourceKind === 'painted-cube' && !!globalThis[PAINTED_KEY]?.captureSave?.(entity)
+						if (!replacePainted) return assessment(false, 'unstable-cube')
+					}
 				}
 				const definition = game.codex?.entities?.[name]
-				if (name !== 'cube' && (!definition || definition.canPurchase !== true)) {
+				const shatteredStabilizerAllowed = name === 'stabilizer3' && creativeActive(creative, game) && (
+					details?.blueprintMode === 'full' || details?.allowShatteredStabilizer === true
+				)
+				if (name !== 'cube' && (!definition || (definition.canPurchase !== true && !shatteredStabilizerAllowed))) {
 					return assessment(false, 'not-purchasable')
 				}
 				if (entity.indestructible === true) return assessment(false, 'indestructible')
@@ -1004,7 +1057,7 @@ ModLoader.register({
 				if ((name === 'pump' || name === 'pump2') && hasAttachedCube(game, entity)) {
 					return assessment(false, 'attached-cube')
 				}
-				if ((name === 'stabilizer' || name === 'stabilizer2') && entity.surge) {
+				if (isStabilizerName(name) && entity.surge) {
 					return assessment(false, 'attached-surge')
 				}
 				if (
@@ -1083,18 +1136,42 @@ ModLoader.register({
 			}
 
 			function inspectTargetState(payload, direction) {
+				const shatteredCount = inspectShatteredStabilizerCount(payload, direction)
+				if (!shatteredCount.ok) return shatteredCount
 				if (direction === 'undo') {
+					const pendingIdentityBindings = []
+					const resolvedEntities = new Set()
 					for (const build of payload.builds) {
-						const entity = entityAt(game, build.position)
+						let entity = entityAt(game, build.position)
+						let rebindIdentity = false
 						if (
 							!entity ||
-							ensureIdentity(entity) !== build.identity ||
-							safeName(entity.name) !== build.name
+							safeName(entity.name) !== build.name ||
+							!samePosition(entity.position, build.position) ||
+							!samePlain(entityFootprint(entity, entity.position), build.footprint)
 						) {
 							return denied('EXTERNAL_CHANGE', 'A placed blueprint building changed outside World Editor.')
 						}
+						if (identityByEntity.get(entity) !== build.identity) {
+							entity = findPaintedBuildIdentityRebindCandidate(build)
+							rebindIdentity = !!entity
+						}
+						if (!entity || resolvedEntities.has(entity)) {
+							return denied('EXTERNAL_CHANGE', 'A placed blueprint building changed outside World Editor.')
+						}
+						resolvedEntities.add(entity)
+						if (
+							build.sourceKind === 'painted-cube' &&
+							globalThis[PAINTED_KEY]?.matchesMaterializedEntity?.(entity, build.save) !== true
+						) {
+							return denied('EXTERNAL_CHANGE', 'A placed painted cube changed outside World Editor.')
+						}
+						if (rebindIdentity) pendingIdentityBindings.push({ entity, identity: build.identity })
 					}
-					return approved()
+					if (!buildRelationsMatch(payload.builds)) {
+						return denied('EXTERNAL_CHANGE', 'A placed stabilizer relationship changed outside World Editor.')
+					}
+					return Object.assign(approved(), { identityBindings: pendingIdentityBindings })
 				}
 				const removableIdentities = new Set(payload.removals.concat(payload.transients).map(function (entry) {
 					return entry.identity
@@ -1108,7 +1185,10 @@ ModLoader.register({
 					) {
 						return denied('EXTERNAL_CHANGE', 'A replacement target changed outside World Editor.')
 					}
-					const assessment = assessEntity(entity, { blueprintMode: payload.blueprintMode })
+					const assessment = assessEntity(entity, {
+						blueprintMode: payload.blueprintMode,
+						sourceKind: removal.replacementSourceKind
+					})
 					if (!assessment.safe) {
 						return denied('UNSAFE_REPLACEMENT', 'A replacement target is no longer safe to restore.')
 					}
@@ -1191,6 +1271,19 @@ ModLoader.register({
 				return approved()
 			}
 
+			function inspectShatteredStabilizerCount(payload, direction) {
+				const touched = payload.builds.concat(payload.removals).some(function (entry) {
+					return safeName(entry?.name) === 'stabilizer3'
+				})
+				if (!touched) return approved()
+				const expected = (direction === 'undo' ? payload.builds : payload.removals).filter(function (entry) {
+					return safeName(entry?.name) === 'stabilizer3'
+				}).length
+				return shatteredStabilizerCount(game) === expected
+					? approved()
+					: denied('EXTERNAL_CHANGE', 'The shattered stabilizer count changed outside World Editor.')
+			}
+
 			function applyForward(context, record, state) {
 				const payload = record.payload
 				const waypointTimestamps = allocateWaypointTimestamps(game, payload.builds)
@@ -1213,6 +1306,7 @@ ModLoader.register({
 					addExpectedEntity(build, waypointTimestamps.get(build.identity))
 					state.mutations.push({ kind: 'created', descriptor: build })
 				}
+				connectExpectedBuildRelations(payload.builds)
 				applyStatsMutation(state, payload.statsDelta)
 				applyOnlyoneMutation(state, payload.onlyOneKeys, payload.onlyonesAfter)
 			}
@@ -1221,11 +1315,13 @@ ModLoader.register({
 				const payload = record.payload
 				const resourceDelta = payload.economy.creative ? [] : negateArray(payload.economy.delta)
 				applyResourceMutation(state, resourceDelta)
-				for (const build of payload.builds.slice().reverse()) {
-					requireCurrent(context)
-					const removed = removeExpectedEntity(build)
-					state.mutations.push({ kind: 'removed', descriptor: removed })
-				}
+				withDeferredShopUpdates(function () {
+					for (const build of payload.builds.slice().reverse()) {
+						requireCurrent(context)
+						const removed = removeExpectedEntity(build)
+						state.mutations.push({ kind: 'removed', descriptor: removed })
+					}
+				})
 				const saved = transactionData.get(record.id)?.removalSaves
 				for (const removal of payload.removals) {
 					requireCurrent(context)
@@ -1248,6 +1344,40 @@ ModLoader.register({
 					machinesSold: -payload.statsDelta.machinesSold
 				})
 				applyOnlyoneMutation(state, payload.onlyOneKeys, payload.onlyonesBefore)
+			}
+
+			function withDeferredShopUpdates(callback) {
+				const restore = deferMethod(game?.shop, 'updateElements')
+				try {
+					return callback()
+				} finally {
+					restore()
+				}
+			}
+
+			function deferMethod(target, name) {
+				if (!target || typeof target[name] !== 'function') return function () {}
+				const hadOwn = Object.prototype.hasOwnProperty.call(target, name)
+				const descriptor = hadOwn ? Object.getOwnPropertyDescriptor(target, name) : null
+				const deferred = function () {}
+				try {
+					Object.defineProperty(target, name, {
+						value: deferred,
+						configurable: true,
+						writable: true
+					})
+				} catch (error) {
+					return function () {}
+				}
+				if (target[name] !== deferred) {
+					if (hadOwn) Object.defineProperty(target, name, descriptor)
+					else delete target[name]
+					return function () {}
+				}
+				return function restoreDeferredMethod() {
+					if (hadOwn) Object.defineProperty(target, name, descriptor)
+					else delete target[name]
+				}
 			}
 
 			function applyResourceMutation(state, delta) {
@@ -1324,12 +1454,23 @@ ModLoader.register({
 
 			function addExpectedEntity(descriptor, waypointTimestamp) {
 				assertFootprintEmpty(game, descriptor.footprint)
+				if (safeName(descriptor?.name) === 'stabilizer3' && shatteredStabilizerCount(game) > 0) {
+					throw placementError('EXTERNAL_CHANGE', 'Another shattered stabilizer already exists.')
+				}
 				let entity
 				if (descriptor.save) {
 					const stateService = globalThis[STATE_KEY]
-					const saved = descriptor.sourceKind && typeof stateService?.materializeSave === 'function'
+					let saved = descriptor.sourceKind === 'painted-cube'
+						? jsonClone(descriptor.save)
+						: descriptor.sourceKind && typeof stateService?.materializeSave === 'function'
 						? stateService.materializeSave(descriptor.save, { waypointTimestamp })
 						: descriptor.save
+					if (descriptor.sourceKind === 'surge' && normalizePosition(descriptor.stabilizerPosition)) {
+						saved = jsonClone(saved)
+						saved.par = Object.assign({}, saved.par, {
+							stabilizerPosition: clonePosition(descriptor.stabilizerPosition)
+						})
+					}
 					entity = restoreEntitySave(game, saved)
 				} else {
 					entity = game.addEntity(descriptor.name, descriptor.position, undefined, { skipShopUpdate: true })
@@ -1344,6 +1485,73 @@ ModLoader.register({
 				if (!entity) throw placementError('APPLY_FAILED', 'A blueprint building could not be created.')
 				assignIdentity(entity, descriptor.identity)
 				return entity
+			}
+
+			function linkedBuildRelations(builds) {
+				const stabilizers = new Map((builds || []).filter(function (build) {
+					return isStabilizerName(build?.name)
+				}).map(function (build) {
+					return [cellKey(build.position), build]
+				}))
+				return (builds || []).map(function (build) {
+					const position = build?.sourceKind === 'surge'
+						? normalizePosition(build.stabilizerPosition)
+						: null
+					const stabilizer = position && stabilizers.get(cellKey(position))
+					return stabilizer ? { stabilizer, surge: build } : null
+				}).filter(Boolean)
+			}
+
+			function connectExpectedBuildRelations(builds) {
+				for (const relation of linkedBuildRelations(builds)) {
+					const stabilizer = entityAt(game, relation.stabilizer.position)
+					const surge = entityAt(game, relation.surge.position)
+					if (!stabilizer || !surge) throw placementError('APPLY_FAILED', 'A stabilizer relationship could not be restored.')
+					if (stabilizer.surge && stabilizer.surge !== surge && stabilizer.surge.stabilizer === stabilizer) {
+						stabilizer.surge.stabilizer = false
+					}
+					if (surge.stabilizer && surge.stabilizer !== stabilizer && surge.stabilizer.surge === surge) {
+						surge.stabilizer.surge = false
+					}
+					stabilizer.surge = surge
+					surge.stabilizer = stabilizer
+					if (Object.prototype.hasOwnProperty.call(surge, 'stabilizerPosition')) delete surge.stabilizerPosition
+					stabilizer.initSurgePower?.()
+				}
+			}
+
+			function buildRelationsMatch(builds) {
+				for (const relation of linkedBuildRelations(builds)) {
+					const stabilizer = entityAt(game, relation.stabilizer.position)
+					const surge = entityAt(game, relation.surge.position)
+					if (!stabilizer || !surge || stabilizer.surge !== surge || surge.stabilizer !== stabilizer) return false
+				}
+				return true
+			}
+
+			function materializePaintedBuilds(builds) {
+				const painted = builds.filter(function (build) { return build.sourceKind === 'painted-cube' })
+				if (!painted.length) return
+				const adapter = globalThis[PAINTED_KEY]
+				const records = painted.map(function (build) {
+					return {
+						kind: 'painted-cube',
+						name: 'cube',
+						position: clonePosition(build.position),
+						state: jsonClone(build.save?.par || {})
+					}
+				})
+				const materialized = adapter?.materializeRecords?.(records, createIdentity('paint-placement'))
+				if (!Array.isArray(materialized) || materialized.length !== painted.length || materialized.some(function (entry) { return !entry })) {
+					throw placementError('INVALID_BLUEPRINT', 'Painted cube placement data could not be materialized safely.')
+				}
+				painted.forEach(function (build, index) {
+					build.save = {
+						name: 'cube',
+						position: clonePosition(build.position),
+						par: jsonClone(materialized[index].state)
+					}
+				})
 			}
 
 			function rollbackMutations(state) {
@@ -1370,10 +1578,11 @@ ModLoader.register({
 				}
 			}
 
-			function verifyAppliedState(payload, state, expectedAfter) {
+			function verifyAppliedState(payload, state, expectedAfter, observed) {
 				const removed = payload.removals.concat(payload.transients)
 				const present = expectedAfter ? payload.builds : removed
 				const absent = expectedAfter ? removed : payload.builds
+				const observedIdentities = scopeIdentitySet(payload, observed)
 				for (const descriptor of present) {
 					const entity = entityAt(game, descriptor.position)
 					if (
@@ -1383,9 +1592,18 @@ ModLoader.register({
 					) {
 						return denied('VERIFY_FAILED', 'A placed entity did not match the transaction result.')
 					}
+					if (
+						descriptor.sourceKind === 'painted-cube' &&
+						globalThis[PAINTED_KEY]?.matchesMaterializedEntity?.(entity, descriptor.save) !== true
+					) {
+						return denied('VERIFY_FAILED', 'A placed painted cube did not match the transaction result.')
+					}
+				}
+				if (expectedAfter && !buildRelationsMatch(payload.builds)) {
+					return denied('VERIFY_FAILED', 'A placed stabilizer relationship did not match the blueprint.')
 				}
 				for (const descriptor of absent) {
-					if (scopeContainsIdentity(payload.scopeCells, descriptor.identity)) {
+					if (observedIdentities.has(descriptor.identity)) {
 						return denied('VERIFY_FAILED', 'A removed entity is still present in the transaction scope.')
 					}
 				}
@@ -1411,12 +1629,32 @@ ModLoader.register({
 				return approved()
 			}
 
-			function scopeContainsIdentity(cells, identity) {
-				for (const position of cells) {
-					const entity = entityAt(game, position)
-					if (entity && ensureIdentity(entity) === identity) return true
+			function scopeIdentitySet(payload, observed) {
+				const captured = Array.isArray(observed?.cells)
+					? observed
+					: captureScope(payload)
+				const identities = new Set()
+				for (const cell of captured.cells) {
+					if (typeof cell?.identity === 'string' && cell.identity) identities.add(cell.identity)
 				}
-				return false
+				return identities
+			}
+
+			function findPaintedBuildIdentityRebindCandidate(build) {
+				const position = normalizePosition(build?.position)
+				const identity = String(build?.identity || '')
+				if (build?.sourceKind !== 'painted-cube' || !position || !identity) return null
+				const candidate = entityAt(game, position)
+				if (
+					!candidate ||
+					safeName(candidate.name) !== safeName(build.name) ||
+					!samePosition(candidate.position, position) ||
+					!samePlain(entityFootprint(candidate, candidate.position), build.footprint)
+				) return null
+				for (const entity of game.stuff || []) {
+					if (entity !== candidate && identityByEntity.get(entity) === identity) return null
+				}
+				return candidate
 			}
 
 			function ensureIdentity(entity) {
@@ -1446,14 +1684,21 @@ ModLoader.register({
 		}
 
 		function cloneBlueprint(value) {
-			let blueprint = jsonClone(value)
 			const stateService = globalThis[STATE_KEY]
+			if (
+				(typeof stateService?.inspectStructure === 'function' && stateService.inspectStructure(value)?.valid !== true) ||
+				(typeof stateService?.inspectBlueprint === 'function' && stateService.inspectBlueprint(value)?.valid !== true)
+			) {
+				throw placementError('BLUEPRINT_CORRUPT', 'The blueprint contains unsafe structure or coordinate data.')
+			}
+			let blueprint = value
 			if (blueprint?.mode === 'full' && typeof stateService?.normalizeBlueprint === 'function') {
 				blueprint = stateService.normalizeBlueprint(blueprint)
 			}
+			blueprint = jsonClone(blueprint)
 			const schemaVersion = Number(blueprint?.schemaVersion)
 			const structureValid = blueprint?.mode === 'structure' && [1, 2, 3, 4].includes(schemaVersion)
-			const fullValid = blueprint?.mode === 'full' && (schemaVersion === 3 || schemaVersion === 5 || schemaVersion === 6)
+			const fullValid = blueprint?.mode === 'full' && (schemaVersion === 3 || schemaVersion === 5 || schemaVersion === 6 || schemaVersion === 7 || schemaVersion === 8)
 			if (fullValid && !Array.isArray(blueprint.blocks)) blueprint.blocks = []
 			if (
 				!blueprint ||
@@ -1462,16 +1707,19 @@ ModLoader.register({
 				(
 					!blueprint.entities.length &&
 					!(
-						(schemaVersion === 4 || schemaVersion === 5 || schemaVersion === 6) &&
+						(schemaVersion === 4 || schemaVersion === 5 || schemaVersion === 6 || schemaVersion === 7 || schemaVersion === 8) &&
 						Array.isArray(blueprint.emptyCells) &&
 						blueprint.emptyCells.length
 					) &&
 					!(fullValid && Array.isArray(blueprint.blocks) && blueprint.blocks.length) &&
-					!(schemaVersion === 6 && Array.isArray(blueprint.surges) && blueprint.surges.length)
+					!((schemaVersion === 6 || schemaVersion === 7 || schemaVersion === 8) && Array.isArray(blueprint.surges) && blueprint.surges.length) &&
+					!((schemaVersion === 7 || schemaVersion === 8) && Array.isArray(blueprint.paintedCubes) && blueprint.paintedCubes.length)
 				) ||
 				(schemaVersion === 4 && !Array.isArray(blueprint.emptyCells)) ||
-				((schemaVersion === 5 || schemaVersion === 6) && !Array.isArray(blueprint.emptyCells)) ||
-				(schemaVersion === 6 && !Array.isArray(blueprint.surges))
+				((schemaVersion === 5 || schemaVersion === 6 || schemaVersion === 7 || schemaVersion === 8) && !Array.isArray(blueprint.emptyCells)) ||
+				((schemaVersion === 6 || schemaVersion === 7 || schemaVersion === 8) && !Array.isArray(blueprint.surges)) ||
+				(schemaVersion === 7 && (!Array.isArray(blueprint.paintedCubes) || !blueprint.paintedCubes.length)) ||
+				(schemaVersion === 8 && !Array.isArray(blueprint.paintedCubes))
 			) {
 				throw placementError('BLUEPRINT_REQUIRED', 'A valid structure or full blueprint is required.')
 			}
@@ -1702,6 +1950,10 @@ ModLoader.register({
 		}
 
 		function captureEntitySave(game, entity) {
+			const paintedSave = safeName(entity?.name) === 'cube'
+				? globalThis[PAINTED_KEY]?.captureSave?.(entity, entity?.position)
+				: null
+			if (paintedSave) return jsonClone(paintedSave)
 			if (typeof game.getEntityString !== 'function') {
 				throw placementError('SAVE_UNAVAILABLE', 'Entity save capture is unavailable.')
 			}
@@ -1800,13 +2052,14 @@ ModLoader.register({
 
 		function entityFootprint(entity, position) {
 			const center = normalizePosition(position)
-			const span = nonNegativeInteger(entity?.entitySpan, 0)
+			if (!center) throw placementError('INVALID_POSITION', 'An entity position is invalid.')
+			const span = nonNegativeSafeInteger(entity?.entitySpan, 0)
 			return {
 				span,
-				minU: center[0] - span,
-				maxU: center[0] + span,
-				minV: center[1] - span,
-				maxV: center[1] + span
+				minU: safeIntegerSubtract(center[0], span),
+				maxU: safeIntegerAdd(center[0], span),
+				minV: safeIntegerSubtract(center[1], span),
+				maxV: safeIntegerAdd(center[1], span)
 			}
 		}
 
@@ -1815,11 +2068,11 @@ ModLoader.register({
 			const maxU = finiteInteger(value?.maxU, NaN)
 			const minV = finiteInteger(value?.minV, NaN)
 			const maxV = finiteInteger(value?.maxV, NaN)
-			if (![minU, maxU, minV, maxV].every(Number.isFinite)) {
+			if (![minU, maxU, minV, maxV].every(Number.isSafeInteger)) {
 				throw placementError('INVALID_BLUEPRINT', 'A blueprint footprint is invalid.')
 			}
 			return {
-				span: nonNegativeInteger(value?.span, 0),
+				span: nonNegativeSafeInteger(value?.span, 0),
 				minU,
 				maxU,
 				minV,
@@ -1849,6 +2102,14 @@ ModLoader.register({
 				creative.snapshot?.().ready &&
 				creative.snapshot?.().creativeMode
 			)
+		}
+
+		function shatteredStabilizerCount(game) {
+			const tracked = Math.max(0, finiteOr(game?.entitiesInGame?.stabilizer3, 0))
+			const live = Array.isArray(game?.stuff)
+				? game.stuff.filter(function (entity) { return safeName(entity?.name) === 'stabilizer3' }).length
+				: 0
+			return Math.max(tracked, live)
 		}
 
 		function requireGameMethods(game) {
@@ -2072,6 +2333,7 @@ ModLoader.register({
 				replaceConflicts: payload?.replaceConflicts === true,
 				syncEmpty: payload?.syncEmpty === true,
 				buildCount: Array.isArray(payload?.builds) ? payload.builds.length : 0,
+				paintedBuildCount: (payload?.builds || []).filter(function (entry) { return entry?.sourceKind === 'painted-cube' }).length,
 				deleteCount: Array.isArray(payload?.removals) ? payload.removals.length : 0,
 				protectedCount: Array.isArray(payload?.protectedTargets) ? payload.protectedTargets.length : 0,
 				transientCount: Array.isArray(payload?.transients) ? payload.transients.length : 0,
@@ -2125,7 +2387,24 @@ ModLoader.register({
 			if (!Array.isArray(value) || value.length < 2) return null
 			const u = Number(value[0])
 			const v = Number(value[1])
-			return Number.isInteger(u) && Number.isInteger(v) ? [u, v] : null
+			return Number.isSafeInteger(u) && Number.isSafeInteger(v) ? [u, v] : null
+		}
+
+		function safeIntegerAdd(left, right) {
+			const value = Number(left) + Number(right)
+			if (!Number.isSafeInteger(value)) throw placementError('INVALID_POSITION', 'Coordinate arithmetic overflowed.')
+			return value
+		}
+
+		function safeIntegerSubtract(left, right) {
+			const value = Number(left) - Number(right)
+			if (!Number.isSafeInteger(value)) throw placementError('INVALID_POSITION', 'Coordinate arithmetic overflowed.')
+			return value
+		}
+
+		function nonNegativeSafeInteger(value, fallback) {
+			const number = Number(value)
+			return Number.isSafeInteger(number) && number >= 0 ? number : fallback
 		}
 
 		function clonePosition(value) {
@@ -2180,6 +2459,7 @@ ModLoader.register({
 						footprint: entry.footprint,
 						sourceConflict: entry.sourceConflict === true,
 						sourceSync: entry.sourceSync === true,
+						replacementSourceKind: String(entry.replacementSourceKind || ''),
 						crossBoundary: entry.crossBoundary === true
 					}
 				}),
@@ -2282,7 +2562,7 @@ ModLoader.register({
 
 		function finiteInteger(value, fallback) {
 			const number = Number(value)
-			return Number.isInteger(number) ? number : fallback
+			return Number.isSafeInteger(number) ? number : fallback
 		}
 
 		function nonNegativeInteger(value, fallback) {

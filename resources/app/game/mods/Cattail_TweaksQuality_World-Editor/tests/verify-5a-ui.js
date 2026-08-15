@@ -116,7 +116,7 @@ async function testThumbnailCacheReadAndDeduplication() {
 			reads += 1
 			assert.equal(options.area, 'cache')
 			assert.equal(options.bucket, 'thumbnails')
-			assert.match(options.name, /^v4__10000000-0000-4000-8000-000000000001__abcdef1234\.png$/)
+			assert.match(options.name, /^v5__10000000-0000-4000-8000-000000000001__abcdef1234\.png$/)
 			return { data: Uint8Array.from([137, 80, 78, 71]) }
 		}
 	}
@@ -164,25 +164,35 @@ async function testThumbnailCacheReadAndDeduplication() {
 	assert.equal(reads, readsBeforeReload + 1, 'an evicted entry returns to the disk-backed load path')
 }
 
-async function testBuildingThumbnailRenderingAndV4Cache() {
+async function testBuildingAndCubeThumbnailRenderingAndV5Cache() {
 	const definitions = []
 	const drawImages = []
 	const pathMoves = []
+	const filledFaces = []
 	const fillRects = []
 	const strokeRects = []
 	const strokeTexts = []
 	let afterGameInit = null
 	let written = null
+	const writes = []
+	let animationFrames = 0
 	const shopImage = { complete: true, naturalWidth: 256, naturalHeight: 256 }
 	function context() {
+		let currentPath = []
 		return {
+			fillStyle: '',
 			fillRect() { fillRects.push(Array.from(arguments)) },
 			strokeRect() { strokeRects.push(Array.from(arguments)) },
-			beginPath() {},
-			moveTo() { pathMoves.push(Array.from(arguments)) },
-			lineTo() {},
+			beginPath() { currentPath = [] },
+			moveTo() {
+				const point = Array.from(arguments)
+				currentPath.push(point)
+				pathMoves.push(point)
+			},
+			lineTo() { currentPath.push(Array.from(arguments)) },
 			closePath() {},
-			fill() {},
+			fill() { filledFaces.push({ color: this.fillStyle, points: currentPath.slice() }) },
+			stroke() {},
 			fillText() {},
 			strokeText() { strokeTexts.push(Array.from(arguments)) },
 			save() {},
@@ -246,6 +256,7 @@ async function testBuildingThumbnailRenderingAndV4Cache() {
 		encodeURIComponent,
 		setTimeout,
 		clearTimeout,
+		requestAnimationFrame(callback) { animationFrames += 1; setImmediate(callback); return animationFrames },
 		document,
 		Blob: FakeBlob,
 		FileReader: FakeFileReader
@@ -258,6 +269,13 @@ async function testBuildingThumbnailRenderingAndV4Cache() {
 	})
 	assert.equal(typeof afterGameInit, 'function')
 	afterGameInit({}, {
+		codex: {
+			resources: [
+				{ triplet: ['#101010', '#202020', '#303030'] },
+				{ triplet: ['#aa1100', '#ffcc22', '#771100'] },
+				{ triplet: ['#005522', '#22cc66', '#003311'] }
+			]
+		},
 		shop: {
 			items: [{
 				name: 'converter32',
@@ -271,7 +289,7 @@ async function testBuildingThumbnailRenderingAndV4Cache() {
 			error.code = 'NOT_FOUND'
 			throw error
 		},
-		async write(options) { written = options }
+		async write(options) { written = options; writes.push(options) }
 	}
 	const entry = {
 		revision: 'abcdef1234',
@@ -279,12 +297,16 @@ async function testBuildingThumbnailRenderingAndV4Cache() {
 			id: '10000000-0000-4000-8000-000000000001',
 			defaultTransform: { rotation: 90, mirrorU: false, mirrorV: false },
 			blueprint: {
-				contentBounds: { min: [0, 0], max: [2, 0] },
+				contentBounds: { min: [0, 0], max: [2, 1] },
 				entities: [
 					{ name: 'converter32', position: [0, 0] },
 					{ name: 'converter32', position: [2, 0] }
 				],
-				blocks: [{ position: [1, 0] }],
+				blocks: [{ position: [0, 0] }],
+				paintedCubes: [
+					{ position: [1, 0], state: { resources: new Array(40).fill(2).concat(new Array(24).fill(1)) } },
+					{ position: [2, 1], state: { resources: new Array(32).fill(2).concat(new Array(32).fill(1)) } }
+				],
 				surges: [{ position: [1, 0] }]
 			}
 		}
@@ -294,21 +316,86 @@ async function testBuildingThumbnailRenderingAndV4Cache() {
 	assert.equal(result.placeholder, false)
 	assert.equal(written.area, 'cache')
 	assert.equal(written.bucket, 'thumbnails')
-	assert.equal(written.name, 'v4__10000000-0000-4000-8000-000000000001__abcdef1234.png')
+	assert.equal(written.name, 'v5__10000000-0000-4000-8000-000000000001__abcdef1234.png')
 	assert.ok(drawImages.some(function (args) { return args[0] === shopImage }), 'shop image is prepared')
 	assert.ok(drawImages.some(function (args) { return args[0] !== shopImage }), 'prepared building icon is drawn into the final thumbnail')
 	assert.ok(pathMoves[0][0] > pathMoves[1][0], '90-degree default transform changes the thumbnail layout before drawing')
+	const cubeFaceColors = filledFaces.slice(2, 11).map(function (face) { return face.color })
+	assert.deepEqual(cubeFaceColors, [
+		'#70b7ff', '#3f82c4', '#a8d8ff',
+		'#aa1100', '#771100', '#ffcc22',
+		'#005522', '#003311', '#22cc66'
+	], 'cube records are depth sorted and use ordinary blue or the saved slots dominant original resource triplet')
+	assert.equal(filledFaces[4].points.length, 4, 'ordinary cubes render a three-face top polygon instead of a flat marker')
+	assert.equal(filledFaces[7].points.length, 4, 'painted cubes render a three-face top polygon instead of a flat marker')
+	const smallTopWidth = Math.max.apply(null, filledFaces[4].points.map(function (point) { return point[0] }))
+		- Math.min.apply(null, filledFaces[4].points.map(function (point) { return point[0] }))
+	const denseStart = filledFaces.length
+	await sandbox[THUMBNAIL_KEY].get(handle, {
+		revision: 'dense1234',
+		envelope: {
+			id: '20000000-0000-4000-8000-000000000002',
+			defaultTransform: { rotation: 0, mirrorU: false, mirrorV: false },
+			blueprint: {
+				contentBounds: { min: [0, 0], max: [52, 53] },
+				entities: [],
+				blocks: [{ position: [26, 26] }],
+				surges: []
+			}
+		}
+	})
+	const denseTop = filledFaces.slice(denseStart)[2]
+	const denseTopWidth = Math.max.apply(null, denseTop.points.map(function (point) { return point[0] }))
+		- Math.min.apply(null, denseTop.points.map(function (point) { return point[0] }))
+	assert.ok(denseTopWidth < smallTopWidth / 4, 'cube faces shrink from projected U/V spacing for dense blueprints')
 	assert.equal(fillRects.length, 0, 'the final thumbnail does not paint an opaque background')
 	assert.equal(strokeRects.length, 0, 'the final thumbnail does not paint a frame around the transparent canvas')
-	assert.equal(strokeTexts.length, 1, 'summary text receives a dark outline for both light and void surfaces')
+	assert.equal(strokeTexts.length, 2, 'each generated summary receives a dark outline for both light and void surfaces')
 	assert.equal(strokeTexts[0][0], '2 Buildings', 'thumbnail summary keeps only the building count')
+	assert.equal(strokeTexts[1][0], '0 Buildings', 'dense Cube-only thumbnails keep the Buildings-only footer contract')
 	assert.doesNotMatch(strokeTexts[0][0], /Cubes|Surges/i, 'thumbnail summary omits cube and surge counts')
+
+	const largeStart = filledFaces.length
+	const largeBlocks = Array.from({ length: 31000 }, function (_, index) {
+		return { position: [index % 200, Math.floor(index / 200)] }
+	})
+	const largeResult = await sandbox[THUMBNAIL_KEY].get(handle, {
+		revision: 'large31000',
+		envelope: {
+			id: '30000000-0000-4000-8000-000000000003',
+			defaultTransform: { rotation: 0, mirrorU: false, mirrorV: false },
+			blueprint: {
+				contentBounds: { min: [0, 0], max: [199, 154] },
+				entities: [], blocks: largeBlocks, paintedCubes: [], surges: []
+			}
+		}
+	})
+	assert.equal(largeResult.placeholder, false)
+	assert.equal(filledFaces.length - largeStart, 31000 * 3, 'all 31k Cubes are drawn without sampling')
+	assert.ok(animationFrames > 100, '31k collection, stable sorting, and drawing yield across many frames')
+
+	const writesBeforeCancel = writes.length
+	const cancelled = sandbox[THUMBNAIL_KEY].get(handle, {
+		revision: 'cancel31000',
+		envelope: {
+			id: '40000000-0000-4000-8000-000000000004',
+			defaultTransform: { rotation: 0, mirrorU: false, mirrorV: false },
+			blueprint: {
+				contentBounds: { min: [0, 0], max: [199, 154] },
+				entities: [], blocks: largeBlocks, paintedCubes: [], surges: []
+			}
+		}
+	})
+	await new Promise(resolve => setImmediate(resolve))
+	sandbox[THUMBNAIL_KEY].dispose('cancel-test')
+	assert.equal(await cancelled, null)
+	assert.equal(writes.length, writesBeforeCancel, 'a stale thumbnail generation cannot write the cache')
 }
 
 function testManifestAndStaticUiContracts() {
 	const manifest = JSON.parse(source('mod.json'))
-	assert.equal(manifest.version, '0.5.1')
-	assert.equal(manifest.loaderVersion, '>=0.3.1')
+	assert.equal(manifest.version, '0.6.0')
+	assert.equal(manifest.loaderVersion, '>=0.4.0')
 	assert.deepEqual(manifest.libraries.blueprints, {
 		directory: 'blueprints',
 		extensions: ['.64schem', '.cattail-blueprint.json'],
@@ -365,7 +452,7 @@ function testManifestAndStaticUiContracts() {
 	assert.match(ui, /description\.textContent = entry\.error \? entry\.error\.message : detailText\(entry\.metadata\)/)
 	assert.match(ui, /metadata\.width[\s\S]*metadata\.entityCount[\s\S]*metadata\.blockCount[\s\S]*metadata\.surgeCount[\s\S]*metadata\.schemaVersion/)
 	assert.match(ui, /metadata\.defaultTransform/)
-	assert.match(ui, /function entryDetailText\(metadata\)[\s\S]*metadata\.width \+ '×' \+ metadata\.height \+ ' · ' \+ metadata\.entityCount \+ ' Buildings · ' \+ metadata\.blockCount \+ ' Cubes · ' \+ metadata\.surgeCount \+ ' Surges · Schema ' \+ metadata\.schemaVersion \+ ' · R' \+ transform\.rotation \+ '°' \+ mirror/)
+	assert.match(ui, /function entryDetailText\(metadata\)[\s\S]*paintedCount[\s\S]*paintedCompatibility[\s\S]*metadata\.schemaVersion[\s\S]*transform\.rotation/)
 	assert.match(ui, /'Area: ' \+ metadata\.width \+ '×' \+ metadata\.height[\s\S]*'Buildings: ' \+ metadata\.entityCount[\s\S]*'Cubes: ' \+ metadata\.blockCount[\s\S]*'Surges: ' \+ metadata\.surgeCount[\s\S]*'Rotate: ' \+ transform\.rotation \+ '°'[\s\S]*'Mirror: ' \+ mirror[\s\S]*'Schema: ' \+ metadata\.schemaVersion[\s\S]*\.join\('\\n'\)/)
 	assert.match(ui, /\.cattail-world-editor-library__item-text small \{ font-size: 11px; \}/)
 	assert.match(ui, /\.cattail-world-editor-library__details p \{[\s\S]*?white-space:\s*pre-line;/)
@@ -492,7 +579,7 @@ function testManifestAndStaticUiContracts() {
 	assert.doesNotMatch(ui, /\.cattail-world-editor-dialog\[data-kind\^="blueprint-library-"\][^{]*::before/)
 	assert.match(ui, /layoutRule\.className = 'cattail-world-editor-library__layout-rule'/)
 	assert.match(ui, /layoutRule\.setAttribute\('aria-hidden', 'true'\)/)
-	assert.match(ui, /const detailsPanel = renderDetails\(selected, refreshSurface\)/)
+	assert.match(ui, /const detailsPanel = renderDetails\(selected, refreshSurface, writesBlocked\)/)
 	assert.match(ui, /layout\.append\(collection, layoutRule, detailsPanel\)/)
 	assert.match(ui, /installSurfaceScroll\(surface, \[collection, detailsPanel\]\)/)
 	assert.match(ui, /pages\?\.installTransientScrollbar\?\.\(element, SCROLLBAR_VISIBLE_CLASS\)/)
@@ -554,14 +641,14 @@ function testManifestAndStaticUiContracts() {
 	assert.match(format, /240 - utf8Length\(suffix\)/)
 	assert.match(thumbnail, /area:\s*'cache',\s*bucket:\s*'thumbnails'/)
 	assert.match(thumbnail, /handle\.write\(\{ area:\s*'cache',\s*bucket:\s*'thumbnails'/)
-	assert.match(thumbnail, /const CACHE_VERSION = 'v4'/)
+	assert.match(thumbnail, /const CACHE_VERSION = 'v5'/)
 	assert.match(thumbnail, /const summary = String\(\(blueprint\.entities \|\| \[\]\)\.length\) \+ ' Buildings'/)
 	assert.doesNotMatch(thumbnail, /length\) \+ ' cubes|length\) \+ ' surges'/i)
 	assert.doesNotMatch(thumbnail, /context\.fillStyle = '#14161b'[\s\S]*?context\.fillRect\(0, 0, canvas\.width, canvas\.height\)/)
 	assert.doesNotMatch(thumbnail, /context\.strokeRect\(\.5, \.5, canvas\.width - 1, canvas\.height - 1\)/)
 	assert.match(thumbnail, /context\.clearRect\(0, 0, canvas\.width, canvas\.height\)/)
 	assert.match(thumbnail, /context\.strokeText\(summary, 12, canvas\.height - 12\)/)
-	assert.match(thumbnail, /renderBytes\(entry\.envelope\.blueprint, entry\.envelope\.defaultTransform\)/)
+	assert.match(thumbnail, /renderBytes\(entry\.envelope\.blueprint, entry\.envelope\.defaultTransform, task\)/)
 	assert.match(thumbnail, /function transformedGeometry\(blueprint, defaultTransform\)/)
 	assert.match(thumbnail, /function defaultTransformMatrix\(value\)/)
 	assert.match(thumbnail, /const RESOLVED_CACHE_LIMIT = 128/)
@@ -575,8 +662,21 @@ function testManifestAndStaticUiContracts() {
 	assert.match(thumbnail, /context\.getImageData\(/)
 	assert.match(thumbnail, /drawEntityIcon\(context, point, iconSize, icon\)/)
 	assert.match(thumbnail, /600 12px Montserrat, Arial, sans-serif/)
-	assert.match(thumbnail, /const blocks = \(blueprint\.blocks \|\| \[\]\)\.map/)
-	assert.match(thumbnail, /const surges = \(blueprint\.surges \|\| \[\]\)\.map/)
+	assert.match(thumbnail, /const blocks = await collectRecords\(blueprint\.blocks/)
+	assert.match(thumbnail, /const paintedCubes = await collectRecords\(blueprint\.paintedCubes/)
+	assert.match(thumbnail, /const cubes = await stableSort\(blocks\.concat\(paintedCubes\)/)
+	assert.match(thumbnail, /const FRAME_BUDGET_MS = 8/)
+	assert.match(thumbnail, /requestAnimationFrame\(resume\)[\s\S]*setTimeout\(resume, 0\)/)
+	assert.match(thumbnail, /assertTaskCurrent\(task\)[\s\S]*handle\.write/)
+	assert.match(thumbnail, /function cubeMetrics\(bounds\)/)
+	assert.match(thumbnail, /Math\.min\(uSpacing, vSpacing\) \* \.42/)
+	assert.match(thumbnail, /function drawIsometricCube\(context, point, metrics, colors\)/)
+	assert.match(thumbnail, /function dominantResourceId\(resources\)/)
+	assert.match(thumbnail, /return right\[1\] - left\[1\] \|\| left\[0\] - right\[0\]/)
+	assert.match(thumbnail, /top: String\(triplet\[1\]\)\.trim\(\)/)
+	assert.match(thumbnail, /left: String\(triplet\[0\]\)\.trim\(\)/)
+	assert.match(thumbnail, /right: String\(triplet\[2\]\)\.trim\(\)/)
+	assert.match(thumbnail, /const surges = await collectRecords\(blueprint\.surges/)
 
 	assert.doesNotMatch(session, /confirmSessionReplacement/)
 	assert.doesNotMatch(input, /confirmSessionReplacement|guardedDeactivate|blueprintDirty/)
@@ -610,9 +710,9 @@ function testManifestAndStaticUiContracts() {
 async function run() {
 	testPageRegistrationAndLanguageFallback()
 	await testThumbnailCacheReadAndDeduplication()
-	await testBuildingThumbnailRenderingAndV4Cache()
+	await testBuildingAndCubeThumbnailRenderingAndV5Cache()
 	testManifestAndStaticUiContracts()
-	console.log('World Editor 5A UI verification passed: Pages API, toolbar and blueprint-card manual save entries, modal keyboard ownership and Escape/focus behavior, shared list/grid model with transparent v4 building thumbnails, game-native typography, details preferences, metadata with/without previews, CRUD/problem actions, non-blocking dialogs, overwrite-without-unsaved-guards, per-placement/per-cut layer defaults, and thumbnail cache contracts.')
+	console.log('World Editor 5A UI verification passed: Pages API, toolbar and blueprint-card manual save entries, modal keyboard ownership and Escape/focus behavior, shared list/grid model with transparent v5 building and adaptive three-face Cube thumbnails, game-native typography, details preferences, metadata with/without previews, CRUD/problem actions, non-blocking dialogs, overwrite-without-unsaved-guards, per-placement/per-cut layer defaults, and thumbnail cache contracts.')
 }
 
 run().catch(error => {

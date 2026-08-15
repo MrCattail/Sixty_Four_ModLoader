@@ -6,6 +6,7 @@ ModLoader.register({
 		const SELECTION_KEY = Symbol.for('cattail.world-editor.selection')
 		const TRANSACTIONS_KEY = Symbol.for('cattail.world-editor.transactions')
 		const DELETE_KEY = Symbol.for('cattail.world-editor.selection-delete')
+		const CREATIVE_KEY = Symbol.for('cattail.world-editor.creative-mode')
 		const I18N_KEY = Symbol.for('cattail.world-editor.i18n')
 		const DIALOGS_KEY = Symbol.for('cattail.world-editor.dialogs')
 		const SHARED_KEY = Symbol.for('cattail.world-editor.shared')
@@ -243,12 +244,27 @@ ModLoader.register({
 				showStatus('deletePlanning', 'busy', 0)
 				let plan
 				try {
-					plan = await deletion.planSelections()
+					const creative = globalThis[CREATIVE_KEY]
+					const creativeActive = !!(
+						creative &&
+						creative.game === game &&
+						creative.snapshot?.().ready &&
+						creative.snapshot?.().creativeMode
+					)
+					plan = await deletion.planSelections({
+						removeCubes: true,
+						removePaintedCubes: true,
+						removeSurges: creativeActive
+					})
 					currentDeletion = deletion.snapshot()
 					markProbe('plan-ready', {
 						safeCount: Number(plan?.summary?.safeCount) || 0,
 						protectedCount: Number(plan?.summary?.protectedCount) || 0,
 						crossBoundaryCount: Number(plan?.summary?.crossBoundaryCount) || 0,
+						buildingCount: Number(plan?.summary?.buildingCount) || 0,
+						cubeCount: Number(plan?.summary?.cubeCount) || 0,
+						paintedCubeCount: Number(plan?.summary?.paintedCubeCount) || 0,
+						surgeCount: Number(plan?.summary?.surgeCount) || 0,
 						creative: !!plan?.summary?.creative
 					})
 					if (!Number(plan?.summary?.safeCount)) {
@@ -271,23 +287,39 @@ ModLoader.register({
 
 			function openConfirmation(plan, input) {
 				const summary = plan.summary
+				const containsCubes = summary.cubeCount > 0 || summary.paintedCubeCount > 0
+				const cubeOnly = containsCubes && summary.buildingCount === 0
 				markProbe('confirmation-opened', {
 					input,
 					safeCount: summary.safeCount,
 					protectedCount: summary.protectedCount,
 					crossBoundaryCount: summary.crossBoundaryCount,
+					buildingCount: summary.buildingCount,
+					cubeCount: summary.cubeCount,
+					paintedCubeCount: summary.paintedCubeCount,
+					surgeCount: summary.surgeCount,
 					creative: summary.creative
 				})
 				const dialog = dialogs.create({
 					id: DIALOG_ID,
 					theme: game.plane ? 'void' : 'reality',
 					kind: 'danger',
-					title: text('deleteConfirmTitle'),
-					message: text('deleteConfirmMessage', {
-						safe: summary.safeCount,
-						protected: summary.protectedCount,
-						cross: summary.crossBoundaryCount
-					}),
+					title: cubeOnly
+						? text('toolbarCardDelete')
+						: text('deleteConfirmTitle'),
+					message: containsCubes
+						? text('deleteConfirmPaintedMessage', {
+							buildings: summary.buildingCount,
+							ordinary: summary.cubeCount,
+							painted: summary.paintedCubeCount,
+							protected: summary.protectedCount,
+							cross: summary.crossBoundaryCount
+						})
+						: text('deleteConfirmMessage', {
+							safe: summary.safeCount,
+							protected: summary.protectedCount,
+							cross: summary.crossBoundaryCount
+						}),
 					closeOnBackdrop: true,
 					fallbackFocus: deleteButton,
 					onClose(reason, handle) {
@@ -307,7 +339,10 @@ ModLoader.register({
 				dialog.content.append(economy)
 
 				const cancel = dialog.createButton(text('deleteCancel'))
-				const confirm = dialog.createButton(text('deleteConfirmAction'), {
+				const confirm = dialog.createButton(
+					cubeOnly
+						? text('toolbarCardDelete')
+						: text('deleteConfirmAction'), {
 					primary: true,
 					danger: true
 				})

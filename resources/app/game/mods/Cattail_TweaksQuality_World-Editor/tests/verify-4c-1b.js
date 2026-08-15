@@ -70,7 +70,7 @@ function candidateFor(plan) {
 		schema: 1,
 		cutToken: plan.signature,
 		blueprint: {
-			schemaVersion: 6,
+			schemaVersion: 7,
 			mode: 'full',
 			includeBlocks: true,
 			sourcePlane: 0,
@@ -79,14 +79,15 @@ function candidateFor(plan) {
 			emptyCells: [],
 			contentBounds: { min: [0, 0], max: [0, 0], width: 1, height: 1 },
 			entities: [{ kind: 'entity', name: 'silo', position: [0, 0] }],
-			blocks: [],
+			blocks: [{ kind: 'cube', name: 'cube', position: [1, 0] }],
+			paintedCubes: [{ kind: 'painted-cube', name: 'cube', position: [2, 0] }],
 			surges: [],
 			production: null,
 			summary: {
 				selectionCount: 1,
 				selectedCellCount: 1,
 				entityCount: 1,
-				blockCount: 0,
+				blockCount: 1,
 				crossBoundaryCount: 0,
 				skippedCount: 2,
 				capturedTypes: [{ name: 'silo', reason: 'captured', count: 1 }],
@@ -106,6 +107,7 @@ function createEnvironment(options = {}) {
 	const order = []
 	const completeCalls = []
 	const deleteCalls = []
+	const planCalls = []
 	const game = {}
 	let planValue = options.plan || deletionPlan()
 	let deletionBlocked = false
@@ -127,8 +129,9 @@ function createEnvironment(options = {}) {
 	}
 	const deletion = {
 		game,
-		async planSelections() {
+		async planSelections(planOptions) {
 			order.push('plan-deletion')
+			planCalls.push(clone(planOptions || {}))
 			return planValue
 		},
 		async execute(plan, input, executionOptions) {
@@ -202,6 +205,7 @@ function createEnvironment(options = {}) {
 		order,
 		completeCalls,
 		deleteCalls,
+		planCalls,
 		setPlan(next) {
 			planValue = next
 		},
@@ -228,9 +232,17 @@ async function testPlanningUsesOneDeletionPlan() {
 	assert.equal(result.summary.safeCount, 1)
 	assert.equal(result.summary.protectedCount, 2)
 	assert.equal(result.summary.crossBoundaryCount, 1)
+	assert.equal(result.summary.ordinaryCubeCount, 1)
+	assert.equal(result.summary.paintedCubeCount, 1)
+	assert.equal(result.summary.cubeCount, 2)
 	assert.deepEqual(clone(result.summary.resourceDelta), [3, -2])
 	assert.equal(result.candidate.cutToken, result.deletionPlan.signature)
 	assert.deepEqual(env.order, ['plan-deletion', 'prepare-blueprint'])
+	assert.deepEqual(env.planCalls, [{
+		removeCubes: false,
+		removePaintedCubes: false,
+		removeSurges: false
+	}])
 	assert.equal(env.cut.snapshot().phase, 'planned')
 	assert.equal(env.cut.snapshot().lastPlan.signature, result.deletionPlan.signature)
 
@@ -248,6 +260,59 @@ async function testPlanningUsesOneDeletionPlan() {
 	assert.equal(empty.deleteCalls.length, 0)
 }
 
+async function testSharedCubeToggleMapsToOrdinaryAndPainted() {
+	const creativePlan = deletionPlan()
+	creativePlan.summary.creative = true
+	const enabled = createEnvironment({ plan: creativePlan })
+	const enabledPlan = await enabled.cut.plan({ removeCubes: true, removeSurges: true })
+	assert.deepEqual(enabled.planCalls, [{
+		removeCubes: true,
+		removePaintedCubes: true,
+		removeSurges: true
+	}])
+	assert.equal(enabledPlan.options.removeCubes, true)
+	assert.equal(enabledPlan.options.removeSurges, true)
+
+	const disabled = createEnvironment()
+	const disabledPlan = await disabled.cut.plan({ removeCubes: false, removeSurges: false })
+	assert.deepEqual(disabled.planCalls, [{
+		removeCubes: false,
+		removePaintedCubes: false,
+		removeSurges: false
+	}])
+	assert.equal(disabledPlan.options.removeCubes, false)
+	assert.equal(disabledPlan.options.removeSurges, false)
+}
+
+async function testExecuteReplansWhenSurgeRemovalIsEnabled() {
+	const initialDeletionPlan = deletionPlan()
+	initialDeletionPlan.summary.creative = true
+	const env = createEnvironment({ plan: initialDeletionPlan })
+	const initialCutPlan = await env.cut.plan()
+	assert.equal(initialCutPlan.options.removeSurges, false)
+
+	const replannedDeletion = clone(initialDeletionPlan)
+	replannedDeletion.signature = 'deletion-signature-with-surge'
+	replannedDeletion.summary.safeCount = 2
+	replannedDeletion.summary.surgeCount = 1
+	replannedDeletion.removals.push({ name: 'surge', layer: 'surge', position: [1, 0] })
+	env.setPlan(replannedDeletion)
+	const result = await env.cut.execute(initialCutPlan, 'mouse', {
+		removeCubes: false,
+		removeSurges: true
+	})
+
+	assert.equal(result.executed, true, JSON.stringify(result))
+	assert.equal(result.deleted, true)
+	assert.deepEqual(env.planCalls, [
+		{ removeCubes: false, removePaintedCubes: false, removeSurges: false },
+		{ removeCubes: false, removePaintedCubes: false, removeSurges: true }
+	])
+	assert.equal(env.deleteCalls.length, 1)
+	assert.equal(env.deleteCalls[0].plan, replannedDeletion)
+	assert.equal(env.deleteCalls[0].options.origin, 'cut')
+}
+
 async function testClipboardBeforeSingleDeletionTransaction() {
 	const env = createEnvironment()
 	const plan = await env.cut.plan()
@@ -256,6 +321,7 @@ async function testClipboardBeforeSingleDeletionTransaction() {
 	assert.equal(result.copied, true)
 	assert.equal(result.deleted, true)
 	assert.equal(result.transaction.kind, 'selection-delete')
+	assert.equal(result.retainedCubeCount, 2)
 	assert.deepEqual(env.order, [
 		'plan-deletion',
 		'prepare-blueprint',
@@ -407,11 +473,14 @@ function testI18nManifestUiAndBoundaries() {
 		'blueprintCutFailed',
 		'cutLayerMessage',
 		'cutCubeOption',
-		'cutSurgeOption'
+		'cutSurgeOption',
+		'cutCubeSourceRemove',
+		'cutCubeSourceRetain',
+		'cutSuccessRetainedCubes'
 	]
-	assert.equal(i18n.version, '0.5.1')
+	assert.equal(i18n.version, '0.6.0')
 	assert.equal(i18n.languages.length, 20)
-	assert.equal(i18n.keys.length, 249)
+	assert.equal(i18n.keys.length, 267)
 	for (const language of i18n.languages) {
 		for (const key of keys) {
 			const value = i18n.t(language, key)
@@ -421,8 +490,8 @@ function testI18nManifestUiAndBoundaries() {
 	}
 
 	const manifest = JSON.parse(source('mod.json'))
-	assert.equal(manifest.version, '0.5.1')
-	assert.equal(manifest.entry.length, 36)
+	assert.equal(manifest.version, '0.6.0')
+	assert.equal(manifest.entry.length, 45)
 	for (const entry of [CUT_SOURCE, CUT_UI_SOURCE]) assert.ok(manifest.entry.includes(entry))
 	const blueprintIndex = manifest.entry.indexOf(BLUEPRINT_SOURCE)
 	const cutIndex = manifest.entry.indexOf(CUT_SOURCE)
@@ -436,7 +505,8 @@ function testI18nManifestUiAndBoundaries() {
 	const deletion = source(DELETE_SOURCE)
 	const shared = source(SHARED_SOURCE)
 	const readme = source('README.md')
-	assert.match(core, /deletion\.planSelections\(requestedOptions\)/)
+	assert.match(core, /deletion\.planSelections\(deletionOptionsForCut\(requestedOptions\)\)/)
+	assert.match(core, /removePaintedCubes:\s*options\.removeCubes/)
 	assert.match(core, /blueprint\.prepareCut\(deletionPlan\)/)
 	assert.match(core, /blueprint\.publishCut\(planRequest\.candidate/)
 	assert.match(core, /\{\s*origin:\s*'cut'\s*\}/)
@@ -458,6 +528,9 @@ function testI18nManifestUiAndBoundaries() {
 	assert.match(ui, /cut\.setDialogOpen\(true/)
 	assert.match(ui, /cut\.setDialogOpen\(false/)
 	assert.match(ui, /cutTargetChangedCopied/)
+	assert.match(ui, /cutCubeSourceRemove/)
+	assert.match(ui, /cutCubeSourceRetain/)
+	assert.match(ui, /cutSuccessRetainedCubes/)
 	assert.doesNotMatch(ui, /sync[- ]?empty/i)
 	assert.match(readme, /4C-1b/)
 	assert.match(readme, /Ctrl\+X/)
@@ -466,12 +539,14 @@ function testI18nManifestUiAndBoundaries() {
 
 async function run() {
 	await testPlanningUsesOneDeletionPlan()
+	await testSharedCubeToggleMapsToOrdinaryAndPainted()
+	await testExecuteReplansWhenSurgeRemovalIsEnabled()
 	await testClipboardBeforeSingleDeletionTransaction()
 	await testClipboardFailureIsZeroWorldWrite()
 	await testTargetChangeAndRollbackFailureKeepCopy()
 	await testBusyAndLifecycle()
 	testI18nManifestUiAndBoundaries()
-	console.log('World Editor 4C-1b verification passed: exact cut planning, clipboard-first safety, single deletion transaction, copied-only failures, lifecycle, Ctrl+X UI, 20 languages, manifest, and scope boundaries.')
+	console.log('World Editor 4C-1b verification passed: exact cut planning, execution-time Surge replanning, clipboard-first safety, single deletion transaction, copied-only failures, lifecycle, Ctrl+X UI, 20 languages, manifest, and scope boundaries.')
 }
 
 run().catch(error => {

@@ -134,7 +134,7 @@ function testWheelInteraction() {
 	const tool = sandbox[TOOL_KEY]
 	const interaction = sandbox[INTERACTION_KEY]
 	assert.equal(selection.version, '0.2.6')
-	assert.equal(tool.version, '0.2.6')
+	assert.equal(tool.version, '0.6.0')
 	assert.equal(interaction.version, '0.2.6')
 	assert.equal(interaction.wheelCommitMs, 1250)
 	assert.equal(interaction.wheelPixelThreshold, 100)
@@ -450,9 +450,9 @@ function testCardI18nManifestAndCompatibilityBoundary() {
 	const api = createApi()
 	for (const definition of definitions) definition.init(api)
 	const i18n = sandbox[I18N_KEY]
-	assert.equal(i18n.version, '0.5.1')
+	assert.equal(i18n.version, '0.6.0')
 	assert.equal(i18n.languages.length, 20)
-	assert.equal(i18n.keys.length, 249)
+	assert.equal(i18n.keys.length, 267)
 	assert.ok(i18n.keys.includes('wheelHint'))
 	for (const language of i18n.languages) {
 		assert.notEqual(i18n.t(language, 'wheelHint'), 'wheelHint')
@@ -507,9 +507,9 @@ function testCardI18nManifestAndCompatibilityBoundary() {
 	assert.match(dynamicCameraSource, /\},\s*true\)/)
 
 	const manifest = JSON.parse(fs.readFileSync(path.join(MOD_ROOT, 'mod.json'), 'utf8'))
-	assert.equal(manifest.version, '0.5.1')
+	assert.equal(manifest.version, '0.6.0')
 	assert.equal(manifest.languageSupport.gameLanguage, true)
-	assert.equal(manifest.entry.length, 36)
+	assert.equal(manifest.entry.length, 45)
 
 	const scriptText = manifest.entry
 		.map(relativePath => fs.readFileSync(path.join(MOD_ROOT, relativePath), 'utf8'))
@@ -517,7 +517,8 @@ function testCardI18nManifestAndCompatibilityBoundary() {
 	const readOnlyScriptText = manifest.entry
 		.filter(relativePath => (
 			relativePath !== 'scripts/core/blueprint-placement.js' &&
-			relativePath !== 'scripts/core/selection-delete.js'
+			relativePath !== 'scripts/core/selection-delete.js' &&
+			relativePath !== 'scripts/core/paint-cube-stroke.js'
 		))
 		.map(relativePath => fs.readFileSync(path.join(MOD_ROOT, relativePath), 'utf8'))
 		.join('\n')

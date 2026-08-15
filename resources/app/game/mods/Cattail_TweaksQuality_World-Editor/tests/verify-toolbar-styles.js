@@ -51,6 +51,12 @@ function testManifestAndLocalization() {
 	const i18n = sandbox[Symbol.for('cattail.world-editor.i18n')]
 	const cardKeys = [
 		'toolbarCardSelect',
+		'toolbarCardDraw',
+		'toolbarCardPaintBrush',
+		'toolbarCardPaintBucket',
+		'toolbarCardPaintEraser',
+		'toolbarCardPaintStable',
+		'toolbarCardPaintGrow',
 		'toolbarCardRemove',
 		'toolbarCardStructure',
 		'toolbarCardFull',
@@ -241,14 +247,15 @@ function testSourceContracts() {
 	assert.match(shellSource, /historyGroup\.append\(undoButton,\s*redoButton\)/)
 	assert.match(shellSource, /const blueprintLibraryGroup\s*=\s*createToolbarGroup\('blueprint-library'\)/)
 	assert.match(shellSource, /blueprintLibraryGroup\.dataset\.worldEditorSlot\s*=\s*'blueprint-library'/)
-	assert.match(shellSource, /actions\.append\(selectionGroup,\s*historyGroup,\s*blueprintGroup,\s*blueprintLibraryGroup,\s*transformGroup,\s*creativeGroup\)/)
+	assert.match(shellSource, /actions\.append\(selectionGroup,\s*historyGroup,\s*blueprintGroup,\s*blueprintLibraryGroup,\s*transformGroup,\s*drawGroup,\s*creativeGroup\)/)
 	assert.match(shellSource, /layout\.append\(statusBar,\s*toolbarBar\)/)
+	assert.match(shellSource, /layout\.append\(palettePanel\)/)
 	assert.match(shellSource, /layout\.append\(historyStatus\)/)
 	assert.match(shellSource, /Symbol\.for\('cattail\.world-editor\.blueprint-preview'\)/)
 	assert.match(shellSource, /const hasVisibleBlueprintPreview\s*=\s*!!\([^)]*currentBlueprintPreview\?\.active[^)]*!currentBlueprintPreview\?\.paused[^)]*currentBlueprintPreview\?\.target[^)]*currentBlueprintPreview\?\.blueprint[^)]*\)/s)
 	assert.match(shellSource, /blueprintMode\s*=\s*currentBlueprintPreview\?\.blueprint\?\.mode\s*===\s*'full'\s*\?\s*'full'\s*:\s*'structure'/)
 	assert.match(shellSource, /blueprintMode\s*===\s*'full'\s*\?\s*'blueprintModeFull'\s*:\s*'blueprintModeStructure'/)
-	assert.match(shellSource, /shell\.dataset\.mode\s*=\s*hasVisibleBlueprintPreview\s*\?\s*'blueprint-'\s*\+\s*blueprintMode\s*:\s*'select'/)
+	assert.match(shellSource, /shell\.dataset\.mode\s*=\s*hasVisibleBlueprintPreview\s*\?\s*'blueprint-'\s*\+\s*blueprintMode\s*:\s*currentTool\?\.mode\s*===\s*'draw'\s*\?\s*'draw'\s*:\s*'select'/)
 	assert.match(shellSource, /modeElement\.dataset\.creative\s*=\s*currentCreative\?\.ready\s*&&\s*currentCreative\?\.creativeMode\s*\?\s*'true'\s*:\s*'false'/)
 	assert.match(shellSource, /stopBlueprintPreviewSubscription\s*=\s*blueprintPreview\.subscribe\(function \(state\)/)
 	assert.match(shellSource, /blueprintPreviewAttachTimer\s*=\s*globalThis\.setTimeout\?\.\(attachBlueprintPreview,\s*0\)/)
@@ -261,7 +268,14 @@ function testSourceContracts() {
 	assert.match(shellSource, /--world-editor-shell-hover-color:\s*#b56b87/)
 	assert.match(shellSource, /--world-editor-shell-hover-filter:\s*brightness\(0\)/)
 	assert.match(shellSource, /createIconButton\('remove-selection',\s*'',\s*'remove',\s*'',\s*'eraser'\)/)
+	assert.match(shellSource, /createIconButton\('paint-brush',\s*'',\s*'paint-brush',\s*'',\s*'brush'\)/)
+	assert.match(shellSource, /createIconButton\('paint-bucket',\s*'',\s*'paint-bucket',\s*'',\s*'bucket'\)/)
+	assert.match(shellSource, /createIconButton\('paint-eraser',\s*'',\s*'paint-eraser',\s*'',\s*'eraser'\)/)
+	assert.match(shellSource, /createIconButton\('paint-palette',\s*'',\s*'paint-palette',\s*'',\s*'palette'\)/)
+	assert.match(shellSource, /\[data-world-editor-toolbar-icon="brush"\]::after/)
 	assert.match(shellSource, /\[data-world-editor-toolbar-icon="eraser"\]::before/)
+	assert.match(shellSource, /\[data-world-editor-toolbar-icon="palette"\]::before/)
+	assert.match(shellSource, /\[data-world-editor-toolbar-icon="palette"\]::after/)
 	assert.match(shellSource, /\[data-world-editor-toolbar-icon="pickaxe"\]::after/)
 	assert.match(deleteUiSource, /compactIcon\.dataset\.worldEditorToolbarIcon\s*=\s*'pickaxe'/)
 	assert.match(deleteUiSource, /cardIcon\.dataset\.worldEditorToolbarIcon\s*=\s*'pickaxe'/)
@@ -357,7 +371,13 @@ function testSourceContracts() {
 	assert.match(shellSource, /\[data-toolbar-style="compact"\][^{]*\.cattail-world-editor-blueprint-mode \.cattail-world-editor-blueprint-compact-label\s*\{\s*display:\s*none;/)
 	assert.match(shellSource, /\[data-toolbar-style="compact"\][^{]*\.cattail-world-editor-blueprint-mode \.cattail-world-editor-blueprint-card-icon\s*\{[^}]*display:\s*inline-block;[^}]*font:\s*700 20px\/1/s)
 	assert.match(shellSource, /\[data-toolbar-style="compact"\][^{]*\.cattail-world-editor-blueprint-mode\[data-active="true"\]\s*\{[^}]*background:\s*transparent !important;[^}]*box-shadow:\s*inset 0 -3px 0 var\(--world-editor-hell-gem-3, #4CB96B\) !important;/s)
+	assert.match(shellSource, /--world-editor-draw-pink-glass:[\s\S]*?var\(--world-editor-draw-pink-1\)[\s\S]*?--world-editor-draw-pink-glass-hover:/)
+	assert.match(shellSource, /--world-editor-draw-pink-glass-shadow:[\s\S]*?var\(--world-editor-draw-pink-1\)[\s\S]*?--world-editor-draw-pink-glass-shadow-hover:/)
+	assert.match(shellSource, /\.cattail-world-editor-shell__tool--draw\[data-active="true"\]\s*\{[^}]*background:\s*var\(--world-editor-draw-pink-glass\);[^}]*backdrop-filter:\s*var\(--world-editor-glass-backdrop\);[^}]*box-shadow:\s*var\(--world-editor-draw-pink-glass-shadow\);/s)
+	assert.match(shellSource, /\.cattail-world-editor-shell__tool--draw\[data-active="true"\]:hover:not\(:disabled\):not\(\[aria-disabled="true"\]\)\s*\{[^}]*background:\s*var\(--world-editor-draw-pink-glass-hover\);[^}]*box-shadow:\s*var\(--world-editor-draw-pink-glass-shadow-hover\);/s)
 	assert.match(shellSource, /\[data-toolbar-style="compact"\][^{]*\.cattail-world-editor-transform-button\[data-active="true"\]\s*\{[^}]*background:\s*var\(--world-editor-shell-active\) !important;/s)
+	assert.match(shellSource, /\[data-toolbar-style="compact"\]\s+\[data-world-editor-toolbar-group="draw"\]\s+\.cattail-world-editor-shell__tool\[data-active="true"\]:not\(\.cattail-world-editor-shell__tool--draw\)\s*\{[^}]*background:\s*transparent !important;[^}]*box-shadow:\s*inset 0 -3px 0 var\(--world-editor-hell-gem-3, #4CB96B\) !important;/s)
+	assert.match(shellSource, /\[data-toolbar-style="compact"\]\s+\.cattail-world-editor-shell__tool--draw\[data-active="true"\]\s*\{[^}]*background:\s*var\(--world-editor-draw-pink-glass\) !important;[^}]*box-shadow:\s*var\(--world-editor-draw-pink-glass-shadow\) !important;/s)
 	assert.match(shellSource, /toolbarBar\.dataset\.scrolling\s*=\s*'true'/)
 	assert.match(shellSource, /toolbarBar\.dataset\.scrolling\s*=\s*'false'/)
 	assert.match(shellSource, /lastRequestedPosition\s*=\s*next\s*\n\s*actions\.scrollLeft\s*=\s*next/)
@@ -401,6 +421,10 @@ function testSourceContracts() {
 	assert.match(shellSource, /\[data-toolbar-style="cards"\][^{]*\[data-world-editor-toolbar-card\]:hover:not\(:disabled\):not\(\[aria-disabled="true"\]\)\s*\{[^}]*color:\s*var\(--world-editor-shell-hover-color\) !important;/s)
 	assert.match(shellSource, /\.cattail-world-editor-shell__style-button\[data-active="true"\]:hover\s*\{[^}]*background:\s*var\(--world-editor-shell-hover-bg\);[^}]*color:\s*var\(--world-editor-shell-hover-color\);/s)
 	assert.match(shellSource, /blueprint-mode\[data-active="true"\]:hover:not\(:disabled\)::after\s*\{[^}]*background:\s*var\(--world-editor-shell-hover-bg\) !important;[^}]*box-shadow:\s*inset 0 -3px 0 var\(--world-editor-hell-gem-3, #4CB96B\) !important;/s)
+	assert.match(shellSource, /\[data-toolbar-style="cards"\]\s+\[data-world-editor-toolbar-group="draw"\]\s+\.cattail-world-editor-shell__tool\[data-active="true"\]:not\(\.cattail-world-editor-shell__tool--draw\)::after\s*\{[^}]*background:\s*transparent;[^}]*box-shadow:\s*inset 0 -3px 0 var\(--world-editor-hell-gem-3, #4CB96B\);/s)
+	assert.match(shellSource, /\[data-toolbar-style="cards"\]\s+\.cattail-world-editor-shell__tool--draw\[data-active="true"\]::after\s*\{[^}]*background:\s*var\(--world-editor-draw-pink-glass\);[^}]*backdrop-filter:\s*var\(--world-editor-glass-backdrop\);[^}]*box-shadow:\s*var\(--world-editor-draw-pink-glass-shadow\);/s)
+	assert.match(shellSource, /tool--draw\[data-active="true"\]:hover:not\(:disabled\):not\(\[aria-disabled="true"\]\)::after\s*\{[^}]*background:\s*var\(--world-editor-draw-pink-glass-hover\) !important;[^}]*backdrop-filter:\s*var\(--world-editor-glass-backdrop\) !important;[^}]*box-shadow:\s*var\(--world-editor-draw-pink-glass-shadow-hover\) !important;/s)
+	assert.doesNotMatch(shellSource, /tool--draw\[data-active="true"\]:hover[^}]*background:\s*var\(--world-editor-shell-hover-bg\)/s)
 	assert.match(shellSource, /tool--creative\[data-creative="true"\]:hover:not\(:disabled\):not\(\[aria-disabled="true"\]\)::after\s*\{[^}]*background:\s*var\(--world-editor-hell-gem-glass-hover\) !important;[^}]*backdrop-filter:\s*var\(--world-editor-glass-backdrop\) !important;[^}]*box-shadow:\s*var\(--world-editor-hell-gem-glass-shadow-hover\) !important;/s)
 	assert.doesNotMatch(shellSource, /tool--creative\[data-creative="true"\]:hover[^}]*background:\s*var\(--world-editor-shell-hover-bg\)/s)
 	assert.match(blueprintSource, /data-toolbar-style="compact"[^}]*blueprint-action="blocks"\]\[data-active="true"\]:hover:not\(:disabled\)[\s\S]*?background:\s*var\(--world-editor-hell-gem-glass-hover\) !important;[\s\S]*?color:\s*#17200c !important;/)
@@ -447,7 +471,7 @@ function testSourceContracts() {
 	assert.match(blueprintSource, /action\s*===\s*'reset'\s*&&\s*!!currentTransform\.identity/)
 	assert.match(blueprintSource, /root\.hidden\s*=\s*!available/)
 	assert.match(blueprintSource, /full\.hidden\s*=\s*!creativeAvailable/)
-	assert.match(blueprintSource, /blocksAvailable\s*=\s*creativeAvailable\s*&&\s*state\.mode\s*===\s*'full'\s*&&\s*!!state\.sourceBlueprint\?\.blocks\?\.length/)
+	assert.match(blueprintSource, /blocksAvailable\s*=\s*creativeAvailable\s*&&\s*state\.mode\s*===\s*'full'\s*&&\s*hasCubeLayer\(state\.sourceBlueprint\)/)
 	assert.match(blueprintSource, /blocks\.hidden\s*=\s*!blocksAvailable/)
 	assert.match(blueprintSource, /surgesAvailable\s*=\s*creativeAvailable\s*&&\s*state\.mode\s*===\s*'full'\s*&&\s*!!state\.sourceBlueprint\?\.surges\?\.length/)
 	assert.match(blueprintSource, /surges\.hidden\s*=\s*!surgesAvailable/)

@@ -245,7 +245,7 @@ function createEnvironment(options = {}) {
 }
 
 function testSourceAndManifestContracts() {
-	assert.equal(manifest.version, '0.5.1')
+	assert.equal(manifest.version, '0.6.0')
 	const cursorIndex = manifest.entry.indexOf('scripts/render/selection-cursor.js')
 	assert.ok(cursorIndex > manifest.entry.indexOf('scripts/blueprint-preview.js'))
 	assert.ok(cursorIndex < manifest.entry.indexOf('scripts/render/blueprint-thumbnail.js'))

@@ -224,6 +224,8 @@ ModLoader.register({
 							FAILURE_MS,
 							deletion.snapshot().refreshWarning.message
 						)
+					} else if (Number(result?.retainedCubeCount) > 0) {
+						showStatus('cutSuccessRetainedCubes', 'warning', SUCCESS_MS)
 					} else {
 						showStatus('cutSuccess', 'success', SUCCESS_MS)
 					}
@@ -318,13 +320,24 @@ ModLoader.register({
 					layerOptions.className = 'cattail-world-editor-selection-cut__layers'
 					const cubes = dialog.createButton('', {})
 					const surges = dialog.createButton('', {})
+					const cubeOutcome = document.createElement('p')
+					cubeOutcome.className = 'cattail-world-editor-selection-cut__layers-message'
 					cubes.classList.add('cattail-world-editor-selection-cut__layer-option')
 					surges.classList.add('cattail-world-editor-selection-cut__layer-option')
 					cubes.hidden = !summary.cubeCount
 					surges.hidden = !summary.surgeCount
+					cubeOutcome.hidden = !summary.cubeCount
 					const renderLayers = function () {
-						cubes.textContent = text('cutCubeOption', { count: summary.cubeCount })
+						cubes.textContent = text('cutCubeOption', {
+							count: summary.cubeCount,
+							ordinary: summary.ordinaryCubeCount,
+							painted: summary.paintedCubeCount
+						})
 						surges.textContent = text('cutSurgeOption', { count: summary.surgeCount })
+						cubeOutcome.textContent = text(
+							removeCubes ? 'cutCubeSourceRemove' : 'cutCubeSourceRetain',
+							{ count: summary.cubeCount }
+						)
 						for (const entry of [[cubes, removeCubes], [surges, removeSurges]]) {
 							entry[0].dataset.active = entry[1] ? 'true' : 'false'
 							entry[0].setAttribute('aria-pressed', entry[1] ? 'true' : 'false')
@@ -334,7 +347,7 @@ ModLoader.register({
 					surges.addEventListener('click', function () { removeSurges = !removeSurges; renderLayers() })
 					renderLayers()
 					layerOptions.append(cubes, surges)
-					dialog.content.append(layerMessage, layerOptions)
+					dialog.content.append(layerMessage, layerOptions, cubeOutcome)
 				}
 				const economy = document.createElement('p')
 				economy.className = 'cattail-world-editor-selection-cut__economy'

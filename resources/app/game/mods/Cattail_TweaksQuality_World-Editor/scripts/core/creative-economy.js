@@ -4,9 +4,11 @@ ModLoader.register({
 		const MOD_ID = api.id
 		const ECONOMY_KEY = Symbol.for('cattail.world-editor.creative-economy')
 		const CREATIVE_KEY = Symbol.for('cattail.world-editor.creative-mode')
+		const TRANSACTIONS_KEY = Symbol.for('cattail.world-editor.transactions')
 		const CONFIG_KEY = 'showCreativePurchaseCosts'
 		const COUNTDOWN_SELECTOR = '.cattail-build-countdown'
 		const COUNTDOWN_PRICE_CLASS = 'cattail-has-active-build-countdown'
+		const TARGET_UNAVAILABLE = Symbol('creative-target-unavailable')
 		const DISPLAY_TIMES = Object.freeze({
 			success: 1500,
 			cancelled: 3000,
@@ -117,6 +119,7 @@ ModLoader.register({
 					const args = Array.from(arguments)
 					const service = serviceFor(game)
 					if (!service?.isCreativeActive?.()) return original.apply(game, args)
+					if (service.isWriteBlocked()) return undefined
 					return withRelocationCredit(game, function () {
 						return original.apply(game, args)
 					})
@@ -220,6 +223,7 @@ ModLoader.register({
 							const service = serviceFor(game)
 							if (
 								!service?.isCreativeActive?.() ||
+								service.isWriteBlocked() ||
 								!Array.isArray(game?.resources) ||
 								Number(game.resources[4]) >= 1 ||
 								!canStartRelocation(game, entity)
@@ -378,6 +382,7 @@ ModLoader.register({
 			})
 
 			function snapshot() {
+				const writeBlockedReason = readWriteBlockedReason()
 				return Object.freeze({
 					version: '1.0.0',
 					ready: !disposed && !!controller && typeof snapshots?.create === 'function',
@@ -390,6 +395,7 @@ ModLoader.register({
 					lastReason,
 					lastSnapshotId,
 					error: publicError(error),
+					writeBlockedReason,
 					disposed
 				})
 			}
@@ -423,7 +429,29 @@ ModLoader.register({
 				return api.config.get(CONFIG_KEY, false) === true
 			}
 
+			function readWriteBlockedReason() {
+				const transactions = globalThis[TRANSACTIONS_KEY]
+				if (!transactions || transactions.game !== game) return null
+				if (typeof transactions.writeBlockedReason === 'function') {
+					return transactions.writeBlockedReason()
+				}
+				return transactions.snapshot?.().terminalBlockedReason || null
+			}
+
+			function isWriteBlocked() {
+				return readWriteBlockedReason() === 'ROLLBACK_FAILED'
+			}
+
 			async function requestOperation(intent, execute) {
+				const writeBlockedReason = readWriteBlockedReason()
+				if (writeBlockedReason) {
+					return Object.freeze({
+						accepted: false,
+						executed: false,
+						reason: writeBlockedReason,
+						error: publicError(createError(writeBlockedReason, 'Reload is required before world changes can continue.'))
+					})
+				}
 				if (
 					disposed ||
 					busy ||
@@ -478,8 +506,9 @@ ModLoader.register({
 					const currentIdentity = readCurrentSaveIdentity(game)
 					if (
 						currentIdentity !== saveIdentity ||
-						!isIntentStillValid(game, intent) ||
-						!isCreativeActive()
+						!isFrozenIntentStillValid(game, intent) ||
+						!isCreativeActive() ||
+						isWriteBlocked()
 					) {
 						await removeUnusedSnapshot(created, 'target-changed')
 						complete('cancelled', 'creative-shop-target-changed')
@@ -493,14 +522,14 @@ ModLoader.register({
 
 					phase = 'executing'
 					notify('creative-shop-' + intent.operation + '-executing')
-					if (!isIntentStillValid(game, intent) || !isCreativeActive()) {
+					if (!isFrozenIntentStillValid(game, intent) || !isCreativeActive() || isWriteBlocked()) {
 						await removeUnusedSnapshot(created, 'target-changed')
 						complete('cancelled', 'creative-shop-target-changed')
 						return Object.freeze({ accepted: true, executed: false, reason: 'target-changed' })
 					}
 					executionStarted = true
 					try {
-						execute()
+						withFrozenIntentTarget(game, intent, execute)
 					} catch (executionError) {
 						throw createError(
 							'EXECUTION_FAILED',
@@ -720,8 +749,9 @@ ModLoader.register({
 					}
 				},
 				isInputBlocked() {
-					return !disposed && busy
+					return !disposed && (busy || isWriteBlocked())
 				},
+				isWriteBlocked,
 				isCreativeActive,
 				showPurchaseCosts,
 				requestOperation,
@@ -779,6 +809,7 @@ ModLoader.register({
 				item,
 				hovered,
 				transported,
+				canPlace: game.canPlace === true,
 				touchAction: touchAction || null
 			})
 		}
@@ -865,6 +896,73 @@ ModLoader.register({
 				return false
 			}
 			return true
+		}
+
+		function isFrozenIntentStillValid(game, intent) {
+			if (!game || !intent || Number(game.plane) !== intent.plane) return false
+			const service = serviceFor(game)
+			if (!service?.isCreativeActive?.()) return false
+			if (game.itemInHand !== intent.item) return false
+			if ((game.transportedEntity || null) !== intent.transported) return false
+			const targetEntity = readIntentTargetEntity(game, intent)
+			if (targetEntity === TARGET_UNAVAILABLE || targetEntity !== intent.hovered) return false
+			return withIntentTargetContext(game, intent, targetEntity, function () {
+				const operation = classifyOperation(game, intent.touchAction)
+				if (operation !== intent.operation) return false
+				return intentEntityName(
+					operation,
+					game.itemInHand || null,
+					game.hoveredEntity || null,
+					game.transportedEntity || null
+				) === intent.entityName
+			}, true)
+		}
+
+		function readIntentTargetEntity(game, intent) {
+			const target = [intent.target.u, intent.target.v]
+			try {
+				if (typeof game.entityAtCoordinates === 'function') {
+					return game.entityAtCoordinates(target) || null
+				}
+				const current = normalizeCell(game.hoveredCell)
+				if (current && current[0] === target[0] && current[1] === target[1]) {
+					return game.hoveredEntity || null
+				}
+			} catch (error) {}
+			return TARGET_UNAVAILABLE
+		}
+
+		function withFrozenIntentTarget(game, intent, callback) {
+			const targetEntity = readIntentTargetEntity(game, intent)
+			if (targetEntity === TARGET_UNAVAILABLE || targetEntity !== intent.hovered) {
+				throw createError('TARGET_CHANGED', 'The frozen creative target changed before execution.')
+			}
+			return withIntentTargetContext(game, intent, targetEntity, callback, false, true)
+		}
+
+		function withIntentTargetContext(game, intent, targetEntity, callback, freezeCanPlace, refreshAfter) {
+			const previousCell = game.hoveredCell
+			const previousEntity = game.hoveredEntity
+			const previousCanPlace = game.canPlace
+			game.hoveredCell = [intent.target.u, intent.target.v]
+			game.hoveredEntity = targetEntity || null
+			if (freezeCanPlace) game.canPlace = intent.canPlace === true
+			try {
+				return callback()
+			} finally {
+				game.hoveredCell = previousCell
+				game.hoveredEntity = previousEntity
+				game.canPlace = previousCanPlace
+				if (refreshAfter && typeof game.processMousemove2 === 'function') {
+					try {
+						game.processMousemove2()
+					} catch (error) {
+						game.hoveredCell = previousCell
+						game.hoveredEntity = previousEntity
+						game.canPlace = previousCanPlace
+					}
+				}
+			}
 		}
 
 		function intentEntityName(operation, item, hovered, transported) {

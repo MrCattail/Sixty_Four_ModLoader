@@ -273,6 +273,34 @@ function testCtrlAndPrimaryInput() {
 	runtime.runCleanups()
 }
 
+function testDrawModeBypassesSelectionInput() {
+	const { canvas, runtime, selection, tool } = setupInput()
+	selectRange(selection, [1, 1], [3, 3])
+	const before = plain(selection.snapshot())
+
+	assert.equal(tool.setMode('draw', 'test-draw-input-ownership'), true)
+	const down = canvas.dispatch('mousedown', createEvent({ button: 0, buttons: 1, offsetX: 20, offsetY: 20 }))
+	const move = canvas.dispatch('mousemove', createEvent({ buttons: 1, offsetX: 24, offsetY: 24 }))
+	const up = canvas.dispatch('mouseup', createEvent({ button: 0, offsetX: 24, offsetY: 24 }))
+	const clickEvent = canvas.dispatch('click', createEvent({ button: 0, offsetX: 24, offsetY: 24 }))
+	for (const event of [down, move, up, clickEvent]) {
+		assert.equal(event.defaultPrevented, true)
+		assert.equal(event.immediatePropagationStopped, true)
+	}
+	const rightDown = canvas.dispatch('mousedown', createEvent({ button: 2, buttons: 2, offsetX: 24, offsetY: 24 }))
+	const rightMove = canvas.dispatch('mousemove', createEvent({ buttons: 2, offsetX: 28, offsetY: 28 }))
+	for (const event of [rightDown, rightMove]) {
+		assert.equal(event.defaultPrevented, false)
+		assert.equal(event.immediatePropagationStopped, false)
+	}
+	assert.deepEqual(plain(selection.snapshot()), before)
+
+	assert.equal(tool.setMode('select', 'test-select-input-ownership'), true)
+	click(canvas, 20, 20)
+	assert.equal(selection.snapshot().previewMode, 'replace')
+	runtime.runCleanups()
+}
+
 function createSelectionFeed(initial) {
 	let state = initial
 	const listeners = new Set()
@@ -410,9 +438,9 @@ function testI18nManifestAndReadOnlyBoundary() {
 	const { definitions, sandbox } = loadModules(['scripts/i18n/editor-text.js'])
 	for (const definition of definitions) definition.init(createApi())
 	const i18n = sandbox[I18N_KEY]
-	assert.equal(i18n.version, '0.5.1')
+	assert.equal(i18n.version, '0.6.0')
 	assert.equal(i18n.languages.length, 20)
-	assert.equal(i18n.keys.length, 249)
+	assert.equal(i18n.keys.length, 267)
 	assert.ok(i18n.keys.includes('removeSelection'))
 	for (const language of i18n.languages) {
 		const translated = i18n.t(language, 'removeSelection')
@@ -442,9 +470,9 @@ function testI18nManifestAndReadOnlyBoundary() {
 	assert.match(controllerSource, /selection\.isPrimarySelected/)
 
 	const manifest = JSON.parse(fs.readFileSync(path.join(MOD_ROOT, 'mod.json'), 'utf8'))
-	assert.equal(manifest.version, '0.5.1')
+	assert.equal(manifest.version, '0.6.0')
 	assert.equal(manifest.languageSupport.gameLanguage, true)
-	assert.equal(manifest.entry.length, 36)
+	assert.equal(manifest.entry.length, 45)
 
 	const scriptText = manifest.entry
 		.map(relativePath => fs.readFileSync(path.join(MOD_ROOT, relativePath), 'utf8'))
@@ -452,7 +480,8 @@ function testI18nManifestAndReadOnlyBoundary() {
 	const readOnlyScriptText = manifest.entry
 		.filter(relativePath => (
 			relativePath !== 'scripts/core/blueprint-placement.js' &&
-			relativePath !== 'scripts/core/selection-delete.js'
+			relativePath !== 'scripts/core/selection-delete.js' &&
+			relativePath !== 'scripts/core/paint-cube-stroke.js'
 		))
 		.map(relativePath => fs.readFileSync(path.join(MOD_ROOT, relativePath), 'utf8'))
 		.join('\n')
@@ -480,7 +509,8 @@ function testI18nManifestAndReadOnlyBoundary() {
 
 testMultiSelectionState()
 testCtrlAndPrimaryInput()
+testDrawModeBypassesSelectionInput()
 testMultiSelectionRendering()
 testI18nManifestAndReadOnlyBoundary()
 
-console.log('2G verification passed: Ctrl-add mode locking, stable selection IDs, overlap-primary ordering, independent move/resize, primary removal, Backspace protection, primary-only compatibility fields, secondary rendering, 20-language UI, manifest, and read-only boundary.')
+console.log('2G verification passed: Ctrl-add mode locking, draw-mode input ownership, stable selection IDs, overlap-primary ordering, independent move/resize, primary removal, Backspace protection, primary-only compatibility fields, secondary rendering, 20-language UI, manifest, and read-only boundary.')

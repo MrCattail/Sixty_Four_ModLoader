@@ -113,8 +113,10 @@ function createGame(options = {}) {
 			}
 		},
 		shop: {
-			updateElements() {},
-			check() {}
+			updates: 0,
+			checks: 0,
+			updateElements() { this.updates += 1 },
+			check() { this.checks += 1 }
 		},
 		processMousemove2() {},
 		assembleSave() {
@@ -167,6 +169,8 @@ function createGame(options = {}) {
 			if (this.throwOnClear) throw new Error('clear failed')
 			const entity = this.entityAtCoordinates(position)
 			if (!entity) return false
+			this.clearCalls += 1
+			this.shop.updateElements()
 			for (const [key, value] of Array.from(cells.entries())) {
 				if (value === entity) cells.delete(key)
 			}
@@ -179,6 +183,7 @@ function createGame(options = {}) {
 			return true
 		},
 		addCalls: 0,
+		clearCalls: 0,
 		failAddAt: null,
 		throwOnClear: false
 	}
@@ -1056,6 +1061,66 @@ async function testUndoAffordabilityRetainsHistory() {
 	runtime.dispose()
 }
 
+async function testBatchedUndoRefreshAndIndexedVerification() {
+	const buildCount = 144
+	const runtime = loadRuntime({ creative: true, resources: [0, 0] })
+	const records = Array.from({ length: buildCount }, function (_, index) {
+		return { name: 'pinhole', position: [index % 24, Math.floor(index / 24)] }
+	})
+	const placed = await runtime.placement.place({
+		blueprint: blueprint(records),
+		target: [120, 120]
+	})
+	assert.equal(placed.executed, true)
+	assert.equal(runtime.game.stuff.length, buildCount)
+
+	const originalLookup = runtime.game.entityAtCoordinates.bind(runtime.game)
+	let lookupCalls = 0
+	runtime.game.entityAtCoordinates = function (position) {
+		lookupCalls += 1
+		return originalLookup(position)
+	}
+	runtime.game.clearCalls = 0
+	runtime.game.shop.updates = 0
+	runtime.game.shop.checks = 0
+	const undone = await runtime.placement.undo('keyboard')
+	assert.equal(undone.executed, true)
+	assert.equal(runtime.game.clearCalls, buildCount, 'Undo retains one vanilla clearCell call per building')
+	assert.equal(runtime.game.shop.updates, 1, 'per-building shop refreshes are deferred to one world refresh')
+	assert.equal(runtime.game.shop.checks, 1)
+	assert.equal(runtime.game.stuff.length, 0)
+	assert.ok(
+		lookupCalls < buildCount * 12,
+		'Undo target and verify lookups remain linear instead of rescanning every scope cell per building'
+	)
+
+	runtime.game.shop.updates = 0
+	const redone = await runtime.placement.redo('keyboard')
+	assert.equal(redone.executed, true)
+	assert.equal(runtime.game.stuff.length, buildCount)
+	assert.equal(runtime.game.shop.updates, 1)
+	runtime.dispose()
+
+	const failureRuntime = loadRuntime({ creative: true, resources: [0, 0] })
+	assert.equal((await failureRuntime.placement.place({
+		blueprint: blueprint([{ name: 'pinhole', position: [0, 0] }]),
+		target: [220, 220]
+	})).executed, true)
+	const originalUpdateElements = failureRuntime.game.shop.updateElements
+	failureRuntime.game.shop.updates = 0
+	failureRuntime.game.throwOnClear = true
+	const failedUndo = await failureRuntime.placement.undo('keyboard')
+	assert.equal(failedUndo.executed, false)
+	assert.equal(failureRuntime.game.shop.updateElements, originalUpdateElements)
+	assert.equal(failureRuntime.game.shop.updates, 1, 'rollback refresh runs after the original shop method is restored')
+	failureRuntime.game.throwOnClear = false
+	failureRuntime.game.shop.updates = 0
+	assert.equal((await failureRuntime.placement.undo('keyboard')).executed, true)
+	assert.equal(failureRuntime.game.shop.updateElements, originalUpdateElements)
+	assert.equal(failureRuntime.game.shop.updates, 1)
+	failureRuntime.dispose()
+}
+
 async function testPreviewCommandLockLifecycle() {
 	const runtime = loadPreviewRuntime()
 	const sourceBlueprint = blueprint([{ name: 'silo', position: [0, 0] }])
@@ -1125,8 +1190,8 @@ async function testPreviewCommandLockLifecycle() {
 
 function testStaticUiLocalizationAndManifestContracts() {
 	const manifest = JSON.parse(source('mod.json'))
-	assert.equal(manifest.version, '0.5.1')
-	assert.equal(manifest.entry.length, 36)
+	assert.equal(manifest.version, '0.6.0')
+	assert.equal(manifest.entry.length, 45)
 	assert.ok(manifest.entry.indexOf(PLACEMENT_SOURCE) > manifest.entry.indexOf(PLAN_SOURCE))
 	assert.ok(manifest.entry.indexOf(PLACEMENT_SOURCE) < manifest.entry.indexOf('scripts/core/input-controller.js'))
 	assert.ok(manifest.entry.indexOf(DIALOG_SOURCE) > manifest.entry.indexOf('scripts/ui/card-opacity.js'))
@@ -1150,6 +1215,9 @@ function testStaticUiLocalizationAndManifestContracts() {
 	assert.match(placementSource, /PRICE_CHANGED/)
 	assert.match(placementSource, /sameEconomy\(currentEconomy, payload\.economy\)/)
 	assert.match(placementSource, /rollbackMutations\(state\)/)
+	assert.match(placementSource, /withDeferredShopUpdates/)
+	assert.match(placementSource, /scopeIdentitySet\(payload, observed\)/)
+	assert.doesNotMatch(placementSource, /scopeContainsIdentity/)
 
 	assert.match(dialogSource, /Symbol\.for\('cattail\.world-editor\.dialogs'\)/)
 	assert.match(dialogSource, /setAttribute\('role', 'dialog'\)/)
@@ -1236,6 +1304,7 @@ async function run() {
 	await testAtomicRollbackAndExternalChangeGuard()
 	await testRollbackFailureEntersTerminalBlock()
 	await testUndoAffordabilityRetainsHistory()
+	await testBatchedUndoRefreshAndIndexedVerification()
 	await testPreviewCommandLockLifecycle()
 	testStaticUiLocalizationAndManifestContracts()
 	console.log(

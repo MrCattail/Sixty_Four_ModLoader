@@ -31,7 +31,7 @@ function testSourceContracts() {
 	assert.match(shellSource, /createHistoryButton\('undo',\s*'↶'\)/)
 	assert.match(shellSource, /createHistoryButton\('redo',\s*'↷'\)/)
 	assert.match(shellSource, /historyGroup\.append\(undoButton,\s*redoButton\)/)
-	assert.match(shellSource, /actions\.append\(selectionGroup,\s*historyGroup,\s*blueprintGroup,\s*blueprintLibraryGroup,\s*transformGroup,\s*creativeGroup\)/)
+	assert.match(shellSource, /actions\.append\(selectionGroup,\s*historyGroup,\s*blueprintGroup,\s*blueprintLibraryGroup,\s*transformGroup,\s*drawGroup,\s*creativeGroup\)/)
 	assert.match(shellSource, /button\.disabled\s*=\s*false/)
 	assert.match(shellSource, /definition\.button\.setAttribute\('aria-disabled',\s*reason\s*\?\s*'true'\s*:\s*'false'\)/)
 	assert.match(shellSource, /worldEditorToolbarBusy\s*=\s*reason\s*===\s*'BUSY'/)
@@ -293,6 +293,31 @@ function createDocument() {
 	return document
 }
 
+function createSettingsUi(document) {
+	return {
+		version: 1,
+		createControl(definition, options = {}) {
+			const element = document.createElement('input')
+			element.type = definition.type === 'slider' ? 'range' : 'number'
+			element.value = String(options.value ?? definition.default ?? 0)
+			const handle = {
+				element,
+				input: element,
+				getValue() { return Number(element.value) },
+				setValue(value) { element.value = String(value); return Number(element.value) },
+				validate() {
+					const value = Number(element.value)
+					return Number.isFinite(value) ? { valid: true, value, error: null } : { valid: false, value: undefined, error: new Error('Invalid number') }
+				},
+				setDisabled(value) { element.disabled = !!value; return handle },
+				destroy() { element.remove?.() }
+			}
+			return handle
+		},
+		scroll: { attach() { return function () {} } }
+	}
+}
+
 class EventHub {
 	constructor() {
 		this.listeners = new Map()
@@ -527,6 +552,7 @@ async function testMountedBehavior() {
 			set() {}
 		},
 		ui: {
+			settings: createSettingsUi(document),
 			hud: {
 				isHidden() { return false },
 				register() { return function () {} }

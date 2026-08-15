@@ -2,6 +2,9 @@ ModLoader.register({
 	id: 'Cattail_TweaksQuality_World-Editor',
 	init() {
 		const STATE_KEY = Symbol.for('cattail.world-editor.blueprint-state')
+		const PAINTED_KEY = Symbol.for('cattail.world-editor.blueprint-painted')
+		const MAX_STRUCTURE_DEPTH = 32
+		const DANGEROUS_KEYS = new Set(['__proto__', 'prototype', 'constructor'])
 		const DURABLE_FIELDS = Object.freeze([
 			'depth',
 			'timeStamp',
@@ -29,6 +32,12 @@ ModLoader.register({
 
 		const service = Object.freeze({
 			version: '0.5.1',
+			maxStructureDepth: MAX_STRUCTURE_DEPTH,
+			inspectStructure,
+			inspectBlueprint,
+			isSafePosition(value) {
+				return normalizePosition(value) !== null
+			},
 			normalizePar,
 			normalizeSave,
 			normalizeSaveDetailed,
@@ -79,20 +88,34 @@ ModLoader.register({
 		})
 
 		function normalizeBlueprint(value) {
+			if (!inspectStructure(value).valid || !inspectBlueprint(value).valid) return null
 			const blueprint = jsonClone(value)
 			const schemaVersion = Number(blueprint?.schemaVersion)
 			if (
 				!blueprint ||
 				blueprint.mode !== 'full' ||
-				(schemaVersion !== 3 && schemaVersion !== 5 && schemaVersion !== 6) ||
+				(schemaVersion !== 3 && schemaVersion !== 5 && schemaVersion !== 6 && schemaVersion !== 7 && schemaVersion !== 8) ||
 				!Array.isArray(blueprint.entities)
 			) {
 				return blueprint
 			}
+			if (schemaVersion !== 7 && schemaVersion !== 8 && Object.prototype.hasOwnProperty.call(blueprint, 'paintedCubes')) return null
+			if (
+				(schemaVersion === 7 || schemaVersion === 8) &&
+				[].concat(blueprint.entities || [], blueprint.blocks || [], blueprint.surges || []).some(function (record) {
+					return Object.prototype.hasOwnProperty.call(record?.state || {}, 'worldEditorPaint')
+				})
+			) return null
 			const waypointEntries = []
 			let normalizedCount = 0
+			let shatteredStabilizerCount = 0
 			blueprint.entities = blueprint.entities.map(function (record, index) {
 				const next = Object.assign({}, record)
+				if (safeName(record?.name) === 'stabilizer3') {
+					shatteredStabilizerCount += 1
+					if (next.restricted?.onlyOne !== true) normalizedCount += 1
+					next.restricted = Object.assign({}, next.restricted, { onlyOne: true })
+				}
 				const originalState = jsonClone(record?.state || {})
 				const detail = normalizeSaveDetailed({
 					name: record?.name,
@@ -114,6 +137,7 @@ ModLoader.register({
 				}
 				return next
 			})
+			if (shatteredStabilizerCount > 1) return null
 			blueprint.blocks = Array.isArray(blueprint.blocks)
 				? blueprint.blocks.map(function (record) {
 					const next = Object.assign({}, record)
@@ -127,10 +151,48 @@ ModLoader.register({
 					return next
 				})
 				: []
-			if (schemaVersion === 6 && Array.isArray(blueprint.surges)) {
-				blueprint.surges = blueprint.surges.map(normalizeSurge).filter(Boolean)
-			} else if (schemaVersion !== 6) {
+			if ((schemaVersion === 6 || schemaVersion === 7 || schemaVersion === 8) && Array.isArray(blueprint.surges)) {
+				const normalizedSurges = []
+				for (const record of blueprint.surges) {
+					const normalized = normalizeSurge(record, { allowStabilizer: schemaVersion === 8 })
+					if (!normalized) return null
+					normalizedSurges.push(normalized)
+				}
+				blueprint.surges = normalizedSurges
+			} else if (schemaVersion !== 6 && schemaVersion !== 7 && schemaVersion !== 8) {
 				blueprint.surges = []
+			}
+			if (schemaVersion === 7 || schemaVersion === 8) {
+				const painted = globalThis[PAINTED_KEY]
+				if (!Array.isArray(blueprint.paintedCubes)) return null
+				if (blueprint.paintedCubes.length) {
+					const records = typeof painted?.normalizeLayer === 'function'
+						? painted.normalizeLayer(blueprint)
+						: null
+					if (!records) return null
+					blueprint.paintedCubes = records
+				} else if (schemaVersion === 7) {
+					return null
+				}
+			}
+			let stabilizerLinkCount = 0
+			if (schemaVersion === 8) {
+				const stabilizers = new Map()
+				for (const record of blueprint.entities) {
+					if (!isStabilizerName(record?.name)) continue
+					const position = normalizePosition(record.position)
+					if (position) stabilizers.set(positionKey(position), record)
+				}
+				const linkedStabilizers = new Set()
+				for (const surge of blueprint.surges) {
+					const position = normalizePosition(surge?.stabilizer?.position)
+					if (!position) continue
+					const key = position && positionKey(position)
+					if (!stabilizers.has(key) || linkedStabilizers.has(key)) return null
+					linkedStabilizers.add(key)
+					stabilizerLinkCount += 1
+				}
+				if (!stabilizerLinkCount) return null
 			}
 			const ordered = waypointEntries.slice().sort(function (left, right) {
 				if (left.order !== null || right.order !== null) {
@@ -144,9 +206,11 @@ ModLoader.register({
 				const record = blueprint.entities[entry.index]
 				record.stateMeta = Object.assign({}, record.stateMeta, { waypointOrder: order })
 			})
-			if ((schemaVersion === 5 || schemaVersion === 6) && !Array.isArray(blueprint.emptyCells)) blueprint.emptyCells = []
+			if ((schemaVersion === 5 || schemaVersion === 6 || schemaVersion === 7 || schemaVersion === 8) && !Array.isArray(blueprint.emptyCells)) blueprint.emptyCells = []
 			blueprint.summary = Object.assign({}, blueprint.summary, {
 				surgeCount: Array.isArray(blueprint.surges) ? blueprint.surges.length : 0,
+				paintedCubeCount: Array.isArray(blueprint.paintedCubes) ? blueprint.paintedCubes.length : 0,
+				stabilizerLinkCount,
 				normalizedCount: Math.max(
 					nonNegativeInteger(blueprint.summary?.normalizedCount, 0),
 					normalizedCount
@@ -155,7 +219,7 @@ ModLoader.register({
 			return blueprint
 		}
 
-		function normalizeSurge(value) {
+		function normalizeSurge(value, options) {
 			const position = normalizePosition(value?.position)
 			const detail = normalizeSaveDetailed({
 				name: 'surge',
@@ -172,12 +236,18 @@ ModLoader.register({
 				positiveNumber(state.maxLife) <= 0 ||
 				positiveInteger(state.rayNumber) <= 0
 			) return null
-			return {
+			const result = {
 				kind: 'surge',
 				name: 'surge',
 				position,
 				state
 			}
+			if (options?.allowStabilizer === true) {
+				const stabilizerPosition = normalizePosition(value?.stabilizer?.position)
+				if (value?.stabilizer !== undefined && !stabilizerPosition) return null
+				if (stabilizerPosition) result.stabilizer = { position: stabilizerPosition }
+			}
+			return result
 		}
 
 		function surgeEligible(entity, saved) {
@@ -201,7 +271,7 @@ ModLoader.register({
 				return next
 			})
 			const neutral = new Map()
-			for (const record of [].concat(source.blocks || [], source.surges || [])) {
+			for (const record of [].concat(source.blocks || [], source.paintedCubes || [], source.surges || [])) {
 				const position = normalizePosition(record?.position)
 				if (position) neutral.set(position[0] + ':' + position[1], position)
 			}
@@ -228,11 +298,13 @@ ModLoader.register({
 				includeBlocks: false,
 				entities,
 				blocks: [],
+				paintedCubes: [],
 				surges: [],
 				production: jsonClone(source.production),
 				summary: Object.assign({}, jsonClone(source.summary || {}), {
 					entityCount: entities.length,
 					blockCount: 0,
+					paintedCubeCount: 0,
 					surgeCount: 0,
 					neutralCellCount: neutral.size,
 					capturedTypes,
@@ -294,6 +366,158 @@ ModLoader.register({
 			return jsonClone(value)
 		}
 
+		function inspectStructure(value) {
+			const stack = [{ value, depth: 0, exit: false }]
+			const ancestors = new WeakSet()
+			while (stack.length) {
+				const entry = stack.pop()
+				const current = entry.value
+				if (!current || typeof current !== 'object') continue
+				if (entry.exit) {
+					ancestors.delete(current)
+					continue
+				}
+				if (entry.depth > MAX_STRUCTURE_DEPTH) return inspection(false, 'depth')
+				if (ancestors.has(current)) return inspection(false, 'cycle')
+				ancestors.add(current)
+				stack.push({ value: current, depth: entry.depth, exit: true })
+				const keys = Object.keys(current)
+				for (let index = keys.length - 1; index >= 0; index -= 1) {
+					const key = keys[index]
+					if (DANGEROUS_KEYS.has(key)) return inspection(false, 'dangerous-key', key)
+					const child = current[key]
+					if (child && typeof child === 'object') {
+						stack.push({ value: child, depth: entry.depth + 1, exit: false })
+					}
+				}
+			}
+			return inspection(true, null)
+		}
+
+		function inspectBlueprint(value) {
+			if (!value || typeof value !== 'object' || Array.isArray(value)) return inspection(false, 'root')
+			const schema = Number(value.schemaVersion)
+			const supported = value.mode === 'structure'
+				? schema >= 1 && schema <= 4
+				: value.mode === 'full' && [3, 5, 6, 7, 8].includes(schema)
+			if (!supported) return inspection(true, null)
+
+			if (!inspectOptionalPosition(value.anchor?.position)) return inspection(false, 'anchor-position')
+			for (const selection of arrayOrEmpty(value.selections)) {
+				for (const key of ['start', 'end', 'min', 'max']) {
+					if (!inspectOptionalPosition(selection?.[key])) return inspection(false, 'selection-' + key)
+				}
+				if (!inspectOptionalSafeInteger(selection?.width, true) || !inspectOptionalSafeInteger(selection?.height, true)) {
+					return inspection(false, 'selection-size')
+				}
+				if (!inspectBounds(selection?.min, selection?.max)) return inspection(false, 'selection-bounds')
+			}
+
+			if (value.contentBounds !== null && value.contentBounds !== undefined) {
+				if (!normalizePosition(value.contentBounds?.min) || !normalizePosition(value.contentBounds?.max)) {
+					return inspection(false, 'content-bounds-position')
+				}
+				if (!inspectOptionalSafeInteger(value.contentBounds?.width, true) || !inspectOptionalSafeInteger(value.contentBounds?.height, true)) {
+					return inspection(false, 'content-bounds-size')
+				}
+				if (!inspectBounds(value.contentBounds.min, value.contentBounds.max)) return inspection(false, 'content-bounds-derived')
+			}
+
+			for (const record of arrayOrEmpty(value.entities)) {
+				const position = normalizePosition(record?.position)
+				if (!position) return inspection(false, 'entity-position')
+				const footprint = record?.footprint
+				if (footprint && typeof footprint === 'object') {
+					if (!inspectOptionalPosition(footprint.min) || !inspectOptionalPosition(footprint.max)) {
+						return inspection(false, 'entity-footprint-position')
+					}
+					if (!inspectOptionalSafeInteger(footprint.span, true)) return inspection(false, 'entity-footprint-span')
+					if (!inspectBounds(footprint.min, footprint.max)) return inspection(false, 'entity-footprint-bounds')
+					if (footprint.span !== undefined) {
+						const span = Number(footprint.span)
+						if (!safeSubtract(position[0], span) || !safeAdd(position[0], span) || !safeSubtract(position[1], span) || !safeAdd(position[1], span)) {
+							return inspection(false, 'entity-footprint-derived')
+						}
+					}
+				}
+			}
+
+			for (const layerName of ['blocks', 'surges', 'paintedCubes']) {
+				for (const record of arrayOrEmpty(value[layerName])) {
+					if (!normalizePosition(record?.position)) return inspection(false, layerName + '-position')
+				}
+			}
+			if (schema === 8) {
+				if (!Array.isArray(value.surges) || !Array.isArray(value.paintedCubes)) return inspection(false, 'schema-8-layers')
+				const stabilizers = new Set(arrayOrEmpty(value.entities).filter(function (record) {
+					return isStabilizerName(record?.name)
+				}).map(function (record) {
+					const position = normalizePosition(record?.position)
+					return position && positionKey(position)
+				}).filter(Boolean))
+				const linked = new Set()
+				for (const surge of value.surges) {
+					const position = normalizePosition(surge?.stabilizer?.position)
+					if (!position) continue
+					const key = position && positionKey(position)
+					if (!stabilizers.has(key) || linked.has(key)) return inspection(false, 'surge-stabilizer')
+					linked.add(key)
+				}
+				if (!linked.size) return inspection(false, 'surge-stabilizer-missing')
+			}
+			for (const layerName of ['emptyCells', 'neutralCells']) {
+				for (const position of arrayOrEmpty(value[layerName])) {
+					if (!normalizePosition(position)) return inspection(false, layerName + '-position')
+				}
+			}
+			return inspection(true, null)
+		}
+
+		function inspectBounds(minValue, maxValue) {
+			if (minValue === undefined && maxValue === undefined) return true
+			const min = normalizePosition(minValue)
+			const max = normalizePosition(maxValue)
+			if (!min || !max) return false
+			for (let axis = 0; axis < 2; axis += 1) {
+				const lower = Math.min(min[axis], max[axis])
+				const upper = Math.max(min[axis], max[axis])
+				if (!safeAdd(min[axis], max[axis])) return false
+				const difference = upper - lower
+				if (!Number.isSafeInteger(difference) || !Number.isSafeInteger(difference + 1)) return false
+			}
+			return true
+		}
+
+		function inspectOptionalPosition(value) {
+			return value === undefined || value === null || normalizePosition(value) !== null
+		}
+
+		function positionKey(position) {
+			return position[0] + ':' + position[1]
+		}
+
+		function inspectOptionalSafeInteger(value, nonNegative) {
+			if (value === undefined || value === null) return true
+			const number = Number(value)
+			return Number.isSafeInteger(number) && (!nonNegative || number >= 0)
+		}
+
+		function safeAdd(left, right) {
+			return Number.isSafeInteger(Number(left) + Number(right))
+		}
+
+		function safeSubtract(left, right) {
+			return Number.isSafeInteger(Number(left) - Number(right))
+		}
+
+		function arrayOrEmpty(value) {
+			return Array.isArray(value) ? value : []
+		}
+
+		function inspection(valid, reason, key) {
+			return Object.freeze({ valid: valid === true, reason: reason || null, key: key || null })
+		}
+
 		function stableString(value) {
 			try {
 				return JSON.stringify(stableValue(value))
@@ -319,11 +543,16 @@ ModLoader.register({
 			if (!Array.isArray(value) || value.length < 2) return null
 			const u = Number(value[0])
 			const v = Number(value[1])
-			return Number.isInteger(u) && Number.isInteger(v) ? [u, v] : null
+			return Number.isSafeInteger(u) && Number.isSafeInteger(v) ? [u, v] : null
 		}
 
 		function safeName(value) {
 			return typeof value === 'string' ? value.trim() : ''
+		}
+
+		function isStabilizerName(value) {
+			const name = safeName(value)
+			return name === 'stabilizer' || name === 'stabilizer2' || name === 'stabilizer3'
 		}
 
 		function finiteOr(value, fallback) {

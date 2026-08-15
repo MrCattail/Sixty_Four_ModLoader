@@ -2,11 +2,33 @@
   "id": "Cattail_TweaksQuality_World-Editor",
   "uniqueId": "Cattail_TweaksQuality_World-Editor",
   "name": "World Editor",
-  "version": "0.5.1",
-  "loaderVersion": ">=0.3.1",
+  "version": "0.6.0",
+  "loaderVersion": ">=0.4.0",
   "languageSupport": {
     "gameLanguage": true
   },
+  "languages": [
+    "en",
+    "sch",
+    "modsch",
+    "ru",
+    "de",
+    "ptbr",
+    "it",
+    "es",
+    "fr",
+    "nl",
+    "cz",
+    "pl",
+    "jp",
+    "kr",
+    "tch",
+    "thai",
+    "hu",
+    "lv",
+    "ro",
+    "no"
+  ],
   "entry": [
     "scripts/core/foundation.js",
     "scripts/core/shared.js",
@@ -16,6 +38,12 @@
     "scripts/core/editor-transactions.js",
     "scripts/core/selection-state.js",
     "scripts/core/tool-state.js",
+    "scripts/core/paint-cube-state.js",
+    "scripts/core/blueprint-painted.js",
+    "scripts/core/paint-cube-growth.js",
+    "scripts/core/paint-cube-stroke.js",
+    "scripts/core/paint-cube-fill.js",
+    "scripts/ui/paint-cube-ui.js",
     "scripts/core/selection-analysis.js",
     "scripts/core/production-state.js",
     "scripts/core/blueprint-state.js",
@@ -26,6 +54,7 @@
     "scripts/core/selection-delete.js",
     "scripts/core/input-controller.js",
     "scripts/render/resize-handles.js",
+    "scripts/input/paint-cube-input.js",
     "scripts/input/selection-controller.js",
     "scripts/render/hover-overlay.js",
     "scripts/render/selected-overlay.js",
@@ -40,6 +69,8 @@
     "scripts/ui/selection-cut-ui.js",
     "scripts/blueprint-preview.js",
     "scripts/render/selection-cursor.js",
+    "scripts/render/paint-cube-cursor.js",
+    "scripts/render/paint-cube-render-diagnostics.js",
     "scripts/render/blueprint-thumbnail.js",
     "scripts/ui/blueprint-library-ui.js",
     "scripts/ui/selection-card.js",
@@ -88,6 +119,16 @@
       "default": false,
       "description": "Uses Fixed Large Toolbar Cards with Horizontal Inertial Scrolling.",
       "reloadPolicy": "hot"
+    },
+    "growDurationSeconds": {
+      "type": "slider",
+      "label": "Grow Duration",
+      "default": 4,
+      "min": 1,
+      "max": 20,
+      "step": 0.5,
+      "description": "Seconds for a Painted Cube to Grow from Empty to Stable, Including Its Final Reveal.",
+      "reloadPolicy": "hot"
     }
   },
   "translations": {
@@ -106,6 +147,10 @@
         "largeToolbarCards": {
           "label": "Use Large-Card Toolbar",
           "description": "Uses Fixed Large Toolbar Cards with Horizontal Inertial Scrolling."
+        },
+        "growDurationSeconds": {
+          "label": "Grow Duration",
+          "description": "Seconds for a Painted Cube to Grow from Empty to Stable, Including Its Final Reveal."
         }
       }
     },
@@ -124,6 +169,10 @@
         "largeToolbarCards": {
           "label": "使用大卡片工具栏",
           "description": "使用固定尺寸的大卡片工具栏，并支持横向惯性滚动。"
+        },
+        "growDurationSeconds": {
+          "label": "生长时长",
+          "description": "绘制矿方体从空白生长至稳定所需的秒数，包括最后的揭示过渡。"
         }
       }
     },
@@ -142,6 +191,10 @@
         "largeToolbarCards": {
           "label": "使用大卡片工具栏",
           "description": "使用固定尺寸的大卡片工具栏，并支持横向惯性滚动。"
+        },
+        "growDurationSeconds": {
+          "label": "生长时长",
+          "description": "绘制矿方体从空白生长至稳定所需的秒数，包括最后的揭示过渡。"
         }
       }
     },
@@ -160,6 +213,10 @@
         "largeToolbarCards": {
           "label": "Крупные карточки панели",
           "description": "Использует фиксированные крупные карточки с горизонтальной инерционной прокруткой."
+        },
+        "growDurationSeconds": {
+          "label": "Продолжительность роста",
+          "description": "Время в секундах, за которое нарисованный куб вырастает от пустого до стабильного, включая финальное раскрытие."
         }
       }
     },
@@ -178,6 +235,10 @@
         "largeToolbarCards": {
           "label": "Große Werkzeugkarten verwenden",
           "description": "Verwendet feste große Karten mit horizontalem Trägheitsscrollen."
+        },
+        "growDurationSeconds": {
+          "label": "Wachstumsdauer",
+          "description": "Sekunden, die ein gemalter Würfel vom leeren Zustand bis zur Stabilität einschließlich der abschließenden Enthüllung benötigt."
         }
       }
     },
@@ -196,6 +257,10 @@
         "largeToolbarCards": {
           "label": "Usar cartões grandes",
           "description": "Usa cartões grandes fixos com rolagem horizontal inercial."
+        },
+        "growDurationSeconds": {
+          "label": "Duração do crescimento",
+          "description": "Segundos para um cubo pintado crescer do vazio até ficar estável, incluindo a revelação final."
         }
       }
     },
@@ -214,6 +279,10 @@
         "largeToolbarCards": {
           "label": "Usa schede grandi",
           "description": "Usa schede grandi fisse con scorrimento orizzontale inerziale."
+        },
+        "growDurationSeconds": {
+          "label": "Durata della crescita",
+          "description": "Secondi necessari a un cubo dipinto per crescere da vuoto a stabile, inclusa la rivelazione finale."
         }
       }
     },
@@ -232,6 +301,10 @@
         "largeToolbarCards": {
           "label": "Usar tarjetas grandes",
           "description": "Usa tarjetas grandes fijas con desplazamiento horizontal inercial."
+        },
+        "growDurationSeconds": {
+          "label": "Duración del crecimiento",
+          "description": "Segundos para que un cubo pintado crezca de vacío a estable, incluida la revelación final."
         }
       }
     },
@@ -250,6 +323,10 @@
         "largeToolbarCards": {
           "label": "Utiliser de grandes cartes",
           "description": "Utilise de grandes cartes fixes avec défilement horizontal inertiel."
+        },
+        "growDurationSeconds": {
+          "label": "Durée de croissance",
+          "description": "Secondes nécessaires à un cube peint pour passer de vide à stable, révélation finale comprise."
         }
       }
     },
@@ -268,6 +345,10 @@
         "largeToolbarCards": {
           "label": "Grote werkbalkkaarten",
           "description": "Gebruikt vaste grote kaarten met horizontaal traagheidsscrollen."
+        },
+        "growDurationSeconds": {
+          "label": "Groeiduur",
+          "description": "Seconden waarin een getekende kubus van leeg naar stabiel groeit, inclusief de laatste onthulling."
         }
       }
     },
@@ -286,6 +367,10 @@
         "largeToolbarCards": {
           "label": "Použít velké karty",
           "description": "Používá pevné velké karty s vodorovným setrvačným posouváním."
+        },
+        "growDurationSeconds": {
+          "label": "Doba růstu",
+          "description": "Počet sekund, za které malovaná kostka vyroste z prázdné do stabilní podoby včetně závěrečného odhalení."
         }
       }
     },
@@ -304,6 +389,10 @@
         "largeToolbarCards": {
           "label": "Użyj dużych kart",
           "description": "Używa stałych dużych kart z poziomym przewijaniem bezwładnościowym."
+        },
+        "growDurationSeconds": {
+          "label": "Czas wzrostu",
+          "description": "Liczba sekund, w których malowana kostka rośnie od pustej do stabilnej, wraz z końcowym odsłonięciem."
         }
       }
     },
@@ -322,6 +411,10 @@
         "largeToolbarCards": {
           "label": "大カードツールバーを使用",
           "description": "固定サイズの大カードと横方向の慣性スクロールを使用します。"
+        },
+        "growDurationSeconds": {
+          "label": "成長時間",
+          "description": "ペイントキューブが空の状態から安定状態まで成長する秒数です。最後の表示切り替えも含みます。"
         }
       }
     },
@@ -340,6 +433,10 @@
         "largeToolbarCards": {
           "label": "큰 카드 도구 모음 사용",
           "description": "고정 크기 큰 카드와 가로 관성 스크롤을 사용합니다."
+        },
+        "growDurationSeconds": {
+          "label": "성장 시간",
+          "description": "페인트 큐브가 빈 상태에서 안정 상태까지 성장하는 시간(초)이며 마지막 표시 전환을 포함합니다."
         }
       }
     },
@@ -358,6 +455,10 @@
         "largeToolbarCards": {
           "label": "使用大卡片工具列",
           "description": "使用固定尺寸的大卡片工具列，並支援橫向慣性捲動。"
+        },
+        "growDurationSeconds": {
+          "label": "生長時間",
+          "description": "繪製礦方體從空白生長至穩定所需的秒數，包括最後的揭示過渡。"
         }
       }
     },
@@ -376,6 +477,10 @@
         "largeToolbarCards": {
           "label": "ใช้แถบเครื่องมือการ์ดใหญ่",
           "description": "ใช้การ์ดขนาดใหญ่คงที่พร้อมการเลื่อนแนวนอนแบบมีแรงเฉื่อย"
+        },
+        "growDurationSeconds": {
+          "label": "ระยะเวลาการเติบโต",
+          "description": "จำนวนวินาทีที่ลูกบาศก์ที่วาดใช้เติบโตจากว่างเปล่าจนคงที่ รวมการเผยให้เห็นช่วงสุดท้าย"
         }
       }
     },
@@ -394,6 +499,10 @@
         "largeToolbarCards": {
           "label": "Nagy kártyás eszköztár",
           "description": "Rögzített nagy kártyákat használ vízszintes tehetetlenségi görgetéssel."
+        },
+        "growDurationSeconds": {
+          "label": "Növekedési idő",
+          "description": "Ennyi másodperc alatt nő a festett kocka üresből stabillá, a végső felfedéssel együtt."
         }
       }
     },
@@ -412,6 +521,10 @@
         "largeToolbarCards": {
           "label": "Lietot lielas kartītes",
           "description": "Lieto fiksētas lielas kartītes ar horizontālu inerces ritināšanu."
+        },
+        "growDurationSeconds": {
+          "label": "Augšanas ilgums",
+          "description": "Sekundes, kurās krāsotais kubs izaug no tukša līdz stabilam, ieskaitot pēdējo atklāšanu."
         }
       }
     },
@@ -430,6 +543,10 @@
         "largeToolbarCards": {
           "label": "Folosește carduri mari",
           "description": "Folosește carduri mari fixe cu derulare orizontală inerțială."
+        },
+        "growDurationSeconds": {
+          "label": "Durata creșterii",
+          "description": "Secundele în care un cub pictat crește de la gol la stabil, inclusiv dezvăluirea finală."
         }
       }
     },
@@ -448,6 +565,10 @@
         "largeToolbarCards": {
           "label": "Bruk store verktøykort",
           "description": "Bruker faste store kort med horisontal treghetsrulling."
+        },
+        "growDurationSeconds": {
+          "label": "Veksttid",
+          "description": "Sekunder et malt kube bruker på å vokse fra tom til stabil, inkludert den siste avdekkingen."
         }
       }
     }

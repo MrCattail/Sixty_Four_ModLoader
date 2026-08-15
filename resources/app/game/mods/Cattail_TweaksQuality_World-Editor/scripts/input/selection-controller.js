@@ -199,7 +199,7 @@ ModLoader.register({
 			}
 
 			function settleWheel(reason) {
-				if (!isWheelGesture(gesture)) return false
+				if (!selectionInputEnabled() || !isWheelGesture(gesture)) return false
 				const completed = gesture
 				if (completed.target === 'resize' && wheelLatch?.target === 'resize') {
 					const activeHandle = selection.snapshot()?.resizeHandle
@@ -220,6 +220,7 @@ ModLoader.register({
 			function startMove(reason) {
 				if (
 					disposed ||
+					!selectionInputEnabled() ||
 					gesture?.type !== 'pending-move' ||
 					!runtime.isActive() ||
 					game.halt ||
@@ -243,6 +244,7 @@ ModLoader.register({
 			}
 
 			function performClick(cell, plane, completed) {
+				if (!selectionInputEnabled()) return false
 				if (!isCell(cell) || plane !== (game.plane ? 1 : 0)) return false
 				const current = selection.snapshot()
 				if (current?.previewKind === 'selection') {
@@ -304,6 +306,7 @@ ModLoader.register({
 			function acquireWheelGesture(event, input) {
 				if (
 					disposed ||
+					!selectionInputEnabled() ||
 					!runtime.isActive() ||
 					game.halt ||
 					game.splash?.isShown ||
@@ -388,6 +391,7 @@ ModLoader.register({
 			const handleWheel = function (event) {
 				if (
 					disposed ||
+					!selectionInputEnabled() ||
 					previewOwnsSelectionInput() ||
 					!runtime.isActive() ||
 					game.halt ||
@@ -430,6 +434,8 @@ ModLoader.register({
 					if (runtime.isActive()) cancelInteraction('mouse-right')
 					return
 				}
+				if (blockUnimplementedDrawInput(event, 'button')) return
+				if (!selectionInputEnabled()) return
 				if (previewOwnsSelectionInput()) return
 				if (!shouldCaptureLeft(runtime, game, event)) return
 				if (isWheelGesture(gesture)) {
@@ -487,6 +493,8 @@ ModLoader.register({
 			}
 
 			const handleMouseMove = function (event) {
+				if (blockUnimplementedDrawInput(event, 'buttons')) return
+				if (!selectionInputEnabled()) return
 				if (previewOwnsSelectionInput()) return
 				if (!runtime.isActive() || game.halt || game.splash?.isShown) return
 				const buttons = Number(event?.buttons) || 0
@@ -514,6 +522,8 @@ ModLoader.register({
 
 			const handleMouseUp = function (event) {
 				if (event?.button !== 0) return
+				if (blockUnimplementedDrawInput(event, 'button')) return
+				if (!selectionInputEnabled()) return
 				if (previewOwnsSelectionInput()) return
 				if (!runtime.isActive() || game.halt || game.splash?.isShown) {
 					cancelInteraction('mouse-up-inactive')
@@ -534,13 +544,15 @@ ModLoader.register({
 			}
 
 			const handleClick = function (event) {
+				if (blockUnimplementedDrawInput(event, 'button')) return
+				if (!selectionInputEnabled()) return
 				if (previewOwnsSelectionInput()) return
 				if (!shouldCaptureLeft(runtime, game, event)) return
 				consume(event)
 			}
 
 			const handleMouseLeave = function () {
-				if (runtime.isActive()) cancelInteraction('mouse-left-canvas')
+				if (runtime.isActive() && selectionInputEnabled()) cancelInteraction('mouse-left-canvas')
 			}
 
 			const handleWindowBlur = function () {
@@ -564,6 +576,11 @@ ModLoader.register({
 					clearWheelLatch()
 				}
 			})
+			const stopToolSubscription = typeof tool.subscribe === 'function'
+				? tool.subscribe(function (state) {
+					if (state?.mode !== 'select') cancelInteraction('selection-tool-inactive')
+				})
+				: null
 			canvas.addEventListener('mousedown', handleMouseDown, true)
 			canvas.addEventListener('mousemove', handleMouseMove, true)
 			canvas.addEventListener('mouseup', handleMouseUp, true)
@@ -584,6 +601,7 @@ ModLoader.register({
 				window.removeEventListener('blur', handleWindowBlur, true)
 				if (typeof stopRuntimeSubscription === 'function') stopRuntimeSubscription()
 				if (typeof stopSelectionSubscription === 'function') stopSelectionSubscription()
+				if (typeof stopToolSubscription === 'function') stopToolSubscription()
 				interaction.dispose('runtime-disposed')
 			})
 
@@ -595,6 +613,26 @@ ModLoader.register({
 				} catch (error) {
 					return false
 				}
+			}
+
+			function selectionInputEnabled() {
+				return !disposed && tool?.snapshot?.().mode === 'select'
+			}
+
+			function blockUnimplementedDrawInput(event, buttonField) {
+				if (
+					disposed ||
+					tool?.snapshot?.().mode !== 'draw' ||
+					!runtime.isActive() ||
+					game.halt ||
+					game.splash?.isShown
+				) return false
+				const ownsLeft = buttonField === 'buttons'
+					? !!((Number(event?.buttons) || 0) & 1)
+					: event?.button === 0
+				if (!ownsLeft) return false
+				consume(event)
+				return true
 			}
 		})
 

@@ -353,6 +353,76 @@ function testBlockOnlyFullLifecycle() {
 	assert.equal(transform.dispose(), false)
 }
 
+function testSchemaEightStabilizerLinkTransform() {
+	const transform = loadTransform()
+	const source = {
+		schemaVersion: 8,
+		mode: 'full',
+		sourcePlane: 0,
+		anchor: { position: [0, 0], selectionIds: [1] },
+		selections: [{
+			id: 1,
+			primary: true,
+			start: [0, 0],
+			end: [1, 0],
+			min: [0, 0],
+			max: [1, 0],
+			width: 2,
+			height: 1
+		}],
+		emptyCells: [],
+		contentBounds: { min: [0, 0], max: [1, 0], width: 2, height: 1 },
+		includeBlocks: true,
+		entities: [{
+			id: 1,
+			kind: 'entity',
+			name: 'stabilizer3',
+			position: [0, 0],
+			footprint: { span: 0, min: [0, 0], max: [0, 0] },
+			restricted: { onlyOne: true },
+			config: {},
+			state: {}
+		}],
+		blocks: [],
+		paintedCubes: [],
+		surges: [{
+			kind: 'surge',
+			name: 'surge',
+			position: [1, 0],
+			stabilizer: { position: [0, 0] },
+			state: {
+				resources: [0, 10],
+				grade: 1,
+				type: 1,
+				rayNumber: 4,
+				colors: ['#ffffff'],
+				maxLife: 100,
+				life: 90
+			}
+		}],
+		production: null,
+		summary: { entityCount: 1, surgeCount: 1, paintedCubeCount: 0 }
+	}
+	const before = JSON.stringify(source)
+	assert.equal(transform.bind(source, 'schema-8-link'), true)
+	assert.equal(transform.snapshot().blueprint.entities[0].name, 'stabilizer3')
+	assert.deepEqual(
+		plain(transform.snapshot().blueprint.surges[0].stabilizer.position),
+		plain(transform.snapshot().blueprint.entities[0].position)
+	)
+	assert.equal(transform.rotateClockwise('schema-8-link-cw'), true)
+	assert.deepEqual(
+		plain(transform.snapshot().blueprint.surges[0].stabilizer.position),
+		plain(transform.snapshot().blueprint.entities[0].position)
+	)
+	assert.equal(transform.mirrorV('schema-8-link-mirror'), true)
+	assert.deepEqual(
+		plain(transform.snapshot().blueprint.surges[0].stabilizer.position),
+		plain(transform.snapshot().blueprint.entities[0].position)
+	)
+	assert.equal(JSON.stringify(source), before)
+}
+
 function testCommandScaleAndSingleNotification() {
 	const transform = loadTransform(() => performance.now())
 	const base = fixture()
@@ -1324,7 +1394,7 @@ function testLocalizationAndIntegrationContract() {
 	]
 
 	assert.equal(i18n.languages.length, 20)
-	assert.equal(i18n.keys.length, 249)
+	assert.equal(i18n.keys.length, 267)
 	for (const language of i18n.languages) {
 		for (const key of transformKeys) {
 			const translated = i18n.t(language, key)
@@ -1333,9 +1403,9 @@ function testLocalizationAndIntegrationContract() {
 		}
 	}
 
-	assert.equal(manifest.version, '0.5.1')
+	assert.equal(manifest.version, '0.6.0')
 	assert.equal(manifest.languageSupport.gameLanguage, true)
-	assert.equal(manifest.entry.length, 36)
+	assert.equal(manifest.entry.length, 45)
 	assert.equal(
 		manifest.entry.indexOf(SHARED_SOURCE),
 		manifest.entry.indexOf('scripts/core/foundation.js') + 1
@@ -1468,7 +1538,7 @@ function testLocalizationAndIntegrationContract() {
 	assert.match(shellSource, /transformGroup\.dataset\.worldEditorSlot = 'transform'/)
 	assert.match(
 		shellSource,
-		/actions\.append\(selectionGroup,\s*historyGroup,\s*blueprintGroup,\s*blueprintLibraryGroup,\s*transformGroup,\s*creativeGroup\)/
+		/actions\.append\(selectionGroup,\s*historyGroup,\s*blueprintGroup,\s*blueprintLibraryGroup,\s*transformGroup,\s*drawGroup,\s*creativeGroup\)/
 	)
 	assert.match(shellSource, /statusBar\.append\(identity,\s*divider,\s*status,\s*hint\)/)
 	assert.match(shellSource, /toolbarBar\.append\(actions\)/)
@@ -1667,6 +1737,7 @@ async function run() {
 	testRestorationAndBounds()
 	testFullPreservationAndSourceImmutability()
 	testBlockOnlyFullLifecycle()
+	testSchemaEightStabilizerLinkTransform()
 	testCommandScaleAndSingleNotification()
 	await testCameraTranslationCache()
 	await testIntegrityMetrics()

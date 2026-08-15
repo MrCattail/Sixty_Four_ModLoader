@@ -3,6 +3,7 @@ ModLoader.register({
 	init() {
 		const PLAN_KEY = Symbol.for('cattail.world-editor.blueprint-preview-plan')
 		const STATE_KEY = Symbol.for('cattail.world-editor.blueprint-state')
+		const PAINTED_KEY = Symbol.for('cattail.world-editor.blueprint-painted')
 		const DEFAULT_CHUNK_SIZE = 512
 		const STATUS = Object.freeze({
 			BUILDABLE: 'buildable',
@@ -88,6 +89,18 @@ ModLoader.register({
 						config: {}
 					})
 				}),
+				(includeBlocks ? blueprint.paintedCubes || [] : []).map(function (painted) {
+					return Object.assign({}, painted, {
+						kind: 'painted-cube',
+						footprint: {
+							span: 0,
+							min: painted.position,
+							max: painted.position
+						},
+						restricted: { onlyOne: false },
+						config: {}
+					})
+				}),
 				(includeSurges ? blueprint.surges || [] : []).map(function (surge) {
 					return Object.assign({}, surge, {
 						kind: 'surge',
@@ -109,7 +122,7 @@ ModLoader.register({
 				const relativePosition = normalizePosition(source?.position)
 				if (
 					!source ||
-					(source.kind !== 'entity' && source.kind !== 'cube' && source.kind !== 'surge') ||
+					(source.kind !== 'entity' && source.kind !== 'cube' && source.kind !== 'painted-cube' && source.kind !== 'surge') ||
 					!safeName(source.name) ||
 					!relativePosition
 				) {
@@ -162,6 +175,9 @@ ModLoader.register({
 					config: jsonClone(source.config || {}),
 					state: jsonClone(source.state || {}),
 					stateMeta: jsonClone(source.stateMeta || {}),
+					stabilizerPosition: source.kind === 'surge' && normalizePosition(source?.stabilizer?.position)
+						? addPosition(normalizedTarget, source.stabilizer.position)
+						: null,
 					sourceKind: source.kind,
 					restricted: jsonClone(source.restricted || {}),
 					status: classification.status,
@@ -172,7 +188,7 @@ ModLoader.register({
 
 			if (
 				(Number(blueprint.schemaVersion) === 4 && blueprint.mode === 'structure') ||
-				((Number(blueprint.schemaVersion) === 5 || Number(blueprint.schemaVersion) === 6 || Number(blueprint.schemaVersion) === 7) && blueprint.mode === 'full')
+				((Number(blueprint.schemaVersion) === 5 || Number(blueprint.schemaVersion) === 6 || Number(blueprint.schemaVersion) === 7 || Number(blueprint.schemaVersion) === 8) && blueprint.mode === 'full')
 			) {
 				const seenEmptyCells = new Set()
 				for (const relativeValue of blueprint.emptyCells || []) {
@@ -223,13 +239,18 @@ ModLoader.register({
 
 		function validateRoot(game, blueprint, target) {
 			if (!game || typeof game !== 'object') throw planError('game-unavailable')
+			const stateService = globalThis[STATE_KEY]
+			if (
+				(typeof stateService?.inspectStructure === 'function' && stateService.inspectStructure(blueprint)?.valid !== true) ||
+				(typeof stateService?.inspectBlueprint === 'function' && stateService.inspectBlueprint(blueprint)?.valid !== true)
+			) throw planError('unsafe-blueprint')
 			const schemaVersion = Number(blueprint?.schemaVersion)
 			if (
 				!blueprint ||
-				(schemaVersion !== 1 && schemaVersion !== 2 && schemaVersion !== 3 && schemaVersion !== 4 && schemaVersion !== 5 && schemaVersion !== 6) ||
+				(schemaVersion !== 1 && schemaVersion !== 2 && schemaVersion !== 3 && schemaVersion !== 4 && schemaVersion !== 5 && schemaVersion !== 6 && schemaVersion !== 7 && schemaVersion !== 8) ||
 				(blueprint.mode !== 'structure' && blueprint.mode !== 'full') ||
-				(blueprint.mode === 'structure' && (schemaVersion === 5 || schemaVersion === 6)) ||
-				(blueprint.mode === 'full' && schemaVersion !== 3 && schemaVersion !== 5 && schemaVersion !== 6)
+				(blueprint.mode === 'structure' && (schemaVersion === 5 || schemaVersion === 6 || schemaVersion === 7 || schemaVersion === 8)) ||
+				(blueprint.mode === 'full' && schemaVersion !== 3 && schemaVersion !== 5 && schemaVersion !== 6 && schemaVersion !== 7 && schemaVersion !== 8)
 			) {
 				throw planError('structure-blueprint-required')
 			}
@@ -237,9 +258,10 @@ ModLoader.register({
 				!Array.isArray(blueprint.entities) ||
 				(
 					!blueprint.entities.length &&
-					!((schemaVersion === 4 || schemaVersion === 5 || schemaVersion === 6) && Array.isArray(blueprint.emptyCells) && blueprint.emptyCells.length) &&
+					!((schemaVersion === 4 || schemaVersion === 5 || schemaVersion === 6 || schemaVersion === 7 || schemaVersion === 8) && Array.isArray(blueprint.emptyCells) && blueprint.emptyCells.length) &&
 					!(blueprint.mode === 'full' && Array.isArray(blueprint.blocks) && blueprint.blocks.length) &&
-					!(schemaVersion === 6 && Array.isArray(blueprint.surges) && blueprint.surges.length)
+					!((schemaVersion === 6 || schemaVersion === 7 || schemaVersion === 8) && Array.isArray(blueprint.surges) && blueprint.surges.length) &&
+					!((schemaVersion === 7 || schemaVersion === 8) && Array.isArray(blueprint.paintedCubes) && blueprint.paintedCubes.length)
 				)
 			) {
 				throw planError('blueprint-empty')
@@ -247,17 +269,23 @@ ModLoader.register({
 			if (schemaVersion === 4 && !Array.isArray(blueprint.emptyCells)) {
 				throw planError('blueprint-empty-mask-missing')
 			}
-			if ((schemaVersion === 5 || schemaVersion === 6) && !Array.isArray(blueprint.emptyCells)) {
+			if ((schemaVersion === 5 || schemaVersion === 6 || schemaVersion === 7 || schemaVersion === 8) && !Array.isArray(blueprint.emptyCells)) {
 				throw planError('blueprint-empty-mask-missing')
 			}
-			if (schemaVersion === 6 && !Array.isArray(blueprint.surges)) throw planError('blueprint-surge-layer-missing')
+			if ((schemaVersion === 6 || schemaVersion === 7 || schemaVersion === 8) && !Array.isArray(blueprint.surges)) throw planError('blueprint-surge-layer-missing')
+			if (schemaVersion === 7 && (!Array.isArray(blueprint.paintedCubes) || !blueprint.paintedCubes.length)) {
+				throw planError('blueprint-painted-layer-missing')
+			}
+			if (schemaVersion === 8 && !Array.isArray(blueprint.paintedCubes)) throw planError('blueprint-painted-layer-missing')
 			if (!normalizePosition(target)) throw planError('target-invalid')
 		}
 
 		function classifyRecord(game, source, name, position, footprint, conflicts, options) {
 			const definition = game.codex?.entities?.[name]
-			const isCube = source.kind === 'cube' && name === 'cube'
+			const isPainted = source.kind === 'painted-cube' && name === 'cube'
+			const isCube = (source.kind === 'cube' || isPainted) && name === 'cube'
 			const isSurge = source.kind === 'surge' && name === 'surge'
+			const isShatteredStabilizer = source.kind === 'entity' && name === 'stabilizer3' && options?.blueprintMode === 'full'
 			if (isSurge) {
 				const stateService = globalThis[STATE_KEY]
 				if (!stateService?.surgeEligible?.(source)) return { status: STATUS.BLOCKED, reason: 'invalid-surge' }
@@ -265,7 +293,7 @@ ModLoader.register({
 					? { status: STATUS.BLOCKED, reason: 'surge-occupied' }
 					: { status: STATUS.BUILDABLE, reason: 'empty' }
 			}
-			if (!isCube && (!definition || definition.canPurchase !== true)) {
+			if (!isCube && (!definition || (definition.canPurchase !== true && !isShatteredStabilizer))) {
 				return { status: STATUS.BLOCKED, reason: 'unsupported' }
 			}
 			const exact = conflicts.length === 1 && exactBlueprintMatch(
@@ -279,7 +307,7 @@ ModLoader.register({
 			)
 			if (exact) return { status: STATUS.SATISFIED, reason: 'matched' }
 			if (
-				isCube &&
+				isCube && !isPainted &&
 				conflicts.some(function (entity) {
 					return safeName(entity?.name) === 'cube' && Number(entity?.state) !== 2
 				})
@@ -311,7 +339,7 @@ ModLoader.register({
 			) {
 				return { status: STATUS.BLOCKED, reason: 'unsafe-replacement' }
 			}
-			if (source.restricted?.onlyOne === true || definition?.onlyone === true) {
+			if (isShatteredStabilizer || source.restricted?.onlyOne === true || definition?.onlyone === true) {
 				if (game.onlyones?.[name] || Number(game.entitiesInGame?.[name]) > 0) {
 					const replacesSameOnlyOne = conflicts.some(function (entity) {
 						return safeName(entity?.name) === name
@@ -338,6 +366,14 @@ ModLoader.register({
 			}
 			if (!sameConfig(source.config || {}, readStructureConfig(entity, source.config || {}))) return false
 			if (options?.blueprintMode !== 'full') return true
+			if (source.kind === 'painted-cube') {
+				return globalThis[PAINTED_KEY]?.matchesEntity?.(entity, {
+					kind: 'painted-cube',
+					name: 'cube',
+					position: source.position,
+					state: source.state
+				}) === true
+			}
 			const stateService = globalThis[STATE_KEY]
 			const currentSave = stateService?.capture?.(game, entity)
 			if (!currentSave || !stateService?.sameState?.(source.state || {}, currentSave.par || {})) return false
@@ -401,6 +437,8 @@ ModLoader.register({
 			const counts = {}
 			const onlyones = {}
 			for (const name of relevantNames) {
+				const definition = game.codex?.entities?.[name]
+				if (!definition || (definition.canPurchase !== true && name !== 'stabilizer3')) continue
 				counts[name] = finiteOr(game.entitiesInGame?.[name], 0)
 				onlyones[name] = !!game.onlyones?.[name]
 			}
@@ -536,31 +574,31 @@ ModLoader.register({
 			const relativeMax = normalizePosition(source.footprint?.max)
 			if (relativeMin && relativeMax) {
 				return {
-					span: nonNegativeInteger(source.footprint?.span, 0),
-					minU: target[0] + Math.min(relativeMin[0], relativeMax[0]),
-					maxU: target[0] + Math.max(relativeMin[0], relativeMax[0]),
-					minV: target[1] + Math.min(relativeMin[1], relativeMax[1]),
-					maxV: target[1] + Math.max(relativeMin[1], relativeMax[1])
+					span: nonNegativeSafeInteger(source.footprint?.span, 0),
+					minU: safeIntegerAdd(target[0], Math.min(relativeMin[0], relativeMax[0])),
+					maxU: safeIntegerAdd(target[0], Math.max(relativeMin[0], relativeMax[0])),
+					minV: safeIntegerAdd(target[1], Math.min(relativeMin[1], relativeMax[1])),
+					maxV: safeIntegerAdd(target[1], Math.max(relativeMin[1], relativeMax[1]))
 				}
 			}
-			const span = nonNegativeInteger(source.footprint?.span, 0)
+			const span = nonNegativeSafeInteger(source.footprint?.span, 0)
 			return {
 				span,
-				minU: position[0] - span,
-				maxU: position[0] + span,
-				minV: position[1] - span,
-				maxV: position[1] + span
+				minU: safeIntegerSubtract(position[0], span),
+				maxU: safeIntegerAdd(position[0], span),
+				minV: safeIntegerSubtract(position[1], span),
+				maxV: safeIntegerAdd(position[1], span)
 			}
 		}
 
 		function entityFootprint(entity, position) {
-			const span = nonNegativeInteger(entity?.entitySpan, 0)
+			const span = nonNegativeSafeInteger(entity?.entitySpan, 0)
 			return {
 				span,
-				minU: position[0] - span,
-				maxU: position[0] + span,
-				minV: position[1] - span,
-				maxV: position[1] + span
+				minU: safeIntegerSubtract(position[0], span),
+				maxU: safeIntegerAdd(position[0], span),
+				minV: safeIntegerSubtract(position[1], span),
+				maxV: safeIntegerAdd(position[1], span)
 			}
 		}
 
@@ -574,10 +612,10 @@ ModLoader.register({
 				maxV: -Infinity
 			}
 			if (min && max) {
-				result.minU = target[0] + Math.min(min[0], max[0])
-				result.maxU = target[0] + Math.max(min[0], max[0])
-				result.minV = target[1] + Math.min(min[1], max[1])
-				result.maxV = target[1] + Math.max(min[1], max[1])
+				result.minU = safeIntegerAdd(target[0], Math.min(min[0], max[0]))
+				result.maxU = safeIntegerAdd(target[0], Math.max(min[0], max[0]))
+				result.minV = safeIntegerAdd(target[1], Math.min(min[1], max[1]))
+				result.maxV = safeIntegerAdd(target[1], Math.max(min[1], max[1]))
 			}
 			for (const record of records) {
 				result.minU = Math.min(result.minU, record.footprint.minU)
@@ -658,12 +696,29 @@ ModLoader.register({
 			if (!Array.isArray(value) || value.length < 2) return null
 			const u = Number(value[0])
 			const v = Number(value[1])
-			if (!Number.isInteger(u) || !Number.isInteger(v)) return null
+			if (!Number.isSafeInteger(u) || !Number.isSafeInteger(v)) return null
 			return [u, v]
 		}
 
 		function addPosition(left, right) {
-			return [left[0] + right[0], left[1] + right[1]]
+			return [safeIntegerAdd(left[0], right[0]), safeIntegerAdd(left[1], right[1])]
+		}
+
+		function safeIntegerAdd(left, right) {
+			const value = Number(left) + Number(right)
+			if (!Number.isSafeInteger(value)) throw planError('coordinate-overflow')
+			return value
+		}
+
+		function safeIntegerSubtract(left, right) {
+			const value = Number(left) - Number(right)
+			if (!Number.isSafeInteger(value)) throw planError('coordinate-overflow')
+			return value
+		}
+
+		function nonNegativeSafeInteger(value, fallback) {
+			const number = Number(value)
+			return Number.isSafeInteger(number) && number >= 0 ? number : fallback
 		}
 
 		function translateCells(cells, target) {

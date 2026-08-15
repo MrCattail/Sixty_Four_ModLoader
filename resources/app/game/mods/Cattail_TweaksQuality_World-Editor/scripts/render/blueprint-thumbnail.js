@@ -3,11 +3,24 @@ ModLoader.register({
 	init(api) {
 		const THUMBNAIL_KEY = Symbol.for('cattail.world-editor.blueprint-thumbnail')
 		const SHARED_KEY = Symbol.for('cattail.world-editor.shared')
-		const CACHE_VERSION = 'v4'
+		const CACHE_VERSION = 'v5'
 		const RESOLVED_CACHE_LIMIT = 128
+		const FRAME_BUDGET_MS = 8
+		const SLICE_RECORD_LIMIT = 256
+		const ORDINARY_CUBE_COLORS = Object.freeze({
+			top: '#a8d8ff',
+			left: '#70b7ff',
+			right: '#3f82c4'
+		})
+		const PAINTED_CUBE_FALLBACK_COLORS = Object.freeze({
+			top: '#a8ffd0',
+			left: '#78f0b3',
+			right: '#3aa979'
+		})
 		const previous = globalThis[THUMBNAIL_KEY]
 		previous?.dispose?.('blueprint-thumbnail-replaced')
 		let disposed = false
+		let generation = 0
 		let game = null
 		const pending = new Map()
 		const resolved = new Map()
@@ -35,15 +48,18 @@ ModLoader.register({
 				const ready = service.peek(entry)
 				if (ready) return Promise.resolve(ready)
 				if (!pending.has(key)) {
-					pending.set(key, loadOrCreate(handle, entry, key)
-						.then(function (result) { return remember(key, result) })
-						.finally(function () { pending.delete(key) }))
+					const task = { key, generation, promise: null }
+					task.promise = loadOrCreate(handle, entry, key, task)
+						.then(function (result) { return isTaskCurrent(task) ? remember(key, result) : null })
+						.finally(function () { if (pending.get(key) === task) pending.delete(key) })
+					pending.set(key, task)
 				}
-				return pending.get(key)
+				return pending.get(key).promise
 			},
 			dispose() {
 				if (disposed) return false
 				disposed = true
+				generation += 1
 				pending.clear()
 				resolved.clear()
 				if (globalThis[THUMBNAIL_KEY] === service) delete globalThis[THUMBNAIL_KEY]
@@ -57,22 +73,27 @@ ModLoader.register({
 			writable: true
 		})
 
-		async function loadOrCreate(handle, entry, key) {
+		async function loadOrCreate(handle, entry, key, task) {
 			try {
 				const cached = await handle.read({ area: 'cache', bucket: 'thumbnails', name: key })
+				assertTaskCurrent(task)
 				return { key, url: await bytesToDataUrl(cached.data), cached: true, placeholder: false }
 			} catch (error) {
+				if (error?.code === 'CANCELLED') return null
 				if (error?.code !== 'NOT_FOUND') return { key, url: placeholderUrl(), cached: false, placeholder: true, error: publicError(error) }
 			}
 			try {
-				const bytes = await renderBytes(entry.envelope.blueprint, entry.envelope.defaultTransform)
+				const bytes = await renderBytes(entry.envelope.blueprint, entry.envelope.defaultTransform, task)
+				assertTaskCurrent(task)
 				try {
 					await handle.write({ area: 'cache', bucket: 'thumbnails', name: key, data: bytes })
 				} catch (writeError) {
 					if (writeError?.code !== 'NAME_CONFLICT') throw writeError
 				}
+				assertTaskCurrent(task)
 				return { key, url: await bytesToDataUrl(bytes), cached: false, placeholder: false }
 			} catch (error) {
+				if (error?.code === 'CANCELLED') return null
 				return { key, url: placeholderUrl(), cached: false, placeholder: true, error: publicError(error) }
 			}
 		}
@@ -93,7 +114,8 @@ ModLoader.register({
 			return id && revision ? CACHE_VERSION + '__' + id + '__' + revision.slice(0, 24) + '.png' : ''
 		}
 
-		async function renderBytes(blueprint, defaultTransform) {
+		async function renderBytes(blueprint, defaultTransform, task) {
+			assertTaskCurrent(task)
 			if (typeof document === 'undefined') throw thumbnailError('CANVAS_UNAVAILABLE')
 			const canvas = document.createElement('canvas')
 			canvas.width = 320
@@ -103,27 +125,46 @@ ModLoader.register({
 			const geometry = transformedGeometry(blueprint, defaultTransform)
 			const bounds = geometry.bounds
 			context.clearRect(0, 0, canvas.width, canvas.height)
-			const entities = (blueprint.entities || []).map(function (entity, index) {
+			const entities = await collectRecords(blueprint.entities, function (entity, index) {
 				return { name: String(entity?.name || ''), position: geometry.point(entity?.position), index }
-			}).filter(function (record) { return !!record.position })
-			const blocks = (blueprint.blocks || []).map(function (cube) { return geometry.point(cube?.position) }).filter(Boolean)
-			const surges = (blueprint.surges || []).map(function (surge) { return geometry.point(surge?.position) }).filter(Boolean)
-			for (const record of entities) drawDiamond(context, project(record.position, bounds), 4.5, 'rgba(166,242,70,.48)')
-			for (const point of blocks) drawDiamond(context, project(point, bounds), 5, '#70b7ff')
-			for (const point of surges) drawDiamond(context, project(point, bounds), 4, '#ec78ff')
-			const iconMap = await loadEntityIcons(entities)
+			}, task)
+			const blocks = await collectRecords(blueprint.blocks, function (cube, index) {
+				return { position: geometry.point(cube?.position), painted: false, state: cube?.state, index }
+			}, task)
+			const paintedCubes = await collectRecords(blueprint.paintedCubes, function (cube, index) {
+				return { position: geometry.point(cube?.position), painted: true, state: cube?.state, index }
+			}, task)
+			const surges = await collectRecords(blueprint.surges, function (surge) { return geometry.point(surge?.position) }, task)
+			await processRecords(entities, function (record) {
+				drawDiamond(context, project(record.position, bounds), 4.5, 'rgba(166,242,70,.48)')
+			}, task)
+			const cubeSize = cubeMetrics(bounds)
+			const cubes = await stableSort(blocks.concat(paintedCubes), function (left, right) {
+				const leftPoint = project(left.position, bounds)
+				const rightPoint = project(right.position, bounds)
+				return leftPoint[1] - rightPoint[1]
+					|| leftPoint[0] - rightPoint[0]
+					|| Number(left.painted) - Number(right.painted)
+					|| left.index - right.index
+			}, task)
+			await processRecords(cubes, function (record) {
+				const colors = record.painted ? paintedCubeColors(record.state) : ORDINARY_CUBE_COLORS
+				drawIsometricCube(context, project(record.position, bounds), cubeSize, colors)
+			}, task)
+			await processRecords(surges, function (point) { drawDiamond(context, project(point, bounds), 4, '#ec78ff') }, task)
+			const iconMap = await loadEntityIcons(entities, task)
 			const iconSize = entityIconSize(bounds, entities.length)
-			entities.sort(function (left, right) {
+			const sortedEntities = await stableSort(entities, function (left, right) {
 				const leftPoint = project(left.position, bounds)
 				const rightPoint = project(right.position, bounds)
 				return leftPoint[1] - rightPoint[1] || leftPoint[0] - rightPoint[0] || left.index - right.index
-			})
-			for (const record of entities) {
+			}, task)
+			await processRecords(sortedEntities, function (record) {
 				const point = project(record.position, bounds)
 				const icon = iconMap.get(record.name)
 				if (icon) drawEntityIcon(context, point, iconSize, icon)
 				else drawEntityFallback(context, point, iconSize, record.name)
-			}
+			}, task)
 			const summary = String((blueprint.entities || []).length) + ' Buildings'
 			context.font = '600 12px Montserrat, Arial, sans-serif'
 			context.lineWidth = 3
@@ -135,7 +176,89 @@ ModLoader.register({
 			const blob = await new Promise(function (resolve, reject) {
 				canvas.toBlob(function (value) { value ? resolve(value) : reject(thumbnailError('PNG_FAILED')) }, 'image/png')
 			})
+			assertTaskCurrent(task)
 			return new Uint8Array(await blob.arrayBuffer())
+		}
+
+		async function collectRecords(values, convert, task) {
+			const source = Array.isArray(values) ? values : []
+			const result = []
+			await processRecords(source, function (value, index) {
+				const record = convert(value, index)
+				if (record && (!Object.prototype.hasOwnProperty.call(record, 'position') || record.position)) result.push(record)
+			}, task)
+			return result
+		}
+
+		async function processRecords(values, process, task) {
+			let sliceStarted = clockNow()
+			let sliceCount = 0
+			for (let index = 0; index < values.length; index += 1) {
+				assertTaskCurrent(task)
+				process(values[index], index)
+				sliceCount += 1
+				if (sliceCount >= SLICE_RECORD_LIMIT || clockNow() - sliceStarted >= FRAME_BUDGET_MS) {
+					await yieldWork(task)
+					sliceStarted = clockNow()
+					sliceCount = 0
+				}
+			}
+			assertTaskCurrent(task)
+		}
+
+		async function stableSort(values, compare, task) {
+			if (values.length < 2) return values.slice()
+			let source = values.slice()
+			let target = new Array(source.length)
+			for (let width = 1; width < source.length; width *= 2) {
+				let operations = 0
+				let sliceStarted = clockNow()
+				for (let start = 0; start < source.length; start += width * 2) {
+					let left = start
+					let right = Math.min(start + width, source.length)
+					const leftEnd = right
+					const rightEnd = Math.min(start + width * 2, source.length)
+					let output = start
+					while (left < leftEnd || right < rightEnd) {
+						target[output++] = right >= rightEnd || (left < leftEnd && compare(source[left], source[right]) <= 0)
+							? source[left++]
+							: source[right++]
+						operations += 1
+						if (operations >= SLICE_RECORD_LIMIT || clockNow() - sliceStarted >= FRAME_BUDGET_MS) {
+							await yieldWork(task)
+							operations = 0
+							sliceStarted = clockNow()
+						}
+					}
+				}
+				const swap = source
+				source = target
+				target = swap
+			}
+			assertTaskCurrent(task)
+			return source
+		}
+
+		function yieldWork(task) {
+			return new Promise(function (resolve, reject) {
+				const resume = function () {
+					try { assertTaskCurrent(task); resolve() } catch (error) { reject(error) }
+				}
+				if (typeof requestAnimationFrame === 'function') requestAnimationFrame(resume)
+				else setTimeout(resume, 0)
+			})
+		}
+
+		function clockNow() {
+			return typeof performance !== 'undefined' && typeof performance.now === 'function' ? performance.now() : Date.now()
+		}
+
+		function isTaskCurrent(task) {
+			return !!task && !disposed && task.generation === generation && pending.get(task.key) === task
+		}
+
+		function assertTaskCurrent(task) {
+			if (!isTaskCurrent(task)) throw thumbnailError('CANCELLED')
 		}
 
 		function contentBounds(blueprint) {
@@ -225,12 +348,96 @@ ModLoader.register({
 			context.fill()
 		}
 
-		async function loadEntityIcons(records) {
+		function cubeMetrics(bounds) {
+			const width = Math.max(1, bounds.max[0] - bounds.min[0] + 1)
+			const height = Math.max(1, bounds.max[1] - bounds.min[1] + 1)
+			const uSpacing = Math.hypot(132 / width, 62 / width)
+			const vSpacing = Math.hypot(132 / height, 62 / height)
+			const halfWidth = clamp(Math.min(uSpacing, vSpacing) * .42, .8, 14)
+			return {
+				halfWidth,
+				halfHeight: halfWidth * (62 / 132),
+				sideHeight: clamp(halfWidth * .82, .75, 11.5),
+				lineWidth: clamp(halfWidth * .12, .35, 1)
+			}
+		}
+
+		function drawIsometricCube(context, point, metrics, colors) {
+			const x = point[0]
+			const y = point[1]
+			const halfWidth = metrics.halfWidth
+			const halfHeight = metrics.halfHeight
+			const halfSide = metrics.sideHeight / 2
+			const top = [x, y - halfHeight - halfSide]
+			const left = [x - halfWidth, y - halfSide]
+			const center = [x, y + halfHeight - halfSide]
+			const right = [x + halfWidth, y - halfSide]
+			const leftBottom = [x - halfWidth, y + halfSide]
+			const bottom = [x, y + halfHeight + halfSide]
+			const rightBottom = [x + halfWidth, y + halfSide]
+			context.save()
+			try {
+				context.strokeStyle = 'rgba(20, 30, 42, .42)'
+				context.lineWidth = metrics.lineWidth
+				context.lineJoin = 'round'
+				context.lineCap = 'round'
+				drawCubeFace(context, colors.left, [left, center, bottom, leftBottom])
+				drawCubeFace(context, colors.right, [right, center, bottom, rightBottom])
+				drawCubeFace(context, colors.top, [top, right, center, left])
+			} finally {
+				context.restore()
+			}
+		}
+
+		function drawCubeFace(context, color, points) {
+			context.fillStyle = color
+			context.beginPath()
+			context.moveTo(points[0][0], points[0][1])
+			for (let index = 1; index < points.length; index += 1) {
+				context.lineTo(points[index][0], points[index][1])
+			}
+			context.closePath()
+			context.fill()
+			context.stroke()
+		}
+
+		function paintedCubeColors(state) {
+			const resource = dominantResourceId(state?.resources)
+			const triplet = Number.isInteger(resource) ? game?.codex?.resources?.[resource]?.triplet : null
+			if (!Array.isArray(triplet) || triplet.length < 3 || !triplet.every(isColorString)) {
+				return PAINTED_CUBE_FALLBACK_COLORS
+			}
+			return {
+				top: String(triplet[1]).trim(),
+				left: String(triplet[0]).trim(),
+				right: String(triplet[2]).trim()
+			}
+		}
+
+		function dominantResourceId(resources) {
+			const counts = new Map()
+			for (const value of Array.isArray(resources) ? resources : []) {
+				const resource = Number(value)
+				if (!Number.isInteger(resource) || resource < 0) continue
+				counts.set(resource, (counts.get(resource) || 0) + 1)
+			}
+			return Array.from(counts.entries()).sort(function (left, right) {
+				return right[1] - left[1] || left[0] - right[0]
+			})[0]?.[0] ?? null
+		}
+
+		function isColorString(value) {
+			return typeof value === 'string' && value.trim().length > 0
+		}
+
+		async function loadEntityIcons(records, task) {
+			assertTaskCurrent(task)
 			const names = Array.from(new Set(records.map(function (record) { return record.name }).filter(Boolean)))
 			await Promise.all(names.map(function (name) {
 				if (!entityIcons.has(name)) entityIcons.set(name, loadEntityIcon(name))
 				return entityIcons.get(name)
 			}))
+			assertTaskCurrent(task)
 			const result = new Map()
 			for (const name of names) {
 				const icon = await entityIcons.get(name)
@@ -350,7 +557,7 @@ ModLoader.register({
 			if (!Array.isArray(value) || value.length < 2) return null
 			const u = Number(value[0])
 			const v = Number(value[1])
-			return Number.isInteger(u) && Number.isInteger(v) ? [u, v] : null
+			return Number.isSafeInteger(u) && Number.isSafeInteger(v) ? [u, v] : null
 		}
 
 		function thumbnailError(code) {

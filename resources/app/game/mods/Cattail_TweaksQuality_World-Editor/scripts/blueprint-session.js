@@ -8,6 +8,8 @@ ModLoader.register({
 		const BLUEPRINT_KEY = Symbol.for('cattail.world-editor.blueprint')
 		const PRODUCTION_KEY = Symbol.for('cattail.world-editor.production')
 		const BLUEPRINT_STATE_KEY = Symbol.for('cattail.world-editor.blueprint-state')
+		const BLUEPRINT_PAINTED_KEY = Symbol.for('cattail.world-editor.blueprint-painted')
+		const PAINT_CUBE_STATE_KEY = Symbol.for('cattail.world-editor.paint-cube-state')
 		const TRANSFORM_KEY = Symbol.for('cattail.world-editor.blueprint-transform')
 		const PREVIEW_KEY = Symbol.for('cattail.world-editor.blueprint-preview')
 		const PLACEMENT_KEY = Symbol.for('cattail.world-editor.blueprint-placement')
@@ -474,7 +476,7 @@ ModLoader.register({
 						clipboard: 'unchanged',
 						mode: normalized.mode,
 						executionMode: mode,
-						includeBlocks: Array.isArray(normalized.blocks) && normalized.blocks.length > 0,
+						includeBlocks: hasCubeLayer(normalized),
 						includeSurges: Array.isArray(normalized.surges) && normalized.surges.length > 0,
 						sourcePlane: Number(normalized.sourcePlane) ? 1 : 0,
 						anchor: normalizePosition(normalized.anchor?.position) || [0, 0],
@@ -722,7 +724,7 @@ ModLoader.register({
 						return true
 					},
 					setIncludeBlocks(next, reason) {
-						if (disposed || mode !== 'full' || !sourceBlueprint?.blocks?.length) return false
+					if (disposed || mode !== 'full' || !hasCubeLayer(sourceBlueprint)) return false
 						next = !!next
 						if (includeBlocks === next) return false
 						includeBlocks = next
@@ -853,13 +855,21 @@ ModLoader.register({
 				const entityRecords = []
 				const capturedEntities = []
 				const blockRecords = []
+				const paintedRecords = []
 				const surgeRecords = []
+				const entityRecordByEntity = new Map()
+				const surgeRecordByEntity = new Map()
 				const waypointRecords = []
 				const skipped = new Map()
 				let crossBoundaryCount = 0
 				let contentBounds = null
 				let normalizedCount = 0
 				const blueprintState = globalThis[BLUEPRINT_STATE_KEY]
+				const paintedState = globalThis[BLUEPRINT_PAINTED_KEY]
+				const paintCubeState = globalThis[PAINT_CUBE_STATE_KEY]
+				const cutCreative = planValue.summary?.creative === true &&
+					creative.snapshot?.().ready === true &&
+					creative.snapshot?.().creativeMode === true
 
 				for (const descriptor of planValue.removals) {
 					const name = String(descriptor?.name || '').trim()
@@ -868,7 +878,8 @@ ModLoader.register({
 					if (name === 'cube' || name === 'surge') continue
 					const footprint = normalizeCutFootprint(descriptor?.footprint, position)
 					const definition = game.codex?.entities?.[name]
-					if (!definition || definition.canPurchase !== true) {
+					const shatteredStabilizer = name === 'stabilizer3' && cutCreative
+					if (!definition || (definition.canPurchase !== true && !shatteredStabilizer)) {
 						throw new Error('unsafe-cut-removal')
 					}
 					let entity = null
@@ -892,7 +903,7 @@ ModLoader.register({
 							max: subtract([footprint.maxU, footprint.maxV], anchor)
 						},
 						restricted: {
-							onlyOne: definition.onlyone === true
+							onlyOne: definition.onlyone === true || shatteredStabilizer
 						},
 						config: {}
 					}
@@ -911,6 +922,7 @@ ModLoader.register({
 						waypointRecords.push({ record, timestamp: Number.isFinite(rawTimestamp) ? rawTimestamp : Number.MAX_SAFE_INTEGER })
 					}
 					entityRecords.push(record)
+					entityRecordByEntity.set(entity, record)
 					capturedEntities.push(entity)
 					if (descriptor.crossBoundary === true) crossBoundaryCount += 1
 					contentBounds = includeBounds(contentBounds, footprint)
@@ -920,20 +932,38 @@ ModLoader.register({
 					if (name !== 'cube' && name !== 'surge') continue
 					const position = normalizePosition(entity?.position)
 					if (!position || !pointInSelections(position[0], position[1], ranges.absolute)) continue
-					let rawSave
-					let detail
-					try {
-						rawSave = cloneEntitySave(game.getEntityString(entity))
-						detail = blueprintState?.normalizeSaveDetailed?.(rawSave)
-					} catch (error) {}
-					const saved = detail?.save || rawSave
 					if (name === 'cube') {
+						if (paintCubeState?.isPainted?.(entity) && paintedState?.ready?.() !== true) {
+							throw new Error('painted-blueprint-unavailable')
+						}
+						const relativePosition = subtract(position, anchor)
+						const paintedRecord = paintedState?.capture?.(entity, relativePosition)
+						if (paintedRecord) {
+							paintedRecords.push(paintedRecord)
+							contentBounds = includePoint(contentBounds, position)
+							continue
+						}
+						let rawSave
+						let detail
+						try {
+							rawSave = cloneEntitySave(game.getEntityString(entity))
+							detail = blueprintState?.normalizeSaveDetailed?.(rawSave)
+						} catch (error) {}
+						const saved = detail?.save || rawSave
 						if (Number(entity.state) !== 2 || !saved) {
 							addTypeCount(skipped, name, Number(entity.state) === 2 ? 'unserializable' : 'unstable')
 							continue
 						}
 						blockRecords.push({ kind: 'cube', name, position: subtract(position, anchor), state: saved.par })
+						if (detail?.changed) normalizedCount += 1
 					} else {
+						let rawSave
+						let detail
+						try {
+							rawSave = cloneEntitySave(game.getEntityString(entity))
+							detail = blueprintState?.normalizeSaveDetailed?.(rawSave)
+						} catch (error) {}
+						const saved = detail?.save || rawSave
 						if (!saved || !blueprintState?.surgeEligible?.(entity, saved)) {
 							addTypeCount(skipped, name, 'unsafe-transient')
 							continue
@@ -944,23 +974,26 @@ ModLoader.register({
 							continue
 						}
 						surgeRecords.push(normalizedSurge)
+						surgeRecordByEntity.set(entity, normalizedSurge)
+						if (detail?.changed) normalizedCount += 1
 					}
-					if (detail?.changed) normalizedCount += 1
 					contentBounds = includePoint(contentBounds, position)
 				}
 				for (const descriptor of Array.isArray(planValue.protectedTargets) ? planValue.protectedTargets : []) {
 					if (descriptor?.name === 'cube' || descriptor?.name === 'surge') continue
 					addTypeCount(skipped, descriptor?.name || 'unknown', descriptor?.reason || 'protected')
 				}
+				const stabilizerLinkCount = attachCapturedStabilizerLinks(entityRecordByEntity, surgeRecordByEntity)
 				sortRecords(entityRecords)
 				sortRecords(blockRecords)
+				sortRecords(paintedRecords)
 				sortRecords(surgeRecords)
 				waypointRecords.sort(function (left, right) {
 					return left.timestamp - right.timestamp || comparePositions(left.record.position, right.record.position)
 				}).forEach(function (entry, order) {
 					entry.record.stateMeta = { waypointOrder: order }
 				})
-				const transientCells = new Set(blockRecords.concat(surgeRecords).map(function (record) {
+				const transientCells = new Set(blockRecords.concat(paintedRecords, surgeRecords).map(function (record) {
 					return record.position[0] + ':' + record.position[1]
 				}))
 				const normalizedEmptyCells = emptyCells.filter(function (position) {
@@ -973,15 +1006,17 @@ ModLoader.register({
 					blockRecords,
 					crossBoundaryCount,
 					skipped,
-					surgeRecords
+					surgeRecords,
+					paintedRecords
 				)
 				summary.normalizedCount = normalizedCount
 				summary.emptyCellCount = normalizedEmptyCells.length
+				summary.stabilizerLinkCount = stabilizerLinkCount
 				const productionState = globalThis[PRODUCTION_KEY]
 				const production = typeof productionState?.captureEntities === 'function'
 					? productionState.captureEntities(capturedEntities)
 					: null
-				const schemaVersion = 6
+				const schemaVersion = stabilizerLinkCount ? 8 : paintedRecords.length ? 7 : 6
 				return deepFreeze({
 					schema: 1,
 					cutToken: String(planValue.signature),
@@ -1003,6 +1038,7 @@ ModLoader.register({
 						includeBlocks: true,
 						entities: entityRecords,
 						blocks: blockRecords,
+						...(schemaVersion === 7 || schemaVersion === 8 ? { paintedCubes: paintedRecords } : {}),
 						surges: surgeRecords,
 						production,
 						summary
@@ -1011,22 +1047,28 @@ ModLoader.register({
 			}
 
 			function normalizeCutCandidate(value) {
+				const schemaVersion = Number(value?.blueprint?.schemaVersion)
 				if (
 					Number(value?.schema) !== 1 ||
 					typeof value?.cutToken !== 'string' ||
 					!value.cutToken ||
-					Number(value?.blueprint?.schemaVersion) !== 6 ||
+					(schemaVersion !== 6 && schemaVersion !== 7 && schemaVersion !== 8) ||
 					value.blueprint?.mode !== 'full' ||
 					value.blueprint?.includeBlocks !== true ||
 					!Array.isArray(value.blueprint?.entities) ||
 					!Array.isArray(value.blueprint?.emptyCells) ||
 					!Array.isArray(value.blueprint?.blocks) ||
 					!Array.isArray(value.blueprint?.surges) ||
-					!(value.blueprint.entities.length + value.blueprint.blocks.length + value.blueprint.surges.length)
+					(schemaVersion === 7 && (!Array.isArray(value.blueprint?.paintedCubes) || !value.blueprint.paintedCubes.length)) ||
+					(schemaVersion === 8 && !Array.isArray(value.blueprint?.paintedCubes)) ||
+					!(value.blueprint.entities.length + value.blueprint.blocks.length + value.blueprint.surges.length + (value.blueprint.paintedCubes?.length || 0))
 				) {
 					throw new Error('invalid-cut-candidate')
 				}
-				return deepFreeze(jsonClone(value))
+				const blueprintState = globalThis[BLUEPRINT_STATE_KEY]
+				const normalized = blueprintState?.normalizeBlueprint?.(value.blueprint)
+				if (!normalized) throw new Error('invalid-cut-candidate')
+				return deepFreeze(Object.assign({}, jsonClone(value), { blueprint: normalized }))
 			}
 
 			function normalizeCutFootprint(value, position) {
@@ -1113,12 +1155,17 @@ ModLoader.register({
 				const entityRecords = []
 				const capturedEntities = []
 				const blockRecords = []
+				const paintedRecords = []
 				const surgeRecords = []
+				const entityRecordByEntity = new Map()
+				const surgeRecordByEntity = new Map()
 				const skipped = new Map()
 				let crossBoundaryCount = 0
 				let normalizedCount = 0
 				let contentBounds = null
 				const waypointRecords = []
+				const paintedState = globalThis[BLUEPRINT_PAINTED_KEY]
+				const paintCubeState = globalThis[PAINT_CUBE_STATE_KEY]
 				for (const entity of foundEntities) {
 					if (isCancelled()) throw new Error('capture-cancelled')
 					const name = safeEntityName(entity)
@@ -1149,18 +1196,29 @@ ModLoader.register({
 						}
 						if (detail?.changed) normalizedCount += 1
 						surgeRecords.push(normalized)
+						surgeRecordByEntity.set(entity, normalized)
 						contentBounds = includePoint(contentBounds, position)
 						continue
 					}
 					if (name === 'cube') {
 						if (captureMode !== 'full' || !captureBlocks) continue
-						if (Number(entity.state) !== 2) {
-							addTypeCount(skipped, name, 'unstable')
-							continue
+						if (paintCubeState?.isPainted?.(entity) && paintedState?.ready?.() !== true) {
+							throw new Error('painted-blueprint-unavailable')
 						}
 						const position = normalizePosition(entity.position)
 						if (!position) {
 							addTypeCount(skipped, name, 'invalid-position')
+							continue
+						}
+						const relativePosition = subtract(position, source.anchor)
+						const paintedRecord = paintedState?.capture?.(entity, relativePosition)
+						if (paintedRecord) {
+							paintedRecords.push(paintedRecord)
+							contentBounds = includePoint(contentBounds, position)
+							continue
+						}
+						if (Number(entity.state) !== 2) {
+							addTypeCount(skipped, name, 'unstable')
 							continue
 						}
 						let saved
@@ -1177,7 +1235,6 @@ ModLoader.register({
 							addTypeCount(skipped, name, 'unserializable')
 							continue
 						}
-						const relativePosition = subtract(position, source.anchor)
 						blockRecords.push({
 							kind: 'cube',
 							name,
@@ -1193,7 +1250,11 @@ ModLoader.register({
 						continue
 					}
 					const definition = game.codex?.entities?.[name]
-					if (!definition || definition.canPurchase !== true) {
+					const shatteredStabilizer = name === 'stabilizer3' &&
+						captureMode === 'full' &&
+						creative.snapshot?.().ready === true &&
+						creative.snapshot?.().creativeMode === true
+					if (!definition || (definition.canPurchase !== true && !shatteredStabilizer)) {
 						addTypeCount(skipped, name, 'unsupported')
 						continue
 					}
@@ -1215,7 +1276,7 @@ ModLoader.register({
 							max: subtract([footprint.maxU, footprint.maxV], source.anchor)
 						},
 						restricted: {
-							onlyOne: definition.onlyone === true
+							onlyOne: definition.onlyone === true || shatteredStabilizer
 						},
 						config: {}
 					}
@@ -1245,13 +1306,16 @@ ModLoader.register({
 						}
 					}
 					entityRecords.push(record)
+					entityRecordByEntity.set(entity, record)
 					capturedEntities.push(entity)
 					if (crossed) crossBoundaryCount += 1
 					contentBounds = includeBounds(contentBounds, footprint)
 				}
 
+				const stabilizerLinkCount = attachCapturedStabilizerLinks(entityRecordByEntity, surgeRecordByEntity)
 				sortRecords(entityRecords)
 				sortRecords(blockRecords)
+				sortRecords(paintedRecords)
 				sortRecords(surgeRecords)
 				waypointRecords.sort(function (left, right) {
 					return left.timestamp - right.timestamp ||
@@ -1263,6 +1327,7 @@ ModLoader.register({
 				if (
 					!entityRecords.length &&
 					!blockRecords.length &&
+					!paintedRecords.length &&
 					!surgeRecords.length &&
 					!normalizedEmptyCells.length
 				) {
@@ -1275,7 +1340,8 @@ ModLoader.register({
 							blockRecords,
 							crossBoundaryCount,
 							skipped,
-							surgeRecords
+							surgeRecords,
+							paintedRecords
 						),
 						capturedTypes: [],
 						skippedTypes: typeCounts(skipped)
@@ -1289,15 +1355,17 @@ ModLoader.register({
 					blockRecords,
 					crossBoundaryCount,
 					skipped,
-					surgeRecords
+					surgeRecords,
+					paintedRecords
 				)
 				summary.normalizedCount = normalizedCount
 				summary.emptyCellCount = normalizedEmptyCells.length
+				summary.stabilizerLinkCount = stabilizerLinkCount
 				const productionState = globalThis[PRODUCTION_KEY]
 				const production = typeof productionState?.captureEntities === 'function'
 					? productionState.captureEntities(capturedEntities)
 					: null
-				const schemaVersion = 6
+				const schemaVersion = stabilizerLinkCount ? 8 : paintedRecords.length ? 7 : 6
 				return {
 					blueprint: {
 						schemaVersion,
@@ -1313,6 +1381,7 @@ ModLoader.register({
 						includeBlocks: true,
 						entities: entityRecords,
 						blocks: blockRecords,
+						...(schemaVersion === 7 || schemaVersion === 8 ? { paintedCubes: paintedRecords } : {}),
 						surges: surgeRecords,
 						production,
 						summary
@@ -1321,6 +1390,28 @@ ModLoader.register({
 					capturedTypes: summary.capturedTypes,
 					skippedTypes: summary.skippedTypes
 				}
+			}
+
+			function attachCapturedStabilizerLinks(entityRecordByEntity, surgeRecordByEntity) {
+				let count = 0
+				const linkedStabilizers = new Set()
+				for (const [surge, surgeRecord] of surgeRecordByEntity || []) {
+					const stabilizer = surge?.stabilizer
+					const stabilizerRecord = entityRecordByEntity?.get?.(stabilizer)
+					if (
+						!stabilizer ||
+						stabilizer?.surge !== surge ||
+						!isStabilizerName(stabilizer?.name) ||
+						!stabilizerRecord ||
+						linkedStabilizers.has(stabilizer)
+					) continue
+					const position = normalizePosition(stabilizerRecord.position)
+					if (!position) continue
+					surgeRecord.stabilizer = { position }
+					linkedStabilizers.add(stabilizer)
+					count += 1
+				}
+				return count
 			}
 
 			function mountUi() {
@@ -1879,7 +1970,7 @@ ModLoader.register({
 				ui.controls.full.hidden = !creativeAvailable
 				ui.controls.full.setAttribute('aria-hidden', creativeAvailable ? 'false' : 'true')
 				ui.controls.modes.dataset.columns = creativeAvailable ? '2' : '1'
-				const blocksAvailable = creativeAvailable && state.mode === 'full' && !!state.sourceBlueprint?.blocks?.length
+				const blocksAvailable = creativeAvailable && state.mode === 'full' && hasCubeLayer(state.sourceBlueprint)
 				const surgesAvailable = creativeAvailable && state.mode === 'full' && !!state.sourceBlueprint?.surges?.length
 				const syncEmptyAvailable = !!state.sourceBlueprint?.emptyCells?.length
 				ui.controls.blocks.hidden = !blocksAvailable
@@ -2331,6 +2422,7 @@ ModLoader.register({
 				if (result.mode !== 'full') return ready
 				return ready + ' · ' + formatTemplate(i18n.t(game, 'blueprintFullSummary'), {
 					cubes: Number(result.summary?.blockCount) || 0,
+					painted: Number(result.summary?.paintedCubeCount) || 0,
 					empty: Number(result.summary?.emptyCellCount) || 0,
 					normalized: Number(result.summary?.normalizedCount) || 0
 				})
@@ -2400,6 +2492,8 @@ ModLoader.register({
 					canvas.height = 32
 					canvas.setAttribute('aria-hidden', 'true')
 					const sample = currentSession.sourceBlueprint?.blocks?.find?.(function (block) {
+						return block.name === 'cube'
+					}) || currentSession.sourceBlueprint?.paintedCubes?.find?.(function (block) {
 						return block.name === 'cube'
 					})
 					drawCubeThumbnail(canvas, sample?.state?.resources)
@@ -2952,7 +3046,14 @@ ModLoader.register({
 						}
 					})
 					dialog.title.textContent = i18n.t(game, 'placementOptionsTitle')
-					dialog.message.textContent = i18n.t(game, 'placementOptionsMessage')
+					dialog.message.textContent = i18n.t(game, 'placementOptionsMessage') + (
+						(Number(plan?.schemaVersion) === 7 || Number(plan?.schemaVersion) === 8) &&
+						Array.isArray(plan?.records) && plan.records.some(function (record) {
+							return record?.sourceKind === 'painted-cube'
+						})
+							? ' · ' + i18n.t(game, 'blueprintPaintedCompatibility')
+							: ''
+					)
 
 					const optionList = document.createElement('div')
 					optionList.className = 'cattail-world-editor-blueprint-placement-options'
@@ -2986,6 +3087,11 @@ ModLoader.register({
 							protected: Number(detail.protectedCount) || 0,
 							cross: Number(detail.crossBoundaryCount) || 0
 						})
+						if (Number(detail.paintedBuildCount) > 0) {
+							summary.textContent += ' · ' + formatTemplate(i18n.t(game, 'blueprintPaintedCount'), {
+								count: Number(detail.paintedBuildCount) || 0
+							})
+						}
 						economy.textContent = detail.creative
 							? i18n.t(game, 'deleteCreativeNoEconomy')
 							: formatPlacementResourceDelta(detail.resourceDelta)
@@ -4649,10 +4755,11 @@ ModLoader.register({
 				return cloned && cloned.par && typeof cloned.par === 'object' ? cloned : null
 			}
 
-			function createSummary(selectionCount, selectedCellCount, entities, blocks, crossing, skipped, surges) {
+			function createSummary(selectionCount, selectedCellCount, entities, blocks, crossing, skipped, surges, paintedCubes) {
 				const captured = new Map()
 				for (const record of entities) addTypeCount(captured, record.name, 'captured')
 				for (const record of blocks) addTypeCount(captured, record.name, 'captured')
+				for (const record of paintedCubes || []) addTypeCount(captured, record.name, 'painted')
 				for (const record of surges || []) addTypeCount(captured, record.name, 'captured')
 				const skippedTypes = typeCounts(skipped)
 				return {
@@ -4660,6 +4767,7 @@ ModLoader.register({
 					selectedCellCount,
 					entityCount: entities.length,
 					blockCount: blocks.length,
+					paintedCubeCount: Array.isArray(paintedCubes) ? paintedCubes.length : 0,
 					surgeCount: Array.isArray(surges) ? surges.length : 0,
 					crossBoundaryCount: crossing,
 					skippedCount: skippedTypes.reduce(function (sum, entry) {
@@ -4670,12 +4778,20 @@ ModLoader.register({
 				}
 			}
 
+			function hasCubeLayer(value) {
+				return !!(
+					(Array.isArray(value?.blocks) && value.blocks.length) ||
+					(Array.isArray(value?.paintedCubes) && value.paintedCubes.length)
+				)
+			}
+
 			function emptySummary(selectionCount) {
 				return {
 					selectionCount: Number(selectionCount) || 0,
 					selectedCellCount: 0,
 					entityCount: 0,
 					blockCount: 0,
+					paintedCubeCount: 0,
 					surgeCount: 0,
 					crossBoundaryCount: 0,
 					skippedCount: 0,
@@ -4774,6 +4890,10 @@ ModLoader.register({
 				const u = Number(position[0])
 				const v = Number(position[1])
 				return Number.isInteger(u) && Number.isInteger(v) ? [u, v] : null
+			}
+
+			function isStabilizerName(value) {
+				return value === 'stabilizer' || value === 'stabilizer2' || value === 'stabilizer3'
 			}
 
 			function blueprintPlacementAllowed(blueprint) {

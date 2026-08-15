@@ -7,6 +7,7 @@ ModLoader.register({
 		const RUNTIME_KEY = Symbol.for('cattail.world-editor.runtime')
 		const THUMBNAIL_KEY = Symbol.for('cattail.world-editor.blueprint-thumbnail')
 		const TRANSFORM_KEY = Symbol.for('cattail.world-editor.blueprint-transform')
+		const TRANSACTIONS_KEY = Symbol.for('cattail.world-editor.transactions')
 		const previous = globalThis[LIBRARY_KEY]
 		previous?.dispose?.('blueprint-library-replaced')
 
@@ -78,10 +79,12 @@ ModLoader.register({
 					if (!entry?.envelope || typeof renderer?.get !== 'function') return null
 					return renderer.get(handle, entry)
 				},
+				writeBlockedReason,
 				dispose
 			})
 
 			function snapshot() {
+				const blockedReason = writeBlockedReason()
 				return Object.freeze({
 					version: '0.5.1',
 					ready,
@@ -95,6 +98,7 @@ ModLoader.register({
 					problems: Object.freeze(problems.slice()),
 					lastReason,
 					error,
+					writeBlockedReason: blockedReason,
 					revision,
 					disposed
 				})
@@ -155,7 +159,7 @@ ModLoader.register({
 				active = lists[0]
 				trash = lists[1]
 				quarantine = lists[2]
-				problems = active.filter(function (entry) { return !!entry.error })
+				problems = active.concat(trash).filter(function (entry) { return !!entry.error })
 				notify(reason || 'refreshed')
 				return snapshot()
 			}
@@ -193,6 +197,7 @@ ModLoader.register({
 			}
 
 			async function saveCurrent(options) {
+				assertWritable()
 				const settings = options || {}
 				const source = session.snapshot().sourceBlueprint
 				if (!source) throw libraryError('BLUEPRINT_REQUIRED', 'There is no current blueprint to save.')
@@ -248,6 +253,7 @@ ModLoader.register({
 			}
 
 			async function rename(entryValue, displayName) {
+				assertWritable()
 				const entry = resolveActiveEntry(entryValue)
 				if (!entry?.envelope) throw libraryError('NOT_FOUND', 'The blueprint is unavailable.')
 				return run('rename', async function () {
@@ -275,6 +281,7 @@ ModLoader.register({
 			}
 
 			async function duplicate(entryValue, displayName) {
+				assertWritable()
 				const entry = resolveActiveEntry(entryValue)
 				if (!entry?.envelope) throw libraryError('NOT_FOUND', 'The blueprint is unavailable.')
 				return run('duplicate', async function () {
@@ -341,6 +348,7 @@ ModLoader.register({
 				if (!candidate?.envelope) throw libraryError('CORRUPT', 'The imported blueprint candidate is unavailable.')
 				const choice = String(resolution || (candidate.conflict ? 'copy' : 'import'))
 				if (choice === 'cancel') return Object.freeze({ canceled: true })
+				assertWritable()
 				if (!['import', 'copy', 'replace'].includes(choice)) throw libraryError('PATH_INVALID', 'The import resolution is invalid.')
 				return run('commit-import-' + choice, async function () {
 					const source = candidate.envelope
@@ -460,6 +468,7 @@ ModLoader.register({
 			}
 
 			async function trashEntry(entryValue) {
+				assertWritable()
 				const entry = resolveActiveEntry(entryValue)
 				if (!entry) throw libraryError('NOT_FOUND', 'The blueprint is unavailable.')
 				return mutateAndRefresh('trash', function () {
@@ -468,6 +477,7 @@ ModLoader.register({
 			}
 
 			async function restore(entryValue) {
+				assertWritable()
 				const entry = resolveEntry(trash, entryValue)
 				if (!entry) throw libraryError('NOT_FOUND', 'The trashed blueprint is unavailable.')
 				const newName = entry.name
@@ -485,6 +495,7 @@ ModLoader.register({
 			}
 
 			async function removeEntry(entryValue) {
+				assertWritable()
 				const entry = resolveEntry(trash.concat(quarantine), entryValue)
 				if (!entry || entry.area === 'active') throw libraryError('NOT_FOUND', 'The removable blueprint is unavailable.')
 				return mutateAndRefresh('remove', function () {
@@ -504,6 +515,18 @@ ModLoader.register({
 					await refreshInternal(reason + '-complete')
 					return result
 				})
+			}
+
+			function writeBlockedReason() {
+				const transactions = globalThis[TRANSACTIONS_KEY]
+				if (!transactions || transactions.game !== game) return null
+				if (typeof transactions.writeBlockedReason === 'function') return transactions.writeBlockedReason()
+				return transactions.snapshot?.().terminalBlockedReason || null
+			}
+
+			function assertWritable() {
+				const reason = writeBlockedReason()
+				if (reason) throw libraryError(reason, 'Reload is required before blueprint library changes can continue.')
 			}
 
 			async function run(reason, operation) {

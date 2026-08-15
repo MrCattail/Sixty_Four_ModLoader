@@ -481,7 +481,7 @@ function testSelectionCard() {
 	sandbox[RUNTIME_KEY] = runtime
 	sandbox[SELECTION_KEY] = selection
 	sandbox[ANALYSIS_KEY] = analysis
-	assert.equal(sandbox[I18N_KEY].keys.length, 249)
+	assert.equal(sandbox[I18N_KEY].keys.length, 267)
 	api.emit('afterGameInit', {}, game)
 
 	const card = document.getElementById('cattail-world-editor-selection-card')
@@ -604,7 +604,7 @@ function testSelectionCard() {
 
 function testManifest() {
 	const manifest = JSON.parse(fs.readFileSync(path.join(MOD_ROOT, 'mod.json'), 'utf8'))
-	assert.equal(manifest.version, '0.5.1')
+	assert.equal(manifest.version, '0.6.0')
 	assert.equal(manifest.languageSupport.gameLanguage, true)
 	assert.deepEqual(manifest.entry, [
 		'scripts/core/foundation.js',
@@ -615,6 +615,12 @@ function testManifest() {
 		'scripts/core/editor-transactions.js',
 		'scripts/core/selection-state.js',
 		'scripts/core/tool-state.js',
+		'scripts/core/paint-cube-state.js',
+		'scripts/core/blueprint-painted.js',
+		'scripts/core/paint-cube-growth.js',
+		'scripts/core/paint-cube-stroke.js',
+		'scripts/core/paint-cube-fill.js',
+		'scripts/ui/paint-cube-ui.js',
 		'scripts/core/selection-analysis.js',
 		'scripts/core/production-state.js',
 		'scripts/core/blueprint-state.js',
@@ -625,6 +631,7 @@ function testManifest() {
 		'scripts/core/selection-delete.js',
 		'scripts/core/input-controller.js',
 		'scripts/render/resize-handles.js',
+		'scripts/input/paint-cube-input.js',
 		'scripts/input/selection-controller.js',
 		'scripts/render/hover-overlay.js',
 		'scripts/render/selected-overlay.js',
@@ -639,6 +646,8 @@ function testManifest() {
 		'scripts/ui/selection-cut-ui.js',
 		'scripts/blueprint-preview.js',
 		'scripts/render/selection-cursor.js',
+		'scripts/render/paint-cube-cursor.js',
+		'scripts/render/paint-cube-render-diagnostics.js',
 		'scripts/render/blueprint-thumbnail.js',
 		'scripts/ui/blueprint-library-ui.js',
 		'scripts/ui/selection-card.js',

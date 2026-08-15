@@ -205,7 +205,7 @@ async function testPrepareGapResourceDriftUsesLatestAffordableBalance() {
 	let assembleCount = 0
 	game.assembleSave = function () {
 		assembleCount += 1
-		if (assembleCount === 2) this.resources[0] += prepareGapGain
+		if (assembleCount === 1) this.resources[0] += prepareGapGain
 		return assembleSave.apply(this, arguments)
 	}
 
@@ -245,7 +245,7 @@ async function testUnaffordablePrepareGapIsZeroWrite() {
 	let assembleCount = 0
 	game.assembleSave = function () {
 		assembleCount += 1
-		if (assembleCount === 2) this.resources.splice(0, this.resources.length, 0, 0)
+		if (assembleCount === 1) this.resources.splice(0, this.resources.length, 0, 0)
 		return assembleSave.apply(this, arguments)
 	}
 
@@ -560,9 +560,9 @@ function testUiLocalizationDocumentationAndManifestContracts() {
 	const readme = fs.readFileSync(path.join(MOD_ROOT, 'README.md'), 'utf8')
 	const manifest = JSON.parse(fs.readFileSync(path.join(MOD_ROOT, 'mod.json'), 'utf8'))
 
-	assert.equal(manifest.version, '0.5.1')
-	assert.equal(manifest.entry.length, 36)
-	assert.match(sessionSource, /const schemaVersion = 6/)
+	assert.equal(manifest.version, '0.6.0')
+	assert.equal(manifest.entry.length, 45)
+	assert.match(sessionSource, /const schemaVersion = stabilizerLinkCount \? 8 : paintedRecords\.length \? 7 : 6/)
 	assert.match(sessionSource, /emptyCells/)
 	assert.match(sessionSource, /confirmPlacementOptions/)
 	assert.match(sessionSource, /let replaceConflicts = false/)

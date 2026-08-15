@@ -127,6 +127,10 @@ function loadRuntime(options = {}) {
 			hooks.get(name).push(listener)
 		}
 	})
+	let loadedSave = { modloader: game.saveId ? { saveInstanceId: game.saveId } : {} }
+	for (const listener of hooks.get('beforeSaveLoad') || []) {
+		loadedSave = listener(loadedSave, game) || loadedSave
+	}
 	for (const listener of hooks.get('afterGameInit') || []) listener({}, game)
 	const service = sandbox[TRANSACTIONS_KEY]
 	assert.ok(service)
@@ -399,6 +403,8 @@ async function testSuccessfulForwardContract() {
 	assert.equal(runtime.snapshotStore.created[0].tags.plane, 'reality')
 	assert.equal(runtime.snapshotStore.created[0].tags.transactionId, result.transaction.id)
 	assert.notEqual(runtime.snapshotStore.created[0].tags.operationId, '')
+	assert.equal(runtime.game.assembleCalls, 1, 'forward reuses one complete save envelope')
+	assert.equal(JSON.parse(runtime.snapshotStore.created[0].data).timestamp, 1)
 	assert.deepEqual(created.calls, [
 		'prepare:forward',
 		'preflight:forward',
@@ -528,6 +534,8 @@ async function testRollbackFailureTerminalBlock() {
 	const state = runtime.service.snapshot()
 	assert.equal(state.phase, 'blocked')
 	assert.equal(state.terminalBlockedReason, 'ROLLBACK_FAILED')
+	assert.equal(runtime.service.writeBlockedReason(), 'ROLLBACK_FAILED')
+	assert.equal(runtime.service.isWriteBlocked(), true)
 	assert.equal(state.canUndo, false)
 	assert.equal(runtime.service.clear('try-clear').error.code, 'ROLLBACK_FAILED')
 	const retry = await runtime.service.execute(request())
@@ -555,6 +563,7 @@ async function testUndoRedoAndSnapshotMetadata() {
 		runtime.snapshotStore.created[1].tags.operationId,
 		runtime.snapshotStore.created[0].tags.operationId
 	)
+	assert.equal(runtime.game.assembleCalls, 2, 'undo adds one complete save envelope')
 
 	const redo = await runtime.service.redo({ input: 'gamepad' })
 	assert.equal(redo.executed, true)
@@ -565,6 +574,7 @@ async function testUndoRedoAndSnapshotMetadata() {
 	assert.equal(runtime.snapshotStore.created[2].tags.input, 'gamepad')
 	assert.equal(runtime.snapshotStore.created[2].tags.originInput, 'keyboard')
 	assert.equal(redo.transaction.snapshotId, forward.snapshotId)
+	assert.equal(runtime.game.assembleCalls, 3, 'redo adds one complete save envelope')
 }
 
 async function testExternalGuardAndDeltaCoexistence() {
@@ -791,7 +801,7 @@ function testStaticIntegrationBoundary() {
 	const transactionIndex = entries.indexOf(TRANSACTION_SOURCE)
 	assert.ok(transactionIndex > entries.indexOf('scripts/core/creative-economy.js'))
 	assert.ok(transactionIndex < entries.indexOf('scripts/core/selection-state.js'))
-	assert.equal(manifest.version, '0.5.1')
+	assert.equal(manifest.version, '0.6.0')
 	assert.match(readme, /4A-3a 内部事务引擎/)
 	assert.match(readme, /cattail\.world-editor\.transactions/)
 	assert.match(transactionSource, /Symbol\.for\('cattail\.world-editor\.transactions'\)/)
