@@ -129,8 +129,60 @@ let win = null
 let snapshotStore = null
 let snapshotAccountScope = ''
 let libraryStore = null
+let appWindowOptions = null
+let saveAppWindowOptions = null
+let recreateAppWindow = null
+let appWindowResizeSaveTimer = null
+let appWindowRecreateTimer = null
+let attachedMainWindowFrameless = false
+let pendingMainWindowFrameless = false
 const snapshotSaveIdPattern = /^[a-f0-9]{8}-[a-f0-9]{4}-[1-5][a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/i
 const LIBRARY_API_VERSION = '1.1.0'
+const appWindowAspectRatios = [
+  { id: '1:1', width: 1, height: 1, label: '1:1' },
+  { id: '4:3', width: 4, height: 3, label: '4:3' },
+  { id: '16:9', width: 16, height: 9, label: '16:9' },
+  { id: '21:9', width: 21, height: 9, label: '21:9', requireDisplayAspect: true },
+  { id: '32:9', width: 32, height: 9, label: '32:9', requireDisplayAspect: true }
+]
+const appWindowPresetSizesByAspect = {
+  '1:1': [
+    [720, 720],
+    [900, 900],
+    [1080, 1080],
+    [1440, 1440],
+    [2160, 2160]
+  ],
+  '4:3': [
+    [1024, 768],
+    [1280, 960],
+    [1600, 1200],
+    [1920, 1440],
+    [2560, 1920]
+  ],
+  '16:9': [
+    [1280, 720],
+    [1366, 768],
+    [1600, 900],
+    [1920, 1080],
+    [2560, 1440],
+    [3840, 2160]
+  ],
+  '21:9': [
+    [1680, 720],
+    [2560, 1080],
+    [3440, 1440],
+    [3840, 1600],
+    [5120, 2160]
+  ],
+  '32:9': [
+    [3840, 1080],
+    [5120, 1440],
+    [7680, 2160]
+  ]
+}
+const appWindowPresetScaleStops = [0.5, 0.625, 0.75, 0.875, 1]
+const appWindowMinDipSize = { width: 640, height: 360 }
 
 function snapshotEnvelope(value){
   return { ok: true, value }
@@ -152,6 +204,594 @@ function libraryErrorEnvelope(error){
   const code = allowed.has(error?.code) ? error.code : 'IO_FAILED'
   runtimeLog('libraryRequestFailed', { code, internalCode: error?.code || '', message: error?.message || String(error) })
   return { ok: false, error: { code, message: safeLibraryMessageForCode(code) } }
+}
+
+function appWindowEnvelope(value){
+  return { ok: true, value }
+}
+
+function appWindowErrorEnvelope(code, message){
+  return { ok: false, error: { code: code || 'IO_FAILED', message: message || 'Window operation failed.' } }
+}
+
+function normalizeAppWindowSize(size, displayBounds){
+  const maxWidth = Math.max(1, Math.round(Number(displayBounds?.width) || 1))
+  const maxHeight = Math.max(1, Math.round(Number(displayBounds?.height) || 1))
+  const width = Math.max(appWindowMinDipSize.width, Math.min(maxWidth, Math.round(Number(size?.width) || 0)))
+  const height = Math.max(appWindowMinDipSize.height, Math.min(maxHeight, Math.round(Number(size?.height) || 0)))
+  if (!width || !height) return null
+  return { width, height }
+}
+
+function getPrimaryAppWindowDisplay(){
+  const display = screen.getPrimaryDisplay()
+  const bounds = display?.bounds || {}
+  const workArea = display?.workArea || {}
+  const scaleFactor = Number(display?.scaleFactor) > 0 ? Number(display.scaleFactor) : 1
+  const dipBounds = {
+    x: Math.round(Number(bounds.x) || 0),
+    y: Math.round(Number(bounds.y) || 0),
+    width: Math.round(Number(bounds.width) || 0),
+    height: Math.round(Number(bounds.height) || 0)
+  }
+  const dipWorkArea = {
+    x: Math.round(Number(workArea.x) || 0),
+    y: Math.round(Number(workArea.y) || 0),
+    width: Math.round(Number(workArea.width) || 0),
+    height: Math.round(Number(workArea.height) || 0)
+  }
+  return {
+    id: display?.id,
+    scaleFactor,
+    bounds: dipBounds,
+    workArea: dipWorkArea,
+    physicalBounds: {
+      width: Math.round(dipBounds.width * scaleFactor),
+      height: Math.round(dipBounds.height * scaleFactor)
+    },
+    physicalWorkArea: {
+      width: Math.round(dipWorkArea.width * scaleFactor),
+      height: Math.round(dipWorkArea.height * scaleFactor)
+    }
+  }
+}
+
+function getAppWindowAspectValue(aspect){
+  return (Number(aspect?.width) || 1) / (Number(aspect?.height) || 1)
+}
+
+function getAppWindowAspectRatio(id){
+  const requested = String(id || '').trim()
+  return appWindowAspectRatios.find(aspect => aspect.id === requested) || appWindowAspectRatios.find(aspect => aspect.id === '16:9')
+}
+
+function displaySupportsAppWindowAspect(display, aspect){
+  const bounds = display?.physicalBounds || display?.bounds || {}
+  const width = Number(bounds.width) || 0
+  const height = Number(bounds.height) || 0
+  if (!width || !height) return false
+  const scaleFactor = Number(display?.scaleFactor) > 0 ? Number(display.scaleFactor) : 1
+  const maxSize = getMaxPhysicalSizeForAspect(bounds, aspect)
+  if (maxSize.width < appWindowMinDipSize.width * scaleFactor || maxSize.height < appWindowMinDipSize.height * scaleFactor) return false
+  if (!aspect?.requireDisplayAspect) return true
+  return width / height >= getAppWindowAspectValue(aspect) - 0.04
+}
+
+function listAppWindowAspectRatios(display){
+  return appWindowAspectRatios.filter(aspect => displaySupportsAppWindowAspect(display, aspect)).map(aspect => ({
+    id: aspect.id,
+    label: aspect.label,
+    width: aspect.width,
+    height: aspect.height
+  }))
+}
+
+function getMaxPhysicalSizeForAspect(physicalBounds, aspect){
+  const target = getAppWindowAspectValue(aspect)
+  const maxWidth = Math.max(1, Math.round(Number(physicalBounds?.width) || 1))
+  const maxHeight = Math.max(1, Math.round(Number(physicalBounds?.height) || 1))
+  let width = maxWidth
+  let height = Math.round(width / target)
+  if (height > maxHeight) {
+    height = maxHeight
+    width = Math.round(height * target)
+  }
+  width = Math.max(1, Math.min(maxWidth, width - (width % 2)))
+  height = Math.max(1, Math.min(maxHeight, height - (height % 2)))
+  return { width, height }
+}
+
+function normalizePhysicalSizeForAspect(width, aspect, physicalBounds){
+  const target = getAppWindowAspectValue(aspect)
+  const maxWidth = Math.max(1, Math.round(Number(physicalBounds?.width) || 1))
+  const maxHeight = Math.max(1, Math.round(Number(physicalBounds?.height) || 1))
+  let nextWidth = Math.max(1, Math.min(maxWidth, Math.round(Number(width) || 0)))
+  let nextHeight = Math.round(nextWidth / target)
+  if (nextHeight > maxHeight) {
+    nextHeight = maxHeight
+    nextWidth = Math.round(nextHeight * target)
+  }
+  nextWidth = Math.max(1, Math.min(maxWidth, nextWidth - (nextWidth % 2)))
+  nextHeight = Math.max(1, Math.min(maxHeight, nextHeight - (nextHeight % 2)))
+  return { width: nextWidth, height: nextHeight }
+}
+
+function listAppWindowPresets(aspectId){
+  const display = getPrimaryAppWindowDisplay()
+  const bounds = display.bounds
+  const physicalBounds = display.physicalBounds || bounds
+  const scaleFactor = display.scaleFactor || 1
+  const aspect = getAppWindowAspectRatio(aspectId || appWindowOptions?.windowAspectRatio || '16:9')
+  const aspectRatios = listAppWindowAspectRatios(display)
+  const presets = []
+  const seen = new Set()
+  const addPreset = function (id, physicalWidth, physicalHeight, label) {
+    const minPhysicalWidth = Math.round(appWindowMinDipSize.width * scaleFactor)
+    const minPhysicalHeight = Math.round(appWindowMinDipSize.height * scaleFactor)
+    if (physicalWidth < minPhysicalWidth || physicalHeight < minPhysicalHeight) return
+    const size = normalizeAppWindowSize({
+      width: Math.round(physicalWidth / scaleFactor),
+      height: Math.round(physicalHeight / scaleFactor)
+    }, bounds)
+    if (!size || seen.has(id)) return
+    seen.add(id)
+    presets.push({
+      id,
+      width: size.width,
+      height: size.height,
+      physicalWidth: Math.round(physicalWidth),
+      physicalHeight: Math.round(physicalHeight),
+      label: label || (Math.round(physicalWidth) + ' x ' + Math.round(physicalHeight))
+    })
+  }
+  const maxAspectSize = physicalBounds.width && physicalBounds.height
+    ? getMaxPhysicalSizeForAspect(physicalBounds, aspect)
+    : null
+  for (const preset of appWindowPresetSizesByAspect[aspect.id] || []) {
+    if (preset[0] <= physicalBounds.width && preset[1] <= physicalBounds.height) addPreset(preset[0] + 'x' + preset[1], preset[0], preset[1])
+  }
+  if (maxAspectSize) {
+    for (const scale of appWindowPresetScaleStops) {
+      const size = normalizePhysicalSizeForAspect(maxAspectSize.width * scale, aspect, maxAspectSize)
+      addPreset(size.width + 'x' + size.height, size.width, size.height)
+    }
+    addPreset(maxAspectSize.width + 'x' + maxAspectSize.height, maxAspectSize.width, maxAspectSize.height, 'Maximum ' + aspect.label + ' (' + maxAspectSize.width + ' x ' + maxAspectSize.height + ')')
+  }
+  presets.sort((a, b) => (a.physicalWidth * a.physicalHeight) - (b.physicalWidth * b.physicalHeight) || a.physicalWidth - b.physicalWidth)
+  return { display, aspect: { id: aspect.id, label: aspect.label, width: aspect.width, height: aspect.height }, aspectRatios, presets }
+}
+
+function getAppWindowPreset(id, aspectId){
+  const data = listAppWindowPresets(aspectId)
+  const preset = data.presets.find(item => item.id === id)
+  if (preset) return { preset, display: data.display }
+  const match = String(id || '').match(/^(\d{3,5})x(\d{3,5})$/)
+  if (!match) return { preset: null, display: data.display }
+  const scaleFactor = data.display.scaleFactor || 1
+  const physicalWidth = Math.round(Number(match[1]) || 0)
+  const physicalHeight = Math.round(Number(match[2]) || 0)
+  const physicalBounds = data.display.physicalBounds || data.display.bounds
+  if (physicalWidth > physicalBounds.width || physicalHeight > physicalBounds.height) return { preset: null, display: data.display }
+  const size = normalizeAppWindowSize({
+    width: Math.round(physicalWidth / scaleFactor),
+    height: Math.round(physicalHeight / scaleFactor)
+  }, data.display.bounds)
+  if (!size) return { preset: null, display: data.display }
+  return {
+    preset: {
+      id: physicalWidth + 'x' + physicalHeight,
+      width: size.width,
+      height: size.height,
+      physicalWidth,
+      physicalHeight,
+      label: physicalWidth + ' x ' + physicalHeight
+    },
+    display: data.display
+  }
+}
+
+function getLargestAppWindowPreset(aspectId){
+  const presets = listAppWindowPresets(aspectId).presets
+  return presets.length ? presets[presets.length - 1] : null
+}
+
+function getFallbackAppWindowPreset(presets){
+  if (!Array.isArray(presets) || !presets.length) return null
+  return presets.find(preset => preset.id === '1920x1080') || presets.find(preset => preset.id === '1280x720') || presets[0]
+}
+
+function isUntrustedMinimumAppWindowPreset(aspectId){
+  if (appWindowOptions?.windowPresetUserSelected === true) return false
+  if (appWindowOptions?.windowPreset !== '1280x720') return false
+  const data = listAppWindowPresets(aspectId || appWindowOptions?.windowAspectRatio)
+  const first = data.presets?.[0]
+  return !!first && first.id === '1280x720'
+}
+
+function getTrustedStoredAppWindowPresetId(aspectId){
+  const presetId = appWindowOptions?.windowPreset
+  if (!presetId) return ''
+  if (isUntrustedMinimumAppWindowPreset(aspectId)) {
+    runtimeLog('appWindowPresetIgnored', {
+      preset: presetId,
+      reason: 'untrusted-minimum',
+      aspect: aspectId || appWindowOptions?.windowAspectRatio || '16:9'
+    })
+    return ''
+  }
+  const resolved = getAppWindowPreset(presetId, aspectId)
+  const preset = resolved.preset
+  if (!preset) return ''
+  const bounds = appWindowOptions?.windowBounds
+  const width = Math.round(Number(bounds?.width) || 0)
+  const height = Math.round(Number(bounds?.height) || 0)
+  if (width && height && (width !== preset.width || height !== preset.height)) {
+    runtimeLog('appWindowPresetIgnored', {
+      preset: presetId,
+      presetSize: { width: preset.width, height: preset.height },
+      savedBounds: { width, height },
+      aspect: aspectId || appWindowOptions?.windowAspectRatio || '16:9'
+    })
+    return ''
+  }
+  return preset.id
+}
+
+function getAppWindowSizeForStoredPreset(aspectId){
+  const presetId = getTrustedStoredAppWindowPresetId(aspectId)
+  if (presetId) {
+    const resolved = getAppWindowPreset(presetId, aspectId)
+  if (resolved.preset) return resolved.preset
+  }
+  const savedPresetId = isUntrustedMinimumAppWindowPreset(aspectId) ? '' : getAppWindowPresetIdForSize(appWindowOptions?.windowBounds, aspectId)
+  if (savedPresetId) {
+    const resolved = getAppWindowPreset(savedPresetId, aspectId)
+    if (resolved.preset) return resolved.preset
+  }
+  return getFallbackAppWindowPreset(listAppWindowPresets(aspectId).presets) || getLargestAppWindowPreset(aspectId)
+}
+
+function getCenteredAppWindowBounds(size, display){
+  const displayBounds = display?.bounds || {}
+  const width = Math.max(1, Math.round(Number(size?.width) || 1))
+  const height = Math.max(1, Math.round(Number(size?.height) || 1))
+  const x = Math.round((Number(displayBounds.x) || 0) + ((Number(displayBounds.width) || width) - width) / 2)
+  const y = Math.round((Number(displayBounds.y) || 0) + ((Number(displayBounds.height) || height) - height) / 2)
+  return { x, y, width, height }
+}
+
+function getAppWindowPresetIdForSize(size, aspectId){
+  const width = Math.round(Number(size?.width) || 0)
+  const height = Math.round(Number(size?.height) || 0)
+  if (!width || !height) return ''
+  const data = listAppWindowPresets(aspectId || appWindowOptions?.windowAspectRatio)
+  const match = data.presets.find(preset => preset.width === width && preset.height === height)
+  return match?.id || ''
+}
+
+function getFallbackAppWindowPresetId(presets){
+  return getFallbackAppWindowPreset(presets)?.id || ''
+}
+
+function getValidAppWindowPresetId(id, presets){
+  const requested = String(id || '')
+  if (requested && Array.isArray(presets) && presets.some(preset => preset.id === requested)) return requested
+  return ''
+}
+
+function persistAppWindowOptions(){
+  if (typeof saveAppWindowOptions !== 'function') return
+  try { saveAppWindowOptions() } catch (error) { runtimeLog('appWindowSaveFailed', error?.message || String(error)) }
+}
+
+function appWindowModeNeedsFrameless(mode){
+  return normalizeAppWindowMode(mode) === 'borderless'
+}
+
+function appWindowFrameMatchesMode(mode){
+  return attachedMainWindowFrameless === appWindowModeNeedsFrameless(mode)
+}
+
+function getSavedAppWindowBounds(){
+  const bounds = appWindowOptions && appWindowOptions.windowBounds
+  const width = Math.round(Number(bounds?.width) || 0)
+  const height = Math.round(Number(bounds?.height) || 0)
+  if (width < 320 || height < 240) return null
+  return { width, height }
+}
+
+function hasAppWindowCreationState(){
+  if (!appWindowOptions) return false
+  return !!(
+    normalizeAppWindowMode(appWindowOptions.windowMode)
+    || appWindowOptions.fullscreen === false
+    || appWindowOptions.windowBounds
+    || appWindowOptions.windowPreset
+    || appWindowOptions.windowAspectRatio
+  )
+}
+
+function getInitialAppWindowBounds(){
+  const size = getAppWindowSizeForStoredPreset(appWindowOptions?.windowAspectRatio)
+  if (size) return size
+  const saved = getSavedAppWindowBounds()
+  if (!saved) return null
+  const display = getPrimaryAppWindowDisplay()
+  return normalizeAppWindowSize(saved, display.bounds)
+}
+
+function getMainWindowOptions(baseOptions){
+  const options = Object.assign({}, baseOptions || {})
+  if (!hasAppWindowCreationState()) {
+    pendingMainWindowFrameless = options.frame === false
+    return options
+  }
+  const mode = getStoredAppWindowMode()
+  const bounds = getInitialAppWindowBounds()
+  if (mode !== 'fullscreen') {
+    options.fullscreen = false
+    if (bounds) {
+      options.width = bounds.width
+      options.height = bounds.height
+    }
+  } else {
+    options.fullscreen = true
+  }
+  if (mode === 'borderless') options.frame = false
+  if (mode === 'borderless' || appWindowOptions.windowPreset || appWindowOptions.windowBounds || appWindowOptions.windowAspectRatio) {
+    options.minWidth = appWindowMinDipSize.width
+    options.minHeight = appWindowMinDipSize.height
+  }
+  pendingMainWindowFrameless = options.frame === false
+  return options
+}
+
+function afterMainWindowCreated(){
+  attachedMainWindowFrameless = pendingMainWindowFrameless === true
+  pendingMainWindowFrameless = false
+  return applyStoredAppWindowMode()
+}
+
+function scheduleAppWindowRecreate(reason){
+  if (typeof recreateAppWindow !== 'function') return false
+  if (appWindowRecreateTimer) return true
+  runtimeLog('appWindowRecreate', reason || 'frame-change')
+  appWindowRecreateTimer = setTimeout(()=>{
+    appWindowRecreateTimer = null
+    try { recreateAppWindow() } catch (error) { runtimeLog('appWindowRecreateFailed', error?.message || String(error)) }
+  }, 20)
+  return true
+}
+
+function getMainWindowBounds(){
+  try {
+    const bounds = win?.getBounds?.()
+    if (!bounds) return null
+    return {
+      x: Math.round(Number(bounds.x) || 0),
+      y: Math.round(Number(bounds.y) || 0),
+      width: Math.round(Number(bounds.width) || 0),
+      height: Math.round(Number(bounds.height) || 0)
+    }
+  } catch (error) {
+    return null
+  }
+}
+
+function saveMainWindowBounds(){
+  if (!win || win.isDestroyed?.() || !appWindowOptions) return
+  try {
+    if (win.isFullScreen?.() || win.isMaximized?.()) return
+    if (getStoredAppWindowMode() === 'borderless') return
+    const bounds = getMainWindowBounds()
+    if (!bounds || bounds.width < 320 || bounds.height < 240) return
+    appWindowOptions.windowBounds = { width: bounds.width, height: bounds.height }
+    appWindowOptions.windowPreset = getAppWindowPresetIdForSize(bounds)
+    persistAppWindowOptions()
+  } catch (error) {
+    runtimeLog('appWindowBoundsSaveFailed', error?.message || String(error))
+  }
+}
+
+function scheduleMainWindowBoundsSave(){
+  if (appWindowResizeSaveTimer) clearTimeout(appWindowResizeSaveTimer)
+  appWindowResizeSaveTimer = setTimeout(()=>{
+    appWindowResizeSaveTimer = null
+    saveMainWindowBounds()
+  }, 250)
+}
+
+function restoreMainWindowBounds(){
+  if (!win || win.isDestroyed?.() || !appWindowOptions) return false
+  const size = getAppWindowSizeForStoredPreset(appWindowOptions?.windowAspectRatio)
+  if (!size) return false
+  try {
+    win.setSize(size.width, size.height)
+    try { win.center() } catch (error) {}
+    return true
+  } catch (error) {
+    runtimeLog('appWindowBoundsRestoreFailed', error?.message || String(error))
+    return false
+  }
+}
+
+function normalizeAppWindowMode(mode){
+  const value = String(mode || '').trim().toLowerCase()
+  return value === 'fullscreen' || value === 'borderless' || value === 'window' ? value : ''
+}
+
+function getStoredAppWindowMode(){
+  return normalizeAppWindowMode(appWindowOptions?.windowMode) || (appWindowOptions?.fullscreen === false ? 'window' : 'fullscreen')
+}
+
+function applyBorderlessMainWindow(){
+  if (!win || win.isDestroyed?.()) return false
+  const display = getPrimaryAppWindowDisplay()
+  const size = getAppWindowSizeForStoredPreset(appWindowOptions?.windowAspectRatio)
+  const bounds = getCenteredAppWindowBounds(size || display.bounds, display)
+  try {
+    if (win.isFullScreen?.()) win.setFullScreen(false)
+    win.setResizable?.(false)
+    win.setMovable?.(true)
+    win.setBounds(bounds)
+    try { win.setMenuBarVisibility(false) } catch (error) {}
+    return true
+  } catch (error) {
+    runtimeLog('appWindowBorderlessApplyFailed', error?.message || String(error))
+    return false
+  }
+}
+
+function applyAppWindowMode(mode){
+  if (!win || win.isDestroyed?.()) throw new Error('Main window is unavailable.')
+  const nextMode = normalizeAppWindowMode(mode) || 'fullscreen'
+  const currentMode = getStoredAppWindowMode()
+  if (appWindowOptions && currentMode === 'window' && nextMode !== 'window' && !win.isFullScreen?.() && !win.isMaximized?.()) {
+    const bounds = getMainWindowBounds()
+    if (bounds && bounds.width >= 320 && bounds.height >= 240) {
+      appWindowOptions.windowBounds = { width: bounds.width, height: bounds.height }
+      appWindowOptions.windowPreset = getAppWindowPresetIdForSize(bounds)
+    }
+  }
+  if (appWindowOptions) {
+    appWindowOptions.windowMode = nextMode
+    appWindowOptions.fullscreen = nextMode === 'fullscreen'
+  }
+  if (nextMode === 'fullscreen') {
+    try { win.setResizable?.(true) } catch (error) {}
+    try { win.setMovable?.(true) } catch (error) {}
+    win.setFullScreen(true)
+  } else if (nextMode === 'borderless') {
+    if (appWindowFrameMatchesMode(nextMode)) applyBorderlessMainWindow()
+    else scheduleAppWindowRecreate('borderless-frame')
+  } else {
+    if (!appWindowFrameMatchesMode(nextMode) && scheduleAppWindowRecreate('window-frame')) {
+      persistAppWindowOptions()
+      return getAppWindowState()
+    }
+    if (win.isFullScreen?.()) win.setFullScreen(false)
+    try { win.setResizable?.(true) } catch (error) {}
+    try { win.setMovable?.(true) } catch (error) {}
+    restoreMainWindowBounds()
+  }
+  persistAppWindowOptions()
+  return getAppWindowState()
+}
+
+function applyStoredAppWindowMode(){
+  const mode = getStoredAppWindowMode()
+  if (!appWindowFrameMatchesMode(mode) && mode !== 'fullscreen') return scheduleAppWindowRecreate('stored-frame')
+  if (mode === 'borderless') return applyBorderlessMainWindow()
+  if (mode === 'window') return restoreMainWindowBounds()
+  return false
+}
+
+function toggleMainWindowFullscreen(){
+  if (!win || win.isDestroyed?.()) return null
+  if (win.isFullScreen?.()) {
+    const nextMode = normalizeAppWindowMode(appWindowOptions?.previousWindowMode) || 'window'
+    return applyAppWindowMode(nextMode === 'fullscreen' ? 'window' : nextMode)
+  }
+  if (appWindowOptions) appWindowOptions.previousWindowMode = getStoredAppWindowMode() === 'fullscreen' ? 'window' : getStoredAppWindowMode()
+  return applyAppWindowMode('fullscreen')
+}
+
+function applyAppWindowPreset(id, aspectId, mode, options){
+  if (!win || win.isDestroyed?.()) throw new Error('Main window is unavailable.')
+  const resolved = getAppWindowPreset(id, aspectId)
+  const preset = resolved.preset
+  if (!preset) throw new Error('Window preset is unavailable on this display.')
+  const nextMode = normalizeAppWindowMode(mode) || 'window'
+  const display = resolved.display || getPrimaryAppWindowDisplay()
+  const bounds = getCenteredAppWindowBounds(preset, display)
+  if (appWindowOptions) {
+    appWindowOptions.fullscreen = false
+    appWindowOptions.windowMode = nextMode === 'borderless' ? 'borderless' : 'window'
+    appWindowOptions.windowAspectRatio = String(aspectId || appWindowOptions.windowAspectRatio || '16:9')
+    appWindowOptions.windowBounds = { width: preset.width, height: preset.height }
+    appWindowOptions.windowPreset = preset.id
+    if (options?.userInitiated === true) appWindowOptions.windowPresetUserSelected = true
+    persistAppWindowOptions()
+  }
+  if (!appWindowFrameMatchesMode(nextMode) && scheduleAppWindowRecreate(nextMode === 'borderless' ? 'preset-borderless-frame' : 'preset-window-frame')) return getAppWindowState()
+  if (win.isFullScreen?.()) win.setFullScreen(false)
+  try { win.setResizable?.(nextMode !== 'borderless') } catch (error) {}
+  try { win.setMovable?.(true) } catch (error) {}
+  win.setBounds(bounds)
+  try { win.setMenuBarVisibility(false) } catch (error) {}
+  return getAppWindowState()
+}
+
+function setAppWindowFullscreen(fullscreen){
+  if (!win || win.isDestroyed?.()) throw new Error('Main window is unavailable.')
+  const enabled = fullscreen !== false
+  if (appWindowOptions) {
+    appWindowOptions.fullscreen = enabled
+    appWindowOptions.windowMode = enabled ? 'fullscreen' : 'window'
+    if (!enabled) {
+      const bounds = getMainWindowBounds()
+      if (bounds) appWindowOptions.windowBounds = { width: bounds.width, height: bounds.height }
+    }
+    persistAppWindowOptions()
+  }
+  win.setFullScreen(enabled)
+  if (!enabled) restoreMainWindowBounds()
+  return getAppWindowState()
+}
+
+function getAppWindowState(){
+  const data = listAppWindowPresets(appWindowOptions?.windowAspectRatio)
+  const bounds = getMainWindowBounds()
+  const savedBounds = appWindowOptions?.windowBounds || null
+  const fullscreen = !!win?.isFullScreen?.()
+  const presetsByAspect = {}
+  for (const aspect of data.aspectRatios || []) {
+    presetsByAspect[aspect.id] = listAppWindowPresets(aspect.id).presets
+  }
+  const selectedPreset = getValidAppWindowPresetId(getTrustedStoredAppWindowPresetId(data.aspect?.id), data.presets)
+    || getValidAppWindowPresetId(isUntrustedMinimumAppWindowPreset(data.aspect?.id) ? '' : getAppWindowPresetIdForSize(savedBounds || bounds, data.aspect?.id), data.presets)
+    || getFallbackAppWindowPresetId(data.presets)
+  if (appWindowOptions && selectedPreset && appWindowOptions.windowPreset !== selectedPreset) {
+    const normalizedPreset = data.presets.find(preset => preset.id === selectedPreset)
+    runtimeLog('appWindowPresetNormalized', {
+      from: appWindowOptions.windowPreset || '',
+      to: selectedPreset,
+      aspect: appWindowOptions.windowAspectRatio || data.aspect?.id || '16:9'
+    })
+    appWindowOptions.windowPreset = selectedPreset
+    if (normalizedPreset) appWindowOptions.windowBounds = { width: normalizedPreset.width, height: normalizedPreset.height }
+    persistAppWindowOptions()
+  }
+  const state = {
+    fullscreen,
+    windowMode: fullscreen ? 'fullscreen' : getStoredAppWindowMode(),
+    bounds,
+    savedBounds,
+    selectedAspectRatio: appWindowOptions?.windowAspectRatio || data.aspect?.id || '16:9',
+    selectedPreset,
+    display: data.display,
+    aspectRatios: data.aspectRatios,
+    aspect: data.aspect,
+    presetsByAspect,
+    presets: data.presets
+  }
+  try {
+    const presetCounts = {}
+    for (const aspectId in presetsByAspect) presetCounts[aspectId] = Array.isArray(presetsByAspect[aspectId]) ? presetsByAspect[aspectId].length : 0
+    runtimeLog('appWindowPresetProbe', {
+      mode: state.windowMode,
+      aspect: state.selectedAspectRatio,
+      selectedPreset: state.selectedPreset,
+      display: {
+        scaleFactor: data.display?.scaleFactor,
+        bounds: data.display?.bounds,
+        physicalBounds: data.display?.physicalBounds
+      },
+      presetCounts,
+      currentPresets: data.presets.map(preset => preset.id)
+    })
+  } catch (error) {}
+  return state
 }
 
 function installationIdentity(){
@@ -766,6 +1406,21 @@ ipcMain.handle(`modloader:dialog:open`, async (event, options)=>{
   return parent ? dialog.showOpenDialog(parent, dialogOptions) : dialog.showOpenDialog(dialogOptions)
 })
 
+ipcMain.handle(`modloader:app-window`, async (event, payload)=>{
+  if (!win || event?.sender !== win.webContents) return appWindowErrorEnvelope('PERMISSION_DENIED', 'Window control is unavailable.')
+  try {
+    const action = String(payload?.action || 'state')
+    if (action === 'state' || action === 'list') return appWindowEnvelope(getAppWindowState())
+    if (action === 'applyPreset') return appWindowEnvelope(applyAppWindowPreset(payload?.preset || payload?.id, payload?.aspectRatio, payload?.mode, { userInitiated: payload?.userInitiated === true }))
+    if (action === 'setMode') return appWindowEnvelope(applyAppWindowMode(payload?.mode))
+    if (action === 'setFullscreen') return appWindowEnvelope(setAppWindowFullscreen(payload?.fullscreen !== false))
+    return appWindowErrorEnvelope('INVALID_PAYLOAD', 'Unknown window action.')
+  } catch (error) {
+    runtimeLog('appWindowRequestFailed', { action: payload?.action, message: error?.message || String(error) })
+    return appWindowErrorEnvelope('IO_FAILED', error?.message || 'Window operation failed.')
+  }
+})
+
 ipcMain.on(`modloader:window:ping`, (event)=>{
   event.returnValue = 'ok'
 })
@@ -905,6 +1560,29 @@ function attachWindow(parentWindow, options){
   win = parentWindow
   configureSnapshotStore(options)
   configureLibraryStore(options)
+  if (win?.on) {
+    win.on('enter-full-screen', ()=>{
+      if (appWindowOptions) {
+        appWindowOptions.fullscreen = true
+        appWindowOptions.windowMode = 'fullscreen'
+        persistAppWindowOptions()
+      }
+    })
+    win.on('leave-full-screen', ()=>{
+      if (appWindowOptions) {
+        appWindowOptions.fullscreen = false
+        appWindowOptions.windowMode = normalizeAppWindowMode(appWindowOptions.previousWindowMode) || 'window'
+        if (!appWindowFrameMatchesMode(appWindowOptions.windowMode)) scheduleAppWindowRecreate('leave-fullscreen-frame')
+        else if (appWindowOptions.windowMode === 'borderless') applyBorderlessMainWindow()
+        else restoreMainWindowBounds()
+        const bounds = getMainWindowBounds()
+        if (bounds) appWindowOptions.windowPreset = getAppWindowPresetIdForSize(bounds)
+        persistAppWindowOptions()
+      }
+    })
+    win.on('resize', scheduleMainWindowBoundsSave)
+    win.on('move', scheduleMainWindowBoundsSave)
+  }
   const sender = win?.webContents
   if (sender?.once) sender.once('destroyed', ()=>{
     clearSnapshotContext(sender)
@@ -912,10 +1590,35 @@ function attachWindow(parentWindow, options){
   })
 }
 
+function setMainWindowFrameless(frameless){
+  attachedMainWindowFrameless = frameless === true
+}
+
+function configureMainWindowHost(options){
+  appWindowOptions = options?.appOptions || null
+  saveAppWindowOptions = typeof options?.saveAppOptions === 'function' ? options.saveAppOptions : null
+  recreateAppWindow = typeof options?.recreateWindow === 'function' ? options.recreateWindow : null
+  if (appWindowOptions && !normalizeAppWindowMode(appWindowOptions.windowMode)) {
+    appWindowOptions.windowMode = appWindowOptions.fullscreen === false ? 'window' : 'fullscreen'
+  }
+}
+
+function configureAppWindowOptions(options, saveOptions, recreateWindow){
+  configureMainWindowHost({ appOptions: options, saveAppOptions: saveOptions, recreateWindow })
+}
+
 module.exports = {
   attachWindow,
+  getMainWindowOptions,
+  afterMainWindowCreated,
+  setMainWindowFrameless,
   clearSnapshotContext,
   clearLibrarySubscriptions,
+  configureMainWindowHost,
+  configureAppWindowOptions,
   collectLibraryDeclarations,
+  applyStoredAppWindowMode,
+  restoreMainWindowBounds,
+  toggleMainWindowFullscreen,
   runtimeLog
 }

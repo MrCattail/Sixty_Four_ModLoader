@@ -27,6 +27,13 @@ try {
 } catch (e){
   console.log(e)
 }
+function saveAppOptions(){
+  try {
+    fs.writeFileSync(optpath, JSON.stringify(options))
+  } catch (e) {
+    console.log(e)
+  }
+}
 
 // greenworks = require('greenworks')
 // if (greenworks.init()) console.log(`LANGUAGE: ` + greenworks.getCurrentGameLanguage())
@@ -34,6 +41,7 @@ try {
 // DEFAULT SETUP
 let win, STEAMLANGUAGE = `english`, STEAMID = ``, client = {}
 let DEBUG = ``
+let recreatingWindow = false
 
 // STEAMWORKS INIT
 // let DEBUG_C = `Undefined string`
@@ -120,9 +128,7 @@ ipcMain.on(`gameError`, (e,d)=>{
   TrackJS?.track(d)
 })
 ipcMain.on(`toggleFullscreen`, (e,d)=>{
-  options.fullscreen = !win.fullScreen
-  win.setFullScreen(!win.fullScreen)
-  fs.writeFileSync(optpath, JSON.stringify(options))
+  ModLoaderMainProcess.toggleMainWindowFullscreen()
 })
 ipcMain.on(`openDiscord`, (e,d)=>{
   shell.openExternal(`https://discord.gg/7YXd3tScqS`)
@@ -175,8 +181,24 @@ function getSteamAchievements(){
 }
 
 // MAIN APP
+function recreateWindow(){
+  if (recreatingWindow) return
+  recreatingWindow = true
+  setImmediate(()=>{
+    const previousWindow = win
+    createWindow()
+    if (previousWindow && !previousWindow.isDestroyed?.()) previousWindow.destroy()
+    recreatingWindow = false
+  })
+}
+
 const createWindow = _=> {
-  win = new BrowserWindow({
+  ModLoaderMainProcess.configureMainWindowHost({
+    appOptions: options,
+    saveAppOptions,
+    recreateWindow
+  })
+  const windowOptions = ModLoaderMainProcess.getMainWindowOptions({
     width: 1280,
     height: 920,
     minWidth: 1024,
@@ -190,9 +212,10 @@ const createWindow = _=> {
         nodeIntegration: true
     }
   })
+  win = new BrowserWindow(windowOptions)
 
-  if (!options.fullscreen) win.setFullScreen(false)
   ModLoaderMainProcess.attachWindow(win, { accountId: STEAMID })
+  ModLoaderMainProcess.afterMainWindowCreated(win)
 
   const isMac = process.platform === 'darwin'
   const temp = [
@@ -211,6 +234,8 @@ const createWindow = _=> {
   const menu = Menu.buildFromTemplate(temp)
   Menu.setApplicationMenu(menu)
 
+  globalShortcut.unregister('CommandOrControl+Shift+I')
+  globalShortcut.unregister('F12')
   globalShortcut.register('CommandOrControl+Shift+I', _=>{
     win.webContents.toggleDevTools()
   })

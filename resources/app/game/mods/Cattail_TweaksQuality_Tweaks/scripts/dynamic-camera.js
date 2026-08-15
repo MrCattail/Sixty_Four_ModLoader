@@ -8,6 +8,9 @@
 	const yawConfigKey = 'cameraYaw'
 	const legacyPitchConfigKey = 'defaultPitch'
 	const legacyYawConfigKey = 'defaultYaw'
+	const cubeProjectionApiKey = '__cattailDynamicCameraCubeProjectionV1'
+	const cubeVoxelSize = .25
+	const cubeGridSize = 4
 
 	let previewEnabled = null
 
@@ -123,6 +126,8 @@
 				return drawDynamicPrism(this, position, size, height, triplet, original, arguments)
 			}
 		})
+
+		installDynamicCubeProjection(api)
 
 		if (typeof Puncture !== 'undefined') {
 			api.patch(Puncture.prototype, 'ondarkmousedown', function (original) {
@@ -459,13 +464,7 @@
 		if (!geometry) return original.apply(game, args)
 
 		game.ctx.save()
-		if (prismHeight) {
-			game.ctx.fillStyle = colors[1]
-			if (geometry.silhouette.length >= 3) drawCellPolygon(game.ctx, geometry.silhouette)
-			drawVisibleSides(game, geometry.bottom, geometry.top, colors)
-		}
-		game.ctx.fillStyle = colors[1]
-		drawCellPolygon(game.ctx, geometry.top)
+		drawProjectedPrism(game, geometry, colors)
 		game.ctx.restore()
 	}
 
@@ -479,7 +478,183 @@
 		return {
 			bottom,
 			top,
+			height: prismHeight,
 			silhouette: prismHeight ? getConvexHull(bottom.concat(top)) : top
+		}
+	}
+
+	function drawProjectedPrism(game, geometry, colors) {
+		if (geometry.height) {
+			game.ctx.fillStyle = colors[1]
+			if (geometry.silhouette.length >= 3) drawCellPolygon(game.ctx, geometry.silhouette)
+			drawVisibleSides(game, geometry.bottom, geometry.top, colors)
+		}
+		game.ctx.fillStyle = colors[1]
+		drawCellPolygon(game.ctx, geometry.top)
+	}
+
+	function installDynamicCubeProjection(api) {
+		if (typeof Cube === 'undefined') return
+		window[cubeProjectionApiKey] = {
+			version: 1,
+			isActive(target) {
+				return isDynamicCubeProjectionActive(target, api)
+			},
+			getVisibleSlots(cube) {
+				return getDynamicCubeVisibleSlots(cube?.master, api)
+			},
+			getBounds(cube) {
+				return getDynamicCubeResourceBounds(cube, api)
+			},
+			getVerticalBasis(game) {
+				return [0, -(Number(game?.unit) || 0)]
+			}
+		}
+
+		api.patch(Cube.prototype, 'drawResources', function (original) {
+			return function () {
+				if (!isDynamicCubeProjectionActive(this, api)) return original.apply(this, arguments)
+				if (!drawDynamicCubeResources(this, api)) return original.apply(this, arguments)
+			}
+		})
+	}
+
+	function isDynamicCubeProjectionActive(target, api) {
+		const game = target?.master || target
+		if (!game || !isEnabled(api)) return false
+		return !isVanillaCameraState(ensureState(game, api))
+	}
+
+	function drawDynamicCubeResources(cube, api) {
+		const game = cube?.master
+		if (!game?.ctx) return false
+		const slots = getDynamicCubeVisibleSlots(game, api)
+		if (!slots) return false
+		const voxels = []
+		for (let i = 0; i < slots.length; i++) {
+			const voxel = getDynamicCubeVoxel(cube, slots[i], true)
+			if (!voxel) return false
+			voxels.push(voxel)
+		}
+
+		game.ctx.save()
+		for (let i = 0; i < voxels.length; i++) {
+			drawProjectedPrism(game, voxels[i].geometry, voxels[i].colors)
+		}
+		game.ctx.restore()
+		return true
+	}
+
+	function getDynamicCubeVisibleSlots(game, api) {
+		const matrix = getMatrix(game, api)
+		if (!matrix) return null
+		const nearU = matrix.uy >= 0 ? cubeGridSize - 1 : 0
+		const nearV = matrix.vy >= 0 ? cubeGridSize - 1 : 0
+		const uSideOrder = nearU ? [0, 1, 2] : [3, 2, 1]
+		const vSideOrder = nearV ? [0, 1, 2, 3] : [3, 2, 1, 0]
+		const slots = []
+
+		for (let z = 0; z < cubeGridSize - 1; z++) {
+			for (let i = 0; i < uSideOrder.length; i++) slots.push(cubeSlot(uSideOrder[i], nearV, z))
+			for (let i = 0; i < vSideOrder.length; i++) slots.push(cubeSlot(nearU, vSideOrder[i], z))
+		}
+
+		const top = []
+		const z = cubeGridSize - 1
+		for (let y = 0; y < cubeGridSize; y++) {
+			for (let x = 0; x < cubeGridSize; x++) {
+				top.push({ slot: cubeSlot(x, y, z), depth: matrix.uy * x + matrix.vy * y })
+			}
+		}
+		top.sort(function (a, b) {
+			return Math.abs(a.depth - b.depth) < 1e-9 ? a.slot - b.slot : a.depth - b.depth
+		})
+		for (let i = 0; i < top.length; i++) slots.push(top[i].slot)
+		return slots
+	}
+
+	function cubeSlot(x, y, z) {
+		return x + y * cubeGridSize + z * cubeGridSize * cubeGridSize
+	}
+
+	function getDynamicCubeVoxel(cube, slot, includeJitter) {
+		const game = cube?.master
+		const position = cube?.position
+		const coordinate = cube?.resourceCoordinates?.[slot]
+		const shift = cube?.resourceShifts3d?.[slot]
+		const resourceId = Number(cube?.resources?.[slot])
+		const colors = game?.codex?.resources?.[resourceId]?.triplet
+		if (!game || !Array.isArray(position) || !Array.isArray(coordinate) || !Array.isArray(shift)) return null
+		if (!Array.isArray(colors) || colors.length < 3) return null
+
+		const values = [position[0], position[1], coordinate[0], coordinate[1], shift[0], shift[1], shift[2], resourceId]
+		for (let i = 0; i < values.length; i++) {
+			if (!Number.isFinite(Number(values[i]))) return null
+		}
+
+		const layer = Math.floor(slot / (cubeGridSize * cubeGridSize))
+		const layerHeight = layer * cubeVoxelSize
+		let jitterX = 0
+		let jitterY = 0
+		let jitterZ = 0
+		if (includeJitter) {
+			const amount = Math.max(0, Number(cube.broken) || 0) * Math.max(0, Number(cube.shakePower) || 0)
+			if (amount) {
+				jitterX = (Math.random() * 2 - 1) * amount
+				jitterY = (Math.random() * 2 - 1) * amount
+				jitterZ = (Math.random() * 2 - 1) * amount
+			}
+		}
+
+		const center = [
+			Number(coordinate[0]) + layerHeight + Number(shift[0]) + jitterX,
+			Number(coordinate[1]) + layerHeight + Number(shift[1]) + jitterY
+		]
+		const baseHeight = layerHeight + Number(shift[2]) + jitterZ
+		const bottom = getCellCorners(game, center, cubeVoxelSize)
+		const verticalOffset = baseHeight * game.unit
+		for (let i = 0; i < bottom.length; i++) bottom[i][1] -= verticalOffset
+		const top = bottom.map(function (point) {
+			return [point[0], point[1] - cubeVoxelSize * game.unit]
+		})
+		return {
+			colors: colors.slice(0, 3),
+			geometry: {
+				bottom,
+				top,
+				height: cubeVoxelSize,
+				silhouette: getConvexHull(bottom.concat(top))
+			}
+		}
+	}
+
+	function getDynamicCubeResourceBounds(cube, api) {
+		if (!isDynamicCubeProjectionActive(cube, api)) return null
+		const slots = getDynamicCubeVisibleSlots(cube?.master, api)
+		if (!slots) return null
+		let minX = Infinity
+		let minY = Infinity
+		let maxX = -Infinity
+		let maxY = -Infinity
+		for (let i = 0; i < slots.length; i++) {
+			const voxel = getDynamicCubeVoxel(cube, slots[i], false)
+			if (!voxel) return null
+			const points = voxel.geometry.bottom.concat(voxel.geometry.top)
+			for (let j = 0; j < points.length; j++) {
+				minX = Math.min(minX, points[j][0])
+				minY = Math.min(minY, points[j][1])
+				maxX = Math.max(maxX, points[j][0])
+				maxY = Math.max(maxY, points[j][1])
+			}
+		}
+		if (![minX, minY, maxX, maxY].every(Number.isFinite)) return null
+		return {
+			minX,
+			minY,
+			maxX,
+			maxY,
+			cacheMode: 'shared-atlas',
+			spriteSignature: 'dynamic-cube-projection-v1'
 		}
 	}
 

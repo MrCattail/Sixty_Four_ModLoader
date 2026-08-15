@@ -351,6 +351,31 @@ function Patch-MainJs {
 		$Text = Apply-Required $Text "const path = require('path')" "const path = require('path')`nconst ModLoaderMainProcess = require('./game/modloader/main-process.js')" 'main-process bridge require'
 	}
 
+	if (-not $Text.Contains('function saveAppOptions()')) {
+		$oldOptionsLoad = @'
+try {
+  options = JSON.parse(fs.readFileSync(optpath))
+} catch (e){
+  console.log(e)
+}
+'@
+		$newOptionsLoad = @'
+try {
+  options = JSON.parse(fs.readFileSync(optpath))
+} catch (e){
+  console.log(e)
+}
+function saveAppOptions(){
+  try {
+    fs.writeFileSync(optpath, JSON.stringify(options))
+  } catch (e) {
+    console.log(e)
+  }
+}
+'@
+		$Text = Apply-Required $Text $oldOptionsLoad $newOptionsLoad 'app options save hook'
+	}
+
 	if (-not $Text.Contains("runtimeLog('gameError'") -and -not $Text.Contains("ModLoaderMainProcess.runtimeLog('gameError'")) {
 		$oldGameError = @'
 ipcMain.on(`gameError`, (e,d)=>{
@@ -366,10 +391,66 @@ ipcMain.on(`gameError`, (e,d)=>{
 		$Text = Apply-Required $Text $oldGameError $newGameError 'game error runtime log hook'
 	}
 
+	if (-not $Text.Contains('ModLoaderMainProcess.toggleMainWindowFullscreen()')) {
+		$oldFullscreenToggle = @'
+ipcMain.on(`toggleFullscreen`, (e,d)=>{
+  options.fullscreen = !win.fullScreen
+  win.setFullScreen(!win.fullScreen)
+  fs.writeFileSync(optpath, JSON.stringify(options))
+})
+'@
+		$newFullscreenToggle = @'
+ipcMain.on(`toggleFullscreen`, (e,d)=>{
+  ModLoaderMainProcess.toggleMainWindowFullscreen()
+})
+'@
+		$Text = Apply-Required $Text $oldFullscreenToggle $newFullscreenToggle 'main window fullscreen toggle hook'
+	}
+
+	if (-not $Text.Contains('function recreateWindow()')) {
+		$recreateWindowBlock = @'
+function recreateWindow(){
+  if (recreatingWindow) return
+  recreatingWindow = true
+  setImmediate(()=>{
+    const previousWindow = win
+    createWindow()
+    if (previousWindow && !previousWindow.isDestroyed?.()) previousWindow.destroy()
+    recreatingWindow = false
+  })
+}
+
+'@
+		$Text = Apply-Required $Text "let DEBUG = ``" "let DEBUG = ```nlet recreatingWindow = false" 'main window recreate state'
+		$Text = Apply-Required $Text "const createWindow = _=> {" ($recreateWindowBlock + "const createWindow = _=> {") 'main window recreate hook'
+	}
+
+	if (-not $Text.Contains('ModLoaderMainProcess.getMainWindowOptions')) {
+		$oldWindowCreate = @'
+const createWindow = _=> {
+  win = new BrowserWindow({
+'@
+		$newWindowCreate = @'
+const createWindow = _=> {
+  ModLoaderMainProcess.configureMainWindowHost({
+    appOptions: options,
+    saveAppOptions,
+    recreateWindow
+  })
+  const windowOptions = ModLoaderMainProcess.getMainWindowOptions({
+'@
+		$Text = Apply-Required $Text $oldWindowCreate $newWindowCreate 'main window before-create options hook'
+		$Text = Apply-Required $Text "  })`n`n  if (!options.fullscreen) win.setFullScreen(false)" "  })`n  win = new BrowserWindow(windowOptions)`n" 'main window options hook application'
+	}
+
+	$Text = $Text.Replace('ModLoaderMainProcess.attachWindow(win)', 'ModLoaderMainProcess.attachWindow(win, { accountId: STEAMID })')
 	if (-not [regex]::IsMatch($Text, 'ModLoaderMainProcess\.attachWindow\(win(?:\s*,|\s*\))')) {
 		$oldAttach = '  if (!options.fullscreen) win.setFullScreen(false)'
-		$newAttach = "  if (!options.fullscreen) win.setFullScreen(false)`n  ModLoaderMainProcess.attachWindow(win)"
+		$newAttach = "  if (!options.fullscreen) win.setFullScreen(false)`n  ModLoaderMainProcess.attachWindow(win, { accountId: STEAMID })"
 		$Text = Apply-Required $Text $oldAttach $newAttach 'main window attachment'
+	}
+	if (-not $Text.Contains('ModLoaderMainProcess.afterMainWindowCreated(win)')) {
+		$Text = Apply-Required $Text '  ModLoaderMainProcess.attachWindow(win, { accountId: STEAMID })' "  ModLoaderMainProcess.attachWindow(win, { accountId: STEAMID })`n  ModLoaderMainProcess.afterMainWindowCreated(win)" 'main window after-create hook'
 	}
 
 	$badDevToolsInlineBlock = @'
@@ -450,7 +531,11 @@ Assert-Contains -RelativePath 'resources\app\game\scripts\game.js' -Pattern 'Mod
 Assert-Contains -RelativePath 'resources\app\game\scripts\sprites.js' -Pattern 'ModLoader?.resolveAsset' -Description 'sprite asset hook'
 Assert-Contains -RelativePath 'resources\app\game\scripts\ui.js' -Pattern 'ModLoader?.resolveAsset' -Description 'shop icon asset hook'
 Assert-Contains -RelativePath 'resources\app\main.js' -Pattern 'ModLoaderMainProcess.attachWindow(win' -Description 'main process bridge'
+Assert-Contains -RelativePath 'resources\app\main.js' -Pattern 'ModLoaderMainProcess.getMainWindowOptions' -Description 'main window before-create options hook'
+Assert-Contains -RelativePath 'resources\app\main.js' -Pattern 'ModLoaderMainProcess.afterMainWindowCreated(win)' -Description 'main window after-create hook'
 Assert-Contains -RelativePath 'resources\app\game\modloader\main-process.js' -Pattern 'module.exports' -Description 'main process module'
+Assert-Contains -RelativePath 'resources\app\game\modloader\main-process.js' -Pattern 'getMainWindowOptions' -Description 'main window options hook implementation'
+Assert-Contains -RelativePath 'resources\app\game\modloader\main-process.js' -Pattern 'afterMainWindowCreated' -Description 'main window after-create hook implementation'
 Assert-Contains -RelativePath 'resources\app\game\modloader\main-process.js' -Pattern 'modloader:libraries:runtime' -Description 'Library API v1 main process bridge'
 Assert-Contains -RelativePath 'resources\app\game\modloader\library-store.js' -Pattern "const API_VERSION = '1.0.0'" -Description 'Library store v1 module'
 

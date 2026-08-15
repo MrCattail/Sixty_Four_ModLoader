@@ -20,8 +20,8 @@ assert.match(source, /const inlineDescriptions = shouldShowPanelDescriptionsInli
 assert.match(source, /const setPanelTooltipText = function \(target, text, options\) \{[\s\S]*?target\.dataset\.modloaderPanelTooltip = value[\s\S]*?target\.dataset\.modloaderPanelTooltipKind = String\(options\.kind\)/)
 assert.match(source, /if \(localizedModDescription && !inlineDescriptions\) setPanelTooltipText\(title, localizedModDescription, \{ kind: 'description' \}\)/)
 assert.match(source, /if \(localizedModDescription && inlineDescriptions\) main\.appendChild\(element\('div', 'modloader-mod-description', localizedModDescription\)\)/)
-assert.match(source, /if \(localizedConfigDescription && inlineDescriptions\) text\.appendChild\(element\('span', 'modloader-config-meta modloader-config-description', localizedConfigDescription\)\)/)
-assert.match(source, /if \(localizedConfigDescription && !inlineDescriptions\) setPanelTooltipText\(text, localizedConfigDescription, \{ kind: 'description' \}\)/)
+assert.match(source, /const createSettingsFieldCore = function \(definition, options\) \{[\s\S]*?if \(description && descriptionMode === 'inline'\) text\.appendChild\(element\('span', 'modloader-config-meta modloader-config-description', description\)\)[\s\S]*?if \(description && descriptionMode !== 'inline'\) setPanelTooltipText\(text, description, \{ kind: 'description' \}\)/)
+assert.match(source, /createSettingsFieldCore\(item, \{[\s\S]*?description: localizedConfigDescription,[\s\S]*?descriptionDisplayMode: inlineDescriptions \? 'inline' : 'hover'/)
 assert.doesNotMatch(source, /localizedModDescription && !inlineDescriptions\) [^;\n]+\.title = localizedModDescription/)
 assert.doesNotMatch(source, /localizedConfigDescription && !inlineDescriptions\) [^;\n]+\.title = localizedConfigDescription/)
 assert.doesNotMatch(source, /\.title\s*=/)
@@ -43,7 +43,7 @@ assert.match(source, /installPanelTooltips\(el\)/)
 assert.match(source, /setPanelTooltipText\(button, title \|\| label\)/)
 assert.match(source, /setPanelTooltipText\(tab, t\('showFromEdge'\)\)/)
 assert.match(source, /setPanelTooltipText\(deleteButton, t\('deleteMod'\)\)/)
-assert.match(source, /const isDescription = target\?\.dataset\?\.modloaderPanelTooltipKind === 'description'[\s\S]*?if \(!text \|\| \(isDescription && shouldShowPanelDescriptionsInline\(\)\)\) return hidePanelTooltip\(\)/)
+assert.match(source, /const isDescription = target\?\.dataset\?\.modloaderPanelTooltipKind === 'description'[\s\S]*?const settingsSurface = target\.closest\?\.\('\.modloader-settings-surface'\)[\s\S]*?const descriptionMode = settingsSurface\?\.dataset\?\.modloaderSettingsDescriptionMode \|\| getPanelDescriptionDisplayMode\(\)[\s\S]*?if \(!text \|\| \(isDescription && descriptionMode === 'inline'\)\) return hidePanelTooltip\(\)/)
 
 const requiredKeys = [
 	'descriptionDisplayMode',

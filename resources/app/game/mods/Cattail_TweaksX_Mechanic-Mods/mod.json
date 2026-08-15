@@ -85,7 +85,7 @@
       "label": "Spawn radius",
       "default": 8,
       "min": 1,
-      "max": 64,
+      "max": 256,
       "step": 1,
       "description": "Circular radius, in cells, used to search for empty reality-plane spawn spots.",
       "reloadPolicy": "hot",
