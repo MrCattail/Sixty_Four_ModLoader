@@ -5,10 +5,14 @@
 	const apiKey = 'CattailTweaksCubeResourceCache'
 	const configKey = 'enableCubeResourceRenderCache'
 	const damagedConfigKey = 'enableDamagedCubeResourceRenderCache'
+	const dynamicCubeProjectionApiKey = '__cattailDynamicCameraCubeProjectionV1'
 	const visibleResourceSlots = [12, 13, 14, 3, 7, 11, 15, 28, 29, 30, 19, 23, 27, 31, 44, 45, 46, 35, 39, 43, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63]
 	const cachePadding = 4
 	const maxCacheSide = 1024
 	const maxCachePixels = 1024 * 1024
+	const dynamicAtlasSide = 1024
+	const dynamicAtlasGutter = 2
+	const maxDynamicAtlasPages = 8
 
 	let previewEnabled = null
 	let previewDamagedEnabled = null
@@ -17,6 +21,8 @@
 	let previewCameraYaw = null
 	let cacheEpoch = 0
 	let activeGame = null
+	let nextDynamicAtlasPageId = 1
+	let dynamicAtlasState = createEmptyDynamicAtlasState()
 	const stats = {
 		draws: 0,
 		hits: 0,
@@ -28,6 +34,12 @@
 		clears: 0,
 		lastFallback: '',
 		lastCacheSize: null,
+		lastCacheKind: '',
+		dynamicAtlasBuilds: 0,
+		dynamicAtlasDraws: 0,
+		dynamicAtlasPageCreates: 0,
+		dynamicAtlasFallbacks: 0,
+		privateCanvasBuilds: 0,
 		fallbackReasons: {}
 	}
 
@@ -91,19 +103,19 @@
 		})
 		api.patch(Cube.prototype, 'swapRandomResource', function (original) {
 			return function (...args) {
-				delete this[cacheKey]
+				dropCubeResourceCache(this)
 				return original.apply(this, args)
 			}
 		})
 		api.patch(Cube.prototype, 'onmousedown', function (original) {
 			return function (...args) {
-				delete this[cacheKey]
+				dropCubeResourceCache(this)
 				return original.apply(this, args)
 			}
 		})
 		api.patch(Cube.prototype, 'onDelete', function (original) {
 			return function (...args) {
-				delete this[cacheKey]
+				dropCubeResourceCache(this)
 				return original.apply(this, args)
 			}
 		})
@@ -113,9 +125,22 @@
 		window[apiKey] = {
 			stats() {
 				const totalCached = stats.hits + stats.misses
+				const atlas = inspectDynamicAtlas()
 				return Object.assign({}, stats, {
 					epoch: cacheEpoch,
 					activeCachedCubes: countActiveCachedCubes(activeGame),
+					activeDynamicAtlasPages: atlas.pages,
+					activeDynamicAtlasEntries: atlas.entries,
+					activeDynamicAtlasPixels: atlas.pixels,
+					dynamicAtlasSide,
+					activeSharedAtlasPages: atlas.pages,
+					activeSharedAtlasEntries: atlas.entries,
+					activeSharedAtlasPixels: atlas.pixels,
+					sharedAtlasSide: dynamicAtlasSide,
+					sharedAtlasBuilds: stats.dynamicAtlasBuilds,
+					sharedAtlasDraws: stats.dynamicAtlasDraws,
+					sharedAtlasPageCreates: stats.dynamicAtlasPageCreates,
+					sharedAtlasFallbacks: stats.dynamicAtlasFallbacks,
 					fallbackReasons: Object.assign({}, stats.fallbackReasons),
 					cacheHitRate: totalCached ? roundNumber(stats.hits / totalCached, 4) : 0,
 					fastPathHitRate: stats.fastAttempts ? roundNumber(stats.fastHits / stats.fastAttempts, 4) : 0,
@@ -176,8 +201,9 @@
 
 	function hasUsableResourceShifts(cube, allowShifted) {
 		if (!Array.isArray(cube.resourceShifts3d) || cube.resourceShifts3d.length < 64) return false
-		for (let i = 0; i < visibleResourceSlots.length; i++) {
-			const shift = cube.resourceShifts3d[visibleResourceSlots[i]]
+		const slots = getRelevantResourceSlots(cube)
+		for (let i = 0; i < slots.length; i++) {
+			const shift = cube.resourceShifts3d[slots[i]]
 			if (!Array.isArray(shift)) return false
 			const sx = Number(shift[0]) || 0
 			const sy = Number(shift[1]) || 0
@@ -209,7 +235,7 @@
 		if (cache.brokenSignature !== getCubeBrokenSignature(cube)) return false
 		activeGame = game
 		if (!drawCubeResourceCache(cube, cache)) {
-			delete cube[cacheKey]
+			dropCubeResourceCache(cube)
 			return false
 		}
 		stats.hits++
@@ -220,6 +246,7 @@
 	function buildAndDrawCachedCubeResources(cube, api, originalDrawResources) {
 		const game = cube.master
 		activeGame = game
+		dropCubeResourceCache(cube)
 		const projectionSignature = getProjectionSignature(game, api)
 		const brokenSignature = getCubeBrokenSignature(cube)
 		const bounds = getCubeResourceBounds(cube)
@@ -241,7 +268,24 @@
 		const anchorXY = game.uvToXY(cache.anchorUv)
 		if (!isFinitePoint(anchorXY)) return false
 		const jitter = cache.damaged ? getDamagedCubeCacheJitter(cube, cache.jitterBasis) : null
-		game.ctx.drawImage(cache.canvas, anchorXY[0] + cache.offsetX + (jitter?.[0] || 0), anchorXY[1] + cache.offsetY + (jitter?.[1] || 0))
+		const x = anchorXY[0] + cache.offsetX + (jitter?.[0] || 0)
+		const y = anchorXY[1] + cache.offsetY + (jitter?.[1] || 0)
+		if (cache.sourceRect) {
+			game.ctx.drawImage(
+				cache.canvas,
+				cache.sourceRect.x,
+				cache.sourceRect.y,
+				cache.sourceRect.width,
+				cache.sourceRect.height,
+				x,
+				y,
+				cache.sourceRect.width,
+				cache.sourceRect.height
+			)
+			stats.dynamicAtlasDraws++
+		} else {
+			game.ctx.drawImage(cache.canvas, x, y)
+		}
 		stats.draws++
 		return true
 	}
@@ -256,35 +300,52 @@
 		if (!anchorUv) return null
 		const anchorXY = game.uvToXY(anchorUv)
 		if (!isFinitePoint(anchorXY)) return null
-		const jitterBasis = damaged ? getCubeCacheJitterBasis(game) : null
+		const jitterBasis = damaged ? getCubeCacheJitterBasis(cube) : null
 		if (damaged && !jitterBasis) return null
-		const canvas = document.createElement('canvas')
-		canvas.width = width
-		canvas.height = height
-		const ctx = canvas.getContext('2d')
-		if (!ctx) return null
-		copyCanvasState(game.ctx, ctx)
+		let target = null
+		if (bounds.cacheMode === 'shared-atlas') {
+			target = reserveDynamicAtlasTarget(game, width, height, signature.projectionSignature)
+			if (!target) stats.dynamicAtlasFallbacks++
+		}
+		if (!target) target = createPrivateCanvasTarget(game, width, height)
+		if (!target) return null
+		const canvas = target.canvas
+		const ctx = target.ctx
 		const originX = bounds.minX - cachePadding
 		const originY = bounds.minY - cachePadding
 		const originalCtx = game.ctx
 		const originalUvToXY = game.uvToXY
+		ctx.save()
+		ctx.beginPath()
+		ctx.rect(target.x, target.y, width, height)
+		ctx.clip()
+		ctx.clearRect(target.x, target.y, width, height)
 		game.ctx = ctx
 		game.uvToXY = function (uv) {
 			const xy = originalUvToXY.call(this, uv)
-			return [xy[0] - originX, xy[1] - originY]
+			return [xy[0] - originX + target.x, xy[1] - originY + target.y]
 		}
 		const originalBroken = cube.broken
+		let rendered = false
 		try {
 			if (damaged) cube.broken = 0
 			originalDrawResources.call(cube)
+			rendered = true
 		} finally {
 			if (damaged) cube.broken = originalBroken
 			game.ctx = originalCtx
 			game.uvToXY = originalUvToXY
+			ctx.restore()
+			if (!rendered && target.reservation) releaseDynamicAtlasRegion(target.reservation)
 		}
 		stats.lastCacheSize = { width, height }
+		stats.lastCacheKind = target.reservation ? 'shared-atlas' : 'private-canvas'
+		if (target.reservation) stats.dynamicAtlasBuilds++
+		else stats.privateCanvasBuilds++
 		return {
 			canvas,
+			sourceRect: target.reservation ? { x: target.x, y: target.y, width, height } : null,
+			atlasReservation: target.reservation || null,
 			epoch: cacheEpoch,
 			projectionSignature: signature.projectionSignature,
 			brokenSignature: signature.brokenSignature,
@@ -298,11 +359,137 @@
 		}
 	}
 
+	function createPrivateCanvasTarget(game, width, height) {
+		const canvas = document.createElement('canvas')
+		canvas.width = width
+		canvas.height = height
+		const ctx = canvas.getContext('2d')
+		if (!ctx) return null
+		copyCanvasState(game.ctx, ctx)
+		return { canvas, ctx, x: 0, y: 0, reservation: null }
+	}
+
+	function reserveDynamicAtlasTarget(game, width, height, projectionSignature) {
+		if (width + dynamicAtlasGutter * 2 > dynamicAtlasSide || height + dynamicAtlasGutter * 2 > dynamicAtlasSide) return null
+		ensureDynamicAtlasState(game, projectionSignature)
+		for (let i = 0; i < dynamicAtlasState.pages.length; i++) {
+			const reservation = reserveDynamicAtlasPageRegion(dynamicAtlasState.pages[i], width, height)
+			if (reservation) return dynamicAtlasTarget(reservation)
+		}
+		if (dynamicAtlasState.pages.length >= maxDynamicAtlasPages) return null
+		const page = createDynamicAtlasPage(game, projectionSignature)
+		if (!page) return null
+		dynamicAtlasState.pages.push(page)
+		stats.dynamicAtlasPageCreates++
+		const reservation = reserveDynamicAtlasPageRegion(page, width, height)
+		return reservation ? dynamicAtlasTarget(reservation) : null
+	}
+
+	function createDynamicAtlasPage(game, projectionSignature) {
+		const canvas = document.createElement('canvas')
+		canvas.width = dynamicAtlasSide
+		canvas.height = dynamicAtlasSide
+		const ctx = canvas.getContext('2d')
+		if (!ctx) return null
+		copyCanvasState(game.ctx, ctx)
+		return {
+			id: nextDynamicAtlasPageId++,
+			epoch: cacheEpoch,
+			projectionSignature,
+			canvas,
+			ctx,
+			cursorX: dynamicAtlasGutter,
+			cursorY: dynamicAtlasGutter,
+			rowHeight: 0,
+			entries: 0,
+			freeRegions: []
+		}
+	}
+
+	function reserveDynamicAtlasPageRegion(page, width, height) {
+		for (let i = 0; i < page.freeRegions.length; i++) {
+			const free = page.freeRegions[i]
+			if (free.width !== width || free.height !== height) continue
+			page.freeRegions.splice(i, 1)
+			page.entries++
+			return atlasReservation(page, free.x, free.y, width, height)
+		}
+		if (page.cursorX + width > dynamicAtlasSide - dynamicAtlasGutter) {
+			page.cursorX = dynamicAtlasGutter
+			page.cursorY += page.rowHeight + dynamicAtlasGutter
+			page.rowHeight = 0
+		}
+		if (page.cursorY + height > dynamicAtlasSide - dynamicAtlasGutter) return null
+		const x = page.cursorX
+		const y = page.cursorY
+		page.cursorX += width + dynamicAtlasGutter
+		page.rowHeight = Math.max(page.rowHeight, height)
+		page.entries++
+		return atlasReservation(page, x, y, width, height)
+	}
+
+	function atlasReservation(page, x, y, width, height) {
+		return { page, x, y, width, height, released: false }
+	}
+
+	function dynamicAtlasTarget(reservation) {
+		return {
+			canvas: reservation.page.canvas,
+			ctx: reservation.page.ctx,
+			x: reservation.x,
+			y: reservation.y,
+			reservation
+		}
+	}
+
+	function ensureDynamicAtlasState(game, projectionSignature) {
+		if (dynamicAtlasState.epoch !== cacheEpoch) dynamicAtlasState = createEmptyDynamicAtlasState()
+		if (dynamicAtlasState.projectionSignature && dynamicAtlasState.projectionSignature !== projectionSignature) {
+			clearAllCaches(game)
+		}
+		if (!dynamicAtlasState.projectionSignature) dynamicAtlasState.projectionSignature = projectionSignature
+	}
+
+	function createEmptyDynamicAtlasState() {
+		return { epoch: cacheEpoch, projectionSignature: '', pages: [] }
+	}
+
+	function dropCubeResourceCache(cube) {
+		if (!cube) return
+		const cache = cube[cacheKey]
+		if (cache?.atlasReservation) releaseDynamicAtlasRegion(cache.atlasReservation)
+		delete cube[cacheKey]
+	}
+
+	function releaseDynamicAtlasRegion(reservation) {
+		if (!reservation || reservation.released) return
+		reservation.released = true
+		const page = reservation.page
+		if (!page || page.epoch !== cacheEpoch || !dynamicAtlasState.pages.includes(page)) return
+		page.entries = Math.max(0, page.entries - 1)
+		page.freeRegions.push({
+			x: reservation.x,
+			y: reservation.y,
+			width: reservation.width,
+			height: reservation.height
+		})
+	}
+
+	function inspectDynamicAtlas() {
+		let entries = 0
+		for (let i = 0; i < dynamicAtlasState.pages.length; i++) entries += dynamicAtlasState.pages[i].entries
+		return {
+			pages: dynamicAtlasState.pages.length,
+			entries,
+			pixels: dynamicAtlasState.pages.length * dynamicAtlasSide * dynamicAtlasSide
+		}
+	}
+
 	function getCubeCacheAnchorUv(cube) {
 		if (Array.isArray(cube?.position)) {
 			return [Number(cube.position[0]) || 0, Number(cube.position[1]) || 0]
 		}
-		return getStableCubeResourceUv(cube, visibleResourceSlots[0])
+		return getStableCubeResourceUv(cube, getRelevantResourceSlots(cube)[0])
 	}
 
 	function copyCanvasState(from, to) {
@@ -314,6 +501,16 @@
 	}
 
 	function getCubeResourceBounds(cube) {
+		const dynamicProjection = getDynamicCubeProjection(cube)
+		if (dynamicProjection) {
+			try {
+				const bounds = dynamicProjection.getBounds(cube)
+				if (!hasFiniteBounds(bounds)) return null
+				return bounds
+			} catch (error) {
+				return null
+			}
+		}
 		const game = cube.master
 		const sprites = game?.resourcesSprites
 		if (!Array.isArray(sprites)) return null
@@ -353,8 +550,21 @@
 			minY,
 			maxX,
 			maxY,
+			cacheMode: 'shared-atlas',
 			spriteSignature: spriteSignatureParts.join(',')
 		}
+	}
+
+	function hasFiniteBounds(bounds) {
+		return !!(
+			bounds &&
+			Number.isFinite(Number(bounds.minX)) &&
+			Number.isFinite(Number(bounds.minY)) &&
+			Number.isFinite(Number(bounds.maxX)) &&
+			Number.isFinite(Number(bounds.maxY)) &&
+			Number(bounds.maxX) >= Number(bounds.minX) &&
+			Number(bounds.maxY) >= Number(bounds.minY)
+		)
 	}
 
 	function getSpriteFrameInfo(game, sprite) {
@@ -435,16 +645,26 @@
 		return roundNumber(cube?.broken, 5)
 	}
 
-	function getCubeCacheJitterBasis(game) {
-		// Vanilla and Dynamic Camera projections are affine, so their translation-free axes preserve the same whole-cache jitter.
+	function getCubeCacheJitterBasis(cube) {
+		const game = cube?.master
 		const origin = game.uvToXY([0, 0])
 		const u = game.uvToXY([1, 0])
 		const v = game.uvToXY([0, 1])
 		if (!isFinitePoint(origin) || !isFinitePoint(u) || !isFinitePoint(v)) return null
-		return [
-			[u[0] - origin[0], u[1] - origin[1]],
-			[v[0] - origin[0], v[1] - origin[1]]
-		]
+		const uBasis = [u[0] - origin[0], u[1] - origin[1]]
+		const vBasis = [v[0] - origin[0], v[1] - origin[1]]
+		let zBasis = [-uBasis[0] - vBasis[0], -uBasis[1] - vBasis[1]]
+		const dynamicProjection = getDynamicCubeProjection(cube)
+		if (dynamicProjection) {
+			try {
+				const projectedZ = dynamicProjection.getVerticalBasis(game)
+				if (!isFinitePoint(projectedZ)) return null
+				zBasis = [Number(projectedZ[0]), Number(projectedZ[1])]
+			} catch (error) {
+				return null
+			}
+		}
+		return [uBasis, vBasis, zBasis]
 	}
 
 	function getDamagedCubeCacheJitter(cube, basis) {
@@ -453,17 +673,16 @@
 		const dx = (Math.random() * 2 - 1) * amount
 		const dy = (Math.random() * 2 - 1) * amount
 		const dz = (Math.random() * 2 - 1) * amount
-		const du = dx - dz
-		const dv = dy - dz
 		return [
-			du * basis[0][0] + dv * basis[1][0],
-			du * basis[0][1] + dv * basis[1][1]
+			dx * basis[0][0] + dy * basis[1][0] + dz * basis[2][0],
+			dx * basis[0][1] + dy * basis[1][1] + dz * basis[2][1]
 		]
 	}
 	function getCubeResourceSignature(cube) {
 		const parts = []
-		for (let i = 0; i < visibleResourceSlots.length; i++) {
-			const slot = visibleResourceSlots[i]
+		const slots = getRelevantResourceSlots(cube)
+		for (let i = 0; i < slots.length; i++) {
+			const slot = slots[i]
 			const coord = cube.resourceCoordinates[slot]
 			const shift = cube.resourceShifts3d[slot]
 			parts.push([
@@ -476,6 +695,36 @@
 			].join(','))
 		}
 		return parts.join(';')
+	}
+
+	function getDynamicCubeProjection(cube) {
+		try {
+			const projection = window?.[dynamicCubeProjectionApiKey]
+			if (!projection || projection.version !== 1 || typeof projection.isActive !== 'function') return null
+			return projection.isActive(cube) ? projection : null
+		} catch (error) {
+			return null
+		}
+	}
+
+	function getRelevantResourceSlots(cube) {
+		const projection = getDynamicCubeProjection(cube)
+		if (!projection || typeof projection.getVisibleSlots !== 'function') return visibleResourceSlots
+		try {
+			const slots = projection.getVisibleSlots(cube)
+			if (!Array.isArray(slots) || !slots.length) return visibleResourceSlots
+			const unique = []
+			const seen = new Set()
+			for (let i = 0; i < slots.length; i++) {
+				const slot = Number(slots[i])
+				if (!Number.isInteger(slot) || slot < 0 || slot >= 64 || seen.has(slot)) return visibleResourceSlots
+				seen.add(slot)
+				unique.push(slot)
+			}
+			return unique
+		} catch (error) {
+			return visibleResourceSlots
+		}
 	}
 
 	function runOriginalWithFallback(cube, original, args, reason) {
@@ -497,6 +746,12 @@
 		stats.clears = 0
 		stats.lastFallback = ''
 		stats.lastCacheSize = null
+		stats.lastCacheKind = ''
+		stats.dynamicAtlasBuilds = 0
+		stats.dynamicAtlasDraws = 0
+		stats.dynamicAtlasPageCreates = 0
+		stats.dynamicAtlasFallbacks = 0
+		stats.privateCanvasBuilds = 0
 		stats.fallbackReasons = {}
 	}
 
@@ -532,10 +787,12 @@
 	function clearAllCaches(game) {
 		cacheEpoch++
 		stats.clears++
-		if (!game?.stuff) return
-		for (let i = 0; i < game.stuff.length; i++) {
-			if (game.stuff[i]) delete game.stuff[i][cacheKey]
+		if (game?.stuff) {
+			for (let i = 0; i < game.stuff.length; i++) {
+				if (game.stuff[i]) delete game.stuff[i][cacheKey]
+			}
 		}
+		dynamicAtlasState = createEmptyDynamicAtlasState()
 	}
 
 	function countActiveCachedCubes(game) {

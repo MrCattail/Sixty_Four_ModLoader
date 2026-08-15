@@ -118,7 +118,7 @@ The page cannot import a file, restore a snapshot, or overwrite a Steam save.
 
 ## Installation Library API
 
-ModLoader 0.3.1 exposes Library API `1.1.0` for persistent, install-wide,
+ModLoader 0.4.0 exposes Library API `1.1.0` for persistent, install-wide,
 Mod-owned document collections. A Mod must declare each named library in its
 enabled `mod.json`; the main process validates the declaration and owns every
 filesystem operation:
@@ -488,6 +488,210 @@ can disable the toolbar or icons with `importExport: false` or `showIcons: false
 Custom palettes can provide `resources`, `rows`, or `colors` entries with `id`,
 `name`, `defaultColor`, and optional `iconIndex`; saved values are an object of
 `id` to `#RRGGBB` overrides.
+
+## Settings UI API v1
+
+ModLoader 0.4.0 exposes the same settings controls used by the `Ctrl+M` panel
+through `api.ui.settings`. The API is bound to the calling mod, uses
+`api.ui.settings.version === 1`, and supports these canonical types:
+
+```js
+api.ui.settings.types
+// boolean, select, number, slider, color, string,
+// array, object, resourceColors
+```
+
+### Register runtime settings
+
+`register()` accepts one definition, an array of definitions, or an object map.
+Keys must be unique within the calling mod. Registration refreshes an open
+`Ctrl+M` panel immediately and returns an unregister function. Unregistering
+removes the field from the schema and UI without deleting its stored value.
+
+```js
+const unregister = api.ui.settings.register([
+  {
+    key: 'showGuides',
+    type: 'boolean',
+    label: { en: 'Show guides', sch: '显示辅助线' },
+    description: { en: 'Draw placement guides.', sch: '显示放置辅助线。' },
+    default: true
+  },
+  {
+    key: 'guideOpacity',
+    type: 'slider',
+    label: 'Guide opacity',
+    default: 0.7,
+    min: 0,
+    max: 1,
+    step: 0.05
+  }
+])
+
+// Later: hides both fields but preserves saved config values.
+unregister()
+```
+
+Static `mod.json` fields continue to use the existing compatibility normalizer.
+The v1 schema standardizes `key`, `type`, `label`, `description`, `default`,
+`section`, `sectionLabel`, `disabled`, and an optional synchronous
+`validate(value)` callback. Numeric controls accept `min`, `max`, `step`, and
+`integer`. A validator can return `false`, an error message, an `Error`, or
+`{ valid: false, message }` to reject a value.
+
+### Create controls, fields, and forms
+
+`createControl()` returns only the styled control surface. `createField()` adds
+the localized label, description, metadata, and visible validation error.
+`createForm()` composes fields and optional sections.
+
+```js
+const control = api.ui.settings.createControl({
+  key: 'accent',
+  type: 'color',
+  label: 'Accent',
+  description: 'Color used by this mod.',
+  default: '#A6F246'
+}, {
+  theme: 'auto',
+  value: api.config.get('accent', '#A6F246'),
+  onInput({ value, valid }) {
+    if (valid) previewAccent(value)
+  },
+  onChange({ value, valid }) {
+    if (valid) console.log('Committed interaction', value)
+  }
+})
+
+document.querySelector('.my-mod-settings').appendChild(control.element)
+
+control.getValue()
+control.setValue('#E3FD43')
+control.reset()
+control.setDisabled(true)
+control.validate()
+control.destroy()
+```
+
+A config-bound form stages changes by default. `input` reports live preview,
+`change` marks the final interaction, and only `save()` writes through
+`api.config`. Set `persist: 'change'` to save each valid final interaction.
+
+```js
+const form = api.ui.settings.createForm({
+  bindConfig: true,
+  persist: 'manual',
+  theme: 'auto', // auto, dark, or light
+  descriptionDisplayMode: 'hover', // hover or inline
+  scroll: {
+    maxHeight: 'min(60vh, 560px)',
+    inertia: true,
+    transient: true
+  },
+  schema: [
+    { key: 'enabled', type: 'boolean', label: 'Enabled', default: true },
+    {
+      key: 'quality',
+      type: 'select',
+      label: 'Quality',
+      default: 2,
+      options: [
+        { value: 1, label: 'Low' },
+        { value: 2, label: 'High' }
+      ]
+    },
+    { key: 'count', type: 'number', label: 'Count', default: 4, min: 1, max: 20, integer: true },
+    { key: 'strength', type: 'slider', label: 'Strength', default: 0.5, min: 0, max: 1, step: 0.1 },
+    { key: 'accent', type: 'color', label: 'Accent', default: '#A6F246' },
+    { key: 'name', type: 'string', label: 'Name', default: '' },
+    { key: 'tags', type: 'array', label: 'Tags', default: [] },
+    { key: 'rules', type: 'object', label: 'Rules', default: {} },
+    { key: 'palette', type: 'resourceColors', label: 'Palette', default: {}, resources: [] }
+  ],
+  onInput({ key, value, valid }) {
+    if (valid) console.log('Preview', key, value)
+  },
+  onChange({ key, value, valid }) {
+    if (valid) console.log('Final interaction', key, value)
+  }
+})
+
+document.querySelector('.my-mod-settings').appendChild(form.element)
+
+form.values()
+form.getValue('quality')
+form.setValue('quality', 1)
+form.reset('quality')
+form.validate() // { valid, values, errors }
+form.dirty
+form.save()     // { changed, values }
+form.destroy()
+```
+
+New v1 `select` definitions preserve primitive string, number, and boolean
+option values. Existing manifest selects retain their historical string behavior
+unless they explicitly set `valueType`, `preserveValueType`, or
+`preserveOptionTypes`. Object-valued select options are rejected.
+
+Array and object fields use validated JSON text areas. `resourceColors` reuses
+the resource icon, picker, hex text, reset, and optional clipboard
+import/export UI. Invalid numbers, ranges, JSON, colors, select values, or custom
+validators display a field error and block `save()`.
+
+### Scroll surfaces
+
+Pass `scroll: true` to `createForm()` for a `min(60vh, 560px)` vertical scroll
+surface with the compact ModLoader scrollbar, transient visibility, and inertial
+wheel movement. Pass an options object to control `maxHeight`, `theme`,
+`transient`, or `inertia`. `theme` accepts `auto`, `dark`, or `light`; v1 supports
+`axis: 'y'`. `inertia` can be `false`, `true`, or an object overriding
+`friction`, `directInfluence`, `tailInfluence`, `maxVelocity`, and
+`stopThreshold`.
+
+The same behavior can be attached to a mod-owned container:
+
+```js
+const detachScroll = api.ui.settings.scroll.attach(container, {
+  axis: 'y',
+  maxHeight: '60vh',
+  theme: 'auto',
+  inertia: true,
+  transient: true
+})
+
+// Removes listeners, timers, animation frames, classes, and inline limits.
+detachScroll()
+```
+
+Inertia and transient visibility default to enabled after a scroll surface is
+requested; set either option to `false` to disable it. Text areas, native select
+controls, explicitly marked `[data-modloader-scroll-native]` elements, and
+nested scroll areas keep their own wheel behavior. Destroying a form also
+detaches its scroll surface automatically.
+
+### Tooltips and lifecycle
+
+Settings surfaces use scoped `.modloader-settings-surface` styles rather than
+Shadow DOM, so they inherit the ModLoader visual language without leaking broad
+global control styles. Auto-themed surfaces update when the ModLoader theme
+changes. Select menus and tooltips use document-level portals and are removed by
+their owning handle's `destroy()` method.
+
+The shared glass tooltip can also be attached to any mod-owned element:
+
+```js
+const detachTooltip = api.ui.settings.tooltip.attach(button, 'Reset values', {
+  root: button.closest('.my-mod-window'),
+  ariaLabel: 'Reset values'
+})
+
+detachTooltip()
+// or: api.ui.settings.tooltip.detach(button)
+```
+
+Tooltips support pointer following, viewport edge flipping, keyboard focus,
+dark/light synchronization, and `aria-label`; they do not use the native
+`title` attribute.
 
 ## Dependencies And Conflicts
 

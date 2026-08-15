@@ -4,8 +4,8 @@
     "kind": "sixty-four.modloader.translations",
     "formatVersion": 1,
     "generator": "Sixty Four ModLoader",
-    "editedAt": "2026-08-05T15:49:56.233Z",
-    "lastAction": "codex-sync-window-size-preset-translations",
+    "editedAt": "2026-08-06T23:15:00.000Z",
+    "lastAction": "codex-sync-world-editor-5c6-grow-translations",
     "exportedAt": "2026-07-21T23:18:15.330Z",
     "sourceName": "Translations-20260721-191815.json"
   },
@@ -333,6 +333,28 @@
             "windowSizePreset": {
               "label": "Window resolution",
               "description": "Applies immediately in Window and Borderless forms and is remembered for the next launch. Available sizes follow the selected aspect ratio."
+            }
+          }
+        },
+        "Cattail_TweaksQuality_World-Editor": {
+          "name": "World Editor",
+          "description": "A Modular In-Game World Editor Developed in Small, Independently Validated Stages Without Modifying Vanilla Scripts.",
+          "config": {
+            "enabled": {
+              "label": "Enable World Editor",
+              "description": "Controls Whether World Editor Features Are Active."
+            },
+            "showCreativePurchaseCosts": {
+              "label": "Show Creative-Mode Purchase Costs",
+              "description": "Shows Normal-Mode Reference Purchase Costs While Creative Mode Remains Free."
+            },
+            "largeToolbarCards": {
+              "label": "Use Large-Card Toolbar",
+              "description": "Uses Fixed Large Toolbar Cards with Horizontal Inertial Scrolling."
+            },
+            "growDurationSeconds": {
+              "label": "Grow Duration",
+              "description": "Seconds for a Painted Cube to Grow from Empty to Stable, Including Its Final Reveal."
             }
           }
         },
@@ -709,6 +731,28 @@
             }
           }
         },
+        "Cattail_TweaksQuality_World-Editor": {
+          "name": "世界编辑器",
+          "description": "模块化的游戏内世界编辑器，按可独立验证的小阶段逐步开发，且不修改原版脚本。",
+          "config": {
+            "enabled": {
+              "label": "启用世界编辑器",
+              "description": "控制世界编辑器功能是否启用。"
+            },
+            "showCreativePurchaseCosts": {
+              "label": "创造模式购买花费显示",
+              "description": "显示普通模式的参考购买花费；创造模式仍然免费。"
+            },
+            "largeToolbarCards": {
+              "label": "使用大卡片工具栏",
+              "description": "使用固定尺寸的大卡片工具栏，并支持横向惯性滚动。"
+            },
+            "growDurationSeconds": {
+              "label": "生长时长",
+              "description": "绘制矿方体从空白生长至稳定所需的秒数，包括最后的揭示过渡。"
+            }
+          }
+        },
         "Cattail_TweaksX_Reality-Pack": {
           "name": "机制修改",
           "description": "修改游戏的机制，可能会影响游戏平衡",
@@ -1082,6 +1126,28 @@
             }
           }
         },
+        "Cattail_TweaksQuality_World-Editor": {
+          "name": "世界编辑器",
+          "description": "模块化的游戏内世界编辑器，按可独立验证的小阶段逐步开发，且不修改原版脚本。",
+          "config": {
+            "enabled": {
+              "label": "启用世界编辑器",
+              "description": "控制世界编辑器功能是否启用。"
+            },
+            "showCreativePurchaseCosts": {
+              "label": "创造模式购买花费显示",
+              "description": "显示普通模式的参考购买花费；创造模式仍然免费。"
+            },
+            "largeToolbarCards": {
+              "label": "使用大卡片工具栏",
+              "description": "使用固定尺寸的大卡片工具栏，并支持横向惯性滚动。"
+            },
+            "growDurationSeconds": {
+              "label": "生长时长",
+              "description": "绘制矿方体从空白生长至稳定所需的秒数，包括最后的揭示过渡。"
+            }
+          }
+        },
         "Cattail_TweaksX_Reality-Pack": {
           "name": "机制修改",
           "description": "修改游戏的机制，可能会影响游戏平衡。",
@@ -1429,6 +1495,28 @@
             }
           }
         },
+        "Cattail_TweaksQuality_World-Editor": {
+          "name": "世界編輯器",
+          "description": "模組化的遊戲內世界編輯器，以可獨立驗證的小階段逐步開發，且不修改原版腳本。",
+          "config": {
+            "enabled": {
+              "label": "啟用世界編輯器",
+              "description": "控制世界編輯器功能是否啟用。"
+            },
+            "showCreativePurchaseCosts": {
+              "label": "顯示創造模式購買花費",
+              "description": "顯示普通模式的參考購買花費；創造模式仍然免費。"
+            },
+            "largeToolbarCards": {
+              "label": "使用大卡片工具列",
+              "description": "使用固定尺寸的大卡片工具列，並支援橫向慣性捲動。"
+            },
+            "growDurationSeconds": {
+              "label": "生長時間",
+              "description": "繪製礦方體從空白生長至穩定所需的秒數，包括最後的揭示過渡。"
+            }
+          }
+        },
         "Cattail_TweaksX_Reality-Pack": {
           "name": "Reality 整合包",
           "description": "將自動 Reality 收集、超臨界浪湧和超級 Silo 整合為一個 TweaksX mod。",
@@ -1678,6 +1766,28 @@
             "windowSizePreset": {
               "label": "Разрешение окна",
               "description": "Применяется сразу в оконном и безрамочном режимах и запоминается для следующего запуска. Размеры зависят от выбранного соотношения."
+            }
+          }
+        },
+        "Cattail_TweaksQuality_World-Editor": {
+          "name": "Редактор мира",
+          "description": "Модульный внутриигровой редактор мира, разрабатываемый небольшими независимо проверяемыми этапами без изменения оригинальных скриптов.",
+          "config": {
+            "enabled": {
+              "label": "Включить редактор мира",
+              "description": "Определяет, активны ли функции редактора мира."
+            },
+            "showCreativePurchaseCosts": {
+              "label": "Показывать цены в творческом режиме",
+              "description": "Показывает справочные цены обычного режима; творческий режим остается бесплатным."
+            },
+            "largeToolbarCards": {
+              "label": "Крупные карточки панели",
+              "description": "Использует фиксированные крупные карточки с горизонтальной инерционной прокруткой."
+            },
+            "growDurationSeconds": {
+              "label": "Продолжительность роста",
+              "description": "Время в секундах, за которое нарисованный куб вырастает от пустого до стабильного, включая финальное раскрытие."
             }
           }
         },
@@ -1933,6 +2043,28 @@
             }
           }
         },
+        "Cattail_TweaksQuality_World-Editor": {
+          "name": "Welteditor",
+          "description": "Ein modularer Welteditor im Spiel, der in kleinen, unabhängig geprüften Schritten entwickelt wird, ohne die Originalskripte zu verändern.",
+          "config": {
+            "enabled": {
+              "label": "Welteditor aktivieren",
+              "description": "Steuert, ob die Funktionen des Welteditors aktiv sind."
+            },
+            "showCreativePurchaseCosts": {
+              "label": "Kaufkosten im Kreativmodus anzeigen",
+              "description": "Zeigt die Referenzkosten des normalen Modus; der Kreativmodus bleibt kostenlos."
+            },
+            "largeToolbarCards": {
+              "label": "Große Werkzeugkarten verwenden",
+              "description": "Verwendet feste große Karten mit horizontalem Trägheitsscrollen."
+            },
+            "growDurationSeconds": {
+              "label": "Wachstumsdauer",
+              "description": "Sekunden, die ein gemalter Würfel vom leeren Zustand bis zur Stabilität einschließlich der abschließenden Enthüllung benötigt."
+            }
+          }
+        },
         "Cattail_TweaksX_Reality-Pack": {
           "name": "Reality-Paket",
           "description": "Kombiniert Reality-Autosammlung, Scan-Realitätswellen und Super-Silo in einem TweaksX-Mod.",
@@ -2182,6 +2314,28 @@
             "windowSizePreset": {
               "label": "Resolução da janela",
               "description": "Aplica imediatamente nos modos Janela e Sem borda e é lembrada na próxima abertura. Os tamanhos seguem a proporção escolhida."
+            }
+          }
+        },
+        "Cattail_TweaksQuality_World-Editor": {
+          "name": "Editor de mundo",
+          "description": "Um editor de mundo modular dentro do jogo, desenvolvido em pequenas etapas validadas de forma independente, sem modificar os scripts originais.",
+          "config": {
+            "enabled": {
+              "label": "Ativar Editor de Mundo",
+              "description": "Controla se os recursos do Editor de Mundo estão ativos."
+            },
+            "showCreativePurchaseCosts": {
+              "label": "Mostrar custos no Modo Criativo",
+              "description": "Mostra os custos de referência do modo normal; o Modo Criativo continua gratuito."
+            },
+            "largeToolbarCards": {
+              "label": "Usar cartões grandes",
+              "description": "Usa cartões grandes fixos com rolagem horizontal inercial."
+            },
+            "growDurationSeconds": {
+              "label": "Duração do crescimento",
+              "description": "Segundos para um cubo pintado crescer do vazio até ficar estável, incluindo a revelação final."
             }
           }
         },
@@ -2437,6 +2591,28 @@
             }
           }
         },
+        "Cattail_TweaksQuality_World-Editor": {
+          "name": "Editor del mondo",
+          "description": "Un editor del mondo modulare all'interno del gioco, sviluppato in piccole fasi convalidate in modo indipendente senza modificare gli script originali.",
+          "config": {
+            "enabled": {
+              "label": "Abilita Editor del mondo",
+              "description": "Controlla se le funzioni dell'Editor del mondo sono attive."
+            },
+            "showCreativePurchaseCosts": {
+              "label": "Mostra costi in modalità creativa",
+              "description": "Mostra i costi di riferimento della modalità normale; la modalità creativa resta gratuita."
+            },
+            "largeToolbarCards": {
+              "label": "Usa schede grandi",
+              "description": "Usa schede grandi fisse con scorrimento orizzontale inerziale."
+            },
+            "growDurationSeconds": {
+              "label": "Durata della crescita",
+              "description": "Secondi necessari a un cubo dipinto per crescere da vuoto a stabile, inclusa la rivelazione finale."
+            }
+          }
+        },
         "Cattail_TweaksX_Reality-Pack": {
           "name": "Pacchetto Reality",
           "description": "Unisce raccolta automatica Reality, impulsi da scansione e Super Silo in un mod TweaksX.",
@@ -2686,6 +2862,28 @@
             "windowSizePreset": {
               "label": "Resolución de ventana",
               "description": "Se aplica al instante en Ventana y Sin bordes y se recuerda para el próximo inicio. Los tamaños siguen la relación elegida."
+            }
+          }
+        },
+        "Cattail_TweaksQuality_World-Editor": {
+          "name": "Editor del mundo",
+          "description": "Un editor de mundo modular dentro del juego, desarrollado en pequeñas fases validadas de forma independiente sin modificar los scripts originales.",
+          "config": {
+            "enabled": {
+              "label": "Activar Editor del mundo",
+              "description": "Controla si las funciones del Editor del mundo están activas."
+            },
+            "showCreativePurchaseCosts": {
+              "label": "Mostrar costes en modo creativo",
+              "description": "Muestra los costes de referencia del modo normal; el modo creativo sigue siendo gratuito."
+            },
+            "largeToolbarCards": {
+              "label": "Usar tarjetas grandes",
+              "description": "Usa tarjetas grandes fijas con desplazamiento horizontal inercial."
+            },
+            "growDurationSeconds": {
+              "label": "Duración del crecimiento",
+              "description": "Segundos para que un cubo pintado crezca de vacío a estable, incluida la revelación final."
             }
           }
         },
@@ -2941,6 +3139,28 @@
             }
           }
         },
+        "Cattail_TweaksQuality_World-Editor": {
+          "name": "Éditeur de monde",
+          "description": "Un éditeur de monde modulaire intégré au jeu, développé par petites étapes validées indépendamment sans modifier les scripts d'origine.",
+          "config": {
+            "enabled": {
+              "label": "Activer l'Éditeur de monde",
+              "description": "Détermine si les fonctions de l'Éditeur de monde sont actives."
+            },
+            "showCreativePurchaseCosts": {
+              "label": "Afficher les coûts en mode créatif",
+              "description": "Affiche les coûts de référence du mode normal ; le mode créatif reste gratuit."
+            },
+            "largeToolbarCards": {
+              "label": "Utiliser de grandes cartes",
+              "description": "Utilise de grandes cartes fixes avec défilement horizontal inertiel."
+            },
+            "growDurationSeconds": {
+              "label": "Durée de croissance",
+              "description": "Secondes nécessaires à un cube peint pour passer de vide à stable, révélation finale comprise."
+            }
+          }
+        },
         "Cattail_TweaksX_Reality-Pack": {
           "name": "Pack Reality",
           "description": "Regroupe la collecte auto de Reality, les surges de scan et le Super silo dans un mod TweaksX.",
@@ -3190,6 +3410,28 @@
             "windowSizePreset": {
               "label": "Vensterresolutie",
               "description": "Wordt meteen toegepast in Venster en Randloos en onthouden voor de volgende start. Groottes volgen de gekozen verhouding."
+            }
+          }
+        },
+        "Cattail_TweaksQuality_World-Editor": {
+          "name": "Wereldeditor",
+          "description": "Een modulaire wereldeditor in het spel, ontwikkeld in kleine, afzonderlijk gevalideerde fasen zonder de originele scripts te wijzigen.",
+          "config": {
+            "enabled": {
+              "label": "Wereldeditor inschakelen",
+              "description": "Bepaalt of de functies van de Wereldeditor actief zijn."
+            },
+            "showCreativePurchaseCosts": {
+              "label": "Aankoopkosten in creatieve modus tonen",
+              "description": "Toont de referentiekosten van de normale modus; de creatieve modus blijft gratis."
+            },
+            "largeToolbarCards": {
+              "label": "Grote werkbalkkaarten",
+              "description": "Gebruikt vaste grote kaarten met horizontaal traagheidsscrollen."
+            },
+            "growDurationSeconds": {
+              "label": "Groeiduur",
+              "description": "Seconden waarin een getekende kubus van leeg naar stabiel groeit, inclusief de laatste onthulling."
             }
           }
         },
@@ -3445,6 +3687,28 @@
             }
           }
         },
+        "Cattail_TweaksQuality_World-Editor": {
+          "name": "Editor světa",
+          "description": "Modulární editor světa přímo ve hře, vyvíjený v malých samostatně ověřovaných etapách bez úprav původních skriptů.",
+          "config": {
+            "enabled": {
+              "label": "Zapnout Editor světa",
+              "description": "Určuje, zda jsou funkce Editoru světa aktivní."
+            },
+            "showCreativePurchaseCosts": {
+              "label": "Zobrazit ceny v kreativním režimu",
+              "description": "Zobrazuje referenční ceny normálního režimu; kreativní režim zůstává zdarma."
+            },
+            "largeToolbarCards": {
+              "label": "Použít velké karty",
+              "description": "Používá pevné velké karty s vodorovným setrvačným posouváním."
+            },
+            "growDurationSeconds": {
+              "label": "Doba růstu",
+              "description": "Počet sekund, za které malovaná kostka vyroste z prázdné do stabilní podoby včetně závěrečného odhalení."
+            }
+          }
+        },
         "Cattail_TweaksX_Reality-Pack": {
           "name": "Balíček Reality",
           "description": "Spojuje automatický sběr Reality, vlny ze skenu a Super silo do jednoho modu TweaksX.",
@@ -3694,6 +3958,28 @@
             "windowSizePreset": {
               "label": "Rozdzielczość okna",
               "description": "Stosuje się od razu w trybie Okno i Bez ramki oraz zostaje zapamiętane na następne uruchomienie. Rozmiary zależą od wybranych proporcji."
+            }
+          }
+        },
+        "Cattail_TweaksQuality_World-Editor": {
+          "name": "Edytor świata",
+          "description": "Modułowy edytor świata w grze, rozwijany w małych, niezależnie weryfikowanych etapach bez modyfikowania oryginalnych skryptów.",
+          "config": {
+            "enabled": {
+              "label": "Włącz Edytor świata",
+              "description": "Określa, czy funkcje Edytora świata są aktywne."
+            },
+            "showCreativePurchaseCosts": {
+              "label": "Pokaż koszty w trybie kreatywnym",
+              "description": "Pokazuje koszty referencyjne trybu normalnego; tryb kreatywny pozostaje bezpłatny."
+            },
+            "largeToolbarCards": {
+              "label": "Użyj dużych kart",
+              "description": "Używa stałych dużych kart z poziomym przewijaniem bezwładnościowym."
+            },
+            "growDurationSeconds": {
+              "label": "Czas wzrostu",
+              "description": "Liczba sekund, w których malowana kostka rośnie od pustej do stabilnej, wraz z końcowym odsłonięciem."
             }
           }
         },
@@ -3949,6 +4235,28 @@
             }
           }
         },
+        "Cattail_TweaksQuality_World-Editor": {
+          "name": "ワールドエディター",
+          "description": "バニラスクリプトを変更せず、個別に検証できる小さな段階ごとに開発する、モジュール式のゲーム内ワールドエディターです。",
+          "config": {
+            "enabled": {
+              "label": "ワールドエディターを有効化",
+              "description": "ワールドエディター機能を有効にするかを制御します。"
+            },
+            "showCreativePurchaseCosts": {
+              "label": "クリエイティブモードの購入費用を表示",
+              "description": "通常モードの参考購入費用を表示します。クリエイティブモードは無料のままです。"
+            },
+            "largeToolbarCards": {
+              "label": "大カードツールバーを使用",
+              "description": "固定サイズの大カードと横方向の慣性スクロールを使用します。"
+            },
+            "growDurationSeconds": {
+              "label": "成長時間",
+              "description": "ペイントキューブが空の状態から安定状態まで成長する秒数です。最後の表示切り替えも含みます。"
+            }
+          }
+        },
         "Cattail_TweaksX_Reality-Pack": {
           "name": "Realityパック",
           "description": "Reality自動回収、スキャン発生サージ、スーパーサイロを1つのTweaksX modに統合します。",
@@ -4198,6 +4506,28 @@
             "windowSizePreset": {
               "label": "창 해상도",
               "description": "창 및 테두리 없음 형태에서 즉시 적용되고 다음 실행에도 기억됩니다. 선택 가능한 크기는 현재 창 비율을 따릅니다."
+            }
+          }
+        },
+        "Cattail_TweaksQuality_World-Editor": {
+          "name": "월드 에디터",
+          "description": "원본 스크립트를 수정하지 않고 독립적으로 검증 가능한 작은 단계로 개발되는 모듈식 게임 내 월드 에디터입니다.",
+          "config": {
+            "enabled": {
+              "label": "월드 에디터 활성화",
+              "description": "월드 에디터 기능의 활성화 여부를 제어합니다."
+            },
+            "showCreativePurchaseCosts": {
+              "label": "크리에이티브 모드 구매 비용 표시",
+              "description": "일반 모드의 참고 구매 비용을 표시합니다. 크리에이티브 모드는 계속 무료입니다."
+            },
+            "largeToolbarCards": {
+              "label": "큰 카드 도구 모음 사용",
+              "description": "고정 크기 큰 카드와 가로 관성 스크롤을 사용합니다."
+            },
+            "growDurationSeconds": {
+              "label": "성장 시간",
+              "description": "페인트 큐브가 빈 상태에서 안정 상태까지 성장하는 시간(초)이며 마지막 표시 전환을 포함합니다."
             }
           }
         },
@@ -4453,6 +4783,28 @@
             }
           }
         },
+        "Cattail_TweaksQuality_World-Editor": {
+          "name": "ตัวแก้ไขโลก",
+          "description": "เครื่องมือแก้ไขโลกแบบโมดูลภายในเกม พัฒนาเป็นขั้นตอนย่อยที่ตรวจสอบแยกกันได้ โดยไม่แก้ไขสคริปต์ดั้งเดิม",
+          "config": {
+            "enabled": {
+              "label": "เปิดใช้ตัวแก้ไขโลก",
+              "description": "ควบคุมว่าจะเปิดใช้ฟีเจอร์ของตัวแก้ไขโลกหรือไม่"
+            },
+            "showCreativePurchaseCosts": {
+              "label": "แสดงค่าใช้จ่ายซื้อในโหมดสร้างสรรค์",
+              "description": "แสดงค่าใช้จ่ายอ้างอิงของโหมดปกติ โดยโหมดสร้างสรรค์ยังคงฟรี"
+            },
+            "largeToolbarCards": {
+              "label": "ใช้แถบเครื่องมือการ์ดใหญ่",
+              "description": "ใช้การ์ดขนาดใหญ่คงที่พร้อมการเลื่อนแนวนอนแบบมีแรงเฉื่อย"
+            },
+            "growDurationSeconds": {
+              "label": "ระยะเวลาการเติบโต",
+              "description": "จำนวนวินาทีที่ลูกบาศก์ที่วาดใช้เติบโตจากว่างเปล่าจนคงที่ รวมการเผยให้เห็นช่วงสุดท้าย"
+            }
+          }
+        },
         "Cattail_TweaksX_Reality-Pack": {
           "name": "แพ็ก Reality",
           "description": "รวมการเก็บ Reality อัตโนมัติ คลื่นพลังจากการสแกน และไซโลพิเศษไว้ในม็อด TweaksX เดียว",
@@ -4702,6 +5054,28 @@
             "windowSizePreset": {
               "label": "Ablakfelbontás",
               "description": "Azonnal érvényesül Ablak és Keret nélküli módban, és a következő indításra is megmarad. A méretek a választott képarányt követik."
+            }
+          }
+        },
+        "Cattail_TweaksQuality_World-Editor": {
+          "name": "Világszerkesztő",
+          "description": "Moduláris, játékon belüli világszerkesztő, amely kis, önállóan ellenőrzött szakaszokban készül az eredeti szkriptek módosítása nélkül.",
+          "config": {
+            "enabled": {
+              "label": "Világszerkesztő engedélyezése",
+              "description": "A Világszerkesztő funkcióinak engedélyezését szabályozza."
+            },
+            "showCreativePurchaseCosts": {
+              "label": "Kreatív mód vásárlási költségeinek mutatása",
+              "description": "A normál mód referenciaárait mutatja; a kreatív mód továbbra is ingyenes."
+            },
+            "largeToolbarCards": {
+              "label": "Nagy kártyás eszköztár",
+              "description": "Rögzített nagy kártyákat használ vízszintes tehetetlenségi görgetéssel."
+            },
+            "growDurationSeconds": {
+              "label": "Növekedési idő",
+              "description": "Ennyi másodperc alatt nő a festett kocka üresből stabillá, a végső felfedéssel együtt."
             }
           }
         },
@@ -4957,6 +5331,28 @@
             }
           }
         },
+        "Cattail_TweaksQuality_World-Editor": {
+          "name": "Pasaules redaktors",
+          "description": "Modulārs spēles pasaules redaktors, kas tiek izstrādāts nelielos, neatkarīgi pārbaudāmos posmos, nemainot oriģinālos skriptus.",
+          "config": {
+            "enabled": {
+              "label": "Iespējot Pasaules redaktoru",
+              "description": "Nosaka, vai Pasaules redaktora funkcijas ir iespējotas."
+            },
+            "showCreativePurchaseCosts": {
+              "label": "Rādīt radošā režīma pirkumu izmaksas",
+              "description": "Rāda parastā režīma atsauces izmaksas; radošais režīms paliek bezmaksas."
+            },
+            "largeToolbarCards": {
+              "label": "Lietot lielas kartītes",
+              "description": "Lieto fiksētas lielas kartītes ar horizontālu inerces ritināšanu."
+            },
+            "growDurationSeconds": {
+              "label": "Augšanas ilgums",
+              "description": "Sekundes, kurās krāsotais kubs izaug no tukša līdz stabilam, ieskaitot pēdējo atklāšanu."
+            }
+          }
+        },
         "Cattail_TweaksX_Reality-Pack": {
           "name": "Reality paka",
           "description": "Apvieno automātisku Reality savākšanu, skenēšanas viļņus un Super Silo vienā TweaksX modā.",
@@ -5209,6 +5605,28 @@
             }
           }
         },
+        "Cattail_TweaksQuality_World-Editor": {
+          "name": "Editor de lume",
+          "description": "Un editor de lume modular în joc, dezvoltat în etape mici și verificate independent, fără modificarea scripturilor originale.",
+          "config": {
+            "enabled": {
+              "label": "Activează Editorul de lume",
+              "description": "Controlează dacă funcțiile Editorului de lume sunt active."
+            },
+            "showCreativePurchaseCosts": {
+              "label": "Arată costurile în modul creativ",
+              "description": "Arată costurile de referință din modul normal; modul creativ rămâne gratuit."
+            },
+            "largeToolbarCards": {
+              "label": "Folosește carduri mari",
+              "description": "Folosește carduri mari fixe cu derulare orizontală inerțială."
+            },
+            "growDurationSeconds": {
+              "label": "Durata creșterii",
+              "description": "Secundele în care un cub pictat crește de la gol la stabil, inclusiv dezvăluirea finală."
+            }
+          }
+        },
         "Cattail_TweaksX_Reality-Pack": {
           "name": "Pachet Reality",
           "description": "Combină colectarea automată Reality, valurile de scanare și Super siloz într-un singur mod TweaksX.",
@@ -5458,6 +5876,28 @@
             "windowSizePreset": {
               "label": "Vindusoppløsning",
               "description": "Brukes umiddelbart i Vindu og Kantløs form og huskes til neste oppstart. Størrelsene følger valgt forhold."
+            }
+          }
+        },
+        "Cattail_TweaksQuality_World-Editor": {
+          "name": "Verdensredigerer",
+          "description": "En modulær verdensredigerer i spillet, utviklet i små, uavhengig verifiserte trinn uten å endre originalskriptene.",
+          "config": {
+            "enabled": {
+              "label": "Aktiver Verdensredigerer",
+              "description": "Styrer om funksjonene i Verdensredigereren er aktive."
+            },
+            "showCreativePurchaseCosts": {
+              "label": "Vis kjøpskostnader i kreativ modus",
+              "description": "Viser referansekostnader fra normal modus; kreativ modus forblir gratis."
+            },
+            "largeToolbarCards": {
+              "label": "Bruk store verktøykort",
+              "description": "Bruker faste store kort med horisontal treghetsrulling."
+            },
+            "growDurationSeconds": {
+              "label": "Veksttid",
+              "description": "Sekunder et malt kube bruker på å vokse fra tom til stabil, inkludert den siste avdekkingen."
             }
           }
         },

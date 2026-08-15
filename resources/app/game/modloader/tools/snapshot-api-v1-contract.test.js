@@ -133,7 +133,7 @@ vm.runInNewContext(source, sandbox, { filename: loaderPath })
 
 async function run() {
 	const modLoader = sandbox.window.ModLoader
-	assert.equal(modLoader.version, '0.3.1')
+	assert.equal(modLoader.version, '0.4.0')
 	const adminPageStart = source.indexOf('const snapshotAdminRequest')
 	const adminPageEnd = source.indexOf('\n\tconst renderPanel = function', adminPageStart)
 	assert.ok(adminPageStart > 0 && adminPageEnd > adminPageStart, 'snapshot management subpage is present')

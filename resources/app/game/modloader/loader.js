@@ -2,7 +2,7 @@
 	'use strict'
 
 	const state = {
-		version: '0.3.1',
+		version: '0.4.0',
 		booted: false,
 		mods: [],
 		modById: {},
@@ -3341,6 +3341,8 @@
 	}
 
 	const installTransientScrollbar = function (list, visibleClass) {
+		if (!list) return function () {}
+		if (list.__modloaderTransientScrollbarStop) list.__modloaderTransientScrollbarStop()
 		let timer
 		const reveal = function () {
 			list.classList.add('modloader-ui-page-scrollbar-visible')
@@ -3351,9 +3353,36 @@
 				if (visibleClass) list.classList.remove(visibleClass)
 			}, 900)
 		}
-		list.onwheel = reveal
-		list.onscroll = reveal
-		list.onpointerdown = reveal
+		list.addEventListener('wheel', reveal, { passive: true })
+		list.addEventListener('scroll', reveal, { passive: true })
+		list.addEventListener('pointerdown', reveal, true)
+		const cleanup = function () {
+			clearTimeout(timer)
+			list.removeEventListener('wheel', reveal)
+			list.removeEventListener('scroll', reveal)
+			list.removeEventListener('pointerdown', reveal, true)
+			list.classList.remove('modloader-ui-page-scrollbar-visible')
+			if (visibleClass) list.classList.remove(visibleClass)
+			if (list.__modloaderTransientScrollbarStop === cleanup) delete list.__modloaderTransientScrollbarStop
+		}
+		list.__modloaderTransientScrollbarStop = cleanup
+		return cleanup
+	}
+
+	const shouldDeferInertialScroll = function (list, event, delta) {
+		const target = event?.target
+		if (!target || target === list || !list.contains?.(target)) return false
+		const nativeScroller = target.closest?.('textarea, select, [contenteditable="true"], [data-modloader-scroll-native]')
+		if (nativeScroller && nativeScroller !== list && list.contains(nativeScroller)) return true
+		for (let node = target; node && node !== list; node = node.parentElement) {
+			if (!node?.style || typeof window?.getComputedStyle !== 'function') continue
+			const style = window.getComputedStyle(node)
+			if (!/(auto|scroll|overlay)/.test(style.overflowY || '')) continue
+			const canScrollUp = delta < 0 && node.scrollTop > 0
+			const canScrollDown = delta > 0 && node.scrollTop + node.clientHeight < node.scrollHeight - 1
+			if (canScrollUp || canScrollDown) return true
+		}
+		return false
 	}
 
 	const installInertialScroll = function (list, options = {}) {
@@ -3397,14 +3426,15 @@
 		const onWheel = function (event) {
 			if (!event.cancelable || event.ctrlKey) return
 			const delta = normalizeWheelDelta(event, list)
-			if (!delta) return
-			event.preventDefault()
+			if (!delta || shouldDeferInertialScroll(list, event, delta)) return
 			const before = list.scrollTop
-			list.scrollTop = clamp(before + delta * directInfluence)
-			if (list.scrollTop === before) {
+			const next = clamp(before + delta * directInfluence)
+			if (next === before) {
 				velocity = 0
 				return
 			}
+			event.preventDefault()
+			list.scrollTop = next
 			velocity = clampVelocity(velocity + delta * tailInfluence)
 			if (!frame) frame = requestAnimationFrame(animate)
 		}
@@ -3524,6 +3554,7 @@
 			hud: createUiHudApi(modId),
 			icons: createUiIconsApi(modId),
 			theme: createUiThemeApi(),
+			settings: createUiSettingsApi(modId),
 			pages: createUiPagesApi(modId)
 		}
 	}
@@ -3886,8 +3917,58 @@
 	"colorInvalidHex": { "en": "Enter colors as #RRGGBB.", "sch": "请输入 #RRGGBB 格式的颜色。", "modsch": "请输入 #RRGGBB 格式的颜色。", "tch": "請輸入 #RRGGBB 格式的顏色。" }
 }
 
+	const ensureSettingsSurfaceStyle = function (panelStyle) {
+		if (!panelStyle || document.getElementById('modloader-settings-surface-style')) return
+		const lines = String(panelStyle.textContent || '').split('\n')
+		const darkRoot = lines.find(function (line) { return line.indexOf('#modloader-panel {') !== -1 }) || ''
+		const lightRoot = lines.find(function (line) { return line.indexOf('#modloader-panel.modloader-panel-theme-light {') !== -1 }) || ''
+		const markers = [
+			'.modloader-config',
+			'.modloader-select-control',
+			'.modloader-select-button',
+			'.modloader-select-value',
+			'.modloader-switch-input',
+			'.modloader-color',
+			'.modloader-resource-color'
+		]
+		const sharedRules = lines.filter(function (line) {
+			if (line === darkRoot || line === lightRoot || line.indexOf('#modloader-panel') === -1) return false
+			if (line.indexOf('grid-template-columns: 1fr') !== -1 || line.indexOf('grid-column: auto') !== -1) return false
+			return markers.some(function (marker) { return line.indexOf(marker) !== -1 })
+		}).map(function (line) {
+			return line.replace(/#modloader-panel/g, '.modloader-settings-surface')
+		}).join('\n')
+		const style = document.createElement('style')
+		style.id = 'modloader-settings-surface-style'
+		style.textContent = [
+			darkRoot.replace('#modloader-panel', '.modloader-settings-surface'),
+			lightRoot.replace('#modloader-panel.modloader-panel-theme-light', '.modloader-settings-surface.modloader-panel-theme-light'),
+			sharedRules,
+			`.modloader-settings-surface { position: relative; inset: auto; z-index: auto; box-sizing: border-box; display: block; width: 100%; max-height: none; overflow: visible; padding: 0; border-radius: 0; background: transparent; box-shadow: none; color: var(--modloader-panel-text); font: 13px/1.45 Montserrat, Arial, sans-serif; transition: color .16s ease; }`,
+			`.modloader-settings-surface button, .modloader-settings-surface input, .modloader-settings-surface textarea, .modloader-settings-surface select { font: inherit; }`,
+			`.modloader-settings-surface > .modloader-config-field:first-child, .modloader-settings-surface > .modloader-config-section:first-child { margin-top: 0; }`,
+			`.modloader-settings-scroll { --modloader-settings-scroll-thumb: rgba(185,185,185,.48); --modloader-settings-scroll-thumb-hover: rgba(210,210,210,.68); box-sizing: border-box; overscroll-behavior: contain; scrollbar-gutter: stable; scrollbar-width: thin; scrollbar-color: var(--modloader-settings-scroll-thumb) transparent; }`,
+			`.modloader-settings-scroll.modloader-settings-scroll-light { --modloader-settings-scroll-thumb: rgba(65,68,70,.34); --modloader-settings-scroll-thumb-hover: rgba(35,38,40,.52); }`,
+			`.modloader-settings-scroll[data-modloader-scroll-axis="y"] { overflow-x: hidden; overflow-y: auto; }`,
+			`.modloader-settings-scroll[data-modloader-scroll-transient="true"] { scrollbar-color: transparent transparent; transition: scrollbar-color .28s ease; }`,
+			`.modloader-settings-scroll[data-modloader-scroll-transient="true"]:hover, .modloader-settings-scroll[data-modloader-scroll-transient="true"]:active, .modloader-settings-scroll.modloader-settings-scrollbar-visible { scrollbar-color: var(--modloader-settings-scroll-thumb) transparent; }`,
+			`.modloader-settings-scroll::-webkit-scrollbar { width: 4px; height: 4px; }`,
+			`.modloader-settings-scroll::-webkit-scrollbar-track { background: transparent; }`,
+			`.modloader-settings-scroll::-webkit-scrollbar-thumb { border-radius: 999px; background: var(--modloader-settings-scroll-thumb); transition: background .28s ease; }`,
+			`.modloader-settings-scroll::-webkit-scrollbar-thumb:hover { background: var(--modloader-settings-scroll-thumb-hover); }`,
+			`.modloader-settings-scroll[data-modloader-scroll-transient="true"]::-webkit-scrollbar-thumb { background: transparent; }`,
+			`.modloader-settings-scroll[data-modloader-scroll-transient="true"]:hover::-webkit-scrollbar-thumb, .modloader-settings-scroll[data-modloader-scroll-transient="true"]:active::-webkit-scrollbar-thumb, .modloader-settings-scroll.modloader-settings-scrollbar-visible::-webkit-scrollbar-thumb { background: var(--modloader-settings-scroll-thumb); }`,
+			`@media (max-width: 640px) { .modloader-settings-surface .modloader-config-field { grid-template-columns: 1fr; } .modloader-settings-surface .modloader-config-error { grid-column: auto; } }`
+		].filter(Boolean).join('\n')
+		document.head.appendChild(style)
+	}
+
 	const ensurePanelStyle = function () {
-		if (document.getElementById('modloader-panel-style')) return
+		const existing = document.getElementById('modloader-panel-style')
+		if (existing) {
+			ensureSettingsSurfaceStyle(existing)
+			return
+		}
 		const style = document.createElement('style')
 		style.id = 'modloader-panel-style'
 		style.textContent = `
@@ -4225,6 +4306,7 @@
 			}
 		`
 		document.head.appendChild(style)
+		ensureSettingsSurfaceStyle(style)
 	}
 
 	const getModFileTools = function () {
@@ -5158,11 +5240,24 @@
 		return true
 	}
 
+	const SETTINGS_API_VERSION = 1
+	const SETTINGS_API_TYPES = Object.freeze([ 'boolean', 'select', 'number', 'slider', 'color', 'string', 'array', 'object', 'resourceColors' ])
+
+	const cloneConfigSchemaItem = function (item) {
+		if (!item || typeof item !== 'object') return item
+		const out = {}
+		for (const key of Object.keys(item)) {
+			const value = item[key]
+			out[key] = typeof value === 'function' ? value : cloneConfigValue(value)
+		}
+		return out
+	}
+
 	const getConfigType = function (item) {
 		return String(item.type || inferConfigType(item.default) || 'string').toLowerCase()
 	}
 	const isColorPaletteConfigType = function (type) {
-		return type === 'colorpalette' || type === 'color-palette'
+		return type === 'colorpalette' || type === 'color-palette' || type === 'resourcecolors' || type === 'resource-colors'
 	}
 
 	const isColorConfigType = function (type) {
@@ -5255,7 +5350,7 @@
 		const liveConfig = state.configs[mod.id]
 		const schemaSource = liveConfig?.schema?.length ? liveConfig.schema : normalizeConfigSchema(mod.manifest.config)
 		const schema = schemaSource.map(function (item) {
-			item = clone(item)
+			item = cloneConfigSchemaItem(item)
 			const localizedValueLabels = getLocalizedConfigValueLabels(mod.manifest, item)
 			if (localizedValueLabels) item.valueLabels = clone(localizedValueLabels)
 			item.type = getConfigType(item)
@@ -5704,6 +5799,7 @@
 		})
 		if (!applied) throw new Error(getInlineLocalizedText(CONFIG_INLINE_TEXT.colorNoMatches))
 		root.dispatchEvent(new Event('input', { bubbles: true }))
+		root.dispatchEvent(new Event('change', { bubbles: true }))
 		return applied
 	}
 	const createColorPaletteShareTools = function (item, root) {
@@ -5788,6 +5884,7 @@
 				picker.value = row.dataset.defaultColor || '#FFFFFF'
 				textInput.value = picker.value
 				root.dispatchEvent(new Event('input', { bubbles: true }))
+				root.dispatchEvent(new Event('change', { bubbles: true }))
 			})
 
 			if (showIcons) row.appendChild(icon)
@@ -5797,6 +5894,19 @@
 
 		root.readConfigValue = function () {
 			return readColorPaletteFromInput(root, { includeDefaults: false })
+		}
+		root.setConfigValue = function (nextValue) {
+			const overrides = isObject(nextValue) ? nextValue : {}
+			root.querySelectorAll('.modloader-resource-color-row').forEach(function (row, index) {
+				const id = row.dataset.resourceId
+				const raw = getColorPaletteConfigValue(overrides, id, index)
+				const color = normalizePanelHexColor(raw) || row.dataset.defaultColor || '#FFFFFF'
+				const picker = row.querySelector('.modloader-resource-color-picker')
+				const textInput = row.querySelector('.modloader-resource-color-text')
+				if (picker) picker.value = color
+				if (textInput) textInput.value = color
+			})
+			return root.readConfigValue()
 		}
 
 		Object.defineProperty(root, 'disabled', {
@@ -6079,6 +6189,7 @@
 			event.stopPropagation()
 			commitSliderValue(getSliderResetValue(item, bounds))
 			root.dispatchEvent(new Event('input', { bubbles: true }))
+			root.dispatchEvent(new Event('change', { bubbles: true }))
 		})
 		setSliderValue(bounds.value, { snap: true })
 
@@ -6087,6 +6198,10 @@
 			if (current === null) return readNumberConfigValue(item, number.value, type, { enforceRange: true, min: bounds.min, max: bounds.max })
 			const snapped = snapSliderValue(current, bounds)
 			return readNumberConfigValue(item, formatSliderNumber(snapped, bounds), type, { enforceRange: true, min: bounds.min, max: bounds.max })
+		}
+		root.setConfigValue = function (nextValue) {
+			const committed = commitSliderValue(nextValue)
+			return readNumberConfigValue(item, formatSliderNumber(committed, bounds), type, { enforceRange: true, min: bounds.min, max: bounds.max })
 		}
 
 		Object.defineProperty(root, 'disabled', {
@@ -6194,6 +6309,7 @@
 			event.preventDefault()
 			setDefault()
 			root.dispatchEvent(new Event('input', { bubbles: true }))
+			root.dispatchEvent(new Event('change', { bubbles: true }))
 		})
 
 		root.readConfigValue = function () {
@@ -6201,6 +6317,18 @@
 			const color = normalizePanelHexColor(textInput.value)
 			if (!color) throw new Error('Enter colors as #RRGGBB.')
 			return color
+		}
+		root.setConfigValue = function (nextValue) {
+			const color = normalizePanelHexColor(nextValue)
+			if (!color && allowAuto && String(nextValue ?? '').trim() === '') setAuto()
+			else {
+				if (!color) throw new Error('Enter colors as #RRGGBB.')
+				auto = false
+				picker.value = color
+				textInput.value = color
+				syncAutoPlaceholder()
+			}
+			return root.readConfigValue()
 		}
 
 		Object.defineProperty(root, 'disabled', {
@@ -6254,6 +6382,7 @@
 			event.stopPropagation()
 			input.value = formatConfigInputValue(getNumberConfigResetValue(item, type), type)
 			input.dispatchEvent(new Event('input', { bubbles: true }))
+			input.dispatchEvent(new Event('change', { bubbles: true }))
 		})
 
 		Object.defineProperty(root, 'value', {
@@ -6272,7 +6401,33 @@
 		return root
 	}
 
-	const getSelectConfigOptions = function (item, value) {
+	const shouldPreserveSelectValueType = function (item) {
+		return item?.settingsApiVersion === SETTINGS_API_VERSION || item?.preserveValueType === true || item?.preserveOptionTypes === true || !!item?.valueType
+	}
+
+	const coerceSelectConfigValue = function (item, value) {
+		if (!shouldPreserveSelectValueType(item)) return String(value ?? '')
+		const valueType = String(item?.valueType || '').trim().toLowerCase()
+		if (valueType === 'number' || valueType === 'float' || valueType === 'integer' || valueType === 'int') {
+			const number = Number(value)
+			if (!Number.isFinite(number)) throw new Error('Select option values must be valid numbers.')
+			return valueType === 'integer' || valueType === 'int' ? Math.round(number) : number
+		}
+		if (valueType === 'boolean' || valueType === 'bool') {
+			if (value === true || value === 'true' || value === 1 || value === '1') return true
+			if (value === false || value === 'false' || value === 0 || value === '0') return false
+			throw new Error('Select option values must be booleans.')
+		}
+		if (valueType === 'string') return String(value ?? '')
+		if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') return value
+		throw new Error('Select option values must be strings, numbers, or booleans.')
+	}
+
+	const getSelectConfigValueKey = function (value) {
+		return typeof value + ':' + String(value)
+	}
+
+	const getSelectConfigOptions = function (item, value, config) {
 		const source = item?.options || item?.choices || item?.values || item?.entries || []
 		const raw = Array.isArray(source)
 			? source
@@ -6280,20 +6435,25 @@
 		const options = []
 		const seen = new Set()
 		const addOption = function (entry) {
-			const optionValue = isObject(entry) ? (entry.value ?? entry.id ?? entry.key ?? entry.name) : entry
-			if (optionValue === undefined || optionValue === null) return
-			const textValue = String(optionValue)
-			if (seen.has(textValue)) return
-			seen.add(textValue)
+			const rawValue = isObject(entry) ? (entry.value ?? entry.id ?? entry.key ?? entry.name) : entry
+			if (rawValue === undefined || rawValue === null) return
+			const optionValue = coerceSelectConfigValue(item, rawValue)
+			const valueKey = getSelectConfigValueKey(optionValue)
+			if (seen.has(valueKey)) return
+			seen.add(valueKey)
 			const labelSource = isObject(entry) ? (entry.label ?? entry.text ?? entry.title ?? entry.name ?? entry.id ?? entry.key) : entry
 			options.push({
-				value: textValue,
-				label: pickLocalizedText(labelSource, getLocaleCandidates()) || String(labelSource ?? textValue)
+				value: optionValue,
+				key: valueKey,
+				label: pickLocalizedText(labelSource, getLocaleCandidates()) || String(labelSource ?? optionValue)
 			})
 		}
 		raw.forEach(addOption)
-		const textValue = value === undefined || value === null ? '' : String(value)
-		if (textValue && !seen.has(textValue)) options.unshift({ value: textValue, label: textValue })
+		if (config?.includeCurrent !== false && value !== undefined && value !== null) {
+			const currentValue = coerceSelectConfigValue(item, value)
+			const currentKey = getSelectConfigValueKey(currentValue)
+			if (!seen.has(currentKey)) options.unshift({ value: currentValue, key: currentKey, label: String(currentValue) })
+		}
 		return options
 	}
 
@@ -6303,7 +6463,7 @@
 		const valueLabel = element('span', 'modloader-select-value')
 		const menu = element('div', 'modloader-select-menu')
 		let selectOptions = []
-		let selectedValue = value === undefined || value === null ? String(item?.default ?? '') : String(value)
+		let selectedValue = coerceSelectConfigValue(item, value === undefined || value === null ? (item?.default ?? '') : value)
 		let open = false
 		let focusedIndex = -1
 
@@ -6317,23 +6477,27 @@
 			const normalized = []
 			const seen = new Set()
 			for (const option of source || []) {
-				const optionValue = String(option?.value ?? '')
-				if (!optionValue || seen.has(optionValue)) continue
-				seen.add(optionValue)
-				normalized.push({ value: optionValue, label: String(option?.label || optionValue) })
+				if (!option || option.value === undefined || option.value === null) continue
+				const optionValue = coerceSelectConfigValue(item, option.value)
+				const valueKey = getSelectConfigValueKey(optionValue)
+				if (seen.has(valueKey)) continue
+				seen.add(valueKey)
+				normalized.push({ value: optionValue, key: valueKey, label: String(option?.label ?? optionValue) })
 			}
 			return normalized
 		}
 
 		const getSelectedOption = function () {
-			return selectOptions.find(function (option) { return option.value === selectedValue }) || null
+			const selectedKey = getSelectConfigValueKey(selectedValue)
+			return selectOptions.find(function (option) { return option.key === selectedKey }) || null
 		}
 
 		const syncSelectedState = function () {
 			const selected = getSelectedOption()
-			valueLabel.textContent = selected?.label || selectedValue
+			valueLabel.textContent = selected?.label || String(selectedValue)
+			const selectedKey = getSelectConfigValueKey(selectedValue)
 			for (const optionButton of Array.from(menu.children)) {
-				const isSelected = optionButton.dataset.value === selectedValue
+				const isSelected = optionButton.dataset.valueKey === selectedKey
 				optionButton.classList.toggle('selected', isSelected)
 				optionButton.setAttribute('aria-selected', isSelected ? 'true' : 'false')
 			}
@@ -6353,12 +6517,19 @@
 		}
 
 		const setValue = function (nextValue, emit) {
-			selectedValue = String(nextValue ?? '')
-			if (selectOptions.length && !selectOptions.some(function (option) { return option.value === selectedValue })) {
+			selectedValue = coerceSelectConfigValue(item, nextValue)
+			const selectedKey = getSelectConfigValueKey(selectedValue)
+			if (selectOptions.length && !selectOptions.some(function (option) { return option.key === selectedKey })) {
+				if (item?.settingsApiVersion === SETTINGS_API_VERSION) {
+					throw new Error('Invalid select value: ' + String(nextValue) + '.')
+				}
 				selectedValue = selectOptions[0].value
 			}
 			syncSelectedState()
-			if (emit) root.dispatchEvent(new Event('input', { bubbles: true }))
+			if (emit) {
+				root.dispatchEvent(new Event('input', { bubbles: true }))
+				root.dispatchEvent(new Event('change', { bubbles: true }))
+			}
 		}
 
 		const placeMenu = function () {
@@ -6407,8 +6578,8 @@
 			open = true
 			root.classList.add('open')
 			button.setAttribute('aria-expanded', 'true')
-			const panel = root.closest('#modloader-panel')
-			const light = panel?.classList.contains('modloader-panel-theme-light')
+			const themeRoot = root.closest('#modloader-panel, .modloader-settings-surface')
+			const light = themeRoot?.classList.contains('modloader-panel-theme-light')
 			menu.classList.toggle('modloader-select-menu-light', !!light)
 			document.body.appendChild(menu)
 			placeMenu()
@@ -6416,7 +6587,8 @@
 			window.addEventListener('resize', onWindowCloseRequest)
 			window.addEventListener('scroll', onWindowCloseRequest, true)
 			requestAnimationFrame(placeMenu)
-			const selectedIndex = Math.max(0, selectOptions.findIndex(function (option) { return option.value === selectedValue }))
+			const selectedKey = getSelectConfigValueKey(selectedValue)
+			const selectedIndex = Math.max(0, selectOptions.findIndex(function (option) { return option.key === selectedKey }))
 			focusOption(selectedIndex)
 		}
 
@@ -6425,7 +6597,7 @@
 			selectOptions.forEach(function (option, index) {
 				const optionButton = element('button', 'modloader-select-option', option.label)
 				optionButton.type = 'button'
-				optionButton.dataset.value = option.value
+				optionButton.dataset.valueKey = option.key
 				optionButton.dataset.index = String(index)
 				optionButton.setAttribute('role', 'option')
 				optionButton.tabIndex = -1
@@ -6495,7 +6667,8 @@
 
 		root.setSelectOptions = function (nextOptions) {
 			selectOptions = normalizeOptions(nextOptions)
-			if (!selectOptions.some(function (option) { return option.value === selectedValue }) && selectOptions[0]) {
+			const selectedKey = getSelectConfigValueKey(selectedValue)
+			if (!selectOptions.some(function (option) { return option.key === selectedKey }) && selectOptions[0]) {
 				selectedValue = selectOptions[0].value
 			}
 			renderOptions()
@@ -6561,7 +6734,7 @@
 		if (isSliderConfigItem(item, type)) return input.readConfigValue()
 		if (isSelectConfigItem(item, type)) return input.value
 		if (type === 'boolean') return !!input.checked
-		if (isNumberConfigType(type)) return readNumberConfigValue(item, input.value, type)
+		if (isNumberConfigType(type)) return readNumberConfigValue(item, input.value, type, { enforceRange: true, min: item.min, max: item.max })
 		if (type === 'array' || type === 'object') {
 			const value = JSON.parse(input.value || (type === 'array' ? '[]' : '{}'))
 			if (type === 'array' && !Array.isArray(value)) throw new Error('Enter a JSON array.')
@@ -6569,6 +6742,673 @@
 			return value
 		}
 		return input.value
+	}
+
+	const normalizeSettingsDefinition = function (definition, options) {
+		if (!definition || typeof definition !== 'object' || Array.isArray(definition)) throw new Error('Settings definitions must be objects.')
+		const item = cloneConfigSchemaItem(definition)
+		const rawType = getConfigType(item)
+		if (isColorPaletteConfigItem(item, rawType)) item.type = 'resourceColors'
+		else if (isColorConfigType(rawType)) item.type = 'color'
+		else if (isSliderConfigItem(item, rawType)) item.type = 'slider'
+		else if (isSelectConfigItem(item, rawType)) item.type = 'select'
+		else if (isNumberConfigType(rawType)) {
+			item.type = 'number'
+			if (rawType === 'integer' || rawType === 'int') item.integer = true
+		} else if (rawType === 'boolean' || rawType === 'string' || rawType === 'array' || rawType === 'object') item.type = rawType
+		else throw new Error('Unsupported settings type: ' + rawType + '.')
+		if (options?.apiV1 !== false) {
+			item.settingsApiVersion = SETTINGS_API_VERSION
+			if (item.type === 'select' && item.preserveValueType === undefined && item.preserveOptionTypes === undefined && !item.valueType) item.preserveOptionTypes = true
+		}
+		return item
+	}
+
+	const normalizeSettingsDefinitions = function (schema, options) {
+		const source = isObject(schema) && schema.key ? [ cloneConfigSchemaItem(schema) ] : normalizeConfigSchema(schema)
+		return source.map(function (item) { return normalizeSettingsDefinition(item, options) })
+	}
+
+	const validateSettingsConfigValue = function (item, value) {
+		const type = getConfigType(item)
+		if (isSelectConfigItem(item, type) && item.settingsApiVersion === SETTINGS_API_VERSION) {
+			const declared = getSelectConfigOptions(item, undefined, { includeCurrent: false })
+			const valueKey = getSelectConfigValueKey(value)
+			if (!declared.some(function (option) { return option.key === valueKey })) throw new Error('Choose one of the available options.')
+		}
+		if (typeof item.validate === 'function') {
+			const result = item.validate(cloneConfigValue(value), cloneConfigSchemaItem(item))
+			if (result === false) throw new Error('The value is invalid.')
+			if (typeof result === 'string' && result.trim()) throw new Error(result.trim())
+			if (result instanceof Error) throw result
+			if (result && typeof result === 'object' && result.valid === false) throw new Error(String(result.message || 'The value is invalid.'))
+		}
+		return value
+	}
+
+	const setConfigInputValue = function (item, input, value) {
+		const type = getConfigType(item)
+		if (typeof input?.setConfigValue === 'function') return input.setConfigValue(cloneConfigValue(value))
+		if (isSelectConfigItem(item, type)) {
+			input.value = coerceSelectConfigValue(item, value)
+			return input.value
+		}
+		if (type === 'boolean') {
+			input.checked = !!value
+			return input.checked
+		}
+		if (type === 'array' || type === 'object') {
+			input.value = formatConfigInputValue(value, type)
+			return value
+		}
+		input.value = formatConfigInputValue(value, type)
+		return input.value
+	}
+
+	const createSettingsCleanupBag = function () {
+		const callbacks = []
+		let cleaned = false
+		return {
+			add(callback) {
+				if (typeof callback !== 'function') return callback
+				if (cleaned) callback()
+				else callbacks.push(callback)
+				return callback
+			},
+			run() {
+				if (cleaned) return
+				cleaned = true
+				while (callbacks.length) {
+					try { callbacks.pop()() } catch (error) { warn('Settings cleanup failed.', error) }
+				}
+			}
+		}
+	}
+
+	const createSettingsControlCore = function (definition, options) {
+		const item = options?.normalized ? definition : normalizeSettingsDefinition(definition, { apiV1: options?.apiV1 !== false })
+		const cleanup = createSettingsCleanupBag()
+		const initialValue = options && Object.prototype.hasOwnProperty.call(options, 'value') ? options.value : item.default
+		const input = createConfigInput(item, cloneConfigValue(initialValue), {
+			addCleanup(callback) { cleanup.add(callback) },
+			mod: options?.mod,
+			item,
+			key: item.key
+		})
+		if (input?.dataset) {
+			input.dataset.modloaderModId = options?.modId || options?.mod?.id || ''
+			input.dataset.modloaderConfigKey = item.key || ''
+		}
+		const accessibleLabel = getSettingsDefinitionText(item, 'label', item.key || '')
+		if (accessibleLabel && input?.setAttribute) input.setAttribute('aria-label', accessibleLabel)
+		let destroyed = false
+		let lastError = null
+		let handle = null
+		const read = function () {
+			return validateSettingsConfigValue(item, readConfigInputValue(item, input))
+		}
+		const notify = function (kind, event) {
+			if (destroyed) return
+			let payload
+			try {
+				const value = read()
+				lastError = null
+				payload = { key: item.key || '', value: cloneConfigValue(value), valid: true, error: null, event, control: handle }
+			} catch (error) {
+				lastError = error
+				payload = { key: item.key || '', value: undefined, valid: false, error, event, control: handle }
+			}
+			const callback = kind === 'input' ? options?.onInput : options?.onChange
+			if (typeof callback === 'function') callback(payload)
+		}
+		const onInput = function (event) { notify('input', event) }
+		const onChange = function (event) { notify('change', event) }
+		input.addEventListener('input', onInput)
+		input.addEventListener('change', onChange)
+		cleanup.add(function () {
+			input.removeEventListener('input', onInput)
+			input.removeEventListener('change', onChange)
+		})
+		handle = {
+			element: input,
+			input,
+			item,
+			getValue() { return cloneConfigValue(read()) },
+			setValue(value, config) {
+				setConfigInputValue(item, input, value)
+				if (config?.emit === true || config?.emit === 'change') {
+					input.dispatchEvent(new Event('input', { bubbles: true }))
+					input.dispatchEvent(new Event('change', { bubbles: true }))
+				} else if (config?.emit === 'input') input.dispatchEvent(new Event('input', { bubbles: true }))
+				return handle.getValue()
+			},
+			reset(config) { return handle.setValue(cloneConfigValue(item.default), config) },
+			setDisabled(disabled) {
+				input.disabled = !!disabled
+				return handle
+			},
+			validate() {
+				try {
+					const value = read()
+					lastError = null
+					return { valid: true, value: cloneConfigValue(value), error: null }
+				} catch (error) {
+					lastError = error
+					return { valid: false, value: undefined, error }
+				}
+			},
+			destroy() {
+				if (destroyed) return
+				destroyed = true
+				cleanup.run()
+			},
+			get error() { return lastError },
+			get valid() { return !lastError }
+		}
+		if (item.disabled === true) handle.setDisabled(true)
+		return handle
+	}
+
+	const getSettingsDefinitionText = function (item, property, fallback) {
+		const localized = pickLocalizedText(item?.[property], getLocaleCandidates())
+		if (localized) return localized
+		const value = item?.[property]
+		if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') return String(value)
+		return fallback || ''
+	}
+
+	const createSettingsFieldCore = function (definition, options) {
+		const item = options?.normalized ? definition : normalizeSettingsDefinition(definition, { apiV1: options?.apiV1 !== false })
+		const type = getConfigType(item)
+		const field = element(type === 'boolean' || isColorPaletteConfigItem(item, type) ? 'div' : 'label', 'modloader-config-field')
+		const text = element('span', 'modloader-config-text')
+		const labelText = options?.label ?? getSettingsDefinitionText(item, 'label', item.key || '')
+		const description = options?.description ?? getSettingsDefinitionText(item, 'description', '')
+		const label = element('span', 'modloader-config-label', labelText || item.key || '')
+		text.appendChild(label)
+		const descriptionMode = options?.descriptionDisplayMode || getPanelDescriptionDisplayMode()
+		if (description && descriptionMode === 'inline') text.appendChild(element('span', 'modloader-config-meta modloader-config-description', description))
+		if (description && descriptionMode !== 'inline') setPanelTooltipText(text, description, { kind: 'description' })
+		if (options?.showMeta === true) {
+			const controlLabel = isSliderConfigItem(item, type) && !isSliderConfigType(type) ? ' | slider' : ''
+			text.appendChild(element('span', 'modloader-config-meta', (item.key || '') + ' | ' + type + controlLabel))
+		}
+		const errorElement = element('span', 'modloader-config-error')
+		let fieldHandle = null
+		const setError = function (error) {
+			const message = error?.message ? String(error.message) : ''
+			errorElement.textContent = message
+			errorElement.classList.toggle('active', !!message)
+			field.classList.toggle('modloader-config-field-invalid', !!message)
+		}
+		const forward = function (kind, payload) {
+			setError(payload.valid ? null : payload.error)
+			const callback = kind === 'input' ? options?.onInput : options?.onChange
+			if (typeof callback === 'function') callback(Object.assign({}, payload, { field: fieldHandle }))
+		}
+		const control = createSettingsControlCore(item, {
+			normalized: true,
+			apiV1: options?.apiV1 !== false,
+			value: options && Object.prototype.hasOwnProperty.call(options, 'value') ? options.value : item.default,
+			mod: options?.mod,
+			modId: options?.modId,
+			onInput(payload) { forward('input', payload) },
+			onChange(payload) { forward('change', payload) }
+		})
+		if (labelText) control.input.setAttribute('aria-label', String(labelText))
+		field.append(text, control.element, errorElement)
+		fieldHandle = {
+			element: field,
+			input: control.input,
+			control,
+			item,
+			getValue: control.getValue,
+			setValue: control.setValue,
+			reset: control.reset,
+			setDisabled(disabled) {
+				field.classList.toggle('modloader-config-field-disabled', !!disabled)
+				control.setDisabled(disabled)
+				return fieldHandle
+			},
+			validate() {
+				const result = control.validate()
+				setError(result.valid ? null : result.error)
+				return result
+			},
+			setError,
+			destroy() { control.destroy() },
+			get error() { return control.error },
+			get valid() { return control.valid }
+		}
+		if (item.disabled === true) fieldHandle.setDisabled(true)
+		return fieldHandle
+	}
+
+	const settingsSurfaceRegistry = new Map()
+	const settingsScrollRegistry = new Map()
+	const settingsTooltipRootRegistry = new WeakMap()
+	const settingsTooltipTargetRegistry = new WeakMap()
+
+	const normalizeSettingsTheme = function (theme) {
+		return theme === 'dark' || theme === 'light' ? theme : 'auto'
+	}
+
+	const syncSettingsSurfaceTheme = function (surface) {
+		const record = settingsSurfaceRegistry.get(surface)
+		if (!record) return
+		const mode = record.theme === 'auto' ? getPanelThemeMode() : record.theme
+		surface.dataset.modloaderSettingsTheme = mode
+		surface.classList.toggle('modloader-panel-theme-light', mode === 'light')
+	}
+
+	const syncSettingsScrollTheme = function (target) {
+		const record = settingsScrollRegistry.get(target)
+		if (!record) return
+		const themeRoot = target.closest?.('.modloader-settings-surface, #modloader-panel')
+		const mode = record.theme === 'auto'
+			? (themeRoot ? (themeRoot.classList.contains('modloader-panel-theme-light') ? 'light' : 'dark') : getPanelThemeMode())
+			: record.theme
+		target.classList.toggle('modloader-settings-scroll-light', mode === 'light')
+		target.dataset.modloaderSettingsScrollTheme = mode
+	}
+
+	const refreshSettingsSurfaceThemes = function () {
+		for (const surface of settingsSurfaceRegistry.keys()) syncSettingsSurfaceTheme(surface)
+		for (const target of settingsScrollRegistry.keys()) syncSettingsScrollTheme(target)
+	}
+
+	const retainSettingsTooltipRoot = function (root) {
+		if (!root) return function () {}
+		let record = settingsTooltipRootRegistry.get(root)
+		if (!record) {
+			const owned = !root.__modloaderPanelTooltipCleanup
+			record = { count: 0, cleanup: owned ? installPanelTooltips(root) : null }
+			settingsTooltipRootRegistry.set(root, record)
+		}
+		record.count++
+		let released = false
+		return function () {
+			if (released) return
+			released = true
+			record.count--
+			if (record.count <= 0) {
+				if (typeof record.cleanup === 'function') record.cleanup()
+				settingsTooltipRootRegistry.delete(root)
+			}
+		}
+	}
+
+	const initializeSettingsSurface = function (surface, options) {
+		ensurePanelStyle()
+		surface.classList.add('modloader-settings-surface')
+		const descriptionMode = options?.descriptionDisplayMode === 'inline' || options?.descriptionDisplayMode === 'hover'
+			? options.descriptionDisplayMode
+			: getPanelDescriptionDisplayMode()
+		surface.dataset.modloaderSettingsDescriptionMode = descriptionMode
+		settingsSurfaceRegistry.set(surface, { theme: normalizeSettingsTheme(options?.theme) })
+		syncSettingsSurfaceTheme(surface)
+		const releaseTooltipRoot = retainSettingsTooltipRoot(surface)
+		let destroyed = false
+		return function () {
+			if (destroyed) return
+			destroyed = true
+			releaseTooltipRoot()
+			settingsSurfaceRegistry.delete(surface)
+		}
+	}
+
+	const attachSettingsScroll = function (target, options) {
+		if (!target?.classList) throw new Error('A settings scroll target is required.')
+		if (target.__modloaderSettingsScrollCleanup) target.__modloaderSettingsScrollCleanup()
+		const config = options === true || options === undefined ? {} : options
+		if (!config || typeof config !== 'object' || Array.isArray(config)) throw new Error('Settings scroll options must be an object.')
+		const axis = config.axis || 'y'
+		if (axis !== 'y') throw new Error('Settings scroll v1 supports axis: y.')
+		ensurePanelStyle()
+		const previous = {
+			hadScrollClass: target.classList.contains('modloader-settings-scroll'),
+			hadLightClass: target.classList.contains('modloader-settings-scroll-light'),
+			axis: target.getAttribute('data-modloader-scroll-axis'),
+			transient: target.getAttribute('data-modloader-scroll-transient'),
+			theme: target.getAttribute('data-modloader-settings-scroll-theme'),
+			maxHeight: target.style.maxHeight
+		}
+		target.classList.add('modloader-settings-scroll')
+		target.dataset.modloaderScrollAxis = axis
+		target.dataset.modloaderScrollTransient = config.transient === false ? 'false' : 'true'
+		if (config.maxHeight !== undefined && config.maxHeight !== null) {
+			target.style.maxHeight = typeof config.maxHeight === 'number' ? Math.max(0, config.maxHeight) + 'px' : String(config.maxHeight)
+		}
+		settingsScrollRegistry.set(target, { theme: normalizeSettingsTheme(config.theme) })
+		syncSettingsScrollTheme(target)
+		const releaseTransient = config.transient === false ? null : installTransientScrollbar(target, 'modloader-settings-scrollbar-visible')
+		const inertiaOptions = config.inertia && typeof config.inertia === 'object' ? config.inertia : {}
+		const releaseInertia = config.inertia === false ? null : installInertialScroll(target, inertiaOptions)
+		let active = true
+		const cleanup = function () {
+			if (!active) return
+			active = false
+			if (typeof releaseInertia === 'function') releaseInertia()
+			if (typeof releaseTransient === 'function') releaseTransient()
+			settingsScrollRegistry.delete(target)
+			if (!previous.hadScrollClass) target.classList.remove('modloader-settings-scroll')
+			if (previous.hadLightClass) target.classList.add('modloader-settings-scroll-light')
+			else target.classList.remove('modloader-settings-scroll-light')
+			if (previous.axis === null) target.removeAttribute('data-modloader-scroll-axis')
+			else target.setAttribute('data-modloader-scroll-axis', previous.axis)
+			if (previous.transient === null) target.removeAttribute('data-modloader-scroll-transient')
+			else target.setAttribute('data-modloader-scroll-transient', previous.transient)
+			if (previous.theme === null) target.removeAttribute('data-modloader-settings-scroll-theme')
+			else target.setAttribute('data-modloader-settings-scroll-theme', previous.theme)
+			target.style.maxHeight = previous.maxHeight
+			if (target.__modloaderSettingsScrollCleanup === cleanup) delete target.__modloaderSettingsScrollCleanup
+		}
+		target.__modloaderSettingsScrollCleanup = cleanup
+		return cleanup
+	}
+
+	const wrapSettingsControlHandle = function (core, options) {
+		const surface = element('div', 'modloader-settings-control-surface')
+		surface.appendChild(core.element)
+		const releaseSurface = initializeSettingsSurface(surface, Object.assign({}, options, { descriptionDisplayMode: 'hover' }))
+		const description = getSettingsDefinitionText(core.item, 'description', '')
+		const label = getSettingsDefinitionText(core.item, 'label', core.item.key || '')
+		const releaseDescription = description ? attachSettingsTooltip(core.input, description, { root: surface, kind: 'description', ariaLabel: label || description }) : null
+		let destroyed = false
+		return {
+			element: surface,
+			input: core.input,
+			item: core.item,
+			getValue: core.getValue,
+			setValue: core.setValue,
+			reset: core.reset,
+			setDisabled: core.setDisabled,
+			validate: core.validate,
+			destroy() {
+				if (destroyed) return
+				destroyed = true
+				if (releaseDescription) releaseDescription()
+				core.destroy()
+				releaseSurface()
+				surface.remove()
+			},
+			get error() { return core.error },
+			get valid() { return core.valid }
+		}
+	}
+
+	const wrapSettingsFieldHandle = function (core, options) {
+		const surface = element('div', 'modloader-settings-field-surface')
+		surface.appendChild(core.element)
+		const releaseSurface = initializeSettingsSurface(surface, options)
+		let destroyed = false
+		return {
+			element: surface,
+			field: core.element,
+			input: core.input,
+			control: core.control,
+			item: core.item,
+			getValue: core.getValue,
+			setValue: core.setValue,
+			reset: core.reset,
+			setDisabled: core.setDisabled,
+			validate: core.validate,
+			setError: core.setError,
+			destroy() {
+				if (destroyed) return
+				destroyed = true
+				core.destroy()
+				releaseSurface()
+				surface.remove()
+			},
+			get error() { return core.error },
+			get valid() { return core.valid }
+		}
+	}
+
+	const getSettingsFormValue = function (modId, item, options) {
+		if (isObject(options?.values) && Object.prototype.hasOwnProperty.call(options.values, item.key)) return cloneConfigValue(options.values[item.key])
+		if (options?.bindConfig === true || options?.config === true) return cloneConfigValue(getConfigValue(modId, item.key, item.default))
+		return cloneConfigValue(item.default)
+	}
+
+	const createSettingsForm = function (modId, options) {
+		const config = options || {}
+		const schema = normalizeSettingsDefinitions(config.schema || config.fields || [], { apiV1: true })
+		const seen = new Set()
+		for (const item of schema) {
+			if (!item.key) throw new Error('Settings form fields require a key.')
+			if (seen.has(item.key)) throw new Error('Duplicate settings key: ' + item.key + '.')
+			seen.add(item.key)
+		}
+		const root = element('div', 'modloader-settings-form')
+		const releaseSurface = initializeSettingsSurface(root, config)
+		const releaseScroll = config.scroll
+			? attachSettingsScroll(root, config.scroll === true ? { maxHeight: 'min(60vh, 560px)' } : config.scroll)
+			: null
+		const fields = new Map()
+		const initialValues = {}
+		const currentValues = {}
+		const bindConfig = config.bindConfig === true || config.config === true
+		const persist = config.persist === 'change' ? 'change' : 'manual'
+		let destroyed = false
+		let formHandle = null
+		const snapshotValues = function () {
+			const out = {}
+			for (const [key, field] of fields) {
+				try { out[key] = field.getValue() } catch (error) { out[key] = cloneConfigValue(currentValues[key]) }
+			}
+			return out
+		}
+		const updateDirtyValue = function (key, value) {
+			currentValues[key] = cloneConfigValue(value)
+		}
+		const emit = function (kind, item, payload) {
+			if (payload.valid) {
+				updateDirtyValue(item.key, payload.value)
+				if (bindConfig && kind === 'input') dispatchConfigPreview({ mod: state.modById[modId] || { id: modId, path: '' }, item, value: payload.value, invalid: false })
+				if (bindConfig && kind === 'change' && persist === 'change') {
+					setConfigValue(modId, item.key, payload.value)
+					initialValues[item.key] = cloneConfigValue(payload.value)
+				}
+			}
+			const callback = kind === 'input' ? config.onInput : config.onChange
+			if (typeof callback === 'function') callback({
+				key: item.key,
+				value: cloneConfigValue(payload.value),
+				values: snapshotValues(),
+				valid: payload.valid,
+				error: payload.error || null,
+				form: formHandle,
+				event: payload.event
+			})
+		}
+		let currentSection = null
+		let currentSectionId = null
+		for (const item of schema) {
+			const value = getSettingsFormValue(modId, item, config)
+			initialValues[item.key] = cloneConfigValue(value)
+			currentValues[item.key] = cloneConfigValue(value)
+			const sectionId = getConfigSectionId(item)
+			if (item.dividerBefore || item.separatorBefore || sectionId !== currentSectionId) {
+				currentSection = null
+				currentSectionId = sectionId
+				if (item.dividerBefore || item.separatorBefore || sectionId) {
+					currentSection = element('div', 'modloader-config-section')
+					const sectionLabel = getSettingsDefinitionText(item, 'sectionLabel', sectionId)
+					if (sectionLabel) {
+						const header = element('div', 'modloader-config-section-header')
+						header.appendChild(element('span', 'modloader-config-section-title', sectionLabel))
+						currentSection.appendChild(header)
+					}
+					currentSection.appendChild(element('div', 'modloader-config-section-body'))
+					root.appendChild(currentSection)
+				}
+			}
+			const field = createSettingsFieldCore(item, {
+				normalized: true,
+				value,
+				modId,
+				descriptionDisplayMode: config.descriptionDisplayMode,
+				showMeta: config.showMeta === true,
+				onInput(payload) { emit('input', item, payload) },
+				onChange(payload) { emit('change', item, payload) }
+			})
+			fields.set(item.key, field)
+			const target = currentSection ? currentSection.querySelector('.modloader-config-section-body') : root
+			target.appendChild(field.element)
+		}
+		formHandle = {
+			element: root,
+			schema: schema.map(cloneConfigSchemaItem),
+			fields,
+			values: snapshotValues,
+			getValue(key) {
+				const field = fields.get(String(key))
+				if (!field) return undefined
+				return field.getValue()
+			},
+			setValue(key, value, setOptions) {
+				const field = fields.get(String(key))
+				if (!field) throw new Error('Unknown settings key: ' + key + '.')
+				const next = field.setValue(value, setOptions)
+				updateDirtyValue(String(key), next)
+				return next
+			},
+			reset(key, resetOptions) {
+				if (key !== undefined && key !== null) {
+					const field = fields.get(String(key))
+					if (!field) throw new Error('Unknown settings key: ' + key + '.')
+					const value = field.reset(resetOptions)
+					updateDirtyValue(String(key), value)
+					return value
+				}
+				for (const [fieldKey, field] of fields) updateDirtyValue(fieldKey, field.reset(resetOptions))
+				return snapshotValues()
+			},
+			validate() {
+				const errors = {}
+				const values = {}
+				for (const [key, field] of fields) {
+					const result = field.validate()
+					if (result.valid) values[key] = cloneConfigValue(result.value)
+					else errors[key] = result.error?.message || 'The value is invalid.'
+				}
+				return { valid: Object.keys(errors).length === 0, values, errors }
+			},
+			save() {
+				const result = formHandle.validate()
+				if (!result.valid) {
+					const error = new Error('Fix invalid settings values before saving.')
+					error.errors = result.errors
+					throw error
+				}
+				const changed = []
+				for (const item of schema) {
+					const value = result.values[item.key]
+					if (sameConfigValue(value, initialValues[item.key])) continue
+					if (bindConfig) setConfigValue(modId, item.key, value)
+					initialValues[item.key] = cloneConfigValue(value)
+					currentValues[item.key] = cloneConfigValue(value)
+					changed.push(item.key)
+				}
+				return { changed, values: cloneConfigValue(result.values) }
+			},
+			destroy() {
+				if (destroyed) return
+				destroyed = true
+				for (const field of fields.values()) field.destroy()
+				fields.clear()
+				if (releaseScroll) releaseScroll()
+				releaseSurface()
+				root.remove()
+			},
+			get dirty() {
+				for (const item of schema) {
+					let value
+					try { value = fields.get(item.key)?.getValue() } catch (error) { return true }
+					if (!sameConfigValue(value, initialValues[item.key])) return true
+				}
+				return false
+			}
+		}
+		return formHandle
+	}
+
+	const registerSettingsDefinitions = function (modId, definitions) {
+		const items = normalizeSettingsDefinitions(definitions, { apiV1: true })
+		if (!items.length) throw new Error('At least one settings definition is required.')
+		const config = state.configs[modId] || (state.configs[modId] = { schema: [], values: {} })
+		const existing = new Set(config.schema.map(function (item) { return item.key }))
+		for (const item of items) {
+			if (!item.key) throw new Error('Registered settings require a key.')
+			if (existing.has(item.key)) throw new Error('Duplicate settings key: ' + item.key + '.')
+			existing.add(item.key)
+		}
+		for (const item of items) {
+			config.schema.push(item)
+			if (config.values[item.key] === undefined) config.values[item.key] = parseStoredConfig(localStorage.getItem(storageKey(modId, item.key)), cloneConfigValue(item.default))
+		}
+		requestAnimationFrame(refreshOpenPanel)
+		let active = true
+		return function () {
+			if (!active) return false
+			active = false
+			const registered = new Set(items)
+			config.schema = config.schema.filter(function (item) { return !registered.has(item) })
+			requestAnimationFrame(refreshOpenPanel)
+			return true
+		}
+	}
+
+	const attachSettingsTooltip = function (target, value, options) {
+		if (!target) throw new Error('A tooltip target is required.')
+		const previous = settingsTooltipTargetRegistry.get(target)
+		if (typeof previous === 'function') previous()
+		ensurePanelStyle()
+		setPanelTooltipText(target, value, options)
+		if (options?.ariaLabel !== false && !target.getAttribute?.('aria-label')) target.setAttribute?.('aria-label', String(options?.ariaLabel || value || ''))
+		const root = options?.root || target.closest?.('.modloader-settings-surface, #modloader-panel') || target.parentElement
+		const releaseRoot = retainSettingsTooltipRoot(root)
+		let active = true
+		const detach = function () {
+			if (!active) return
+			active = false
+			setPanelTooltipText(target, '')
+			releaseRoot()
+			if (settingsTooltipTargetRegistry.get(target) === detach) settingsTooltipTargetRegistry.delete(target)
+		}
+		settingsTooltipTargetRegistry.set(target, detach)
+		return detach
+	}
+
+	const detachSettingsTooltip = function (target) {
+		if (!target) return false
+		const detach = settingsTooltipTargetRegistry.get(target)
+		if (typeof detach === 'function') {
+			detach()
+			return true
+		}
+		setPanelTooltipText(target, '')
+		return true
+	}
+
+	const createUiSettingsApi = function (modId) {
+		return Object.freeze({
+			version: SETTINGS_API_VERSION,
+			types: Object.freeze(SETTINGS_API_TYPES.slice()),
+			register(definitions) { return registerSettingsDefinitions(modId, definitions) },
+			createControl(definition, options) { return wrapSettingsControlHandle(createSettingsControlCore(definition, Object.assign({}, options, { modId })), options) },
+			createField(definition, options) { return wrapSettingsFieldHandle(createSettingsFieldCore(definition, Object.assign({}, options, { modId })), options) },
+			createForm(options) { return createSettingsForm(modId, options) },
+			scroll: Object.freeze({
+				attach(target, options) { return attachSettingsScroll(target, options) }
+			}),
+			tooltip: Object.freeze({
+				attach(target, value, options) { return attachSettingsTooltip(target, value, options) },
+				detach(target) { return detachSettingsTooltip(target) }
+			})
+		})
 	}
 
 	const writeConfigChanges = function (models, selected) {
@@ -7283,6 +8123,7 @@
 		panel.classList.toggle('modloader-panel-theme-light', state.panelSettings.theme === 'light')
 		panel.classList.toggle('modloader-panel-manual-hide', !isPanelAutoHideEnabled())
 		panel.classList.toggle('modloader-panel-description-inline', shouldShowPanelDescriptionsInline())
+		refreshSettingsSurfaceThemes()
 		syncPanelSettingsPageState(panel)
 		if (!isPanelAutoHideEnabled()) clearPanelAutoHideTimer()
 	}
@@ -7342,8 +8183,10 @@
 	const showPanelTooltip = function (target, point) {
 		const text = String(target?.dataset?.modloaderPanelTooltip || '').trim()
 		const isDescription = target?.dataset?.modloaderPanelTooltipKind === 'description'
-		if (!text || (isDescription && shouldShowPanelDescriptionsInline())) return hidePanelTooltip()
-		const panel = target.closest?.('#modloader-panel')
+		const settingsSurface = target.closest?.('.modloader-settings-surface')
+		const descriptionMode = settingsSurface?.dataset?.modloaderSettingsDescriptionMode || getPanelDescriptionDisplayMode()
+		if (!text || (isDescription && descriptionMode === 'inline')) return hidePanelTooltip()
+		const panel = settingsSurface || target.closest?.('#modloader-panel')
 		const tooltip = getPanelTooltipElement()
 		tooltip.textContent = text
 		tooltip.classList.toggle('modloader-panel-tooltip-light', !!panel?.classList?.contains('modloader-panel-theme-light'))
@@ -7358,7 +8201,7 @@
 	}
 
 	const installPanelTooltips = function (root, addCleanup) {
-		if (!root) return
+		if (!root) return function () {}
 		if (root.__modloaderPanelTooltipCleanup) root.__modloaderPanelTooltipCleanup()
 		let activeTarget = null
 		let activePoint = null
@@ -7428,6 +8271,7 @@
 		}
 		root.__modloaderPanelTooltipCleanup = cleanup
 		if (typeof addCleanup === 'function') addCleanup(cleanup)
+		return cleanup
 	}
 
 	const applyPanelHiddenPosition = function (panel) {
@@ -8859,53 +9703,44 @@
 					event.stopPropagation()
 				}, { passive: true })
 				const createConfigField = function (item, target) {
-					const type = getConfigType(item)
 					const value = modConfig.values[item.key]
-					const field = element(type === 'boolean' || isColorPaletteConfigItem(item, type) ? 'div' : 'label', 'modloader-config-field')
-					const text = element('span', 'modloader-config-text')
 					const localizedConfigLabel = getLocalizedConfigText(mod.manifest, item, 'label', item.key)
 					const localizedConfigDescription = getLocalizedConfigText(mod.manifest, item, 'description', '')
-					const label = element('span', 'modloader-config-label', localizedConfigLabel || item.key)
-					text.appendChild(label)
-					if (localizedConfigDescription && inlineDescriptions) text.appendChild(element('span', 'modloader-config-meta modloader-config-description', localizedConfigDescription))
-					if (localizedConfigDescription && !inlineDescriptions) setPanelTooltipText(text, localizedConfigDescription, { kind: 'description' })
-					const controlLabel = isSliderConfigItem(item, type) && !isSliderConfigType(type) ? ' | slider' : ''
-					text.appendChild(element('span', 'modloader-config-meta', item.key + ' | ' + type + controlLabel))
-					const input = createConfigInput(item, value, { addCleanup, mod, item, key: item.key })
-					if (input?.dataset) {
-						input.dataset.modloaderModId = mod.id || ''
-						input.dataset.modloaderConfigKey = item.key || ''
+					let model = null
+					const syncModel = function (payload) {
+						if (!model) return
+						model.invalid = !payload.valid
+						if (payload.valid) {
+							model.value = cloneConfigValue(payload.value)
+							dispatchConfigPreview(model)
+						}
+						refreshRows()
 					}
-					const error = element('span', 'modloader-config-error')
-					const model = {
+					const fieldHandle = createSettingsFieldCore(item, {
+						normalized: true,
+						apiV1: false,
+						value,
+						mod,
+						modId: mod.id,
+						label: localizedConfigLabel || item.key,
+						description: localizedConfigDescription,
+						descriptionDisplayMode: inlineDescriptions ? 'inline' : 'hover',
+						showMeta: true,
+						onInput: syncModel,
+						onChange: syncModel
+					})
+					const field = fieldHandle.element
+					model = {
 						mod,
 						item,
-						input,
+						input: fieldHandle.input,
 						container: field,
-						error,
+						error: field.querySelector('.modloader-config-error'),
 						initial: cloneConfigValue(value),
 						value: cloneConfigValue(value),
 						invalid: false
 					}
-					const updateConfig = function () {
-						try {
-							model.value = readConfigInputValue(item, input)
-							model.invalid = false
-							error.textContent = ''
-							error.classList.remove('active')
-							field.classList.remove('modloader-config-field-invalid')
-							dispatchConfigPreview(model)
-						} catch (errorValue) {
-							model.invalid = true
-							error.textContent = errorValue.message
-							error.classList.add('active')
-							field.classList.add('modloader-config-field-invalid')
-						}
-						refreshRows()
-					}
-					input.oninput = updateConfig
-					input.onchange = updateConfig
-					field.append(text, input, error)
+					addCleanup(fieldHandle.destroy)
 					target.appendChild(field)
 					rowConfigModels.push(model)
 					configModels.push(model)
@@ -9238,10 +10073,10 @@
 
 	const normalizeConfigSchema = function (schema) {
 		if (!schema) return []
-		if (Array.isArray(schema)) return schema.filter(function (item) { return item && item.key })
+		if (Array.isArray(schema)) return schema.filter(function (item) { return item && item.key }).map(cloneConfigSchemaItem)
 		if (isObject(schema)) {
 			return Object.keys(schema).map(function (key) {
-				const item = isObject(schema[key]) ? clone(schema[key]) : { default: schema[key] }
+				const item = isObject(schema[key]) ? cloneConfigSchemaItem(schema[key]) : { default: schema[key] }
 				item.key = item.key || key
 				return item
 			})
@@ -10005,7 +10840,7 @@
 					get(key, fallback) { return getConfigValue(modId, key, fallback) },
 					set(key, value) { return setConfigValue(modId, key, value) },
 					all() { return clone(state.configs[modId]?.values || {}) },
-					schema() { return clone(state.configs[modId]?.schema || []) }
+					schema() { return (state.configs[modId]?.schema || []).map(cloneConfigSchemaItem) }
 				},
 				deepMerge,
 				state

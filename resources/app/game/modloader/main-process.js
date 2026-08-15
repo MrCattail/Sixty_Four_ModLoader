@@ -135,6 +135,7 @@ let recreateAppWindow = null
 let appWindowResizeSaveTimer = null
 let appWindowRecreateTimer = null
 let attachedMainWindowFrameless = false
+let pendingMainWindowFrameless = false
 const snapshotSaveIdPattern = /^[a-f0-9]{8}-[a-f0-9]{4}-[1-5][a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/i
 const LIBRARY_API_VERSION = '1.1.0'
 const appWindowAspectRatios = [
@@ -489,6 +490,66 @@ function appWindowModeNeedsFrameless(mode){
 
 function appWindowFrameMatchesMode(mode){
   return attachedMainWindowFrameless === appWindowModeNeedsFrameless(mode)
+}
+
+function getSavedAppWindowBounds(){
+  const bounds = appWindowOptions && appWindowOptions.windowBounds
+  const width = Math.round(Number(bounds?.width) || 0)
+  const height = Math.round(Number(bounds?.height) || 0)
+  if (width < 320 || height < 240) return null
+  return { width, height }
+}
+
+function hasAppWindowCreationState(){
+  if (!appWindowOptions) return false
+  return !!(
+    normalizeAppWindowMode(appWindowOptions.windowMode)
+    || appWindowOptions.fullscreen === false
+    || appWindowOptions.windowBounds
+    || appWindowOptions.windowPreset
+    || appWindowOptions.windowAspectRatio
+  )
+}
+
+function getInitialAppWindowBounds(){
+  const size = getAppWindowSizeForStoredPreset(appWindowOptions?.windowAspectRatio)
+  if (size) return size
+  const saved = getSavedAppWindowBounds()
+  if (!saved) return null
+  const display = getPrimaryAppWindowDisplay()
+  return normalizeAppWindowSize(saved, display.bounds)
+}
+
+function getMainWindowOptions(baseOptions){
+  const options = Object.assign({}, baseOptions || {})
+  if (!hasAppWindowCreationState()) {
+    pendingMainWindowFrameless = options.frame === false
+    return options
+  }
+  const mode = getStoredAppWindowMode()
+  const bounds = getInitialAppWindowBounds()
+  if (mode !== 'fullscreen') {
+    options.fullscreen = false
+    if (bounds) {
+      options.width = bounds.width
+      options.height = bounds.height
+    }
+  } else {
+    options.fullscreen = true
+  }
+  if (mode === 'borderless') options.frame = false
+  if (mode === 'borderless' || appWindowOptions.windowPreset || appWindowOptions.windowBounds || appWindowOptions.windowAspectRatio) {
+    options.minWidth = appWindowMinDipSize.width
+    options.minHeight = appWindowMinDipSize.height
+  }
+  pendingMainWindowFrameless = options.frame === false
+  return options
+}
+
+function afterMainWindowCreated(){
+  attachedMainWindowFrameless = pendingMainWindowFrameless === true
+  pendingMainWindowFrameless = false
+  return applyStoredAppWindowMode()
 }
 
 function scheduleAppWindowRecreate(reason){
@@ -1533,20 +1594,27 @@ function setMainWindowFrameless(frameless){
   attachedMainWindowFrameless = frameless === true
 }
 
-function configureAppWindowOptions(options, saveOptions, recreateWindow){
-  appWindowOptions = options || null
-  saveAppWindowOptions = typeof saveOptions === 'function' ? saveOptions : null
-  recreateAppWindow = typeof recreateWindow === 'function' ? recreateWindow : null
+function configureMainWindowHost(options){
+  appWindowOptions = options?.appOptions || null
+  saveAppWindowOptions = typeof options?.saveAppOptions === 'function' ? options.saveAppOptions : null
+  recreateAppWindow = typeof options?.recreateWindow === 'function' ? options.recreateWindow : null
   if (appWindowOptions && !normalizeAppWindowMode(appWindowOptions.windowMode)) {
     appWindowOptions.windowMode = appWindowOptions.fullscreen === false ? 'window' : 'fullscreen'
   }
 }
 
+function configureAppWindowOptions(options, saveOptions, recreateWindow){
+  configureMainWindowHost({ appOptions: options, saveAppOptions: saveOptions, recreateWindow })
+}
+
 module.exports = {
   attachWindow,
+  getMainWindowOptions,
+  afterMainWindowCreated,
   setMainWindowFrameless,
   clearSnapshotContext,
   clearLibrarySubscriptions,
+  configureMainWindowHost,
   configureAppWindowOptions,
   collectLibraryDeclarations,
   applyStoredAppWindowMode,
