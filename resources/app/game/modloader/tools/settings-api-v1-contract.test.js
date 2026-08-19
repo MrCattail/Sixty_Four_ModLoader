@@ -47,9 +47,21 @@ assert.match(source, /const shouldDeferInertialScroll = function \(list, event, 
 assert.match(source, /const installTransientScrollbar = function \(list, visibleClass\) \{[\s\S]*?addEventListener\('wheel', reveal[\s\S]*?removeEventListener\('wheel', reveal\)[\s\S]*?return cleanup/)
 assert.match(source, /const onWheel = function \(event\) \{[\s\S]*?shouldDeferInertialScroll\(list, event, delta\)[\s\S]*?if \(next === before\)[\s\S]*?event\.preventDefault\(\)[\s\S]*?list\.scrollTop = next/)
 assert.match(source, /const attachSettingsTooltip = function \(target, value, options\) \{[\s\S]*?setPanelTooltipText\(target, value, options\)[\s\S]*?retainSettingsTooltipRoot\(root\)[\s\S]*?settingsTooltipTargetRegistry\.set\(target, detach\)/)
+assert.match(source, /const setPanelTooltipText = function \(target, text, options\) \{[\s\S]*?modloaderPanelTooltipDelayMs[\s\S]*?Number\.isFinite\(delayMs\)[\s\S]*?delete target\.dataset\.modloaderPanelTooltipDelayMs/)
+assert.match(source, /const setPanelTooltipText = function \(target, text, options\) \{[\s\S]*?target\.dataset\.modloaderPanelTooltipTheme = options\?\.theme === 'global' \? 'global' : 'plane'[\s\S]*?delete target\.dataset\.modloaderPanelTooltipTheme/)
+assert.match(source, /const getPanelTooltipDelayMs = function \(target\) \{[\s\S]*?modloaderPanelTooltipDelayMs[\s\S]*?Math\.min\(10000, Math\.max\(0, Math\.round\(value\)\)\)/)
 assert.match(source, /const installPanelTooltips = function \(root, addCleanup\) \{[\s\S]*?return cleanup/)
+assert.match(source, /let delayTimer = 0[\s\S]*?const clearDelay = function \(\) \{[\s\S]*?clearTimeout\(delayTimer\)[\s\S]*?delayTimer = 0/)
+assert.match(source, /const beginReveal = function \(target, delayMs\) \{[\s\S]*?const reveal = function[\s\S]*?activeTarget !== target[\s\S]*?ready = true[\s\S]*?setTimeout\(reveal, delayMs\)/)
+assert.match(source, /const activate = function \(event\) \{[\s\S]*?event\.type === 'focusin' && !ready[\s\S]*?event\.type === 'focusin' \? 0 : getPanelTooltipDelayMs\(target\)[\s\S]*?beginReveal\(target, delayMs\)/)
+assert.match(source, /const clear = function \(\) \{[\s\S]*?ready = false[\s\S]*?clearDelay\(\)[\s\S]*?clearFrame\(\)[\s\S]*?hidePanelTooltip\(\)/)
 assert.match(source, /const settingsSurface = target\.closest\?\.\('\.modloader-settings-surface'\)[\s\S]*?const descriptionMode = settingsSurface\?\.dataset\?\.modloaderSettingsDescriptionMode \|\| getPanelDescriptionDisplayMode\(\)[\s\S]*?const panel = settingsSurface \|\| target\.closest\?\.\('#modloader-panel'\)/)
+assert.match(source, /const tooltipLight = resolvePanelTooltipLightTheme\(target, panel\)[\s\S]*?modloader-panel-tooltip-light', tooltipLight/)
 assert.match(readme, /### Scroll surfaces[\s\S]*?scroll: true[\s\S]*?api\.ui\.settings\.scroll\.attach\(container,[\s\S]*?detachScroll\(\)/)
+assert.match(readme, /theme: 'global'/)
+assert.match(readme, /outside a Settings surface or the ModLoader\s+panel[\s\S]*?light tooltip in Reality[\s\S]*?dark tooltip in the Void[\s\S]*?falls back\s+to the current ModLoader theme/i)
+assert.match(readme, /delayMs: 600/)
+assert.match(readme, /pointer delay[\s\S]*?keyboard focus remains immediate/i)
 
 const extractConstFunction = function (name, nextName) {
 	const pattern = new RegExp(`\\tconst ${name} = function \\([\\s\\S]*?(?=\\n\\tconst ${nextName} =)`, 'm')
@@ -57,6 +69,127 @@ const extractConstFunction = function (name, nextName) {
 	assert.ok(match, `${name} source is present`)
 	return match[0].trim()
 }
+
+const tooltipMetadata = vm.runInNewContext(`(() => {
+	${extractConstFunction('setPanelTooltipText', 'getPanelTooltipDelayMs')}
+	const target = { dataset: {} }
+	setPanelTooltipText(target, 'Default')
+	const defaultTheme = target.dataset.modloaderPanelTooltipTheme
+	setPanelTooltipText(target, 'Global', { theme: 'global' })
+	const globalTheme = target.dataset.modloaderPanelTooltipTheme
+	setPanelTooltipText(target, 'Plane', { theme: 'plane' })
+	const planeTheme = target.dataset.modloaderPanelTooltipTheme
+	setPanelTooltipText(target, 'Invalid', { theme: 'light' })
+	const invalidTheme = target.dataset.modloaderPanelTooltipTheme
+	setPanelTooltipText(target, '')
+	return { defaultTheme, globalTheme, planeTheme, invalidTheme, cleaned: !('modloaderPanelTooltipTheme' in target.dataset) }
+})()`)
+
+assert.equal(tooltipMetadata.defaultTheme, 'plane')
+assert.equal(tooltipMetadata.globalTheme, 'global')
+assert.equal(tooltipMetadata.planeTheme, 'plane')
+assert.equal(tooltipMetadata.invalidTheme, 'plane')
+assert.equal(tooltipMetadata.cleaned, true)
+
+const tooltipTiming = vm.runInNewContext(`(() => {
+	let now = 0
+	let nextTimer = 1
+	let nextFrame = 1
+	const timers = new Map()
+	const frames = new Map()
+	const shown = []
+	let hidden = 0
+	const target = { dataset: { modloaderPanelTooltipDelayMs: '600' } }
+	const root = {
+		handlers: {},
+		contains(node) { return node === target },
+		addEventListener(type, handler) { this.handlers[type] = handler },
+		removeEventListener(type, handler) { if (this.handlers[type] === handler) delete this.handlers[type] }
+	}
+	const window = {
+		handlers: {},
+		addEventListener(type, handler) { this.handlers[type] = handler },
+		removeEventListener(type, handler) { if (this.handlers[type] === handler) delete this.handlers[type] }
+	}
+	const setTimeout = function (callback, delay) {
+		const id = nextTimer++
+		timers.set(id, { at: now + delay, callback })
+		return id
+	}
+	const clearTimeout = function (id) { timers.delete(id) }
+	const requestAnimationFrame = function (callback) {
+		const id = nextFrame++
+		frames.set(id, callback)
+		return id
+	}
+	const cancelAnimationFrame = function (id) { frames.delete(id) }
+	const flushFrames = function () {
+		const pending = Array.from(frames.values())
+		frames.clear()
+		for (const callback of pending) callback()
+	}
+	const advance = function (duration) {
+		now += duration
+		while (true) {
+			const due = Array.from(timers.entries()).filter(([, timer]) => timer.at <= now).sort((a, b) => a[1].at - b[1].at)
+			if (!due.length) return
+			const [id, timer] = due[0]
+			timers.delete(id)
+			timer.callback()
+		}
+	}
+	const getPanelTooltipTarget = function (node, scope) { return node === target && scope === root ? target : null }
+	const hidePanelTooltip = function () { hidden++ }
+	const showPanelTooltip = function (node, point) { shown.push({ node, point: point ? { x: point.x, y: point.y } : null }) }
+	${extractConstFunction('getPanelTooltipDelayMs', 'panelRow')}
+	${extractConstFunction('installPanelTooltips', 'applyPanelHiddenPosition')}
+	const cleanup = installPanelTooltips(root)
+	const emit = function (type, properties) { root.handlers[type](Object.assign({ type, target }, properties || {})) }
+
+	emit('pointerover', { clientX: 10, clientY: 20 })
+	flushFrames()
+	const beforeDelay = shown.length
+	emit('pointermove', { clientX: 12, clientY: 22 })
+	advance(599)
+	flushFrames()
+	const after599 = shown.length
+	advance(1)
+	flushFrames()
+	const after600 = shown.length
+	const delayedPointX = shown[shown.length - 1]?.point?.x
+	emit('pointermove', { clientX: 16, clientY: 26 })
+	flushFrames()
+	const afterReadyMove = shown.length
+	emit('pointerout', { relatedTarget: null })
+
+	emit('focusin')
+	flushFrames()
+	const afterFocus = shown.length
+	emit('focusout', { relatedTarget: null })
+
+	delete target.dataset.modloaderPanelTooltipDelayMs
+	emit('pointerover', { clientX: 30, clientY: 40 })
+	flushFrames()
+	const afterDefault = shown.length
+	emit('pointerout', { relatedTarget: null })
+
+	target.dataset.modloaderPanelTooltipDelayMs = '600'
+	emit('pointerover', { clientX: 50, clientY: 60 })
+	cleanup()
+	advance(600)
+	flushFrames()
+	return { beforeDelay, after599, after600, delayedPointX, afterReadyMove, afterFocus, afterDefault, afterCleanup: shown.length, hidden }
+})()`)
+
+assert.equal(tooltipTiming.beforeDelay, 0)
+assert.equal(tooltipTiming.after599, 0)
+assert.equal(tooltipTiming.after600, 1)
+assert.equal(tooltipTiming.delayedPointX, 12)
+assert.equal(tooltipTiming.afterReadyMove, 2)
+assert.equal(tooltipTiming.afterFocus, 3)
+assert.equal(tooltipTiming.afterDefault, 4)
+assert.equal(tooltipTiming.afterCleanup, 4)
+assert.ok(tooltipTiming.hidden >= 4)
 
 const selectHelpers = vm.runInNewContext(`(() => {
 	const SETTINGS_API_VERSION = 1

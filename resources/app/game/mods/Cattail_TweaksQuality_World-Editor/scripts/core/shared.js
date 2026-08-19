@@ -1,6 +1,6 @@
 ModLoader.register({
 	id: 'Cattail_TweaksQuality_World-Editor',
-	init() {
+	init(api) {
 		const SHARED_KEY = Symbol.for('cattail.world-editor.shared')
 		const CREATIVE_KEY = Symbol.for('cattail.world-editor.creative-mode')
 		const CREATIVE_ECONOMY_KEY = Symbol.for('cattail.world-editor.creative-economy')
@@ -15,6 +15,7 @@ ModLoader.register({
 
 		const worldDragGroups = new Map()
 		const disclosureControllers = new Set()
+		const tooltipScopes = new Set()
 		let worldDragListening = false
 		ensureSharedStyle()
 
@@ -38,6 +39,50 @@ ModLoader.register({
 				globalThis[SELECTION_CUT_KEY]?.isInputBlocked?.() ||
 				globalThis[BLUEPRINT_LIBRARY_UI_KEY]?.isInputBlocked?.()
 			)
+		}
+
+		function createTooltipScope(options) {
+			const tooltipApi = api.ui?.settings?.tooltip
+			const defaults = options && typeof options === 'object' ? options : {}
+			const entries = new Map()
+			let disposed = false
+			const scope = Object.freeze({ set, clear, dispose })
+			tooltipScopes.add(scope)
+			return scope
+
+			function set(target, value, options) {
+				if (disposed || !target) return false
+				clear(target)
+				target.removeAttribute?.('title')
+				if ('title' in target) target.title = ''
+				const text = String(value || '').trim()
+				if (!text || typeof tooltipApi?.attach !== 'function') return false
+				const attachOptions = Object.assign({}, defaults, options)
+				const detach = tooltipApi.attach(target, text, attachOptions)
+				entries.set(target, typeof detach === 'function' ? detach : function () {
+					tooltipApi.detach?.(target)
+				})
+				return true
+			}
+
+			function clear(target) {
+				if (!target) return false
+				const detach = entries.get(target)
+				if (typeof detach === 'function') detach()
+				entries.delete(target)
+				target.removeAttribute?.('title')
+				if ('title' in target) target.title = ''
+				return typeof detach === 'function'
+			}
+
+			function dispose() {
+				if (disposed) return false
+				disposed = true
+				for (const detach of entries.values()) detach()
+				entries.clear()
+				tooltipScopes.delete(scope)
+				return true
+			}
 		}
 
 		function isCardControlEvent(event, extraSelector) {
@@ -673,7 +718,7 @@ ModLoader.register({
 		}
 
 		const shared = Object.freeze({
-			version: 1,
+			version: 2,
 			isEditableEvent,
 			isModLoaderPanelBlocking,
 			isWorldEditorInputBlocked,
@@ -684,9 +729,11 @@ ModLoader.register({
 			rectanglesOverlap,
 			rectangleOverlapArea,
 			resolveEntityIcon,
+			createTooltipScope,
 			createDisclosureController,
 			registerWorldDragCard,
 			dispose() {
+				for (const scope of Array.from(tooltipScopes)) scope.dispose()
 				for (const controller of Array.from(disclosureControllers)) controller.release()
 				disclosureControllers.clear()
 				clearWorldDragGroups()

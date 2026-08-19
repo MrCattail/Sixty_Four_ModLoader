@@ -682,7 +682,9 @@ The shared glass tooltip can also be attached to any mod-owned element:
 ```js
 const detachTooltip = api.ui.settings.tooltip.attach(button, 'Reset values', {
   root: button.closest('.my-mod-window'),
-  ariaLabel: 'Reset values'
+  ariaLabel: 'Reset values',
+  delayMs: 600,
+  theme: 'global' // optional: follow the ModLoader theme instead of the plane
 })
 
 detachTooltip()
@@ -691,7 +693,30 @@ detachTooltip()
 
 Tooltips support pointer following, viewport edge flipping, keyboard focus,
 dark/light synchronization, and `aria-label`; they do not use the native
-`title` attribute.
+`title` attribute. Inside a Settings surface or the ModLoader panel, tooltips
+follow that container's theme. Outside a Settings surface or the ModLoader
+panel, the default `theme: 'plane'` uses the light tooltip in Reality and the
+dark tooltip in the Void. When no active game has a valid plane, it falls back
+to the current ModLoader theme. Pass `theme: 'global'` to make an external
+tooltip follow the current ModLoader dark/light selection instead. Other theme
+values also use the default plane behavior. `delayMs` adds an optional
+pointer delay from `0` to `10000` milliseconds; keyboard focus remains immediate.
+The shared portal uses the tooltip's own single glass surface, so its background,
+border, inset highlight, blur, and shadow do not require a separate opaque
+silhouette or a clipped custom path. One rendered line keeps the original
+`999px` capsule, `11px` side padding, and `340px` maximum width. For two, three,
+four, and five-or-more rendered lines, the horizontal ellipse-radius ratio
+decreases through `height * 0.50`, `height * 0.46`, `height * 0.42`, and
+`height * 0.38`, while the vertical radius stays at `50%`. This makes taller
+tooltips progressively flatter at their side midpoints without adding a straight
+vertical segment. Multiline side safety is calculated
+from the real ellipse boundary at the first and last line centers, plus a `4px`
+text gap, clamped from `16px` to `48px`. The shell's maximum width grows by twice
+the extra padding, preserving the original text-block width when viewport space
+is available; the normal `10px` viewport margin remains the hard limit and may
+cause additional wrapping in narrow windows. The final rendered layout drives
+the radius and padding, so localized text follows the same rule without consumer-specific
+character counts or CSS.
 
 ## Dependencies And Conflicts
 

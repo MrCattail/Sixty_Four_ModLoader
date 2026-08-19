@@ -4139,66 +4139,102 @@ ModLoader.register({
 		const FULL_BLUEPRINT_TEXT = {
 			en: {
 				previewFullUnavailable: 'Full source projected to structure outside Creative Mode',
-				blueprintFullSummary: 'Stable Cubes {cubes} · empty cells {empty} · normalized {normalized}',
-				blueprintIncludeSurges: 'Include Surges',
-				blueprintSurge: 'Surge',
-				toolbarCardSurges: 'Surges',
+				blueprintFullSummary: 'Stable Cubes {cubes} · Painted Cubes {painted} · empty cells {empty} · normalized {normalized}',
 				cutLayerMessage: 'Creative Mode can remove captured transient layers in the same safe cut transaction. Both choices apply only to this cut and default to off.',
 				cutCubeOption: 'Also remove the {count} captured stable Cube(s). Recommended only when the source Cubes should move with this blueprint.',
-				cutSurgeOption: 'Also remove the {count} captured safe Surge(s). Recommended only when the source Surges should move with this blueprint.'
+				cutSurgeOption: 'Also remove the {count} captured safe Surge(s). Recommended only when the source Surges should move with this blueprint.',
+				attachedCubeRemovalNotice: '{count} unfinished Cube(s) attached to the selected extractor will be removed with it. They are not copied into the blueprint and provide no resource refund.'
 			},
 			sch: {
 				previewFullUnavailable: '非创造模式会把完整源蓝图按结构规格预览和放置',
-				blueprintFullSummary: '稳定 Cube {cubes} · 空格 {empty} · 已归一化 {normalized}',
-				blueprintIncludeSurges: '包含 Surge',
-				blueprintSurge: 'Surge',
-				toolbarCardSurges: 'Surge',
+				blueprintFullSummary: '稳定 Cube {cubes} · 绘制矿方体 {painted} · 空格 {empty} · 已归一化 {normalized}',
 				cutLayerMessage: '创造模式可以在同一条安全剪切事务中移除已捕获的临时层；两个选项都只对本次剪切生效，并且默认关闭。',
 				cutCubeOption: '同时移除已捕获的 {count} 个稳定 Cube；仅当这些 Cube 应随蓝图一起移动时建议启用。',
-				cutSurgeOption: '同时移除已捕获的 {count} 个安全 Surge；仅当这些 Surge 应随蓝图一起移动时建议启用。'
+				cutSurgeOption: '同时移除已捕获的 {count} 个安全 Surge；仅当这些 Surge 应随蓝图一起移动时建议启用。',
+				attachedCubeRemovalNotice: '将随所属矿井一并移除 {count} 个尚未完成的矿方块；它们不会写入蓝图，也不会产生资源返还。'
 			},
 			modsch: {
 				previewFullUnavailable: '非创造模式会把完整源蓝图按结构规格预览和放置',
-				blueprintFullSummary: '稳定 Cube {cubes} · 空格 {empty} · 已归一化 {normalized}',
-				blueprintIncludeSurges: '包含 Surge',
-				blueprintSurge: 'Surge',
-				toolbarCardSurges: 'Surge',
+				blueprintFullSummary: '稳定 Cube {cubes} · 绘制矿方体 {painted} · 空格 {empty} · 已归一化 {normalized}',
 				cutLayerMessage: '创造模式可以在同一条安全剪切事务中移除已捕获的临时层；两个选项都只对本次剪切生效，并且默认关闭。',
 				cutCubeOption: '同时移除已捕获的 {count} 个稳定 Cube；仅当这些 Cube 应随蓝图一起移动时建议启用。',
-				cutSurgeOption: '同时移除已捕获的 {count} 个安全 Surge；仅当这些 Surge 应随蓝图一起移动时建议启用。'
+				cutSurgeOption: '同时移除已捕获的 {count} 个安全 Surge；仅当这些 Surge 应随蓝图一起移动时建议启用。',
+				attachedCubeRemovalNotice: '将随所属矿井一并移除 {count} 个尚未完成的矿方块；它们不会写入蓝图，也不会产生资源返还。'
 			},
 			tch: {
 				previewFullUnavailable: '非創造模式會把完整來源藍圖按結構規格預覽和放置',
-				blueprintFullSummary: '穩定 Cube {cubes} · 空格 {empty} · 已正規化 {normalized}',
-				blueprintIncludeSurges: '包含 Surge',
-				blueprintSurge: 'Surge',
-				toolbarCardSurges: 'Surge',
+				blueprintFullSummary: '穩定 Cube {cubes} · 繪製礦方體 {painted} · 空格 {empty} · 已正規化 {normalized}',
 				cutLayerMessage: '創造模式可以在同一筆安全剪下交易中移除已擷取的暫態層；兩個選項都只對本次剪下生效，並且預設關閉。',
 				cutCubeOption: '同時移除已擷取的 {count} 個穩定 Cube；僅當這些 Cube 應隨藍圖一起移動時建議啟用。',
-				cutSurgeOption: '同時移除已擷取的 {count} 個安全 Surge；僅當這些 Surge 應隨藍圖一起移動時建議啟用。'
+				cutSurgeOption: '同時移除已擷取的 {count} 個安全 Surge；僅當這些 Surge 應隨藍圖一起移動時建議啟用。',
+				attachedCubeRemovalNotice: '將隨所屬礦井一併移除 {count} 個尚未完成的礦方體；它們不會寫入藍圖，也不會產生資源返還。'
 			}
 		}
 		const INCLUDE_SURGES_TEXT = Object.freeze({
 			en: 'Include Surges',
-			ru: 'Включать Surge',
-			de: 'Surges einbeziehen',
-			ptbr: 'Incluir Surges',
-			it: 'Includi Surge',
-			es: 'Incluir Surges',
-			fr: 'Inclure les Surges',
-			nl: 'Surges meenemen',
-			cz: 'Zahrnout Surge',
-			pl: 'Uwzględnij Surge',
-			jp: 'Surgeを含める',
-			kr: 'Surge 포함',
-			sch: '包含 Surge',
-			tch: '包含 Surge',
-			thai: 'รวม Surge',
-			hu: 'Surge-ok felvétele',
-			lv: 'Iekļaut Surge',
-			ro: 'Include Surge',
-			no: 'Inkluder Surges',
-			modsch: '包含 Surge'
+			ru: 'Включать выбросы',
+			de: 'Stromstöße einbeziehen',
+			ptbr: 'Incluir sobrecargas de corrente',
+			it: 'Includi sovratensioni',
+			es: 'Incluir sobrecargas',
+			fr: 'Inclure les surtensions',
+			nl: 'Spanningspieken meenemen',
+			cz: 'Zahrnout proudové přívaly',
+			pl: 'Uwzględnij przypływy mocy',
+			jp: '電流の急増を含める',
+			kr: '전류 급증 포함',
+			sch: '包含电流浪涌',
+			tch: '包含電流波動',
+			thai: 'รวมคลื่นพลัง',
+			hu: 'Túlfeszültségek felvétele',
+			lv: 'Iekļaut pārspriegumus',
+			ro: 'Include valuri de curent',
+			no: 'Inkluder overspenninger',
+			modsch: '包含电流浪涌'
+		})
+		const SURGE_NAME_TEXT = Object.freeze({
+			en: 'Surge',
+			ru: 'Выброс',
+			de: 'Stromstoß',
+			ptbr: 'Sobrecarga de corrente',
+			it: 'Sovratensione',
+			es: 'Sobrecarga',
+			fr: 'Surtension',
+			nl: 'Spanningspiek',
+			cz: 'Proudový příval',
+			pl: 'Przypływ mocy',
+			jp: '電流の急増',
+			kr: '전류 급증',
+			sch: '电流浪涌',
+			tch: '電流波動',
+			thai: 'คลื่นพลัง',
+			hu: 'Túlfeszültség',
+			lv: 'Pārspriegums',
+			ro: 'Val de curent',
+			no: 'Overspenning',
+			modsch: '电流浪涌'
+		})
+		const SURGE_TOOLBAR_TEXT = Object.freeze({
+			en: 'Surges',
+			ru: 'Выбросы',
+			de: 'Stromstöße',
+			ptbr: 'Sobrecargas de corrente',
+			it: 'Sovratensioni',
+			es: 'Sobrecargas',
+			fr: 'Surtensions',
+			nl: 'Spanningspieken',
+			cz: 'Proudové přívaly',
+			pl: 'Przypływy mocy',
+			jp: '電流の急増',
+			kr: '전류 급증',
+			sch: '电流浪涌',
+			tch: '電流波動',
+			thai: 'คลื่นพลัง',
+			hu: 'Túlfeszültségek',
+			lv: 'Pārspriegumi',
+			ro: 'Valuri de curent',
+			no: 'Overspenninger',
+			modsch: '电流浪涌'
 		})
 		const SYNC_EMPTY_TEXT = {
 			en: { blueprintSyncEmpty: 'Include Cells', toolbarCardSyncEmpty: 'Cells' },
@@ -4309,6 +4345,182 @@ ModLoader.register({
 			const fallback = language === 'modsch' ? LIBRARY_TEXT_OVERRIDES.sch : language === 'tch' ? LIBRARY_TEXT_OVERRIDES.sch : null
 			return [language, Object.freeze(Object.assign({}, LIBRARY_TEXT_EN, fallback || {}, LIBRARY_TEXT_OVERRIDES[language] || {}))]
 		})))
+		const DRAW_MODE_TEXT = Object.freeze({
+			en: { drawMode: 'Draw Mode', toolbarCardDraw: 'Draw' },
+			ru: { drawMode: 'Режим рисования', toolbarCardDraw: 'Рисование' },
+			de: { drawMode: 'Zeichenmodus', toolbarCardDraw: 'Zeichnen' },
+			ptbr: { drawMode: 'Modo de desenho', toolbarCardDraw: 'Desenhar' },
+			it: { drawMode: 'Modalità disegno', toolbarCardDraw: 'Disegna' },
+			es: { drawMode: 'Modo de dibujo', toolbarCardDraw: 'Dibujar' },
+			fr: { drawMode: 'Mode dessin', toolbarCardDraw: 'Dessiner' },
+			nl: { drawMode: 'Tekenmodus', toolbarCardDraw: 'Tekenen' },
+			cz: { drawMode: 'Režim kreslení', toolbarCardDraw: 'Kreslit' },
+			pl: { drawMode: 'Tryb rysowania', toolbarCardDraw: 'Rysuj' },
+			jp: { drawMode: '描画モード', toolbarCardDraw: '描画' },
+			kr: { drawMode: '그리기 모드', toolbarCardDraw: '그리기' },
+			sch: { drawMode: '绘制模式', toolbarCardDraw: '绘制' },
+			tch: { drawMode: '繪製模式', toolbarCardDraw: '繪製' },
+			thai: { drawMode: 'โหมดวาด', toolbarCardDraw: 'วาด' },
+			hu: { drawMode: 'Rajzolási mód', toolbarCardDraw: 'Rajzolás' },
+			lv: { drawMode: 'Zīmēšanas režīms', toolbarCardDraw: 'Zīmēt' },
+			ro: { drawMode: 'Mod desenare', toolbarCardDraw: 'Desenează' },
+			no: { drawMode: 'Tegnemodus', toolbarCardDraw: 'Tegn' },
+			modsch: { drawMode: '绘制模式', toolbarCardDraw: '绘制' }
+		})
+		const PAINT_STAGE_TEXT = Object.freeze({
+			en: { paintBrush: 'Brush', paintEraser: 'Eraser', toolbarCardPaintBrush: 'Brush', toolbarCardPaintEraser: 'Eraser', paintCellOccupied: 'This cell is occupied.', paintStrokeSummary: 'Stroke: {painted} new, {replaced} replaced, {erased} erased, {skipped} skipped.', paintStrokeCancelled: 'Paint stroke cancelled.', paintStrokeLimit: 'Stroke limit reached ({limit} cells).', paintNoChanges: 'No eligible painted cube cells.' },
+			ru: { paintBrush: 'Кисть', paintEraser: 'Ластик', toolbarCardPaintBrush: 'Кисть', toolbarCardPaintEraser: 'Ластик', paintCellOccupied: 'Эта клетка занята.', paintStrokeSummary: 'Штрих: новых — {painted}, заменено — {replaced}, удалено — {erased}, пропущено — {skipped}.', paintStrokeCancelled: 'Штрих отменён.', paintStrokeLimit: 'Достигнут предел штриха ({limit} клеток).', paintNoChanges: 'Нет подходящих клеток с нарисованными кубами.' },
+			de: { paintBrush: 'Pinsel', paintEraser: 'Radierer', toolbarCardPaintBrush: 'Pinsel', toolbarCardPaintEraser: 'Radierer', paintCellOccupied: 'Dieses Feld ist belegt.', paintStrokeSummary: 'Strich: {painted} neu, {replaced} ersetzt, {erased} gelöscht, {skipped} übersprungen.', paintStrokeCancelled: 'Malstrich abgebrochen.', paintStrokeLimit: 'Strichlimit erreicht ({limit} Felder).', paintNoChanges: 'Keine geeigneten Felder mit gemalten Würfeln.' },
+			ptbr: { paintBrush: 'Pincel', paintEraser: 'Borracha', toolbarCardPaintBrush: 'Pincel', toolbarCardPaintEraser: 'Borracha', paintCellOccupied: 'Esta célula está ocupada.', paintStrokeSummary: 'Traço: {painted} novos, {replaced} substituídos, {erased} apagados, {skipped} ignorados.', paintStrokeCancelled: 'Traço cancelado.', paintStrokeLimit: 'Limite do traço atingido ({limit} células).', paintNoChanges: 'Nenhuma célula de cubo pintado elegível.' },
+			it: { paintBrush: 'Pennello', paintEraser: 'Gomma', toolbarCardPaintBrush: 'Pennello', toolbarCardPaintEraser: 'Gomma', paintCellOccupied: 'Questa casella è occupata.', paintStrokeSummary: 'Tratto: {painted} nuovi, {replaced} sostituiti, {erased} cancellati, {skipped} saltati.', paintStrokeCancelled: 'Tratto annullato.', paintStrokeLimit: 'Limite del tratto raggiunto ({limit} caselle).', paintNoChanges: 'Nessuna casella di cubo dipinto idonea.' },
+			es: { paintBrush: 'Pincel', paintEraser: 'Borrador', toolbarCardPaintBrush: 'Pincel', toolbarCardPaintEraser: 'Borrador', paintCellOccupied: 'Esta celda está ocupada.', paintStrokeSummary: 'Trazo: {painted} nuevos, {replaced} reemplazados, {erased} borrados, {skipped} omitidos.', paintStrokeCancelled: 'Trazo cancelado.', paintStrokeLimit: 'Límite del trazo alcanzado ({limit} celdas).', paintNoChanges: 'No hay celdas de cubos pintados aptas.' },
+			fr: { paintBrush: 'Pinceau', paintEraser: 'Gomme', toolbarCardPaintBrush: 'Pinceau', toolbarCardPaintEraser: 'Gomme', paintCellOccupied: 'Cette case est occupée.', paintStrokeSummary: 'Trait : {painted} nouveaux, {replaced} remplacés, {erased} effacés, {skipped} ignorés.', paintStrokeCancelled: 'Trait annulé.', paintStrokeLimit: 'Limite du trait atteinte ({limit} cases).', paintNoChanges: 'Aucune case de cube peint admissible.' },
+			nl: { paintBrush: 'Penseel', paintEraser: 'Gum', toolbarCardPaintBrush: 'Penseel', toolbarCardPaintEraser: 'Gum', paintCellOccupied: 'Deze cel is bezet.', paintStrokeSummary: 'Streek: {painted} nieuw, {replaced} vervangen, {erased} gewist, {skipped} overgeslagen.', paintStrokeCancelled: 'Tekenstreek geannuleerd.', paintStrokeLimit: 'Streeklimiet bereikt ({limit} cellen).', paintNoChanges: 'Geen geschikte cellen met getekende kubussen.' },
+			cz: { paintBrush: 'Štětec', paintEraser: 'Guma', toolbarCardPaintBrush: 'Štětec', toolbarCardPaintEraser: 'Guma', paintCellOccupied: 'Toto pole je obsazené.', paintStrokeSummary: 'Tah: {painted} nových, {replaced} nahrazených, {erased} smazaných, {skipped} přeskočených.', paintStrokeCancelled: 'Tah byl zrušen.', paintStrokeLimit: 'Dosažen limit tahu ({limit} polí).', paintNoChanges: 'Žádná vhodná pole s malovanými kostkami.' },
+			pl: { paintBrush: 'Pędzel', paintEraser: 'Gumka', toolbarCardPaintBrush: 'Pędzel', toolbarCardPaintEraser: 'Gumka', paintCellOccupied: 'To pole jest zajęte.', paintStrokeSummary: 'Pociągnięcie: {painted} nowych, {replaced} zastąpionych, {erased} usuniętych, {skipped} pominiętych.', paintStrokeCancelled: 'Pociągnięcie anulowane.', paintStrokeLimit: 'Osiągnięto limit ({limit} pól).', paintNoChanges: 'Brak odpowiednich pól z malowanymi kostkami.' },
+			jp: { paintBrush: 'ブラシ', paintEraser: '消しゴム', toolbarCardPaintBrush: 'ブラシ', toolbarCardPaintEraser: '消しゴム', paintCellOccupied: 'このマスは使用中です。', paintStrokeSummary: 'ストローク：新規 {painted}、置換 {replaced}、消去 {erased}、スキップ {skipped}。', paintStrokeCancelled: 'ストロークをキャンセルしました。', paintStrokeLimit: 'ストローク上限に達しました（{limit} マス）。', paintNoChanges: '対象になるペイント済みキューブがありません。' },
+			kr: { paintBrush: '브러시', paintEraser: '지우개', toolbarCardPaintBrush: '브러시', toolbarCardPaintEraser: '지우개', paintCellOccupied: '이 칸은 이미 차지되어 있습니다.', paintStrokeSummary: '획: 새로 칠함 {painted}, 교체 {replaced}, 지움 {erased}, 건너뜀 {skipped}.', paintStrokeCancelled: '그리기 획을 취소했습니다.', paintStrokeLimit: '획 제한에 도달했습니다({limit}칸).', paintNoChanges: '처리할 수 있는 페인트 큐브 칸이 없습니다.' },
+			sch: { paintBrush: '画笔', paintEraser: '橡皮擦', toolbarCardPaintBrush: '画笔', toolbarCardPaintEraser: '橡皮擦', paintCellOccupied: '这个格子已被占用。', paintStrokeSummary: '笔画：新增 {painted}，替换 {replaced}，擦除 {erased}，跳过 {skipped}。', paintStrokeCancelled: '已取消本次笔画。', paintStrokeLimit: '已达到笔画上限（{limit} 格）。', paintNoChanges: '没有可操作的绘制矿方体格子。' },
+			tch: { paintBrush: '畫筆', paintEraser: '橡皮擦', toolbarCardPaintBrush: '畫筆', toolbarCardPaintEraser: '橡皮擦', paintCellOccupied: '此格已被佔用。', paintStrokeSummary: '筆畫：新增 {painted}，替換 {replaced}，擦除 {erased}，略過 {skipped}。', paintStrokeCancelled: '已取消本次筆畫。', paintStrokeLimit: '已達到筆畫上限（{limit} 格）。', paintNoChanges: '沒有可操作的繪製礦方體格子。' },
+			thai: { paintBrush: 'แปรง', paintEraser: 'ยางลบ', toolbarCardPaintBrush: 'แปรง', toolbarCardPaintEraser: 'ยางลบ', paintCellOccupied: 'ช่องนี้ถูกใช้งานอยู่', paintStrokeSummary: 'เส้น: ใหม่ {painted}, แทนที่ {replaced}, ลบ {erased}, ข้าม {skipped}', paintStrokeCancelled: 'ยกเลิกเส้นวาดแล้ว', paintStrokeLimit: 'ถึงขีดจำกัดเส้นแล้ว ({limit} ช่อง)', paintNoChanges: 'ไม่มีช่องลูกบาศก์ที่วาดซึ่งใช้งานได้' },
+			hu: { paintBrush: 'Ecset', paintEraser: 'Radír', toolbarCardPaintBrush: 'Ecset', toolbarCardPaintEraser: 'Radír', paintCellOccupied: 'Ez a mező foglalt.', paintStrokeSummary: 'Vonás: {painted} új, {replaced} cserélt, {erased} törölt, {skipped} kihagyott.', paintStrokeCancelled: 'A vonás megszakítva.', paintStrokeLimit: 'Vonáskorlát elérve ({limit} mező).', paintNoChanges: 'Nincs megfelelő festettkocka-mező.' },
+			lv: { paintBrush: 'Ota', paintEraser: 'Dzēšgumija', toolbarCardPaintBrush: 'Ota', toolbarCardPaintEraser: 'Dzēšgumija', paintCellOccupied: 'Šī šūna ir aizņemta.', paintStrokeSummary: 'Vilciens: {painted} jauni, {replaced} aizstāti, {erased} dzēsti, {skipped} izlaisti.', paintStrokeCancelled: 'Vilciens atcelts.', paintStrokeLimit: 'Sasniegts vilciena limits ({limit} šūnas).', paintNoChanges: 'Nav piemērotu krāsoto kubu šūnu.' },
+			ro: { paintBrush: 'Pensulă', paintEraser: 'Radieră', toolbarCardPaintBrush: 'Pensulă', toolbarCardPaintEraser: 'Radieră', paintCellOccupied: 'Această celulă este ocupată.', paintStrokeSummary: 'Trasare: {painted} noi, {replaced} înlocuite, {erased} șterse, {skipped} omise.', paintStrokeCancelled: 'Trasarea a fost anulată.', paintStrokeLimit: 'Limita trasării a fost atinsă ({limit} celule).', paintNoChanges: 'Nu există celule eligibile cu cuburi pictate.' },
+			no: { paintBrush: 'Pensel', paintEraser: 'Viskelær', toolbarCardPaintBrush: 'Pensel', toolbarCardPaintEraser: 'Viskelær', paintCellOccupied: 'Denne ruten er opptatt.', paintStrokeSummary: 'Strøk: {painted} nye, {replaced} erstattet, {erased} slettet, {skipped} hoppet over.', paintStrokeCancelled: 'Strøket ble avbrutt.', paintStrokeLimit: 'Strøkgrensen er nådd ({limit} ruter).', paintNoChanges: 'Ingen egnede ruter med malte kuber.' },
+			modsch: { paintBrush: '画笔', paintEraser: '橡皮擦', toolbarCardPaintBrush: '画笔', toolbarCardPaintEraser: '橡皮擦', paintCellOccupied: '该格子已被占用。', paintStrokeSummary: '笔画：新增 {painted}，替换 {replaced}，擦除 {erased}，跳过 {skipped}。', paintStrokeCancelled: '已取消本次笔画。', paintStrokeLimit: '已达到笔画上限（{limit} 格）。', paintNoChanges: '没有可操作的绘制矿方体格子。' }
+		})
+		const PAINT_BUCKET_TEXT = Object.freeze({
+			en: { paintBucket: 'Paint Bucket', toolbarCardPaintBucket: 'Bucket', paintBucketPlanning: 'Calculating fill region…', paintBucketCancelled: 'Paint Bucket cancelled.', paintBucketSummary: 'Bucket: {count} changed in a {region}-cell region ({painted} new, {replaced} replaced, {skipped} skipped).', paintBucketOpenOrTooLarge: 'The area is open or exceeds {limit} cells.' },
+			ru: { paintBucket: 'Заливка', toolbarCardPaintBucket: 'Заливка', paintBucketPlanning: 'Расчёт области заливки…', paintBucketCancelled: 'Заливка отменена.', paintBucketSummary: 'Заливка: изменено {count} из {region} клеток (новых {painted}, заменено {replaced}, пропущено {skipped}).', paintBucketOpenOrTooLarge: 'Область открыта или превышает {limit} клеток.' },
+			de: { paintBucket: 'Fülleimer', toolbarCardPaintBucket: 'Füllen', paintBucketPlanning: 'Füllbereich wird berechnet…', paintBucketCancelled: 'Füllvorgang abgebrochen.', paintBucketSummary: 'Füllen: {count} von {region} Feldern geändert ({painted} neu, {replaced} ersetzt, {skipped} übersprungen).', paintBucketOpenOrTooLarge: 'Der Bereich ist offen oder größer als {limit} Felder.' },
+			ptbr: { paintBucket: 'Balde de tinta', toolbarCardPaintBucket: 'Balde', paintBucketPlanning: 'Calculando área de preenchimento…', paintBucketCancelled: 'Preenchimento cancelado.', paintBucketSummary: 'Balde: {count} de {region} células alteradas ({painted} novas, {replaced} substituídas, {skipped} ignoradas).', paintBucketOpenOrTooLarge: 'A área está aberta ou excede {limit} células.' },
+			it: { paintBucket: 'Secchiello', toolbarCardPaintBucket: 'Riempi', paintBucketPlanning: 'Calcolo dell’area di riempimento…', paintBucketCancelled: 'Riempimento annullato.', paintBucketSummary: 'Riempimento: modificate {count} celle su {region} ({painted} nuove, {replaced} sostituite, {skipped} saltate).', paintBucketOpenOrTooLarge: 'L’area è aperta o supera {limit} celle.' },
+			es: { paintBucket: 'Cubo de pintura', toolbarCardPaintBucket: 'Rellenar', paintBucketPlanning: 'Calculando el área de relleno…', paintBucketCancelled: 'Relleno cancelado.', paintBucketSummary: 'Relleno: {count} de {region} celdas modificadas ({painted} nuevas, {replaced} reemplazadas, {skipped} omitidas).', paintBucketOpenOrTooLarge: 'El área está abierta o supera {limit} celdas.' },
+			fr: { paintBucket: 'Pot de peinture', toolbarCardPaintBucket: 'Remplir', paintBucketPlanning: 'Calcul de la zone de remplissage…', paintBucketCancelled: 'Remplissage annulé.', paintBucketSummary: 'Remplissage : {count} cases modifiées sur {region} ({painted} nouvelles, {replaced} remplacées, {skipped} ignorées).', paintBucketOpenOrTooLarge: 'La zone est ouverte ou dépasse {limit} cases.' },
+			nl: { paintBucket: 'Verfemmer', toolbarCardPaintBucket: 'Vullen', paintBucketPlanning: 'Vulgebied berekenen…', paintBucketCancelled: 'Vullen geannuleerd.', paintBucketSummary: 'Vullen: {count} van {region} cellen gewijzigd ({painted} nieuw, {replaced} vervangen, {skipped} overgeslagen).', paintBucketOpenOrTooLarge: 'Het gebied is open of groter dan {limit} cellen.' },
+			cz: { paintBucket: 'Výplň', toolbarCardPaintBucket: 'Vyplnit', paintBucketPlanning: 'Výpočet oblasti výplně…', paintBucketCancelled: 'Výplň byla zrušena.', paintBucketSummary: 'Výplň: změněno {count} z {region} polí ({painted} nových, {replaced} nahrazených, {skipped} přeskočených).', paintBucketOpenOrTooLarge: 'Oblast je otevřená nebo přesahuje {limit} polí.' },
+			pl: { paintBucket: 'Wiadro z farbą', toolbarCardPaintBucket: 'Wypełnij', paintBucketPlanning: 'Obliczanie obszaru wypełnienia…', paintBucketCancelled: 'Wypełnianie anulowane.', paintBucketSummary: 'Wypełnienie: zmieniono {count} z {region} pól ({painted} nowych, {replaced} zastąpionych, {skipped} pominiętych).', paintBucketOpenOrTooLarge: 'Obszar jest otwarty lub przekracza {limit} pól.' },
+			jp: { paintBucket: '塗りつぶし', toolbarCardPaintBucket: '塗りつぶし', paintBucketPlanning: '塗りつぶし範囲を計算中…', paintBucketCancelled: '塗りつぶしをキャンセルしました。', paintBucketSummary: '塗りつぶし：{region} マス中 {count} マスを変更（新規 {painted}、置換 {replaced}、スキップ {skipped}）。', paintBucketOpenOrTooLarge: '領域が開いているか、{limit} マスを超えています。' },
+			kr: { paintBucket: '페인트 통', toolbarCardPaintBucket: '채우기', paintBucketPlanning: '채우기 영역 계산 중…', paintBucketCancelled: '채우기를 취소했습니다.', paintBucketSummary: '채우기: {region}칸 중 {count}칸 변경(새로 칠함 {painted}, 교체 {replaced}, 건너뜀 {skipped}).', paintBucketOpenOrTooLarge: '영역이 열려 있거나 {limit}칸을 초과합니다.' },
+			sch: { paintBucket: '油漆桶', toolbarCardPaintBucket: '油漆桶', paintBucketPlanning: '正在计算填充区域…', paintBucketCancelled: '已取消油漆桶操作。', paintBucketSummary: '油漆桶：在 {region} 格区域中更改 {count} 格（新增 {painted}，替换 {replaced}，跳过 {skipped}）。', paintBucketOpenOrTooLarge: '区域未封闭或超过 {limit} 格。' },
+			tch: { paintBucket: '油漆桶', toolbarCardPaintBucket: '油漆桶', paintBucketPlanning: '正在計算填滿區域…', paintBucketCancelled: '已取消油漆桶操作。', paintBucketSummary: '油漆桶：在 {region} 格區域中變更 {count} 格（新增 {painted}，取代 {replaced}，略過 {skipped}）。', paintBucketOpenOrTooLarge: '區域未封閉或超過 {limit} 格。' },
+			thai: { paintBucket: 'ถังสี', toolbarCardPaintBucket: 'เติมสี', paintBucketPlanning: 'กำลังคำนวณพื้นที่เติมสี…', paintBucketCancelled: 'ยกเลิกการเติมสีแล้ว', paintBucketSummary: 'เติมสี: เปลี่ยน {count} จาก {region} ช่อง (ใหม่ {painted}, แทนที่ {replaced}, ข้าม {skipped})', paintBucketOpenOrTooLarge: 'พื้นที่เปิดอยู่หรือเกิน {limit} ช่อง' },
+			hu: { paintBucket: 'Festékes vödör', toolbarCardPaintBucket: 'Kitöltés', paintBucketPlanning: 'Kitöltési terület számítása…', paintBucketCancelled: 'A kitöltés megszakítva.', paintBucketSummary: 'Kitöltés: {count} módosítva {region} mezőből ({painted} új, {replaced} cserélt, {skipped} kihagyott).', paintBucketOpenOrTooLarge: 'A terület nyitott vagy nagyobb mint {limit} mező.' },
+			lv: { paintBucket: 'Krāsas spainis', toolbarCardPaintBucket: 'Aizpildīt', paintBucketPlanning: 'Aizpildījuma apgabala aprēķins…', paintBucketCancelled: 'Aizpildīšana atcelta.', paintBucketSummary: 'Aizpildīšana: mainītas {count} no {region} šūnām ({painted} jaunas, {replaced} aizstātas, {skipped} izlaistas).', paintBucketOpenOrTooLarge: 'Apgabals ir atvērts vai pārsniedz {limit} šūnas.' },
+			ro: { paintBucket: 'Găleată de vopsea', toolbarCardPaintBucket: 'Umplere', paintBucketPlanning: 'Se calculează zona de umplere…', paintBucketCancelled: 'Umplerea a fost anulată.', paintBucketSummary: 'Umplere: {count} din {region} celule modificate ({painted} noi, {replaced} înlocuite, {skipped} omise).', paintBucketOpenOrTooLarge: 'Zona este deschisă sau depășește {limit} celule.' },
+			no: { paintBucket: 'Malingsbøtte', toolbarCardPaintBucket: 'Fyll', paintBucketPlanning: 'Beregner fyllområde…', paintBucketCancelled: 'Fylling avbrutt.', paintBucketSummary: 'Fylling: {count} av {region} ruter endret ({painted} nye, {replaced} erstattet, {skipped} hoppet over).', paintBucketOpenOrTooLarge: 'Området er åpent eller større enn {limit} ruter.' },
+			modsch: { paintBucket: '油漆桶', toolbarCardPaintBucket: '油漆桶', paintBucketPlanning: '正在计算填充区域…', paintBucketCancelled: '已取消油漆桶操作。', paintBucketSummary: '油漆桶：在 {region} 格区域中更改 {count} 格（新增 {painted}，替换 {replaced}，跳过 {skipped}）。', paintBucketOpenOrTooLarge: '区域未封闭或超过 {limit} 格。' }
+		})
+		const PAINT_SAVE_TEXT = Object.freeze({
+			en: { paintGrowSaveFailed: 'Save stopped: Grow painted Cube capture failed at {cell}. Reloading is not required; fix the cube and save again. ({code})' },
+			ru: { paintGrowSaveFailed: 'Сохранение остановлено: не удалось записать растущий окрашенный куб в ячейке {cell}. Перезагрузка не требуется; исправьте куб и сохраните снова. ({code})' },
+			de: { paintGrowSaveFailed: 'Speichern gestoppt: Der wachsende gemalte Würfel bei {cell} konnte nicht erfasst werden. Kein Neuladen nötig; Würfel korrigieren und erneut speichern. ({code})' },
+			ptbr: { paintGrowSaveFailed: 'Salvamento interrompido: falha ao capturar o cubo pintado em crescimento em {cell}. Não é preciso recarregar; corrija o cubo e salve novamente. ({code})' },
+			it: { paintGrowSaveFailed: 'Salvataggio interrotto: acquisizione del cubo dipinto in crescita non riuscita in {cell}. Non serve ricaricare; correggi il cubo e salva di nuovo. ({code})' },
+			es: { paintGrowSaveFailed: 'Guardado detenido: no se pudo capturar el cubo pintado en crecimiento en {cell}. No hace falta recargar; corrige el cubo y vuelve a guardar. ({code})' },
+			fr: { paintGrowSaveFailed: 'Sauvegarde interrompue : impossible de capturer le cube peint en croissance en {cell}. Aucun rechargement requis ; corrigez le cube puis réessayez. ({code})' },
+			nl: { paintGrowSaveFailed: 'Opslaan gestopt: de groeiende geschilderde kubus op {cell} kon niet worden vastgelegd. Herladen is niet nodig; herstel de kubus en sla opnieuw op. ({code})' },
+			cz: { paintGrowSaveFailed: 'Ukládání zastaveno: rostoucí malovanou kostku na {cell} se nepodařilo zachytit. Není nutné znovu načítat; opravte kostku a uložte znovu. ({code})' },
+			pl: { paintGrowSaveFailed: 'Zapisywanie zatrzymane: nie udało się przechwycić rosnącej malowanej kostki w {cell}. Ponowne wczytanie nie jest wymagane; popraw kostkę i zapisz ponownie. ({code})' },
+			jp: { paintGrowSaveFailed: '保存を中止しました：{cell} の成長中ペイントキューブを記録できません。再読み込みは不要です。キューブを修正して再度保存してください。({code})' },
+			kr: { paintGrowSaveFailed: '저장을 중단했습니다: {cell}의 성장 중인 페인트 큐브를 기록하지 못했습니다. 다시 불러올 필요는 없습니다. 큐브를 수정한 뒤 다시 저장하세요. ({code})' },
+			sch: { paintGrowSaveFailed: '保存已停止：无法记录 {cell} 处正在生长的绘制矿方体。无需重新加载；请修复该矿方体后再次保存。({code})' },
+			tch: { paintGrowSaveFailed: '儲存已停止：無法記錄 {cell} 處正在生長的繪製礦方體。無須重新載入；請修復該礦方體後再次儲存。({code})' },
+			thai: { paintGrowSaveFailed: 'หยุดการบันทึกแล้ว: ไม่สามารถเก็บข้อมูลลูกบาศก์ที่ทาสีและกำลังเติบโตที่ {cell} ได้ ไม่ต้องโหลดใหม่; แก้ไขลูกบาศก์แล้วบันทึกอีกครั้ง ({code})' },
+			hu: { paintGrowSaveFailed: 'A mentés leállt: a(z) {cell} helyen lévő növekvő festett kocka nem rögzíthető. Nem kell újratölteni; javítsd a kockát, majd ments újra. ({code})' },
+			lv: { paintGrowSaveFailed: 'Saglabāšana apturēta: augošo krāsoto kubu šūnā {cell} neizdevās ierakstīt. Pārlādēšana nav vajadzīga; salabojiet kubu un saglabājiet vēlreiz. ({code})' },
+			ro: { paintGrowSaveFailed: 'Salvarea a fost oprită: cubul pictat în creștere de la {cell} nu a putut fi capturat. Nu este necesară reîncărcarea; corectează cubul și salvează din nou. ({code})' },
+			no: { paintGrowSaveFailed: 'Lagring stoppet: den voksende malte kuben ved {cell} kunne ikke registreres. Ny innlasting er ikke nødvendig; rett kuben og lagre igjen. ({code})' },
+			modsch: { paintGrowSaveFailed: '保存已停止：无法记录 {cell} 处正在生长的绘制矿方体。无需重新加载；请修复该矿方体后再次保存。({code})' }
+		})
+		const PAINT_GROW_TEXT = Object.freeze({
+			en: { paintStable: 'Stable', paintGrow: 'Grow', toolbarCardPaintStable: 'Stable', toolbarCardPaintGrow: 'Grow' },
+			ru: { paintStable: 'Стабильный', paintGrow: 'Рост', toolbarCardPaintStable: 'Стабильный', toolbarCardPaintGrow: 'Рост' },
+			de: { paintStable: 'Stabil', paintGrow: 'Wachsen', toolbarCardPaintStable: 'Stabil', toolbarCardPaintGrow: 'Wachsen' },
+			ptbr: { paintStable: 'Estável', paintGrow: 'Crescer', toolbarCardPaintStable: 'Estável', toolbarCardPaintGrow: 'Crescer' },
+			it: { paintStable: 'Stabile', paintGrow: 'Crescita', toolbarCardPaintStable: 'Stabile', toolbarCardPaintGrow: 'Crescita' },
+			es: { paintStable: 'Estable', paintGrow: 'Crecer', toolbarCardPaintStable: 'Estable', toolbarCardPaintGrow: 'Crecer' },
+			fr: { paintStable: 'Stable', paintGrow: 'Croissance', toolbarCardPaintStable: 'Stable', toolbarCardPaintGrow: 'Croissance' },
+			nl: { paintStable: 'Stabiel', paintGrow: 'Groeien', toolbarCardPaintStable: 'Stabiel', toolbarCardPaintGrow: 'Groeien' },
+			cz: { paintStable: 'Stabilní', paintGrow: 'Růst', toolbarCardPaintStable: 'Stabilní', toolbarCardPaintGrow: 'Růst' },
+			pl: { paintStable: 'Stabilny', paintGrow: 'Wzrost', toolbarCardPaintStable: 'Stabilny', toolbarCardPaintGrow: 'Wzrost' },
+			jp: { paintStable: '安定', paintGrow: '成長', toolbarCardPaintStable: '安定', toolbarCardPaintGrow: '成長' },
+			kr: { paintStable: '안정', paintGrow: '성장', toolbarCardPaintStable: '안정', toolbarCardPaintGrow: '성장' },
+			sch: { paintStable: '稳定', paintGrow: '生长', toolbarCardPaintStable: '稳定', toolbarCardPaintGrow: '生长' },
+			tch: { paintStable: '穩定', paintGrow: '生長', toolbarCardPaintStable: '穩定', toolbarCardPaintGrow: '生長' },
+			thai: { paintStable: 'คงที่', paintGrow: 'เติบโต', toolbarCardPaintStable: 'คงที่', toolbarCardPaintGrow: 'เติบโต' },
+			hu: { paintStable: 'Stabil', paintGrow: 'Növekedés', toolbarCardPaintStable: 'Stabil', toolbarCardPaintGrow: 'Növekedés' },
+			lv: { paintStable: 'Stabils', paintGrow: 'Augšana', toolbarCardPaintStable: 'Stabils', toolbarCardPaintGrow: 'Augšana' },
+			ro: { paintStable: 'Stabil', paintGrow: 'Creștere', toolbarCardPaintStable: 'Stabil', toolbarCardPaintGrow: 'Creștere' },
+			no: { paintStable: 'Stabil', paintGrow: 'Vekst', toolbarCardPaintStable: 'Stabil', toolbarCardPaintGrow: 'Vekst' },
+			modsch: { paintStable: '稳定', paintGrow: '生长', toolbarCardPaintStable: '稳定', toolbarCardPaintGrow: '生长' }
+		})
+		const PAINT_PALETTE_TEXT = Object.freeze({
+			en: { paintPalette: 'Palette', toolbarCardPaintPalette: 'Palette', paintPaletteTitle: 'Painted Cube Palette', paintPaletteResource: 'Resource', paintPaletteWeight: 'Weight', paintPaletteNormalized: 'Normalized', paintPaletteSlots: 'Slots', paintPaletteApply: 'Apply', paintPaletteCancel: 'Cancel' },
+			ru: { paintPalette: 'Палитра', toolbarCardPaintPalette: 'Палитра', paintPaletteTitle: 'Палитра окрашенного куба', paintPaletteResource: 'Ресурс', paintPaletteWeight: 'Вес', paintPaletteNormalized: 'Доля', paintPaletteSlots: 'Ячейки', paintPaletteApply: 'Применить', paintPaletteCancel: 'Отмена' },
+			de: { paintPalette: 'Palette', toolbarCardPaintPalette: 'Palette', paintPaletteTitle: 'Palette für gemalte Würfel', paintPaletteResource: 'Ressource', paintPaletteWeight: 'Gewicht', paintPaletteNormalized: 'Anteil', paintPaletteSlots: 'Plätze', paintPaletteApply: 'Anwenden', paintPaletteCancel: 'Abbrechen' },
+			ptbr: { paintPalette: 'Paleta', toolbarCardPaintPalette: 'Paleta', paintPaletteTitle: 'Paleta do cubo pintado', paintPaletteResource: 'Recurso', paintPaletteWeight: 'Peso', paintPaletteNormalized: 'Proporção', paintPaletteSlots: 'Espaços', paintPaletteApply: 'Aplicar', paintPaletteCancel: 'Cancelar' },
+			it: { paintPalette: 'Tavolozza', toolbarCardPaintPalette: 'Tavolozza', paintPaletteTitle: 'Tavolozza del cubo dipinto', paintPaletteResource: 'Risorsa', paintPaletteWeight: 'Peso', paintPaletteNormalized: 'Quota', paintPaletteSlots: 'Spazi', paintPaletteApply: 'Applica', paintPaletteCancel: 'Annulla' },
+			es: { paintPalette: 'Paleta', toolbarCardPaintPalette: 'Paleta', paintPaletteTitle: 'Paleta del cubo pintado', paintPaletteResource: 'Recurso', paintPaletteWeight: 'Peso', paintPaletteNormalized: 'Proporción', paintPaletteSlots: 'Espacios', paintPaletteApply: 'Aplicar', paintPaletteCancel: 'Cancelar' },
+			fr: { paintPalette: 'Palette', toolbarCardPaintPalette: 'Palette', paintPaletteTitle: 'Palette du cube peint', paintPaletteResource: 'Ressource', paintPaletteWeight: 'Poids', paintPaletteNormalized: 'Part', paintPaletteSlots: 'Cases', paintPaletteApply: 'Appliquer', paintPaletteCancel: 'Annuler' },
+			nl: { paintPalette: 'Palet', toolbarCardPaintPalette: 'Palet', paintPaletteTitle: 'Palet voor getekende kubus', paintPaletteResource: 'Grondstof', paintPaletteWeight: 'Gewicht', paintPaletteNormalized: 'Aandeel', paintPaletteSlots: 'Vakken', paintPaletteApply: 'Toepassen', paintPaletteCancel: 'Annuleren' },
+			cz: { paintPalette: 'Paleta', toolbarCardPaintPalette: 'Paleta', paintPaletteTitle: 'Paleta malované kostky', paintPaletteResource: 'Surovina', paintPaletteWeight: 'Váha', paintPaletteNormalized: 'Podíl', paintPaletteSlots: 'Místa', paintPaletteApply: 'Použít', paintPaletteCancel: 'Zrušit' },
+			pl: { paintPalette: 'Paleta', toolbarCardPaintPalette: 'Paleta', paintPaletteTitle: 'Paleta malowanej kostki', paintPaletteResource: 'Surowiec', paintPaletteWeight: 'Waga', paintPaletteNormalized: 'Udział', paintPaletteSlots: 'Pola', paintPaletteApply: 'Zastosuj', paintPaletteCancel: 'Anuluj' },
+			jp: { paintPalette: 'パレット', toolbarCardPaintPalette: 'パレット', paintPaletteTitle: 'ペイントキューブのパレット', paintPaletteResource: '資源', paintPaletteWeight: '比重', paintPaletteNormalized: '割合', paintPaletteSlots: 'スロット', paintPaletteApply: '適用', paintPaletteCancel: 'キャンセル' },
+			kr: { paintPalette: '팔레트', toolbarCardPaintPalette: '팔레트', paintPaletteTitle: '페인트 큐브 팔레트', paintPaletteResource: '자원', paintPaletteWeight: '가중치', paintPaletteNormalized: '비율', paintPaletteSlots: '슬롯', paintPaletteApply: '적용', paintPaletteCancel: '취소' },
+			sch: { paintPalette: '调色板', toolbarCardPaintPalette: '调色板', paintPaletteTitle: '绘制矿方体调色板', paintPaletteResource: '资源', paintPaletteWeight: '权重', paintPaletteNormalized: '比例', paintPaletteSlots: '槽位', paintPaletteApply: '应用', paintPaletteCancel: '取消' },
+			tch: { paintPalette: '調色板', toolbarCardPaintPalette: '調色板', paintPaletteTitle: '繪製礦方體調色板', paintPaletteResource: '資源', paintPaletteWeight: '權重', paintPaletteNormalized: '比例', paintPaletteSlots: '槽位', paintPaletteApply: '套用', paintPaletteCancel: '取消' },
+			thai: { paintPalette: 'จานสี', toolbarCardPaintPalette: 'จานสี', paintPaletteTitle: 'จานสีลูกบาศก์ที่วาด', paintPaletteResource: 'ทรัพยากร', paintPaletteWeight: 'น้ำหนัก', paintPaletteNormalized: 'สัดส่วน', paintPaletteSlots: 'ช่อง', paintPaletteApply: 'นำไปใช้', paintPaletteCancel: 'ยกเลิก' },
+			hu: { paintPalette: 'Paletta', toolbarCardPaintPalette: 'Paletta', paintPaletteTitle: 'Festett kocka palettája', paintPaletteResource: 'Nyersanyag', paintPaletteWeight: 'Súly', paintPaletteNormalized: 'Arány', paintPaletteSlots: 'Helyek', paintPaletteApply: 'Alkalmaz', paintPaletteCancel: 'Mégse' },
+			lv: { paintPalette: 'Palete', toolbarCardPaintPalette: 'Palete', paintPaletteTitle: 'Krāsotā kuba palete', paintPaletteResource: 'Resurss', paintPaletteWeight: 'Svars', paintPaletteNormalized: 'Daļa', paintPaletteSlots: 'Vietas', paintPaletteApply: 'Lietot', paintPaletteCancel: 'Atcelt' },
+			ro: { paintPalette: 'Paletă', toolbarCardPaintPalette: 'Paletă', paintPaletteTitle: 'Paleta cubului pictat', paintPaletteResource: 'Resursă', paintPaletteWeight: 'Pondere', paintPaletteNormalized: 'Proporție', paintPaletteSlots: 'Sloturi', paintPaletteApply: 'Aplică', paintPaletteCancel: 'Anulează' },
+			no: { paintPalette: 'Palett', toolbarCardPaintPalette: 'Palett', paintPaletteTitle: 'Palett for malt kube', paintPaletteResource: 'Ressurs', paintPaletteWeight: 'Vekt', paintPaletteNormalized: 'Andel', paintPaletteSlots: 'Plasser', paintPaletteApply: 'Bruk', paintPaletteCancel: 'Avbryt' },
+			modsch: { paintPalette: '调色板', toolbarCardPaintPalette: '调色板', paintPaletteTitle: '绘制矿方体调色板', paintPaletteResource: '资源', paintPaletteWeight: '权重', paintPaletteNormalized: '比例', paintPaletteSlots: '槽位', paintPaletteApply: '应用', paintPaletteCancel: '取消' }
+		})
+		const PAINTED_BLUEPRINT_TEXT = Object.freeze({
+			en: { blueprintPaintedCount: 'Painted Cubes: {count}', blueprintPaintedCompatibility: 'Schema 7 · Painted Cubes supported' },
+			ru: { blueprintPaintedCount: 'Нарисованные кубы: {count}', blueprintPaintedCompatibility: 'Схема 7 · Нарисованные кубы поддерживаются' },
+			de: { blueprintPaintedCount: 'Gemalte Würfel: {count}', blueprintPaintedCompatibility: 'Schema 7 · Gemalte Würfel unterstützt' },
+			ptbr: { blueprintPaintedCount: 'Cubos pintados: {count}', blueprintPaintedCompatibility: 'Esquema 7 · Cubos pintados compatíveis' },
+			it: { blueprintPaintedCount: 'Cubi dipinti: {count}', blueprintPaintedCompatibility: 'Schema 7 · Cubi dipinti supportati' },
+			es: { blueprintPaintedCount: 'Cubos pintados: {count}', blueprintPaintedCompatibility: 'Esquema 7 · Cubos pintados compatibles' },
+			fr: { blueprintPaintedCount: 'Cubes peints : {count}', blueprintPaintedCompatibility: 'Schéma 7 · Cubes peints pris en charge' },
+			nl: { blueprintPaintedCount: 'Geschilderde kubussen: {count}', blueprintPaintedCompatibility: 'Schema 7 · Geschilderde kubussen ondersteund' },
+			cz: { blueprintPaintedCount: 'Malované kostky: {count}', blueprintPaintedCompatibility: 'Schéma 7 · Malované kostky podporovány' },
+			pl: { blueprintPaintedCount: 'Malowane kostki: {count}', blueprintPaintedCompatibility: 'Schemat 7 · Obsługa malowanych kostek' },
+			jp: { blueprintPaintedCount: 'ペイントキューブ: {count}', blueprintPaintedCompatibility: 'スキーマ 7 · ペイントキューブ対応' },
+			kr: { blueprintPaintedCount: '페인트 큐브: {count}', blueprintPaintedCompatibility: '스키마 7 · 페인트 큐브 지원' },
+			sch: { blueprintPaintedCount: '绘制矿方体：{count}', blueprintPaintedCompatibility: 'Schema 7 · 支持绘制矿方体' },
+			tch: { blueprintPaintedCount: '繪製礦方體：{count}', blueprintPaintedCompatibility: 'Schema 7 · 支援繪製礦方體' },
+			thai: { blueprintPaintedCount: 'ลูกบาศก์ที่วาด: {count}', blueprintPaintedCompatibility: 'สคีมา 7 · รองรับลูกบาศก์ที่วาด' },
+			hu: { blueprintPaintedCount: 'Festett kockák: {count}', blueprintPaintedCompatibility: '7-es séma · Festett kockák támogatva' },
+			lv: { blueprintPaintedCount: 'Krāsotie kubi: {count}', blueprintPaintedCompatibility: '7. shēma · Krāsotie kubi atbalstīti' },
+			ro: { blueprintPaintedCount: 'Cuburi pictate: {count}', blueprintPaintedCompatibility: 'Schema 7 · Cuburi pictate acceptate' },
+			no: { blueprintPaintedCount: 'Malte kuber: {count}', blueprintPaintedCompatibility: 'Skjema 7 · Malte kuber støttes' },
+			modsch: { blueprintPaintedCount: '绘制矿方体：{count}', blueprintPaintedCompatibility: 'Schema 7 · 支持绘制矿方体' }
+		})
+		const SELECTION_PAINTED_COMPAT_TEXT = Object.freeze({
+			en: { deleteConfirmPaintedMessage: '{buildings} building(s), {ordinary} ordinary Stable Cube(s), and {painted} painted Cube(s) can be dismantled. {protected} protected object(s) will remain; {cross} object(s) cross a selection boundary.', cutCubeOption: 'Also remove Cubes: {count} (ordinary {ordinary} / painted {painted}).', cutCubeSourceRemove: 'After the copy succeeds, the {count} source Cube(s) will be removed.', cutCubeSourceRetain: 'The {count} Cube(s) will be copied; the source Cube(s) will remain.', cutSuccessRetainedCubes: 'Blueprint copied. Source Cubes were retained.' },
+			ru: { deleteConfirmPaintedMessage: 'Можно разобрать: зданий {buildings}, обычных стабильных кубов {ordinary}, окрашенных кубов {painted}. Защищённые объекты ({protected}) останутся; объектов за границей выделения: {cross}.', cutCubeOption: 'Также удалить кубы: {count} (обычные {ordinary} / окрашенные {painted}).', cutCubeSourceRemove: 'После успешного копирования исходные кубы ({count}) будут удалены.', cutCubeSourceRetain: 'Кубы ({count}) будут скопированы; исходные кубы останутся.', cutSuccessRetainedCubes: 'Чертёж скопирован. Исходные кубы сохранены.' },
+			de: { deleteConfirmPaintedMessage: '{buildings} Gebäude, {ordinary} normale stabile Würfel und {painted} bemalte Würfel können zerlegt werden. {protected} geschützte Objekte bleiben; {cross} Objekte überschreiten die Auswahlgrenze.', cutCubeOption: 'Auch Würfel entfernen: {count} (normal {ordinary} / bemalt {painted}).', cutCubeSourceRemove: 'Nach erfolgreichem Kopieren werden die {count} Quellwürfel entfernt.', cutCubeSourceRetain: 'Die {count} Würfel werden kopiert; die Quellwürfel bleiben erhalten.', cutSuccessRetainedCubes: 'Blaupause kopiert. Quellwürfel wurden beibehalten.' },
+			ptbr: { deleteConfirmPaintedMessage: '{buildings} construção(ões), {ordinary} Cubo(s) estável(is) comum(ns) e {painted} Cubo(s) pintado(s) podem ser desmontados. {protected} objeto(s) protegido(s) permanecerão; {cross} cruzam o limite da seleção.', cutCubeOption: 'Também remover Cubos: {count} (comuns {ordinary} / pintados {painted}).', cutCubeSourceRemove: 'Após a cópia, os {count} Cubos de origem serão removidos.', cutCubeSourceRetain: 'Os {count} Cubos serão copiados; os Cubos de origem permanecerão.', cutSuccessRetainedCubes: 'Projeto copiado. Os Cubos de origem foram mantidos.' },
+			it: { deleteConfirmPaintedMessage: 'È possibile smontare {buildings} edifici, {ordinary} cubi stabili normali e {painted} cubi dipinti. {protected} oggetti protetti resteranno; {cross} superano il confine della selezione.', cutCubeOption: 'Rimuovi anche i Cubi: {count} (normali {ordinary} / dipinti {painted}).', cutCubeSourceRemove: 'Dopo la copia, i {count} Cubi di origine verranno rimossi.', cutCubeSourceRetain: 'I {count} Cubi verranno copiati; quelli di origine resteranno.', cutSuccessRetainedCubes: 'Progetto copiato. I Cubi di origine sono stati mantenuti.' },
+			es: { deleteConfirmPaintedMessage: 'Se pueden desmontar {buildings} edificios, {ordinary} cubos estables normales y {painted} cubos pintados. Permanecerán {protected} objetos protegidos; {cross} cruzan el límite de la selección.', cutCubeOption: 'Eliminar también Cubos: {count} (normales {ordinary} / pintados {painted}).', cutCubeSourceRemove: 'Tras copiar, se eliminarán los {count} Cubos de origen.', cutCubeSourceRetain: 'Se copiarán los {count} Cubos; los Cubos de origen permanecerán.', cutSuccessRetainedCubes: 'Plano copiado. Se conservaron los Cubos de origen.' },
+			fr: { deleteConfirmPaintedMessage: '{buildings} bâtiments, {ordinary} Cubes stables ordinaires et {painted} Cubes peints peuvent être démontés. {protected} objets protégés resteront ; {cross} franchissent la limite de sélection.', cutCubeOption: 'Supprimer aussi les Cubes : {count} (ordinaires {ordinary} / peints {painted}).', cutCubeSourceRemove: 'Après la copie, les {count} Cubes sources seront supprimés.', cutCubeSourceRetain: 'Les {count} Cubes seront copiés ; les Cubes sources resteront.', cutSuccessRetainedCubes: 'Plan copié. Les Cubes sources ont été conservés.' },
+			nl: { deleteConfirmPaintedMessage: '{buildings} gebouwen, {ordinary} gewone stabiele kubussen en {painted} geschilderde kubussen kunnen worden ontmanteld. {protected} beschermde objecten blijven; {cross} overschrijden de selectierand.', cutCubeOption: 'Ook Kubussen verwijderen: {count} (normaal {ordinary} / geschilderd {painted}).', cutCubeSourceRemove: 'Na het kopiëren worden de {count} bronkubussen verwijderd.', cutCubeSourceRetain: 'De {count} kubussen worden gekopieerd; de bronkubussen blijven.', cutSuccessRetainedCubes: 'Blauwdruk gekopieerd. Bronkubussen zijn behouden.' },
+			cz: { deleteConfirmPaintedMessage: 'Lze rozebrat {buildings} budov, {ordinary} běžných stabilních kostek a {painted} malovaných kostek. {protected} chráněných objektů zůstane; {cross} přesahuje hranici výběru.', cutCubeOption: 'Odstranit také kostky: {count} (běžné {ordinary} / malované {painted}).', cutCubeSourceRemove: 'Po zkopírování bude odstraněno {count} zdrojových kostek.', cutCubeSourceRetain: '{count} kostek bude zkopírováno; zdrojové kostky zůstanou.', cutSuccessRetainedCubes: 'Plán zkopírován. Zdrojové kostky zůstaly zachovány.' },
+			pl: { deleteConfirmPaintedMessage: 'Można rozebrać {buildings} budynków, {ordinary} zwykłych stabilnych kostek i {painted} malowanych kostek. {protected} chronionych obiektów pozostanie; {cross} przekracza granicę zaznaczenia.', cutCubeOption: 'Usuń także kostki: {count} (zwykłe {ordinary} / malowane {painted}).', cutCubeSourceRemove: 'Po skopiowaniu {count} kostek źródłowych zostanie usuniętych.', cutCubeSourceRetain: '{count} kostek zostanie skopiowanych; kostki źródłowe pozostaną.', cutSuccessRetainedCubes: 'Schemat skopiowany. Kostki źródłowe zachowano.' },
+			jp: { deleteConfirmPaintedMessage: '建築 {buildings} 件、通常の安定キューブ {ordinary} 個、ペイントキューブ {painted} 個を解体できます。保護対象 {protected} 件は残り、{cross} 件は選択境界をまたぎます。', cutCubeOption: 'キューブも削除：{count}（通常 {ordinary} / ペイント {painted}）。', cutCubeSourceRemove: 'コピー成功後、元のキューブ {count} 個を削除します。', cutCubeSourceRetain: 'キューブ {count} 個をコピーし、元のキューブは残します。', cutSuccessRetainedCubes: '設計図をコピーしました。元のキューブは保持されました。' },
+			kr: { deleteConfirmPaintedMessage: '건물 {buildings}개, 일반 Stable 큐브 {ordinary}개, 페인트 큐브 {painted}개를 해체할 수 있습니다. 보호 대상 {protected}개는 남고, {cross}개는 선택 경계를 넘습니다.', cutCubeOption: '큐브도 제거: {count} (일반 {ordinary} / 페인트 {painted}).', cutCubeSourceRemove: '복사에 성공하면 원본 큐브 {count}개를 제거합니다.', cutCubeSourceRetain: '큐브 {count}개를 복사하고 원본 큐브는 유지합니다.', cutSuccessRetainedCubes: '청사진을 복사했습니다. 원본 큐브는 유지되었습니다.' },
+			sch: { deleteConfirmPaintedMessage: '可拆解建筑 {buildings} 栋、原版 Stable 矿方体 {ordinary} 个、绘制矿方体 {painted} 个；受保护对象 {protected} 个会保留；跨越选区边界 {cross} 个。', cutCubeOption: '同时移除 Cube：共 {count} 个（普通 {ordinary} / 绘制 {painted}）。', cutCubeSourceRemove: '复制成功后，将移除源位置的 {count} 个 Cube。', cutCubeSourceRetain: '将复制 {count} 个 Cube；源位置的 Cube 会保留。', cutSuccessRetainedCubes: '蓝图已复制；源位置的 Cube 已保留。' },
+			tch: { deleteConfirmPaintedMessage: '可拆解建築 {buildings} 棟、原版 Stable 礦方體 {ordinary} 個、繪製礦方體 {painted} 個；受保護物件 {protected} 個會保留；跨越選區邊界 {cross} 個。', cutCubeOption: '同時移除 Cube：共 {count} 個（普通 {ordinary} / 繪製 {painted}）。', cutCubeSourceRemove: '複製成功後，將移除來源位置的 {count} 個 Cube。', cutCubeSourceRetain: '將複製 {count} 個 Cube；來源位置的 Cube 會保留。', cutSuccessRetainedCubes: '藍圖已複製；來源位置的 Cube 已保留。' },
+			thai: { deleteConfirmPaintedMessage: 'รื้อถอนได้: สิ่งปลูกสร้าง {buildings}, ลูกบาศก์ Stable ปกติ {ordinary} และลูกบาศก์ที่วาด {painted}; วัตถุที่ป้องกัน {protected} จะคงอยู่ และ {cross} ข้ามขอบเขตที่เลือก', cutCubeOption: 'ลบลูกบาศก์ด้วย: {count} (ปกติ {ordinary} / วาด {painted})', cutCubeSourceRemove: 'เมื่อคัดลอกสำเร็จ ลูกบาศก์ต้นทาง {count} อันจะถูกลบ', cutCubeSourceRetain: 'จะคัดลอกลูกบาศก์ {count} อัน และคงต้นทางไว้', cutSuccessRetainedCubes: 'คัดลอกพิมพ์เขียวแล้ว และคงลูกบาศก์ต้นทางไว้' },
+			hu: { deleteConfirmPaintedMessage: '{buildings} épület, {ordinary} normál stabil kocka és {painted} festett kocka bontható el. {protected} védett objektum megmarad; {cross} átlépi a kijelölés határát.', cutCubeOption: 'Kockák eltávolítása is: {count} (normál {ordinary} / festett {painted}).', cutCubeSourceRemove: 'Sikeres másolás után a(z) {count} forráskocka törlődik.', cutCubeSourceRetain: 'A(z) {count} kocka másolódik; a forráskockák megmaradnak.', cutSuccessRetainedCubes: 'Tervrajz másolva. A forráskockák megmaradtak.' },
+			lv: { deleteConfirmPaintedMessage: 'Var demontēt {buildings} ēkas, {ordinary} parastus stabilus kubus un {painted} krāsotos kubus. {protected} aizsargāti objekti paliks; {cross} šķērso atlases robežu.', cutCubeOption: 'Noņemt arī kubus: {count} (parasti {ordinary} / krāsoti {painted}).', cutCubeSourceRemove: 'Pēc kopēšanas tiks noņemti {count} avota kubi.', cutCubeSourceRetain: 'Tiks kopēti {count} kubi; avota kubi paliks.', cutSuccessRetainedCubes: 'Rasējums nokopēts. Avota kubi saglabāti.' },
+			ro: { deleteConfirmPaintedMessage: 'Pot fi demontate {buildings} clădiri, {ordinary} Cuburi stabile obișnuite și {painted} Cuburi pictate. {protected} obiecte protejate rămân; {cross} depășesc limita selecției.', cutCubeOption: 'Elimină și Cuburile: {count} (obișnuite {ordinary} / pictate {painted}).', cutCubeSourceRemove: 'După copiere, cele {count} Cuburi sursă vor fi eliminate.', cutCubeSourceRetain: 'Cele {count} Cuburi vor fi copiate; Cuburile sursă vor rămâne.', cutSuccessRetainedCubes: 'Schiță copiată. Cuburile sursă au fost păstrate.' },
+			no: { deleteConfirmPaintedMessage: '{buildings} bygninger, {ordinary} vanlige stabile kuber og {painted} malte kuber kan demonteres. {protected} beskyttede objekter blir stående; {cross} krysser utvalgsgrensen.', cutCubeOption: 'Fjern også kuber: {count} (vanlige {ordinary} / malte {painted}).', cutCubeSourceRemove: 'Etter kopiering fjernes de {count} kildekubene.', cutCubeSourceRetain: 'De {count} kubene kopieres; kildekubene blir stående.', cutSuccessRetainedCubes: 'Blåkopi kopiert. Kildekubene ble beholdt.' },
+			modsch: { deleteConfirmPaintedMessage: '可拆解建筑 {buildings} 栋、原版 Stable 矿方体 {ordinary} 个、绘制矿方体 {painted} 个；受保护对象 {protected} 个会保留；跨越选区边界 {cross} 个。', cutCubeOption: '同时移除 Cube：共 {count} 个（普通 {ordinary} / 绘制 {painted}）。', cutCubeSourceRemove: '复制成功后，将移除源位置的 {count} 个 Cube。', cutCubeSourceRetain: '将复制 {count} 个 Cube；源位置的 Cube 会保留。', cutSuccessRetainedCubes: '蓝图已复制；源位置的 Cube 已保留。' }
+		})
 		for (const language of Object.keys(TEXT)) {
 			Object.assign(
 				TEXT[language],
@@ -4326,8 +4538,20 @@ ModLoader.register({
 				PLACEMENT_TEXT[language] || PLACEMENT_TEXT.en,
 				FULL_BLUEPRINT_TEXT[language] || FULL_BLUEPRINT_TEXT.en,
 				{ blueprintIncludeSurges: INCLUDE_SURGES_TEXT[language] || INCLUDE_SURGES_TEXT.en },
+				{
+					blueprintSurge: SURGE_NAME_TEXT[language] || SURGE_NAME_TEXT.en,
+					toolbarCardSurges: SURGE_TOOLBAR_TEXT[language] || SURGE_TOOLBAR_TEXT.en
+				},
 				SYNC_EMPTY_TEXT[language] || SYNC_EMPTY_TEXT.en,
 				LIBRARY_TEXT[language],
+				DRAW_MODE_TEXT[language] || DRAW_MODE_TEXT.en,
+				PAINT_STAGE_TEXT[language] || PAINT_STAGE_TEXT.en,
+				PAINT_BUCKET_TEXT[language] || PAINT_BUCKET_TEXT.en,
+				PAINT_SAVE_TEXT[language] || PAINT_SAVE_TEXT.en,
+				PAINT_GROW_TEXT[language] || PAINT_GROW_TEXT.en,
+				PAINT_PALETTE_TEXT[language],
+				PAINTED_BLUEPRINT_TEXT[language] || PAINTED_BLUEPRINT_TEXT.en,
+				SELECTION_PAINTED_COMPAT_TEXT[language] || SELECTION_PAINTED_COMPAT_TEXT.en,
 				{ toolbarCardCut: CUT_TOOLBAR_TEXT[language] || CUT_TOOLBAR_TEXT.en }
 			)
 		}
@@ -4355,7 +4579,13 @@ ModLoader.register({
 				'toolbarCardUndo',
 				'toolbarCardRedo',
 				'toolbarCardDelete',
-				'toolbarCardCut'
+				'toolbarCardCut',
+				'toolbarCardDraw',
+				'toolbarCardPaintBrush',
+				'toolbarCardPaintBucket',
+				'toolbarCardPaintEraser',
+				'toolbarCardPaintStable',
+				'toolbarCardPaintGrow'
 			])
 		)
 		const HISTORY_KEYS = Object.freeze(
@@ -4363,19 +4593,30 @@ ModLoader.register({
 				return !TOOLBAR_KEYS.includes(key)
 			})
 		)
+		const PAINT_PALETTE_KEYS = Object.freeze(Object.keys(PAINT_PALETTE_TEXT.en))
+		const PRIVATE_SELECTION_COMPAT_KEYS = new Set([
+			'deleteConfirmPaintedMessage',
+			'cutCubeSourceRemove',
+			'cutCubeSourceRetain',
+			'cutSuccessRetainedCubes'
+		])
 		const KEYS = Object.freeze(Object.keys(TEXT.en).filter(function (key) {
-			return !TOOLBAR_KEYS.includes(key) && !HISTORY_KEYS.includes(key)
+			return !TOOLBAR_KEYS.includes(key) &&
+				!HISTORY_KEYS.includes(key) &&
+				!PAINT_PALETTE_KEYS.includes(key) &&
+				!PRIVATE_SELECTION_COMPAT_KEYS.has(key)
 		}))
 
 		for (const language of LANGUAGES) Object.freeze(TEXT[language])
 		Object.freeze(TEXT)
 
 		const i18n = Object.freeze({
-			version: '0.5.1',
+			version: '0.6.0',
 			languages: LANGUAGES,
 			keys: KEYS,
 			toolbarKeys: TOOLBAR_KEYS,
 			historyKeys: HISTORY_KEYS,
+			paintPaletteKeys: PAINT_PALETTE_KEYS,
 			t(languageOrGame, key) {
 				const language = typeof languageOrGame === 'string' ? languageOrGame : languageOrGame?.language
 				const economyTable = CREATIVE_ECONOMY_TEXT[language] || CREATIVE_ECONOMY_TEXT.en

@@ -3,6 +3,7 @@ ModLoader.register({
 	init() {
 		const TRANSFORM_KEY = Symbol.for('cattail.world-editor.blueprint-transform')
 		const STATE_KEY = Symbol.for('cattail.world-editor.blueprint-state')
+		const PAINTED_KEY = Symbol.for('cattail.world-editor.blueprint-painted')
 		const IDENTITY = Object.freeze([1, 0, 0, 1])
 		const ROTATE_CW = Object.freeze([0, -1, 1, 0])
 		const ROTATE_CCW = Object.freeze([0, 1, -1, 0])
@@ -293,6 +294,7 @@ ModLoader.register({
 				...effective,
 				entities: Object.freeze((effective.entities || []).map(freezeContainer)),
 				blocks: Object.freeze((effective.blocks || []).map(freezeContainer)),
+				paintedCubes: Object.freeze((effective.paintedCubes || []).map(freezeContainer)),
 				surges: Object.freeze((effective.surges || []).map(freezeContainer)),
 				emptyCells: Object.freeze((effective.emptyCells || []).map(function (position) {
 					return Object.freeze(position.slice())
@@ -345,8 +347,8 @@ ModLoader.register({
 						end,
 						min: bounds.min,
 						max: bounds.max,
-						width: bounds.max[0] - bounds.min[0] + 1,
-						height: bounds.max[1] - bounds.min[1] + 1
+						width: safeDimension(bounds.min[0], bounds.max[0]),
+						height: safeDimension(bounds.min[1], bounds.max[1])
 					}))
 				})
 				: []
@@ -370,15 +372,29 @@ ModLoader.register({
 					position: transformPoint(block.position, center, transformMatrix)
 				}))
 			})
+			const paintedService = globalThis[PAINTED_KEY]
+			const paintedCubes = (value.paintedCubes || []).map(function (record) {
+				const transformed = paintedService?.transformRecord?.(record, function (position) {
+					return transformPoint(position, center, transformMatrix)
+				})
+				if (!transformed) throw new TypeError('World Editor transform requires a valid painted cube record.')
+				return freezeContainer(transformed)
+			})
 			const surges = (value.surges || []).map(function (surge) {
+				const stabilizerPosition = normalizePoint(surge?.stabilizer?.position)
 				return freezeContainer(Object.assign({}, surge, {
-					position: transformPoint(surge.position, center, transformMatrix)
+					position: transformPoint(surge.position, center, transformMatrix),
+					...(stabilizerPosition ? {
+						stabilizer: freezeContainer({
+							position: transformPoint(stabilizerPosition, center, transformMatrix)
+						})
+					} : {})
 				}))
 			})
 			const supportsEmptyCells = (
 				Number(value.schemaVersion) === 4 && value.mode === 'structure'
 			) || (
-				(Number(value.schemaVersion) === 5 || Number(value.schemaVersion) === 6) && value.mode === 'full'
+				(Number(value.schemaVersion) === 5 || Number(value.schemaVersion) === 6 || Number(value.schemaVersion) === 7 || Number(value.schemaVersion) === 8) && value.mode === 'full'
 			)
 			const emptyCells = supportsEmptyCells && Array.isArray(value.emptyCells)
 				? value.emptyCells.map(function (position) {
@@ -400,6 +416,7 @@ ModLoader.register({
 				contentBounds,
 				entities: Object.freeze(entities),
 				blocks: Object.freeze(blocks),
+				paintedCubes: Object.freeze(paintedCubes),
 				surges: Object.freeze(surges)
 			}))
 		}
@@ -410,8 +427,8 @@ ModLoader.register({
 			const max = normalizePoint(bounds?.max)
 			if (!min || !max) return Object.freeze([0, 0])
 			return Object.freeze([
-				Math.ceil((Math.min(min[0], max[0]) + Math.max(min[0], max[0])) / 2),
-				Math.ceil((Math.min(min[1], max[1]) + Math.max(min[1], max[1])) / 2)
+				Math.ceil(safeIntegerAdd(Math.min(min[0], max[0]), Math.max(min[0], max[0])) / 2),
+				Math.ceil(safeIntegerAdd(Math.min(min[1], max[1]), Math.max(min[1], max[1])) / 2)
 			])
 		}
 
@@ -478,12 +495,21 @@ ModLoader.register({
 
 		function transformPoint(value, center, transformMatrix) {
 			const point = normalizePoint(value)
-			if (!point) throw new TypeError('World Editor transform requires integer positions.')
-			const relativeU = point[0] - center[0]
-			const relativeV = point[1] - center[1]
+			const normalizedCenter = normalizePoint(center)
+			if (!point || !normalizedCenter) throw new TypeError('World Editor transform requires safe integer positions.')
+			const relativeU = safeIntegerSubtract(point[0], normalizedCenter[0])
+			const relativeV = safeIntegerSubtract(point[1], normalizedCenter[1])
+			const transformedU = safeIntegerAdd(
+				safeIntegerMultiply(transformMatrix[0], relativeU),
+				safeIntegerMultiply(transformMatrix[1], relativeV)
+			)
+			const transformedV = safeIntegerAdd(
+				safeIntegerMultiply(transformMatrix[2], relativeU),
+				safeIntegerMultiply(transformMatrix[3], relativeV)
+			)
 			return Object.freeze([
-				center[0] + transformMatrix[0] * relativeU + transformMatrix[1] * relativeV,
-				center[1] + transformMatrix[2] * relativeU + transformMatrix[3] * relativeV
+				safeIntegerAdd(normalizedCenter[0], transformedU),
+				safeIntegerAdd(normalizedCenter[1], transformedV)
 			])
 		}
 
@@ -492,8 +518,8 @@ ModLoader.register({
 			return freezeContainer({
 				min: Object.freeze(bounds.min.slice()),
 				max: Object.freeze(bounds.max.slice()),
-				width: bounds.max[0] - bounds.min[0] + 1,
-				height: bounds.max[1] - bounds.min[1] + 1
+				width: safeDimension(bounds.min[0], bounds.max[0]),
+				height: safeDimension(bounds.min[1], bounds.max[1])
 			})
 		}
 
@@ -501,18 +527,60 @@ ModLoader.register({
 			if (!Array.isArray(value) || value.length < 2) return null
 			const u = Number(value[0])
 			const v = Number(value[1])
-			return Number.isInteger(u) && Number.isInteger(v) ? [u, v] : null
+			return Number.isSafeInteger(u) && Number.isSafeInteger(v) ? [u, v] : null
 		}
 
 		function validSource(value) {
 			const schemaVersion = Number(value?.schemaVersion)
-			return !!value &&
-				(schemaVersion === 1 || schemaVersion === 2 || schemaVersion === 3 || schemaVersion === 4 || schemaVersion === 5 || schemaVersion === 6) &&
+			const stateService = globalThis[STATE_KEY]
+			if (
+				typeof stateService?.inspectStructure === 'function' &&
+				stateService.inspectStructure(value)?.valid !== true
+			) return false
+			if (
+				typeof stateService?.inspectBlueprint === 'function' &&
+				stateService.inspectBlueprint(value)?.valid !== true
+			) return false
+			const paintedService = globalThis[PAINTED_KEY]
+			const paintedRequired = schemaVersion === 7 || (
+				schemaVersion === 8 && Array.isArray(value?.paintedCubes) && value.paintedCubes.length > 0
+			)
+			const paintedValid = !paintedRequired || (
+				typeof paintedService?.normalizeLayer === 'function' &&
+				Array.isArray(paintedService.normalizeLayer(value))
+			)
+			return !!value && paintedValid &&
+				(schemaVersion === 1 || schemaVersion === 2 || schemaVersion === 3 || schemaVersion === 4 || schemaVersion === 5 || schemaVersion === 6 || schemaVersion === 7 || schemaVersion === 8) &&
 				(value.mode === 'structure' || value.mode === 'full') &&
 				Array.isArray(value.entities) &&
 				(schemaVersion !== 4 || value.mode !== 'structure' || Array.isArray(value.emptyCells)) &&
-				((schemaVersion !== 5 && schemaVersion !== 6) || value.mode !== 'full' || Array.isArray(value.emptyCells)) &&
-				(schemaVersion !== 6 || value.mode !== 'full' || Array.isArray(value.surges))
+				((schemaVersion !== 5 && schemaVersion !== 6 && schemaVersion !== 7 && schemaVersion !== 8) || value.mode !== 'full' || Array.isArray(value.emptyCells)) &&
+				((schemaVersion !== 6 && schemaVersion !== 7 && schemaVersion !== 8) || value.mode !== 'full' || Array.isArray(value.surges)) &&
+				(schemaVersion !== 7 || (value.mode === 'full' && Array.isArray(value.paintedCubes) && value.paintedCubes.length > 0)) &&
+				(schemaVersion !== 8 || (value.mode === 'full' && Array.isArray(value.paintedCubes)))
+		}
+
+		function safeDimension(left, right) {
+			const min = Math.min(left, right)
+			const max = Math.max(left, right)
+			return safeIntegerAdd(safeIntegerSubtract(max, min), 1)
+		}
+
+		function safeIntegerAdd(left, right) {
+			return requireSafeInteger(Number(left) + Number(right))
+		}
+
+		function safeIntegerSubtract(left, right) {
+			return requireSafeInteger(Number(left) - Number(right))
+		}
+
+		function safeIntegerMultiply(left, right) {
+			return requireSafeInteger(Number(left) * Number(right))
+		}
+
+		function requireSafeInteger(value) {
+			if (!Number.isSafeInteger(value)) throw new TypeError('World Editor transform coordinate arithmetic overflowed.')
+			return value
 		}
 
 		function nonNegativeInteger(value, fallback) {

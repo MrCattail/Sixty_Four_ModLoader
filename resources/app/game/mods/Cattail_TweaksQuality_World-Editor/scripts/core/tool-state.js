@@ -4,7 +4,8 @@ ModLoader.register({
 		const RUNTIME_KEY = Symbol.for('cattail.world-editor.runtime')
 		const SELECTION_KEY = Symbol.for('cattail.world-editor.selection')
 		const TOOL_KEY = Symbol.for('cattail.world-editor.tool')
-		const MODES = Object.freeze(['select'])
+		const MODES = Object.freeze(['select', 'draw'])
+		const SERVICE_VERSION = '0.6.0'
 
 		api.on('afterGameInit', function (payload, game) {
 			const runtime = globalThis[RUNTIME_KEY]
@@ -36,7 +37,7 @@ ModLoader.register({
 				tool.dispose('runtime-disposed')
 			})
 
-			console.info('[Cattail World Editor] Tool state 2F ready.')
+			console.info('[Cattail World Editor] Tool state 5C-1 ready.')
 		})
 
 		function createToolState() {
@@ -48,7 +49,7 @@ ModLoader.register({
 
 			function snapshot() {
 				return {
-					version: '0.2.6',
+					version: SERVICE_VERSION,
 					mode,
 					revision,
 					lastReason,
@@ -68,7 +69,7 @@ ModLoader.register({
 			}
 
 			const tool = Object.freeze({
-				version: '0.2.6',
+				version: SERVICE_VERSION,
 				modes: MODES,
 				snapshot,
 				setMode(nextMode, reason) {

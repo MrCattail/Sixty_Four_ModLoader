@@ -366,8 +366,8 @@ function testResourceHudGeometryRenderingHoverAndRestore() {
 }
 
 function testSourceStyleScopeAndDocumentation() {
-	assert.equal(manifest.version, '0.5.1')
-	assert.equal(manifest.entry.length, 35)
+	assert.equal(manifest.version, '0.6.0')
+	assert.equal(manifest.entry.length, 45)
 	assert.equal(manifest.entry.includes('scripts/ui/resource-hud.js'), false)
 	assert.match(shellSource, /resourceTriplet\(game, 1, \['#FFC759', '#FFE86F', '#FF8F60'\]\)/)
 	assert.match(shellSource, /resourceTriplet\(game, 3, \['#F26F67', '#FFB68C', '#C02E63'\]\)/)
@@ -409,7 +409,8 @@ function testSourceStyleScopeAndDocumentation() {
 	assert.match(readme, /Beta-Pylene/)
 	assert.match(sessionSource, /preview-status\[data-status="buildable"\][^{]*\{ color: #09a943; \}/)
 	assert.match(sessionSource, /preview-status\[data-status="satisfied"\][^{]*\{ color: #bd8c00; \}/)
-	assert.match(cutSource, /status\[data-kind="warning"\][\s\S]*color: #f2cc60/)
+	assert.match(cutSource, /status\[data-kind="warning"\][^{]*\{[^}]*--world-editor-local-status-accent:\s*var\(--world-editor-history-warning\);[^}]*--world-editor-local-status-color:\s*color-mix\(in srgb,\s*var\(--world-editor-history-warning\) 78%,\s*var\(--world-editor-shell-text\)\);/s)
+	assert.doesNotMatch(cutSource, /status\[data-kind="warning"\][^{]*\{[^}]*color:\s*#f2cc60/s)
 	assert.match(shellSource, /'setResourceHomesMobile'/)
 	assert.match(shellSource, /'renderDarkResources'/)
 	assert.match(shellSource, /'updateMouseData'/)

@@ -9,6 +9,8 @@ ModLoader.register({
 		const toggleKey = '_cattailShopCategoryToggle'
 		const compressedKey = '_cattailShopCategoryCompressed'
 		const signatureKey = '_cattailShopCategorySignature'
+		const tooltipCleanupKey = Symbol('cattail-shop-category-tooltip-cleanups')
+		const SHOP_ITEM_TOOLTIP_DELAY_MS = 600
 
 		const categories = [
 			{
@@ -351,6 +353,7 @@ ModLoader.register({
 		}
 
 		function resetPanel(shop) {
+			releaseItemTooltips(shop)
 			if (shop[panelKey]) shop[panelKey].remove()
 			shop[panelKey] = null
 			shop[signatureKey] = ''
@@ -374,6 +377,7 @@ ModLoader.register({
 			}
 
 			panel.classList.remove('cattail-shop-category-panel-hidden')
+			releaseItemTooltips(shop)
 			panel.innerHTML = ''
 
 			for (const category of visibleCategories) {
@@ -526,7 +530,36 @@ ModLoader.register({
 				event.stopPropagation()
 				activateItem(shop, item)
 			}
+			attachItemTooltip(shop, row, item)
 			return row
+		}
+
+		function getItemDescription(item) {
+			return String(item?.html?.querySelector('.itemDescription')?.textContent || '').trim()
+		}
+
+		function attachItemTooltip(shop, row, item) {
+			const tooltipApi = api.ui?.settings?.tooltip
+			const description = getItemDescription(item)
+			if (shop?.master?.isMobile || !description || typeof tooltipApi?.attach !== 'function') return false
+			const detach = tooltipApi.attach(row, description, {
+				root: shop?.[panelKey] || shop?.vessel,
+				ariaLabel: false,
+				delayMs: SHOP_ITEM_TOOLTIP_DELAY_MS
+			})
+			if (typeof detach !== 'function') return false
+			if (!Array.isArray(shop[tooltipCleanupKey])) shop[tooltipCleanupKey] = []
+			shop[tooltipCleanupKey].push(detach)
+			return true
+		}
+
+		function releaseItemTooltips(shop) {
+			const cleanups = shop?.[tooltipCleanupKey]
+			if (!Array.isArray(cleanups)) return
+			for (const detach of cleanups) {
+				try { detach() } catch (error) {}
+			}
+			shop[tooltipCleanupKey] = []
 		}
 
 		function activateItem(shop, item) {

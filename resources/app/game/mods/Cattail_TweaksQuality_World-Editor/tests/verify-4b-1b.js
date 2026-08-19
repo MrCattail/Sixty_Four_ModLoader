@@ -31,7 +31,7 @@ function testSourceContracts() {
 	assert.match(shellSource, /createHistoryButton\('undo',\s*'↶'\)/)
 	assert.match(shellSource, /createHistoryButton\('redo',\s*'↷'\)/)
 	assert.match(shellSource, /historyGroup\.append\(undoButton,\s*redoButton\)/)
-	assert.match(shellSource, /actions\.append\(selectionGroup,\s*historyGroup,\s*blueprintGroup,\s*blueprintLibraryGroup,\s*transformGroup,\s*creativeGroup\)/)
+	assert.match(shellSource, /actions\.append\(selectionGroup,\s*historyGroup,\s*blueprintGroup,\s*blueprintLibraryGroup,\s*transformGroup,\s*drawGroup,\s*creativeGroup\)/)
 	assert.match(shellSource, /button\.disabled\s*=\s*false/)
 	assert.match(shellSource, /definition\.button\.setAttribute\('aria-disabled',\s*reason\s*\?\s*'true'\s*:\s*'false'\)/)
 	assert.match(shellSource, /worldEditorToolbarBusy\s*=\s*reason\s*===\s*'BUSY'/)
@@ -293,6 +293,31 @@ function createDocument() {
 	return document
 }
 
+function createSettingsUi(document) {
+	return {
+		version: 1,
+		createControl(definition, options = {}) {
+			const element = document.createElement('input')
+			element.type = definition.type === 'slider' ? 'range' : 'number'
+			element.value = String(options.value ?? definition.default ?? 0)
+			const handle = {
+				element,
+				input: element,
+				getValue() { return Number(element.value) },
+				setValue(value) { element.value = String(value); return Number(element.value) },
+				validate() {
+					const value = Number(element.value)
+					return Number.isFinite(value) ? { valid: true, value, error: null } : { valid: false, value: undefined, error: new Error('Invalid number') }
+				},
+				setDisabled(value) { element.disabled = !!value; return handle },
+				destroy() { element.remove?.() }
+			}
+			return handle
+		},
+		scroll: { attach() { return function () {} } }
+	}
+}
+
 class EventHub {
 	constructor() {
 		this.listeners = new Map()
@@ -486,6 +511,8 @@ async function testMountedBehavior() {
 	let panelBlocking = false
 	let inputBlocked = false
 	let dialogOpen = false
+	let tooltipDisposed = false
+	const tooltipText = new Map()
 	const document = createDocument()
 	const window = new EventHub()
 	class Game {
@@ -527,6 +554,7 @@ async function testMountedBehavior() {
 			set() {}
 		},
 		ui: {
+			settings: createSettingsUi(document),
 			hud: {
 				isHidden() { return false },
 				register() { return function () {} }
@@ -559,7 +587,22 @@ async function testMountedBehavior() {
 	const shared = {
 		isEditableEvent(value) { return value.editable === true },
 		isModLoaderPanelBlocking() { return panelBlocking },
-		isWorldEditorInputBlocked() { return inputBlocked }
+		isWorldEditorInputBlocked() { return inputBlocked },
+		createTooltipScope() {
+			return {
+				set(target, value) {
+					target.title = ''
+					tooltipText.set(target, String(value))
+					return true
+				},
+				clear(target) { return tooltipText.delete(target) },
+				dispose() {
+					tooltipDisposed = true
+					tooltipText.clear()
+					return true
+				}
+			}
+		}
 	}
 	const dialogs = {
 		game,
@@ -591,8 +634,10 @@ async function testMountedBehavior() {
 	assert.equal(undo.getAttribute('aria-disabled'), 'false')
 	assert.equal(redo.getAttribute('aria-disabled'), 'true')
 	assert.equal(redo.dataset.historyBlockedReason, 'NO_REDO')
-	assert.match(undo.title, /Undo \(Ctrl\+Z\)/)
-	assert.match(redo.title, /Nothing to Redo/)
+	assert.equal(undo.title, '')
+	assert.equal(redo.title, '')
+	assert.match(tooltipText.get(undo), /Undo \(Ctrl\+Z\)/)
+	assert.match(tooltipText.get(redo), /Nothing to Redo/)
 	assert.equal(status.getAttribute('role'), 'status')
 	assert.equal(status.getAttribute('aria-live'), 'polite')
 	assert.equal(status.dataset.active, 'false')
@@ -739,10 +784,12 @@ async function testMountedBehavior() {
 
 	game.language = 'sch'
 	for (const listener of hooks.get('afterWords') || []) listener({}, game)
-	assert.match(undo.title, /撤销/)
+	assert.match(tooltipText.get(undo), /撤销/)
 	assert.equal(status.textContent, '恢复失败。请重新加载游戏后再编辑。')
 
 	for (const cleanup of cleanups.splice(0)) cleanup()
+	assert.equal(tooltipDisposed, true)
+	assert.equal(tooltipText.size, 0)
 	assert.equal(window.count('keydown'), 0)
 	assert.equal(document.getElementById('cattail-world-editor-shell'), null)
 }

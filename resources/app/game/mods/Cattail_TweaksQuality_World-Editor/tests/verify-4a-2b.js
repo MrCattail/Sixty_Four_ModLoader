@@ -161,6 +161,18 @@ class Widget2 extends Entity {
 	}
 }
 
+class Scan extends Entity {
+	constructor(master) {
+		super(master, 'scan')
+	}
+}
+
+class Puncture extends Entity {
+	constructor(master) {
+		super(master, 'puncture')
+	}
+}
+
 class Shop {
 	constructor(master) {
 		this.master = master
@@ -209,6 +221,8 @@ class Game {
 			entities: {
 				widget: { class: Widget, canPurchase: true, onlyone: false },
 				widget2: { class: Widget2, canPurchase: true, onlyone: false, isUpgradeTo: 'widget' },
+				scan: { class: Scan, canPurchase: true, onlyone: true, isDark: true },
+				puncture: { class: Puncture, canPurchase: true, onlyone: false, isDark: true },
 				eraser: { canPurchase: true },
 				eventThing: { canPurchase: false }
 			}
@@ -224,6 +238,7 @@ class Game {
 		this.builds = []
 		this.clears = []
 		this.relocations = []
+		this.targetEntities = new Map()
 		this.transfers = []
 		this.canvas = new FakeCanvas()
 		this.mouse = { currentAction: null, state: 0, timer: 0, maxTimer: 10, positionChanged: false }
@@ -318,8 +333,12 @@ class Game {
 	canRelocate(entity) {
 		return !!entity && entity.name !== 'eraser'
 	}
-	entityAtCoordinates() {
-		return this.hoveredEntity
+	entityAtCoordinates(cell) {
+		const key = Array.isArray(cell) ? cell[0] + ':' + cell[1] : ''
+		if (this.targetEntities.has(key)) return this.targetEntities.get(key)
+		return Array.isArray(cell) && cell[0] === this.hoveredCell?.[0] && cell[1] === this.hoveredCell?.[1]
+			? this.hoveredEntity
+			: null
 	}
 	relocate(entity, cell) {
 		this.relocations.push({ entity, cell: Array.from(cell) })
@@ -611,6 +630,53 @@ async function verifyRuntimeContract() {
 	assert.equal(runtime.snapshots.created.length, snapshotsBeforeNormal)
 	creative.setActive(true)
 
+	game.plane = 1
+	game.hoveredCell = [40, 41]
+	game.hoveredEntity = null
+	game.pickupItem('scan')
+	const createsBeforeVoidScan = runtime.snapshots.created.length
+	const buildsBeforeVoidScan = game.builds.length
+	game.processClick()
+	await waitForAsyncWork()
+	assert.equal(runtime.snapshots.created.length, createsBeforeVoidScan + 1)
+	assert.equal(runtime.snapshots.created.at(-1).reason, 'creative-shop-before-build')
+	assert.equal(runtime.snapshots.created.at(-1).tags.plane, 'void')
+	assert.equal(runtime.snapshots.created.at(-1).tags.entity, 'scan')
+	assert.equal(game.builds.length, buildsBeforeVoidScan + 1)
+	assert.equal(game.builds.at(-1).name, 'scan')
+
+	game.hoveredCell = [42, 43]
+	game.pickupItem('puncture')
+	const createsBeforeVoidPuncture = runtime.snapshots.created.length
+	const buildsBeforeVoidPuncture = game.builds.length
+	game.processClick()
+	await waitForAsyncWork()
+	assert.equal(runtime.snapshots.created.length, createsBeforeVoidPuncture + 1)
+	assert.equal(runtime.snapshots.created.at(-1).tags.plane, 'void')
+	assert.equal(runtime.snapshots.created.at(-1).tags.entity, 'puncture')
+	assert.equal(game.builds.length, buildsBeforeVoidPuncture + 1)
+	assert.equal(game.builds.at(-1).name, 'puncture')
+
+	game.hoveredCell = [44, 45]
+	game.pickupItem('widget')
+	const createsBeforeInvalidVoidBuild = runtime.snapshots.created.length
+	const buildsBeforeInvalidVoidBuild = game.builds.length
+	game.processClick()
+	await waitForAsyncWork()
+	assert.equal(runtime.snapshots.created.length, createsBeforeInvalidVoidBuild)
+	assert.equal(game.builds.length, buildsBeforeInvalidVoidBuild)
+
+	game.hoveredCell = [46, 47]
+	game.hoveredEntity = new Scan(game)
+	game.pickupItem('puncture')
+	const createsBeforeOccupiedVoidBuild = runtime.snapshots.created.length
+	game.processClick()
+	await waitForAsyncWork()
+	assert.equal(runtime.snapshots.created.length, createsBeforeOccupiedVoidBuild)
+	assert.equal(game.builds.length, buildsBeforeInvalidVoidBuild)
+	game.plane = 0
+	game.hoveredEntity = null
+
 	runtime.snapshots.create = null
 	game.resources[0] = 10
 	game.hoveredCell = [2, 3]
@@ -648,14 +714,37 @@ async function verifyRuntimeContract() {
 
 	game.pickupItem('widget')
 	game.hoveredCell = [4, 5]
-	const buildsBeforeChangedTarget = game.builds.length
+	game.hoveredEntity = null
+	const buildsBeforeFrozenTarget = game.builds.length
+	const removedBeforeFrozenTarget = runtime.snapshots.removed.length
 	game.processClick()
 	game.hoveredCell = [6, 7]
+	const liveHoverEntity = new Widget(game)
+	game.hoveredEntity = liveHoverEntity
 	runtime.snapshots.resolveNext()
 	await waitForAsyncWork()
-	assert.equal(game.builds.length, buildsBeforeChangedTarget)
-	assert.equal(runtime.snapshots.removed.length, 1)
+	assert.equal(game.builds.length, buildsBeforeFrozenTarget + 1, 'moving after the click must not cancel the frozen build target')
+	assert.deepEqual(game.builds.at(-1), { name: 'widget', cell: [4, 5] })
+	assert.deepEqual(game.hoveredCell, [6, 7], 'execution restores the live hover after using the frozen target')
+	assert.equal(game.hoveredEntity, liveHoverEntity, 'an unrelated entity under the moved cursor does not replace the frozen target')
+	assert.equal(runtime.snapshots.removed.length, removedBeforeFrozenTarget)
+	assert.equal(economy.snapshot().phase, 'success')
+
+	game.hoveredCell = [7, 8]
+	game.hoveredEntity = null
+	game.pickupItem('widget')
+	const buildsBeforeOccupiedFrozenTarget = game.builds.length
+	game.processClick()
+	game.hoveredCell = [9, 10]
+	game.hoveredEntity = null
+	const externallyPlaced = new Widget(game)
+	externallyPlaced.position = [7, 8]
+	game.targetEntities.set('7:8', externallyPlaced)
+	runtime.snapshots.resolveNext()
+	await waitForAsyncWork()
+	assert.equal(game.builds.length, buildsBeforeOccupiedFrozenTarget, 'a real occupancy change at the frozen cell still cancels safely')
 	assert.equal(economy.snapshot().phase, 'cancelled')
+	game.targetEntities.delete('7:8')
 
 	game.hoveredCell = [20, 21]
 	game.hoveredEntity = new Widget(game)
@@ -711,7 +800,8 @@ async function verifyRuntimeContract() {
 	game.pickupItem('widget')
 	const buildsBeforeCleanupFailure = game.builds.length
 	game.processClick()
-	game.hoveredCell = [30, 31]
+	game.hoveredEntity = new Widget(game)
+	game.hoveredEntity.position = [28, 29]
 	runtime.snapshots.resolveNext()
 	await waitForAsyncWork()
 	assert.equal(game.builds.length, buildsBeforeCleanupFailure)
@@ -858,7 +948,7 @@ async function verifyRuntimeContract() {
 
 function verifyStaticIntegration() {
 	const manifest = JSON.parse(source('mod.json'))
-	assert.equal(manifest.version, '0.5.1')
+	assert.equal(manifest.version, '0.6.0')
 	assert.equal(manifest.config.showCreativePurchaseCosts.type, 'boolean')
 	assert.equal(manifest.config.showCreativePurchaseCosts.default, false)
 	assert.equal(manifest.config.showCreativePurchaseCosts.reloadPolicy, 'hot')
@@ -887,7 +977,9 @@ function verifyStaticIntegration() {
 		"snapshots.remove({ id })",
 		"patchListenerRegistration('setListenersTouch', true)",
 		"withInputSource('gamepad'",
-		"withInputSource('touch'"
+		"withInputSource('touch'",
+		'isSupportedCreativePlane(game.plane)',
+		'definition?.isDark !== true'
 	]) {
 		assert.ok(economy.includes(text), text)
 	}

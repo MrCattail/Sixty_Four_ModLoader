@@ -2,6 +2,7 @@ ModLoader.register({
 	id: 'Cattail_TweaksQuality_World-Editor',
 	init() {
 		const CONTROLLER_KEY = Symbol.for('cattail.world-editor.card-opacity')
+		const SHARED_KEY = Symbol.for('cattail.world-editor.shared')
 		const STYLE_ID = 'cattail-world-editor-card-opacity-style'
 		const OPACITY_MIN = .25
 		const OPACITY_MAX = 1
@@ -18,6 +19,7 @@ ModLoader.register({
 		})
 		const previous = globalThis[CONTROLLER_KEY]
 		previous?.dispose?.()
+		const tooltips = globalThis[SHARED_KEY]?.createTooltipScope?.()
 
 		const registrations = new Map()
 		const groups = new Map()
@@ -63,6 +65,7 @@ ModLoader.register({
 				element.style.removeProperty('--world-editor-card-shell-saturate')
 				delete element.dataset.opacityContentIndependent
 				delete element.dataset.cardOpacity
+				tooltips?.clear(state.hint)
 				if (state.group && !Array.from(registrations.values()).some(function (entry) {
 					return entry.group === state.group
 				})) {
@@ -219,9 +222,9 @@ ModLoader.register({
 			const text = state.getText?.(stateSnapshot(state)) || {}
 			const tooltip = [text.instruction, text.mode].filter(Boolean).join(' ')
 			if (state.hint) {
-				state.hint.dataset.tooltip = tooltip
 				state.hint.dataset.contentIndependent = state.shared.contentIndependent ? 'true' : 'false'
 				state.hint.setAttribute('aria-label', tooltip)
+				tooltips?.set(state.hint, tooltip)
 			}
 		}
 
@@ -337,38 +340,6 @@ ModLoader.register({
 				.cattail-world-editor-card-opacity-hint[data-content-independent="true"] {
 					opacity: .94;
 				}
-				.cattail-world-editor-card-opacity-hint::after {
-					content: attr(data-tooltip);
-					position: absolute;
-					z-index: 4;
-					top: calc(100% + 6px);
-					right: 0;
-					width: max-content;
-					max-width: 220px;
-					padding: 5px 7px;
-					border: 1px solid rgba(92, 65, 132, .18);
-					border-radius: 5px;
-					background: rgba(248, 248, 246, .96);
-					box-shadow: 0 5px 16px rgba(0, 0, 0, .14);
-					color: rgba(18, 20, 22, .78);
-					font: 400 10px/1.35 Montserrat, Arial, sans-serif;
-					letter-spacing: 0;
-					opacity: 0;
-					visibility: hidden;
-					white-space: normal;
-					pointer-events: none;
-					transition: opacity .1s ease, visibility 0s linear .1s;
-				}
-				[data-theme="void"] .cattail-world-editor-card-opacity-hint::after {
-					border-color: rgba(210, 188, 250, .22);
-					background: rgba(8, 10, 12, .96);
-					color: rgba(255, 255, 255, .82);
-				}
-				.cattail-world-editor-card-opacity-hint:hover::after {
-					opacity: 1;
-					visibility: visible;
-					transition-delay: 0s;
-				}
 			`
 			document.head.append(style)
 		}
@@ -378,6 +349,7 @@ ModLoader.register({
 		}
 
 		function dispose() {
+			tooltips?.dispose()
 			for (const state of Array.from(registrations.values())) state.release()
 			groups.clear()
 			removeListeners()

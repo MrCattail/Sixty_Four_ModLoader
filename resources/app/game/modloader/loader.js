@@ -3568,15 +3568,27 @@
 	const setPanelTooltipText = function (target, text, options) {
 		if (!target?.dataset) return target
 		const value = String(text || '').trim()
+		const delayProperty = 'modloaderPanelTooltipDelayMs'
+		const delayMs = Number(options?.delayMs)
 		if (value) {
 			target.dataset.modloaderPanelTooltip = value
+			target.dataset.modloaderPanelTooltipTheme = options?.theme === 'global' ? 'global' : 'plane'
 			if (options?.kind) target.dataset.modloaderPanelTooltipKind = String(options.kind)
 			else delete target.dataset.modloaderPanelTooltipKind
+			if (Number.isFinite(delayMs) && delayMs > 0) target.dataset[delayProperty] = String(Math.min(10000, Math.max(0, Math.round(delayMs))))
+			else delete target.dataset.modloaderPanelTooltipDelayMs
 		} else {
 			delete target.dataset.modloaderPanelTooltip
+			delete target.dataset.modloaderPanelTooltipTheme
 			delete target.dataset.modloaderPanelTooltipKind
+			delete target.dataset.modloaderPanelTooltipDelayMs
 		}
 		return target
+	}
+
+	const getPanelTooltipDelayMs = function (target) {
+		const value = Number(target?.dataset?.modloaderPanelTooltipDelayMs)
+		return Number.isFinite(value) ? Math.min(10000, Math.max(0, Math.round(value))) : 0
 	}
 
 	const panelRow = function (label, value) {
@@ -4012,7 +4024,7 @@
 			#modloader-panel .modloader-panel-settings-number { box-sizing: border-box; width: 66px; border: 1px solid var(--modloader-input-border); border-radius: 5px; padding: 4px 6px; background: var(--modloader-input-bg); color: var(--modloader-input-text); text-align: right; outline: none; }
 			#modloader-panel .modloader-panel-settings-number:focus { border-color: var(--modloader-focus-border); }
 			#modloader-panel .modloader-panel-settings-unit { font-size: 12px; }
-			#modloader-panel-tooltip { position: fixed; left: 0; top: 0; z-index: 2147483647; box-sizing: border-box; max-width: min(340px, calc(100vw - 20px)); border: 1px solid rgba(255,255,255,.13); border-radius: 999px; padding: 5px 11px; background: rgba(18, 20, 23, .26); color: rgba(255,255,255,.9); box-shadow: 0 8px 22px rgba(0,0,0,.24), inset 0 1px 0 rgba(255,255,255,.1); font: 11px/1.32 Montserrat, Arial, sans-serif; letter-spacing: 0; text-align: left; overflow-wrap: anywhere; pointer-events: none; opacity: 0; transform: translateY(-2px) scale(.985); transition: opacity .1s ease, transform .12s ease; backdrop-filter: blur(12px) saturate(1.25); -webkit-backdrop-filter: blur(12px) saturate(1.25); }
+			#modloader-panel-tooltip { position: fixed; left: 0; top: 0; z-index: 2147483647; box-sizing: border-box; max-width: min(var(--modloader-panel-tooltip-max-width, 340px), calc(100vw - 20px)); border: 1px solid rgba(255,255,255,.13); border-radius: var(--modloader-panel-tooltip-radius, 999px); padding: 5px var(--modloader-panel-tooltip-side-padding, 11px); background: rgba(18, 20, 23, .26); color: rgba(255,255,255,.9); box-shadow: 0 8px 22px rgba(0,0,0,.24), inset 0 1px 0 rgba(255,255,255,.1); font: 11px/1.32 Montserrat, Arial, sans-serif; letter-spacing: 0; text-align: left; overflow-wrap: anywhere; pointer-events: none; opacity: 0; transform: translateY(-2px) scale(.985); transition: opacity .1s ease, transform .12s ease; backdrop-filter: blur(12px) saturate(1.25); -webkit-backdrop-filter: blur(12px) saturate(1.25); }
 			#modloader-panel-tooltip.active { opacity: 1; transform: translateY(0) scale(1); }
 			#modloader-panel-tooltip.modloader-panel-tooltip-light { border-color: rgba(18,20,22,.12); background: rgba(255,255,255,.34); color: rgba(18,20,22,.82); box-shadow: 0 8px 22px rgba(0,0,0,.16), inset 0 1px 0 rgba(255,255,255,.62); }
 			#modloader-panel.modloader-panel-theme-light { --modloader-panel-bg: rgba(248,248,246,.96); --modloader-panel-text: rgba(18,20,22,.94); --modloader-text-strong: rgba(18,20,22,.9); --modloader-text: rgba(30,32,34,.68); --modloader-text-muted: rgba(18,20,22,.58); --modloader-text-subtle: rgba(18,20,22,.46); --modloader-border: rgba(0,0,0,.1); --modloader-border-strong: rgba(0,0,0,.14); --modloader-surface: rgba(0,0,0,.035); --modloader-surface-hover: rgba(0,0,0,.06); --modloader-surface-active: rgba(0,0,0,.09); --modloader-control-bg: rgba(0,0,0,.055); --modloader-control-bg-hover: rgba(0,0,0,.09); --modloader-control-border: rgba(0,0,0,.12); --modloader-control-border-hover: rgba(0,0,0,.18); --modloader-control-text: rgba(18,20,22,.78); --modloader-control-text-hover: rgba(18,20,22,.92); --modloader-input-bg: rgba(0,0,0,.045); --modloader-input-border: rgba(0,0,0,.14); --modloader-input-text: rgba(18,20,22,.92); --modloader-focus-border: rgba(18,20,22,.32); --modloader-panel-shadow: 0 12px 36px rgba(0,0,0,.18); --modloader-primary-bg: rgba(18,20,22,.9); --modloader-primary-text: #fff; --modloader-danger-bg: rgba(155,31,45,.1); --modloader-danger-border: rgba(155,31,45,.24); --modloader-danger-text: #9b1f2d; --modloader-warning-text: rgba(120,78,0,.9); --modloader-error-text: #9b1f2d; --modloader-ok-text: rgba(18,20,22,.62); --modloader-slider-fill-color: rgba(18,20,22,.52); --modloader-slider-track-color: rgba(0,0,0,.12); --modloader-slider-track-shadow: inset 0 1px 2px rgba(0,0,0,.18); }
@@ -7712,6 +7724,14 @@
 	const PANEL_AUTO_HIDE_SECONDS_MAX = 60
 	const PANEL_STATE_STORAGE_KEY = 'modloader:panelState'
 	const PANEL_TOOLTIP_OFFSET = 10
+	const PANEL_TOOLTIP_BASE_MAX_WIDTH = 340
+	const PANEL_TOOLTIP_BASE_SIDE_PADDING = 11
+	const PANEL_TOOLTIP_MULTILINE_RADIUS_START_RATIO = .5
+	const PANEL_TOOLTIP_MULTILINE_RADIUS_STEP = .04
+	const PANEL_TOOLTIP_MULTILINE_RADIUS_MIN_RATIO = .38
+	const PANEL_TOOLTIP_MULTILINE_SIDE_PADDING_MIN = 16
+	const PANEL_TOOLTIP_MULTILINE_SIDE_PADDING_MAX = 48
+	const PANEL_TOOLTIP_MULTILINE_TEXT_GAP = 4
 	const PANEL_THEME_TOKEN_NAMES = Object.freeze([
 		'--modloader-panel-bg',
 		'--modloader-panel-text',
@@ -8140,6 +8160,51 @@
 		syncPanelSettingsPageState(panel)
 	}
 
+	const formatPanelTooltipLayoutNumber = function (value) {
+		return String(Math.round((Number(value) || 0) * 100) / 100)
+	}
+
+	const getPanelTooltipLayout = function (lineCount, height, lineHeight, paddingTop, paddingBottom, borderTop, borderBottom) {
+		lineCount = Math.max(1, Math.round(Number(lineCount) || 1))
+		height = Math.max(0, Number(height) || 0)
+		lineHeight = Math.max(0, Number(lineHeight) || 0)
+		paddingTop = Math.max(0, Number(paddingTop) || 0)
+		paddingBottom = Math.max(0, Number(paddingBottom) || 0)
+		borderTop = Math.max(0, Number(borderTop) || 0)
+		borderBottom = Math.max(0, Number(borderBottom) || 0)
+		if (lineCount === 1) {
+			return {
+				borderRadius: '999px',
+				sidePadding: PANEL_TOOLTIP_BASE_SIDE_PADDING,
+				maxWidth: PANEL_TOOLTIP_BASE_MAX_WIDTH
+			}
+		}
+		const horizontalRadiusRatio = Math.max(
+			PANEL_TOOLTIP_MULTILINE_RADIUS_MIN_RATIO,
+			PANEL_TOOLTIP_MULTILINE_RADIUS_START_RATIO - PANEL_TOOLTIP_MULTILINE_RADIUS_STEP * (lineCount - 2)
+		)
+		const horizontalRadius = height * horizontalRadiusRatio
+		const halfHeight = height / 2
+		const edgeLineCenter = Math.max(0, Math.min(
+			halfHeight,
+			Math.min(
+				borderTop + paddingTop + lineHeight / 2,
+				borderBottom + paddingBottom + lineHeight / 2
+			)
+		))
+		const normalizedDistance = halfHeight > 0 ? (halfHeight - edgeLineCenter) / halfHeight : 0
+		const boundaryInset = horizontalRadius * (1 - Math.sqrt(Math.max(0, 1 - normalizedDistance * normalizedDistance)))
+		const sidePadding = Number(formatPanelTooltipLayoutNumber(Math.max(
+			PANEL_TOOLTIP_MULTILINE_SIDE_PADDING_MIN,
+			Math.min(PANEL_TOOLTIP_MULTILINE_SIDE_PADDING_MAX, boundaryInset + PANEL_TOOLTIP_MULTILINE_TEXT_GAP)
+		)))
+		return {
+			borderRadius: formatPanelTooltipLayoutNumber(horizontalRadius) + 'px / 50%',
+			sidePadding,
+			maxWidth: Number(formatPanelTooltipLayoutNumber(PANEL_TOOLTIP_BASE_MAX_WIDTH + (sidePadding - PANEL_TOOLTIP_BASE_SIDE_PADDING) * 2))
+		}
+	}
+
 	const getPanelTooltipElement = function () {
 		let tooltip = document.getElementById('modloader-panel-tooltip')
 		if (!tooltip) {
@@ -8157,6 +8222,39 @@
 		if (!tooltip) return
 		tooltip.classList.remove('active')
 		tooltip.setAttribute('aria-hidden', 'true')
+	}
+
+	const syncPanelTooltipLayout = function (tooltip) {
+		if (!tooltip) return
+		tooltip.style.removeProperty('--modloader-panel-tooltip-clip')
+		tooltip.style.removeProperty('--modloader-panel-tooltip-inner-clip')
+		tooltip.classList.remove('modloader-panel-tooltip-continuous')
+		let layout = getPanelTooltipLayout(1, tooltip.offsetHeight || tooltip.scrollHeight || 0)
+		for (let pass = 0; pass < 4; pass++) {
+			const style = window.getComputedStyle(tooltip)
+			const lineHeight = Number.parseFloat(style?.lineHeight)
+			const paddingTop = Number.parseFloat(style?.paddingTop) || 0
+			const paddingBottom = Number.parseFloat(style?.paddingBottom) || 0
+			const borderTop = Number.parseFloat(style?.borderTopWidth) || 0
+			const borderBottom = Number.parseFloat(style?.borderBottomWidth) || 0
+			const contentHeight = Math.max(0, tooltip.scrollHeight - paddingTop - paddingBottom)
+			const lineCount = lineHeight > 0 ? Math.max(1, Math.round(contentHeight / lineHeight)) : 1
+			const rect = tooltip.getBoundingClientRect?.() || {}
+			const height = Math.max(0, tooltip.offsetHeight || Number(rect.height) || tooltip.scrollHeight || 0)
+			layout = getPanelTooltipLayout(lineCount, height, lineHeight, paddingTop, paddingBottom, borderTop, borderBottom)
+			const borderRadiusValue = layout.borderRadius
+			const sidePaddingValue = formatPanelTooltipLayoutNumber(layout.sidePadding) + 'px'
+			const maxWidthValue = formatPanelTooltipLayoutNumber(layout.maxWidth) + 'px'
+			if (
+				tooltip.style.getPropertyValue('--modloader-panel-tooltip-radius') === borderRadiusValue
+				&& tooltip.style.getPropertyValue('--modloader-panel-tooltip-side-padding') === sidePaddingValue
+				&& tooltip.style.getPropertyValue('--modloader-panel-tooltip-max-width') === maxWidthValue
+			) break
+			tooltip.style.setProperty('--modloader-panel-tooltip-radius', borderRadiusValue)
+			tooltip.style.setProperty('--modloader-panel-tooltip-side-padding', sidePaddingValue)
+			tooltip.style.setProperty('--modloader-panel-tooltip-max-width', maxWidthValue)
+		}
+		return layout
 	}
 
 	const positionPanelTooltip = function (tooltip, target, point) {
@@ -8180,6 +8278,15 @@
 		tooltip.style.top = Math.round(y) + 'px'
 	}
 
+	const resolvePanelTooltipLightTheme = function (target, panel) {
+		if (panel) return !!panel.classList?.contains('modloader-panel-theme-light')
+		if (target?.dataset?.modloaderPanelTooltipTheme === 'global') return getPanelThemeMode() === 'light'
+		const plane = state.game?.plane
+		if (plane === 0) return true
+		if (plane === 1) return false
+		return getPanelThemeMode() === 'light'
+	}
+
 	const showPanelTooltip = function (target, point) {
 		const text = String(target?.dataset?.modloaderPanelTooltip || '').trim()
 		const isDescription = target?.dataset?.modloaderPanelTooltipKind === 'description'
@@ -8189,9 +8296,11 @@
 		const panel = settingsSurface || target.closest?.('#modloader-panel')
 		const tooltip = getPanelTooltipElement()
 		tooltip.textContent = text
-		tooltip.classList.toggle('modloader-panel-tooltip-light', !!panel?.classList?.contains('modloader-panel-theme-light'))
+		const tooltipLight = resolvePanelTooltipLightTheme(target, panel)
+		tooltip.classList.toggle('modloader-panel-tooltip-light', tooltipLight)
 		tooltip.setAttribute('aria-hidden', 'false')
 		tooltip.classList.add('active')
+		syncPanelTooltipLayout(tooltip)
 		positionPanelTooltip(tooltip, target, point)
 	}
 
@@ -8205,23 +8314,44 @@
 		if (root.__modloaderPanelTooltipCleanup) root.__modloaderPanelTooltipCleanup()
 		let activeTarget = null
 		let activePoint = null
+		let ready = false
 		let frame = 0
+		let delayTimer = 0
 		const clearFrame = function () {
 			if (!frame) return
 			cancelAnimationFrame(frame)
 			frame = 0
 		}
+		const clearDelay = function () {
+			if (!delayTimer) return
+			clearTimeout(delayTimer)
+			delayTimer = 0
+		}
 		const sync = function (target) {
 			clearFrame()
 			frame = requestAnimationFrame(function () {
 				frame = 0
-				if (activeTarget !== target) return
+				if (activeTarget !== target || !ready) return
 				showPanelTooltip(target, activePoint)
 			})
+		}
+		const beginReveal = function (target, delayMs) {
+			clearDelay()
+			ready = false
+			const reveal = function () {
+				delayTimer = 0
+				if (activeTarget !== target) return
+				ready = true
+				sync(target)
+			}
+			if (delayMs > 0) delayTimer = setTimeout(reveal, delayMs)
+			else reveal()
 		}
 		const clear = function () {
 			activeTarget = null
 			activePoint = null
+			ready = false
+			clearDelay()
 			clearFrame()
 			hidePanelTooltip()
 		}
@@ -8235,15 +8365,26 @@
 				if (event.type === 'focusin') clear()
 				return
 			}
+			const point = pointFromEvent(event)
+			if (target === activeTarget) {
+				activePoint = point || activePoint
+				if (event.type === 'focusin' && !ready) beginReveal(target, 0)
+				else if (ready) sync(target)
+				return
+			}
+			clearDelay()
+			clearFrame()
+			hidePanelTooltip()
 			activeTarget = target
-			activePoint = pointFromEvent(event) || activePoint
-			sync(target)
+			activePoint = point
+			const delayMs = event.type === 'focusin' ? 0 : getPanelTooltipDelayMs(target)
+			beginReveal(target, delayMs)
 		}
 		const move = function (event) {
 			const target = getPanelTooltipTarget(event.target, root)
 			if (!target || target !== activeTarget) return
 			activePoint = pointFromEvent(event) || activePoint
-			sync(target)
+			if (ready) sync(target)
 		}
 		const deactivate = function (event) {
 			if (!activeTarget) return

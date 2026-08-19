@@ -8,12 +8,17 @@ ModLoader.register({
 		const TRANSACTIONS_KEY = Symbol.for('cattail.world-editor.transactions')
 		const BLUEPRINT_PREVIEW_KEY = Symbol.for('cattail.world-editor.blueprint-preview')
 		const SELECTION_KEY = Symbol.for('cattail.world-editor.selection')
+		const TOOL_KEY = Symbol.for('cattail.world-editor.tool')
+		const PAINT_STATE_KEY = Symbol.for('cattail.world-editor.paint-cube-state')
+		const PAINT_UI_KEY = Symbol.for('cattail.world-editor.paint-cube-ui')
 		const CREATIVE_KEY = Symbol.for('cattail.world-editor.creative-mode')
 		const CREATIVE_ECONOMY_KEY = Symbol.for('cattail.world-editor.creative-economy')
 		const DIALOGS_KEY = Symbol.for('cattail.world-editor.dialogs')
 		const TOOLBAR_SCROLL_PROBE_KEY = Symbol.for('cattail.world-editor.toolbar-scroll-probe')
 		const RESOURCE_HUD_PROBE_KEY = Symbol.for('cattail.world-editor.resource-hud-probe')
 		const SAVE_SLOTS_KEY = Symbol.for('cattail.better-uis.save-slots')
+		const PALETTE_ROW_CONTROLS_KEY = Symbol('cattail.world-editor.palette-row-controls')
+		const PALETTE_LIFECYCLE_KEY = Symbol('cattail.world-editor.palette-lifecycle')
 		const SHELL_ID = 'cattail-world-editor-shell'
 		const ECONOMY_STATUS_ID = 'cattail-world-editor-economy-status'
 		const STYLE_ID = 'cattail-world-editor-shell-style'
@@ -35,6 +40,29 @@ ModLoader.register({
 		const LARGE_TOOLBAR_STOP_VELOCITY = .01
 		const HISTORY_SUCCESS_MS = 3000
 		const HISTORY_FAILURE_MS = 6000
+		const PAINT_STATUS_EVENT = 'cattail:world-editor-paint-status'
+		const PAINT_STATUS_KEYS = new Set([
+			'paintCellOccupied',
+			'paintStrokeSummary',
+			'paintStrokeCancelled',
+			'paintStrokeLimit',
+			'paintNoChanges',
+			'paintBucketPlanning',
+			'paintBucketCancelled',
+			'paintBucketSummary',
+			'paintBucketOpenOrTooLarge',
+			'paintGrowSaveFailed',
+			'historyBusy',
+			'historyNotReady',
+			'historyUnavailable',
+			'historyPlaneChanged',
+			'historySaveChanged',
+			'historyExternalChange',
+			'historyRolledBack',
+			'historyReloadRequired',
+			'historyFailed'
+		])
+		const PAINT_STATUS_KINDS = new Set(['neutral', 'warning', 'error', 'busy', 'terminal'])
 		const RESOURCE_HUD_ANIMATION_MS = 180
 		const RESOURCE_HUD_MIN_SCALE = .48
 		const RESOURCE_HUD_MAX_SCALE = .64
@@ -62,12 +90,14 @@ ModLoader.register({
 		])
 		let refreshMountedText = null
 		let refreshMountedTheme = null
+		let closeMountedPalette = null
 
 		api.on('afterVanillaScripts', function () {
 			if (typeof Game === 'undefined' || !Game.prototype || typeof Game.prototype.switchPlane !== 'function') return
 			api.patch(Game.prototype, 'switchPlane', function (original) {
 				return function (...args) {
 					const result = original.apply(this, args)
+					if (typeof closeMountedPalette === 'function') closeMountedPalette(this, 'plane-changed')
 					if (typeof refreshMountedTheme === 'function') refreshMountedTheme(this)
 					return result
 				}
@@ -84,6 +114,9 @@ ModLoader.register({
 			let shared = globalThis[SHARED_KEY]
 			let transactions = globalThis[TRANSACTIONS_KEY]
 			const selection = globalThis[SELECTION_KEY]
+			const tool = globalThis[TOOL_KEY]
+			let paintState = globalThis[PAINT_STATE_KEY]
+			let paintUi = globalThis[PAINT_UI_KEY]
 			const dialogs = globalThis[DIALOGS_KEY]
 			let creative = globalThis[CREATIVE_KEY]
 			let creativeEconomy = globalThis[CREATIVE_ECONOMY_KEY]
@@ -122,6 +155,37 @@ ModLoader.register({
 				console.warn('[Cattail World Editor] Toolbar 2G could not find the selection state.')
 				return
 			}
+			if (
+				!tool ||
+				typeof tool.snapshot !== 'function' ||
+				typeof tool.subscribe !== 'function' ||
+				typeof tool.setMode !== 'function'
+			) {
+				console.warn('[Cattail World Editor] Toolbar 5C-1 could not find draw-mode state.')
+				return
+			}
+			if (
+				!paintState ||
+				typeof paintState.defaultRecipe !== 'function' ||
+				typeof paintState.normalizeRecipe !== 'function' ||
+				typeof paintState.allocateSlots !== 'function'
+			) {
+				console.warn('[Cattail World Editor] Toolbar 5C-5 could not find paint palette calculations.')
+				paintState = unavailablePaintState()
+			}
+			if (
+				!paintUi ||
+				paintUi.game !== game ||
+				typeof paintUi.snapshot !== 'function' ||
+				typeof paintUi.subscribe !== 'function' ||
+				typeof paintUi.setSubtool !== 'function' ||
+				typeof paintUi.setCubeMode !== 'function' ||
+				typeof paintUi.setRecipe !== 'function' ||
+				typeof paintUi.setPaletteOpen !== 'function'
+			) {
+				console.warn('[Cattail World Editor] Toolbar 5C-4 could not find Brush/Eraser state.')
+				paintUi = unavailablePaintUi(game)
+			}
 			if (!dialogs || dialogs.game !== game || typeof dialogs.create !== 'function') {
 				console.warn('[Cattail World Editor] Toolbar 4B-1a could not find the shared dialog service.')
 				return
@@ -138,6 +202,14 @@ ModLoader.register({
 				console.warn('[Cattail World Editor] Toolbar 2E requires the ModLoader game HUD API.')
 				return
 			}
+			if (
+				api.ui?.settings?.version !== 1 ||
+				typeof api.ui.settings.createControl !== 'function' ||
+				typeof api.ui.settings.scroll?.attach !== 'function'
+			) {
+				console.warn('[Cattail World Editor] Palette 5C-5 requires the ModLoader Settings UI API v1.')
+				return
+			}
 
 			document.getElementById(SHELL_ID)?.remove()
 			document.getElementById(ECONOMY_STATUS_ID)?.remove()
@@ -145,6 +217,7 @@ ModLoader.register({
 			const shell = createShell()
 			const economyStatus = createEconomyStatus()
 			document.body.append(shell, economyStatus)
+			const tooltips = shared.createTooltipScope?.()
 			const rootStyle = document.documentElement?.style
 			const previousScale = readStyleProperty(rootStyle, '--world-editor-ui-scale')
 			const previousToolbarWidth = readStyleProperty(rootStyle, '--world-editor-toolbar-layout-width')
@@ -157,6 +230,8 @@ ModLoader.register({
 
 			let currentState = runtime.snapshot()
 			let currentSelection = selection.snapshot()
+			let currentTool = tool.snapshot()
+			let currentPaintUi = paintUi.snapshot()
 			let currentBlueprintPreview = null
 			let currentCreative = creative.snapshot()
 			let currentCreativeEconomy = creativeEconomy.snapshot()
@@ -175,6 +250,22 @@ ModLoader.register({
 			const redoButton = shell.querySelector('[data-world-editor-action="redo"]')
 			const historyStatus = shell.querySelector('[data-world-editor-action="history-status"]')
 			const creativeButton = shell.querySelector('[data-world-editor-action="creative-mode"]')
+			const drawButton = shell.querySelector('[data-world-editor-action="draw-mode"]')
+			const brushButton = shell.querySelector('[data-world-editor-action="paint-brush"]')
+			const bucketButton = shell.querySelector('[data-world-editor-action="paint-bucket"]')
+			const eraserButton = shell.querySelector('[data-world-editor-action="paint-eraser"]')
+			const stableButton = shell.querySelector('[data-world-editor-action="paint-stable"]')
+			const growButton = shell.querySelector('[data-world-editor-action="paint-grow"]')
+			const paletteButton = shell.querySelector('[data-world-editor-action="paint-palette"]') || unavailablePaletteElement()
+			const palettePanel = shell.querySelector('[data-world-editor-palette]') || unavailablePaletteElement()
+			const paletteLifecycle = palettePanel[PALETTE_LIFECYCLE_KEY]
+			const paletteApply = shell.querySelector('[data-world-editor-action="paint-palette-apply"]') || unavailablePaletteElement()
+			const paletteCancel = shell.querySelector('[data-world-editor-action="paint-palette-cancel"]') || unavailablePaletteElement()
+			const paletteRows = []
+			for (let resource = 0; resource < 10; resource += 1) {
+				const row = shell.querySelector('[data-world-editor-palette-resource="' + resource + '"]')
+				if (row) paletteRows.push(row)
+			}
 			const actions = (removeButton.parentElement || removeButton.parentNode)?.parentElement ||
 				(removeButton.parentElement || removeButton.parentNode)?.parentNode
 			const toolbarBar = actions?.parentElement || actions?.parentNode
@@ -188,6 +279,7 @@ ModLoader.register({
 			const previousResourceHudProbe = globalThis[RESOURCE_HUD_PROBE_KEY]
 			globalThis[RESOURCE_HUD_PROBE_KEY] = resourceHud.probe
 			let largeToolbarCards = api.config?.get?.(LARGE_TOOLBAR_CONFIG_KEY, false) === true
+			let paletteDraft = null
 			const accessibleText = {
 				brand: '',
 				mode: '',
@@ -195,6 +287,10 @@ ModLoader.register({
 				remove: '',
 				undo: '',
 				redo: '',
+				draw: '',
+				paintSubtool: '',
+				paintCubeMode: '',
+				paintPalette: '',
 				creative: '',
 				exitHint: ''
 			}
@@ -207,6 +303,10 @@ ModLoader.register({
 					accessibleText.remove,
 					accessibleText.undo,
 					accessibleText.redo,
+					accessibleText.draw,
+					accessibleText.paintSubtool,
+					accessibleText.paintCubeMode,
+					accessibleText.paintPalette,
 					accessibleText.creative,
 					accessibleText.exitHint
 				].filter(Boolean).join('. ') + '.')
@@ -250,7 +350,10 @@ ModLoader.register({
 
 			const renderHistoryStatus = function (languageGame) {
 				if (!historyStatusState) return
-				const text = i18n.t(languageGame || game, historyStatusState.key)
+				const text = formatStatusText(
+					i18n.t(languageGame || game, historyStatusState.key),
+					historyStatusState.values
+				)
 				historyStatus.textContent = text
 				historyStatus.title = text
 				historyStatus.dataset.active = 'true'
@@ -269,13 +372,14 @@ ModLoader.register({
 				return true
 			}
 
-			const showHistoryStatus = function (key, kind, duration, persistent) {
+			const showHistoryStatus = function (key, kind, duration, persistent, values) {
 				if (historyStatusTimer) clearTimeout(historyStatusTimer)
 				historyStatusTimer = 0
 				historyStatusState = {
 					key: String(key || 'historyFailed'),
 					kind: String(kind || 'neutral'),
-					persistent: persistent === true
+					persistent: persistent === true,
+					values: normalizeStatusValues(values)
 				}
 				renderHistoryStatus(game)
 				if (!historyStatusState.persistent && Number(duration) > 0) {
@@ -284,6 +388,38 @@ ModLoader.register({
 						clearHistoryStatus()
 					}, Number(duration))
 				}
+			}
+
+			const handlePaintStatus = function (event) {
+				const detail = event?.detail
+				const key = String(detail?.key || '')
+				const kind = String(detail?.kind || '')
+				if (!PAINT_STATUS_KEYS.has(key) || !PAINT_STATUS_KINDS.has(kind)) return
+				const persistent = detail?.persistent === true && (key === 'historyReloadRequired' || key === 'paintGrowSaveFailed')
+				const duration = persistent ? 0 : Math.min(60000, Math.max(0, Number(detail?.duration) || 0))
+				showHistoryStatus(key, kind, duration, persistent, detail?.values)
+			}
+
+			const normalizeStatusValues = function (value) {
+				if (!value || typeof value !== 'object') return Object.freeze({})
+				const result = {}
+				for (const key of ['painted', 'replaced', 'erased', 'skipped', 'limit', 'count', 'region']) {
+					const number = Number(value[key])
+					result[key] = Number.isInteger(number) && number >= 0 ? Math.min(1000000, number) : 0
+				}
+				result.cell = String(value.cell || '?').replace(/[\u0000-\u001f]/g, '').slice(0, 80) || '?'
+				result.code = String(value.code || '').replace(/[^A-Z0-9_-]/gi, '').slice(0, 48)
+				return Object.freeze(result)
+			}
+
+			const formatStatusText = function (value, replacements) {
+				const source = String(value || '')
+				const safe = replacements && typeof replacements === 'object' ? replacements : {}
+				return source.replace(/\{(painted|replaced|erased|skipped|limit|count|region|cell|code)\}/g, function (match, key) {
+					return ['cell', 'code'].includes(key)
+						? String(safe[key] || (key === 'cell' ? '?' : ''))
+						: String(Number.isInteger(safe[key]) ? safe[key] : 0)
+				})
 			}
 
 			const showHistoryCode = function (code, direction) {
@@ -323,8 +459,8 @@ ModLoader.register({
 					definition.button.setAttribute('aria-disabled', reason ? 'true' : 'false')
 					definition.button.dataset.worldEditorToolbarBusy = reason === 'BUSY' ? 'true' : 'false'
 					definition.button.dataset.historyBlockedReason = reason || ''
-					definition.button.title = accessibleLabel
 					definition.button.setAttribute('aria-label', accessibleLabel)
+					tooltips?.set(definition.button, accessibleLabel)
 					setCardText(definition.button, i18n.t(source, definition.cardKey))
 					accessibleText[definition.direction] = accessibleLabel
 				}
@@ -332,23 +468,178 @@ ModLoader.register({
 				refreshAccessibility()
 			}
 
+			const recipeWeights = function (recipe) {
+				const values = new Array(Number(paintState.resourceCount) || 10).fill(0)
+				for (const entry of recipe?.weights || []) {
+					const resource = Number(entry?.resource)
+					const weight = Number(entry?.weight)
+					if (Number.isInteger(resource) && resource >= 0 && resource < values.length && Number.isInteger(weight)) {
+						values[resource] = Math.min(100, Math.max(0, weight))
+					}
+				}
+				return values
+			}
+
+			const draftRecipe = function () {
+				if (!Array.isArray(paletteDraft)) return null
+				return paintState.normalizeRecipe(paletteDraft.map(function (weight, resource) {
+					return { resource, weight }
+				}))
+			}
+
+			const resourceName = function (index) {
+				try {
+					const pronounced = game.pronounce?.('resources', index)
+					if (pronounced && String(pronounced) !== String(index)) return String(pronounced)
+				} catch (error) {}
+				return String(game.codex?.resources?.[index]?.name || ('Resource ' + (index + 1)))
+			}
+
+			const resourceSwatch = function (index) {
+				const triplet = game.codex?.resources?.[index]?.triplet
+				return Array.isArray(triplet) && triplet.length
+					? 'linear-gradient(135deg, ' + triplet.join(', ') + ')'
+					: 'rgba(255, 255, 255, .2)'
+			}
+
+			const formatRecipePercent = function (weight, total) {
+				if (!total) return '0%'
+				const value = weight * 100 / total
+				return (Math.round(value * 10) / 10).toLocaleString(undefined, { maximumFractionDigits: 1 }) + '%'
+			}
+
+			const renderPaintPalette = function (languageGame, activeWeightResource) {
+				const source = languageGame || game
+				const values = Array.isArray(paletteDraft)
+					? paletteDraft
+					: recipeWeights(currentPaintUi?.recipe || paintState.defaultRecipe())
+				const recipe = paintState.normalizeRecipe(values.map(function (weight, resource) {
+					return { resource, weight }
+				}))
+				const total = values.reduce(function (sum, weight) { return sum + weight }, 0)
+				const slots = recipe ? paintState.allocateSlots(recipe) : new Array(values.length).fill(0)
+				for (const row of paletteRows) {
+					const resource = Number(row.dataset.worldEditorPaletteResource)
+					const weight = values[resource] || 0
+					const controls = row[PALETTE_ROW_CONTROLS_KEY]
+					const swatch = row.querySelector('[data-world-editor-palette-swatch]')
+					const name = row.querySelector('[data-world-editor-palette-name]')
+					const normalized = row.querySelector('[data-world-editor-palette-normalized]')
+					const slotValue = row.querySelector('[data-world-editor-palette-slots]')
+					if (swatch) swatch.style.background = resourceSwatch(resource)
+					const localizedResourceName = resourceName(resource)
+					if (name) name.textContent = localizedResourceName
+					if (resource !== activeWeightResource) controls?.weight?.setValue?.(weight)
+					controls?.weight?.input?.setAttribute?.('aria-label', localizedResourceName + ' ' + i18n.t(source, 'paintPaletteWeight'))
+					if (normalized) normalized.textContent = formatRecipePercent(weight, total)
+					if (slotValue) {
+						const slotText = String(slots?.[resource] || 0) + '/64'
+						slotValue.textContent = slotText
+						slotValue.setAttribute('aria-label', localizedResourceName + ' ' + i18n.t(source, 'paintPaletteSlots') + ': ' + slotText)
+					}
+				}
+				paletteApply.disabled = !recipe
+			}
+
+			const closePaintPalette = function (reason) {
+				const wasOpen = palettePanel.hidden === false || currentPaintUi?.paletteOpen === true
+				palettePanel.hidden = true
+				palettePanel.dataset.open = 'false'
+				paletteButton.dataset.active = 'false'
+				paletteButton.setAttribute('aria-pressed', 'false')
+				paletteButton.setAttribute('aria-expanded', 'false')
+				paletteDraft = null
+				if (currentPaintUi?.paletteOpen === true) paintUi.setPaletteOpen(false, reason || 'palette-cancelled')
+				return wasOpen
+			}
+
+			const openPaintPalette = function () {
+				if (paletteButton.hidden || paletteButton.disabled || currentPaintUi?.ready === false) return false
+				paletteDraft = recipeWeights(currentPaintUi?.recipe || paintState.defaultRecipe())
+				paintUi.setPaletteOpen(true, 'toolbar-palette-open')
+				palettePanel.hidden = false
+				palettePanel.dataset.open = 'true'
+				paletteButton.dataset.active = 'true'
+				paletteButton.setAttribute('aria-pressed', 'true')
+				paletteButton.setAttribute('aria-expanded', 'true')
+				renderPaintPalette(game)
+				palettePanel.querySelector('[data-world-editor-palette-weight] .modloader-config-slider-number')?.focus?.()
+				return true
+			}
+
+			const applyPaintPalette = function () {
+				const recipe = draftRecipe()
+				if (!recipe || !paintUi.setRecipe(recipe, 'palette-apply')) return false
+				closePaintPalette('palette-applied')
+				return true
+			}
+
+			const refreshPaintPaletteText = function (languageGame) {
+				const source = languageGame || game
+				palettePanel.querySelector('[data-world-editor-palette-title]').textContent = i18n.t(source, 'paintPaletteTitle')
+				for (const key of ['resource', 'weight', 'normalized', 'slots']) {
+					const node = palettePanel.querySelector('[data-world-editor-palette-heading="' + key + '"]')
+					if (node) node.textContent = i18n.t(source, 'paintPalette' + key[0].toUpperCase() + key.slice(1))
+				}
+				paletteApply.textContent = i18n.t(source, 'paintPaletteApply')
+				paletteCancel.textContent = i18n.t(source, 'paintPaletteCancel')
+				renderPaintPalette(source)
+			}
+
+			const mountedPaletteCloser = function (changedGame, reason) {
+				if (changedGame === game) closePaintPalette(reason || 'external-change')
+			}
+			closeMountedPalette = mountedPaletteCloser
+
 			const refreshText = function (languageGame) {
 				const source = languageGame || game
 				const brand = i18n.t(source, 'brand')
 				shell.querySelector('[data-world-editor-text="brand"]').textContent = brand
 				const removeText = i18n.t(source, 'removeSelection')
-				removeButton.title = removeText
 				removeButton.setAttribute('aria-label', removeText)
+				tooltips?.set(removeButton, removeText)
 				setCardText(removeButton, i18n.t(source, 'toolbarCardRemove'))
+				const drawText = i18n.t(source, 'drawMode')
+				drawButton.querySelector('[data-world-editor-text="draw-mode"]').textContent = drawText
+				drawButton.setAttribute('aria-label', drawText)
+				tooltips?.set(drawButton, drawText)
+				setCardText(drawButton, i18n.t(source, 'toolbarCardDraw'))
+				const brushText = i18n.t(source, 'paintBrush')
+				brushButton.setAttribute('aria-label', brushText)
+				tooltips?.set(brushButton, brushText)
+				setCardText(brushButton, i18n.t(source, 'toolbarCardPaintBrush'))
+				const bucketText = i18n.t(source, 'paintBucket')
+				bucketButton.setAttribute('aria-label', bucketText)
+				tooltips?.set(bucketButton, bucketText)
+				setCardText(bucketButton, i18n.t(source, 'toolbarCardPaintBucket'))
+				const eraserText = i18n.t(source, 'paintEraser')
+				eraserButton.setAttribute('aria-label', eraserText)
+				tooltips?.set(eraserButton, eraserText)
+				setCardText(eraserButton, i18n.t(source, 'toolbarCardPaintEraser'))
+				const stableText = i18n.t(source, 'paintStable')
+				stableButton.setAttribute('aria-label', stableText)
+				tooltips?.set(stableButton, stableText)
+				setCardText(stableButton, i18n.t(source, 'toolbarCardPaintStable'))
+				const growText = i18n.t(source, 'paintGrow')
+				growButton.setAttribute('aria-label', growText)
+				tooltips?.set(growButton, growText)
+				setCardText(growButton, i18n.t(source, 'toolbarCardPaintGrow'))
+				const paletteText = i18n.t(source, 'paintPalette')
+				paletteButton.setAttribute('aria-label', paletteText)
+				tooltips?.set(paletteButton, paletteText)
+				setCardText(paletteButton, i18n.t(source, 'toolbarCardPaintPalette'))
+				refreshPaintPaletteText(source)
 				setCardText(creativeButton, i18n.t(source, 'toolbarCardCreative'))
 				const compactStyleText = i18n.t(source, 'toolbarStyleCompact')
 				const largeStyleText = i18n.t(source, 'toolbarStyleLargeCards')
-				compactStyleButton.title = compactStyleText
 				compactStyleButton.setAttribute('aria-label', compactStyleText)
-				largeStyleButton.title = largeStyleText
+				tooltips?.set(compactStyleButton, compactStyleText)
 				largeStyleButton.setAttribute('aria-label', largeStyleText)
+				tooltips?.set(largeStyleButton, largeStyleText)
 				accessibleText.brand = brand
 				accessibleText.remove = removeText
+				accessibleText.draw = drawText
+				accessibleText.paintPalette = paletteText
 				refreshHistory(source)
 				renderHistoryStatus(source)
 				refreshCreative(source)
@@ -369,15 +660,68 @@ ModLoader.register({
 					currentBlueprintPreview?.blueprint
 				)
 				const blueprintMode = currentBlueprintPreview?.blueprint?.mode === 'full' ? 'full' : 'structure'
+				if (hasVisibleBlueprintPreview && currentTool?.mode === 'draw') {
+					tool.setMode('select', 'blueprint-preview-active')
+					currentTool = tool.snapshot()
+				}
 				const modeKey = hasVisibleBlueprintPreview
 					? blueprintMode === 'full' ? 'blueprintModeFull' : 'blueprintModeStructure'
-					: 'toolbarModeArea'
+					: currentTool?.mode === 'draw' ? 'drawMode' : 'toolbarModeArea'
 				const mode = i18n.t(source, modeKey)
 				const modeElement = shell.querySelector('[data-world-editor-text="mode"]')
-				shell.dataset.mode = hasVisibleBlueprintPreview ? 'blueprint-' + blueprintMode : 'select'
+				shell.dataset.mode = hasVisibleBlueprintPreview ? 'blueprint-' + blueprintMode : currentTool?.mode === 'draw' ? 'draw' : 'select'
 				modeElement.textContent = mode
 				modeElement.dataset.creative = currentCreative?.ready && currentCreative?.creativeMode ? 'true' : 'false'
 				accessibleText.mode = mode
+				const drawActive = !hasVisibleBlueprintPreview && currentTool?.mode === 'draw'
+				drawButton.dataset.active = drawActive ? 'true' : 'false'
+				drawButton.setAttribute('aria-pressed', drawActive ? 'true' : 'false')
+				drawButton.disabled = hasVisibleBlueprintPreview || !currentState?.active
+				const showPaintSubtools = drawActive && !game.plane && !!currentState?.active && currentPaintUi?.ready !== false
+				const activeSubtool = currentPaintUi?.subtool === 'eraser'
+					? 'eraser'
+					: currentPaintUi?.subtool === 'bucket' ? 'bucket' : 'brush'
+				const activeCubeMode = currentPaintUi?.cubeMode === 'grow' ? 'grow' : 'stable'
+				const growAvailable = currentPaintUi?.growAvailable === true
+				if (!showPaintSubtools && currentPaintUi?.paletteOpen === true) closePaintPalette('draw-unavailable')
+				brushButton.hidden = !showPaintSubtools
+				bucketButton.hidden = !showPaintSubtools
+				eraserButton.hidden = !showPaintSubtools
+				stableButton.hidden = !showPaintSubtools
+				growButton.hidden = !showPaintSubtools || !growAvailable
+				paletteButton.hidden = !showPaintSubtools
+				brushButton.disabled = !showPaintSubtools
+				bucketButton.disabled = !showPaintSubtools
+				eraserButton.disabled = !showPaintSubtools
+				stableButton.disabled = !showPaintSubtools
+				growButton.disabled = !showPaintSubtools || !growAvailable
+				paletteButton.disabled = !showPaintSubtools
+				brushButton.dataset.active = showPaintSubtools && activeSubtool === 'brush' ? 'true' : 'false'
+				bucketButton.dataset.active = showPaintSubtools && activeSubtool === 'bucket' ? 'true' : 'false'
+				eraserButton.dataset.active = showPaintSubtools && activeSubtool === 'eraser' ? 'true' : 'false'
+				stableButton.dataset.active = showPaintSubtools && activeCubeMode === 'stable' ? 'true' : 'false'
+				growButton.dataset.active = showPaintSubtools && growAvailable && activeCubeMode === 'grow' ? 'true' : 'false'
+				paletteButton.dataset.active = showPaintSubtools && currentPaintUi?.paletteOpen === true ? 'true' : 'false'
+				brushButton.setAttribute('aria-pressed', brushButton.dataset.active)
+				bucketButton.setAttribute('aria-pressed', bucketButton.dataset.active)
+				eraserButton.setAttribute('aria-pressed', eraserButton.dataset.active)
+				stableButton.setAttribute('aria-pressed', stableButton.dataset.active)
+				growButton.setAttribute('aria-pressed', growButton.dataset.active)
+				paletteButton.setAttribute('aria-pressed', paletteButton.dataset.active)
+				paletteButton.setAttribute('aria-expanded', paletteButton.dataset.active)
+				brushButton.setAttribute('aria-hidden', showPaintSubtools ? 'false' : 'true')
+				bucketButton.setAttribute('aria-hidden', showPaintSubtools ? 'false' : 'true')
+				eraserButton.setAttribute('aria-hidden', showPaintSubtools ? 'false' : 'true')
+				stableButton.setAttribute('aria-hidden', showPaintSubtools ? 'false' : 'true')
+				growButton.setAttribute('aria-hidden', showPaintSubtools && growAvailable ? 'false' : 'true')
+				paletteButton.setAttribute('aria-hidden', showPaintSubtools ? 'false' : 'true')
+				accessibleText.paintSubtool = showPaintSubtools
+					? i18n.t(source, activeSubtool === 'eraser' ? 'paintEraser' : activeSubtool === 'bucket' ? 'paintBucket' : 'paintBrush')
+					: ''
+				accessibleText.paintCubeMode = showPaintSubtools
+					? i18n.t(source, activeCubeMode === 'grow' ? 'paintGrow' : 'paintStable')
+					: ''
+				toolbarScroller.refresh('draw-mode')
 				refreshAccessibility()
 			}
 
@@ -446,8 +790,8 @@ ModLoader.register({
 				creativeButton.disabled = !currentCreative?.ready || busy
 				creativeButton.dataset.worldEditorToolbarBusy = busy ? 'true' : 'false'
 				creativeButton.dataset.worldEditorLargeHidden = !currentCreative?.ready && !busy ? 'true' : 'false'
-				creativeButton.title = currentCreative?.error?.message || label
 				creativeButton.setAttribute('aria-label', label)
+				tooltips?.set(creativeButton, currentCreative?.error?.message || label)
 				toolbarScroller.refresh('creative')
 				accessibleText.creative = label
 				refreshCreativeDialogText(source)
@@ -517,8 +861,10 @@ ModLoader.register({
 
 			const stopStateSubscription = runtime.subscribe(function (state) {
 				currentState = state
+				if (!state.active) closePaintPalette('editor-inactive')
 				if (!state.active && creativeDialog && !currentCreative?.busy) closeCreativeDialog('editor-inactive')
 				refreshVisibility()
+				refreshTool(game)
 				resourceHud.setActive(!!state.active, 'editor-state')
 			})
 
@@ -526,6 +872,21 @@ ModLoader.register({
 				currentSelection = state
 				refreshSelectionCount(game)
 				refreshTool(game)
+			})
+			const stopToolSubscription = tool.subscribe(function (state) {
+				currentTool = state
+				if (state?.mode !== 'draw') closePaintPalette('draw-mode-left')
+				refreshTool(game)
+			})
+			const stopPaintUiSubscription = paintUi.subscribe(function (state) {
+				const previousPaintUi = currentPaintUi
+				currentPaintUi = state
+				if (state?.paletteOpen === true && previousPaintUi?.subtool !== state?.subtool) {
+					closePaintPalette('subtool-changed')
+					return
+				}
+				refreshTool(game)
+				if (state?.paletteOpen === true && paletteDraft) renderPaintPalette(game)
 			})
 
 			const stopCreativeSubscription = creative.subscribe(function (state) {
@@ -553,7 +914,6 @@ ModLoader.register({
 					clearHistoryStatus(true)
 				}
 			})
-
 			const runHistory = async function (direction, input) {
 				const blocked = historyBlockedReason(direction)
 				if (blocked) {
@@ -694,6 +1054,109 @@ ModLoader.register({
 				if (!currentCreative?.ready || currentCreative.busy || currentCreativeEconomy?.busy) return
 				if (currentCreative.creativeMode) openDisableCreativeDialog()
 				else openEnableCreativeDialog()
+			}
+
+			const handleDrawClick = function (event) {
+				event?.preventDefault?.()
+				event?.stopPropagation?.()
+				if (!currentState?.active || game.halt || game.splash?.isShown || drawButton.disabled) return
+				closePaintPalette('draw-mode-toggled')
+				const nextMode = currentTool?.mode === 'draw' ? 'select' : 'draw'
+				tool.setMode(nextMode, 'toolbar-draw-mode')
+			}
+
+			const handleBrushClick = function (event) {
+				event?.preventDefault?.()
+				event?.stopPropagation?.()
+				if (brushButton.hidden || brushButton.disabled) return
+				closePaintPalette('toolbar-brush')
+				paintUi.setSubtool('brush', 'toolbar-brush')
+			}
+
+			const handleBucketClick = function (event) {
+				event?.preventDefault?.()
+				event?.stopPropagation?.()
+				if (bucketButton.hidden || bucketButton.disabled) return
+				closePaintPalette('toolbar-bucket')
+				paintUi.setSubtool('bucket', 'toolbar-bucket')
+			}
+
+			const handleEraserClick = function (event) {
+				event?.preventDefault?.()
+				event?.stopPropagation?.()
+				if (eraserButton.hidden || eraserButton.disabled) return
+				closePaintPalette('toolbar-eraser')
+				paintUi.setSubtool('eraser', 'toolbar-eraser')
+			}
+
+			const handleStableClick = function (event) {
+				event?.preventDefault?.()
+				event?.stopPropagation?.()
+				if (stableButton.hidden || stableButton.disabled) return
+				closePaintPalette('toolbar-stable')
+				paintUi.setCubeMode('stable', 'toolbar-stable')
+			}
+
+			const handleGrowClick = function (event) {
+				event?.preventDefault?.()
+				event?.stopPropagation?.()
+				if (growButton.hidden || growButton.disabled) return
+				closePaintPalette('toolbar-grow')
+				paintUi.setCubeMode('grow', 'toolbar-grow')
+			}
+
+			const handlePaletteClick = function (event) {
+				event?.preventDefault?.()
+				event?.stopPropagation?.()
+				if (paletteButton.hidden || paletteButton.disabled) return
+				if (currentPaintUi?.paletteOpen === true) closePaintPalette('toolbar-palette-toggle')
+				else openPaintPalette()
+			}
+
+			const handlePaletteInput = function (event) {
+				const surface = event?.target?.closest?.('[data-world-editor-palette-weight]')
+				const row = surface?.closest?.('[data-world-editor-palette-resource]')
+				const resource = Number(row?.dataset?.worldEditorPaletteResource)
+				const control = row?.[PALETTE_ROW_CONTROLS_KEY]?.weight
+				if (!surface || !control || !Array.isArray(paletteDraft) || !Number.isInteger(resource)) return
+				const validation = control.validate?.()
+				if (!validation?.valid) return
+				const value = Math.min(100, Math.max(0, Math.round(Number(validation.value) || 0)))
+				paletteDraft[resource] = value
+				renderPaintPalette(game, resource)
+			}
+
+			const handlePaletteApply = function (event) {
+				event?.preventDefault?.()
+				event?.stopPropagation?.()
+				applyPaintPalette()
+			}
+
+			const handlePaletteCancel = function (event) {
+				event?.preventDefault?.()
+				event?.stopPropagation?.()
+				closePaintPalette('palette-cancel')
+			}
+
+			const handlePaletteEscape = function (event) {
+				if (currentPaintUi?.paletteOpen !== true || String(event?.key || '') !== 'Escape') return
+				event.preventDefault()
+				event.stopPropagation()
+				event.stopImmediatePropagation?.()
+				closePaintPalette('palette-escape')
+			}
+
+			const handlePaletteOutside = function (event) {
+				if (currentPaintUi?.paletteOpen !== true) return
+				const target = event?.target
+				if (palettePanel.contains(target) || paletteButton.contains(target)) return
+				const canvasClick = target === game.canvas
+				closePaintPalette('palette-outside')
+				if (canvasClick) {
+					event.preventDefault()
+					event.stopPropagation()
+					event.stopImmediatePropagation?.()
+				}
 			}
 
 			const applyToolbarStyle = function (large, reason) {
@@ -989,6 +1452,17 @@ ModLoader.register({
 			removeButton.addEventListener('click', handleRemoveClick)
 			undoButton.addEventListener('click', handleUndoClick)
 			redoButton.addEventListener('click', handleRedoClick)
+			drawButton.addEventListener('click', handleDrawClick)
+			brushButton.addEventListener('click', handleBrushClick)
+			bucketButton.addEventListener('click', handleBucketClick)
+			eraserButton.addEventListener('click', handleEraserClick)
+			stableButton.addEventListener('click', handleStableClick)
+			growButton.addEventListener('click', handleGrowClick)
+			paletteButton.addEventListener('click', handlePaletteClick)
+			palettePanel.addEventListener('input', handlePaletteInput)
+			palettePanel.addEventListener('change', handlePaletteInput)
+			paletteApply.addEventListener('click', handlePaletteApply)
+			paletteCancel.addEventListener('click', handlePaletteCancel)
 			creativeButton.addEventListener('click', handleCreativeClick)
 			compactStyleButton.addEventListener('click', handleCompactStyleClick)
 			largeStyleButton.addEventListener('click', handleLargeStyleClick)
@@ -1009,7 +1483,10 @@ ModLoader.register({
 			window.addEventListener('modloader:vanilla-game-hud', handleVanillaGameHud)
 			window.addEventListener('modloader:config-preview', handleToolbarConfigPreview)
 			window.addEventListener('cattail:world-editor-toolbar-layout', handleToolbarLayoutChange)
+			window.addEventListener(PAINT_STATUS_EVENT, handlePaintStatus)
 			window.addEventListener('keydown', handleHistoryKeydown, true)
+			window.addEventListener('keydown', handlePaletteEscape, true)
+			window.addEventListener('mousedown', handlePaletteOutside, true)
 			window.addEventListener('resize', refreshUiScale)
 			blueprintPreviewAttachTimer = globalThis.setTimeout?.(attachBlueprintPreview, 0) ?? null
 			const uiScaleObserver = createUiScaleObserver(game, refreshUiScale)
@@ -1035,14 +1512,20 @@ ModLoader.register({
 			resourceHud.setActive(!!currentState.active, 'initial-state')
 
 			runtime.addCleanup(function () {
+				tooltips?.dispose()
 				if (refreshMountedText === refreshText) refreshMountedText = null
 				if (refreshMountedTheme === refreshTheme) refreshMountedTheme = null
+				closePaintPalette('shell-cleanup')
+				if (closeMountedPalette === mountedPaletteCloser) closeMountedPalette = null
 				if (creativeDialog) closeCreativeDialog('shell-cleanup', true)
 				window.removeEventListener('modloader:game-hud', handleGameHud)
 				window.removeEventListener('modloader:vanilla-game-hud', handleVanillaGameHud)
 				window.removeEventListener('modloader:config-preview', handleToolbarConfigPreview)
 				window.removeEventListener('cattail:world-editor-toolbar-layout', handleToolbarLayoutChange)
+				window.removeEventListener(PAINT_STATUS_EVENT, handlePaintStatus)
 				window.removeEventListener('keydown', handleHistoryKeydown, true)
+				window.removeEventListener('keydown', handlePaletteEscape, true)
+				window.removeEventListener('mousedown', handlePaletteOutside, true)
 				window.removeEventListener('resize', refreshUiScale)
 				if (historyStatusTimer) clearTimeout(historyStatusTimer)
 				historyStatusTimer = 0
@@ -1066,12 +1549,26 @@ ModLoader.register({
 				}
 				if (typeof stopStateSubscription === 'function') stopStateSubscription()
 				if (typeof stopSelectionSubscription === 'function') stopSelectionSubscription()
+				if (typeof stopToolSubscription === 'function') stopToolSubscription()
+				if (typeof stopPaintUiSubscription === 'function') stopPaintUiSubscription()
 				if (typeof stopCreativeSubscription === 'function') stopCreativeSubscription()
 				if (typeof stopCreativeEconomySubscription === 'function') stopCreativeEconomySubscription()
 				if (typeof stopTransactionSubscription === 'function') stopTransactionSubscription()
 				removeButton.removeEventListener('click', handleRemoveClick)
 				undoButton.removeEventListener('click', handleUndoClick)
 				redoButton.removeEventListener('click', handleRedoClick)
+				drawButton.removeEventListener('click', handleDrawClick)
+				brushButton.removeEventListener('click', handleBrushClick)
+				bucketButton.removeEventListener('click', handleBucketClick)
+				eraserButton.removeEventListener('click', handleEraserClick)
+				stableButton.removeEventListener('click', handleStableClick)
+				growButton.removeEventListener('click', handleGrowClick)
+				paletteButton.removeEventListener('click', handlePaletteClick)
+				palettePanel.removeEventListener('input', handlePaletteInput)
+				palettePanel.removeEventListener('change', handlePaletteInput)
+				paletteApply.removeEventListener('click', handlePaletteApply)
+				paletteCancel.removeEventListener('click', handlePaletteCancel)
+				paletteLifecycle?.destroy?.()
 				creativeButton.removeEventListener('click', handleCreativeClick)
 				compactStyleButton.removeEventListener('click', handleCompactStyleClick)
 				largeStyleButton.removeEventListener('click', handleLargeStyleClick)
@@ -1139,6 +1636,39 @@ ModLoader.register({
 			const removeButton = createIconButton('remove-selection', '', 'remove', '', 'eraser')
 			const undoButton = createHistoryButton('undo', '↶')
 			const redoButton = createHistoryButton('redo', '↷')
+			const drawButton = createToolButton('draw-mode', 'draw-mode', 'draw', '✎')
+			drawButton.className += ' cattail-world-editor-shell__tool--draw'
+			const brushButton = createIconButton('paint-brush', '', 'paint-brush', '', 'brush')
+			const bucketButton = createIconButton('paint-bucket', '', 'paint-bucket', '', 'bucket')
+			const eraserButton = createIconButton('paint-eraser', '', 'paint-eraser', '', 'eraser')
+			const stableButton = createIconButton('paint-stable', '', 'paint-stable', '', 'stable')
+			const growButton = createIconButton('paint-grow', '', 'paint-grow', '', 'grow')
+			const paletteButton = createIconButton('paint-palette', '', 'paint-palette', '', 'palette')
+			brushButton.dataset.worldEditorDrawSubtool = 'brush'
+			bucketButton.dataset.worldEditorDrawSubtool = 'bucket'
+			eraserButton.dataset.worldEditorDrawSubtool = 'eraser'
+			stableButton.dataset.worldEditorDrawCubeMode = 'stable'
+			growButton.dataset.worldEditorDrawCubeMode = 'grow'
+			brushButton.dataset.active = 'false'
+			bucketButton.dataset.active = 'false'
+			eraserButton.dataset.active = 'false'
+			brushButton.setAttribute('aria-pressed', 'false')
+			bucketButton.setAttribute('aria-pressed', 'false')
+			eraserButton.setAttribute('aria-pressed', 'false')
+			stableButton.dataset.active = 'true'
+			growButton.dataset.active = 'false'
+			stableButton.setAttribute('aria-pressed', 'true')
+			growButton.setAttribute('aria-pressed', 'false')
+			paletteButton.dataset.active = 'false'
+			paletteButton.setAttribute('aria-pressed', 'false')
+			paletteButton.setAttribute('aria-haspopup', 'dialog')
+			paletteButton.setAttribute('aria-expanded', 'false')
+			brushButton.hidden = true
+			bucketButton.hidden = true
+			eraserButton.hidden = true
+			stableButton.hidden = true
+			growButton.hidden = true
+			paletteButton.hidden = true
 			const creativeButton = createToolButton('creative-mode', 'creative-mode', 'creative', '✦')
 			creativeButton.className += ' cattail-world-editor-shell__tool--creative'
 			creativeButton.dataset.active = 'false'
@@ -1149,15 +1679,19 @@ ModLoader.register({
 			const blueprintGroup = createToolbarGroup('blueprint')
 			const blueprintLibraryGroup = createToolbarGroup('blueprint-library')
 			const transformGroup = createToolbarGroup('transform')
+			const drawGroup = createToolbarGroup('draw')
 			const creativeGroup = createToolbarGroup('creative')
 			historyGroup.dataset.worldEditorSlot = 'history'
 			blueprintGroup.dataset.worldEditorSlot = 'blueprint'
 			blueprintLibraryGroup.dataset.worldEditorSlot = 'blueprint-library'
 			transformGroup.dataset.worldEditorSlot = 'transform'
+			drawGroup.dataset.worldEditorSlot = 'draw'
 			selectionGroup.append(removeButton)
 			historyGroup.append(undoButton, redoButton)
+			drawGroup.append(drawButton, brushButton, bucketButton, eraserButton, stableButton, growButton)
+			drawGroup.append(paletteButton)
 			creativeGroup.append(creativeButton)
-			actions.append(selectionGroup, historyGroup, blueprintGroup, blueprintLibraryGroup, transformGroup, creativeGroup)
+			actions.append(selectionGroup, historyGroup, blueprintGroup, blueprintLibraryGroup, transformGroup, drawGroup, creativeGroup)
 
 			const hint = document.createElement('span')
 			hint.className = 'cattail-world-editor-shell__hint'
@@ -1179,14 +1713,108 @@ ModLoader.register({
 			historyStatus.setAttribute('role', 'status')
 			historyStatus.setAttribute('aria-live', 'polite')
 			historyStatus.setAttribute('aria-atomic', 'true')
+			const palettePanel = createPaintPalettePanel()
 
 			statusBar.append(identity, divider, status, hint)
 			statusBar.append(toolbarStyleSwitch)
 			toolbarBar.append(actions)
 			layout.append(statusBar, toolbarBar)
+			layout.append(palettePanel)
 			layout.append(historyStatus)
 			shell.append(layout)
 			return shell
+		}
+
+		function createPaintPalettePanel() {
+			const panel = document.createElement('section')
+			panel.className = 'cattail-world-editor-shell__paint-palette'
+			panel.dataset.worldEditorPalette = ''
+			panel.dataset.open = 'false'
+			panel.hidden = true
+			panel.setAttribute('role', 'dialog')
+			panel.setAttribute('aria-modal', 'false')
+			const title = document.createElement('h2')
+			title.className = 'cattail-world-editor-shell__paint-palette-title'
+			title.dataset.worldEditorPaletteTitle = ''
+			panel.setAttribute('aria-labelledby', 'cattail-world-editor-paint-palette-title')
+			title.id = 'cattail-world-editor-paint-palette-title'
+
+			const headings = document.createElement('div')
+			headings.className = 'cattail-world-editor-shell__paint-palette-headings'
+			for (const key of ['resource', 'weight', 'normalized', 'slots']) {
+				const heading = document.createElement('span')
+				heading.dataset.worldEditorPaletteHeading = key
+				headings.append(heading)
+			}
+			const rows = document.createElement('div')
+			rows.className = 'cattail-world-editor-shell__paint-palette-rows'
+			const settingsControls = []
+			for (let resource = 0; resource < 10; resource += 1) {
+				const row = document.createElement('div')
+				row.className = 'cattail-world-editor-shell__paint-palette-row'
+				row.dataset.worldEditorPaletteResource = String(resource)
+				const swatch = document.createElement('span')
+				swatch.className = 'cattail-world-editor-shell__paint-palette-swatch'
+				swatch.dataset.worldEditorPaletteSwatch = ''
+				swatch.setAttribute('aria-hidden', 'true')
+				const name = document.createElement('span')
+				name.className = 'cattail-world-editor-shell__paint-palette-name'
+				name.dataset.worldEditorPaletteName = ''
+				const defaultWeight = resource === 0 ? 100 : 0
+				const weightControl = api.ui.settings.createControl({
+					key: 'paintPaletteWeight' + resource,
+					type: 'slider',
+					label: 'Paint palette weight',
+					default: defaultWeight,
+					min: 0,
+					max: 100,
+					step: 1,
+					integer: true
+				}, { theme: 'auto', value: defaultWeight })
+				weightControl.element.className += ' cattail-world-editor-shell__paint-palette-weight-control'
+				weightControl.element.dataset.worldEditorPaletteWeight = ''
+				const normalized = document.createElement('span')
+				normalized.className = 'cattail-world-editor-shell__paint-palette-value'
+				normalized.dataset.worldEditorPaletteNormalized = ''
+				const slotValue = document.createElement('span')
+				slotValue.className = 'cattail-world-editor-shell__paint-palette-value'
+				slotValue.dataset.worldEditorPaletteSlots = ''
+				slotValue.textContent = (resource === 0 ? '64' : '0') + '/64'
+				row[PALETTE_ROW_CONTROLS_KEY] = Object.freeze({ weight: weightControl })
+				settingsControls.push(weightControl)
+				row.append(swatch, name, weightControl.element, normalized, slotValue)
+				rows.append(row)
+			}
+			const detachScroll = api.ui.settings.scroll.attach(rows, {
+				axis: 'y',
+				maxHeight: 'min(360px, calc(100vh - 270px))',
+				theme: 'auto',
+				inertia: true,
+				transient: true
+			})
+
+			const actions = document.createElement('div')
+			actions.className = 'cattail-world-editor-shell__paint-palette-actions'
+			const cancel = document.createElement('button')
+			cancel.type = 'button'
+			cancel.className = 'cattail-world-editor-shell__paint-palette-action'
+			cancel.dataset.worldEditorAction = 'paint-palette-cancel'
+			const apply = document.createElement('button')
+			apply.type = 'button'
+			apply.className = 'cattail-world-editor-shell__paint-palette-action cattail-world-editor-shell__paint-palette-action--primary'
+			apply.dataset.worldEditorAction = 'paint-palette-apply'
+			actions.append(cancel, apply)
+			panel.append(title, headings, rows, actions)
+			let destroyed = false
+			panel[PALETTE_LIFECYCLE_KEY] = Object.freeze({
+				destroy() {
+					if (destroyed) return
+					destroyed = true
+					detachScroll()
+					for (const control of settingsControls) control.destroy()
+				}
+			})
+			return panel
 		}
 
 		function createToolbarGroup(kind) {
@@ -2226,6 +2854,87 @@ ModLoader.register({
 			})
 		}
 
+		function unavailablePaletteElement() {
+			const element = {
+				hidden: true,
+				disabled: true,
+				dataset: {},
+				style: {},
+				textContent: '',
+				value: '',
+				addEventListener() {},
+				removeEventListener() {},
+				setAttribute() {},
+				contains() { return false },
+				focus() {},
+				querySelector() { return element }
+			}
+			return element
+		}
+
+		function unavailablePaintUi(game) {
+			const recipe = Object.freeze({
+				version: 1,
+				weights: Object.freeze([Object.freeze({ resource: 0, weight: 100 })]),
+				totalWeight: 100
+			})
+			const state = Object.freeze({
+				version: '0.6.0',
+				subtool: 'brush',
+				cubeMode: 'stable',
+				growAvailable: false,
+				growDurationMs: 4000,
+				recipe,
+				paletteOpen: false,
+				revision: 0,
+				lastReason: 'not-ready',
+				ready: false,
+				disposed: false
+			})
+			return Object.freeze({
+				game,
+				snapshot() { return state },
+				subscribe(listener) {
+					listener(state)
+					return function () {}
+				},
+				setSubtool() { return false },
+				setCubeMode() { return false },
+				setRecipe() { return false },
+				setPaletteOpen() { return false }
+			})
+		}
+
+		function unavailablePaintState() {
+			const defaultRecipe = function () {
+				return { version: 1, weights: [{ resource: 0, weight: 100 }], totalWeight: 100 }
+			}
+			return Object.freeze({
+				resourceCount: 10,
+				defaultRecipe,
+				normalizeRecipe(value) {
+					const weights = Array.isArray(value) ? value : value?.weights
+					if (!Array.isArray(weights)) return null
+					const normalized = weights.filter(function (entry) {
+						return Number.isInteger(Number(entry?.resource)) && Number(entry?.weight) > 0
+					}).map(function (entry) {
+						return { resource: Number(entry.resource), weight: Math.min(100, Math.round(Number(entry.weight))) }
+					})
+					if (!normalized.length) return null
+					return {
+						version: 1,
+						weights: normalized,
+						totalWeight: normalized.reduce(function (sum, entry) { return sum + entry.weight }, 0)
+					}
+				},
+				allocateSlots(recipe) {
+					const counts = new Array(10).fill(0)
+					if (recipe?.weights?.[0]) counts[recipe.weights[0].resource] = 64
+					return counts
+				}
+			})
+		}
+
 		function unavailableTransactions(game) {
 			const state = Object.freeze({
 				version: '1.0.0',
@@ -2336,6 +3045,9 @@ ModLoader.register({
 					--world-editor-hell-gem-1: #A6F246;
 					--world-editor-hell-gem-2: #E3FD43;
 					--world-editor-hell-gem-3: #4CB96B;
+					--world-editor-draw-pink-1: #F58BB7;
+					--world-editor-draw-pink-2: #FFD1E2;
+					--world-editor-draw-pink-3: #B9478D;
 					--world-editor-glass-backdrop: blur(10px) saturate(1.2) brightness(1.05);
 					--world-editor-elmerine-glass:
 						radial-gradient(ellipse 92% 72% at 50% -18%, rgba(255, 255, 255, .72) 0%, rgba(255, 255, 255, .22) 46%, transparent 72%),
@@ -2385,6 +3097,44 @@ ModLoader.register({
 						0 2px 7px rgba(10, 16, 24, .16),
 						0 0 10px color-mix(in srgb, var(--world-editor-hell-gem-1) 38%, transparent),
 						0 0 20px color-mix(in srgb, var(--world-editor-hell-gem-2) 20%, transparent);
+					--world-editor-draw-pink-glass:
+						radial-gradient(ellipse 92% 72% at 50% -18%, rgba(255, 255, 255, .76) 0%, rgba(255, 255, 255, .24) 46%, transparent 72%),
+						linear-gradient(180deg, rgba(255, 255, 255, .3) 0%, rgba(255, 255, 255, .07) 34%, rgba(255, 255, 255, .04) 60%, rgba(255, 255, 255, .34) 100%),
+						linear-gradient(112deg, transparent 8%, rgba(255, 255, 255, .5) 24%, rgba(255, 255, 255, .1) 43%, transparent 59%),
+						linear-gradient(145deg, color-mix(in srgb, var(--world-editor-draw-pink-2) 24%, transparent), color-mix(in srgb, var(--world-editor-draw-pink-1) 18%, transparent) 54%, color-mix(in srgb, var(--world-editor-draw-pink-3) 22%, transparent));
+					--world-editor-draw-pink-glass-hover:
+						radial-gradient(ellipse 96% 78% at 50% -18%, rgba(255, 255, 255, .86) 0%, rgba(255, 255, 255, .34) 48%, transparent 74%),
+						linear-gradient(180deg, rgba(255, 255, 255, .38) 0%, rgba(255, 255, 255, .09) 34%, rgba(255, 255, 255, .05) 60%, rgba(255, 255, 255, .44) 100%),
+						linear-gradient(108deg, transparent 6%, rgba(255, 255, 255, .6) 24%, rgba(255, 255, 255, .15) 44%, transparent 61%),
+						linear-gradient(145deg, color-mix(in srgb, var(--world-editor-draw-pink-2) 31%, transparent), color-mix(in srgb, var(--world-editor-draw-pink-1) 24%, transparent) 54%, color-mix(in srgb, var(--world-editor-draw-pink-3) 29%, transparent));
+					--world-editor-draw-pink-glass-shadow:
+						inset 0 0 0 1px rgba(255, 255, 255, .64),
+						inset 0 1px 1px rgba(255, 255, 255, .94),
+						inset 0 -1px 1px rgba(255, 255, 255, .7),
+						inset 1px 0 1px rgba(255, 255, 255, .4),
+						inset -1px 0 1px color-mix(in srgb, var(--world-editor-draw-pink-2) 36%, transparent),
+						inset 0 -6px 12px color-mix(in srgb, var(--world-editor-draw-pink-3) 20%, transparent),
+						0 5px 12px rgba(10, 16, 24, .16),
+						0 0 12px color-mix(in srgb, var(--world-editor-draw-pink-1) 44%, transparent),
+						0 0 26px color-mix(in srgb, var(--world-editor-draw-pink-2) 24%, transparent);
+					--world-editor-draw-pink-glass-shadow-hover:
+						inset 0 0 0 1px rgba(255, 255, 255, .78),
+						inset 0 1px 1px rgba(255, 255, 255, .98),
+						inset 0 -2px 2px rgba(255, 255, 255, .8),
+						inset 1px 0 1px rgba(255, 255, 255, .52),
+						inset -1px 0 1px color-mix(in srgb, var(--world-editor-draw-pink-2) 44%, transparent),
+						inset 0 -7px 14px color-mix(in srgb, var(--world-editor-draw-pink-3) 24%, transparent),
+						0 6px 14px rgba(10, 16, 24, .18),
+						0 0 16px color-mix(in srgb, var(--world-editor-draw-pink-1) 56%, transparent),
+						0 0 32px color-mix(in srgb, var(--world-editor-draw-pink-2) 32%, transparent);
+					--world-editor-draw-pink-glass-shadow-pressed:
+						inset 0 0 0 1px rgba(255, 255, 255, .6),
+						inset 0 1px 1px rgba(255, 255, 255, .76),
+						inset 0 4px 9px color-mix(in srgb, var(--world-editor-draw-pink-3) 26%, transparent),
+						inset 0 -1px 1px rgba(255, 255, 255, .56),
+						0 2px 7px rgba(10, 16, 24, .16),
+						0 0 10px color-mix(in srgb, var(--world-editor-draw-pink-1) 40%, transparent),
+						0 0 20px color-mix(in srgb, var(--world-editor-draw-pink-2) 22%, transparent);
 				}
 				.cattail-world-editor-shell {
 					--world-editor-shell-bg: rgba(248, 248, 246, .88);
@@ -2641,6 +3391,32 @@ ModLoader.register({
 					box-sizing: border-box;
 					content: '';
 				}
+				[data-world-editor-toolbar-icon="brush"]::before {
+					left: .45em;
+					top: .05em;
+					width: .16em;
+					height: .68em;
+					border-radius: .09em;
+					background: currentColor;
+					transform: rotate(42deg);
+					transform-origin: 50% 85%;
+				}
+				[data-world-editor-toolbar-icon="brush"]::after {
+					left: .12em;
+					top: .55em;
+					width: .46em;
+					height: .32em;
+					border-radius: .08em .08em .2em .1em;
+					background: currentColor;
+					clip-path: polygon(14% 0, 100% 0, 85% 67%, 62% 100%, 42% 79%, 0 100%, 11% 55%);
+					transform: rotate(-5deg);
+				}
+				[data-world-editor-toolbar-icon="bucket"]::before {
+					inset: .05em;
+					background: currentColor;
+					-webkit-mask: url('mods/Cattail_TweaksQuality_World-Editor/assets/icons/paint-bucket.svg') center / contain no-repeat;
+					mask: url('mods/Cattail_TweaksQuality_World-Editor/assets/icons/paint-bucket.svg') center / contain no-repeat;
+				}
 				[data-world-editor-toolbar-icon="eraser"]::before {
 					left: .16em;
 					top: .29em;
@@ -2659,6 +3435,62 @@ ModLoader.register({
 					border-radius: 999px;
 					background: currentColor;
 					opacity: .5;
+				}
+				[data-world-editor-toolbar-icon="palette"]::before {
+					left: .09em;
+					top: .13em;
+					width: .82em;
+					height: .72em;
+					border: .075em solid currentColor;
+					border-radius: 52% 48% 48% 42%;
+					background:
+						radial-gradient(circle at 27% 31%, currentColor 0 .07em, transparent .075em),
+						radial-gradient(circle at 56% 23%, currentColor 0 .07em, transparent .075em),
+						radial-gradient(circle at 72% 48%, currentColor 0 .07em, transparent .075em),
+						radial-gradient(circle at 39% 67%, currentColor 0 .07em, transparent .075em);
+					transform: rotate(-9deg);
+				}
+				[data-world-editor-toolbar-icon="palette"]::after {
+					right: .08em;
+					bottom: .08em;
+					width: .3em;
+					height: .3em;
+					border-radius: 50%;
+					background: var(--world-editor-shell-bg);
+					box-shadow: inset 0 0 0 .07em currentColor;
+				}
+				[data-world-editor-toolbar-icon="stable"]::before {
+					left: .17em;
+					top: .17em;
+					width: .66em;
+					height: .66em;
+					border: .09em solid currentColor;
+					border-radius: .08em;
+					transform: rotate(45deg) scale(.82);
+				}
+				[data-world-editor-toolbar-icon="stable"]::after {
+					left: .46em;
+					top: .22em;
+					width: .09em;
+					height: .56em;
+					background: currentColor;
+					box-shadow: -.2em .2em 0 -.025em currentColor, .2em .2em 0 -.025em currentColor;
+				}
+				[data-world-editor-toolbar-icon="grow"]::before {
+					left: .16em;
+					bottom: .12em;
+					width: .68em;
+					height: .34em;
+					border: .09em solid currentColor;
+					clip-path: polygon(18% 0, 82% 0, 100% 34%, 100% 100%, 0 100%, 0 34%);
+				}
+				[data-world-editor-toolbar-icon="grow"]::after {
+					left: .455em;
+					top: .08em;
+					width: .09em;
+					height: .51em;
+					background: currentColor;
+					clip-path: polygon(0 26%, 50% 0, 100% 26%, 72% 26%, 72% 100%, 28% 100%, 28% 26%);
 				}
 				[data-world-editor-toolbar-icon="pickaxe"]::before {
 					left: .455em;
@@ -2707,6 +3539,28 @@ ModLoader.register({
 				}
 				.cattail-world-editor-shell__tool--creative[data-creative="true"]:focus-visible:not(:disabled) {
 					box-shadow: var(--world-editor-hell-gem-glass-shadow), 0 0 0 2px var(--world-editor-shell-text);
+				}
+				.cattail-world-editor-shell__tool--draw[data-active="true"] {
+					border-color: color-mix(in srgb, rgba(255, 255, 255, .88) 54%, var(--world-editor-draw-pink-1));
+					background: var(--world-editor-draw-pink-glass);
+					background-blend-mode: screen, screen, screen, normal;
+					backdrop-filter: var(--world-editor-glass-backdrop);
+					-webkit-backdrop-filter: var(--world-editor-glass-backdrop);
+					box-shadow: var(--world-editor-draw-pink-glass-shadow);
+					color: #2c1321;
+				}
+				.cattail-world-editor-shell__tool--draw[data-active="true"]:hover:not(:disabled):not([aria-disabled="true"]) {
+					border-color: color-mix(in srgb, rgba(255, 255, 255, .96) 68%, var(--world-editor-draw-pink-1));
+					background: var(--world-editor-draw-pink-glass-hover);
+					box-shadow: var(--world-editor-draw-pink-glass-shadow-hover);
+					color: #2c1321;
+				}
+				.cattail-world-editor-shell__tool--draw[data-active="true"]:active:not(:disabled):not([aria-disabled="true"]) {
+					transform: translateY(1px);
+					box-shadow: var(--world-editor-draw-pink-glass-shadow-pressed);
+				}
+				.cattail-world-editor-shell__tool--draw[data-active="true"]:focus-visible:not(:disabled) {
+					box-shadow: var(--world-editor-draw-pink-glass-shadow), 0 0 0 2px var(--world-editor-shell-text);
 				}
 				.cattail-world-editor-shell__tool:disabled {
 					opacity: .38;
@@ -2769,6 +3623,128 @@ ModLoader.register({
 				.cattail-world-editor-shell__history-status[data-kind="terminal"] {
 					border-color: var(--world-editor-history-error);
 				}
+				.cattail-world-editor-shell__paint-palette {
+					width: min(760px, var(--world-editor-toolbar-layout-width, calc(100vw - 24px)));
+					max-height: min(520px, calc(100vh - 170px));
+					box-sizing: border-box;
+					overflow: hidden;
+					padding: 14px;
+					border: 1px solid var(--world-editor-shell-active-border);
+					border-radius: 12px;
+					background: var(--world-editor-shell-bg);
+					box-shadow: var(--world-editor-shell-shadow);
+					backdrop-filter: blur(16px) saturate(1.14);
+					-webkit-backdrop-filter: blur(16px) saturate(1.14);
+					color: var(--world-editor-shell-text);
+					font: 600 12px/1.3 Montserrat, Arial, sans-serif;
+					white-space: normal;
+					pointer-events: auto;
+				}
+				.cattail-world-editor-shell__paint-palette[hidden] { display: none !important; }
+				.cattail-world-editor-shell__paint-palette-title {
+					margin: 0 0 10px;
+					font: 700 15px/1.3 Montserrat, Arial, sans-serif;
+					text-align: left;
+				}
+				.cattail-world-editor-shell__paint-palette-headings,
+				.cattail-world-editor-shell__paint-palette-row {
+					display: grid;
+					grid-template-columns: 25px minmax(112px, 1fr) minmax(250px, 2fr) 72px 64px;
+					gap: 8px;
+					align-items: center;
+				}
+				.cattail-world-editor-shell__paint-palette-headings {
+					padding: 0 8px 6px;
+					color: var(--world-editor-shell-muted);
+					font-size: 12px;
+					font-weight: 700;
+					letter-spacing: .04em;
+					text-transform: uppercase;
+				}
+				.cattail-world-editor-shell__paint-palette-headings [data-world-editor-palette-heading="resource"] { grid-column: 1 / 3; }
+				.cattail-world-editor-shell__paint-palette-headings [data-world-editor-palette-heading="weight"] { grid-column: 3; }
+				.cattail-world-editor-shell__paint-palette-headings [data-world-editor-palette-heading="normalized"] { grid-column: 4; }
+				.cattail-world-editor-shell__paint-palette-headings [data-world-editor-palette-heading="slots"] { grid-column: 5; }
+				.cattail-world-editor-shell__paint-palette-rows {
+					display: grid;
+					gap: 4px;
+					padding: 2px 4px 2px 0;
+				}
+				.cattail-world-editor-shell__paint-palette-row {
+					min-height: 34px;
+					padding: 4px 8px;
+					border-radius: 7px;
+					background: var(--world-editor-shell-group);
+				}
+				.cattail-world-editor-shell__paint-palette-swatch {
+					width: 25px;
+					height: 25px;
+					box-sizing: border-box;
+					border: 1px solid var(--world-editor-shell-border);
+					border-radius: 5px;
+					box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .36);
+				}
+				.cattail-world-editor-shell__paint-palette-name {
+					overflow: hidden;
+					text-overflow: ellipsis;
+					white-space: nowrap;
+				}
+				.cattail-world-editor-shell__paint-palette-weight-control { min-width: 0; }
+				.cattail-world-editor-shell__paint-palette .cattail-world-editor-shell__paint-palette-weight-control .modloader-config-slider {
+					grid-template-columns: minmax(0, 1fr) 66px;
+				}
+				.cattail-world-editor-shell__paint-palette .cattail-world-editor-shell__paint-palette-weight-control .modloader-config-slider-reset {
+					display: none !important;
+				}
+				.cattail-world-editor-shell__paint-palette-value {
+					color: var(--world-editor-shell-muted);
+					font-variant-numeric: tabular-nums;
+					text-align: right;
+				}
+				.cattail-world-editor-shell__paint-palette-action {
+					min-height: 28px;
+					box-sizing: border-box;
+					padding: 5px 9px;
+					border: 1px solid var(--world-editor-shell-border);
+					border-radius: 6px;
+					background: var(--world-editor-shell-chip);
+					color: var(--world-editor-shell-text);
+					font: 600 11px/1.2 Montserrat, Arial, sans-serif;
+					cursor: pointer;
+					outline: none;
+					transition: background .12s ease, border-color .12s ease, box-shadow .12s ease, color .12s ease, opacity .12s ease, transform .08s ease;
+				}
+				.cattail-world-editor-shell__paint-palette-action:hover:not(:disabled) { background: var(--world-editor-shell-hover-bg); }
+				.cattail-world-editor-shell__paint-palette-actions {
+					display: flex;
+					justify-content: flex-end;
+					gap: 8px;
+					padding-top: 10px;
+				}
+				.cattail-world-editor-shell__paint-palette-action--primary:not(:disabled) {
+					border-color: color-mix(in srgb, rgba(255, 255, 255, .88) 54%, var(--world-editor-hell-gem-1));
+					background: var(--world-editor-hell-gem-glass);
+					background-blend-mode: screen, screen, screen, normal;
+					backdrop-filter: var(--world-editor-glass-backdrop);
+					-webkit-backdrop-filter: var(--world-editor-glass-backdrop);
+					box-shadow: var(--world-editor-hell-gem-glass-shadow);
+					color: #17200c;
+				}
+				.cattail-world-editor-shell__paint-palette-action--primary:hover:not(:disabled) {
+					border-color: color-mix(in srgb, rgba(255, 255, 255, .96) 68%, var(--world-editor-hell-gem-1));
+					background: var(--world-editor-hell-gem-glass-hover);
+					box-shadow: var(--world-editor-hell-gem-glass-shadow-hover);
+					color: #17200c;
+				}
+				.cattail-world-editor-shell__paint-palette-action--primary:active:not(:disabled) {
+					transform: translateY(1px);
+					box-shadow: var(--world-editor-hell-gem-glass-shadow-pressed);
+				}
+				.cattail-world-editor-shell__paint-palette-action--primary:focus-visible:not(:disabled) {
+					box-shadow: var(--world-editor-hell-gem-glass-shadow), 0 0 0 2px var(--world-editor-shell-text);
+				}
+				.cattail-world-editor-shell__paint-palette-action:disabled { opacity: .38; cursor: default; }
+				.cattail-world-editor-shell__paint-palette-action--primary:disabled { box-shadow: none; }
 				.cattail-world-editor-shell[data-toolbar-style="compact"] .cattail-world-editor-shell__actions {
 					gap: 0;
 				}
@@ -2865,6 +3841,38 @@ ModLoader.register({
 					box-shadow: inset 0 -3px 0 var(--world-editor-hell-gem-3, #4CB96B) !important;
 					color: var(--world-editor-shell-hover-color) !important;
 				}
+				.cattail-world-editor-shell[data-toolbar-style="compact"] [data-world-editor-toolbar-group="draw"] .cattail-world-editor-shell__tool[data-active="true"]:not(.cattail-world-editor-shell__tool--draw) {
+					background: transparent !important;
+					box-shadow: inset 0 -3px 0 var(--world-editor-hell-gem-3, #4CB96B) !important;
+					color: var(--world-editor-shell-text);
+				}
+				.cattail-world-editor-shell[data-toolbar-style="compact"] [data-world-editor-toolbar-group="draw"] .cattail-world-editor-shell__tool[data-active="true"]:not(.cattail-world-editor-shell__tool--draw):hover:not(:disabled):not([aria-disabled="true"]) {
+					background: var(--world-editor-shell-hover-bg) !important;
+					box-shadow: inset 0 -3px 0 var(--world-editor-hell-gem-3, #4CB96B) !important;
+					color: var(--world-editor-shell-hover-color) !important;
+				}
+				.cattail-world-editor-shell[data-toolbar-style="compact"] .cattail-world-editor-shell__tool--draw[data-active="true"] {
+					border-radius: 5px;
+					border: 1px solid color-mix(in srgb, rgba(255, 255, 255, .88) 54%, var(--world-editor-draw-pink-1)) !important;
+					background: var(--world-editor-draw-pink-glass) !important;
+					background-blend-mode: screen, screen, screen, normal !important;
+					backdrop-filter: var(--world-editor-glass-backdrop) !important;
+					-webkit-backdrop-filter: var(--world-editor-glass-backdrop) !important;
+					box-shadow: var(--world-editor-draw-pink-glass-shadow) !important;
+					color: #2c1321;
+				}
+				.cattail-world-editor-shell[data-toolbar-style="compact"] .cattail-world-editor-shell__tool--draw[data-active="true"]:hover:not(:disabled):not([aria-disabled="true"]) {
+					border: 1px solid color-mix(in srgb, rgba(255, 255, 255, .96) 68%, var(--world-editor-draw-pink-1)) !important;
+					background: var(--world-editor-draw-pink-glass-hover) !important;
+					background-blend-mode: screen, screen, screen, normal !important;
+					backdrop-filter: var(--world-editor-glass-backdrop) !important;
+					-webkit-backdrop-filter: var(--world-editor-glass-backdrop) !important;
+					box-shadow: var(--world-editor-draw-pink-glass-shadow-hover) !important;
+					color: #2c1321 !important;
+				}
+				.cattail-world-editor-shell[data-toolbar-style="compact"] .cattail-world-editor-shell__tool--draw[data-active="true"]:focus-visible:not(:disabled):not([aria-disabled="true"]) {
+					box-shadow: var(--world-editor-draw-pink-glass-shadow), 0 0 0 2px var(--world-editor-shell-text) !important;
+				}
 				.cattail-world-editor-shell[data-toolbar-style="compact"] .cattail-world-editor-shell__tool--creative[data-creative="true"] {
 					border-radius: 5px;
 					border: 1px solid color-mix(in srgb, rgba(255, 255, 255, .88) 54%, var(--world-editor-hell-gem-1)) !important;
@@ -2895,6 +3903,12 @@ ModLoader.register({
 					padding: 6px;
 					border-radius: 12px;
 					overflow: visible;
+					transition:
+						width .22s cubic-bezier(.22, .75, .24, 1),
+						background .18s ease,
+						border-color .18s ease,
+						color .18s ease,
+						box-shadow .18s ease;
 				}
 				.cattail-world-editor-shell[data-toolbar-style="cards"] .cattail-world-editor-shell__toolbar-bar::before,
 				.cattail-world-editor-shell[data-toolbar-style="cards"] .cattail-world-editor-shell__toolbar-bar::after {
@@ -2948,11 +3962,17 @@ ModLoader.register({
 					border: 0;
 					border-radius: 0;
 					background: transparent;
+					opacity: 1;
 					transform: translate3d(var(--world-editor-large-toolbar-scroll-residual, 0px), 0, 0);
+					visibility: visible;
 					will-change: transform;
+					transition: opacity .16s ease, visibility 0s linear 0s;
 				}
 				.cattail-world-editor-shell[data-toolbar-style="cards"] .cattail-world-editor-shell__group[data-large-empty="true"] {
-					display: none;
+					opacity: 0;
+					visibility: hidden;
+					pointer-events: none;
+					transition: opacity .16s ease, visibility 0s linear .22s;
 				}
 				.cattail-world-editor-shell[data-toolbar-style="cards"] .cattail-world-editor-shell__group:not([data-world-editor-toolbar-group="selection"])::before {
 					content: "";
@@ -2999,6 +4019,18 @@ ModLoader.register({
 					font: 650 15px/1.25 Montserrat, Arial, sans-serif;
 					text-align: center;
 					white-space: normal;
+					opacity: 1;
+					transform: translateY(0) scale(1);
+					visibility: visible;
+					transition:
+						flex-basis .22s cubic-bezier(.22, .75, .24, 1),
+						width .22s cubic-bezier(.22, .75, .24, 1),
+						min-width .22s cubic-bezier(.22, .75, .24, 1),
+						max-width .22s cubic-bezier(.22, .75, .24, 1),
+						padding .22s cubic-bezier(.22, .75, .24, 1),
+						opacity .16s ease,
+						transform .22s cubic-bezier(.22, .75, .24, 1),
+						visibility 0s linear 0s;
 				}
 				.cattail-world-editor-shell[data-toolbar-style="cards"] [data-world-editor-toolbar-card]::after {
 					content: "";
@@ -3076,6 +4108,40 @@ ModLoader.register({
 				.cattail-world-editor-shell[data-toolbar-style="cards"] .cattail-world-editor-blueprint-mode[data-active="true"]:hover:not(:disabled)::after {
 					background: var(--world-editor-shell-hover-bg) !important;
 					box-shadow: inset 0 -3px 0 var(--world-editor-hell-gem-3, #4CB96B) !important;
+				}
+				.cattail-world-editor-shell[data-toolbar-style="cards"] [data-world-editor-toolbar-group="draw"] .cattail-world-editor-shell__tool[data-active="true"]:not(.cattail-world-editor-shell__tool--draw)::after {
+					background: transparent;
+					box-shadow: inset 0 -3px 0 var(--world-editor-hell-gem-3, #4CB96B);
+				}
+				.cattail-world-editor-shell[data-toolbar-style="cards"] [data-world-editor-toolbar-group="draw"] .cattail-world-editor-shell__tool[data-active="true"]:not(.cattail-world-editor-shell__tool--draw):hover:not(:disabled):not([aria-disabled="true"])::after {
+					background: var(--world-editor-shell-hover-bg) !important;
+					box-shadow: inset 0 -3px 0 var(--world-editor-hell-gem-3, #4CB96B) !important;
+				}
+				.cattail-world-editor-shell[data-toolbar-style="cards"] .cattail-world-editor-shell__tool--draw[data-active="true"] {
+					background: transparent;
+					color: #2c1321;
+					box-shadow: none;
+				}
+				.cattail-world-editor-shell[data-toolbar-style="cards"] .cattail-world-editor-shell__tool--draw[data-active="true"]::after {
+					background: var(--world-editor-draw-pink-glass);
+					background-blend-mode: screen, screen, screen, normal;
+					backdrop-filter: var(--world-editor-glass-backdrop);
+					-webkit-backdrop-filter: var(--world-editor-glass-backdrop);
+					box-shadow: var(--world-editor-draw-pink-glass-shadow);
+				}
+				.cattail-world-editor-shell[data-toolbar-style="cards"] .cattail-world-editor-shell__tool--draw[data-active="true"]:hover:not(:disabled):not([aria-disabled="true"]),
+				.cattail-world-editor-shell[data-toolbar-style="cards"] .cattail-world-editor-shell__tool--draw[data-active="true"]:hover:not(:disabled):not([aria-disabled="true"]) .cattail-world-editor-shell__card-icon {
+					color: #2c1321 !important;
+				}
+				.cattail-world-editor-shell[data-toolbar-style="cards"] .cattail-world-editor-shell__tool--draw[data-active="true"]:hover:not(:disabled):not([aria-disabled="true"])::after {
+					background: var(--world-editor-draw-pink-glass-hover) !important;
+					background-blend-mode: screen, screen, screen, normal !important;
+					backdrop-filter: var(--world-editor-glass-backdrop) !important;
+					-webkit-backdrop-filter: var(--world-editor-glass-backdrop) !important;
+					box-shadow: var(--world-editor-draw-pink-glass-shadow-hover) !important;
+				}
+				.cattail-world-editor-shell[data-toolbar-style="cards"] .cattail-world-editor-shell__tool--draw[data-active="true"]:focus-visible:not(:disabled):not([aria-disabled="true"])::after {
+					box-shadow: var(--world-editor-draw-pink-glass-shadow), 0 0 0 2px var(--world-editor-shell-text);
 				}
 				.cattail-world-editor-shell[data-toolbar-style="cards"] .cattail-world-editor-shell__tool--creative[data-creative="true"] {
 					background: transparent;
@@ -3161,10 +4227,55 @@ ModLoader.register({
 				}
 				.cattail-world-editor-shell[data-toolbar-style="cards"] [data-world-editor-large-hidden="true"],
 				.cattail-world-editor-shell[data-toolbar-style="cards"] [data-world-editor-toolbar-card][aria-disabled="true"]:not([data-world-editor-toolbar-busy="true"]) {
-					display: none !important;
+					display: inline-grid !important;
+					flex: 0 0 0;
+					width: 0 !important;
+					min-width: 0 !important;
+					max-width: 0;
+					padding-left: 0 !important;
+					padding-right: 0 !important;
+					opacity: 0;
+					transform: translateY(-8px) scale(.9);
+					visibility: hidden;
+					pointer-events: none;
+					transition:
+						flex-basis .22s cubic-bezier(.22, .75, .24, 1),
+						width .22s cubic-bezier(.22, .75, .24, 1),
+						min-width .22s cubic-bezier(.22, .75, .24, 1),
+						max-width .22s cubic-bezier(.22, .75, .24, 1),
+						padding .22s cubic-bezier(.22, .75, .24, 1),
+						opacity .16s ease,
+						transform .22s cubic-bezier(.22, .75, .24, 1),
+						visibility 0s linear .22s;
 				}
 				.cattail-world-editor-shell[data-toolbar-style="cards"] [data-world-editor-toolbar-card][hidden] {
-					display: none !important;
+					display: inline-grid !important;
+					flex: 0 0 0;
+					width: 0 !important;
+					min-width: 0 !important;
+					max-width: 0;
+					padding-left: 0 !important;
+					padding-right: 0 !important;
+					opacity: 0;
+					transform: translateY(-8px) scale(.9);
+					visibility: hidden;
+					pointer-events: none;
+					transition:
+						flex-basis .22s cubic-bezier(.22, .75, .24, 1),
+						width .22s cubic-bezier(.22, .75, .24, 1),
+						min-width .22s cubic-bezier(.22, .75, .24, 1),
+						max-width .22s cubic-bezier(.22, .75, .24, 1),
+						padding .22s cubic-bezier(.22, .75, .24, 1),
+						opacity .16s ease,
+						transform .22s cubic-bezier(.22, .75, .24, 1),
+						visibility 0s linear .22s;
+				}
+				@media (prefers-reduced-motion: reduce) {
+					.cattail-world-editor-shell[data-toolbar-style="cards"] .cattail-world-editor-shell__toolbar-bar,
+					.cattail-world-editor-shell[data-toolbar-style="cards"] .cattail-world-editor-shell__group,
+					.cattail-world-editor-shell[data-toolbar-style="cards"] [data-world-editor-toolbar-card] {
+						transition: none !important;
+					}
 				}
 				.cattail-world-editor-economy-status {
 					--world-editor-economy-bg: rgba(248, 248, 246, .94);

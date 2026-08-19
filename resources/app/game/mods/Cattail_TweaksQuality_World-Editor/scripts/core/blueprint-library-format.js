@@ -9,6 +9,8 @@ ModLoader.register({
 		const FILE_EXTENSIONS = Object.freeze([FILE_EXTENSION, LEGACY_FILE_EXTENSION])
 		const LIBRARY_SCHEMA_VERSION = 2
 		const LEGACY_LIBRARY_SCHEMA_VERSION = 1
+		const MAX_STRUCTURE_DEPTH = 32
+		const DANGEROUS_KEYS = new Set(['__proto__', 'prototype', 'constructor'])
 		const previous = globalThis[FORMAT_KEY]
 		previous?.dispose?.('blueprint-library-format-replaced')
 		let disposed = false
@@ -44,7 +46,7 @@ ModLoader.register({
 		})
 
 		function create(options) {
-			const blueprint = normalizeBlueprint(options?.blueprint)
+			const blueprint = normalizeBlueprint(options?.blueprint, 'BLUEPRINT_INVALID')
 			if (!validBlueprint(blueprint)) throw formatError('BLUEPRINT_INVALID', 'The blueprint payload is invalid or unsupported.')
 			const now = isoTime(options?.modifiedAt || options?.updatedAt || Date.now())
 			const createdAt = isoTime(options?.createdAt || now)
@@ -73,6 +75,7 @@ ModLoader.register({
 			if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
 				throw formatError('CORRUPT', 'The blueprint file root must be an object.')
 			}
+			assertSafeStructure(parsed, 'CORRUPT')
 			const librarySchemaVersion = Number(parsed.librarySchemaVersion)
 			if (![LEGACY_LIBRARY_SCHEMA_VERSION, LIBRARY_SCHEMA_VERSION].includes(librarySchemaVersion)) {
 				throw formatError('INCOMPATIBLE', 'The blueprint library file version is not supported.')
@@ -82,7 +85,7 @@ ModLoader.register({
 			}
 			const id = normalizeId(parsed.id)
 			if (!id) throw formatError('CORRUPT', 'The blueprint file has no valid stable ID.')
-			const blueprint = normalizeBlueprint(parsed.blueprint)
+			const blueprint = normalizeBlueprint(parsed.blueprint, 'CORRUPT')
 			if (!validBlueprint(blueprint)) throw formatError('INCOMPATIBLE', 'The blueprint payload schema is not supported.')
 			return freeze({
 				librarySchemaVersion,
@@ -106,7 +109,7 @@ ModLoader.register({
 		}
 
 		function metadata(value) {
-			const envelope = Number(value?.librarySchemaVersion) === LIBRARY_SCHEMA_VERSION ? value : parse(value)
+			const envelope = parse(value)
 			const blueprint = envelope.blueprint || {}
 			const bounds = blueprint.contentBounds || {}
 			const min = normalizePosition(bounds.min)
@@ -127,6 +130,8 @@ ModLoader.register({
 				defaultTransform,
 				entityCount: Array.isArray(blueprint.entities) ? blueprint.entities.length : 0,
 				blockCount: Array.isArray(blueprint.blocks) ? blueprint.blocks.length : 0,
+				paintedCubeCount: Array.isArray(blueprint.paintedCubes) ? blueprint.paintedCubes.length : 0,
+				paintedCompatible: Number(blueprint.schemaVersion) === 7 || Number(blueprint.schemaVersion) === 8,
 				surgeCount: Array.isArray(blueprint.surges) ? blueprint.surges.length : 0,
 				emptyCellCount: Array.isArray(blueprint.emptyCells) ? blueprint.emptyCells.length : 0
 			})
@@ -204,20 +209,128 @@ ModLoader.register({
 			return [hex.slice(0, 8), hex.slice(8, 12), hex.slice(12, 16), hex.slice(16, 20), hex.slice(20)].join('-')
 		}
 
-		function normalizeBlueprint(value) {
+		function normalizeBlueprint(value, errorCode) {
 			const state = globalThis[STATE_KEY]
+			assertSafeStructure(value, errorCode || 'BLUEPRINT_INVALID')
+			const geometry = typeof state?.inspectBlueprint === 'function'
+				? state.inspectBlueprint(value)
+				: inspectBlueprintGeometry(value)
+			if (geometry?.valid !== true) {
+				throw formatError(errorCode || 'BLUEPRINT_INVALID', 'The blueprint contains unsafe coordinate geometry.')
+			}
 			const cloned = clone(value)
 			return typeof state?.normalizeBlueprint === 'function' ? state.normalizeBlueprint(cloned) : cloned
+		}
+
+		function assertSafeStructure(value, code) {
+			const state = globalThis[STATE_KEY]
+			const result = typeof state?.inspectStructure === 'function'
+				? state.inspectStructure(value)
+				: inspectStructure(value)
+			if (result?.valid === true) return
+			throw formatError(code || 'CORRUPT', 'The blueprint contains an unsafe object structure.')
+		}
+
+		function inspectStructure(value) {
+			const stack = [{ value, depth: 0, exit: false }]
+			const ancestors = new WeakSet()
+			while (stack.length) {
+				const entry = stack.pop()
+				const current = entry.value
+				if (!current || typeof current !== 'object') continue
+				if (entry.exit) {
+					ancestors.delete(current)
+					continue
+				}
+				if (entry.depth > MAX_STRUCTURE_DEPTH || ancestors.has(current)) return { valid: false }
+				ancestors.add(current)
+				stack.push({ value: current, depth: entry.depth, exit: true })
+				for (const key of Object.keys(current)) {
+					if (DANGEROUS_KEYS.has(key)) return { valid: false }
+					const child = current[key]
+					if (child && typeof child === 'object') stack.push({ value: child, depth: entry.depth + 1, exit: false })
+				}
+			}
+			return { valid: true }
+		}
+
+		function inspectBlueprintGeometry(value) {
+			if (!value || typeof value !== 'object' || Array.isArray(value)) return { valid: false }
+			const schema = Number(value.schemaVersion)
+			const supported = value.mode === 'structure'
+				? schema >= 1 && schema <= 4
+				: value.mode === 'full' && [3, 5, 6, 7, 8].includes(schema)
+			if (!supported) return { valid: true }
+			const pairs = []
+			if (value.anchor?.position !== undefined) pairs.push(value.anchor.position)
+			for (const selection of Array.isArray(value.selections) ? value.selections : []) {
+				for (const key of ['start', 'end', 'min', 'max']) if (selection?.[key] !== undefined) pairs.push(selection[key])
+				if (!optionalSafeInteger(selection?.width, true) || !optionalSafeInteger(selection?.height, true)) return { valid: false }
+				if (!safeBounds(selection?.min, selection?.max)) return { valid: false }
+			}
+			if (value.contentBounds !== null && value.contentBounds !== undefined) {
+				pairs.push(value.contentBounds?.min, value.contentBounds?.max)
+				if (!optionalSafeInteger(value.contentBounds?.width, true) || !optionalSafeInteger(value.contentBounds?.height, true)) return { valid: false }
+				if (!safeBounds(value.contentBounds?.min, value.contentBounds?.max)) return { valid: false }
+			}
+			for (const record of Array.isArray(value.entities) ? value.entities : []) {
+				pairs.push(record?.position)
+				if (record?.footprint?.min !== undefined) pairs.push(record.footprint.min)
+				if (record?.footprint?.max !== undefined) pairs.push(record.footprint.max)
+				if (!optionalSafeInteger(record?.footprint?.span, true)) return { valid: false }
+				if (!safeBounds(record?.footprint?.min, record?.footprint?.max)) return { valid: false }
+				if (record?.footprint?.span !== undefined) {
+					const position = normalizePosition(record?.position)
+					const span = Number(record.footprint.span)
+					if (!position || !safeArithmetic(position[0] - span) || !safeArithmetic(position[0] + span) || !safeArithmetic(position[1] - span) || !safeArithmetic(position[1] + span)) return { valid: false }
+				}
+			}
+			for (const name of ['blocks', 'surges', 'paintedCubes']) {
+				for (const record of Array.isArray(value[name]) ? value[name] : []) {
+					pairs.push(record?.position)
+					if (name === 'surges') pairs.push(record?.stabilizer?.position)
+				}
+			}
+			for (const name of ['emptyCells', 'neutralCells']) {
+				for (const position of Array.isArray(value[name]) ? value[name] : []) pairs.push(position)
+			}
+			return { valid: pairs.every(function (pair) { return normalizePosition(pair) !== null }) }
+		}
+
+		function safeBounds(minValue, maxValue) {
+			if (minValue === undefined && maxValue === undefined) return true
+			const min = normalizePosition(minValue)
+			const max = normalizePosition(maxValue)
+			if (!min || !max) return false
+			for (let axis = 0; axis < 2; axis += 1) {
+				const lower = Math.min(min[axis], max[axis])
+				const upper = Math.max(min[axis], max[axis])
+				if (!safeArithmetic(min[axis] + max[axis])) return false
+				if (!safeArithmetic(upper - lower) || !safeArithmetic(upper - lower + 1)) return false
+			}
+			return true
+		}
+
+		function optionalSafeInteger(value, nonNegative) {
+			if (value === undefined || value === null) return true
+			const number = Number(value)
+			return Number.isSafeInteger(number) && (!nonNegative || number >= 0)
+		}
+
+		function safeArithmetic(value) {
+			return Number.isSafeInteger(value)
 		}
 
 		function validBlueprint(value) {
 			const schema = Number(value?.schemaVersion)
 			if (!value || !Array.isArray(value.entities)) return false
 			if (value.mode === 'structure') return schema >= 1 && schema <= 4
-			if (value.mode !== 'full' || ![3, 5, 6].includes(schema)) return false
+			if (value.mode !== 'full' || ![3, 5, 6, 7, 8].includes(schema)) return false
 			if (schema >= 5 && !Array.isArray(value.emptyCells)) return false
 			if (!Array.isArray(value.blocks)) return false
-			return schema !== 6 || Array.isArray(value.surges)
+			if ((schema === 6 || schema === 7 || schema === 8) && !Array.isArray(value.surges)) return false
+			if (schema === 7) return Array.isArray(value.paintedCubes) && value.paintedCubes.length > 0
+			return schema !== 8 || Array.isArray(value.paintedCubes)
 		}
 
 		function normalizeId(value) {
@@ -237,7 +350,7 @@ ModLoader.register({
 			if (!Array.isArray(value) || value.length < 2) return null
 			const u = Number(value[0])
 			const v = Number(value[1])
-			return Number.isInteger(u) && Number.isInteger(v) ? [u, v] : null
+			return Number.isSafeInteger(u) && Number.isSafeInteger(v) ? [u, v] : null
 		}
 
 		function formatError(code, message) {

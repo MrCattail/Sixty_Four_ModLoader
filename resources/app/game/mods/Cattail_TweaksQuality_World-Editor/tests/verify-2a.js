@@ -49,6 +49,32 @@ function createApi() {
 	}
 }
 
+function createSettingsUi(document) {
+	return {
+		version: 1,
+		createControl(definition, options = {}) {
+			const element = document.createElement('input')
+			element.type = definition.type === 'slider' ? 'range' : 'number'
+			element.value = String(options.value ?? definition.default ?? 0)
+			let disabled = false
+			const handle = {
+				element,
+				input: element,
+				getValue() { return Number(element.value) },
+				setValue(value) { element.value = String(value); return Number(element.value) },
+				validate() {
+					const value = Number(element.value)
+					return Number.isFinite(value) ? { valid: true, value, error: null } : { valid: false, value: undefined, error: new Error('Invalid number') }
+				},
+				setDisabled(value) { disabled = !!value; element.disabled = disabled; return handle },
+				destroy() { element.remove?.() }
+			}
+			return handle
+		},
+		scroll: { attach() { return function () {} } }
+	}
+}
+
 function createRuntime(game, active = true) {
 	const listeners = new Set()
 	const cleanups = []
@@ -687,6 +713,7 @@ function testI18nAndUi() {
 	const api = createApi()
 	let releasedHud = false
 	api.ui = {
+		settings: createSettingsUi(document),
 		hud: {
 			isHidden() {
 				return false
@@ -706,7 +733,7 @@ function testI18nAndUi() {
 
 	const i18n = sandbox[I18N_KEY]
 	const languages = ['en', 'sch', 'modsch', 'ru', 'de', 'ptbr', 'it', 'es', 'fr', 'nl', 'cz', 'pl', 'jp', 'kr', 'tch', 'thai', 'hu', 'lv', 'ro', 'no']
-	assert.equal(i18n.version, '0.5.1')
+	assert.equal(i18n.version, '0.6.0')
 	assert.equal(i18n.languages.length, 20)
 	assert.deepEqual(new Set(i18n.languages), new Set(languages))
 	for (const key of ['brand', 'modeArea', 'exitHint', 'cancelHint', 'toolbarModeArea', 'toolbarModeMove', 'toolSelect', 'toolMove', 'cardMovePreview', 'moveHint', 'selectionCount']) {

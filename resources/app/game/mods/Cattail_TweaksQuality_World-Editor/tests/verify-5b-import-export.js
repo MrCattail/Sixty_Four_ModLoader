@@ -32,10 +32,63 @@ function fullBlueprint(marker = 'source') {
 		includeBlocks: true,
 		entities: [{ id: 1, kind: 'entity', name: 'pump', position: [0, 0], footprint: { span: 0, min: [0, 0], max: [0, 0] }, state: { marker } }],
 		blocks: [{ kind: 'cube', name: 'cube', position: [1, 0], state: { fill: 64 } }],
-		surges: [{ kind: 'surge', name: 'surge', position: [2, 0], state: { resources: [3] } }],
+		surges: [{
+			kind: 'surge',
+			name: 'surge',
+			position: [2, 0],
+			state: {
+				resources: [3],
+				grade: 1,
+				type: 1,
+				rayNumber: 4,
+				colors: ['#ffffff'],
+				maxLife: 100,
+				life: 90
+			}
+		}],
 		emptyCells: [],
 		production: null,
 		summary: { entityCount: 1, blockCount: 1, surgeCount: 1, marker }
+	}
+}
+
+function linkedBlueprint() {
+	return {
+		schemaVersion: 8,
+		mode: 'full',
+		sourcePlane: 0,
+		anchor: { position: [0, 0], selectionIds: [1] },
+		selections: [{ id: 1, min: [0, 0], max: [1, 0] }],
+		contentBounds: { min: [0, 0], max: [1, 0], width: 2, height: 1 },
+		includeBlocks: true,
+		entities: [{
+			id: 1,
+			kind: 'entity',
+			name: 'stabilizer',
+			position: [0, 0],
+			footprint: { span: 0, min: [0, 0], max: [0, 0] },
+			state: {}
+		}],
+		blocks: [],
+		paintedCubes: [],
+		surges: [{
+			kind: 'surge',
+			name: 'surge',
+			position: [1, 0],
+			stabilizer: { position: [0, 0] },
+			state: {
+				resources: [0, 10],
+				grade: 1,
+				type: 1,
+				rayNumber: 4,
+				colors: ['#ffffff'],
+				maxLife: 100,
+				life: 90
+			}
+		}],
+		emptyCells: [],
+		production: null,
+		summary: { entityCount: 1, blockCount: 0, surgeCount: 1, paintedCubeCount: 0 }
 	}
 }
 
@@ -264,10 +317,24 @@ async function testHistoricalIdentitySuffixTransitionsExportAndShare() {
 	assert.equal(candidateWithoutActiveConflict.conflict, null)
 }
 
+async function testSchemaEightRelationshipImportExportRoundTrip() {
+	const env = await createEnvironment()
+	const envelope = env.format.create({
+		displayName: 'Linked stabilizer',
+		blueprint: linkedBlueprint()
+	})
+	assert.equal(envelope.blueprint.schemaVersion, 8)
+	assert.deepEqual(clone(envelope.blueprint.surges[0].stabilizer), { position: [0, 0] })
+	const parsed = env.format.parse(env.format.serialize(envelope))
+	assert.equal(parsed.blueprint.schemaVersion, 8)
+	assert.deepEqual(clone(parsed.blueprint.surges[0].stabilizer), { position: [0, 0] })
+	assert.equal(env.format.metadata(parsed).paintedCompatible, true)
+}
+
 function testI18nUiAndManifestContracts() {
 	const manifest = JSON.parse(source('mod.json'))
-	assert.equal(manifest.version, '0.5.1')
-	assert.equal(manifest.loaderVersion, '>=0.3.1')
+	assert.equal(manifest.version, '0.6.0')
+	assert.equal(manifest.loaderVersion, '>=0.4.0')
 	assert.deepEqual(manifest.libraries.blueprints.extensions, ['.64schem', '.cattail-blueprint.json'])
 
 	const definitions = []
@@ -277,7 +344,7 @@ function testI18nUiAndManifestContracts() {
 	vm.runInContext(source(TEXT_SOURCE), sandbox, { filename: TEXT_SOURCE })
 	definitions[0].init()
 	const i18n = sandbox[I18N_KEY]
-	assert.equal(i18n.version, '0.5.1')
+	assert.equal(i18n.version, '0.6.0')
 	assert.equal(i18n.languages.length, 20)
 	const keys = [
 		'blueprintLibraryImport', 'blueprintLibraryChooseFile', 'blueprintLibraryPasteShareText', 'blueprintLibraryExportFile',
@@ -306,6 +373,7 @@ async function run() {
 	await testDoubleReadSingleWriteAndValidation()
 	await testConflictCopyReplaceCancelAndRevision()
 	await testHistoricalIdentitySuffixTransitionsExportAndShare()
+	await testSchemaEightRelationshipImportExportRoundTrip()
 	testI18nUiAndManifestContracts()
 	console.log('World Editor 5B verification passed: .64schem double-read/single-write, v1/v2 validation, conflict copy/replace/cancel with revision checks, legacy suffix transitions, active export/share, 20-language keys, and shared Pages/modal UI contracts.')
 }

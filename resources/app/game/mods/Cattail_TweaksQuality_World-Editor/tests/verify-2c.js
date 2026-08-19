@@ -49,6 +49,31 @@ function createApi() {
 	}
 }
 
+function createSettingsUi(document) {
+	return {
+		version: 1,
+		createControl(definition, options = {}) {
+			const element = document.createElement('input')
+			element.type = definition.type === 'slider' ? 'range' : 'number'
+			element.value = String(options.value ?? definition.default ?? 0)
+			const handle = {
+				element,
+				input: element,
+				getValue() { return Number(element.value) },
+				setValue(value) { element.value = String(value); return Number(element.value) },
+				validate() {
+					const value = Number(element.value)
+					return Number.isFinite(value) ? { valid: true, value, error: null } : { valid: false, value: undefined, error: new Error('Invalid number') }
+				},
+				setDisabled(value) { element.disabled = !!value; return handle },
+				destroy() { element.remove?.() }
+			}
+			return handle
+		},
+		scroll: { attach() { return function () {} } }
+	}
+}
+
 function createRuntime(game) {
 	const listeners = new Set()
 	const cleanups = []
@@ -170,8 +195,8 @@ function testMoveStateAndToolLifecycle() {
 	const tool = sandbox[TOOL_KEY]
 
 	assert.equal(selection.version, '0.2.6')
-	assert.equal(tool.version, '0.2.6')
-	assert.deepEqual(plain(tool.modes), ['select'])
+	assert.equal(tool.version, '0.6.0')
+	assert.deepEqual(plain(tool.modes), ['select', 'draw'])
 	assert.equal(tool.snapshot().mode, 'select')
 
 	selection.begin([4, 6], 0, 'start')
@@ -541,6 +566,7 @@ function testUnifiedToolbarAndLocalization() {
 	})
 	const api = createApi()
 	api.ui = {
+		settings: createSettingsUi(document),
 		hud: {
 			isHidden() {
 				return false
@@ -579,9 +605,9 @@ function testUnifiedToolbarAndLocalization() {
 	const selectButton = shell.querySelector('[data-world-editor-action="select"]')
 	const moveButton = shell.querySelector('[data-world-editor-action="move"]')
 	const resizeButton = shell.querySelector('[data-world-editor-action="resize"]')
-	assert.equal(i18n.version, '0.5.1')
+	assert.equal(i18n.version, '0.6.0')
 	assert.equal(i18n.languages.length, 20)
-	assert.equal(i18n.keys.length, 249)
+	assert.equal(i18n.keys.length, 268)
 	assert.equal(shell.getAttribute('role'), 'toolbar')
 	assert.equal(selectButton, null)
 	assert.equal(moveButton, null)
@@ -604,7 +630,7 @@ function testUnifiedToolbarAndLocalization() {
 
 function testManifestAndReadOnlyBoundary() {
 	const manifest = JSON.parse(fs.readFileSync(path.join(MOD_ROOT, 'mod.json'), 'utf8'))
-	assert.equal(manifest.version, '0.5.1')
+	assert.equal(manifest.version, '0.6.0')
 	assert.equal(manifest.languageSupport.gameLanguage, true)
 	assert.deepEqual(manifest.entry, [
 		'scripts/core/foundation.js',
@@ -615,6 +641,12 @@ function testManifestAndReadOnlyBoundary() {
 		'scripts/core/editor-transactions.js',
 		'scripts/core/selection-state.js',
 		'scripts/core/tool-state.js',
+		'scripts/core/paint-cube-state.js',
+		'scripts/core/blueprint-painted.js',
+		'scripts/core/paint-cube-growth.js',
+		'scripts/core/paint-cube-stroke.js',
+		'scripts/core/paint-cube-fill.js',
+		'scripts/ui/paint-cube-ui.js',
 		'scripts/core/selection-analysis.js',
 		'scripts/core/production-state.js',
 		'scripts/core/blueprint-state.js',
@@ -625,6 +657,7 @@ function testManifestAndReadOnlyBoundary() {
 		'scripts/core/selection-delete.js',
 		'scripts/core/input-controller.js',
 		'scripts/render/resize-handles.js',
+		'scripts/input/paint-cube-input.js',
 		'scripts/input/selection-controller.js',
 		'scripts/render/hover-overlay.js',
 		'scripts/render/selected-overlay.js',
@@ -638,6 +671,9 @@ function testManifestAndReadOnlyBoundary() {
 		'scripts/core/selection-cut.js',
 		'scripts/ui/selection-cut-ui.js',
 		'scripts/blueprint-preview.js',
+		'scripts/render/selection-cursor.js',
+		'scripts/render/paint-cube-cursor.js',
+		'scripts/render/paint-cube-render-diagnostics.js',
 		'scripts/render/blueprint-thumbnail.js',
 		'scripts/ui/blueprint-library-ui.js',
 		'scripts/ui/selection-card.js',
@@ -650,10 +686,11 @@ function testManifestAndReadOnlyBoundary() {
 	const libraryUiSource = fs.readFileSync(path.join(scriptRoot, 'ui', 'blueprint-library-ui.js'), 'utf8')
 	const placementSource = fs.readFileSync(path.join(scriptRoot, 'core', 'blueprint-placement.js'), 'utf8')
 	const selectionDeleteSource = fs.readFileSync(path.join(scriptRoot, 'core', 'selection-delete.js'), 'utf8')
+	const paintStrokeSource = fs.readFileSync(path.join(scriptRoot, 'core', 'paint-cube-stroke.js'), 'utf8')
 	const scriptSources = readScriptSources(scriptRoot)
 	const sources = scriptSources.join('\n')
 	const readOnlySources = scriptSources
-		.filter(source => source !== placementSource && source !== selectionDeleteSource)
+		.filter(source => source !== placementSource && source !== selectionDeleteSource && source !== paintStrokeSource)
 		.join('\n')
 	const stateFreeSources = scriptSources
 		.filter(source => source !== cardOpacitySource && source !== creativeModeSource && source !== libraryUiSource)

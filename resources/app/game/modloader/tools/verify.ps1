@@ -169,6 +169,11 @@ $modFeatureContractTests = @(
 		pattern = 'atomic batch creation, activation rollback, lineage finalization, name conflict'
 	},
 	[ordered]@{
+		path = 'mods\Cattail_TweaksQuality_Better-UIs\tests\verify-shop-categories-tooltips.js'
+		description = 'Better UIs Shop Categories tooltip contract'
+		pattern = 'localized vanilla descriptions, shared API delay, disabled-card coverage, rebuild cleanup'
+	},
+	[ordered]@{
 		path = 'mods\Cattail_TweaksQuality_World-Editor\tests\verify-4a-2a.js'
 		description = 'World Editor 4A-2a creative mode contract'
 		pattern = 'save persistence, in-place identity, fork identity removal, input and full-mode gates'
