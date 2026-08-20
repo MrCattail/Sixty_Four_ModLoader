@@ -4,6 +4,8 @@
 	const MOD_ID = 'Cattail_Tweaks_简体中文优化'
 	const DATA_KEY = '__cattailTweaksSimplifiedChineseTrilingual'
 	const LANGUAGE_KEYS = [ 'en', 'sch', 'modsch' ]
+	const OPEN_MODE_KEY = 'translationFileOpenMode'
+	const OPEN_ACTION_KEY = 'openTranslationFile'
 	const hasOwn = function (value, key) {
 		return Object.prototype.hasOwnProperty.call(value, key)
 	}
@@ -78,6 +80,63 @@
 		return result
 	}
 
+	const getTranslationFileTools = function () {
+		if (typeof require !== 'function') throw new Error('Desktop file access is unavailable.')
+		const shell = require('electron')?.shell
+		const fileURLToPath = require('url')?.fileURLToPath
+		if (!shell || typeof fileURLToPath !== 'function') throw new Error('Desktop file access is unavailable.')
+		return { shell, fileURLToPath }
+	}
+
+	const getTranslationFilePath = function (api) {
+		const tools = getTranslationFileTools()
+		const assetUrl = new URL(api.asset('locale/trilingual-data.js'), window.location.href)
+		return { shell: tools.shell, path: tools.fileURLToPath(assetUrl) }
+	}
+
+	const registerTranslationFileSettings = function (api) {
+		const settings = api?.ui?.settings
+		if (!settings || !Array.isArray(settings.types) || !settings.types.includes('action') || typeof settings.register !== 'function') return
+		settings.register([
+			{
+				key: OPEN_MODE_KEY,
+				type: 'select',
+				default: 'reveal',
+				persist: 'change',
+				section: 'translationFile',
+				sectionLabel: 'Translation file',
+				label: 'Open method',
+				description: 'Choose how the translation source file opens.',
+				options: [
+					{ value: 'reveal', label: 'Show in File Explorer' },
+					{ value: 'system', label: 'Use system default association (.js may run)' }
+				]
+			},
+			{
+				key: OPEN_ACTION_KEY,
+				type: 'action',
+				section: 'translationFile',
+				sectionLabel: 'Translation file',
+				label: 'Open translation file',
+				description: 'Opens locale/trilingual-data.js using the selected method.',
+				buttonLabel: 'Open translation file',
+				pendingText: 'Opening...',
+				successText: 'Translation file opened.',
+				errorText: 'Could not open the translation file: {value}',
+				async onAction() {
+					const target = getTranslationFilePath(api)
+					const mode = api.config.get(OPEN_MODE_KEY, 'reveal')
+					if (mode === 'system') {
+						const errorMessage = await target.shell.openPath(target.path)
+						if (errorMessage) throw new Error(errorMessage)
+						return
+					}
+					target.shell.showItemInFolder(target.path)
+				}
+			}
+		])
+	}
+
 	ModLoader.register({
 		id: MOD_ID,
 		init(api) {
@@ -92,6 +151,7 @@
 				words.modsch = mergeModsch(words.modsch, extractModsch(source, ''))
 				return words
 			})
+			registerTranslationFileSettings(api)
 		}
 	})
 })()

@@ -445,9 +445,14 @@ const createWindow = _=> {
 
 	$Text = $Text.Replace('ModLoaderMainProcess.attachWindow(win)', 'ModLoaderMainProcess.attachWindow(win, { accountId: STEAMID })')
 	if (-not [regex]::IsMatch($Text, 'ModLoaderMainProcess\.attachWindow\(win(?:\s*,|\s*\))')) {
-		$oldAttach = '  if (!options.fullscreen) win.setFullScreen(false)'
-		$newAttach = "  if (!options.fullscreen) win.setFullScreen(false)`n  ModLoaderMainProcess.attachWindow(win, { accountId: STEAMID })"
-		$Text = Apply-Required $Text $oldAttach $newAttach 'main window attachment'
+		$windowOptionsAttach = '  win = new BrowserWindow(windowOptions)'
+		if ($Text.Contains($windowOptionsAttach)) {
+			$Text = Apply-Required $Text $windowOptionsAttach "$windowOptionsAttach`n  ModLoaderMainProcess.attachWindow(win, { accountId: STEAMID })" 'main window attachment'
+		} else {
+			$oldAttach = '  if (!options.fullscreen) win.setFullScreen(false)'
+			$newAttach = "  if (!options.fullscreen) win.setFullScreen(false)`n  ModLoaderMainProcess.attachWindow(win, { accountId: STEAMID })"
+			$Text = Apply-Required $Text $oldAttach $newAttach 'main window attachment'
+		}
 	}
 	if (-not $Text.Contains('ModLoaderMainProcess.afterMainWindowCreated(win)')) {
 		$Text = Apply-Required $Text '  ModLoaderMainProcess.attachWindow(win, { accountId: STEAMID })' "  ModLoaderMainProcess.attachWindow(win, { accountId: STEAMID })`n  ModLoaderMainProcess.afterMainWindowCreated(win)" 'main window after-create hook'

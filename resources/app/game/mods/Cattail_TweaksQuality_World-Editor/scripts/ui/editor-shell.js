@@ -217,6 +217,7 @@ ModLoader.register({
 			const shell = createShell()
 			const economyStatus = createEconomyStatus()
 			document.body.append(shell, economyStatus)
+			const tooltips = shared.createTooltipScope?.()
 			const rootStyle = document.documentElement?.style
 			const previousScale = readStyleProperty(rootStyle, '--world-editor-ui-scale')
 			const previousToolbarWidth = readStyleProperty(rootStyle, '--world-editor-toolbar-layout-width')
@@ -458,8 +459,8 @@ ModLoader.register({
 					definition.button.setAttribute('aria-disabled', reason ? 'true' : 'false')
 					definition.button.dataset.worldEditorToolbarBusy = reason === 'BUSY' ? 'true' : 'false'
 					definition.button.dataset.historyBlockedReason = reason || ''
-					definition.button.title = accessibleLabel
 					definition.button.setAttribute('aria-label', accessibleLabel)
+					tooltips?.set(definition.button, accessibleLabel)
 					setCardText(definition.button, i18n.t(source, definition.cardKey))
 					accessibleText[definition.direction] = accessibleLabel
 				}
@@ -595,46 +596,46 @@ ModLoader.register({
 				const brand = i18n.t(source, 'brand')
 				shell.querySelector('[data-world-editor-text="brand"]').textContent = brand
 				const removeText = i18n.t(source, 'removeSelection')
-				removeButton.title = removeText
 				removeButton.setAttribute('aria-label', removeText)
+				tooltips?.set(removeButton, removeText)
 				setCardText(removeButton, i18n.t(source, 'toolbarCardRemove'))
 				const drawText = i18n.t(source, 'drawMode')
 				drawButton.querySelector('[data-world-editor-text="draw-mode"]').textContent = drawText
-				drawButton.title = drawText
 				drawButton.setAttribute('aria-label', drawText)
+				tooltips?.set(drawButton, drawText)
 				setCardText(drawButton, i18n.t(source, 'toolbarCardDraw'))
 				const brushText = i18n.t(source, 'paintBrush')
-				brushButton.title = brushText
 				brushButton.setAttribute('aria-label', brushText)
+				tooltips?.set(brushButton, brushText)
 				setCardText(brushButton, i18n.t(source, 'toolbarCardPaintBrush'))
 				const bucketText = i18n.t(source, 'paintBucket')
-				bucketButton.title = bucketText
 				bucketButton.setAttribute('aria-label', bucketText)
+				tooltips?.set(bucketButton, bucketText)
 				setCardText(bucketButton, i18n.t(source, 'toolbarCardPaintBucket'))
 				const eraserText = i18n.t(source, 'paintEraser')
-				eraserButton.title = eraserText
 				eraserButton.setAttribute('aria-label', eraserText)
+				tooltips?.set(eraserButton, eraserText)
 				setCardText(eraserButton, i18n.t(source, 'toolbarCardPaintEraser'))
 				const stableText = i18n.t(source, 'paintStable')
-				stableButton.title = stableText
 				stableButton.setAttribute('aria-label', stableText)
+				tooltips?.set(stableButton, stableText)
 				setCardText(stableButton, i18n.t(source, 'toolbarCardPaintStable'))
 				const growText = i18n.t(source, 'paintGrow')
-				growButton.title = growText
 				growButton.setAttribute('aria-label', growText)
+				tooltips?.set(growButton, growText)
 				setCardText(growButton, i18n.t(source, 'toolbarCardPaintGrow'))
 				const paletteText = i18n.t(source, 'paintPalette')
-				paletteButton.title = paletteText
 				paletteButton.setAttribute('aria-label', paletteText)
+				tooltips?.set(paletteButton, paletteText)
 				setCardText(paletteButton, i18n.t(source, 'toolbarCardPaintPalette'))
 				refreshPaintPaletteText(source)
 				setCardText(creativeButton, i18n.t(source, 'toolbarCardCreative'))
 				const compactStyleText = i18n.t(source, 'toolbarStyleCompact')
 				const largeStyleText = i18n.t(source, 'toolbarStyleLargeCards')
-				compactStyleButton.title = compactStyleText
 				compactStyleButton.setAttribute('aria-label', compactStyleText)
-				largeStyleButton.title = largeStyleText
+				tooltips?.set(compactStyleButton, compactStyleText)
 				largeStyleButton.setAttribute('aria-label', largeStyleText)
+				tooltips?.set(largeStyleButton, largeStyleText)
 				accessibleText.brand = brand
 				accessibleText.remove = removeText
 				accessibleText.draw = drawText
@@ -789,8 +790,8 @@ ModLoader.register({
 				creativeButton.disabled = !currentCreative?.ready || busy
 				creativeButton.dataset.worldEditorToolbarBusy = busy ? 'true' : 'false'
 				creativeButton.dataset.worldEditorLargeHidden = !currentCreative?.ready && !busy ? 'true' : 'false'
-				creativeButton.title = currentCreative?.error?.message || label
 				creativeButton.setAttribute('aria-label', label)
+				tooltips?.set(creativeButton, currentCreative?.error?.message || label)
 				toolbarScroller.refresh('creative')
 				accessibleText.creative = label
 				refreshCreativeDialogText(source)
@@ -1511,6 +1512,7 @@ ModLoader.register({
 			resourceHud.setActive(!!currentState.active, 'initial-state')
 
 			runtime.addCleanup(function () {
+				tooltips?.dispose()
 				if (refreshMountedText === refreshText) refreshMountedText = null
 				if (refreshMountedTheme === refreshTheme) refreshMountedTheme = null
 				closePaintPalette('shell-cleanup')

@@ -22,66 +22,466 @@
   "translations": {
     "sch": {
       "name": "简体中文优化",
-      "description": "简体中文优化版。"
+      "description": "简体中文优化版。",
+      "config": {
+        "translationFileOpenMode": {
+          "sectionLabel": "翻译文件",
+          "label": "打开方式",
+          "description": "选择打开翻译源文件的方式。",
+          "valueLabels": {
+            "reveal": "在资源管理器中显示并选中文件",
+            "system": "使用系统默认关联（可能执行 .js）"
+          }
+        },
+        "openTranslationFile": {
+          "sectionLabel": "翻译文件",
+          "label": "打开翻译文件",
+          "description": "使用所选方式打开 locale/trilingual-data.js。",
+          "buttonLabel": "打开翻译文件",
+          "pendingText": "正在打开…",
+          "successText": "已打开翻译文件。",
+          "errorText": "无法打开翻译文件：{value}"
+        }
+      }
     },
     "modsch": {
       "name": "简体中文优化",
-      "description": "简体中文优化版。"
+      "description": "简体中文优化版。",
+      "config": {
+        "translationFileOpenMode": {
+          "sectionLabel": "翻译文件",
+          "label": "打开方式",
+          "description": "选择打开翻译源文件的方式。",
+          "valueLabels": {
+            "reveal": "在资源管理器中显示并选中文件",
+            "system": "使用系统默认关联（可能执行 .js）"
+          }
+        },
+        "openTranslationFile": {
+          "sectionLabel": "翻译文件",
+          "label": "打开翻译文件",
+          "description": "使用所选方式打开 locale/trilingual-data.js。",
+          "buttonLabel": "打开翻译文件",
+          "pendingText": "正在打开…",
+          "successText": "已打开翻译文件。",
+          "errorText": "无法打开翻译文件：{value}"
+        }
+      }
     },
     "en": {
       "name": "Optimized Simplified Chinese Locale",
-      "description": "Adds the 中文优化版 language extracted from the previous modified words.js."
+      "description": "Adds the 中文优化版 language extracted from the previous modified words.js.",
+      "config": {
+        "translationFileOpenMode": {
+          "sectionLabel": "Translation file",
+          "label": "Open method",
+          "description": "Choose how the translation source file opens.",
+          "valueLabels": {
+            "reveal": "Show and select in File Explorer",
+            "system": "Use system default association (.js may run)"
+          }
+        },
+        "openTranslationFile": {
+          "sectionLabel": "Translation file",
+          "label": "Open translation file",
+          "description": "Open locale/trilingual-data.js using the selected method.",
+          "buttonLabel": "Open translation file",
+          "pendingText": "Opening…",
+          "successText": "Translation file opened.",
+          "errorText": "Could not open the translation file: {value}"
+        }
+      }
     },
     "ru": {
-      "name": "Оптимизация упрощенного китайского"
+      "name": "Оптимизация упрощенного китайского",
+      "config": {
+        "translationFileOpenMode": {
+          "sectionLabel": "Файл перевода",
+          "label": "Способ открытия",
+          "description": "Выберите способ открытия исходного файла перевода.",
+          "valueLabels": {
+            "reveal": "Показать и выделить в Проводнике",
+            "system": "Использовать системную ассоциацию (.js может быть выполнен)"
+          }
+        },
+        "openTranslationFile": {
+          "sectionLabel": "Файл перевода",
+          "label": "Открыть файл перевода",
+          "description": "Открыть locale/trilingual-data.js выбранным способом.",
+          "buttonLabel": "Открыть файл перевода",
+          "pendingText": "Открытие…",
+          "successText": "Файл перевода открыт.",
+          "errorText": "Не удалось открыть файл перевода: {value}"
+        }
+      }
     },
     "de": {
-      "name": "Optimiertes vereinfachtes Chinesisch"
+      "name": "Optimiertes vereinfachtes Chinesisch",
+      "config": {
+        "translationFileOpenMode": {
+          "sectionLabel": "Übersetzungsdatei",
+          "label": "Öffnungsmethode",
+          "description": "Wähle, wie die Übersetzungsquelldatei geöffnet wird.",
+          "valueLabels": {
+            "reveal": "Im Datei-Explorer anzeigen und auswählen",
+            "system": "Systemstandard verwenden (.js kann ausgeführt werden)"
+          }
+        },
+        "openTranslationFile": {
+          "sectionLabel": "Übersetzungsdatei",
+          "label": "Übersetzungsdatei öffnen",
+          "description": "Öffnet locale/trilingual-data.js mit der gewählten Methode.",
+          "buttonLabel": "Übersetzungsdatei öffnen",
+          "pendingText": "Wird geöffnet…",
+          "successText": "Übersetzungsdatei wurde geöffnet.",
+          "errorText": "Übersetzungsdatei konnte nicht geöffnet werden: {value}"
+        }
+      }
     },
     "ptbr": {
-      "name": "Otimização de chinês simplificado"
+      "name": "Otimização de chinês simplificado",
+      "config": {
+        "translationFileOpenMode": {
+          "sectionLabel": "Arquivo de tradução",
+          "label": "Modo de abertura",
+          "description": "Escolha como abrir o arquivo-fonte da tradução.",
+          "valueLabels": {
+            "reveal": "Mostrar e selecionar no Explorador de Arquivos",
+            "system": "Usar associação padrão do sistema (.js pode ser executado)"
+          }
+        },
+        "openTranslationFile": {
+          "sectionLabel": "Arquivo de tradução",
+          "label": "Abrir arquivo de tradução",
+          "description": "Abre locale/trilingual-data.js usando o modo selecionado.",
+          "buttonLabel": "Abrir arquivo de tradução",
+          "pendingText": "Abrindo…",
+          "successText": "Arquivo de tradução aberto.",
+          "errorText": "Não foi possível abrir o arquivo de tradução: {value}"
+        }
+      }
     },
     "it": {
-      "name": "Ottimizzazione cinese semplificato"
+      "name": "Ottimizzazione cinese semplificato",
+      "config": {
+        "translationFileOpenMode": {
+          "sectionLabel": "File di traduzione",
+          "label": "Metodo di apertura",
+          "description": "Scegli come aprire il file sorgente della traduzione.",
+          "valueLabels": {
+            "reveal": "Mostra e seleziona in Esplora file",
+            "system": "Usa l'associazione predefinita (.js potrebbe essere eseguito)"
+          }
+        },
+        "openTranslationFile": {
+          "sectionLabel": "File di traduzione",
+          "label": "Apri file di traduzione",
+          "description": "Apre locale/trilingual-data.js con il metodo selezionato.",
+          "buttonLabel": "Apri file di traduzione",
+          "pendingText": "Apertura…",
+          "successText": "File di traduzione aperto.",
+          "errorText": "Impossibile aprire il file di traduzione: {value}"
+        }
+      }
     },
     "es": {
-      "name": "Optimización de chino simplificado"
+      "name": "Optimización de chino simplificado",
+      "config": {
+        "translationFileOpenMode": {
+          "sectionLabel": "Archivo de traducción",
+          "label": "Método de apertura",
+          "description": "Elige cómo abrir el archivo fuente de traducción.",
+          "valueLabels": {
+            "reveal": "Mostrar y seleccionar en el Explorador de archivos",
+            "system": "Usar la asociación predeterminada (.js puede ejecutarse)"
+          }
+        },
+        "openTranslationFile": {
+          "sectionLabel": "Archivo de traducción",
+          "label": "Abrir archivo de traducción",
+          "description": "Abre locale/trilingual-data.js con el método seleccionado.",
+          "buttonLabel": "Abrir archivo de traducción",
+          "pendingText": "Abriendo…",
+          "successText": "Archivo de traducción abierto.",
+          "errorText": "No se pudo abrir el archivo de traducción: {value}"
+        }
+      }
     },
     "fr": {
-      "name": "Optimisation chinois simplifié"
+      "name": "Optimisation chinois simplifié",
+      "config": {
+        "translationFileOpenMode": {
+          "sectionLabel": "Fichier de traduction",
+          "label": "Méthode d'ouverture",
+          "description": "Choisissez comment ouvrir le fichier source de traduction.",
+          "valueLabels": {
+            "reveal": "Afficher et sélectionner dans l'Explorateur de fichiers",
+            "system": "Utiliser l'association système (.js peut être exécuté)"
+          }
+        },
+        "openTranslationFile": {
+          "sectionLabel": "Fichier de traduction",
+          "label": "Ouvrir le fichier de traduction",
+          "description": "Ouvre locale/trilingual-data.js avec la méthode sélectionnée.",
+          "buttonLabel": "Ouvrir le fichier de traduction",
+          "pendingText": "Ouverture…",
+          "successText": "Fichier de traduction ouvert.",
+          "errorText": "Impossible d'ouvrir le fichier de traduction : {value}"
+        }
+      }
     },
     "nl": {
-      "name": "Vereenvoudigd Chinees verbeteren"
+      "name": "Vereenvoudigd Chinees verbeteren",
+      "config": {
+        "translationFileOpenMode": {
+          "sectionLabel": "Vertaalbestand",
+          "label": "Openmethode",
+          "description": "Kies hoe het bronbestand van de vertaling wordt geopend.",
+          "valueLabels": {
+            "reveal": "Tonen en selecteren in Verkenner",
+            "system": "Standaard systeemkoppeling gebruiken (.js kan worden uitgevoerd)"
+          }
+        },
+        "openTranslationFile": {
+          "sectionLabel": "Vertaalbestand",
+          "label": "Vertaalbestand openen",
+          "description": "Opent locale/trilingual-data.js met de gekozen methode.",
+          "buttonLabel": "Vertaalbestand openen",
+          "pendingText": "Bezig met openen…",
+          "successText": "Vertaalbestand geopend.",
+          "errorText": "Vertaalbestand kon niet worden geopend: {value}"
+        }
+      }
     },
     "cz": {
-      "name": "Optimalizace zjednodušené čínštiny"
+      "name": "Optimalizace zjednodušené čínštiny",
+      "config": {
+        "translationFileOpenMode": {
+          "sectionLabel": "Soubor překladu",
+          "label": "Způsob otevření",
+          "description": "Zvolte, jak otevřít zdrojový soubor překladu.",
+          "valueLabels": {
+            "reveal": "Zobrazit a vybrat v Průzkumníku souborů",
+            "system": "Použít výchozí systémové přiřazení (.js může být spuštěn)"
+          }
+        },
+        "openTranslationFile": {
+          "sectionLabel": "Soubor překladu",
+          "label": "Otevřít soubor překladu",
+          "description": "Otevře locale/trilingual-data.js zvoleným způsobem.",
+          "buttonLabel": "Otevřít soubor překladu",
+          "pendingText": "Otevírání…",
+          "successText": "Soubor překladu byl otevřen.",
+          "errorText": "Soubor překladu se nepodařilo otevřít: {value}"
+        }
+      }
     },
     "pl": {
-      "name": "Optymalizacja chińskiego uproszczonego"
+      "name": "Optymalizacja chińskiego uproszczonego",
+      "config": {
+        "translationFileOpenMode": {
+          "sectionLabel": "Plik tłumaczenia",
+          "label": "Sposób otwierania",
+          "description": "Wybierz sposób otwierania pliku źródłowego tłumaczenia.",
+          "valueLabels": {
+            "reveal": "Pokaż i zaznacz w Eksploratorze plików",
+            "system": "Użyj domyślnego skojarzenia systemu (.js może zostać uruchomiony)"
+          }
+        },
+        "openTranslationFile": {
+          "sectionLabel": "Plik tłumaczenia",
+          "label": "Otwórz plik tłumaczenia",
+          "description": "Otwiera locale/trilingual-data.js wybraną metodą.",
+          "buttonLabel": "Otwórz plik tłumaczenia",
+          "pendingText": "Otwieranie…",
+          "successText": "Plik tłumaczenia został otwarty.",
+          "errorText": "Nie udało się otworzyć pliku tłumaczenia: {value}"
+        }
+      }
     },
     "jp": {
-      "name": "簡体字中国語最適化"
+      "name": "簡体字中国語最適化",
+      "config": {
+        "translationFileOpenMode": {
+          "sectionLabel": "翻訳ファイル",
+          "label": "開き方",
+          "description": "翻訳元ファイルを開く方法を選択します。",
+          "valueLabels": {
+            "reveal": "エクスプローラーで表示して選択",
+            "system": "システムの既定の関連付けを使用（.js が実行される可能性あり）"
+          }
+        },
+        "openTranslationFile": {
+          "sectionLabel": "翻訳ファイル",
+          "label": "翻訳ファイルを開く",
+          "description": "選択した方法で locale/trilingual-data.js を開きます。",
+          "buttonLabel": "翻訳ファイルを開く",
+          "pendingText": "開いています…",
+          "successText": "翻訳ファイルを開きました。",
+          "errorText": "翻訳ファイルを開けませんでした：{value}"
+        }
+      }
     },
     "kr": {
-      "name": "간체 중국어 최적화"
+      "name": "간체 중국어 최적화",
+      "config": {
+        "translationFileOpenMode": {
+          "sectionLabel": "번역 파일",
+          "label": "열기 방식",
+          "description": "번역 원본 파일을 여는 방식을 선택합니다.",
+          "valueLabels": {
+            "reveal": "파일 탐색기에서 표시하고 선택",
+            "system": "시스템 기본 연결 사용(.js가 실행될 수 있음)"
+          }
+        },
+        "openTranslationFile": {
+          "sectionLabel": "번역 파일",
+          "label": "번역 파일 열기",
+          "description": "선택한 방식으로 locale/trilingual-data.js를 엽니다.",
+          "buttonLabel": "번역 파일 열기",
+          "pendingText": "여는 중…",
+          "successText": "번역 파일을 열었습니다.",
+          "errorText": "번역 파일을 열 수 없습니다: {value}"
+        }
+      }
     },
     "tch": {
-      "name": "簡體中文優化"
+      "name": "簡體中文優化",
+      "config": {
+        "translationFileOpenMode": {
+          "sectionLabel": "翻譯檔案",
+          "label": "開啟方式",
+          "description": "選擇開啟翻譯來源檔案的方式。",
+          "valueLabels": {
+            "reveal": "在檔案總管中顯示並選取檔案",
+            "system": "使用系統預設關聯（可能執行 .js）"
+          }
+        },
+        "openTranslationFile": {
+          "sectionLabel": "翻譯檔案",
+          "label": "開啟翻譯檔案",
+          "description": "使用所選方式開啟 locale/trilingual-data.js。",
+          "buttonLabel": "開啟翻譯檔案",
+          "pendingText": "正在開啟…",
+          "successText": "已開啟翻譯檔案。",
+          "errorText": "無法開啟翻譯檔案：{value}"
+        }
+      }
     },
     "thai": {
-      "name": "ปรับปรุงภาษาจีนตัวย่อ"
+      "name": "ปรับปรุงภาษาจีนตัวย่อ",
+      "config": {
+        "translationFileOpenMode": {
+          "sectionLabel": "ไฟล์คำแปล",
+          "label": "วิธีเปิด",
+          "description": "เลือกวิธีเปิดไฟล์ต้นฉบับคำแปล",
+          "valueLabels": {
+            "reveal": "แสดงและเลือกใน File Explorer",
+            "system": "ใช้การเชื่อมโยงเริ่มต้นของระบบ (.js อาจถูกเรียกใช้)"
+          }
+        },
+        "openTranslationFile": {
+          "sectionLabel": "ไฟล์คำแปล",
+          "label": "เปิดไฟล์คำแปล",
+          "description": "เปิด locale/trilingual-data.js ด้วยวิธีที่เลือก",
+          "buttonLabel": "เปิดไฟล์คำแปล",
+          "pendingText": "กำลังเปิด…",
+          "successText": "เปิดไฟล์คำแปลแล้ว",
+          "errorText": "ไม่สามารถเปิดไฟล์คำแปลได้: {value}"
+        }
+      }
     },
     "hu": {
-      "name": "Egyszerűsített kínai optimalizálás"
+      "name": "Egyszerűsített kínai optimalizálás",
+      "config": {
+        "translationFileOpenMode": {
+          "sectionLabel": "Fordítási fájl",
+          "label": "Megnyitási mód",
+          "description": "Válaszd ki a fordítás forrásfájljának megnyitási módját.",
+          "valueLabels": {
+            "reveal": "Megjelenítés és kijelölés a Fájlkezelőben",
+            "system": "Rendszer alapértelmezett társítása (.js végrehajtható)"
+          }
+        },
+        "openTranslationFile": {
+          "sectionLabel": "Fordítási fájl",
+          "label": "Fordítási fájl megnyitása",
+          "description": "A locale/trilingual-data.js megnyitása a kiválasztott módon.",
+          "buttonLabel": "Fordítási fájl megnyitása",
+          "pendingText": "Megnyitás…",
+          "successText": "A fordítási fájl megnyílt.",
+          "errorText": "A fordítási fájl nem nyitható meg: {value}"
+        }
+      }
     },
     "lv": {
-      "name": "Vienkāršotās ķīniešu valodas uzlabojums"
+      "name": "Vienkāršotās ķīniešu valodas uzlabojums",
+      "config": {
+        "translationFileOpenMode": {
+          "sectionLabel": "Tulkojuma fails",
+          "label": "Atvēršanas veids",
+          "description": "Izvēlieties, kā atvērt tulkojuma avota failu.",
+          "valueLabels": {
+            "reveal": "Parādīt un atlasīt failu pārlūkā",
+            "system": "Izmantot sistēmas noklusējuma saistījumu (.js var tikt izpildīts)"
+          }
+        },
+        "openTranslationFile": {
+          "sectionLabel": "Tulkojuma fails",
+          "label": "Atvērt tulkojuma failu",
+          "description": "Atver locale/trilingual-data.js ar izvēlēto veidu.",
+          "buttonLabel": "Atvērt tulkojuma failu",
+          "pendingText": "Atver…",
+          "successText": "Tulkojuma fails ir atvērts.",
+          "errorText": "Neizdevās atvērt tulkojuma failu: {value}"
+        }
+      }
     },
     "ro": {
-      "name": "Optimizare chineză simplificată"
+      "name": "Optimizare chineză simplificată",
+      "config": {
+        "translationFileOpenMode": {
+          "sectionLabel": "Fișier de traducere",
+          "label": "Metodă de deschidere",
+          "description": "Alege cum se deschide fișierul sursă al traducerii.",
+          "valueLabels": {
+            "reveal": "Afișează și selectează în Explorer",
+            "system": "Folosește asocierea implicită a sistemului (.js poate fi executat)"
+          }
+        },
+        "openTranslationFile": {
+          "sectionLabel": "Fișier de traducere",
+          "label": "Deschide fișierul de traducere",
+          "description": "Deschide locale/trilingual-data.js prin metoda selectată.",
+          "buttonLabel": "Deschide fișierul de traducere",
+          "pendingText": "Se deschide…",
+          "successText": "Fișierul de traducere a fost deschis.",
+          "errorText": "Fișierul de traducere nu a putut fi deschis: {value}"
+        }
+      }
     },
     "no": {
-      "name": "Optimalisering av forenklet kinesisk"
+      "name": "Optimalisering av forenklet kinesisk",
+      "config": {
+        "translationFileOpenMode": {
+          "sectionLabel": "Oversettelsesfil",
+          "label": "Åpningsmetode",
+          "description": "Velg hvordan kildefilen for oversettelsen skal åpnes.",
+          "valueLabels": {
+            "reveal": "Vis og marker i Filutforsker",
+            "system": "Bruk systemets standardtilknytning (.js kan bli kjørt)"
+          }
+        },
+        "openTranslationFile": {
+          "sectionLabel": "Oversettelsesfil",
+          "label": "Åpne oversettelsesfil",
+          "description": "Åpner locale/trilingual-data.js med valgt metode.",
+          "buttonLabel": "Åpne oversettelsesfil",
+          "pendingText": "Åpner…",
+          "successText": "Oversettelsesfilen er åpnet.",
+          "errorText": "Kunne ikke åpne oversettelsesfilen: {value}"
+        }
+      }
     }
   }
 }

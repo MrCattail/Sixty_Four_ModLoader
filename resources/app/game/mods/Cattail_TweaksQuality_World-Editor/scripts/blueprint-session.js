@@ -128,6 +128,7 @@ ModLoader.register({
 				console.warn('[Cattail World Editor] Blueprint 3E could not find shared card services.')
 				return
 			}
+			const tooltips = shared.createTooltipScope?.()
 
 			const previous = globalThis[BLUEPRINT_KEY]
 			if (previous && typeof previous.dispose === 'function') previous.dispose('blueprint-replaced')
@@ -334,6 +335,7 @@ ModLoader.register({
 			refreshUi()
 
 			runtime.addCleanup(function () {
+				tooltips?.dispose()
 				if (refreshMountedText) refreshMountedText = null
 				if (typeof window !== 'undefined' && typeof window.removeEventListener === 'function') {
 					window.removeEventListener('keydown', handleKeydown, true)
@@ -867,6 +869,12 @@ ModLoader.register({
 				const blueprintState = globalThis[BLUEPRINT_STATE_KEY]
 				const paintedState = globalThis[BLUEPRINT_PAINTED_KEY]
 				const paintCubeState = globalThis[PAINT_CUBE_STATE_KEY]
+				const attachedCubeCells = new Set(planValue.removals.filter(function (descriptor) {
+					return descriptor?.layer === 'attached-cube' && descriptor?.name === 'cube'
+				}).map(function (descriptor) {
+					const position = normalizePosition(descriptor?.position)
+					return position ? position[0] + ':' + position[1] : ''
+				}).filter(Boolean))
 				const cutCreative = planValue.summary?.creative === true &&
 					creative.snapshot?.().ready === true &&
 					creative.snapshot?.().creativeMode === true
@@ -933,6 +941,7 @@ ModLoader.register({
 					const position = normalizePosition(entity?.position)
 					if (!position || !pointInSelections(position[0], position[1], ranges.absolute)) continue
 					if (name === 'cube') {
+						if (attachedCubeCells.has(position[0] + ':' + position[1])) continue
 						if (paintCubeState?.isPainted?.(entity) && paintedState?.ready?.() !== true) {
 							throw new Error('painted-blueprint-unavailable')
 						}
@@ -1012,6 +1021,7 @@ ModLoader.register({
 				summary.normalizedCount = normalizedCount
 				summary.emptyCellCount = normalizedEmptyCells.length
 				summary.stabilizerLinkCount = stabilizerLinkCount
+				summary.attachedCubeCount = Number(planValue.summary?.attachedCubeCount) || 0
 				const productionState = globalThis[PRODUCTION_KEY]
 				const production = typeof productionState?.captureEntities === 'function'
 					? productionState.captureEntities(capturedEntities)
@@ -2020,20 +2030,20 @@ ModLoader.register({
 				const copyText = i18n.t(source, 'blueprintCopy')
 				ui.controls.structure.querySelector('.cattail-world-editor-blueprint-compact-label').textContent = structureText
 				ui.controls.full.querySelector('.cattail-world-editor-blueprint-compact-label').textContent = fullText
-				ui.controls.structure.title = structureText
-				ui.controls.full.title = fullText
 				ui.controls.structure.setAttribute('aria-label', structureText)
 				ui.controls.full.setAttribute('aria-label', fullText)
-				ui.controls.blocks.title = blocksText
+				tooltips?.set(ui.controls.structure, structureText)
+				tooltips?.set(ui.controls.full, fullText)
 				ui.controls.blocks.setAttribute('aria-label', blocksText)
-				ui.controls.surges.title = surgesText
+				tooltips?.set(ui.controls.blocks, blocksText)
 				ui.controls.surges.setAttribute('aria-label', surgesText)
-				ui.controls.syncEmpty.title = syncEmptyText
+				tooltips?.set(ui.controls.surges, surgesText)
 				ui.controls.syncEmpty.setAttribute('aria-label', syncEmptyText)
-				ui.controls.clearBlueprint.title = clearBlueprintText
+				tooltips?.set(ui.controls.syncEmpty, syncEmptyText)
 				ui.controls.clearBlueprint.setAttribute('aria-label', clearBlueprintText)
-				ui.controls.copy.title = copyText
+				tooltips?.set(ui.controls.clearBlueprint, clearBlueprintText)
 				ui.controls.copy.setAttribute('aria-label', copyText)
+				tooltips?.set(ui.controls.copy, copyText)
 				setToolbarCardText(ui.controls.structure, i18n.t(source, 'toolbarCardStructure'))
 				setToolbarCardText(ui.controls.full, i18n.t(source, 'toolbarCardFull'))
 				setToolbarCardText(ui.controls.blocks, i18n.t(source, 'toolbarCardCubes'))
@@ -2044,13 +2054,13 @@ ModLoader.register({
 				refreshTransformText(source)
 				const clear = ui.card.querySelector('[data-world-editor-blueprint-action="clear"]')
 				const clearText = i18n.t(source, 'blueprintClear')
-				clear.title = clearText
 				clear.setAttribute('aria-label', clearText)
+				tooltips?.set(clear, clearText)
 				const place = ui.card.querySelector('[data-world-editor-blueprint-action="place"]')
 				const placeText = i18n.t(source, 'blueprintPlace')
 				place.textContent = placeText
-				place.title = placeText
 				place.setAttribute('aria-label', placeText)
+				tooltips?.set(place, placeText)
 				refreshSectionText(source)
 				refreshCard()
 			}
@@ -2099,8 +2109,8 @@ ModLoader.register({
 					const toggle = ui.card.querySelector('[data-world-editor-section-toggle="' + kind + '"]')
 					if (!state || !toggle) continue
 					const action = i18n.t(source, state.expanded ? 'blueprintCollapseSection' : 'blueprintExpandSection')
-					toggle.title = action
 					toggle.setAttribute('aria-label', action)
+					tooltips?.set(toggle, action)
 				}
 			}
 
@@ -2128,14 +2138,14 @@ ModLoader.register({
 				}
 				for (const button of ui.controls.transforms.querySelectorAll('[data-world-editor-transform-action]')) {
 					const label = labels[button.dataset.worldEditorTransformAction] || ''
-					button.title = label
 					button.setAttribute('aria-label', label)
+					tooltips?.set(button, label)
 					setToolbarCardText(button, i18n.t(source, cardKeys[button.dataset.worldEditorTransformAction]))
 				}
 				for (const button of ui.card.querySelectorAll('[data-world-editor-transform-action]')) {
 					const label = labels[button.dataset.worldEditorTransformAction] || ''
-					button.title = label
 					button.setAttribute('aria-label', label)
+					tooltips?.set(button, label)
 				}
 				refreshTransformUi()
 			}

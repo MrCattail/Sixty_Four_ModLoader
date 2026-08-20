@@ -4142,28 +4142,32 @@ ModLoader.register({
 				blueprintFullSummary: 'Stable Cubes {cubes} · Painted Cubes {painted} · empty cells {empty} · normalized {normalized}',
 				cutLayerMessage: 'Creative Mode can remove captured transient layers in the same safe cut transaction. Both choices apply only to this cut and default to off.',
 				cutCubeOption: 'Also remove the {count} captured stable Cube(s). Recommended only when the source Cubes should move with this blueprint.',
-				cutSurgeOption: 'Also remove the {count} captured safe Surge(s). Recommended only when the source Surges should move with this blueprint.'
+				cutSurgeOption: 'Also remove the {count} captured safe Surge(s). Recommended only when the source Surges should move with this blueprint.',
+				attachedCubeRemovalNotice: '{count} unfinished Cube(s) attached to the selected extractor will be removed with it. They are not copied into the blueprint and provide no resource refund.'
 			},
 			sch: {
 				previewFullUnavailable: '非创造模式会把完整源蓝图按结构规格预览和放置',
 				blueprintFullSummary: '稳定 Cube {cubes} · 绘制矿方体 {painted} · 空格 {empty} · 已归一化 {normalized}',
 				cutLayerMessage: '创造模式可以在同一条安全剪切事务中移除已捕获的临时层；两个选项都只对本次剪切生效，并且默认关闭。',
 				cutCubeOption: '同时移除已捕获的 {count} 个稳定 Cube；仅当这些 Cube 应随蓝图一起移动时建议启用。',
-				cutSurgeOption: '同时移除已捕获的 {count} 个安全 Surge；仅当这些 Surge 应随蓝图一起移动时建议启用。'
+				cutSurgeOption: '同时移除已捕获的 {count} 个安全 Surge；仅当这些 Surge 应随蓝图一起移动时建议启用。',
+				attachedCubeRemovalNotice: '将随所属矿井一并移除 {count} 个尚未完成的矿方块；它们不会写入蓝图，也不会产生资源返还。'
 			},
 			modsch: {
 				previewFullUnavailable: '非创造模式会把完整源蓝图按结构规格预览和放置',
 				blueprintFullSummary: '稳定 Cube {cubes} · 绘制矿方体 {painted} · 空格 {empty} · 已归一化 {normalized}',
 				cutLayerMessage: '创造模式可以在同一条安全剪切事务中移除已捕获的临时层；两个选项都只对本次剪切生效，并且默认关闭。',
 				cutCubeOption: '同时移除已捕获的 {count} 个稳定 Cube；仅当这些 Cube 应随蓝图一起移动时建议启用。',
-				cutSurgeOption: '同时移除已捕获的 {count} 个安全 Surge；仅当这些 Surge 应随蓝图一起移动时建议启用。'
+				cutSurgeOption: '同时移除已捕获的 {count} 个安全 Surge；仅当这些 Surge 应随蓝图一起移动时建议启用。',
+				attachedCubeRemovalNotice: '将随所属矿井一并移除 {count} 个尚未完成的矿方块；它们不会写入蓝图，也不会产生资源返还。'
 			},
 			tch: {
 				previewFullUnavailable: '非創造模式會把完整來源藍圖按結構規格預覽和放置',
 				blueprintFullSummary: '穩定 Cube {cubes} · 繪製礦方體 {painted} · 空格 {empty} · 已正規化 {normalized}',
 				cutLayerMessage: '創造模式可以在同一筆安全剪下交易中移除已擷取的暫態層；兩個選項都只對本次剪下生效，並且預設關閉。',
 				cutCubeOption: '同時移除已擷取的 {count} 個穩定 Cube；僅當這些 Cube 應隨藍圖一起移動時建議啟用。',
-				cutSurgeOption: '同時移除已擷取的 {count} 個安全 Surge；僅當這些 Surge 應隨藍圖一起移動時建議啟用。'
+				cutSurgeOption: '同時移除已擷取的 {count} 個安全 Surge；僅當這些 Surge 應隨藍圖一起移動時建議啟用。',
+				attachedCubeRemovalNotice: '將隨所屬礦井一併移除 {count} 個尚未完成的礦方體；它們不會寫入藍圖，也不會產生資源返還。'
 			}
 		}
 		const INCLUDE_SURGES_TEXT = Object.freeze({

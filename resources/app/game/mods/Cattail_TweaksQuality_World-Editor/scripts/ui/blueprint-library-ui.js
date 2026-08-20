@@ -8,6 +8,7 @@ ModLoader.register({
 		const DIALOG_KEY = Symbol.for('cattail.world-editor.dialogs')
 		const I18N_KEY = Symbol.for('cattail.world-editor.i18n')
 		const TRANSACTIONS_KEY = Symbol.for('cattail.world-editor.transactions')
+		const SHARED_KEY = Symbol.for('cattail.world-editor.shared')
 		const SHELL_ID = 'cattail-world-editor-shell'
 		const CARD_ID = 'cattail-world-editor-blueprint-card'
 		const STYLE_ID = 'cattail-world-editor-blueprint-library-style'
@@ -56,6 +57,7 @@ ModLoader.register({
 		})
 		const previous = globalThis[UI_KEY]
 		previous?.dispose?.('blueprint-library-ui-replaced')
+		const tooltips = globalThis[SHARED_KEY]?.createTooltipScope?.()
 		const model = {
 			area: 'active',
 			view: readPreference('view', 'list') === 'grid' ? 'grid' : 'list',
@@ -208,19 +210,19 @@ ModLoader.register({
 			const libraryText = label(game, 'library')
 			const saveText = label(game, 'save')
 			if (toolbarButton) {
-				toolbarButton.title = libraryText
 				toolbarButton.setAttribute('aria-label', libraryText)
+				tooltips?.set(toolbarButton, libraryText)
 				toolbarButton.querySelector('.cattail-world-editor-toolbar-card-label').textContent = libraryText
 			}
 			if (toolbarSaveButton) {
-				toolbarSaveButton.title = saveText
 				toolbarSaveButton.setAttribute('aria-label', saveText)
+				tooltips?.set(toolbarSaveButton, saveText)
 				toolbarSaveButton.querySelector('.cattail-world-editor-toolbar-card-label').textContent = saveText
 			}
 			if (cardSaveButton) {
 				cardSaveButton.textContent = saveText
-				cardSaveButton.title = saveText
 				cardSaveButton.setAttribute('aria-label', saveText)
+				tooltips?.set(cardSaveButton, saveText)
 			}
 		}
 
@@ -568,10 +570,11 @@ ModLoader.register({
 			region.append(text)
 			if (statusMessage.kind === 'error') {
 				const dismiss = actionButton('×', function () { clearStatus(true) })
+				const dismissText = label(game, 'statusDismiss')
 				dismiss.className = 'cattail-world-editor-library__status-dismiss'
-				dismiss.title = label(game, 'statusDismiss')
-				dismiss.setAttribute('aria-label', label(game, 'statusDismiss'))
+				dismiss.setAttribute('aria-label', dismissText)
 				region.append(dismiss)
+				tooltips?.set(dismiss, dismissText)
 			}
 			return region
 		}
@@ -1149,6 +1152,7 @@ ModLoader.register({
 		function dispose(reason) {
 			if (disposed) return false
 			disposed = true
+			tooltips?.dispose()
 			clearStatus(false)
 			interactionDialog?.close?.(reason || 'blueprint-library-ui-disposed', true)
 			interactionDialog = null

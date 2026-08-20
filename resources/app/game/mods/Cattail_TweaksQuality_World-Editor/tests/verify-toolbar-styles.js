@@ -233,6 +233,54 @@ function testManifestAndLocalization() {
 	assert.doesNotMatch(i18nSource, /'Delete Contents'|'Delete Selection Contents'|'Delete Selection'|'Cut Contents'/)
 }
 
+function assertThemedLocalStatus(source, className) {
+	const selector = className.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+	assert.match(
+		source,
+		new RegExp(
+			selector + '\\s*\\{[^}]*' +
+			'--world-editor-local-status-accent:\\s*var\\(--world-editor-shell-border\\);[^}]*' +
+			'--world-editor-local-status-color:\\s*var\\(--world-editor-shell-text\\);[^}]*' +
+			'max-width:\\s*min\\(520px,\\s*calc\\(var\\(--world-editor-toolbar-layout-width,\\s*calc\\(100vw - 24px\\)\\) - 28px\\)\\);[^}]*' +
+			'box-sizing:\\s*border-box;[^}]*' +
+			'padding:\\s*7px 12px;[^}]*' +
+			'border:\\s*1px solid var\\(--world-editor-local-status-accent\\);[^}]*' +
+			'border-radius:\\s*999px;[^}]*' +
+			'background:\\s*var\\(--world-editor-shell-bg\\);[^}]*' +
+			'box-shadow:\\s*var\\(--world-editor-shell-shadow\\);[^}]*' +
+			'backdrop-filter:\\s*blur\\(12px\\) saturate\\(1\\.08\\);[^}]*' +
+			'-webkit-backdrop-filter:\\s*blur\\(12px\\) saturate\\(1\\.08\\);[^}]*' +
+			'color:\\s*var\\(--world-editor-local-status-color\\);',
+			's'
+		)
+	)
+	for (const [kind, token] of [
+		['busy', 'busy'],
+		['success', 'success'],
+		['warning', 'warning'],
+		['error', 'error']
+	]) {
+		assert.match(
+			source,
+			new RegExp(
+				selector + '\\[data-kind="' + kind + '"\\][^{]*\\{[^}]*' +
+				'--world-editor-local-status-accent:\\s*var\\(--world-editor-history-' + token + '\\);[^}]*' +
+				'--world-editor-local-status-color:\\s*color-mix\\(in srgb,\\s*var\\(--world-editor-history-' + token + '\\) 78%,\\s*var\\(--world-editor-shell-text\\)\\);',
+				's'
+			)
+		)
+	}
+	assert.match(
+		source,
+		new RegExp(
+			selector + '\\[data-kind="error"\\],\\s*' +
+			selector + '\\[data-kind="terminal"\\]\\s*\\{',
+			's'
+		)
+	)
+	assert.doesNotMatch(source, new RegExp(selector + '\\[data-kind="(?:busy|success|warning|error|terminal)"\\][^{]*\\{[^}]*color:\\s*#[0-9a-f]{6}', 'is'))
+}
+
 function testSourceContracts() {
 	assert.match(shellSource, /shell\.dataset\.toolbarStyle\s*=\s*'compact'/)
 	assert.match(shellSource, /api\.config\?\.get\?\.\(LARGE_TOOLBAR_CONFIG_KEY,\s*false\)/)
@@ -460,6 +508,8 @@ function testSourceContracts() {
 	assert.match(shellSource, /\[aria-disabled="true"\]:not\(\[data-world-editor-toolbar-busy="true"\]\)/)
 	assert.match(shellSource, /\.cattail-world-editor-shell__tool\[aria-disabled="true"\]\s*\{\s*opacity:\s*\.38;\s*cursor:\s*default;/)
 	assert.match(shellSource, /\.cattail-world-editor-shell__history-status\[data-active="true"\]\s*\{\s*display:\s*block;/)
+	assertThemedLocalStatus(deleteUiSource, '.cattail-world-editor-selection-delete__status')
+	assertThemedLocalStatus(cutUiSource, '.cattail-world-editor-selection-cut__status')
 	assert.match(shellSource, /group\.dataset\.largeEmpty\s*=\s*available\s*\?\s*'false'\s*:\s*'true'/)
 	assert.match(shellSource, /font-size:\s*48px/)
 	assert.match(shellSource, /opacity:\s*\.12 !important/)

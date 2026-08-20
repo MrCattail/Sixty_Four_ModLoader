@@ -67,6 +67,14 @@ loader logs. The panel can open the `mods` folder, import mod zip packages by
 file drop or paste, and delete mod folders after an in-panel confirmation. Menu
 labels follow the current game language where ModLoader translations exist.
 
+The panel header keeps its quick controls in this order: Menu Settings, theme,
+hide mode, Hide to edge, and Close. Dark mode shows a sun action for switching
+to light mode; light mode shows a moon action for switching to dark mode. The
+hide-mode pin is tilted while auto-hide is active and upright in manual mode.
+Both shortcuts update the existing `modloader:panelState` immediately and stay
+in sync with Menu Settings. Manual mode stops the auto-hide timer but still
+allows **Hide to edge** to be used explicitly.
+
 The lower-left status line also shows the loader version, enabled mod count,
 and `Ctrl+M` reminder.
 
@@ -498,7 +506,7 @@ through `api.ui.settings`. The API is bound to the calling mod, uses
 ```js
 api.ui.settings.types
 // boolean, select, number, slider, color, string,
-// array, object, resourceColors
+// array, object, resourceColors, action
 ```
 
 ### Register runtime settings
@@ -532,7 +540,40 @@ const unregister = api.ui.settings.register([
 unregister()
 ```
 
-Static `mod.json` fields continue to use the existing compatibility normalizer.
+A registered `Ctrl+M` field can set `persist: 'change'` to save each valid final
+interaction immediately. Only that explicit field changes its persistence mode;
+other fields remain staged for **Save Config** or **Save & Reload**.
+
+`action` adds an immediate Mod-owned command to the same Settings renderer:
+
+```js
+const unregisterAction = api.ui.settings.register({
+  key: 'openSourceFile',
+  type: 'action',
+  label: 'Source file',
+  description: 'Open this Mod\'s editable source file.',
+  buttonLabel: 'Open source file',
+  pendingText: 'Opening...',
+  successText: 'Source file opened.',
+  errorText: 'Could not open the source file: {value}',
+  async onAction({ modId, key, control, event }) {
+    await openOwnedSourceFile()
+  }
+})
+```
+
+The shared action control accepts synchronous or asynchronous `onAction`
+handlers. It disables itself while pending, exposes `run()`, `clearStatus()`,
+`pending`, `status`, and `error` on its control/field handle, and shows localized
+pending, success, or error status. `destroy()` removes its listener and prevents
+an outstanding promise from updating destroyed UI.
+
+Actions do not participate in config values, dirty state, validation, save,
+`localStorage`, config preview/change events, or reload decisions. Their
+definitions and functions remain in the runtime schema only; do not declare an
+executable handler in static JSON.
+
+Static `mod.json` value fields continue to use the existing compatibility normalizer.
 The v1 schema standardizes `key`, `type`, `label`, `description`, `default`,
 `section`, `sectionLabel`, `disabled`, and an optional synchronous
 `validate(value)` callback. Numeric controls accept `min`, `max`, `step`, and
@@ -575,7 +616,9 @@ control.destroy()
 
 A config-bound form stages changes by default. `input` reports live preview,
 `change` marks the final interaction, and only `save()` writes through
-`api.config`. Set `persist: 'change'` to save each valid final interaction.
+`api.config`. Set the form-level `persist: 'change'` to save each valid final
+interaction. Action fields render and run inside a form but are omitted from
+`values()`, `dirty`, `validate()`, `save()`, and reset operations.
 
 ```js
 const form = api.ui.settings.createForm({
@@ -682,7 +725,9 @@ The shared glass tooltip can also be attached to any mod-owned element:
 ```js
 const detachTooltip = api.ui.settings.tooltip.attach(button, 'Reset values', {
   root: button.closest('.my-mod-window'),
-  ariaLabel: 'Reset values'
+  ariaLabel: 'Reset values',
+  delayMs: 600,
+  theme: 'global' // optional: follow the ModLoader theme instead of the plane
 })
 
 detachTooltip()
@@ -691,7 +736,30 @@ detachTooltip()
 
 Tooltips support pointer following, viewport edge flipping, keyboard focus,
 dark/light synchronization, and `aria-label`; they do not use the native
-`title` attribute.
+`title` attribute. Inside a Settings surface or the ModLoader panel, tooltips
+follow that container's theme. Outside a Settings surface or the ModLoader
+panel, the default `theme: 'plane'` uses the light tooltip in Reality and the
+dark tooltip in the Void. When no active game has a valid plane, it falls back
+to the current ModLoader theme. Pass `theme: 'global'` to make an external
+tooltip follow the current ModLoader dark/light selection instead. Other theme
+values also use the default plane behavior. `delayMs` adds an optional
+pointer delay from `0` to `10000` milliseconds; keyboard focus remains immediate.
+The shared portal uses the tooltip's own single glass surface, so its background,
+border, inset highlight, blur, and shadow do not require a separate opaque
+silhouette or a clipped custom path. One rendered line keeps the original
+`999px` capsule, `11px` side padding, and `340px` maximum width. For two, three,
+four, and five-or-more rendered lines, the horizontal ellipse-radius ratio
+decreases through `height * 0.50`, `height * 0.46`, `height * 0.42`, and
+`height * 0.38`, while the vertical radius stays at `50%`. This makes taller
+tooltips progressively flatter at their side midpoints without adding a straight
+vertical segment. Multiline side safety is calculated
+from the real ellipse boundary at the first and last line centers, plus a `4px`
+text gap, clamped from `16px` to `48px`. The shell's maximum width grows by twice
+the extra padding, preserving the original text-block width when viewport space
+is available; the normal `10px` viewport margin remains the hard limit and may
+cause additional wrapping in narrow windows. The final rendered layout drives
+the radius and padding, so localized text follows the same rule without consumer-specific
+character counts or CSS.
 
 ## Dependencies And Conflicts
 

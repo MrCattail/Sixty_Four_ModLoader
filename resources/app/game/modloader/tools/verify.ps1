@@ -131,7 +131,9 @@ if (Test-Path -LiteralPath $renderApiContractTestPath) {
 $snapshotContractTests = @(
 	[ordered]@{ file = 'ui-page-menu-scroll-contract.test.js'; description = 'UI page menu scroll contract'; pattern = 'automatic max-height, inertial wheel, ModLoader scrollbar styling' },
 	[ordered]@{ file = 'panel-description-display-mode-contract.test.js'; description = 'Panel description display mode contract'; pattern = 'hover default, inline descriptions, translated settings' },
-	[ordered]@{ file = 'settings-api-v1-contract.test.js'; description = 'Settings API v1 contract'; pattern = 'registration, shared renderer, typed values, validation, persistence, themes, scrolling, tooltips, cleanup' },
+	[ordered]@{ file = 'panel-header-quick-toggles-contract.test.js'; description = 'Panel header quick toggles contract'; pattern = 'button order, sun/moon, pin states, persistence, manual edge hiding, themes, translations' },
+	[ordered]@{ file = 'settings-api-v1-contract.test.js'; description = 'Settings API v1 contract'; pattern = 'registration, actions, shared renderer, typed values, validation, persistence, themes, scrolling, tooltips, cleanup' },
+	[ordered]@{ file = 'chinese-optimization-open-translation-contract.test.js'; description = 'Chinese Optimization open translation contract'; pattern = '20 languages, feature detection, immediate select, Explorer reveal, default association' },
 	[ordered]@{ file = 'snapshot-container-v1-contract.test.js'; description = 'Snapshot export container v1 contract'; pattern = 'binary framing, metadata, checksum, corruption rejection' },
 	[ordered]@{ file = 'snapshot-store-v1-contract.test.js'; description = 'Snapshot store v1 contract'; pattern = 'validation, isolation, queueing, rotation, quarantine, cleanup' },
 	[ordered]@{ file = 'snapshot-api-v1-contract.test.js'; description = 'Storage Snapshot API v1 runtime contract'; pattern = 'bound Mod API, data types, safe errors, save identity, admin UI boundary' },
@@ -167,6 +169,11 @@ $modFeatureContractTests = @(
 		path = 'mods\Cattail_TweaksQuality_Better-UIs\tests\verify-save-slots-service-v1.js'
 		description = 'Better UIs Save Slots Service v1 contract'
 		pattern = 'atomic batch creation, activation rollback, lineage finalization, name conflict'
+	},
+	[ordered]@{
+		path = 'mods\Cattail_TweaksQuality_Better-UIs\tests\verify-shop-categories-tooltips.js'
+		description = 'Better UIs Shop Categories tooltip contract'
+		pattern = 'localized vanilla descriptions, shared API delay, disabled-card coverage, rebuild cleanup'
 	},
 	[ordered]@{
 		path = 'mods\Cattail_TweaksQuality_World-Editor\tests\verify-4a-2a.js'

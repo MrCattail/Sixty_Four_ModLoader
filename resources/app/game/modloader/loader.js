@@ -3568,15 +3568,27 @@
 	const setPanelTooltipText = function (target, text, options) {
 		if (!target?.dataset) return target
 		const value = String(text || '').trim()
+		const delayProperty = 'modloaderPanelTooltipDelayMs'
+		const delayMs = Number(options?.delayMs)
 		if (value) {
 			target.dataset.modloaderPanelTooltip = value
+			target.dataset.modloaderPanelTooltipTheme = options?.theme === 'global' ? 'global' : 'plane'
 			if (options?.kind) target.dataset.modloaderPanelTooltipKind = String(options.kind)
 			else delete target.dataset.modloaderPanelTooltipKind
+			if (Number.isFinite(delayMs) && delayMs > 0) target.dataset[delayProperty] = String(Math.min(10000, Math.max(0, Math.round(delayMs))))
+			else delete target.dataset.modloaderPanelTooltipDelayMs
 		} else {
 			delete target.dataset.modloaderPanelTooltip
+			delete target.dataset.modloaderPanelTooltipTheme
 			delete target.dataset.modloaderPanelTooltipKind
+			delete target.dataset.modloaderPanelTooltipDelayMs
 		}
 		return target
+	}
+
+	const getPanelTooltipDelayMs = function (target) {
+		const value = Number(target?.dataset?.modloaderPanelTooltipDelayMs)
+		return Number.isFinite(value) ? Math.min(10000, Math.max(0, Math.round(value))) : 0
 	}
 
 	const panelRow = function (label, value) {
@@ -3928,6 +3940,8 @@
 			'.modloader-select-button',
 			'.modloader-select-value',
 			'.modloader-switch-input',
+			'.modloader-action-button',
+			'.modloader-settings-action',
 			'.modloader-color',
 			'.modloader-resource-color'
 		]
@@ -3980,14 +3994,22 @@
 			#modloader-panel .modloader-panel-header { display: flex; align-items: center; gap: 10px; margin: -3px -3px 8px; padding: 3px; cursor: grab; user-select: none; touch-action: none; }
 			#modloader-panel .modloader-panel-header:active { cursor: grabbing; }
 			#modloader-panel .modloader-panel-controls { display: inline-flex; align-items: center; gap: 4px; flex: 0 0 auto; }
-			#modloader-panel .modloader-panel-close, #modloader-panel .modloader-panel-edge, #modloader-panel .modloader-panel-settings { position: relative; display: grid; place-items: center; width: 24px; height: 24px; border: 0; border-radius: 5px; padding: 0; background: transparent; color: var(--modloader-control-text); cursor: pointer; }
+			#modloader-panel .modloader-panel-close, #modloader-panel .modloader-panel-edge, #modloader-panel .modloader-panel-settings, #modloader-panel .modloader-panel-theme-toggle, #modloader-panel .modloader-panel-hide-toggle { position: relative; display: grid; place-items: center; width: 24px; height: 24px; border: 0; border-radius: 5px; padding: 0; background: transparent; color: var(--modloader-control-text); cursor: pointer; }
 			#modloader-panel .modloader-panel-close:before, #modloader-panel .modloader-panel-close:after { content: ''; position: absolute; left: 50%; top: 50%; width: 15px; height: 2px; border-radius: 999px; background: currentColor; transform-origin: center; }
 			#modloader-panel .modloader-panel-close:before { transform: translate(-50%, -50%) rotate(45deg); }
 			#modloader-panel .modloader-panel-close:after { transform: translate(-50%, -50%) rotate(-45deg); }
 			#modloader-panel .modloader-panel-edge { font: 700 15px/1 Montserrat, Arial, sans-serif; letter-spacing: -1px; }
 			#modloader-panel .modloader-panel-edge-icon { display: block; transform: translateY(-1px); }
 			#modloader-panel .modloader-panel-settings:before { content: '\\2699'; display: block; font-size: 16px; line-height: 1; transform: translateY(1px); }
-			#modloader-panel .modloader-panel-settings.active, #modloader-panel .modloader-panel-edge:hover:not(:disabled), #modloader-panel .modloader-panel-settings:hover, #modloader-panel .modloader-panel-close:hover { color: var(--modloader-control-text-hover); background: var(--modloader-surface-hover); }
+			#modloader-panel .modloader-panel-quick-icon { position: relative; display: block; width: 16px; height: 16px; color: currentColor; transition: transform .16s ease; }
+			#modloader-panel .modloader-panel-quick-icon-sun:before { content: ''; position: absolute; box-sizing: border-box; left: 4.5px; top: 4.5px; width: 7px; height: 7px; border: 1.5px solid currentColor; border-radius: 50%; }
+			#modloader-panel .modloader-panel-quick-icon-sun:after { content: ''; position: absolute; left: 7.25px; top: 7.25px; width: 1.5px; height: 1.5px; border-radius: 50%; background: currentColor; box-shadow: 0 -7px 0 currentColor, 0 7px 0 currentColor, -7px 0 0 currentColor, 7px 0 0 currentColor, -5px -5px 0 currentColor, 5px -5px 0 currentColor, -5px 5px 0 currentColor, 5px 5px 0 currentColor; }
+			#modloader-panel .modloader-panel-quick-icon-moon:before { content: ''; position: absolute; left: 2px; top: 2px; width: 12px; height: 12px; border-radius: 50%; background: currentColor; -webkit-mask: radial-gradient(circle at 68% 32%, transparent 0 42%, #000 45%); mask: radial-gradient(circle at 68% 32%, transparent 0 42%, #000 45%); transform: rotate(-8deg); }
+			#modloader-panel .modloader-panel-quick-icon-pin-upright:before, #modloader-panel .modloader-panel-quick-icon-pin-tilted:before { content: ''; position: absolute; box-sizing: border-box; left: 3px; top: 2px; width: 10px; height: 7px; border: 1.5px solid currentColor; border-radius: 3px 3px 2px 2px; background: transparent; }
+			#modloader-panel .modloader-panel-quick-icon-pin-upright:after, #modloader-panel .modloader-panel-quick-icon-pin-tilted:after { content: ''; position: absolute; left: 7px; top: 8px; width: 2px; height: 7px; border-radius: 999px; background: currentColor; clip-path: polygon(0 0, 100% 0, 60% 100%, 40% 100%); }
+			#modloader-panel .modloader-panel-quick-icon-pin-tilted { transform: rotate(-35deg); }
+			#modloader-panel .modloader-panel-settings.active, #modloader-panel .modloader-panel-edge:hover:not(:disabled), #modloader-panel .modloader-panel-settings:hover, #modloader-panel .modloader-panel-theme-toggle:hover, #modloader-panel .modloader-panel-hide-toggle:hover, #modloader-panel .modloader-panel-close:hover { color: var(--modloader-control-text-hover); background: var(--modloader-surface-hover); }
+			#modloader-panel .modloader-panel-close:focus-visible, #modloader-panel .modloader-panel-edge:focus-visible, #modloader-panel .modloader-panel-settings:focus-visible, #modloader-panel .modloader-panel-theme-toggle:focus-visible, #modloader-panel .modloader-panel-hide-toggle:focus-visible { outline: none; color: var(--modloader-control-text-hover); background: var(--modloader-surface-hover); box-shadow: 0 0 0 2px var(--modloader-focus-border); }
 			#modloader-panel .modloader-panel-edge:disabled { cursor: default; opacity: .34; }
 			#modloader-panel.modloader-panel-dragging { transition: none; }
 			#modloader-panel.modloader-panel-autohidden { width: 42px; height: 42px; max-height: 42px; overflow: visible; padding: 0; background: transparent; box-shadow: none; pointer-events: none; }
@@ -4012,14 +4034,14 @@
 			#modloader-panel .modloader-panel-settings-number { box-sizing: border-box; width: 66px; border: 1px solid var(--modloader-input-border); border-radius: 5px; padding: 4px 6px; background: var(--modloader-input-bg); color: var(--modloader-input-text); text-align: right; outline: none; }
 			#modloader-panel .modloader-panel-settings-number:focus { border-color: var(--modloader-focus-border); }
 			#modloader-panel .modloader-panel-settings-unit { font-size: 12px; }
-			#modloader-panel-tooltip { position: fixed; left: 0; top: 0; z-index: 2147483647; box-sizing: border-box; max-width: min(340px, calc(100vw - 20px)); border: 1px solid rgba(255,255,255,.13); border-radius: 999px; padding: 5px 11px; background: rgba(18, 20, 23, .26); color: rgba(255,255,255,.9); box-shadow: 0 8px 22px rgba(0,0,0,.24), inset 0 1px 0 rgba(255,255,255,.1); font: 11px/1.32 Montserrat, Arial, sans-serif; letter-spacing: 0; text-align: left; overflow-wrap: anywhere; pointer-events: none; opacity: 0; transform: translateY(-2px) scale(.985); transition: opacity .1s ease, transform .12s ease; backdrop-filter: blur(12px) saturate(1.25); -webkit-backdrop-filter: blur(12px) saturate(1.25); }
+			#modloader-panel-tooltip { position: fixed; left: 0; top: 0; z-index: 2147483647; box-sizing: border-box; max-width: min(var(--modloader-panel-tooltip-max-width, 340px), calc(100vw - 20px)); border: 1px solid rgba(255,255,255,.13); border-radius: var(--modloader-panel-tooltip-radius, 999px); padding: 5px var(--modloader-panel-tooltip-side-padding, 11px); background: rgba(18, 20, 23, .26); color: rgba(255,255,255,.9); box-shadow: 0 8px 22px rgba(0,0,0,.24), inset 0 1px 0 rgba(255,255,255,.1); font: 11px/1.32 Montserrat, Arial, sans-serif; letter-spacing: 0; text-align: left; overflow-wrap: anywhere; pointer-events: none; opacity: 0; transform: translateY(-2px) scale(.985); transition: opacity .1s ease, transform .12s ease; backdrop-filter: blur(12px) saturate(1.25); -webkit-backdrop-filter: blur(12px) saturate(1.25); }
 			#modloader-panel-tooltip.active { opacity: 1; transform: translateY(0) scale(1); }
 			#modloader-panel-tooltip.modloader-panel-tooltip-light { border-color: rgba(18,20,22,.12); background: rgba(255,255,255,.34); color: rgba(18,20,22,.82); box-shadow: 0 8px 22px rgba(0,0,0,.16), inset 0 1px 0 rgba(255,255,255,.62); }
 			#modloader-panel.modloader-panel-theme-light { --modloader-panel-bg: rgba(248,248,246,.96); --modloader-panel-text: rgba(18,20,22,.94); --modloader-text-strong: rgba(18,20,22,.9); --modloader-text: rgba(30,32,34,.68); --modloader-text-muted: rgba(18,20,22,.58); --modloader-text-subtle: rgba(18,20,22,.46); --modloader-border: rgba(0,0,0,.1); --modloader-border-strong: rgba(0,0,0,.14); --modloader-surface: rgba(0,0,0,.035); --modloader-surface-hover: rgba(0,0,0,.06); --modloader-surface-active: rgba(0,0,0,.09); --modloader-control-bg: rgba(0,0,0,.055); --modloader-control-bg-hover: rgba(0,0,0,.09); --modloader-control-border: rgba(0,0,0,.12); --modloader-control-border-hover: rgba(0,0,0,.18); --modloader-control-text: rgba(18,20,22,.78); --modloader-control-text-hover: rgba(18,20,22,.92); --modloader-input-bg: rgba(0,0,0,.045); --modloader-input-border: rgba(0,0,0,.14); --modloader-input-text: rgba(18,20,22,.92); --modloader-focus-border: rgba(18,20,22,.32); --modloader-panel-shadow: 0 12px 36px rgba(0,0,0,.18); --modloader-primary-bg: rgba(18,20,22,.9); --modloader-primary-text: #fff; --modloader-danger-bg: rgba(155,31,45,.1); --modloader-danger-border: rgba(155,31,45,.24); --modloader-danger-text: #9b1f2d; --modloader-warning-text: rgba(120,78,0,.9); --modloader-error-text: #9b1f2d; --modloader-ok-text: rgba(18,20,22,.62); --modloader-slider-fill-color: rgba(18,20,22,.52); --modloader-slider-track-color: rgba(0,0,0,.12); --modloader-slider-track-shadow: inset 0 1px 2px rgba(0,0,0,.18); }
 			#modloader-panel.modloader-panel-theme-light h3, #modloader-panel.modloader-panel-theme-light .modloader-panel-note, #modloader-panel.modloader-panel-theme-light .modloader-panel-label, #modloader-panel.modloader-panel-theme-light .modloader-panel-settings-row, #modloader-panel.modloader-panel-theme-light .modloader-select-all-control { color: var(--modloader-text); }
 			#modloader-panel.modloader-panel-theme-light .modloader-panel-settings-title, #modloader-panel.modloader-panel-theme-light .modloader-panel-value, #modloader-panel.modloader-panel-theme-light .modloader-mod-path, #modloader-panel.modloader-panel-theme-light .modloader-mod-label, #modloader-panel.modloader-panel-theme-light .modloader-mod-config-title, #modloader-panel.modloader-panel-theme-light .modloader-config-label { color: var(--modloader-text-strong); }
-			#modloader-panel.modloader-panel-theme-light .modloader-panel-close, #modloader-panel.modloader-panel-theme-light .modloader-panel-edge, #modloader-panel.modloader-panel-theme-light .modloader-panel-settings { color: var(--modloader-control-text); }
-			#modloader-panel.modloader-panel-theme-light .modloader-panel-settings.active, #modloader-panel.modloader-panel-theme-light .modloader-panel-edge:hover:not(:disabled), #modloader-panel.modloader-panel-theme-light .modloader-panel-settings:hover, #modloader-panel.modloader-panel-theme-light .modloader-panel-close:hover { color: var(--modloader-control-text-hover); background: var(--modloader-surface-hover); }
+			#modloader-panel.modloader-panel-theme-light .modloader-panel-close, #modloader-panel.modloader-panel-theme-light .modloader-panel-edge, #modloader-panel.modloader-panel-theme-light .modloader-panel-settings, #modloader-panel.modloader-panel-theme-light .modloader-panel-theme-toggle, #modloader-panel.modloader-panel-theme-light .modloader-panel-hide-toggle { color: var(--modloader-control-text); }
+			#modloader-panel.modloader-panel-theme-light .modloader-panel-settings.active, #modloader-panel.modloader-panel-theme-light .modloader-panel-edge:hover:not(:disabled), #modloader-panel.modloader-panel-theme-light .modloader-panel-settings:hover, #modloader-panel.modloader-panel-theme-light .modloader-panel-theme-toggle:hover, #modloader-panel.modloader-panel-theme-light .modloader-panel-hide-toggle:hover, #modloader-panel.modloader-panel-theme-light .modloader-panel-close:hover { color: var(--modloader-control-text-hover); background: var(--modloader-surface-hover); }
 			#modloader-panel.modloader-panel-theme-light .modloader-panel-settings-page.active { border-color: var(--modloader-border); }
 			#modloader-panel.modloader-panel-theme-light .modloader-panel-settings-options { background: var(--modloader-surface-hover); }
 			#modloader-panel.modloader-panel-theme-light .modloader-panel-settings-option { color: var(--modloader-control-text); }
@@ -4068,7 +4090,14 @@
 			#modloader-panel .modloader-toolbar-actions { display: inline-flex; align-items: center; gap: 6px; flex: 0 0 auto; }
 			#modloader-panel .modloader-action-button { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--modloader-control-border); border-radius: 6px; padding: 7px 9px; background: var(--modloader-control-bg); color: var(--modloader-control-text); cursor: pointer; }
 			#modloader-panel .modloader-action-button:hover:not(:disabled), #modloader-panel .modloader-action-button.active { background: var(--modloader-control-bg-hover); border-color: var(--modloader-control-border-hover); color: var(--modloader-control-text-hover); }
+			#modloader-panel .modloader-action-button:focus-visible { outline: none; border-color: var(--modloader-focus-border); box-shadow: 0 0 0 2px var(--modloader-focus-border); }
 			#modloader-panel .modloader-action-button:disabled { cursor: default; opacity: .45; }
+			#modloader-panel .modloader-settings-action { display: flex; flex-wrap: wrap; align-items: center; gap: 5px 8px; min-width: 0; }
+			#modloader-panel .modloader-settings-action-status { flex: 1 1 150px; min-width: 0; color: var(--modloader-text-subtle); font-size: 11px; overflow-wrap: anywhere; }
+			#modloader-panel .modloader-settings-action-status:empty { display: none; }
+			#modloader-panel .modloader-settings-action-status.pending { color: var(--modloader-text-muted); }
+			#modloader-panel .modloader-settings-action-status.success { color: var(--modloader-ok-text); }
+			#modloader-panel .modloader-settings-action-status.error { color: var(--modloader-error-text); }
 			#modloader-panel .modloader-action-icon { position: relative; display: inline-block; width: 15px; height: 15px; flex: 0 0 auto; color: currentColor; }
 			#modloader-panel .modloader-action-icon-plus:before, #modloader-panel .modloader-action-icon-plus:after { content: ''; position: absolute; left: 50%; top: 50%; width: 13px; height: 2px; border-radius: 999px; background: currentColor; transform: translate(-50%, -50%); }
 			#modloader-panel .modloader-action-icon-plus:after { transform: translate(-50%, -50%) rotate(90deg); }
@@ -5241,7 +5270,7 @@
 	}
 
 	const SETTINGS_API_VERSION = 1
-	const SETTINGS_API_TYPES = Object.freeze([ 'boolean', 'select', 'number', 'slider', 'color', 'string', 'array', 'object', 'resourceColors' ])
+	const SETTINGS_API_TYPES = Object.freeze([ 'boolean', 'select', 'number', 'slider', 'color', 'string', 'array', 'object', 'resourceColors', 'action' ])
 
 	const cloneConfigSchemaItem = function (item) {
 		if (!item || typeof item !== 'object') return item
@@ -5255,6 +5284,9 @@
 
 	const getConfigType = function (item) {
 		return String(item.type || inferConfigType(item.default) || 'string').toLowerCase()
+	}
+	const isSettingsActionItem = function (item) {
+		return getConfigType(item) === 'action'
 	}
 	const isColorPaletteConfigType = function (type) {
 		return type === 'colorpalette' || type === 'color-palette' || type === 'resourcecolors' || type === 'resource-colors'
@@ -5353,11 +5385,16 @@
 			item = cloneConfigSchemaItem(item)
 			const localizedValueLabels = getLocalizedConfigValueLabels(mod.manifest, item)
 			if (localizedValueLabels) item.valueLabels = clone(localizedValueLabels)
+			for (const property of [ 'sectionLabel', 'buttonLabel', 'pendingText', 'successText', 'errorText' ]) {
+				const localized = getLocalizedConfigText(mod.manifest, item, property, '')
+				if (localized) item[property] = localized
+			}
 			item.type = getConfigType(item)
 			return item
 		})
 		const values = {}
 		for (const item of schema) {
+			if (isSettingsActionItem(item)) continue
 			const liveValue = liveConfig?.values ? liveConfig.values[item.key] : undefined
 			values[item.key] = liveValue === undefined
 				? parseStoredConfig(localStorage.getItem(storageKey(mod.id, item.key)), item.default)
@@ -6427,6 +6464,14 @@
 		return typeof value + ':' + String(value)
 	}
 
+	const getSelectConfigOptionLabel = function (item, value, index, fallback) {
+		const labels = item?.valueLabels
+		let label
+		if (Array.isArray(labels)) label = labels[index]
+		else if (isObject(labels)) label = labels[String(value)]
+		return pickLocalizedText(label, getLocaleCandidates()) || String(label ?? fallback ?? value)
+	}
+
 	const getSelectConfigOptions = function (item, value, config) {
 		const source = item?.options || item?.choices || item?.values || item?.entries || []
 		const raw = Array.isArray(source)
@@ -6434,7 +6479,7 @@
 			: (isObject(source) ? Object.keys(source).map(function (key) { return { value: key, label: source[key] } }) : [])
 		const options = []
 		const seen = new Set()
-		const addOption = function (entry) {
+		const addOption = function (entry, index) {
 			const rawValue = isObject(entry) ? (entry.value ?? entry.id ?? entry.key ?? entry.name) : entry
 			if (rawValue === undefined || rawValue === null) return
 			const optionValue = coerceSelectConfigValue(item, rawValue)
@@ -6445,7 +6490,7 @@
 			options.push({
 				value: optionValue,
 				key: valueKey,
-				label: pickLocalizedText(labelSource, getLocaleCandidates()) || String(labelSource ?? optionValue)
+				label: getSelectConfigOptionLabel(item, optionValue, index, pickLocalizedText(labelSource, getLocaleCandidates()) || String(labelSource ?? optionValue))
 			})
 		}
 		raw.forEach(addOption)
@@ -6755,6 +6800,9 @@
 		else if (isNumberConfigType(rawType)) {
 			item.type = 'number'
 			if (rawType === 'integer' || rawType === 'int') item.integer = true
+		} else if (rawType === 'action') {
+			item.type = 'action'
+			if (typeof item.onAction !== 'function') throw new Error('Action settings require an onAction handler.')
 		} else if (rawType === 'boolean' || rawType === 'string' || rawType === 'array' || rawType === 'object') item.type = rawType
 		else throw new Error('Unsupported settings type: ' + rawType + '.')
 		if (options?.apiV1 !== false) {
@@ -6825,8 +6873,110 @@
 		}
 	}
 
+	const createSettingsActionControlCore = function (item, options) {
+		const root = element('div', 'modloader-settings-action')
+		const buttonLabel = getSettingsDefinitionText(item, 'buttonLabel', getSettingsDefinitionText(item, 'label', item.key || 'Action'))
+		const button = element('button', 'modloader-action-button modloader-settings-action-button', buttonLabel)
+		const status = element('span', 'modloader-settings-action-status')
+		button.type = 'button'
+		button.setAttribute('aria-label', buttonLabel)
+		button.setAttribute('aria-busy', 'false')
+		status.setAttribute('aria-live', 'polite')
+		root.append(button, status)
+		let destroyed = false
+		let disabled = item.disabled === true
+		let pending = false
+		let lastError = null
+		let runSerial = 0
+		let handle = null
+		const setStatus = function (kind, message) {
+			const normalized = kind === 'pending' || kind === 'success' || kind === 'error' ? kind : ''
+			root.dataset.status = normalized
+			status.className = 'modloader-settings-action-status' + (normalized ? ' ' + normalized : '')
+			status.textContent = String(message || '')
+		}
+		const syncDisabled = function () {
+			button.disabled = disabled || pending
+			button.setAttribute('aria-busy', pending ? 'true' : 'false')
+		}
+		const run = function (event) {
+			if (destroyed || disabled || pending) return Promise.resolve(undefined)
+			pending = true
+			lastError = null
+			const serial = ++runSerial
+			setStatus('pending', getSettingsDefinitionText(item, 'pendingText', ''))
+			syncDisabled()
+			return Promise.resolve().then(function () {
+				return item.onAction({
+					modId: options?.modId || options?.mod?.id || '',
+					key: item.key || '',
+					definition: cloneConfigSchemaItem(item),
+					control: handle,
+					event: event || null
+				})
+			}).then(function (result) {
+				if (destroyed || serial !== runSerial) return result
+				pending = false
+				const message = typeof result === 'string' && result ? result : getSettingsDefinitionText(item, 'successText', '')
+				setStatus('success', message)
+				syncDisabled()
+				return result
+			}, function (error) {
+				const normalizedError = error instanceof Error ? error : new Error(String(error || 'Action failed.'))
+				if (!destroyed && serial === runSerial) {
+					pending = false
+					lastError = normalizedError
+					const template = getSettingsDefinitionText(item, 'errorText', '{value}')
+					setStatus('error', template.replace(/\{value\}/g, normalizedError.message))
+					syncDisabled()
+				}
+				throw normalizedError
+			})
+		}
+		const onClick = function (event) {
+			event.preventDefault()
+			event.stopPropagation()
+			run(event).catch(function () {})
+		}
+		button.addEventListener('click', onClick)
+		handle = {
+			element: root,
+			input: button,
+			item,
+			run,
+			getValue() { return undefined },
+			setValue() { throw new Error('Action settings do not have values.') },
+			reset() { throw new Error('Action settings do not have values.') },
+			setDisabled(nextDisabled) {
+				disabled = !!nextDisabled
+				syncDisabled()
+				return handle
+			},
+			validate() { return { valid: true, value: undefined, error: null } },
+			clearStatus() {
+				lastError = null
+				setStatus('', '')
+				return handle
+			},
+			destroy() {
+				if (destroyed) return
+				destroyed = true
+				pending = false
+				runSerial++
+				button.removeEventListener('click', onClick)
+			},
+			get error() { return lastError },
+			get valid() { return true },
+			get pending() { return pending },
+			get status() { return root.dataset.status || '' }
+		}
+		syncDisabled()
+		return handle
+	}
+
 	const createSettingsControlCore = function (definition, options) {
 		const item = options?.normalized ? definition : normalizeSettingsDefinition(definition, { apiV1: options?.apiV1 !== false })
+		if (isSettingsActionItem(item)) return createSettingsActionControlCore(item, options)
 		const cleanup = createSettingsCleanupBag()
 		const initialValue = options && Object.prototype.hasOwnProperty.call(options, 'value') ? options.value : item.default
 		const input = createConfigInput(item, cloneConfigValue(initialValue), {
@@ -6920,7 +7070,7 @@
 	const createSettingsFieldCore = function (definition, options) {
 		const item = options?.normalized ? definition : normalizeSettingsDefinition(definition, { apiV1: options?.apiV1 !== false })
 		const type = getConfigType(item)
-		const field = element(type === 'boolean' || isColorPaletteConfigItem(item, type) ? 'div' : 'label', 'modloader-config-field')
+		const field = element(type === 'boolean' || isColorPaletteConfigItem(item, type) || isSettingsActionItem(item) ? 'div' : 'label', 'modloader-config-field')
 		const text = element('span', 'modloader-config-text')
 		const labelText = options?.label ?? getSettingsDefinitionText(item, 'label', item.key || '')
 		const description = options?.description ?? getSettingsDefinitionText(item, 'description', '')
@@ -6962,6 +7112,8 @@
 			input: control.input,
 			control,
 			item,
+			run: control.run,
+			clearStatus: control.clearStatus,
 			getValue: control.getValue,
 			setValue: control.setValue,
 			reset: control.reset,
@@ -6978,7 +7130,9 @@
 			setError,
 			destroy() { control.destroy() },
 			get error() { return control.error },
-			get valid() { return control.valid }
+			get valid() { return control.valid },
+			get pending() { return !!control.pending },
+			get status() { return control.status || '' }
 		}
 		if (item.disabled === true) fieldHandle.setDisabled(true)
 		return fieldHandle
@@ -7119,6 +7273,8 @@
 			element: surface,
 			input: core.input,
 			item: core.item,
+			run: core.run,
+			clearStatus: core.clearStatus,
 			getValue: core.getValue,
 			setValue: core.setValue,
 			reset: core.reset,
@@ -7133,7 +7289,9 @@
 				surface.remove()
 			},
 			get error() { return core.error },
-			get valid() { return core.valid }
+			get valid() { return core.valid },
+			get pending() { return !!core.pending },
+			get status() { return core.status || '' }
 		}
 	}
 
@@ -7148,6 +7306,8 @@
 			input: core.input,
 			control: core.control,
 			item: core.item,
+			run: core.run,
+			clearStatus: core.clearStatus,
 			getValue: core.getValue,
 			setValue: core.setValue,
 			reset: core.reset,
@@ -7162,7 +7322,9 @@
 				surface.remove()
 			},
 			get error() { return core.error },
-			get valid() { return core.valid }
+			get valid() { return core.valid },
+			get pending() { return !!core.pending },
+			get status() { return core.status || '' }
 		}
 	}
 
@@ -7175,6 +7337,7 @@
 	const createSettingsForm = function (modId, options) {
 		const config = options || {}
 		const schema = normalizeSettingsDefinitions(config.schema || config.fields || [], { apiV1: true })
+		const valueItems = schema.filter(function (item) { return !isSettingsActionItem(item) })
 		const seen = new Set()
 		for (const item of schema) {
 			if (!item.key) throw new Error('Settings form fields require a key.')
@@ -7196,6 +7359,7 @@
 		const snapshotValues = function () {
 			const out = {}
 			for (const [key, field] of fields) {
+				if (isSettingsActionItem(field.item)) continue
 				try { out[key] = field.getValue() } catch (error) { out[key] = cloneConfigValue(currentValues[key]) }
 			}
 			return out
@@ -7226,9 +7390,12 @@
 		let currentSection = null
 		let currentSectionId = null
 		for (const item of schema) {
-			const value = getSettingsFormValue(modId, item, config)
-			initialValues[item.key] = cloneConfigValue(value)
-			currentValues[item.key] = cloneConfigValue(value)
+			const actionItem = isSettingsActionItem(item)
+			const value = actionItem ? undefined : getSettingsFormValue(modId, item, config)
+			if (!actionItem) {
+				initialValues[item.key] = cloneConfigValue(value)
+				currentValues[item.key] = cloneConfigValue(value)
+			}
 			const sectionId = getConfigSectionId(item)
 			if (item.dividerBefore || item.separatorBefore || sectionId !== currentSectionId) {
 				currentSection = null
@@ -7283,13 +7450,17 @@
 					updateDirtyValue(String(key), value)
 					return value
 				}
-				for (const [fieldKey, field] of fields) updateDirtyValue(fieldKey, field.reset(resetOptions))
+				for (const [fieldKey, field] of fields) {
+					if (isSettingsActionItem(field.item)) continue
+					updateDirtyValue(fieldKey, field.reset(resetOptions))
+				}
 				return snapshotValues()
 			},
 			validate() {
 				const errors = {}
 				const values = {}
 				for (const [key, field] of fields) {
+					if (isSettingsActionItem(field.item)) continue
 					const result = field.validate()
 					if (result.valid) values[key] = cloneConfigValue(result.value)
 					else errors[key] = result.error?.message || 'The value is invalid.'
@@ -7304,7 +7475,7 @@
 					throw error
 				}
 				const changed = []
-				for (const item of schema) {
+				for (const item of valueItems) {
 					const value = result.values[item.key]
 					if (sameConfigValue(value, initialValues[item.key])) continue
 					if (bindConfig) setConfigValue(modId, item.key, value)
@@ -7324,7 +7495,7 @@
 				root.remove()
 			},
 			get dirty() {
-				for (const item of schema) {
+				for (const item of valueItems) {
 					let value
 					try { value = fields.get(item.key)?.getValue() } catch (error) { return true }
 					if (!sameConfigValue(value, initialValues[item.key])) return true
@@ -7347,7 +7518,7 @@
 		}
 		for (const item of items) {
 			config.schema.push(item)
-			if (config.values[item.key] === undefined) config.values[item.key] = parseStoredConfig(localStorage.getItem(storageKey(modId, item.key)), cloneConfigValue(item.default))
+			if (!isSettingsActionItem(item) && config.values[item.key] === undefined) config.values[item.key] = parseStoredConfig(localStorage.getItem(storageKey(modId, item.key)), cloneConfigValue(item.default))
 		}
 		requestAnimationFrame(refreshOpenPanel)
 		let active = true
@@ -7712,6 +7883,14 @@
 	const PANEL_AUTO_HIDE_SECONDS_MAX = 60
 	const PANEL_STATE_STORAGE_KEY = 'modloader:panelState'
 	const PANEL_TOOLTIP_OFFSET = 10
+	const PANEL_TOOLTIP_BASE_MAX_WIDTH = 340
+	const PANEL_TOOLTIP_BASE_SIDE_PADDING = 11
+	const PANEL_TOOLTIP_MULTILINE_RADIUS_START_RATIO = .5
+	const PANEL_TOOLTIP_MULTILINE_RADIUS_STEP = .04
+	const PANEL_TOOLTIP_MULTILINE_RADIUS_MIN_RATIO = .38
+	const PANEL_TOOLTIP_MULTILINE_SIDE_PADDING_MIN = 16
+	const PANEL_TOOLTIP_MULTILINE_SIDE_PADDING_MAX = 48
+	const PANEL_TOOLTIP_MULTILINE_TEXT_GAP = 4
 	const PANEL_THEME_TOKEN_NAMES = Object.freeze([
 		'--modloader-panel-bg',
 		'--modloader-panel-text',
@@ -7913,8 +8092,8 @@
 			}
 			if (isValidPanelEdge(stored.hiddenSide)) state.panelHiddenSide = stored.hiddenSide
 			else if (activeTab) state.panelHiddenSide = activeTab.edge
-			state.panelHidden = (stored.hidden === true || stored.restoreAsTab === true) && state.panelSettings.hideMode !== 'manual'
-			if (state.panelSettings.hideMode === 'manual') state.panelHidden = false
+			const restoreAutomatically = stored.restoreAsTab === true && isPanelAutoHideEnabled()
+			state.panelHidden = stored.hidden === true || restoreAutomatically
 		} catch (error) {}
 	}
 
@@ -7953,6 +8132,18 @@
 
 	const isPanelAutoHideEnabled = function () {
 		return state.panelSettings.hideMode !== 'manual'
+	}
+
+	const getPanelThemeQuickToggle = function () {
+		const current = getPanelThemeMode()
+		const target = current === 'dark' ? 'light' : 'dark'
+		return { current, target, icon: current === 'dark' ? 'sun' : 'moon', labelKey: target === 'light' ? 'lightMode' : 'darkMode' }
+	}
+
+	const getPanelHideModeQuickToggle = function () {
+		const current = isPanelAutoHideEnabled() ? 'auto' : 'manual'
+		const target = current === 'auto' ? 'manual' : 'auto'
+		return { current, target, icon: current === 'auto' ? 'pin-tilted' : 'pin-upright', labelKey: target === 'manual' ? 'manualHide' : 'autoHide' }
 	}
 
 	const clearPanelAutoHideTimer = function () {
@@ -8059,7 +8250,7 @@
 	}
 
 	const rememberVisiblePanelRestoreTab = function (panel) {
-		if (!panel || state.panelHidden || !isPanelAutoHideEnabled()) return
+		if (!panel || state.panelHidden) return
 		const tab = getPanelRestoreTabFromVisiblePanel(panel)
 		if (!tab) return
 		rememberPanelTabPosition(tab)
@@ -8140,6 +8331,51 @@
 		syncPanelSettingsPageState(panel)
 	}
 
+	const formatPanelTooltipLayoutNumber = function (value) {
+		return String(Math.round((Number(value) || 0) * 100) / 100)
+	}
+
+	const getPanelTooltipLayout = function (lineCount, height, lineHeight, paddingTop, paddingBottom, borderTop, borderBottom) {
+		lineCount = Math.max(1, Math.round(Number(lineCount) || 1))
+		height = Math.max(0, Number(height) || 0)
+		lineHeight = Math.max(0, Number(lineHeight) || 0)
+		paddingTop = Math.max(0, Number(paddingTop) || 0)
+		paddingBottom = Math.max(0, Number(paddingBottom) || 0)
+		borderTop = Math.max(0, Number(borderTop) || 0)
+		borderBottom = Math.max(0, Number(borderBottom) || 0)
+		if (lineCount === 1) {
+			return {
+				borderRadius: '999px',
+				sidePadding: PANEL_TOOLTIP_BASE_SIDE_PADDING,
+				maxWidth: PANEL_TOOLTIP_BASE_MAX_WIDTH
+			}
+		}
+		const horizontalRadiusRatio = Math.max(
+			PANEL_TOOLTIP_MULTILINE_RADIUS_MIN_RATIO,
+			PANEL_TOOLTIP_MULTILINE_RADIUS_START_RATIO - PANEL_TOOLTIP_MULTILINE_RADIUS_STEP * (lineCount - 2)
+		)
+		const horizontalRadius = height * horizontalRadiusRatio
+		const halfHeight = height / 2
+		const edgeLineCenter = Math.max(0, Math.min(
+			halfHeight,
+			Math.min(
+				borderTop + paddingTop + lineHeight / 2,
+				borderBottom + paddingBottom + lineHeight / 2
+			)
+		))
+		const normalizedDistance = halfHeight > 0 ? (halfHeight - edgeLineCenter) / halfHeight : 0
+		const boundaryInset = horizontalRadius * (1 - Math.sqrt(Math.max(0, 1 - normalizedDistance * normalizedDistance)))
+		const sidePadding = Number(formatPanelTooltipLayoutNumber(Math.max(
+			PANEL_TOOLTIP_MULTILINE_SIDE_PADDING_MIN,
+			Math.min(PANEL_TOOLTIP_MULTILINE_SIDE_PADDING_MAX, boundaryInset + PANEL_TOOLTIP_MULTILINE_TEXT_GAP)
+		)))
+		return {
+			borderRadius: formatPanelTooltipLayoutNumber(horizontalRadius) + 'px / 50%',
+			sidePadding,
+			maxWidth: Number(formatPanelTooltipLayoutNumber(PANEL_TOOLTIP_BASE_MAX_WIDTH + (sidePadding - PANEL_TOOLTIP_BASE_SIDE_PADDING) * 2))
+		}
+	}
+
 	const getPanelTooltipElement = function () {
 		let tooltip = document.getElementById('modloader-panel-tooltip')
 		if (!tooltip) {
@@ -8157,6 +8393,39 @@
 		if (!tooltip) return
 		tooltip.classList.remove('active')
 		tooltip.setAttribute('aria-hidden', 'true')
+	}
+
+	const syncPanelTooltipLayout = function (tooltip) {
+		if (!tooltip) return
+		tooltip.style.removeProperty('--modloader-panel-tooltip-clip')
+		tooltip.style.removeProperty('--modloader-panel-tooltip-inner-clip')
+		tooltip.classList.remove('modloader-panel-tooltip-continuous')
+		let layout = getPanelTooltipLayout(1, tooltip.offsetHeight || tooltip.scrollHeight || 0)
+		for (let pass = 0; pass < 4; pass++) {
+			const style = window.getComputedStyle(tooltip)
+			const lineHeight = Number.parseFloat(style?.lineHeight)
+			const paddingTop = Number.parseFloat(style?.paddingTop) || 0
+			const paddingBottom = Number.parseFloat(style?.paddingBottom) || 0
+			const borderTop = Number.parseFloat(style?.borderTopWidth) || 0
+			const borderBottom = Number.parseFloat(style?.borderBottomWidth) || 0
+			const contentHeight = Math.max(0, tooltip.scrollHeight - paddingTop - paddingBottom)
+			const lineCount = lineHeight > 0 ? Math.max(1, Math.round(contentHeight / lineHeight)) : 1
+			const rect = tooltip.getBoundingClientRect?.() || {}
+			const height = Math.max(0, tooltip.offsetHeight || Number(rect.height) || tooltip.scrollHeight || 0)
+			layout = getPanelTooltipLayout(lineCount, height, lineHeight, paddingTop, paddingBottom, borderTop, borderBottom)
+			const borderRadiusValue = layout.borderRadius
+			const sidePaddingValue = formatPanelTooltipLayoutNumber(layout.sidePadding) + 'px'
+			const maxWidthValue = formatPanelTooltipLayoutNumber(layout.maxWidth) + 'px'
+			if (
+				tooltip.style.getPropertyValue('--modloader-panel-tooltip-radius') === borderRadiusValue
+				&& tooltip.style.getPropertyValue('--modloader-panel-tooltip-side-padding') === sidePaddingValue
+				&& tooltip.style.getPropertyValue('--modloader-panel-tooltip-max-width') === maxWidthValue
+			) break
+			tooltip.style.setProperty('--modloader-panel-tooltip-radius', borderRadiusValue)
+			tooltip.style.setProperty('--modloader-panel-tooltip-side-padding', sidePaddingValue)
+			tooltip.style.setProperty('--modloader-panel-tooltip-max-width', maxWidthValue)
+		}
+		return layout
 	}
 
 	const positionPanelTooltip = function (tooltip, target, point) {
@@ -8180,6 +8449,15 @@
 		tooltip.style.top = Math.round(y) + 'px'
 	}
 
+	const resolvePanelTooltipLightTheme = function (target, panel) {
+		if (panel) return !!panel.classList?.contains('modloader-panel-theme-light')
+		if (target?.dataset?.modloaderPanelTooltipTheme === 'global') return getPanelThemeMode() === 'light'
+		const plane = state.game?.plane
+		if (plane === 0) return true
+		if (plane === 1) return false
+		return getPanelThemeMode() === 'light'
+	}
+
 	const showPanelTooltip = function (target, point) {
 		const text = String(target?.dataset?.modloaderPanelTooltip || '').trim()
 		const isDescription = target?.dataset?.modloaderPanelTooltipKind === 'description'
@@ -8189,9 +8467,11 @@
 		const panel = settingsSurface || target.closest?.('#modloader-panel')
 		const tooltip = getPanelTooltipElement()
 		tooltip.textContent = text
-		tooltip.classList.toggle('modloader-panel-tooltip-light', !!panel?.classList?.contains('modloader-panel-theme-light'))
+		const tooltipLight = resolvePanelTooltipLightTheme(target, panel)
+		tooltip.classList.toggle('modloader-panel-tooltip-light', tooltipLight)
 		tooltip.setAttribute('aria-hidden', 'false')
 		tooltip.classList.add('active')
+		syncPanelTooltipLayout(tooltip)
 		positionPanelTooltip(tooltip, target, point)
 	}
 
@@ -8205,23 +8485,44 @@
 		if (root.__modloaderPanelTooltipCleanup) root.__modloaderPanelTooltipCleanup()
 		let activeTarget = null
 		let activePoint = null
+		let ready = false
 		let frame = 0
+		let delayTimer = 0
 		const clearFrame = function () {
 			if (!frame) return
 			cancelAnimationFrame(frame)
 			frame = 0
 		}
+		const clearDelay = function () {
+			if (!delayTimer) return
+			clearTimeout(delayTimer)
+			delayTimer = 0
+		}
 		const sync = function (target) {
 			clearFrame()
 			frame = requestAnimationFrame(function () {
 				frame = 0
-				if (activeTarget !== target) return
+				if (activeTarget !== target || !ready) return
 				showPanelTooltip(target, activePoint)
 			})
+		}
+		const beginReveal = function (target, delayMs) {
+			clearDelay()
+			ready = false
+			const reveal = function () {
+				delayTimer = 0
+				if (activeTarget !== target) return
+				ready = true
+				sync(target)
+			}
+			if (delayMs > 0) delayTimer = setTimeout(reveal, delayMs)
+			else reveal()
 		}
 		const clear = function () {
 			activeTarget = null
 			activePoint = null
+			ready = false
+			clearDelay()
 			clearFrame()
 			hidePanelTooltip()
 		}
@@ -8235,15 +8536,26 @@
 				if (event.type === 'focusin') clear()
 				return
 			}
+			const point = pointFromEvent(event)
+			if (target === activeTarget) {
+				activePoint = point || activePoint
+				if (event.type === 'focusin' && !ready) beginReveal(target, 0)
+				else if (ready) sync(target)
+				return
+			}
+			clearDelay()
+			clearFrame()
+			hidePanelTooltip()
 			activeTarget = target
-			activePoint = pointFromEvent(event) || activePoint
-			sync(target)
+			activePoint = point
+			const delayMs = event.type === 'focusin' ? 0 : getPanelTooltipDelayMs(target)
+			beginReveal(target, delayMs)
 		}
 		const move = function (event) {
 			const target = getPanelTooltipTarget(event.target, root)
 			if (!target || target !== activeTarget) return
 			activePoint = pointFromEvent(event) || activePoint
-			sync(target)
+			if (ready) sync(target)
 		}
 		const deactivate = function (event) {
 			if (!activeTarget) return
@@ -8275,11 +8587,6 @@
 	}
 
 	const applyPanelHiddenPosition = function (panel) {
-		if (!isPanelAutoHideEnabled()) {
-			state.panelHidden = false
-			setPanelHiddenClasses(panel, state.panelHiddenSide || 'right')
-			return
-		}
 		setPanelHiddenTabPosition(panel, getActivePanelTabPosition(panel))
 	}
 
@@ -8309,7 +8616,6 @@
 	}
 
 	const hidePanelToEdge = function (panel, useStoredTab) {
-		if (!isPanelAutoHideEnabled()) return
 		try { document.dispatchEvent(new CustomEvent('modloader:select-close')) } catch (error) {}
 		closePanelSettingsPage(panel)
 		const rect = panel.getBoundingClientRect()
@@ -8687,16 +8993,41 @@
 			}
 			togglePanelSettingsPage(panel)
 		}
+		const themeToggleState = getPanelThemeQuickToggle()
+		const themeToggle = element('button', 'modloader-panel-theme-toggle')
+		themeToggle.type = 'button'
+		setPanelTooltipText(themeToggle, t(themeToggleState.labelKey))
+		themeToggle.setAttribute('aria-label', t(themeToggleState.labelKey))
+		themeToggle.appendChild(element('span', 'modloader-panel-quick-icon modloader-panel-quick-icon-' + themeToggleState.icon))
+		themeToggle.onclick = function (event) {
+			event.preventDefault()
+			event.stopPropagation()
+			state.panelSettings.theme = themeToggleState.target
+			savePanelState()
+			renderPanel()
+		}
+		const hideModeToggleState = getPanelHideModeQuickToggle()
+		const hideModeToggle = element('button', 'modloader-panel-hide-toggle')
+		hideModeToggle.type = 'button'
+		setPanelTooltipText(hideModeToggle, t(hideModeToggleState.labelKey))
+		hideModeToggle.setAttribute('aria-label', t(hideModeToggleState.labelKey))
+		hideModeToggle.appendChild(element('span', 'modloader-panel-quick-icon modloader-panel-quick-icon-' + hideModeToggleState.icon))
+		hideModeToggle.onclick = function (event) {
+			event.preventDefault()
+			event.stopPropagation()
+			state.panelSettings.hideMode = hideModeToggleState.target
+			if (hideModeToggleState.target === 'manual') clearPanelAutoHideTimer()
+			savePanelState()
+			renderPanel()
+		}
 		const hide = element('button', 'modloader-panel-edge')
 		hide.type = 'button'
 		setPanelTooltipText(hide, t('hideToEdge'))
 		hide.setAttribute('aria-label', t('hideToEdge'))
-		hide.disabled = !isPanelAutoHideEnabled()
 		hide.appendChild(element('span', 'modloader-panel-edge-icon', '\u2192|'))
 		hide.onclick = function (event) {
 			event.preventDefault()
 			event.stopPropagation()
-			if (!isPanelAutoHideEnabled()) return
 			hidePanelToEdge(panel, true)
 		}
 		const close = element('button', 'modloader-panel-close')
@@ -8711,7 +9042,7 @@
 			if (panel.__modloaderCleanup) panel.__modloaderCleanup()
 			panel.remove()
 		}
-		controls.append(settings, hide, close)
+		controls.append(settings, themeToggle, hideModeToggle, hide, close)
 		header.append(title, controls)
 		panel.appendChild(header)
 		installPanelDrag(panel, header, addCleanup)
@@ -9609,8 +9940,9 @@
 				row.container.classList.toggle('modloader-mod-row-selected', checked)
 				for (const model of row.configModels) {
 					const disabled = !checked || !!mod.loadError
-					model.input.disabled = disabled
+					model.fieldHandle.setDisabled(disabled)
 					model.container.classList.toggle('modloader-config-field-disabled', disabled)
+					if (model.action) continue
 					if (disabled) continue
 					if (model.invalid) configInvalid = true
 					if (!sameConfigValue(model.value, model.initial)) {
@@ -9703,20 +10035,33 @@
 					event.stopPropagation()
 				}, { passive: true })
 				const createConfigField = function (item, target) {
-					const value = modConfig.values[item.key]
+					const actionItem = isSettingsActionItem(item)
+					const persistOnChange = item.persist === 'change'
+					const value = actionItem ? undefined : modConfig.values[item.key]
 					const localizedConfigLabel = getLocalizedConfigText(mod.manifest, item, 'label', item.key)
 					const localizedConfigDescription = getLocalizedConfigText(mod.manifest, item, 'description', '')
 					let model = null
-					const syncModel = function (payload) {
-						if (!model) return
+					let fieldHandle = null
+					const syncModel = function (payload, kind) {
+						if (!model || actionItem) return
 						model.invalid = !payload.valid
 						if (payload.valid) {
 							model.value = cloneConfigValue(payload.value)
 							dispatchConfigPreview(model)
+							if (persistOnChange && kind === 'change' && payload.valid) {
+								try {
+									setConfigValue(mod.id, item.key, payload.value)
+									model.initial = cloneConfigValue(payload.value)
+									fieldHandle.setError(null)
+								} catch (error) {
+									model.invalid = true
+									fieldHandle.setError(error)
+								}
+							}
 						}
 						refreshRows()
 					}
-					const fieldHandle = createSettingsFieldCore(item, {
+					fieldHandle = createSettingsFieldCore(item, {
 						normalized: true,
 						apiV1: false,
 						value,
@@ -9726,24 +10071,30 @@
 						description: localizedConfigDescription,
 						descriptionDisplayMode: inlineDescriptions ? 'inline' : 'hover',
 						showMeta: true,
-						onInput: syncModel,
-						onChange: syncModel
+						onInput(payload) { syncModel(payload, 'input') },
+						onChange(payload) { syncModel(payload, 'change') }
 					})
 					const field = fieldHandle.element
 					model = {
 						mod,
 						item,
 						input: fieldHandle.input,
+						fieldHandle,
 						container: field,
 						error: field.querySelector('.modloader-config-error'),
 						initial: cloneConfigValue(value),
 						value: cloneConfigValue(value),
-						invalid: false
+						invalid: false,
+						action: actionItem
 					}
 					addCleanup(fieldHandle.destroy)
 					target.appendChild(field)
-					rowConfigModels.push(model)
-					configModels.push(model)
+					if (isSettingsActionItem(item)) {
+						rowConfigModels.push(model)
+					} else {
+						rowConfigModels.push(model)
+						configModels.push(model)
+					}
 					return field
 				}
 				if (state.panelSettings.sortConfigSections === false) {

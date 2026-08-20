@@ -103,7 +103,6 @@ ModLoader.register({
 					const requestedOptions = normalizeCutOptions(options)
 					const deletionPlan = await deletion.planSelections(deletionOptionsForCut(requestedOptions))
 					if (token !== planToken || disposed) throw cutError('INVALIDATED', 'Selection cut planning was cancelled.')
-					const safeCount = nonNegativeInteger(deletionPlan?.summary?.safeCount)
 					let candidate
 					try {
 						candidate = await blueprint.prepareCut(deletionPlan)
@@ -117,22 +116,7 @@ ModLoader.register({
 						candidate,
 						options: effectiveOptions,
 						replacesBlueprint: !!blueprint.snapshot?.().blueprint,
-						summary: {
-							sourceCellCount: nonNegativeInteger(deletionPlan?.summary?.sourceCellCount),
-							safeCount,
-							protectedCount: nonNegativeInteger(deletionPlan?.summary?.protectedCount),
-							crossBoundaryCount: nonNegativeInteger(deletionPlan?.summary?.crossBoundaryCount),
-							resourceDelta: Array.isArray(deletionPlan?.summary?.resourceDelta)
-								? deletionPlan.summary.resourceDelta.slice()
-								: [],
-							creative: deletionPlan?.summary?.creative === true,
-							buildingCount: nonNegativeInteger(deletionPlan?.summary?.buildingCount),
-							ordinaryCubeCount: nonNegativeInteger(candidate?.blueprint?.blocks?.length),
-							paintedCubeCount: nonNegativeInteger(candidate?.blueprint?.paintedCubes?.length),
-							cubeCount: nonNegativeInteger(candidate?.blueprint?.blocks?.length) +
-								nonNegativeInteger(candidate?.blueprint?.paintedCubes?.length),
-							surgeCount: nonNegativeInteger(candidate?.blueprint?.surges?.length)
-						}
+						summary: summarizeCutPlan(deletionPlan, candidate)
 					})
 					lastPlan = result
 					phase = candidate ? 'planned' : 'nothing'
@@ -167,30 +151,23 @@ ModLoader.register({
 				error = null
 				notify('selection-cut-execution-planning')
 				const requestedOptions = normalizeCutOptions(options, planRequest.summary.creative === true)
-				if (!sameCutOptions(requestedOptions, planRequest.options)) {
-					try {
-						const deletionPlan = await deletion.planSelections(deletionOptionsForCut(requestedOptions))
-						const candidate = await blueprint.prepareCut(deletionPlan)
-						planRequest = normalizePlan(Object.assign({}, planRequest, {
-							deletionPlan,
-							candidate,
-							options: requestedOptions,
-							summary: Object.assign({}, planRequest.summary, {
-								safeCount: nonNegativeInteger(deletionPlan?.summary?.safeCount),
-								protectedCount: nonNegativeInteger(deletionPlan?.summary?.protectedCount),
-								crossBoundaryCount: nonNegativeInteger(deletionPlan?.summary?.crossBoundaryCount),
-								resourceDelta: Array.isArray(deletionPlan?.summary?.resourceDelta) ? deletionPlan.summary.resourceDelta.slice() : [],
-								buildingCount: nonNegativeInteger(deletionPlan?.summary?.buildingCount)
-							})
-						}))
-					} catch (replanError) {
-						error = publicError(normalizeCandidateError(replanError), 'CUT_PLAN_FAILED')
-						phase = 'failed'
-						lastResult = rejectedResult(error.code, error.message)
-						busy = false
-						notify('selection-cut-execution-failed')
-						return lastResult
-					}
+				try {
+					const deletionPlan = await deletion.planSelections(deletionOptionsForCut(requestedOptions))
+					const candidate = await blueprint.prepareCut(deletionPlan)
+					planRequest = normalizePlan(Object.assign({}, planRequest, {
+						deletionPlan,
+						candidate,
+						options: normalizeCutOptions(requestedOptions, deletionPlan?.summary?.creative === true),
+						summary: summarizeCutPlan(deletionPlan, candidate)
+					}))
+					lastPlan = planRequest
+				} catch (replanError) {
+					error = publicError(normalizeCandidateError(replanError), 'CUT_PLAN_FAILED')
+					phase = 'failed'
+					lastResult = rejectedResult(error.code, error.message)
+					busy = false
+					notify('selection-cut-execution-failed')
+					return lastResult
 				}
 				phase = 'copying'
 				notify('selection-cut-copying')
@@ -407,8 +384,25 @@ ModLoader.register({
 			}
 		}
 
-		function sameCutOptions(left, right) {
-			return !!left?.removeCubes === !!right?.removeCubes && !!left?.removeSurges === !!right?.removeSurges
+		function summarizeCutPlan(deletionPlan, candidate) {
+			const ordinaryCubeCount = nonNegativeInteger(candidate?.blueprint?.blocks?.length)
+			const paintedCubeCount = nonNegativeInteger(candidate?.blueprint?.paintedCubes?.length)
+			return {
+				sourceCellCount: nonNegativeInteger(deletionPlan?.summary?.sourceCellCount),
+				safeCount: nonNegativeInteger(deletionPlan?.summary?.safeCount),
+				protectedCount: nonNegativeInteger(deletionPlan?.summary?.protectedCount),
+				crossBoundaryCount: nonNegativeInteger(deletionPlan?.summary?.crossBoundaryCount),
+				resourceDelta: Array.isArray(deletionPlan?.summary?.resourceDelta)
+					? deletionPlan.summary.resourceDelta.slice()
+					: [],
+				creative: deletionPlan?.summary?.creative === true,
+				buildingCount: nonNegativeInteger(deletionPlan?.summary?.buildingCount),
+				attachedCubeCount: nonNegativeInteger(deletionPlan?.summary?.attachedCubeCount),
+				ordinaryCubeCount,
+				paintedCubeCount,
+				cubeCount: ordinaryCubeCount + paintedCubeCount,
+				surgeCount: nonNegativeInteger(candidate?.blueprint?.surges?.length)
+			}
 		}
 
 		function deletionOptionsForCut(value) {

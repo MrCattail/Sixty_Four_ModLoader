@@ -8,6 +8,7 @@ const CUT_SOURCE = 'scripts/core/selection-cut.js'
 const CUT_UI_SOURCE = 'scripts/ui/selection-cut-ui.js'
 const BLUEPRINT_SOURCE = 'scripts/blueprint-session.js'
 const DELETE_SOURCE = 'scripts/core/selection-delete.js'
+const PLACEMENT_SOURCE = 'scripts/core/blueprint-placement.js'
 const SHARED_SOURCE = 'scripts/core/shared.js'
 const I18N_SOURCE = 'scripts/i18n/editor-text.js'
 const RUNTIME_KEY = Symbol.for('cattail.world-editor.runtime')
@@ -55,7 +56,9 @@ function deletionPlan(safeCount = 1) {
 			protectedCount: 2,
 			crossBoundaryCount: 1,
 			resourceDelta: [3, -2],
-			creative: false
+			creative: false,
+			buildingCount: safeCount,
+			attachedCubeCount: 0
 		},
 		removals: safeCount ? [{ name: 'silo', position: [0, 0] }] : [],
 		protectedTargets: [
@@ -108,6 +111,7 @@ function createEnvironment(options = {}) {
 	const completeCalls = []
 	const deleteCalls = []
 	const planCalls = []
+	const publishCalls = []
 	const game = {}
 	let planValue = options.plan || deletionPlan()
 	let deletionBlocked = false
@@ -154,6 +158,7 @@ function createEnvironment(options = {}) {
 		},
 		async publishCut(candidate) {
 			order.push('publish-clipboard')
+			publishCalls.push(candidate)
 			if (publishResult) return publishResult
 			existingBlueprint = true
 			return {
@@ -206,6 +211,7 @@ function createEnvironment(options = {}) {
 		completeCalls,
 		deleteCalls,
 		planCalls,
+		publishCalls,
 		setPlan(next) {
 			planValue = next
 		},
@@ -325,6 +331,8 @@ async function testClipboardBeforeSingleDeletionTransaction() {
 	assert.deepEqual(env.order, [
 		'plan-deletion',
 		'prepare-blueprint',
+		'plan-deletion',
+		'prepare-blueprint',
 		'publish-clipboard',
 		'delete-world',
 		'complete-success'
@@ -336,6 +344,30 @@ async function testClipboardBeforeSingleDeletionTransaction() {
 	assert.equal(env.completeCalls.length, 1)
 	assert.equal(env.completeCalls[0].outcome.status, 'success')
 	assert.equal(env.cut.snapshot().phase, 'success')
+}
+
+async function testExecuteAlwaysReplansAtFinalConfirmation() {
+	const env = createEnvironment()
+	const initial = await env.cut.plan()
+	const latest = deletionPlan(2)
+	latest.signature = 'deletion-signature-final-confirmation'
+	latest.summary.protectedCount = 1
+	latest.summary.attachedCubeCount = 1
+	latest.removals.push({
+		name: 'cube',
+		layer: 'attached-cube',
+		position: [1, 0]
+	})
+	env.setPlan(latest)
+	const result = await env.cut.execute(initial, 'mouse')
+	assert.equal(result.executed, true, JSON.stringify(result))
+	assert.deepEqual(env.planCalls, [
+		{ removeCubes: false, removePaintedCubes: false, removeSurges: false },
+		{ removeCubes: false, removePaintedCubes: false, removeSurges: false }
+	])
+	assert.strictEqual(env.deleteCalls[0].plan, latest)
+	assert.equal(env.publishCalls[0].cutToken, latest.signature)
+	assert.equal(env.cut.snapshot().lastPlan.signature, latest.signature)
 }
 
 async function testClipboardFailureIsZeroWorldWrite() {
@@ -354,6 +386,8 @@ async function testClipboardFailureIsZeroWorldWrite() {
 	assert.equal(env.deleteCalls.length, 0)
 	assert.equal(env.completeCalls.length, 0)
 	assert.deepEqual(env.order, [
+		'plan-deletion',
+		'prepare-blueprint',
 		'plan-deletion',
 		'prepare-blueprint',
 		'publish-clipboard'
@@ -433,6 +467,12 @@ async function testBusyAndLifecycle() {
 	assert.equal(result.error.code, 'NOT_READY')
 }
 
+function testPlanningStatusLifecycleContract() {
+	const ui = source(CUT_UI_SOURCE)
+	assert.match(ui, /clearStatus\(true\)\s*openConfirmation\(plan, input\)/)
+	assert.match(ui, /onClose\(reason, handle\)\s*\{\s*clearStatus\(true\)\s*cut\.setDialogOpen\(false/)
+}
+
 function testI18nManifestUiAndBoundaries() {
 	const definitions = []
 	const sandbox = {
@@ -476,11 +516,12 @@ function testI18nManifestUiAndBoundaries() {
 		'cutSurgeOption',
 		'cutCubeSourceRemove',
 		'cutCubeSourceRetain',
-		'cutSuccessRetainedCubes'
+		'cutSuccessRetainedCubes',
+		'attachedCubeRemovalNotice'
 	]
 	assert.equal(i18n.version, '0.6.0')
 	assert.equal(i18n.languages.length, 20)
-	assert.equal(i18n.keys.length, 267)
+	assert.equal(i18n.keys.length, 268)
 	for (const language of i18n.languages) {
 		for (const key of keys) {
 			const value = i18n.t(language, key)
@@ -503,6 +544,7 @@ function testI18nManifestUiAndBoundaries() {
 	const ui = source(CUT_UI_SOURCE)
 	const blueprint = source(BLUEPRINT_SOURCE)
 	const deletion = source(DELETE_SOURCE)
+	const placement = source(PLACEMENT_SOURCE)
 	const shared = source(SHARED_SOURCE)
 	const readme = source('README.md')
 	assert.match(core, /deletion\.planSelections\(deletionOptionsForCut\(requestedOptions\)\)/)
@@ -519,6 +561,10 @@ function testI18nManifestUiAndBoundaries() {
 	assert.match(blueprint, /function completeCut/)
 	assert.match(deletion, /normalizeOrigin/)
 	assert.match(deletion, /origin === 'cut'/)
+	assert.match(deletion, /dynamicCubeSignature/)
+	assert.match(deletion, /apply\.dynamic-cube-skipped/)
+	assert.match(placement, /const includeBlocks = blueprint\.mode === 'full' && request\?\.includeBlocks === true/)
+	assert.match(placement, /if \(details\?\.blueprintMode !== 'full'\) return assessment\(false, 'protected-cube'\)/)
 	assert.match(shared, /cattail\.world-editor\.selection-cut/)
 	assert.match(ui, /event\?\.code === 'KeyX'/)
 	assert.match(ui, /event\?\.ctrlKey \|\| event\?\.metaKey/)
@@ -531,6 +577,7 @@ function testI18nManifestUiAndBoundaries() {
 	assert.match(ui, /cutCubeSourceRemove/)
 	assert.match(ui, /cutCubeSourceRetain/)
 	assert.match(ui, /cutSuccessRetainedCubes/)
+	assert.match(ui, /attachedCubeRemovalNotice/)
 	assert.doesNotMatch(ui, /sync[- ]?empty/i)
 	assert.match(readme, /4C-1b/)
 	assert.match(readme, /Ctrl\+X/)
@@ -542,9 +589,11 @@ async function run() {
 	await testSharedCubeToggleMapsToOrdinaryAndPainted()
 	await testExecuteReplansWhenSurgeRemovalIsEnabled()
 	await testClipboardBeforeSingleDeletionTransaction()
+	await testExecuteAlwaysReplansAtFinalConfirmation()
 	await testClipboardFailureIsZeroWorldWrite()
 	await testTargetChangeAndRollbackFailureKeepCopy()
 	await testBusyAndLifecycle()
+	testPlanningStatusLifecycleContract()
 	testI18nManifestUiAndBoundaries()
 	console.log('World Editor 4C-1b verification passed: exact cut planning, execution-time Surge replanning, clipboard-first safety, single deletion transaction, copied-only failures, lifecycle, Ctrl+X UI, 20 languages, manifest, and scope boundaries.')
 }

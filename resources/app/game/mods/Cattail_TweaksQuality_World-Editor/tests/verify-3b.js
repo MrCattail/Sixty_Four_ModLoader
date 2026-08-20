@@ -1232,7 +1232,7 @@ function testManifestLocalizationAndStaticContracts() {
 	const i18n = loadI18n()
 	assert.equal(i18n.version, '0.6.0')
 	assert.equal(i18n.languages.length, 20)
-	assert.equal(i18n.keys.length, 267)
+	assert.equal(i18n.keys.length, 268)
 	for (const language of i18n.languages) {
 		for (const key of previewKeys) {
 			const translated = i18n.t(language, key)

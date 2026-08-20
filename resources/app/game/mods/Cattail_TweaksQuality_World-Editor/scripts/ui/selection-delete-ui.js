@@ -65,6 +65,7 @@ ModLoader.register({
 			const status = createStatus()
 			selectionGroup.append(deleteButton)
 			layout.append(status)
+			const tooltips = shared.createTooltipScope?.()
 			dispatchToolbarLayout('selection-delete-mounted')
 
 			let currentRuntime = runtime.snapshot()
@@ -96,8 +97,8 @@ ModLoader.register({
 				const source = languageGame || game
 				const compactText = i18n.t(source, 'deleteSelectionContents')
 				const cardText = i18n.t(source, 'toolbarCardDelete')
-				deleteButton.title = compactText
 				deleteButton.setAttribute('aria-label', compactText)
+				tooltips?.set(deleteButton, compactText)
 				deleteButton.querySelector('[data-world-editor-card-text]').textContent = cardText
 				if (statusState) renderStatus(source)
 				if (currentDialog && !currentDialog.closed && !currentDialog.busy) {
@@ -264,6 +265,7 @@ ModLoader.register({
 						buildingCount: Number(plan?.summary?.buildingCount) || 0,
 						cubeCount: Number(plan?.summary?.cubeCount) || 0,
 						paintedCubeCount: Number(plan?.summary?.paintedCubeCount) || 0,
+						attachedCubeCount: Number(plan?.summary?.attachedCubeCount) || 0,
 						surgeCount: Number(plan?.summary?.surgeCount) || 0,
 						creative: !!plan?.summary?.creative
 					})
@@ -287,6 +289,10 @@ ModLoader.register({
 
 			function openConfirmation(plan, input) {
 				const summary = plan.summary
+				const confirmedTargetCount = Math.max(
+					0,
+					Number(summary.safeCount) - Number(summary.attachedCubeCount || 0)
+				)
 				const containsCubes = summary.cubeCount > 0 || summary.paintedCubeCount > 0
 				const cubeOnly = containsCubes && summary.buildingCount === 0
 				markProbe('confirmation-opened', {
@@ -297,6 +303,7 @@ ModLoader.register({
 					buildingCount: summary.buildingCount,
 					cubeCount: summary.cubeCount,
 					paintedCubeCount: summary.paintedCubeCount,
+					attachedCubeCount: summary.attachedCubeCount,
 					surgeCount: summary.surgeCount,
 					creative: summary.creative
 				})
@@ -316,7 +323,7 @@ ModLoader.register({
 							cross: summary.crossBoundaryCount
 						})
 						: text('deleteConfirmMessage', {
-							safe: summary.safeCount,
+							safe: confirmedTargetCount,
 							protected: summary.protectedCount,
 							cross: summary.crossBoundaryCount
 						}),
@@ -337,6 +344,14 @@ ModLoader.register({
 					? text('deleteCreativeNoEconomy')
 					: formatResourceDelta(summary.resourceDelta)
 				dialog.content.append(economy)
+				if (Number(summary.attachedCubeCount) > 0) {
+					const attachedCubeNotice = document.createElement('p')
+					attachedCubeNotice.className = 'cattail-world-editor-selection-delete__economy'
+					attachedCubeNotice.textContent = text('attachedCubeRemovalNotice', {
+						count: summary.attachedCubeCount
+					})
+					dialog.content.append(attachedCubeNotice)
+				}
 
 				const cancel = dialog.createButton(text('deleteCancel'))
 				const confirm = dialog.createButton(
@@ -508,6 +523,7 @@ ModLoader.register({
 			})
 			runtime.addCleanup(function () {
 				disposed = true
+				tooltips?.dispose()
 				if (refreshMountedText === refreshText) refreshMountedText = null
 				if (statusTimer) clearTimeout(statusTimer)
 				currentDialog?.close?.('runtime-disposed', true)
@@ -581,32 +597,46 @@ ModLoader.register({
 			style.id = STYLE_ID
 			style.textContent = `
 				.cattail-world-editor-selection-delete__status {
+					--world-editor-local-status-accent: var(--world-editor-shell-border);
+					--world-editor-local-status-color: var(--world-editor-shell-text);
 					display: none;
 					align-items: center;
 					justify-content: center;
-					min-height: 24px;
-					padding: 3px 12px;
-					border-top: 1px solid rgba(255, 255, 255, .08);
-					color: var(--world-editor-shell-muted);
-					font: 600 12px/1.35 Montserrat, sans-serif;
+					max-width: min(520px, calc(var(--world-editor-toolbar-layout-width, calc(100vw - 24px)) - 28px));
+					box-sizing: border-box;
+					padding: 7px 12px;
+					border: 1px solid var(--world-editor-local-status-accent);
+					border-radius: 999px;
+					background: var(--world-editor-shell-bg);
+					box-shadow: var(--world-editor-shell-shadow);
+					backdrop-filter: blur(12px) saturate(1.08);
+					-webkit-backdrop-filter: blur(12px) saturate(1.08);
+					color: var(--world-editor-local-status-color);
+					font: 600 12px/1.35 Montserrat, Arial, sans-serif;
 					text-align: center;
+					white-space: normal;
+					overflow-wrap: anywhere;
 					pointer-events: none;
 				}
 				.cattail-world-editor-selection-delete__status[data-active="true"] {
 					display: flex;
 				}
 				.cattail-world-editor-selection-delete__status[data-kind="busy"] {
-					color: #e3fd43;
+					--world-editor-local-status-accent: var(--world-editor-history-busy);
+					--world-editor-local-status-color: color-mix(in srgb, var(--world-editor-history-busy) 78%, var(--world-editor-shell-text));
 				}
 				.cattail-world-editor-selection-delete__status[data-kind="success"] {
-					color: #7ee787;
+					--world-editor-local-status-accent: var(--world-editor-history-success);
+					--world-editor-local-status-color: color-mix(in srgb, var(--world-editor-history-success) 78%, var(--world-editor-shell-text));
 				}
 				.cattail-world-editor-selection-delete__status[data-kind="warning"] {
-					color: #f2cc60;
+					--world-editor-local-status-accent: var(--world-editor-history-warning);
+					--world-editor-local-status-color: color-mix(in srgb, var(--world-editor-history-warning) 78%, var(--world-editor-shell-text));
 				}
 				.cattail-world-editor-selection-delete__status[data-kind="error"],
 				.cattail-world-editor-selection-delete__status[data-kind="terminal"] {
-					color: #ff7d72;
+					--world-editor-local-status-accent: var(--world-editor-history-error);
+					--world-editor-local-status-color: color-mix(in srgb, var(--world-editor-history-error) 78%, var(--world-editor-shell-text));
 				}
 				.cattail-world-editor-selection-delete__economy {
 					margin: 0;

@@ -607,7 +607,7 @@ function testUnifiedToolbarAndLocalization() {
 	const resizeButton = shell.querySelector('[data-world-editor-action="resize"]')
 	assert.equal(i18n.version, '0.6.0')
 	assert.equal(i18n.languages.length, 20)
-	assert.equal(i18n.keys.length, 267)
+	assert.equal(i18n.keys.length, 268)
 	assert.equal(shell.getAttribute('role'), 'toolbar')
 	assert.equal(selectButton, null)
 	assert.equal(moveButton, null)

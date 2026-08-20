@@ -1054,7 +1054,11 @@ ModLoader.register({
 				if (entity.indestructible === true) return assessment(false, 'indestructible')
 				if (game.transportedEntity === entity) return assessment(false, 'being-relocated')
 				if (finiteOr(entity.spawnedHollows, 0) > 0) return assessment(false, 'generated-attachments')
-				if ((name === 'pump' || name === 'pump2') && hasAttachedCube(game, entity)) {
+				if (
+					(name === 'pump' || name === 'pump2') &&
+					hasAttachedCube(game, entity) &&
+					details?.allowAttachedCube !== true
+				) {
 					return assessment(false, 'attached-cube')
 				}
 				if (isStabilizerName(name) && entity.surge) {
@@ -2080,12 +2084,17 @@ ModLoader.register({
 			}
 		}
 
-		function hasAttachedCube(game, entity) {
-			for (const candidate of game.stuff || []) {
-				if (safeName(candidate?.name) === 'cube' && candidate.pump === entity) return true
+			function hasAttachedCube(game, entity) {
+				for (const candidate of game.stuff || []) {
+					if (
+						safeName(candidate?.name) === 'cube' &&
+						(candidate?.state === 0 || candidate?.state === 1) &&
+						candidate?.killme !== true &&
+						candidate.pump === entity
+					) return true
+				}
+				return false
 			}
-			return false
-		}
 
 		function pumpFamilyCount(game) {
 			return (

@@ -791,8 +791,17 @@ async function testCutCandidateClipboardAndOutcome() {
 	const env = createEnvironment({ selection: state })
 	const silo = { name: 'silo', position: [0, 0], entitySpan: 0, par: { fill: 4 } }
 	const pump = { name: 'pump', position: [1, 0], entitySpan: 0, par: { depth: 2 } }
+	const unfinishedCube = {
+		name: 'cube',
+		position: [2, 0],
+		entitySpan: 0,
+		state: 0,
+		par: { state: 0, fill: 12, resources: new Array(64).fill(0) },
+		pump
+	}
 	env.game.setCell(0, 0, silo)
 	env.game.setCell(1, 0, pump)
+	env.game.setCell(2, 0, unfinishedCube)
 	assert.equal((await env.session.capture('cut-existing-blueprint')).status, 'captured')
 	const existingBlueprint = env.session.snapshot().blueprint
 	const writesBeforeCut = env.writes.length
@@ -804,28 +813,37 @@ async function testCutCandidateClipboardAndOutcome() {
 			plane: 0,
 			revision: 9,
 			ranges: [
-				{ id: 32, primary: true, range: range([1, 0], [1, 0]) }
+				{ id: 32, primary: true, range: range([1, 0], [2, 0]) }
 			]
 		},
 		summary: {
-			sourceCellCount: 1,
-			safeCount: 1,
-			protectedCount: 1,
+			sourceCellCount: 2,
+			safeCount: 2,
+			protectedCount: 0,
 			crossBoundaryCount: 0,
 			resourceDelta: [0],
-			creative: false
+			creative: false,
+			attachedCubeCount: 1
 		},
 		removals: [
 			{
 				name: 'pump',
+				identity: 'pump-identity',
 				position: [1, 0],
 				footprint: { span: 0, minU: 1, maxU: 1, minV: 0, maxV: 0 },
 				crossBoundary: false
+			},
+			{
+				name: 'cube',
+				identity: 'cube-identity',
+				layer: 'attached-cube',
+				position: [2, 0],
+				footprint: { span: 0, minU: 2, maxU: 2, minV: 0, maxV: 0 },
+				pump: { identity: 'pump-identity', name: 'pump', position: [1, 0] },
+				crossBoundary: false
 			}
 		],
-		protectedTargets: [
-			{ name: 'cube', reason: 'cube', position: [2, 0] }
-		]
+		protectedTargets: []
 	}
 
 	const candidate = env.session.prepareCut(deletionPlan)
@@ -877,7 +895,7 @@ function testLanguagesManifestUiAndReadOnlyBoundary() {
 	const i18n = i18nSandbox[I18N_KEY]
 	assert.equal(i18n.version, '0.6.0')
 	assert.equal(i18n.languages.length, 20)
-	assert.equal(i18n.keys.length, 267)
+	assert.equal(i18n.keys.length, 268)
 	const blueprintKeys = [
 		'blueprintModeStructure',
 		'blueprintModeFull',

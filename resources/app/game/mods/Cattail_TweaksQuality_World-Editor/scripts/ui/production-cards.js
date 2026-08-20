@@ -59,6 +59,7 @@ ModLoader.register({
 			}
 
 			ensureStyle()
+			const tooltips = shared.createTooltipScope?.()
 			const selectionSummary = createSelectionSummary()
 			const selectionMetrics = selectionCard.querySelector('.cattail-world-editor-selection-card__metrics')
 			if (selectionMetrics) selectionMetrics.after(selectionSummary.section)
@@ -145,26 +146,27 @@ ModLoader.register({
 				}
 			})
 
+			function setTooltip(target, value) {
+				const text = String(value || '')
+				target?.setAttribute?.('aria-label', text)
+				tooltips?.set(target, text)
+			}
+
 			function refreshText(languageGame) {
 				const source = languageGame || game
 				selectionSummary.title.textContent = i18n.t(source, 'productionActual')
-				selectionSummary.toggle.title = i18n.t(source, selectionSummaryState.expanded ? 'blueprintCollapseSection' : 'blueprintExpandSection')
-				selectionSummary.toggle.setAttribute('aria-label', selectionSummary.toggle.title)
+				setTooltip(selectionSummary.toggle, i18n.t(source, selectionSummaryState.expanded ? 'blueprintCollapseSection' : 'blueprintExpandSection'))
 				selectionProductionCard.title.textContent = i18n.t(source, 'productionActual')
 				blueprintSummary.title.textContent = i18n.t(source, 'productionTitle')
 				blueprintSummary.theory.title.textContent = i18n.t(source, 'productionTheoretical')
 				blueprintSummary.captured.title.textContent = i18n.t(source, 'productionCapturedActual')
-				blueprintSummary.theory.toggle.title = i18n.t(source, blueprintTheorySummaryState.expanded ? 'blueprintCollapseSection' : 'blueprintExpandSection')
-				blueprintSummary.captured.toggle.title = i18n.t(source, blueprintCapturedSummaryState.expanded ? 'blueprintCollapseSection' : 'blueprintExpandSection')
-				blueprintSummary.theory.toggle.setAttribute('aria-label', blueprintSummary.theory.toggle.title)
-				blueprintSummary.captured.toggle.setAttribute('aria-label', blueprintSummary.captured.toggle.title)
+				setTooltip(blueprintSummary.theory.toggle, i18n.t(source, blueprintTheorySummaryState.expanded ? 'blueprintCollapseSection' : 'blueprintExpandSection'))
+				setTooltip(blueprintSummary.captured.toggle, i18n.t(source, blueprintCapturedSummaryState.expanded ? 'blueprintCollapseSection' : 'blueprintExpandSection'))
 				blueprintProductionCard.title.textContent = i18n.t(source, 'productionTitle')
 				blueprintProductionCard.theory.title.textContent = i18n.t(source, 'productionTheoretical')
 				blueprintProductionCard.captured.title.textContent = i18n.t(source, 'productionCapturedActual')
-				blueprintProductionCard.theory.toggle.title = i18n.t(source, blueprintTheoryTypesState.expanded ? 'blueprintCollapseSection' : 'blueprintExpandSection')
-				blueprintProductionCard.captured.toggle.title = i18n.t(source, blueprintCapturedTypesState.expanded ? 'blueprintCollapseSection' : 'blueprintExpandSection')
-				blueprintProductionCard.theory.toggle.setAttribute('aria-label', blueprintProductionCard.theory.toggle.title)
-				blueprintProductionCard.captured.toggle.setAttribute('aria-label', blueprintProductionCard.captured.toggle.title)
+				setTooltip(blueprintProductionCard.theory.toggle, i18n.t(source, blueprintTheoryTypesState.expanded ? 'blueprintCollapseSection' : 'blueprintExpandSection'))
+				setTooltip(blueprintProductionCard.captured.toggle, i18n.t(source, blueprintCapturedTypesState.expanded ? 'blueprintCollapseSection' : 'blueprintExpandSection'))
 				selectionOpacityControls?.refresh?.()
 				blueprintOpacityControls?.refresh?.()
 				refreshSelectionToggleText(source)
@@ -175,15 +177,13 @@ ModLoader.register({
 
 			function refreshBlueprintToggleText(source) {
 				const text = i18n.t(source || game, blueprintVisible ? 'productionHide' : 'productionShow')
-				blueprintToggle.title = text
-				blueprintToggle.setAttribute('aria-label', text)
+				setTooltip(blueprintToggle, text)
 				blueprintToggle.setAttribute('aria-pressed', blueprintVisible ? 'true' : 'false')
 			}
 
 			function refreshSelectionToggleText(source) {
 				const text = i18n.t(source || game, selectionVisible ? 'productionHide' : 'productionShow')
-				selectionToggle.title = text
-				selectionToggle.setAttribute('aria-label', text)
+				setTooltip(selectionToggle, text)
 				selectionToggle.setAttribute('aria-pressed', selectionVisible ? 'true' : 'false')
 			}
 
@@ -454,8 +454,7 @@ ModLoader.register({
 			function refreshNoFlowSectionText(section, count, viewKey) {
 				section.title.textContent = i18n.t(game, 'productionNoFlow') + ' (' + count + ')'
 				const action = i18n.t(game, noFlowStates[viewKey].expanded ? 'blueprintCollapseSection' : 'blueprintExpandSection')
-				section.toggle.title = action
-				section.toggle.setAttribute('aria-label', action)
+				setTooltip(section.toggle, action)
 			}
 
 			function targetProductionCard(element) {
@@ -1089,6 +1088,7 @@ ModLoader.register({
 			syncBlueprintCompanion()
 
 			runtime.addCleanup(function () {
+				tooltips?.dispose()
 				if (refreshMountedText === refreshText) refreshMountedText = null
 				stopProductionSubscription?.()
 				stopBlueprintSubscription?.()

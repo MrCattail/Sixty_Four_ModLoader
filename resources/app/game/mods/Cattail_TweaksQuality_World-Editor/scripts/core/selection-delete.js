@@ -14,6 +14,7 @@ ModLoader.register({
 		const TRANSACTION_KIND = 'selection-delete'
 		const SERVICE_VERSION = '1.1.0'
 		const ADAPTER_VERSION = '1.0.0'
+		const IMPLEMENTATION = 'operating-targets-r21'
 		const PLAN_SCHEMA = 1
 		const TRANSACTION_SCHEMA = 1
 		const SCAN_CHUNK_SIZE = 512
@@ -21,6 +22,20 @@ ModLoader.register({
 		const PROBE_EVENT_LIMIT = 160
 		const EPSILON = 1e-7
 		const EXTRACTOR_NAMES = new Set(['pump', 'pump2', 'gradient'])
+		const BUILDING_RUNTIME_SAVE_FIELDS = new Set([
+			'fill',
+			'state',
+			'conversion',
+			'resources',
+			'resourceCount'
+		])
+		const ATTACHED_CUBE_RUNTIME_SAVE_FIELDS = new Set([
+			'fill',
+			'state',
+			'reverseTimer',
+			'unveilProgress',
+			'broken'
+		])
 
 		api.on('afterGameInit', function (payload, game) {
 			const runtime = globalThis[RUNTIME_KEY]
@@ -76,6 +91,7 @@ ModLoader.register({
 			const listeners = new Set()
 			const identityByEntity = new WeakMap()
 			const transactionData = new Map()
+			const operationPayloads = new Map()
 			const operations = new Map()
 			const probeEvents = []
 			let identitySequence = 0
@@ -107,8 +123,26 @@ ModLoader.register({
 						return !context.isCurrent()
 					})
 					requireCurrent(context)
+					const allowCutRetainedCubeRebase = cutRetainedCubeRebaseAllowed(
+						origin,
+						requested.source,
+						'forward'
+					)
+					const cutRetainedCubeMatch = allowCutRetainedCubeRebase &&
+						rebuilt.cutRetainedCubeSignature === requested.cutRetainedCubeSignature
 					traceProbe('adapter.prepare.rebuilt', {
 						signatureMatch: rebuilt.signature === requested.signature,
+						compatibilityMatch: rebuilt.compatibilitySignature === requested.compatibilitySignature,
+						dynamicCubeMatch: rebuilt.dynamicCubeSignature === requested.dynamicCubeSignature,
+						pumpDependencyMatch: rebuilt.pumpDependencySignature === requested.pumpDependencySignature,
+						dynamicSurgeMatch: rebuilt.dynamicSurgeSignature === requested.dynamicSurgeSignature,
+						cutRetainedCubeMatch,
+						cutRetainedCubeDifference: allowCutRetainedCubeRebase && !cutRetainedCubeMatch
+							? comparePlanSignatures(
+								requested.cutRetainedCubeSignature,
+								rebuilt.cutRetainedCubeSignature
+							)
+							: null,
 						safeCount: rebuilt.summary.safeCount,
 						protectedCount: rebuilt.summary.protectedCount,
 						crossBoundaryCount: rebuilt.summary.crossBoundaryCount,
@@ -117,7 +151,18 @@ ModLoader.register({
 							rebuilt.fingerprints
 						)
 					})
-					if (!plansMatch(requested, rebuilt, paintCubeState)) {
+					const matches = plansMatch(
+						requested,
+						rebuilt,
+						paintCubeState,
+						currentPumpCubeState,
+						currentOrdinaryCubeState,
+						{ allowCutRetainedCubeRebase }
+					)
+					if (!matches) {
+						tracePlanMismatch(requested, rebuilt, 'forward', false, {
+							allowCutRetainedCubeRebase
+						})
 						throw deletionError('TARGET_CHANGED', 'The selected deletion target changed after confirmation.')
 					}
 					if (!rebuilt.removals.length) {
@@ -140,26 +185,7 @@ ModLoader.register({
 							cells: rebuilt.scopeCells,
 							deleteCount: rebuilt.summary.safeCount
 						},
-						payload: {
-							schema: TRANSACTION_SCHEMA,
-							origin,
-							source: rebuilt.source,
-							planSignature: rebuilt.signature,
-							compatibilitySignature: rebuilt.compatibilitySignature,
-							growStates: rebuilt.growStates,
-							paintedStates: rebuilt.paintedStates,
-							surgeStates: rebuilt.surgeStates,
-							removals: rebuilt.removals,
-							relations: rebuilt.relations,
-							scopeCells: rebuilt.scopeCells,
-							onlyOneKeys: rebuilt.onlyOneKeys,
-							onlyonesBefore: rebuilt.onlyonesBefore,
-							onlyonesAfter: rebuilt.onlyonesAfter,
-							economy: rebuilt.economy,
-							statsDelta: {
-								machinesSold: rebuilt.removals.filter(isBuildingRemoval).length
-							}
-						}
+						payload: createTransactionPayload(rebuilt, origin)
 					}
 				},
 				async preflight(context, record, direction) {
@@ -171,28 +197,96 @@ ModLoader.register({
 					requireCurrent(context)
 					validateRecord(record)
 					requireGameMethods(game)
-					const payload = record.payload
+					if (!context?.snapshotId) operationPayloads.clear()
+					let payload = operationPayload(context, record)
 					if (creativeActive(creative, game) !== payload.economy.creative) {
 						return denied('ECONOMY_MODE_CHANGED', 'Creative mode changed after deletion was prepared.')
 					}
 
-					if (direction === 'forward') {
+					if (
+						direction === 'forward' ||
+						(direction === 'redo' && (
+							hasPumpRemoval(payload) ||
+							payload.source?.removeSurges === true
+						))
+					) {
 						try {
-							const rebuilt = await rebuildPlan(payload.source, function () {
+							const isCancelled = function () {
 								return !context.isCurrent()
-							})
+							}
+							const rebuilt = direction === 'redo'
+								? await buildPlan(payload.source, isCancelled)
+								: await rebuildPlan(payload.source, isCancelled)
 							requireCurrent(context)
-							if (!plansMatch(payload, rebuilt, paintCubeState)) {
+							const allowCutRetainedCubeRebase = cutRetainedCubeRebaseAllowed(
+								payload.origin,
+								payload.source,
+								direction
+							)
+							const cutRetainedCubeMatch = allowCutRetainedCubeRebase &&
+								rebuilt.cutRetainedCubeSignature === payload.cutRetainedCubeSignature
+							const matches = plansMatch(
+								payload,
+								rebuilt,
+								paintCubeState,
+								currentPumpCubeState,
+								currentOrdinaryCubeState,
+								{
+									allowDynamicStandaloneSurges: direction === 'redo',
+									allowCutRetainedCubeRebase
+								}
+							)
+							traceProbe('adapter.preflight.rebuilt', {
+								hasSnapshot: !!context?.snapshotId,
+								direction,
+								signatureMatch: rebuilt.signature === payload.planSignature,
+								compatibilityMatch: rebuilt.compatibilitySignature === payload.compatibilitySignature,
+								dynamicCubeMatch: rebuilt.dynamicCubeSignature === payload.dynamicCubeSignature,
+								pumpDependencyMatch: rebuilt.pumpDependencySignature === payload.pumpDependencySignature,
+								dynamicSurgeMatch: rebuilt.dynamicSurgeSignature === payload.dynamicSurgeSignature,
+								cutRetainedCubeMatch,
+								cutRetainedCubeDifference: allowCutRetainedCubeRebase && !cutRetainedCubeMatch
+									? comparePlanSignatures(
+										payload.cutRetainedCubeSignature,
+										rebuilt.cutRetainedCubeSignature
+									)
+									: null,
+								accepted: matches,
+								signatureDifference: comparePlanFingerprints(payload.fingerprints, rebuilt.fingerprints)
+							})
+							if (!matches) {
+								tracePlanMismatch(payload, rebuilt, direction, !!context?.snapshotId, {
+									allowDynamicStandaloneSurges: direction === 'redo',
+									allowCutRetainedCubeRebase
+								})
 								return denied('TARGET_CHANGED', 'The selected deletion target changed after confirmation.')
 							}
+							const rebound = createTransactionPayload(rebuilt, payload.origin)
+							if (
+								cutRetainedCubeMatch &&
+								rebuilt.signature !== payload.planSignature
+							) {
+								traceProbe('contract.forward.cut-retained-cubes-rebased', {
+									beforeAttachedCount: countRemovalLayer(payload.removals, 'attached-cube'),
+									afterAttachedCount: countRemovalLayer(rebound.removals, 'attached-cube'),
+									removeCubes: payload.source?.removeCubes === true,
+									removePaintedCubes: payload.source?.removePaintedCubes === true
+								})
+							}
+							payload = direction === 'redo'
+								? retainRecordedOrdinaryCubeRemovals(payload, rebound)
+								: rebound
+							operationPayloads.set(context.operationId, payload)
 						} catch (targetError) {
 							return denied(
 								targetError?.code || 'TARGET_CHANGED',
 								targetError?.message || 'The selected deletion target changed after confirmation.'
 							)
 						}
-					} else {
-						const targetState = inspectRecordedTargets(payload, direction, record.id)
+					}
+
+					if (direction !== 'forward') {
+						const targetState = inspectRecordedTargets(payload, direction, record.id, record.payload)
 						if (!targetState.ok) return targetState
 						if (direction === 'redo') {
 							try {
@@ -227,7 +321,8 @@ ModLoader.register({
 				async capture(context, record) {
 					if (!context.isCurrent()) throw deletionError('INVALIDATED', 'The deletion operation was invalidated.')
 					validateRecord(record)
-					const captured = captureScope(record.payload, context?.direction)
+					const payload = operationPayload(context, record)
+					const captured = captureScope(payload, context?.direction, record.payload)
 					traceProbe('adapter.capture', {
 						direction: context?.direction,
 						hasSnapshot: !!context?.snapshotId,
@@ -240,27 +335,38 @@ ModLoader.register({
 					traceProbe('adapter.apply.start', {
 						operationId: context?.operationId,
 						direction,
-						deleteCount: record?.payload?.removals?.length || 0
+						deleteCount: operationPayload(context, record)?.removals?.length || 0
 					})
 					requireCurrent(context)
 					validateRecord(record)
+					const payload = operationPayload(context, record)
 					const state = {
 						recordId: record.id,
 						direction,
+						payload,
 						mutations: [],
 						resourcesBefore: numericArray(game.resources),
 						statsBefore: captureStats(game),
 						resourceDelta: [],
 						statsAfter: null,
 						removedSaves: new Map(),
+						pendingRemovals: new Map(),
+						rollingExpectedSaves: new Map(),
+						ownedOriginalSaves: new Map(),
+						ownedRebasedIdentities: new Set(),
+						removedPumpOwners: new Map(),
 						recreatedRelationSurges: new Set(),
-						relations: record.payload.relations
+						contract: createOperationContract(payload),
+						relations: payload.relations
 					}
 					operations.set(context.operationId, state)
 					const restoreBatchedWrites = beginBatchedWorldWrites(game)
 					try {
-						if (direction === 'undo') await applyUndo(context, record, state)
+						if (direction === 'undo') {
+							await applyUndo(context, record, state)
+						}
 						else await applyForward(context, record, state)
+						state.contract.commitManifest = createDynamicCommitManifest(state)
 					} finally {
 						restoreBatchedWrites()
 					}
@@ -289,7 +395,7 @@ ModLoader.register({
 						return denied('VERIFY_FAILED', 'The deletion operation state is unavailable.')
 					}
 					const expectedAfter = direction !== 'undo'
-					const verification = verifyAppliedState(record.payload, state, expectedAfter)
+					const verification = verifyAppliedState(state.payload, state, expectedAfter)
 					if (!verification.ok) {
 						traceProbe('adapter.verify.denied', {
 							direction,
@@ -298,19 +404,23 @@ ModLoader.register({
 						return verification
 					}
 
-					if (expectedAfter) {
-						const previousData = transactionData.get(record.id)
-						transactionData.set(record.id, {
-							removalSaves: new Map(state.removedSaves),
-							timeSinceLastDelete: previousData?.timeSinceLastDelete ?? state.statsBefore.timeSinceLastDelete
-						})
-					}
-					if (expectedAfter) playRecycleSound(record.payload.removals)
+					const previousData = transactionData.get(record.id)
+					transactionData.set(record.id, {
+						removalSaves: expectedAfter
+							? new Map(state.removedSaves)
+							: new Map(state.payload.removals.map(function (descriptor) {
+								return [descriptor.identity, jsonClone(descriptor.save)]
+							})),
+						payload: state.payload,
+						timeSinceLastDelete: previousData?.timeSinceLastDelete ?? state.statsBefore.timeSinceLastDelete
+					})
+					if (expectedAfter) playRecycleSound(state.payload.removals)
 					operations.delete(context.operationId)
+					operationPayloads.delete(context.operationId)
 					refreshSelectionAnalysis('selection-delete-' + direction + '-verified')
 					traceProbe('adapter.verify.complete', {
 						direction,
-						deleteCount: record.payload.removals.length
+						deleteCount: state.payload.removals.length
 					})
 					return approved()
 				},
@@ -325,13 +435,14 @@ ModLoader.register({
 					try {
 						const restoreBatchedWrites = beginBatchedWorldWrites(game)
 						try {
-							rollbackMutations(state)
-							if (context?.direction !== 'undo') restoreRecordedRelations(record.payload.relations)
+							await rollbackMutations(context, state)
+							if (context?.direction !== 'undo') restoreRecordedRelations(state.payload.relations)
 						} finally {
 							restoreBatchedWrites()
 						}
 						refreshWorld(game)
 						operations.delete(context.operationId)
+						operationPayloads.delete(context.operationId)
 						traceProbe('adapter.restore.complete', {
 							operationId: context?.operationId,
 							direction: context?.direction
@@ -350,6 +461,219 @@ ModLoader.register({
 				}
 			}
 
+			function createTransactionPayload(planValue, originValue) {
+				return deepFreeze({
+					schema: TRANSACTION_SCHEMA,
+					origin: normalizeOrigin(originValue),
+					source: planValue.source,
+					planSignature: planValue.signature,
+					compatibilitySignature: planValue.compatibilitySignature,
+					dynamicCubeSignature: planValue.dynamicCubeSignature,
+					pumpDependencySignature: planValue.pumpDependencySignature,
+					dynamicSurgeSignature: planValue.dynamicSurgeSignature,
+					cutRetainedCubeSignature: planValue.cutRetainedCubeSignature,
+					ordinaryCubeStates: planValue.ordinaryCubeStates,
+					pumpCubeStates: planValue.pumpCubeStates,
+					growStates: planValue.growStates,
+					paintedStates: planValue.paintedStates,
+					surgeStates: planValue.surgeStates,
+					strictSurgeStates: planValue.strictSurgeStates,
+					fingerprints: planValue.fingerprints,
+					removals: planValue.removals,
+					relations: planValue.relations,
+					scopeCells: planValue.scopeCells,
+					onlyOneKeys: planValue.onlyOneKeys,
+					onlyonesBefore: planValue.onlyonesBefore,
+					onlyonesAfter: planValue.onlyonesAfter,
+					economy: planValue.economy,
+					statsDelta: {
+						machinesSold: planValue.removals.filter(isBuildingRemoval).length
+					}
+				})
+			}
+
+			function retainRecordedOrdinaryCubeRemovals(recorded, rebound) {
+				const recordedDynamic = (recorded?.removals || []).filter(function (entry) {
+					return isDynamicOrdinaryStableCubeDescriptor(entry, paintCubeState)
+				})
+				const strictRebound = (rebound?.removals || []).filter(function (entry) {
+					return !isDynamicOrdinaryStableCubeDescriptor(entry, paintCubeState)
+				})
+				const removals = strictRebound.concat(recordedDynamic).sort(compareDescriptors)
+				const payload = deepFreeze(Object.assign({}, rebound, {
+					removals,
+					ordinaryCubeStates: createOrdinaryCubeRuntimeStates({ removals: recordedDynamic }, paintCubeState),
+					statsDelta: {
+						machinesSold: removals.filter(isBuildingRemoval).length
+					}
+				}))
+				traceProbe('adapter.redo.dynamic-cubes-retained', {
+					recordedCount: recordedDynamic.length,
+					currentCount: (rebound?.removals || []).filter(function (entry) {
+						return isDynamicOrdinaryStableCubeDescriptor(entry, paintCubeState)
+					}).length
+				})
+				traceDynamicStandaloneSurgeRebase(recorded, payload)
+				return payload
+			}
+
+			function traceDynamicStandaloneSurgeRebase(beforeValue, afterValue) {
+				const before = standaloneSurgeDescriptors(beforeValue)
+				const after = standaloneSurgeDescriptors(afterValue)
+				const beforeIdentities = new Set(before.map(function (entry) { return entry.identity }))
+				const afterIdentities = new Set(after.map(function (entry) { return entry.identity }))
+				const added = after.filter(function (entry) { return !beforeIdentities.has(entry.identity) })
+				const removed = before.filter(function (entry) { return !afterIdentities.has(entry.identity) })
+				if (!added.length && !removed.length) return
+				traceProbe('contract.redo.dynamic-surge-rebased', {
+					removeSurges: afterValue?.source?.removeSurges === true,
+					beforeCount: before.length,
+					afterCount: after.length,
+					added: added.map(function (entry) { return clonePosition(entry.position) }),
+					removed: removed.map(function (entry) { return clonePosition(entry.position) })
+				})
+			}
+
+			function standaloneSurgeDescriptors(value) {
+				const relationSurges = relationSurgeIdentities(value?.relations)
+				return (value?.removals || []).filter(function (entry) {
+					return isDynamicStandaloneSurgeDescriptor(entry, relationSurges, 'removal')
+				}).slice().sort(compareDescriptors)
+			}
+
+			function countRemovalLayer(removals, layer) {
+				return (removals || []).filter(function (entry) {
+					return normalizeRemovalLayer(entry?.layer, entry) === layer
+				}).length
+			}
+
+			function operationPayload(context, record) {
+				const pending = operationPayloads.get(context?.operationId)
+				if (pending) return pending
+				if (context?.direction === 'undo' || context?.direction === 'redo') {
+					return transactionData.get(record?.id)?.payload || record.payload
+				}
+				return record.payload
+			}
+
+			function currentPumpCubeState(identity) {
+				const expectedIdentity = String(identity || '')
+				if (!expectedIdentity) return null
+				for (const cube of game.stuff || []) {
+					if (safeName(cube?.name) !== 'cube' || ensureIdentity(cube) !== expectedIdentity) continue
+					return capturePumpCubeState(cube, ensureIdentity, paintCubeState)
+				}
+				return null
+			}
+
+			function currentOrdinaryCubeState(identity) {
+				const expectedIdentity = String(identity || '')
+				if (!expectedIdentity) return null
+				for (const entity of game.stuff || []) {
+					if (ensureIdentity(entity) !== expectedIdentity) continue
+					let save = null
+					try { save = captureDeletionEntitySave(entity, 'cube') } catch (error) {}
+					return createOrdinaryCubeRuntimeState({
+						identity: expectedIdentity,
+						layer: 'cube',
+						name: safeName(entity?.name),
+						position: normalizePosition(entity?.position),
+						save
+					}, paintCubeState) || {
+						identity: expectedIdentity,
+						position: normalizePosition(entity?.position) || [0, 0],
+						valid: false,
+						save: null
+					}
+				}
+				return null
+			}
+
+			function hasPumpRemoval(payload) {
+				return (payload?.removals || []).some(function (descriptor) {
+					return normalizeRemovalLayer(descriptor?.layer, descriptor) === 'building' &&
+						(safeName(descriptor?.name) === 'pump' || safeName(descriptor?.name) === 'pump2')
+				})
+			}
+
+			function tracePlanMismatch(beforeValue, afterValue, direction, hasSnapshot, options) {
+				try {
+					const selectedPumps = diagnosticSelectedPumps(beforeValue, afterValue)
+					const vicinity = selectedPumpVicinity(selectedPumps)
+					const selectedPumpSet = new Set(selectedPumps)
+					traceProbe('diagnostic.plan-mismatch', Object.assign(
+						{
+							direction,
+							hasSnapshot,
+							targets: diagnosticPlanTargetDifferences(beforeValue, afterValue, function (descriptor) {
+								if (safeName(descriptor?.name || descriptor?.save?.name) !== 'cube') return null
+								const live = diagnosticEntity(descriptor)
+								if (safeName(live?.name) !== 'cube') return { liveCube: null }
+								const owner = isPumpEntity(live?.pump) ? live.pump : null
+								const position = normalizePosition(live?.position)
+								return {
+									liveCube: Object.assign({}, liveVanillaCubeClassification(live, paintCubeState), {
+										identity: ensureIdentity(live),
+										position,
+										ownerIdentity: owner ? ensureIdentity(owner) : null,
+										ownerName: owner ? safeName(owner.name) : null,
+										ownerPosition: owner ? normalizePosition(owner.position) : null,
+										ownerInSelectedPumps: owner ? selectedPumpSet.has(owner) : false,
+										inSelectedPumpVicinity: !!position && vicinity.has(cellKey(position[0], position[1]))
+									})
+								}
+							})
+						},
+						diagnosePlansMatch(
+							beforeValue,
+							afterValue,
+							paintCubeState,
+							currentPumpCubeState,
+							currentOrdinaryCubeState,
+							options
+						)
+					))
+				} catch (diagnosticError) {
+					try {
+						traceProbe('diagnostic.plan-mismatch-failed', {
+							direction,
+							hasSnapshot,
+							message: String(diagnosticError?.message || diagnosticError || 'Unknown diagnostic failure.')
+						})
+					} catch (ignored) {}
+				}
+			}
+
+			function diagnosticSelectedPumps(beforeValue, afterValue) {
+				const result = new Set()
+				for (const descriptor of [].concat(
+					diagnosticTargetEntries(beforeValue, 'removal'),
+					diagnosticTargetEntries(beforeValue, 'protected'),
+					diagnosticTargetEntries(afterValue, 'removal'),
+					diagnosticTargetEntries(afterValue, 'protected')
+				)) {
+					if (!isPumpEntity(descriptor)) continue
+					const entity = diagnosticEntity(descriptor)
+					if (isPumpEntity(entity)) result.add(entity)
+				}
+				return Array.from(result)
+			}
+
+			function diagnosticEntity(descriptor) {
+				const identityMatch = findEntityByIdentity(descriptor?.identity)
+				if (identityMatch) return identityMatch
+				const position = normalizePosition(descriptor?.position)
+				if (!position) return null
+				const occupant = entityAt(game, position)
+				return safeName(occupant?.name) === safeName(descriptor?.name || descriptor?.save?.name)
+					? occupant
+					: null
+			}
+
+			function selectedPumpVicinity(pumps) {
+				return selectedPumpVicinityCells(pumps)
+			}
+
 			const unregisterAdapter = transactions.registerAdapter(TRANSACTION_KIND, adapter)
 			const stopRuntimeSubscription = runtime.subscribe(function (state) {
 				if (!state?.active) {
@@ -363,7 +687,8 @@ ModLoader.register({
 			})
 			traceProbe('service.ready', {
 				adapterVersion: ADAPTER_VERSION,
-				serviceVersion: SERVICE_VERSION
+				serviceVersion: SERVICE_VERSION,
+				implementation: IMPLEMENTATION
 			})
 
 			function snapshot() {
@@ -417,7 +742,8 @@ ModLoader.register({
 				const selectionState = selection.snapshot?.() || null
 				const transactionState = transactions.snapshot?.() || null
 				return deepFreeze({
-					version: 1,
+					version: 3,
+					implementation: IMPLEMENTATION,
 					generatedAt: Date.now(),
 					service: {
 						ready: !disposed,
@@ -644,6 +970,7 @@ ModLoader.register({
 					} catch (subscriptionError) {}
 					listeners.clear()
 					operations.clear()
+					operationPayloads.clear()
 					transactionData.clear()
 					lastReason = String(reason || 'disposed')
 					if (globalThis[DELETE_KEY] === service) delete globalThis[DELETE_KEY]
@@ -762,6 +1089,17 @@ ModLoader.register({
 						cellKeys.has(cellKey(position[0], position[1]))
 					) entities.add(entity)
 				}
+				const selectedPumps = Array.from(entities).filter(isPumpEntity)
+				const selectedPumpSet = new Set(selectedPumps)
+				const selectedPumpVicinityCellsSet = selectedPumpVicinityCells(selectedPumps)
+				const pumpCubeStates = createPumpCubeStates(game, selectedPumps, ensureIdentity, paintCubeState)
+				const attachedCubeOwners = collectSelectedPumpAttachments(
+					game,
+					selectedPumps,
+					paintCubeState,
+					source.removeCubes === true
+				)
+				for (const cube of attachedCubeOwners.keys()) entities.add(cube)
 
 				const safe = []
 				const protectedTargets = []
@@ -775,6 +1113,35 @@ ModLoader.register({
 					const activeRelation = captureActiveStabilizerRelation(entity, entities)
 					if (activeRelation) activeRelations.set(relationKey(activeRelation), activeRelation)
 					if (name === 'cube') {
+						if (ignorableSelectedPumpTerminalCube(
+							entity,
+							selectedPumpSet,
+							selectedPumpVicinityCellsSet,
+							paintCubeState
+						)) continue
+						const attachedPump = attachedCubeOwners.get(entity)
+						if (attachedPump) {
+							if (attachedCubeRemovalSafe(entity, attachedPump, paintCubeState)) {
+								try {
+									safe.push(captureRestorableEntity(entity, crossBoundary, 'attached-cube'))
+								} catch (captureError) {
+									protectedTargets.push(captureProtectedEntity(
+										entity,
+										'save-unavailable',
+										crossBoundary,
+										'attached-cube'
+									))
+								}
+							} else {
+								protectedTargets.push(captureProtectedEntity(
+									entity,
+									'unsafe-attached-cube',
+									crossBoundary,
+									'attached-cube'
+								))
+							}
+							continue
+						}
 						const paintedKind = classifyPaintedCube(entity, paintCubeState)
 						const requestedLayer = paintedKind === 'strict'
 							? source.removePaintedCubes === true
@@ -809,25 +1176,29 @@ ModLoader.register({
 					}
 					if (name === 'surge') {
 						const requestedLayer = source.removeSurges === true
-						const relationValid = !hasActiveSurgeStabilizer(entity?.stabilizer) || !!activeRelation
-						if (requestedLayer && relationValid && transientRemovalSafe(game, entity, name, blueprintState)) {
+						const standaloneSafe = !activeRelation && !!captureReplaceableStandaloneSurge(entity)
+						const connectedSafe = !!activeRelation && transientRemovalSafe(game, entity, name, blueprintState)
+						if (requestedLayer && (standaloneSafe || connectedSafe)) {
 							try {
 								safe.push(captureRestorableEntity(entity, crossBoundary, name))
 							} catch (captureError) {
 								protectedTargets.push(captureProtectedEntity(entity, 'save-unavailable', crossBoundary, name))
 							}
 						} else {
-							protectedTargets.push(captureProtectedEntity(
+							const protectedDescriptor = captureProtectedEntity(
 								entity,
 								requestedLayer ? 'unsafe-' + name : name,
 								crossBoundary,
 								name
-							))
+							)
+							if (!requestedLayer && standaloneSafe) protectedDescriptor.dynamicStandaloneSurge = true
+							protectedTargets.push(protectedDescriptor)
 						}
 						continue
 					}
 					const assessment = placement.assessEntity(entity, {
-						allowShatteredStabilizer: creativeActive(creative, game)
+						allowShatteredStabilizer: creativeActive(creative, game),
+						allowAttachedCube: pumpAttachmentsSafe(game, entity, attachedCubeOwners, paintCubeState)
 					})
 					const connectedStabilizerSafe =
 						isStabilizerName(name) &&
@@ -852,6 +1223,7 @@ ModLoader.register({
 				safe.sort(compareDescriptors)
 				protectedTargets.sort(compareDescriptors)
 				enforceExtractorInvariant(safe, protectedTargets)
+				enforceAttachedCubeAtomicity(safe, protectedTargets)
 				safe.sort(compareDescriptors)
 				protectedTargets.sort(compareDescriptors)
 				const relations = createRemovalRelations(activeRelations, safe)
@@ -875,13 +1247,16 @@ ModLoader.register({
 					buildingCount: buildingRemovals.length,
 					cubeCount: safe.filter(function (entry) { return entry.layer === 'cube' }).length,
 					paintedCubeCount: safe.filter(function (entry) { return entry.layer === 'painted' }).length,
+					attachedCubeCount: safe.filter(function (entry) { return entry.layer === 'attached-cube' }).length,
 					surgeCount: safe.filter(function (entry) { return entry.layer === 'surge' }).length
 				}
 				const signatureValue = {
 					source,
 					removals: safe.map(signatureDescriptor),
 					relations,
-					protectedTargets: protectedTargets.map(signatureProtectedDescriptor),
+					protectedTargets: protectedTargets.map(function (entry) {
+						return signatureProtectedDescriptor(entry, paintCubeState)
+					}),
 					onlyOneKeys,
 					onlyonesBefore,
 					onlyonesAfter,
@@ -889,9 +1264,26 @@ ModLoader.register({
 				}
 				const signature = planSignature(signatureValue)
 				const compatibilitySignature = planSignature(planCompatibilityValue(signatureValue, paintCubeState))
+				const dynamicCubeSignature = planSignature(
+					dynamicCubeCompatibilityValue(signatureValue, paintCubeState)
+				)
+				const pumpDependencySignature = planSignature(
+					pumpDependencyCompatibilityValue(signatureValue, paintCubeState)
+				)
+				const dynamicSurgeSignature = planSignature(
+					dynamicStandaloneSurgeCompatibilityValue(signatureValue, paintCubeState)
+				)
+				const cutRetainedCubeSignature = planSignature(
+					cutRetainedCubeCompatibilityValue(signatureValue, paintCubeState)
+				)
+				const ordinaryCubeStates = createOrdinaryCubeRuntimeStates({
+					removals: safe,
+					protectedTargets
+				}, paintCubeState)
 				const growStates = createGrowStates(signatureValue, paintCubeState)
 				const paintedStates = createPaintedRuntimeStates(signatureValue, paintCubeState)
 				const surgeStates = createSurgeRuntimeStates(signatureValue)
+				const strictSurgeStates = createStrictSurgeRuntimeStates(signatureValue)
 				const fingerprints = createPlanFingerprints(signatureValue)
 				return deepFreeze({
 					schema: PLAN_SCHEMA,
@@ -907,9 +1299,16 @@ ModLoader.register({
 					economy,
 					signature,
 					compatibilitySignature,
+					dynamicCubeSignature,
+					pumpDependencySignature,
+					dynamicSurgeSignature,
+					cutRetainedCubeSignature,
+					pumpCubeStates,
+					ordinaryCubeStates,
 					growStates,
 					paintedStates,
 					surgeStates,
+					strictSurgeStates,
 					fingerprints
 				})
 			}
@@ -939,7 +1338,7 @@ ModLoader.register({
 				if (!position || !save) {
 					throw deletionError('SAVE_UNAVAILABLE', 'A deletion target could not be captured safely.')
 				}
-				return {
+				const descriptor = {
 					identity: ensureIdentity(entity),
 					layer: normalizedLayer,
 					name: safeName(entity.name),
@@ -948,6 +1347,8 @@ ModLoader.register({
 					save,
 					crossBoundary: crossBoundary === true
 				}
+				if (normalizedLayer === 'attached-cube') descriptor.pump = captureAttachedPump(entity)
+				return descriptor
 			}
 
 			function captureActiveStabilizerRelation(entity, selectedEntities) {
@@ -1038,7 +1439,7 @@ ModLoader.register({
 				try {
 					save = captureDeletionEntitySave(entity, normalizedLayer)
 				} catch (saveError) {}
-				return {
+				const descriptor = {
 					identity: ensureIdentity(entity),
 					layer: normalizedLayer,
 					name: safeName(entity?.name),
@@ -1048,10 +1449,18 @@ ModLoader.register({
 					reason: String(reason || 'protected'),
 					crossBoundary: crossBoundary === true
 				}
+				if (normalizedLayer === 'attached-cube') descriptor.pump = captureAttachedPump(entity)
+				if (
+					normalizedLayer !== 'attached-cube' &&
+					cutRetainableLiveCubeEntity(entity, paintCubeState)
+				) descriptor.cutRetainableCube = true
+				return descriptor
 			}
 
 			function captureDeletionEntitySave(entity, layer) {
-				if (normalizeRemovalLayer(layer, entity) !== 'painted') return captureEntitySave(game, entity)
+				const normalizedLayer = normalizeRemovalLayer(layer, entity)
+				if (normalizedLayer === 'attached-cube') return captureAttachedCubeSave(entity)
+				if (normalizedLayer !== 'painted') return captureEntitySave(game, entity)
 				const position = normalizePosition(entity?.position)
 				const save = paintCubeState?.capturePaintedCubeSave?.(entity, position)
 				if (
@@ -1061,6 +1470,47 @@ ModLoader.register({
 					!paintCubeState?.normalizePaint?.(save)
 				) throw deletionError('SAVE_UNAVAILABLE', 'A painted Cube state could not be serialized.')
 				return jsonClone(save)
+			}
+
+			function captureAttachedPump(entity) {
+				const pump = entity?.pump
+				const position = normalizePosition(pump?.position)
+				const name = safeName(pump?.name)
+				if (!position || (name !== 'pump' && name !== 'pump2')) {
+					throw deletionError('SAVE_UNAVAILABLE', 'An attached Cube owner could not be captured safely.')
+				}
+				return {
+					identity: ensureIdentity(pump),
+					name,
+					position
+				}
+			}
+
+			function captureAttachedCubeSave(entity) {
+				if (!attachedCubeRemovalSafe(entity, entity?.pump, paintCubeState)) {
+					throw deletionError('SAVE_UNAVAILABLE', 'An attached unfinished Cube could not be serialized.')
+				}
+				const fields = [
+					'state',
+					'fill',
+					'maxFill',
+					'reversePause',
+					'reverseTimer',
+					'reverseSpeed',
+					'unveilSpeed',
+					'unveilProgress',
+					'broken',
+					'baseBreakPower',
+					'breakPower',
+					'shakePower'
+				]
+				const par = { resources: jsonClone(entity.resources) }
+				for (const field of fields) par[field] = Number(entity[field])
+				return {
+					name: 'cube',
+					position: clonePosition(entity.position),
+					par
+				}
 			}
 
 			function enforceExtractorInvariant(safe, protectedTargets) {
@@ -1082,7 +1532,31 @@ ModLoader.register({
 				}
 			}
 
-			function inspectRecordedTargets(payload, direction, recordId) {
+			function enforceAttachedCubeAtomicity(safe, protectedTargets) {
+				const blockedPumps = new Set(protectedTargets.filter(function (entry) {
+					return normalizeRemovalLayer(entry?.layer, entry) === 'attached-cube'
+				}).map(function (entry) {
+					return String(entry?.pump?.identity || '')
+				}).filter(Boolean))
+				for (let index = safe.length - 1; index >= 0; index -= 1) {
+					const descriptor = safe[index]
+					if (!blockedPumps.has(descriptor.identity)) continue
+					safe.splice(index, 1)
+					protectedTargets.push(Object.assign({}, descriptor, { reason: 'attached-cube' }))
+				}
+				const safeIdentities = new Set(safe.map(function (entry) { return entry.identity }))
+				for (let index = safe.length - 1; index >= 0; index -= 1) {
+					const descriptor = safe[index]
+					if (
+						normalizeRemovalLayer(descriptor?.layer, descriptor) !== 'attached-cube' ||
+						safeIdentities.has(descriptor?.pump?.identity)
+					) continue
+					safe.splice(index, 1)
+					protectedTargets.push(Object.assign({}, descriptor, { reason: 'attached-pump-protected' }))
+				}
+			}
+
+			function inspectRecordedTargets(payload, direction, recordId, originalPayload) {
 				const shatteredRemovals = payload.removals.filter(function (entry) {
 					return safeName(entry?.name) === 'stabilizer3'
 				}).length
@@ -1101,6 +1575,27 @@ ModLoader.register({
 								allowsStandaloneSurgeReplacement(descriptor) &&
 								captureReplaceableStandaloneSurge(entity)
 							) continue
+							if (undoOwnerBoundOrphanAllowed(payload, descriptor, entity)) {
+								traceProbe('contract.undo.owner-bound-orphan-accepted', {
+									direction: 'undo',
+									origin: normalizeOrigin(payload?.origin),
+									descriptor: describeRemovalDescriptor(descriptor),
+									occupant: describeContractOccupant(entity),
+									liveCube: liveCubeProbeDetails(entity)
+								})
+								continue
+							}
+							if (!isBuildingRemoval(descriptor)) {
+								traceProbe(
+									'contract.undo.transient-occupant-denied',
+									undoTransientOccupantProbeDetails(
+										payload,
+										originalPayload,
+										descriptor,
+										entity
+									)
+								)
+							}
 							return denied(
 								'EXTERNAL_CHANGE',
 								isBuildingRemoval(descriptor)
@@ -1115,8 +1610,28 @@ ModLoader.register({
 				const pendingIdentityBindings = []
 				const resolvedEntities = new Set()
 				for (const descriptor of payload.removals) {
+					const dynamicOrdinaryCube = isDynamicOrdinaryStableCubeDescriptor(descriptor, paintCubeState)
 					let entity = findExpectedEntity(descriptor)
 					let rebindIdentity = false
+					if (!entity && dynamicOrdinaryCube) {
+						const resolution = resolveRedoDynamicCubeAbsence(descriptor)
+						if (direction === 'redo') {
+							traceProbe(
+								resolution.allowed
+									? 'contract.redo.dynamic-cube-skipped'
+									: 'contract.redo.dynamic-cube-denied',
+								redoDynamicCubeProbeDetails(descriptor, resolution)
+							)
+							if (!resolution.allowed) {
+								return denied('EXTERNAL_CHANGE', 'A recorded dynamic Cube historical cell has a strict occupant.')
+							}
+							continue
+						}
+						if (resolution.relocated || !resolution.allowed) {
+							return denied('EXTERNAL_CHANGE', 'A recorded dynamic Cube changed beyond its live removal contract.')
+						}
+						continue
+					}
 					if (!entity) {
 						entity = findIdentityRebindCandidate(descriptor)
 						rebindIdentity = !!entity
@@ -1129,26 +1644,43 @@ ModLoader.register({
 					const safeNow = isBuildingRemoval(descriptor)
 						? (function () {
 							const assessment = placement.assessEntity(entity, {
-								allowShatteredStabilizer: creativeActive(creative, game)
+								allowShatteredStabilizer: creativeActive(creative, game),
+								allowAttachedCube: recordedPumpAttachmentsSafe(payload, descriptor, entity)
 							})
 							return assessment?.safe ||
 								assessment?.reason === 'last-extractor' ||
 								connectedStabilizerRemovalAllowed(payload, descriptor, entity)
 						})()
-						: layer === 'painted'
+						: layer === 'attached-cube'
+							? recordedAttachedCubeSafe(descriptor, entity)
+							: layer === 'painted'
 							? paintedRemovalSafe(game, entity, paintCubeState)
-							: transientRemovalSafe(game, entity, layer, blueprintState)
+							: layer === 'surge'
+								? recordedSurgeRemovalSafe(payload, descriptor, entity)
+								: transientRemovalSafe(game, entity, layer, blueprintState)
 					if (!safeNow) {
 						return denied('UNSAFE_DELETION', 'A deletion target is no longer safe to restore.')
 					}
 					try {
-						const expectedSave = expectedRemovalSave(recordId, descriptor)
-						if (!matchesDeletionSave(
-							captureDeletionEntitySave(entity, descriptor.layer),
-							expectedSave,
-							descriptor,
-							paintCubeState
-						)) {
+						const expectedSave = expectedRecordedTargetSave(recordId, descriptor, direction)
+						const currentSave = captureDeletionEntitySave(entity, descriptor.layer)
+						const saveMatches = dynamicOrdinaryCube
+							? isDynamicOrdinaryStableCubeEntity(entity, paintCubeState) &&
+								samePlain(
+									dynamicOrdinaryCubeComparableSave(currentSave, descriptor),
+									dynamicOrdinaryCubeComparableSave(expectedSave, descriptor)
+								)
+							: matchesDeletionSave(currentSave, expectedSave, descriptor, paintCubeState)
+						if (!saveMatches) {
+							traceProbe('contract.history.recorded-target-state-denied', {
+								direction,
+								descriptor: describeRemovalDescriptor(descriptor),
+								changedFields: changedSaveFields(
+									saveFieldFingerprints(expectedSave),
+									saveFieldFingerprints(currentSave)
+								),
+								liveCube: safeName(entity?.name) === 'cube' ? liveCubeProbeDetails(entity) : null
+							})
 							return denied('EXTERNAL_CHANGE', 'A deletion target state changed outside World Editor.')
 						}
 					} catch (saveError) {
@@ -1174,6 +1706,37 @@ ModLoader.register({
 				if (!relation) return false
 				const surge = entityAt(game, relation.surge.position)
 				return !!surge && entity.surge === surge && surge.stabilizer === entity
+			}
+
+			function recordedSurgeRemovalSafe(payload, descriptor, entity) {
+				if (safeName(entity?.name) !== 'surge') return false
+				const relation = (payload?.relations || []).find(function (entry) {
+					return entry?.removeSurge === true && entry?.surge?.identity === descriptor?.identity
+				})
+				if (!relation) return !!captureReplaceableStandaloneSurge(entity)
+				const stabilizer = findExpectedEntity(relation.stabilizer)
+				return !!stabilizer &&
+					stabilizer.surge === entity &&
+					entity.stabilizer === stabilizer &&
+					transientRemovalSafe(game, entity, 'surge', blueprintState)
+			}
+
+			function recordedPumpAttachmentsSafe(payload, descriptor, entity) {
+				if (safeName(entity?.name) !== 'pump' && safeName(entity?.name) !== 'pump2') return false
+				const attached = (payload?.removals || []).filter(function (entry) {
+					return normalizeRemovalLayer(entry?.layer, entry) === 'attached-cube' &&
+						entry?.pump?.identity === descriptor?.identity
+				})
+				if (!attached.length) return false
+				return attached.every(function (entry) {
+					const cube = findExpectedEntity(entry)
+					return !!cube && cube.pump === entity && attachedCubeRemovalSafe(cube, entity, paintCubeState)
+				})
+			}
+
+			function recordedAttachedCubeSafe(descriptor, entity) {
+				const pump = findExpectedEntity(descriptor?.pump)
+				return !!pump && entity?.pump === pump && attachedCubeRemovalSafe(entity, pump, paintCubeState)
 			}
 
 			function inspectRecordedRelations(payload, direction) {
@@ -1205,24 +1768,69 @@ ModLoader.register({
 				return approved()
 			}
 
-			function captureScope(payload, direction) {
+			function captureScope(payload, direction, anchorPayload) {
 				const entities = new Map()
 				const cells = []
+				const stablePayload = anchorPayload || payload
+				const ignoredAttachmentCells = new Set()
+				const ignoredStandaloneSurgeCells = new Set()
+				const selectedPumpIdentities = new Set()
+				const liveSuccessorCells = new Set()
+				const currentRemovalIdentities = new Set((payload?.removals || []).map(function (descriptor) {
+					return String(descriptor?.identity || '')
+				}))
+				for (const descriptor of stablePayload?.removals || []) {
+					if (!isDynamicOrdinaryStableCubeDescriptor(descriptor, paintCubeState)) continue
+					const retainedByCurrentPayload = !currentRemovalIdentities.has(String(descriptor?.identity || ''))
+					if (direction !== 'redo' && !(direction === 'undo' && retainedByCurrentPayload)) continue
+					for (const position of footprintCells(descriptor.footprint)) {
+						liveSuccessorCells.add(cellKey(position[0], position[1]))
+					}
+				}
+				for (const source of [stablePayload, payload]) {
+					for (const descriptor of standaloneSurgeDescriptors(source)) {
+						for (const position of footprintCells(descriptor.footprint)) {
+							ignoredStandaloneSurgeCells.add(cellKey(position[0], position[1]))
+						}
+					}
+					for (const descriptor of source?.removals || []) {
+						const layer = normalizeRemovalLayer(descriptor?.layer, descriptor)
+						if (layer === 'attached-cube') {
+							const position = normalizePosition(descriptor?.position)
+							if (position) ignoredAttachmentCells.add(cellKey(position[0], position[1]))
+						}
+						if (
+							layer === 'building' &&
+							(safeName(descriptor?.name) === 'pump' || safeName(descriptor?.name) === 'pump2')
+						) selectedPumpIdentities.add(String(descriptor?.identity || ''))
+					}
+				}
 				const recoverableRelations = direction === 'undo'
 					? recoverableMissingRelationSurges(payload.relations)
 					: new Map()
 				const replacementCells = direction === 'undo'
 					? standaloneSurgeReplacementCells(payload.removals)
 					: null
-				for (const position of payload.scopeCells) {
+				for (const position of stablePayload.scopeCells) {
 					const entity = entityAt(game, position)
+					const ignoredAttachment = ignoredAttachmentCells.has(cellKey(position[0], position[1])) || (
+						isPumpOwnedVanillaCube(entity, entity?.pump, paintCubeState) &&
+						selectedPumpIdentities.has(String(entity?.pump ? ensureIdentity(entity.pump) : ''))
+					)
+					const ignoredDynamicCube = isDynamicOrdinaryStableCubeEntity(entity, paintCubeState) || (
+						liveSuccessorCells.has(cellKey(position[0], position[1])) &&
+						isRetainableLiveVanillaCubeEntity(entity, paintCubeState)
+					)
+					const ignoredStandaloneSurge = ignoredStandaloneSurgeCells.has(cellKey(position[0], position[1])) &&
+						(!entity || !!captureReplaceableStandaloneSurge(entity))
+					const ignoredTransient = ignoredAttachment || ignoredDynamicCube || ignoredStandaloneSurge
 					const replaceableSurge = !!entity &&
 						replacementCells?.has(cellKey(position[0], position[1])) &&
 						!!captureReplaceableStandaloneSurge(entity)
-					const recoverableRelation = !entity
+					const recoverableRelation = !entity && !ignoredTransient
 						? recoverableRelations.get(cellKey(position[0], position[1]))
 						: null
-					const identity = entity && !replaceableSurge
+					const identity = entity && !replaceableSurge && !ignoredTransient
 						? ensureIdentity(entity)
 						: recoverableRelation?.surge?.identity || null
 					cells.push({
@@ -1230,7 +1838,7 @@ ModLoader.register({
 						v: position[1],
 						identity
 					})
-					if (entity && !replaceableSurge && !entities.has(identity)) {
+					if (entity && !replaceableSurge && !ignoredTransient && !entities.has(identity)) {
 						entities.set(identity, {
 							identity,
 							name: safeName(entity.name),
@@ -1256,18 +1864,533 @@ ModLoader.register({
 				}
 			}
 
+			function createOperationContract(payload) {
+				const baseline = new Map()
+				for (const position of payload?.scopeCells || []) {
+					baseline.set(
+						cellKey(position[0], position[1]),
+						describeContractOccupant(entityAt(game, position))
+					)
+				}
+				return {
+					baseline,
+					journal: [],
+					createdCells: new Set(),
+					vacatedCells: new Set(),
+					commitManifest: null
+				}
+			}
+
+			function describeContractOccupant(entity) {
+				if (!entity) return null
+				const layer = contractEntityLayer(entity)
+				const result = {
+					identity: ensureIdentity(entity),
+					name: safeName(entity.name),
+					layer,
+					position: normalizePosition(entity.position)
+				}
+				if (layer === 'attached-cube' && entity.pump) {
+					result.pumpIdentity = ensureIdentity(entity.pump)
+				}
+				return result
+			}
+
+			function contractEntityLayer(entity) {
+				const name = safeName(entity?.name)
+				if (name === 'surge') return 'surge'
+				if (name !== 'cube') return 'building'
+				if (
+					Object.prototype.hasOwnProperty.call(entity || {}, 'worldEditorPaint') ||
+					(function () {
+						try { return !!paintCubeState?.normalizePaint?.(entity) } catch (error) { return true }
+					})()
+				) return 'painted'
+				if (isPumpOwnedVanillaCube(entity, entity?.pump, paintCubeState)) return 'attached-cube'
+				return 'cube'
+			}
+
+			function recordContractMutation(state, kind, descriptor) {
+				if (!state?.contract || !descriptor) return
+				const cells = footprintCells(descriptor.footprint).map(function (position) {
+					return cellKey(position[0], position[1])
+				})
+				if (kind === 'created') {
+					for (const key of cells) state.contract.createdCells.add(key)
+				} else if (kind === 'removed') {
+					for (const key of cells) state.contract.vacatedCells.add(key)
+				}
+				state.contract.journal.push({
+					kind,
+					identity: String(descriptor.identity || ''),
+					layer: normalizeRemovalLayer(descriptor.layer, descriptor),
+					position: normalizePosition(descriptor.position),
+					cells
+				})
+			}
+
+			function contractBaseline(state, descriptor) {
+				const position = normalizePosition(descriptor?.position)
+				if (!position) return null
+				return state?.contract?.baseline?.get?.(cellKey(position[0], position[1])) || null
+			}
+
+			function contractProbeDetails(state, descriptor, current, reason) {
+				return {
+					descriptor: {
+						identity: String(descriptor?.identity || ''),
+						name: safeName(descriptor?.name)
+					},
+					layer: normalizeRemovalLayer(descriptor?.layer, descriptor),
+					position: normalizePosition(descriptor?.position),
+					baselineOccupant: contractBaseline(state, descriptor),
+					currentOccupant: describeContractOccupant(current),
+					reason: String(reason || 'unknown')
+				}
+			}
+
+			function resolveRedoDynamicCubeAbsence(descriptor) {
+				const relocated = findEntityByIdentity(descriptor?.identity)
+				const occupant = entityAt(game, descriptor?.position)
+				const strictOccupant = !!occupant &&
+					!isRetainableLiveVanillaCubeEntity(occupant, paintCubeState)
+				return {
+					allowed: !strictOccupant,
+					relocated,
+					occupant,
+					reason: strictOccupant
+						? 'strict-occupant'
+						: relocated
+							? 'relocated-recorded-cube'
+							: occupant
+								? 'dynamic-successor-retained'
+								: 'disappeared'
+				}
+			}
+
+			function redoDynamicCubeProbeDetails(descriptor, resolution) {
+				const current = resolution?.relocated || resolution?.occupant || null
+				return {
+					descriptor: {
+						identity: String(descriptor?.identity || ''),
+						name: safeName(descriptor?.name)
+					},
+					layer: normalizeRemovalLayer(descriptor?.layer, descriptor),
+					historicalPosition: normalizePosition(descriptor?.position),
+					currentPosition: normalizePosition(current?.position),
+					currentOccupant: describeContractOccupant(resolution?.occupant),
+					liveCube: liveCubeProbeDetails(resolution?.occupant),
+					relocatedEntity: resolution?.relocated && resolution.relocated !== resolution.occupant
+						? describeContractOccupant(resolution.relocated)
+						: null,
+					relocatedCube: resolution?.relocated && resolution.relocated !== resolution.occupant
+						? liveCubeProbeDetails(resolution.relocated)
+						: null,
+					reason: String(resolution?.reason || 'unknown')
+				}
+			}
+
+			function liveCubeProbeDetails(entity) {
+				if (!entity) return null
+				const result = liveVanillaCubeClassification(entity, paintCubeState)
+				result.pump = entity?.pump
+					? {
+						identity: ensureIdentity(entity.pump),
+						name: safeName(entity.pump.name),
+						position: normalizePosition(entity.pump.position),
+						state: Number.isFinite(Number(entity.pump.state)) ? Number(entity.pump.state) : null
+					}
+					: null
+				return result
+			}
+
+			function undoTransientOccupantProbeDetails(payload, originalPayload, descriptor, occupant) {
+				const occupantIdentity = ensureIdentity(occupant)
+				const actualRemovalIdentities = new Set((payload?.removals || []).map(function (entry) {
+					return String(entry?.identity || '')
+				}))
+				const originalRemovalIdentities = new Set((originalPayload?.removals || []).map(function (entry) {
+					return String(entry?.identity || '')
+				}))
+				return {
+					direction: 'undo',
+					origin: normalizeOrigin(payload?.origin),
+					descriptor: {
+						identity: String(descriptor?.identity || ''),
+						name: safeName(descriptor?.name),
+						layer: normalizeRemovalLayer(descriptor?.layer, descriptor),
+						position: normalizePosition(descriptor?.position),
+						footprint: jsonClone(descriptor?.footprint)
+					},
+					occupant: {
+						identity: occupantIdentity,
+						name: safeName(occupant?.name),
+						layer: contractEntityLayer(occupant),
+						position: normalizePosition(occupant?.position),
+						state: Number.isFinite(Number(occupant?.state)) ? Number(occupant.state) : null,
+						killme: occupant?.killme === true,
+						pumpIdentity: occupant?.pump ? ensureIdentity(occupant.pump) : null
+					},
+					sameIdentity: occupantIdentity === String(descriptor?.identity || ''),
+					occupantInActualRemovals: actualRemovalIdentities.has(occupantIdentity),
+					occupantInOriginalRemovals: originalRemovalIdentities.has(occupantIdentity),
+					liveCube: liveCubeProbeDetails(occupant)
+				}
+			}
+
+			function undoOwnerBoundOrphanAllowed(payload, descriptor, entity) {
+				if (normalizeRemovalLayer(descriptor?.layer, descriptor) !== 'attached-cube') return false
+				const pumpIdentity = String(descriptor?.pump?.identity || '')
+				const ownerDescriptor = recordedPumpRemoval(payload, pumpIdentity)
+				if (!ownerDescriptor || findExpectedEntity(ownerDescriptor)) return false
+				const staleOwner = entity?.pump
+				if (
+					!isPumpEntity(staleOwner) ||
+					game.stuff?.includes?.(staleOwner) ||
+					ensureIdentity(staleOwner) !== pumpIdentity
+				) return false
+				return eligibleLateAttachedCube(entity, staleOwner)
+			}
+
+			function isDynamicRestorationDescriptor(descriptor) {
+				return isDynamicOrdinaryStableCubeDescriptor(descriptor, paintCubeState) ||
+					normalizeRemovalLayer(descriptor?.layer, descriptor) === 'attached-cube'
+			}
+
+			function isVanillaLifecycleCubeEntity(entity) {
+				const live = liveVanillaCubeClassification(entity, paintCubeState)
+				return live.name === 'cube' &&
+					(live.state === 0 || live.state === 1 || live.state === 2 || live.state === 3) &&
+					live.resourcesValid &&
+					!live.hasWorldEditorPaint &&
+					!live.paint &&
+					!live.paintError
+			}
+
+			function isTerminalVanillaCube(entity) {
+				return entity?.killme === true || Number(entity?.state) === 3
+			}
+
+			function commitComparableSave(value) {
+				const save = jsonClone(value)
+				if (save?.par && typeof save.par === 'object') delete save.par.soul
+				return save
+			}
+
+			function dynamicDescriptorMatchesCommit(entity, descriptor) {
+				if (
+					!entity ||
+					ensureIdentity(entity) !== descriptor?.identity ||
+					safeName(entity.name) !== safeName(descriptor?.name)
+				) return false
+				if (normalizeRemovalLayer(descriptor?.layer, descriptor) === 'attached-cube') {
+					const pump = findExpectedEntity(descriptor.pump)
+					if (!pump || entity.pump !== pump) return false
+				}
+				try {
+					return samePlain(
+						commitComparableSave(captureDeletionEntitySave(entity, descriptor.layer)),
+						commitComparableSave(descriptor.save)
+					)
+				} catch (error) {
+					return false
+				}
+			}
+
+			function dynamicReconciliationAuthorized(state, descriptor) {
+				const baseline = contractBaseline(state, descriptor)
+				return !baseline || baseline.layer === 'surge'
+			}
+
+			function transactionCreatedPump(state, pump) {
+				if (!isPumpEntity(pump)) return false
+				const identity = ensureIdentity(pump)
+				return state.mutations.some(function (mutation) {
+					return mutation.kind === 'created' &&
+						mutation.descriptor?.identity === identity &&
+						isPumpEntity(mutation.descriptor)
+				})
+			}
+
+			function ownerBoundDynamicSuccessorAllowed(state, descriptor, entity) {
+				if (
+					normalizeRemovalLayer(descriptor?.layer, descriptor) !== 'attached-cube' ||
+					!isVanillaLifecycleCubeEntity(entity)
+				) return false
+				const pump = findExpectedEntity(descriptor.pump)
+				return !!pump && entity?.pump === pump && transactionCreatedPump(state, pump)
+			}
+
+			function clearProvenanceDynamicEntity(state, descriptor, entity, event, reason) {
+				const restoreTemporaryRelationGuards = prepareRelationRemovalGuards(descriptor, state.relations)
+				try {
+					game.clearCell(entity.position)
+				} finally {
+					restoreTemporaryRelationGuards()
+				}
+				if (game.stuff?.includes?.(entity) || entityAt(game, entity.position) === entity) {
+					throw deletionError('APPLY_FAILED', 'A dynamic Cube could not be cleared safely.')
+				}
+				state.contract.journal.push({
+					kind: event,
+					identity: ensureIdentity(entity),
+					position: normalizePosition(descriptor.position),
+					reason
+				})
+				traceProbe(event, contractProbeDetails(state, descriptor, entity, reason))
+			}
+
+			function resolveDynamicRestoration(state, mutation) {
+				const descriptor = mutation.contractDescriptor || mutation.descriptor
+				const current = entityAt(game, descriptor.position)
+				const directExact = current && ensureIdentity(current) === descriptor.identity
+					? current
+					: null
+				const exact = directExact || findEntityByIdentity(descriptor.identity)
+				if (exact && exact !== current) {
+					return { allowed: false, descriptor, current, reason: 'relocated-recorded-cube' }
+				}
+				if (exact) {
+					return {
+						allowed: isVanillaLifecycleCubeEntity(exact),
+						descriptor,
+						current: exact,
+						exact: true,
+						reason: isVanillaLifecycleCubeEntity(exact)
+							? dynamicDescriptorMatchesCommit(exact, mutation.descriptor)
+								? 'historical-exact'
+								: 'dynamic-state-drift'
+							: 'strict-occupant'
+					}
+				}
+				if (!current) {
+					return { allowed: true, descriptor, current: null, terminal: true, reason: 'natural-disappearance' }
+				}
+				const successorAllowed = dynamicReconciliationAuthorized(state, descriptor) &&
+					ownerBoundDynamicSuccessorAllowed(state, descriptor, current)
+				return {
+					allowed: successorAllowed,
+					descriptor,
+					current,
+					successor: successorAllowed,
+					reason: successorAllowed ? 'owner-bound-successor' : 'strict-occupant'
+				}
+			}
+
+			function captureCommittedDynamicDescriptor(descriptor, entity) {
+				const expectedPump = normalizeRemovalLayer(descriptor?.layer, descriptor) === 'attached-cube'
+					? findExpectedEntity(descriptor.pump)
+					: null
+				const layer = expectedPump && entity?.pump === expectedPump
+					? 'attached-cube'
+					: 'cube'
+				if (layer === 'cube' && Number(entity?.state) !== 2) return null
+				const committed = Object.assign({}, descriptor, {
+					layer,
+					name: 'cube',
+					position: clonePosition(entity.position),
+					footprint: entityFootprint(entity, entity.position),
+					save: captureDeletionEntitySave(entity, layer)
+				})
+				if (layer === 'attached-cube') committed.pump = captureAttachedPump(entity)
+				else delete committed.pump
+				return committed
+			}
+
+			function reconcileDynamicRestorations(state, mutations) {
+				const targets = mutations || state.mutations.filter(function (mutation) {
+					return mutation.kind === 'created' &&
+						isDynamicRestorationDescriptor(mutation.contractDescriptor || mutation.descriptor)
+				})
+				for (const mutation of targets) {
+					const resolution = resolveDynamicRestoration(state, mutation)
+					if (!resolution.allowed) {
+						traceProbe('contract.dynamic.denied', contractProbeDetails(
+							state,
+							resolution.descriptor,
+							resolution.current,
+							resolution.reason
+						))
+						throw deletionError('EXTERNAL_CHANGE', 'A dynamic Cube changed beyond the deletion contract.')
+					}
+
+					if (
+						resolution.terminal ||
+						isTerminalVanillaCube(resolution.current) ||
+						(resolution.current && !captureCommittedDynamicDescriptor(resolution.descriptor, resolution.current))
+					) {
+						if (resolution.current) {
+							clearProvenanceDynamicEntity(
+								state,
+								resolution.descriptor,
+								resolution.current,
+								'contract.dynamic.committed',
+								'lifecycle-terminal'
+							)
+						} else {
+							traceProbe('contract.dynamic.committed', contractProbeDetails(
+								state,
+								resolution.descriptor,
+								null,
+								resolution.reason
+							))
+						}
+						mutation.committedDescriptor = null
+						continue
+					}
+
+					if (resolution.successor) assignIdentity(resolution.current, resolution.descriptor.identity)
+					const committed = captureCommittedDynamicDescriptor(resolution.descriptor, resolution.current)
+					mutation.descriptor = committed
+					mutation.committedDescriptor = committed
+					if (resolution.reason !== 'historical-exact') {
+						traceProbe('contract.dynamic.committed', contractProbeDetails(
+							state,
+							committed,
+							resolution.current,
+							resolution.reason
+						))
+					}
+				}
+			}
+
+			function finalizeDynamicRestorationPayload(state) {
+				const committedByIdentity = new Map()
+				for (const mutation of state.mutations) {
+					const contractDescriptor = mutation.contractDescriptor || mutation.descriptor
+					if (mutation.kind !== 'created' || !isDynamicRestorationDescriptor(contractDescriptor)) continue
+					committedByIdentity.set(contractDescriptor.identity, mutation.committedDescriptor || null)
+				}
+				const removals = []
+				for (const descriptor of state.payload.removals) {
+					if (!committedByIdentity.has(descriptor.identity)) removals.push(descriptor)
+					else if (committedByIdentity.get(descriptor.identity)) removals.push(committedByIdentity.get(descriptor.identity))
+				}
+				state.payload = payloadWithActualRemovals(state.payload, removals)
+				state.payload = payloadWithRestoredPumpCubeBaseline(state.payload)
+				state.relations = state.payload.relations
+			}
+
+			function payloadWithRestoredPumpCubeBaseline(payload) {
+				const pumpDescriptors = (payload?.removals || []).filter(function (descriptor) {
+					return normalizeRemovalLayer(descriptor?.layer, descriptor) === 'building' &&
+						(safeName(descriptor?.name) === 'pump' || safeName(descriptor?.name) === 'pump2')
+				})
+				if (!pumpDescriptors.length) return payload
+				const restoredPumps = new Map()
+				for (const descriptor of pumpDescriptors) {
+					const pump = findExpectedEntity(descriptor)
+					if (!isPumpEntity(pump)) continue
+					restoredPumps.set(ensureIdentity(pump), pump)
+				}
+				const pumpCubeStates = createPumpCubeStates(game, restoredPumps.values(), ensureIdentity, paintCubeState)
+				traceProbe('contract.undo.pump-cube-baseline-refreshed', {
+					origin: normalizeOrigin(payload?.origin),
+					expectedPumpCount: pumpDescriptors.length,
+					restoredPumpCount: restoredPumps.size,
+					beforeCount: normalizePumpCubeStates(payload?.pumpCubeStates).length,
+					afterCount: pumpCubeStates.length
+				})
+				return deepFreeze(Object.assign({}, payload, { pumpCubeStates }))
+			}
+
+			function createDynamicCommitManifest(state) {
+				const entries = new Map()
+				if (state.direction === 'undo') {
+					for (const mutation of state.mutations) {
+						const contractDescriptor = mutation.contractDescriptor || mutation.descriptor
+						if (mutation.kind !== 'created' || !isDynamicRestorationDescriptor(contractDescriptor)) continue
+						const descriptor = mutation.committedDescriptor
+						if (!descriptor) continue
+						const entity = findExpectedEntity(descriptor)
+						if (!entity || !dynamicDescriptorMatchesCommit(entity, descriptor)) {
+							traceProbe('contract.verify.denied', contractProbeDetails(
+								state,
+								descriptor,
+								entityAt(game, descriptor.position),
+								'commit-manifest-mismatch'
+							))
+							throw deletionError('VERIFY_FAILED', 'A dynamic Cube could not be committed exactly.')
+						}
+						entries.set(descriptor.identity, {
+							identity: descriptor.identity,
+							name: safeName(entity.name),
+							layer: normalizeRemovalLayer(descriptor.layer, descriptor),
+							position: normalizePosition(entity.position),
+							save: commitComparableSave(captureDeletionEntitySave(entity, descriptor.layer)),
+							pumpIdentity: entity.pump ? ensureIdentity(entity.pump) : null
+						})
+					}
+				}
+				traceProbe('contract.commit-manifest.created', {
+					direction: state.direction,
+					dynamicCount: entries.size,
+					journalCount: state.contract.journal.length
+				})
+				return { direction: state.direction, entries }
+			}
+
+			function verifyDynamicCommitManifest(state) {
+				const manifest = state?.contract?.commitManifest
+				if (!manifest || manifest.direction !== state.direction) {
+					return denied('VERIFY_FAILED', 'The dynamic Cube commit manifest is unavailable.')
+				}
+				for (const expected of manifest.entries.values()) {
+					const descriptor = expected
+					const entity = findExpectedEntity(descriptor)
+					let observedSave = null
+					try {
+						observedSave = entity
+							? commitComparableSave(captureDeletionEntitySave(entity, descriptor.layer))
+							: null
+					} catch (error) {}
+					const pumpIdentity = entity?.pump ? ensureIdentity(entity.pump) : null
+					if (
+						!entity ||
+						ensureIdentity(entity) !== expected.identity ||
+						safeName(entity.name) !== expected.name ||
+						!samePlain(normalizePosition(entity.position), expected.position) ||
+						!samePlain(observedSave, expected.save) ||
+						pumpIdentity !== expected.pumpIdentity
+					) {
+						traceProbe('contract.verify.denied', contractProbeDetails(
+							state,
+							descriptor,
+							entityAt(game, descriptor.position),
+							'commit-manifest-changed'
+						))
+						return denied('VERIFY_FAILED', 'A dynamic Cube changed after deletion reconciliation.')
+					}
+				}
+				return approved()
+			}
+
 			async function applyForward(context, record, state) {
-				const payload = record.payload
+				const payload = state.payload
 				const resourceDelta = payload.economy.creative ? [] : payload.economy.delta
 				const removals = removalApplyOrder(payload.removals, payload.relations)
+				const actualRemovals = []
+				state.pendingRemovals = new Map(removals.map(function (entry) {
+					return [entry.identity, entry]
+				}))
 				for (let index = 0; index < removals.length; index += 1) {
 					requireCurrent(context)
 					const removal = removals[index]
-					const removed = removeExpectedEntity(removal, record.id, payload.relations)
+					const outcome = removeExpectedEntity(removal, record.id, payload.relations, state)
+					state.pendingRemovals.delete(removal.identity)
+					if (outcome.skipped === true) {
+						if ((index + 1) % APPLY_CHUNK_SIZE === 0) await yieldOperation(context)
+						continue
+					}
+					const removed = outcome.removed
+					actualRemovals.push(removed)
 					state.removedSaves.set(removal.identity, removed.save)
 					state.mutations.push({ kind: 'removed', descriptor: removed })
+					recordContractMutation(state, 'removed', removed)
+					rebasePendingConductorNeighbours(outcome.pendingConductorNeighbours, state)
 					if ((index + 1) % APPLY_CHUNK_SIZE === 0) await yieldOperation(context)
 				}
+				reconcileLateAttachedCubeRemovals(state, actualRemovals)
 				state.resourcesBefore = numericArray(game.resources)
 				applyResourceMutation(state, resourceDelta)
 				if (payload.statsDelta.machinesSold > 0) {
@@ -1279,10 +2402,224 @@ ModLoader.register({
 					state.statsAfter = captureStats(game)
 				}
 				applyOnlyoneMutation(state, payload.onlyOneKeys, payload.onlyonesAfter)
+				state.payload = payloadWithActualRemovals(payload, actualRemovals)
+				state.relations = state.payload.relations
+			}
+
+			function payloadWithActualRemovals(payload, removals) {
+				return deepFreeze(Object.assign({}, payload, {
+					removals: removals.slice().sort(compareDescriptors),
+					scopeCells: mergeScopeCells(
+						payload.scopeCells,
+						collectScopeCells(removals, payload.relations)
+					),
+					ordinaryCubeStates: createOrdinaryCubeRuntimeStates({ removals }, paintCubeState),
+					statsDelta: {
+						machinesSold: removals.filter(isBuildingRemoval).length
+					}
+				}))
+			}
+
+			function mergeScopeCells(left, right) {
+				const cells = new Map()
+				for (const position of [].concat(left || [], right || [])) {
+					const normalized = normalizePosition(position)
+					if (!normalized) continue
+					cells.set(cellKey(normalized[0], normalized[1]), normalized)
+				}
+				return Array.from(cells.values()).sort(comparePositions)
+			}
+
+			function describeRemovalDescriptor(descriptor) {
+				return {
+					identity: String(descriptor?.identity || ''),
+					name: safeName(descriptor?.name),
+					layer: normalizeRemovalLayer(descriptor?.layer, descriptor),
+					position: normalizePosition(descriptor?.position),
+					footprint: jsonClone(descriptor?.footprint),
+					pumpIdentity: String(descriptor?.pump?.identity || '') || null
+				}
+			}
+
+			function recordedPumpRemoval(payload, identity) {
+				const expectedIdentity = String(identity || '')
+				if (!expectedIdentity) return null
+				return (payload?.removals || []).find(function (descriptor) {
+					return isBuildingRemoval(descriptor) &&
+						isPumpEntity(descriptor) &&
+						String(descriptor?.identity || '') === expectedIdentity
+				}) || null
+			}
+
+			function eligibleLateAttachedCube(entity, owner) {
+				return isUnfinishedPumpCube(entity, owner) &&
+					attachedCubeRemovalSafe(entity, owner, paintCubeState)
+			}
+
+			function sameOwnerCubeDisposition(entity, owner) {
+				if (safeName(entity?.name) !== 'cube' || entity?.pump !== owner) return 'unrelated'
+				if (ignorableSelectedPumpTerminalCube(
+					entity,
+					new Set([owner]),
+					selectedPumpVicinityCells([owner]),
+					paintCubeState
+				)) return 'terminal'
+				if (
+					Number(entity?.state) === 2 &&
+					entity?.killme !== true &&
+					isRetainableLiveVanillaCubeEntity(entity, paintCubeState)
+				) return 'retained-stable'
+				return eligibleLateAttachedCube(entity, owner) ? 'eligible' : 'strict'
+			}
+
+			function attachedDescriptorAtPosition(removals, pumpIdentity, position) {
+				return (removals || []).find(function (descriptor) {
+					return normalizeRemovalLayer(descriptor?.layer, descriptor) === 'attached-cube' &&
+						String(descriptor?.pump?.identity || '') === String(pumpIdentity || '') &&
+						footprintCells(descriptor.footprint).some(function (cell) {
+							return sameCellPosition(cell, position)
+						})
+				}) || null
+			}
+
+			function ordinaryStableDescriptorAtPosition(removals, position) {
+				return (removals || []).find(function (descriptor) {
+					return isDynamicOrdinaryStableCubeDescriptor(descriptor, paintCubeState) &&
+						footprintCells(descriptor.footprint).some(function (cell) {
+							return sameCellPosition(cell, position)
+						})
+				}) || null
+			}
+
+			function removedMutation(state, identity) {
+				return state.mutations.find(function (mutation) {
+					return mutation.kind === 'removed' && mutation.descriptor?.identity === identity
+				}) || null
+			}
+
+			function insertLateRemovalBeforeOwner(state, descriptor, ownerIdentity) {
+				const ownerIndex = state.mutations.findIndex(function (mutation) {
+					return mutation.kind === 'removed' &&
+						mutation.descriptor?.identity === ownerIdentity &&
+						isPumpEntity(mutation.descriptor)
+				})
+				if (ownerIndex < 0) {
+					throw deletionError('APPLY_FAILED', 'A late attached Cube owner mutation was unavailable.')
+				}
+				state.mutations.splice(ownerIndex, 0, { kind: 'removed', descriptor })
+				recordContractMutation(state, 'removed', descriptor)
+			}
+
+			function clearLateAttachedCube(state, descriptor, entity) {
+				const restoreTemporaryRelationGuards = prepareRelationRemovalGuards(descriptor, state.relations)
+				try {
+					game.clearCell(entity.position)
+				} finally {
+					restoreTemporaryRelationGuards()
+				}
+				if (game.stuff?.includes?.(entity) || entityAt(game, entity.position) === entity) {
+					throw deletionError('APPLY_FAILED', 'A late attached Cube could not be cleared safely.')
+				}
+			}
+
+			function reconcileLateAttachedCubeRemovals(state, actualRemovals) {
+				for (const ownerEntry of state.removedPumpOwners.values()) {
+					const candidates = (game.stuff || []).filter(function (entity) {
+						return entity?.pump === ownerEntry.entity
+					})
+					for (const entity of candidates) {
+						const disposition = sameOwnerCubeDisposition(entity, ownerEntry.entity)
+						if (
+							disposition === 'terminal' ||
+							disposition === 'retained-stable' ||
+							disposition === 'unrelated'
+						) continue
+						if (disposition !== 'eligible') {
+							traceProbe('contract.forward.late-attached-cube-denied', {
+								direction: state.direction,
+								origin: normalizeOrigin(state.payload?.origin),
+								owner: describeRemovalDescriptor(ownerEntry.descriptor),
+								occupant: describeContractOccupant(entity),
+								liveCube: liveCubeProbeDetails(entity)
+							})
+							throw deletionError('EXTERNAL_CHANGE', 'A late attached Cube is outside the live removal contract.')
+						}
+
+						const captured = captureRestorableEntity(entity, false, 'attached-cube')
+						const historicalOrdinary = ordinaryStableDescriptorAtPosition(
+							actualRemovals,
+							captured.position
+						)
+						if (historicalOrdinary) {
+							state.mutations.push({
+								kind: 'discarded-transaction-vacancy-successor',
+								descriptor: captured
+							})
+							clearLateAttachedCube(state, captured, entity)
+							state.contract.journal.push({
+								kind: 'transaction-vacancy-successor-suppressed',
+								identity: captured.identity,
+								ownerIdentity: ownerEntry.identity,
+								position: clonePosition(captured.position),
+								historicalIdentity: historicalOrdinary.identity
+							})
+							traceProbe('contract.forward.transaction-vacancy-cube-suppressed', {
+								direction: state.direction,
+								origin: normalizeOrigin(state.payload?.origin),
+								position: clonePosition(captured.position),
+								ownerIdentity: ownerEntry.identity,
+								historical: describeRemovalDescriptor(historicalOrdinary),
+								successor: describeRemovalDescriptor(captured),
+								liveCube: liveCubeProbeDetails(entity)
+							})
+							continue
+						}
+						const historical = attachedDescriptorAtPosition(
+							actualRemovals,
+							ownerEntry.identity,
+							captured.position
+						)
+						let committed = captured
+						let event = 'contract.forward.late-attached-cube-added'
+						if (historical) {
+							committed = Object.assign({}, captured, {
+								identity: historical.identity,
+								pump: historical.pump,
+								crossBoundary: historical.crossBoundary === true
+							})
+							const mutation = removedMutation(state, historical.identity)
+							if (!mutation) {
+								throw deletionError('APPLY_FAILED', 'A historical attached Cube mutation was unavailable.')
+							}
+							mutation.descriptor = committed
+							const index = actualRemovals.indexOf(historical)
+							if (index >= 0) actualRemovals[index] = committed
+							event = 'contract.forward.late-attached-cube-rebased'
+						} else {
+							insertLateRemovalBeforeOwner(state, committed, ownerEntry.identity)
+							actualRemovals.push(committed)
+						}
+						state.removedSaves.set(committed.identity, jsonClone(committed.save))
+						clearLateAttachedCube(state, committed, entity)
+						traceProbe(event, {
+							direction: state.direction,
+							origin: normalizeOrigin(state.payload?.origin),
+							identity: committed.identity,
+							ownerIdentity: ownerEntry.identity,
+							position: clonePosition(committed.position),
+							state: Number(entity.state),
+							liveCube: liveCubeProbeDetails(entity)
+						})
+					}
+				}
 			}
 
 			function removalApplyOrder(removals, relations) {
-				const result = (removals || []).slice()
+				const result = (removals || []).slice().sort(function (left, right) {
+					const leftAttached = normalizeRemovalLayer(left?.layer, left) === 'attached-cube'
+					const rightAttached = normalizeRemovalLayer(right?.layer, right) === 'attached-cube'
+					return leftAttached === rightAttached ? 0 : leftAttached ? -1 : 1
+				})
 				for (const relation of relations || []) {
 					if (!relation.removeStabilizer || !relation.removeSurge) continue
 					const stabilizerIndex = result.findIndex(function (entry) {
@@ -1298,23 +2635,205 @@ ModLoader.register({
 				return result
 			}
 
+			function captureUndoOwnerBoundOrphan(payload, descriptor, state) {
+				if (normalizeRemovalLayer(descriptor?.layer, descriptor) !== 'attached-cube') return null
+				const entity = entityAt(game, descriptor.position)
+				if (!entity || safeName(entity.name) !== 'cube') return null
+				const pumpIdentity = String(descriptor?.pump?.identity || '')
+				const ownerDescriptor = recordedPumpRemoval(payload, pumpIdentity)
+				const restoredOwner = findExpectedEntity(descriptor.pump)
+				const entityOwner = entity?.pump
+				if (
+					!ownerDescriptor ||
+					!restoredOwner ||
+					!transactionCreatedPump(state, restoredOwner) ||
+					!isPumpEntity(entityOwner) ||
+					ensureIdentity(entityOwner) !== pumpIdentity ||
+					!eligibleLateAttachedCube(entity, entityOwner)
+				) {
+					return null
+				}
+				const displaced = captureRestorableEntity(entity, false, 'attached-cube')
+				const restoreTemporaryRelationGuards = prepareRelationRemovalGuards(displaced, state.relations)
+				try {
+					game.clearCell(entity.position)
+				} finally {
+					restoreTemporaryRelationGuards()
+				}
+				if (game.stuff?.includes?.(entity) || entityAt(game, entity.position) === entity) {
+					throw deletionError('APPLY_FAILED', 'An owner-bound orphan Cube could not be displaced.')
+				}
+				state.mutations.push({ kind: 'displaced-attached-cube', descriptor: displaced })
+				traceProbe('contract.undo.owner-bound-orphan-rebased', {
+					direction: 'undo',
+					origin: normalizeOrigin(payload?.origin),
+					descriptor: describeRemovalDescriptor(descriptor),
+					occupant: describeRemovalDescriptor(displaced),
+					liveCube: liveCubeProbeDetails(entity)
+				})
+				return displaced.save
+			}
+
+			function clearUndoTransactionPumpSuccessor(payload, descriptor, state) {
+				if (!isDynamicOrdinaryStableCubeDescriptor(descriptor, paintCubeState)) return false
+				const entity = entityAt(game, descriptor.position)
+				if (!entity || findEntityByIdentity(descriptor.identity)) return false
+				const pump = entity?.pump
+				const pumpIdentity = isPumpEntity(pump) ? ensureIdentity(pump) : ''
+				const pumpDescriptor = recordedPumpRemoval(payload, pumpIdentity)
+				if (
+					!pumpDescriptor ||
+					findExpectedEntity(pumpDescriptor) !== pump ||
+					!transactionCreatedPump(state, pump) ||
+					!eligibleLateAttachedCube(entity, pump) ||
+					!dynamicReconciliationAuthorized(state, descriptor)
+				) return false
+
+				const identity = ensureIdentity(entity)
+				if ((payload?.removals || []).some(function (removal) {
+					return removal?.identity === identity
+				})) return false
+
+				const displaced = captureRestorableEntity(entity, false, 'attached-cube')
+				const restoreTemporaryRelationGuards = prepareRelationRemovalGuards(displaced, state.relations)
+				let clearError = null
+				try {
+					game.clearCell(entity.position)
+				} catch (error) {
+					clearError = error
+				} finally {
+					restoreTemporaryRelationGuards()
+				}
+				const stillPresent = game.stuff?.includes?.(entity) || entityAt(game, entity.position) === entity
+				if (clearError) throw clearError
+				if (stillPresent) {
+					throw deletionError('APPLY_FAILED', 'A transaction-created Pump Cube could not be cleared for restoration.')
+				}
+
+				state.contract.journal.push({
+					kind: 'undo-owner-bound-successor-rebased',
+					identity,
+					ownerIdentity: pumpIdentity,
+					position: normalizePosition(entity.position)
+				})
+				traceProbe('contract.undo.owner-bound-successor-rebased', {
+					direction: 'undo',
+					origin: normalizeOrigin(payload?.origin),
+					descriptor: describeRemovalDescriptor(descriptor),
+					occupant: describeRemovalDescriptor(displaced),
+					baselineOccupant: contractBaseline(state, descriptor),
+					owner: describeRemovalDescriptor(pumpDescriptor),
+					liveCube: liveCubeProbeDetails(entity)
+				})
+				return true
+			}
+
+			function undoTransactionPumpSuccessorDenialDetails(payload, descriptor, state, entity) {
+				const historicalIdentityOccupant = findEntityByIdentity(descriptor?.identity)
+				const owner = entity?.pump
+				const ownerIsPump = isPumpEntity(owner)
+				const ownerIdentity = ownerIsPump ? ensureIdentity(owner) : ''
+				const ownerDescriptor = recordedPumpRemoval(payload, ownerIdentity)
+				const expectedOwner = ownerDescriptor ? findExpectedEntity(ownerDescriptor) : null
+				const occupantIdentity = entity ? ensureIdentity(entity) : ''
+				const occupantInRemovals = !!occupantIdentity && (payload?.removals || []).some(function (removal) {
+					return String(removal?.identity || '') === occupantIdentity
+				})
+				const gates = {
+					historicalTargetEligible: isDynamicOrdinaryStableCubeDescriptor(descriptor, paintCubeState),
+					occupantPresent: !!entity,
+					historicalIdentityAbsent: !historicalIdentityOccupant,
+					ownerIsPump,
+					ownerRecorded: !!ownerDescriptor,
+					ownerAtHistoricalPosition: !!ownerDescriptor && expectedOwner === owner,
+					ownerCreatedByTransaction: transactionCreatedPump(state, owner),
+					occupantUnfinished: isUnfinishedPumpCube(entity, owner),
+					occupantRemovalSafe: attachedCubeRemovalSafe(entity, owner, paintCubeState),
+					baselineAuthorized: dynamicReconciliationAuthorized(state, descriptor),
+					occupantNotInRemovals: !occupantInRemovals
+				}
+				const failedGates = Object.keys(gates).filter(function (gate) {
+					return gates[gate] !== true
+				})
+				return {
+					direction: String(state?.direction || 'undo'),
+					origin: normalizeOrigin(payload?.origin),
+					descriptor: describeRemovalDescriptor(descriptor),
+					occupant: describeContractOccupant(entity),
+					liveCube: liveCubeProbeDetails(entity),
+					baselineOccupant: contractBaseline(state, descriptor),
+					identityProvenance: {
+						historicalIdentity: String(descriptor?.identity || ''),
+						historicalIdentityOccupant: describeContractOccupant(historicalIdentityOccupant),
+						occupantIdentity,
+						occupantInRemovals
+					},
+					owner: {
+						live: describeContractOccupant(owner),
+						recorded: ownerDescriptor ? describeRemovalDescriptor(ownerDescriptor) : null,
+						expected: describeContractOccupant(expectedOwner)
+					},
+					gates,
+					failedGates,
+					removalCount: (payload?.removals || []).length,
+					priorOwnerBoundRebaseCount: (state?.contract?.journal || []).filter(function (entry) {
+						return entry?.kind === 'undo-owner-bound-successor-rebased'
+					}).length
+				}
+			}
+
 			async function applyUndo(context, record, state) {
-				const payload = record.payload
+				const payload = state.payload
 				const resourceDelta = payload.economy.creative ? [] : negateArray(payload.economy.delta)
 				const saved = transactionData.get(record.id)
 				restoreMissingRelationSurges(payload.relations, state)
-				for (let index = 0; index < payload.removals.length; index += 1) {
+				const removals = restorationApplyOrder(payload.removals)
+				const dynamicBatch = []
+				let strictProcessed = 0
+				let relationsRestored = false
+				for (let index = 0; index < removals.length; index += 1) {
 					requireCurrent(context)
-					const removal = payload.removals[index]
+					const removal = removals[index]
+					const dynamic = isDynamicRestorationDescriptor(removal)
+					if (dynamic && !relationsRestored) {
+						restoreRecordedRelations(payload.relations)
+						relationsRestored = true
+					}
+					const ownerBoundOrphanSave = captureUndoOwnerBoundOrphan(payload, removal, state)
+					clearUndoTransactionPumpSuccessor(payload, removal, state)
 					displaceStandaloneSurges(removal, state)
 					const descriptor = Object.assign({}, removal, {
-						save: jsonClone(saved?.removalSaves?.get(removal.identity) || removal.save)
+						save: jsonClone(
+							ownerBoundOrphanSave ||
+							saved?.removalSaves?.get(removal.identity) ||
+							removal.save
+						)
 					})
 					addExpectedEntity(descriptor, payload.relations, state)
-					state.mutations.push({ kind: 'created', descriptor })
-					if ((index + 1) % APPLY_CHUNK_SIZE === 0) await yieldOperation(context)
+					const mutation = {
+						kind: 'created',
+						descriptor,
+						contractDescriptor: descriptor,
+						committedDescriptor: dynamic ? descriptor : undefined
+					}
+					state.mutations.push(mutation)
+					recordContractMutation(state, 'created', descriptor)
+					if (dynamic) {
+						dynamicBatch.push(mutation)
+						if (dynamicBatch.length >= APPLY_CHUNK_SIZE) {
+							reconcileDynamicRestorations(state, dynamicBatch)
+							dynamicBatch.length = 0
+							await yieldOperation(context)
+						}
+					} else {
+						strictProcessed += 1
+						if (strictProcessed % APPLY_CHUNK_SIZE === 0) await yieldOperation(context)
+					}
 				}
-				restoreRecordedRelations(payload.relations)
+				if (!relationsRestored) restoreRecordedRelations(payload.relations)
+				if (dynamicBatch.length) reconcileDynamicRestorations(state, dynamicBatch)
+				reconcileDynamicRestorations(state)
+				finalizeDynamicRestorationPayload(state)
 				state.resourcesBefore = numericArray(game.resources)
 				applyResourceMutation(state, resourceDelta)
 				if (payload.statsDelta.machinesSold > 0) {
@@ -1326,6 +2845,15 @@ ModLoader.register({
 					state.statsAfter = captureStats(game)
 				}
 				applyOnlyoneMutation(state, payload.onlyOneKeys, payload.onlyonesBefore)
+			}
+
+			function restorationApplyOrder(removals) {
+				const result = (removals || []).slice()
+				const strict = result.filter(function (descriptor) {
+					return !isDynamicRestorationDescriptor(descriptor)
+				})
+				const dynamic = result.filter(isDynamicRestorationDescriptor)
+				return strict.concat(dynamic)
 			}
 
 			function applyResourceMutation(state, delta) {
@@ -1351,8 +2879,9 @@ ModLoader.register({
 				state.mutations.push({ kind: 'onlyones', keys: keys.slice(), values: previous })
 			}
 
-			function removeExpectedEntity(descriptor, recordId, relations) {
+			function removeExpectedEntity(descriptor, recordId, relations, state) {
 				const entity = findExpectedEntity(descriptor)
+				const dynamicOrdinaryCube = isDynamicOrdinaryStableCubeDescriptor(descriptor, paintCubeState)
 				traceProbe('apply.clear.before', {
 					name: descriptor.name,
 					position: descriptor.position,
@@ -1360,19 +2889,70 @@ ModLoader.register({
 					stuffCount: Array.isArray(game.stuff) ? game.stuff.length : null,
 					entityCount: finiteOr(game.entitiesInGame?.[descriptor.name], null)
 				})
+				if (!entity && dynamicOrdinaryCube) {
+					const resolution = resolveRedoDynamicCubeAbsence(descriptor)
+					if (state.direction === 'redo') {
+						traceProbe(
+							resolution.allowed
+								? 'contract.redo.dynamic-cube-skipped'
+								: 'contract.redo.dynamic-cube-denied',
+							redoDynamicCubeProbeDetails(descriptor, resolution)
+						)
+						if (!resolution.allowed) {
+							throw deletionError('EXTERNAL_CHANGE', 'A dynamic Cube historical cell has a strict occupant.')
+						}
+						return { skipped: true, removed: null, pendingConductorNeighbours: [] }
+					}
+					if (resolution.relocated || !resolution.allowed) {
+						throw deletionError('EXTERNAL_CHANGE', 'A dynamic Cube changed beyond its live removal contract.')
+					}
+					traceProbe('apply.dynamic-cube-skipped', {
+						name: descriptor.name,
+						position: descriptor.position,
+						reason: resolution.occupant ? 'replaced-by-dynamic-cube' : 'disappeared'
+					})
+					return { skipped: true, removed: null, pendingConductorNeighbours: [] }
+				}
 				if (!entity || ensureIdentity(entity) !== descriptor.identity) {
 					throw deletionError('EXTERNAL_CHANGE', 'A deletion target entity changed.')
 				}
+				if (
+					normalizeRemovalLayer(descriptor?.layer, descriptor) === 'surge' &&
+					!recordedSurgeRemovalSafe({ relations }, descriptor, entity)
+				) {
+					throw deletionError('EXTERNAL_CHANGE', 'A deletion Surge became unsafe before removal.')
+				}
 				const save = captureDeletionEntitySave(entity, descriptor.layer)
-				const expectedSave = expectedRemovalSave(recordId, descriptor)
-				if (!matchesDeletionSave(save, expectedSave, descriptor, paintCubeState)) {
+				const redoAttachedCube = state.direction === 'redo' &&
+					normalizeRemovalLayer(descriptor?.layer, descriptor) === 'attached-cube'
+				const expectedSave = redoAttachedCube
+					? descriptor?.save
+					: expectedRemovalSave(recordId, descriptor, state)
+				const saveMatches = redoAttachedCube
+					? recordedAttachedCubeSafe(descriptor, entity)
+					: dynamicOrdinaryCube
+					? isDynamicOrdinaryStableCubeEntity(entity, paintCubeState) &&
+						samePlain(
+							dynamicOrdinaryCubeComparableSave(save, descriptor),
+							dynamicOrdinaryCubeComparableSave(expectedSave, descriptor)
+						)
+					: matchesDeletionSave(save, expectedSave, descriptor, paintCubeState)
+				if (!saveMatches) {
 					throw deletionError('EXTERNAL_CHANGE', 'A deletion target state changed.')
 				}
+				const pendingConductorNeighbours = capturePendingConductorNeighbours(
+					entity,
+					recordId,
+					state
+				)
+				const removalSave = state?.ownedRebasedIdentities?.has?.(descriptor.identity)
+					? state.ownedOriginalSaves.get(descriptor.identity) || save
+					: save
 				const removed = Object.assign({}, descriptor, {
 					name: safeName(entity.name),
 					position: clonePosition(entity.position),
 					footprint: entityFootprint(entity, entity.position),
-					save
+					save: jsonClone(removalSave)
 				})
 				const restoreTemporaryRelationGuards = prepareRelationRemovalGuards(descriptor, relations)
 				try {
@@ -1398,7 +2978,97 @@ ModLoader.register({
 					stuffCount: Array.isArray(game.stuff) ? game.stuff.length : null,
 					entityCount: finiteOr(game.entitiesInGame?.[descriptor.name], null)
 				})
-				return removed
+				if (isBuildingRemoval(descriptor) && isPumpEntity(entity)) {
+					state.removedPumpOwners.set(descriptor.identity, {
+						identity: descriptor.identity,
+						entity,
+						descriptor: removed
+					})
+				}
+				return { removed, pendingConductorNeighbours }
+			}
+
+			function capturePendingConductorNeighbours(entity, recordId, state) {
+				if (!state?.pendingRemovals || typeof entity?.getNeighbours !== 'function') return []
+				const result = []
+				const seen = new Set()
+				for (const candidate of entity.getNeighbours() || []) {
+					if (!candidate || safeName(candidate.name) !== 'conductor') continue
+					const identity = ensureIdentity(candidate)
+					if (seen.has(identity)) continue
+					seen.add(identity)
+					const descriptor = state.pendingRemovals.get(identity)
+					if (!descriptor || safeName(descriptor.name) !== 'conductor') continue
+					if (findExpectedEntity(descriptor) !== candidate) {
+						throw deletionError('EXTERNAL_CHANGE', 'A pending Conductor changed before neighbour refresh.')
+					}
+					const beforeSave = captureDeletionEntitySave(candidate, descriptor.layer)
+					const expectedSave = expectedRemovalSave(recordId, descriptor, state)
+					if (!matchesDeletionSave(beforeSave, expectedSave, descriptor, paintCubeState)) {
+						throw deletionError('EXTERNAL_CHANGE', 'A pending Conductor state changed before neighbour refresh.')
+					}
+					if (!state.ownedOriginalSaves.has(identity)) {
+						state.ownedOriginalSaves.set(identity, jsonClone(beforeSave))
+					}
+					result.push({ descriptor, entity: candidate, beforeSave })
+				}
+				return result
+			}
+
+			function rebasePendingConductorNeighbours(entries, state) {
+				for (const entry of entries || []) {
+					const descriptor = entry.descriptor
+					const current = findExpectedEntity(descriptor)
+					if (current !== entry.entity) {
+						throw deletionError('EXTERNAL_CHANGE', 'A pending Conductor changed during neighbour refresh.')
+					}
+					const afterSave = captureDeletionEntitySave(current, descriptor.layer)
+					const comparison = compareOwnedConductorVariantChange(entry.beforeSave, afterSave, descriptor)
+					if (!comparison.ok) {
+						throw deletionError('EXTERNAL_CHANGE', 'A pending Conductor changed beyond its derived variant.')
+					}
+					state.rollingExpectedSaves.set(descriptor.identity, jsonClone(afterSave))
+					if (!comparison.changed) continue
+					state.ownedRebasedIdentities.add(descriptor.identity)
+					traceProbe('apply.conductor-variant-rebased', {
+						name: descriptor.name,
+						position: descriptor.position,
+						before: entry.beforeSave?.par?.variant,
+						after: afterSave?.par?.variant
+					})
+				}
+			}
+
+			function compareOwnedConductorVariantChange(before, after, descriptor) {
+				if (sameDeletionSave(before, after, descriptor)) return { ok: true, changed: false }
+				if (
+					safeName(descriptor?.name) !== 'conductor' ||
+					normalizeRemovalLayer(descriptor?.layer, descriptor) !== 'building' ||
+					!before?.par ||
+					!after?.par ||
+					!Object.prototype.hasOwnProperty.call(before.par, 'variant') ||
+					!Object.prototype.hasOwnProperty.call(after.par, 'variant') ||
+					typeof before.par.variant !== 'number' ||
+					typeof after.par.variant !== 'number'
+				) return { ok: false, changed: false }
+				const beforeVariant = before.par.variant
+				const afterVariant = after.par.variant
+				if (
+					!Number.isFinite(beforeVariant) ||
+					!Number.isFinite(afterVariant) ||
+					beforeVariant < 0 ||
+					beforeVariant > 1 ||
+					afterVariant < 0 ||
+					afterVariant > 1
+				) return { ok: false, changed: false }
+				const comparableBefore = comparableDeletionSave(before, descriptor)
+				const comparableAfter = comparableDeletionSave(after, descriptor)
+				comparableBefore.par.variant = 'owned-conductor-variant'
+				comparableAfter.par.variant = 'owned-conductor-variant'
+				return {
+					ok: samePlain(comparableBefore, comparableAfter),
+					changed: beforeVariant !== afterVariant
+				}
 			}
 
 			function prepareRelationRemovalGuards(descriptor, relations) {
@@ -1490,12 +3160,25 @@ ModLoader.register({
 				}
 			}
 
-			function expectedRemovalSave(recordId, descriptor) {
-				return transactionData.get(recordId)?.removalSaves?.get(descriptor?.identity) || descriptor?.save
+			function expectedRemovalSave(recordId, descriptor, state) {
+				return state?.rollingExpectedSaves?.get?.(descriptor?.identity) ||
+					transactionData.get(recordId)?.removalSaves?.get(descriptor?.identity) ||
+					descriptor?.save
+			}
+
+			function expectedRecordedTargetSave(recordId, descriptor, direction) {
+				if (
+					direction === 'redo' &&
+					normalizeRemovalLayer(descriptor?.layer, descriptor) === 'attached-cube'
+				) return descriptor?.save
+				return expectedRemovalSave(recordId, descriptor)
 			}
 
 			function addExpectedEntity(descriptor, relations, state) {
-				if (isBuildingRemoval(descriptor)) assertFootprintEmpty(game, descriptor.footprint)
+				const layer = normalizeRemovalLayer(descriptor?.layer, descriptor)
+				if (isBuildingRemoval(descriptor) || layer === 'attached-cube') {
+					assertFootprintEmpty(game, descriptor.footprint)
+				}
 				else if (findExpectedEntity(descriptor)) {
 					throw deletionError('EXTERNAL_CHANGE', 'A transient deletion target is no longer empty.')
 				}
@@ -1505,7 +3188,13 @@ ModLoader.register({
 				const restoreTemporaryRelationGuards = prepareRelationRestoreGuards(descriptor, relations, state)
 				let entity
 				try {
-					entity = restoreEntitySave(game, descriptor.save)
+					if (layer === 'attached-cube') {
+						const pump = findExpectedEntity(descriptor.pump)
+						if (!pump) throw deletionError('EXTERNAL_CHANGE', 'An attached Cube owner was not restored.')
+						entity = restoreAttachedCubeSave(game, descriptor.save, pump)
+					} else {
+						entity = restoreEntitySave(game, descriptor.save)
+					}
 				} finally {
 					restoreTemporaryRelationGuards()
 				}
@@ -1592,7 +3281,7 @@ ModLoader.register({
 
 			function allowsStandaloneSurgeReplacement(descriptor) {
 				const layer = normalizeRemovalLayer(descriptor?.layer, descriptor)
-				return layer === 'building' || layer === 'cube' || layer === 'painted'
+				return layer === 'building' || layer === 'cube' || layer === 'painted' || layer === 'attached-cube'
 			}
 
 			function standaloneSurgeReplacementCells(removals) {
@@ -1651,6 +3340,10 @@ ModLoader.register({
 					if (!entity) continue
 					const save = captureReplaceableStandaloneSurge(entity)
 					if (!save) {
+						traceProbe(
+							'contract.undo.restoration-occupant-denied',
+							undoTransactionPumpSuccessorDenialDetails(state.payload, descriptor, state, entity)
+						)
 						throw deletionError('EXTERNAL_CHANGE', 'A deletion restoration target changed outside World Editor.')
 					}
 					const displaced = {
@@ -1688,27 +3381,279 @@ ModLoader.register({
 				assignIdentity(entity, descriptor.identity)
 			}
 
-			function rollbackMutations(state) {
+			function restoreDisplacedAttachedCube(descriptor, state) {
+				if (findExpectedEntity(descriptor)) return
+				addExpectedEntity(descriptor, state.relations, state)
+			}
+
+			function rollbackDiscardedTransactionVacancySuccessor(state, descriptor) {
+				const exact = findEntityByIdentity(descriptor?.identity)
+				if (!exact) return
+				const ownerIdentity = String(descriptor?.pump?.identity || '')
+				if (
+					!isVanillaLifecycleCubeEntity(exact) ||
+					entityAt(game, exact.position) !== exact ||
+					!isPumpEntity(exact.pump) ||
+					ensureIdentity(exact.pump) !== ownerIdentity
+				) {
+					traceProbe('contract.rollback.transaction-vacancy-cube-denied', {
+						direction: state.direction,
+						descriptor: describeRemovalDescriptor(descriptor),
+						occupant: describeContractOccupant(exact),
+						liveCube: liveCubeProbeDetails(exact)
+					})
+					throw deletionError('ROLLBACK_FAILED', 'A transaction-vacancy Cube changed before rollback.')
+				}
+				const currentDescriptor = Object.assign({}, descriptor, {
+					position: clonePosition(exact.position),
+					footprint: entityFootprint(exact, exact.position)
+				})
+				const restoreTemporaryRelationGuards = prepareRelationRemovalGuards(
+					currentDescriptor,
+					state.relations
+				)
+				try {
+					game.clearCell(exact.position)
+				} finally {
+					restoreTemporaryRelationGuards()
+				}
+				if (game.stuff?.includes?.(exact) || entityAt(game, exact.position) === exact) {
+					throw deletionError('ROLLBACK_FAILED', 'A transaction-vacancy Cube could not be cleared during rollback.')
+				}
+				traceProbe('contract.rollback.transaction-vacancy-cube-cleared', {
+					direction: state.direction,
+					descriptor: describeRemovalDescriptor(descriptor),
+					position: clonePosition(exact.position)
+				})
+			}
+
+			function rollbackPumpOwnedByTransaction(state, pump) {
+				if (!isPumpEntity(pump)) return false
+				const identity = ensureIdentity(pump)
+				return state.mutations.some(function (mutation) {
+					return (mutation.kind === 'created' || mutation.kind === 'removed') &&
+						mutation.descriptor?.identity === identity &&
+						isPumpEntity(mutation.descriptor)
+				})
+			}
+
+			function rollbackOwnerBoundOccupant(state, descriptor, entity) {
+				if (
+					normalizeRemovalLayer(descriptor?.layer, descriptor) !== 'attached-cube' ||
+					safeName(entity?.name) !== 'cube'
+				) return false
+				const position = normalizePosition(entity?.position)
+				if (!position || !footprintCells(descriptor.footprint).some(function (cell) {
+					return sameCellPosition(cell, position)
+				})) return false
+				const restoredPump = findExpectedEntity(descriptor.pump)
+				const stalePump = entity?.pump
+				if (
+					!restoredPump ||
+					!rollbackPumpOwnedByTransaction(state, restoredPump) ||
+					!isPumpEntity(stalePump) ||
+					ensureIdentity(stalePump) !== String(descriptor?.pump?.identity || '')
+				) return false
+				if (entity.pump !== restoredPump) entity.pump = restoredPump
+				traceProbe('contract.rollback.owner-bound-orphan-rebound', {
+					direction: state.direction,
+					descriptor: describeRemovalDescriptor(descriptor),
+					occupant: describeContractOccupant(entity)
+				})
+				return true
+			}
+
+			function rollbackDynamicEntityAllowed(state, descriptor, entity) {
+				if (!isVanillaLifecycleCubeEntity(entity)) return false
+				const position = normalizePosition(entity?.position)
+				if (!position || !footprintCells(descriptor?.footprint).some(function (cell) {
+					return cell[0] === position[0] && cell[1] === position[1]
+				})) return false
+				if (!isDynamicRestorationDescriptor(descriptor)) return true
+				if (ensureIdentity(entity) === descriptor?.identity) return true
+				return !findEntityByIdentity(descriptor?.identity) &&
+					ownerBoundDynamicSuccessorAllowed(state, descriptor, entity)
+			}
+
+			function clearRollbackDynamicEntity(state, descriptor, entity, reason) {
+				if (!rollbackDynamicEntityAllowed(state, descriptor, entity)) {
+					traceProbe('contract.rollback.denied', contractProbeDetails(
+						state,
+						descriptor,
+						entity,
+						'strict-occupant'
+					))
+					throw deletionError('ROLLBACK_FAILED', 'A rollback target was occupied by a strict entity.')
+				}
+				game.clearCell(entity.position)
+				if (game.stuff?.includes?.(entity) || entityAt(game, entity.position) === entity) {
+					throw deletionError('ROLLBACK_FAILED', 'A live Cube could not be removed during rollback.')
+				}
+				state.contract.journal.push({
+					kind: 'rollback-dynamic-compensation',
+					identity: ensureIdentity(entity),
+					position: normalizePosition(entity.position),
+					reason
+				})
+				traceProbe(
+					'contract.rollback.dynamic-compensated',
+					contractProbeDetails(state, descriptor, entity, reason)
+				)
+			}
+
+			function rollbackCellAuthorized(state, descriptor, position, kind) {
+				const key = cellKey(position[0], position[1])
+				const baseline = state.contract.baseline.get(key) || null
+				if (kind === 'created') {
+					return state.contract.createdCells.has(key) && (!baseline || baseline.layer === 'surge')
+				}
+				return state.contract.vacatedCells.has(key) && baseline?.identity === descriptor?.identity
+			}
+
+			function rollbackCreatedMutation(state, mutation) {
+				const descriptor = mutation.descriptor
+				const contractDescriptor = mutation.contractDescriptor || descriptor
+				const expected = findExpectedEntity(descriptor)
+				if (expected) {
+					if (
+						isDynamicRestorationDescriptor(contractDescriptor) &&
+						!rollbackDynamicEntityAllowed(state, contractDescriptor, expected)
+					) {
+						traceProbe('contract.rollback.denied', contractProbeDetails(
+							state,
+							contractDescriptor,
+							expected,
+							'strict-layer-transition'
+						))
+						throw deletionError('ROLLBACK_FAILED', 'A restored dynamic Cube entered a strict layer.')
+					}
+					const restoreTemporaryRelationGuards = prepareRelationRemovalGuards(contractDescriptor, state.relations)
+					try {
+						game.clearCell(expected.position)
+					} finally {
+						restoreTemporaryRelationGuards()
+					}
+					if (game.stuff?.includes?.(expected) || entityAt(game, expected.position) === expected) {
+						throw deletionError('ROLLBACK_FAILED', 'A restored entity could not be removed during rollback.')
+					}
+					if (isDynamicRestorationDescriptor(contractDescriptor)) {
+						state.contract.journal.push({
+							kind: 'rollback-dynamic-compensation',
+							identity: ensureIdentity(expected),
+							position: normalizePosition(expected.position),
+							reason: 'exact-identity-provenance'
+						})
+						traceProbe(
+							'contract.rollback.dynamic-compensated',
+							contractProbeDetails(
+								state,
+								contractDescriptor,
+								expected,
+								'exact-identity-provenance'
+							)
+						)
+					}
+					return
+				}
+				if (findEntityByIdentity(contractDescriptor.identity)) {
+					throw deletionError('ROLLBACK_FAILED', 'A restored entity moved outside its rollback footprint.')
+				}
+				const occupants = new Set()
+				for (const position of footprintCells(contractDescriptor.footprint)) {
+					const current = entityAt(game, position)
+					if (!current) continue
+					const baseline = state.contract.baseline.get(cellKey(position[0], position[1])) || null
+					if (baseline && ensureIdentity(current) === baseline.identity) continue
+					if (!rollbackCellAuthorized(state, contractDescriptor, position, 'created')) {
+						traceProbe('contract.rollback.denied', contractProbeDetails(
+							state,
+							contractDescriptor,
+							current,
+							'outside-created-provenance'
+						))
+						throw deletionError('ROLLBACK_FAILED', 'A restored entity footprint changed during rollback.')
+					}
+					occupants.add(current)
+				}
+				for (const current of occupants) {
+					clearRollbackDynamicEntity(state, contractDescriptor, current, 'dynamic-successor')
+				}
+			}
+
+			function rollbackRemovedMutation(state, descriptor) {
+				const expected = findExpectedEntity(descriptor)
+				if (expected) {
+					if (
+						normalizeRemovalLayer(descriptor?.layer, descriptor) === 'attached-cube' &&
+						expected.pump !== findExpectedEntity(descriptor.pump) &&
+						!rollbackOwnerBoundOccupant(state, descriptor, expected)
+					) {
+						throw deletionError('ROLLBACK_FAILED', 'A restored attached Cube owner changed during rollback.')
+					}
+					return
+				}
+				if (findEntityByIdentity(descriptor.identity)) {
+					throw deletionError('ROLLBACK_FAILED', 'A removed entity moved outside its rollback footprint.')
+				}
+				const ownerBoundOccupant = entityAt(game, descriptor.position)
+				if (rollbackOwnerBoundOccupant(state, descriptor, ownerBoundOccupant)) return
+				const occupants = new Set()
+				for (const position of footprintCells(descriptor.footprint)) {
+					const current = entityAt(game, position)
+					if (!current) continue
+					if (!rollbackCellAuthorized(state, descriptor, position, 'removed')) {
+						traceProbe('contract.rollback.denied', contractProbeDetails(
+							state,
+							descriptor,
+							current,
+							'outside-vacated-provenance'
+						))
+						throw deletionError('ROLLBACK_FAILED', 'A deletion footprint is no longer recoverable.')
+					}
+					occupants.add(current)
+				}
+				for (const current of occupants) {
+					clearRollbackDynamicEntity(state, descriptor, current, 'transaction-vacancy-successor')
+				}
+				addExpectedEntity(descriptor, state.relations)
+			}
+
+			function reconcileRollbackBaseline(state) {
+				const descriptorsByCell = new Map()
+				for (const mutation of state.mutations) {
+					if (mutation.kind !== 'created') continue
+					for (const position of footprintCells(mutation.descriptor.footprint)) {
+						descriptorsByCell.set(cellKey(position[0], position[1]), mutation.descriptor)
+					}
+				}
+				for (const key of state.contract.createdCells) {
+					const descriptor = descriptorsByCell.get(key)
+					if (!descriptor) continue
+					const position = key.split(':').map(Number)
+					const baseline = state.contract.baseline.get(key) || null
+					const current = entityAt(game, position)
+					if (!current || (baseline && ensureIdentity(current) === baseline.identity)) continue
+					if (!rollbackCellAuthorized(state, descriptor, position, 'created')) {
+						throw deletionError('ROLLBACK_FAILED', 'A rollback baseline changed outside World Editor.')
+					}
+					clearRollbackDynamicEntity(state, descriptor, current, 'late-dynamic-successor')
+				}
+			}
+
+			async function rollbackMutations(context, state) {
+				let processed = 0
 				for (let index = state.mutations.length - 1; index >= 0; index -= 1) {
 					const mutation = state.mutations[index]
 					if (mutation.kind === 'created') {
-						const entity = findExpectedEntity(mutation.descriptor)
-						if (!entity || ensureIdentity(entity) !== mutation.descriptor.identity) {
-							throw deletionError('ROLLBACK_FAILED', 'A restored entity could not be removed during rollback.')
-						}
-						const restoreTemporaryRelationGuards = prepareRelationRemovalGuards(
-							mutation.descriptor,
-							state.relations
-						)
-						try {
-							game.clearCell(entity.position)
-						} finally {
-							restoreTemporaryRelationGuards()
-						}
+						rollbackCreatedMutation(state, mutation)
 					} else if (mutation.kind === 'displaced-surge') {
 						restoreDisplacedSurge(mutation.descriptor)
+					} else if (mutation.kind === 'displaced-attached-cube') {
+						restoreDisplacedAttachedCube(mutation.descriptor, state)
+					} else if (mutation.kind === 'discarded-transaction-vacancy-successor') {
+						rollbackDiscardedTransactionVacancySuccessor(state, mutation.descriptor)
 					} else if (mutation.kind === 'removed') {
-						addExpectedEntity(mutation.descriptor, state.relations)
+						rollbackRemovedMutation(state, mutation.descriptor)
 					} else if (mutation.kind === 'resources') {
 						applyResourceDelta(game, negateArray(mutation.delta), true)
 					} else if (mutation.kind === 'stats') {
@@ -1718,10 +3663,17 @@ ModLoader.register({
 					} else if (mutation.kind === 'onlyones') {
 						writeOnlyones(game, mutation.keys, mutation.values)
 					}
+					processed += 1
+					if (processed % APPLY_CHUNK_SIZE === 0) await yieldTurn()
 				}
+				if (state.direction === 'undo') reconcileRollbackBaseline(state)
 			}
 
 			function verifyAppliedState(payload, state, expectedAfter) {
+				if (!expectedAfter) {
+					const manifestState = verifyDynamicCommitManifest(state)
+					if (!manifestState.ok) return manifestState
+				}
 				for (const descriptor of payload.removals) {
 					const entity = findExpectedEntity(descriptor)
 					if (expectedAfter) {
@@ -1734,12 +3686,20 @@ ModLoader.register({
 								return denied('VERIFY_FAILED', 'A deleted building is still present.')
 							}
 						}
+					} else if (isDynamicRestorationDescriptor(descriptor)) {
+						continue
 					} else if (
 						!entity ||
 						ensureIdentity(entity) !== descriptor.identity ||
 						safeName(entity.name) !== descriptor.name
 					) {
 						return denied('VERIFY_FAILED', 'A deleted building was not restored exactly.')
+					}
+					if (!expectedAfter && normalizeRemovalLayer(descriptor?.layer, descriptor) === 'attached-cube') {
+						const pump = findExpectedEntity(descriptor.pump)
+						if (!pump || entity.pump !== pump) {
+							return denied('VERIFY_FAILED', 'An attached Cube was not restored to its extractor.')
+						}
 					}
 				}
 				const relationState = inspectRecordedRelations(payload, expectedAfter ? 'undo' : 'redo')
@@ -1919,12 +3879,38 @@ ModLoader.register({
 				source: normalizeSource(value.source),
 				signature: String(value.signature),
 				compatibilitySignature: String(value.compatibilitySignature || ''),
+				dynamicCubeSignature: String(value.dynamicCubeSignature || ''),
+				pumpDependencySignature: String(value.pumpDependencySignature || ''),
+				dynamicSurgeSignature: String(value.dynamicSurgeSignature || ''),
+				cutRetainedCubeSignature: String(value.cutRetainedCubeSignature || ''),
+				pumpCubeStates: normalizePumpCubeStates(value.pumpCubeStates),
+				ordinaryCubeStates: normalizeOrdinaryCubeRuntimeStates(value.ordinaryCubeStates),
 				growStates: normalizeGrowStates(value.growStates),
 				paintedStates: normalizePaintedRuntimeStates(value.paintedStates),
 				surgeStates: normalizeSurgeRuntimeStates(value.surgeStates),
+				strictSurgeStates: normalizeSurgeRuntimeStates(value.strictSurgeStates),
 				relations: normalizeRelations(value.relations),
-				fingerprints: normalizePlanFingerprints(value.fingerprints)
+				fingerprints: normalizePlanFingerprints(value.fingerprints),
+				diagnosticTargets: normalizeDiagnosticTargets(value)
 			}
+		}
+
+		function normalizeDiagnosticTargets(value) {
+			return {
+				removal: normalizeDiagnosticTargetSummaries(
+					Array.isArray(value?.removals) ? value.removals : value?.diagnosticTargets?.removal
+				),
+				protected: normalizeDiagnosticTargetSummaries(
+					Array.isArray(value?.protectedTargets) ? value.protectedTargets : value?.diagnosticTargets?.protected
+				)
+			}
+		}
+
+		function normalizeDiagnosticTargetSummaries(value) {
+			if (!Array.isArray(value)) return []
+			return value.map(diagnosticTargetSummary).sort(function (left, right) {
+				return diagnosticTargetKey(left).localeCompare(diagnosticTargetKey(right))
+			})
 		}
 
 		function normalizeRelations(value) {
@@ -1977,6 +3963,40 @@ ModLoader.register({
 					paint: jsonClone(entry?.paint)
 				}
 			}).sort(compareGrowStates)
+		}
+
+		function normalizePumpCubeStates(value) {
+			if (!Array.isArray(value)) return []
+			return value.map(function (entry) {
+				return {
+					identity: String(entry?.identity || ''),
+					position: normalizePosition(entry?.position) || [0, 0],
+					state: finiteInteger(entry?.state, -1),
+					resources: String(entry?.resources || ''),
+					killme: entry?.killme === true,
+					resourcesValid: entry?.resourcesValid === true,
+					paintFree: entry?.paintFree === true,
+					selectedOwner: entry?.selectedOwner === true,
+					inSelectedPumpVicinity: entry?.inSelectedPumpVicinity === true,
+					pump: entry?.pump ? {
+						identity: String(entry.pump.identity || ''),
+						name: safeName(entry.pump.name),
+						position: normalizePosition(entry.pump.position) || [0, 0]
+					} : null
+				}
+			}).sort(comparePumpCubeStates)
+		}
+
+		function normalizeOrdinaryCubeRuntimeStates(value) {
+			if (!Array.isArray(value)) return []
+			return value.map(function (entry) {
+				return {
+					identity: String(entry?.identity || ''),
+					position: normalizePosition(entry?.position) || [0, 0],
+					valid: entry?.valid === true,
+					save: jsonClone(entry?.save)
+				}
+			}).sort(compareOrdinaryCubeRuntimeStates)
 		}
 
 		function normalizeSource(value) {
@@ -2070,7 +4090,7 @@ ModLoader.register({
 
 		function normalizeRemovalLayer(value, entity) {
 			const layer = String(value || '').toLowerCase()
-			if (layer === 'cube' || layer === 'painted' || layer === 'surge') return layer
+			if (layer === 'cube' || layer === 'painted' || layer === 'surge' || layer === 'attached-cube') return layer
 			const name = safeName(entity?.name)
 			return name === 'cube' || name === 'surge' ? name : 'building'
 		}
@@ -2093,6 +4113,13 @@ ModLoader.register({
 			if (kind === 'invalid') return 'invalid-painted-cube'
 			if (kind === 'strict') return requested ? 'unsafe-painted-cube' : 'painted-cube'
 			return requested ? 'unsafe-cube' : 'cube'
+		}
+
+		function cutRetainableLiveCubeEntity(entity, paintCubeState) {
+			const kind = classifyPaintedCube(entity, paintCubeState)
+			if (kind === 'strict') return paintedRemovalSafe(null, entity, paintCubeState)
+			if (kind !== 'ordinary') return false
+			return isRetainableLiveVanillaCubeEntity(entity, paintCubeState)
 		}
 
 		function paintedRemovalSafe(game, entity, paintCubeState) {
@@ -2130,6 +4157,288 @@ ModLoader.register({
 			} catch (error) {
 				return false
 			}
+		}
+
+		function isDynamicOrdinaryStableCubeDescriptor(value, paintCubeState) {
+			if (
+				normalizeRemovalLayer(value?.layer, value) !== 'cube' ||
+				safeName(value?.name || value?.save?.name) !== 'cube' ||
+				Number(value?.save?.par?.state) !== 2 ||
+				value?.save?.par?.killme === true ||
+				!validOrdinaryCubeResources(value?.save?.par?.resources) ||
+				Object.prototype.hasOwnProperty.call(value?.save?.par || {}, 'worldEditorPaint')
+			) return false
+			try {
+				if (paintCubeState?.normalizePaint?.(value.save)) return false
+			} catch (error) {
+				return false
+			}
+			return true
+		}
+
+		function isDynamicOrdinaryStableCubeEntity(entity, paintCubeState) {
+			if (
+				safeName(entity?.name) !== 'cube' ||
+				Number(entity?.state) !== 2 ||
+				entity?.killme === true ||
+				!validOrdinaryCubeResources(entity?.resources) ||
+				Object.prototype.hasOwnProperty.call(entity || {}, 'worldEditorPaint')
+			) return false
+			try {
+				return !paintCubeState?.normalizePaint?.(entity)
+			} catch (error) {
+				return false
+			}
+		}
+
+		function liveVanillaCubeClassification(entity, paintCubeState) {
+			const name = safeName(entity?.name)
+			const state = Number.isFinite(Number(entity?.state)) ? Number(entity.state) : null
+			const killme = entity?.killme === true
+			const resourcesLength = Array.isArray(entity?.resources) ? entity.resources.length : null
+			const resourcesValid = validOrdinaryCubeResources(entity?.resources)
+			const hasWorldEditorPaint = Object.prototype.hasOwnProperty.call(entity || {}, 'worldEditorPaint')
+			let normalizedPaint = null
+			let paintError = null
+			try {
+				normalizedPaint = paintCubeState?.normalizePaint?.(entity) || null
+			} catch (error) {
+				paintError = String(error?.message || error || 'Paint state could not be normalized.')
+			}
+			const paint = normalizedPaint
+				? {
+					version: Number.isFinite(Number(normalizedPaint.version)) ? Number(normalizedPaint.version) : null,
+					kind: String(normalizedPaint.kind || ''),
+					mode: String(normalizedPaint.mode || ''),
+					growthPhase: normalizedPaint.growth?.phase
+						? String(normalizedPaint.growth.phase)
+						: null
+				}
+				: null
+			return {
+				name,
+				state,
+				killme,
+				resourcesLength,
+				resourcesValid,
+				hasWorldEditorPaint,
+				paint,
+				paintError,
+				retainable: name === 'cube' &&
+					(state === 0 || state === 1 || state === 2) &&
+					!killme &&
+					resourcesValid &&
+					!hasWorldEditorPaint &&
+					!normalizedPaint &&
+					!paintError
+			}
+		}
+
+		function isRetainableLiveVanillaCubeEntity(entity, paintCubeState) {
+			return liveVanillaCubeClassification(entity, paintCubeState).retainable
+		}
+
+		function validOrdinaryCubeResources(value) {
+			return Array.isArray(value) && value.length === 64 && value.every(function (resource) {
+				return Number.isInteger(resource) && resource >= 0
+			})
+		}
+
+		function dynamicOrdinaryCubeComparableSave(value, descriptor) {
+			const save = comparableDeletionSave(value, descriptor || { layer: 'cube', name: 'cube' })
+			if (!save?.par || typeof save.par !== 'object') return save
+			save.par.resources = 'ordinary-cube-runtime'
+			save.par.broken = 'ordinary-cube-runtime'
+			return save
+		}
+
+		function createOrdinaryCubeRuntimeState(descriptor, paintCubeState) {
+			if (!isDynamicOrdinaryStableCubeDescriptor(descriptor, paintCubeState)) return null
+			return {
+				identity: String(descriptor?.identity || ''),
+				position: normalizePosition(descriptor?.position) || [0, 0],
+				valid: true,
+				save: dynamicOrdinaryCubeComparableSave(descriptor.save, descriptor)
+			}
+		}
+
+		function createOrdinaryCubeRuntimeStates(value, paintCubeState) {
+			const result = []
+			for (const entry of [].concat(value?.removals || [], value?.protectedTargets || [])) {
+				const state = createOrdinaryCubeRuntimeState(entry, paintCubeState)
+				if (state) result.push(state)
+			}
+			return result.sort(compareOrdinaryCubeRuntimeStates)
+		}
+
+		function compatibleOrdinaryCubeRuntimeStates(beforeValue, afterValue, resolveCurrent) {
+			const before = normalizeOrdinaryCubeRuntimeStates(beforeValue)
+			const after = normalizeOrdinaryCubeRuntimeStates(afterValue)
+			const afterByIdentity = new Map(after.map(function (entry) {
+				return [entry.identity, entry]
+			}))
+			for (const oldEntry of before) {
+				const newEntry = afterByIdentity.get(oldEntry.identity) ||
+					(typeof resolveCurrent === 'function' ? resolveCurrent(oldEntry.identity) : null)
+				if (!newEntry) continue
+				if (
+					oldEntry.valid !== true ||
+					newEntry.valid !== true ||
+					comparePositions(oldEntry.position, newEntry.position) !== 0 ||
+					!samePlain(oldEntry.save, newEntry.save)
+				) return false
+			}
+			return true
+		}
+
+		function compareOrdinaryCubeRuntimeStates(left, right) {
+			const leftPosition = normalizePosition(left?.position) || [0, 0]
+			const rightPosition = normalizePosition(right?.position) || [0, 0]
+			return (
+				String(left?.identity || '').localeCompare(String(right?.identity || '')) ||
+				comparePositions(leftPosition, rightPosition)
+			)
+		}
+
+		function isPumpEntity(entity) {
+			const name = safeName(entity?.name)
+			return name === 'pump' || name === 'pump2'
+		}
+
+		function isUnfinishedPumpCube(entity, pump) {
+			return safeName(entity?.name) === 'cube' &&
+				(entity?.state === 0 || entity?.state === 1) &&
+				entity?.killme !== true &&
+				entity?.pump === pump
+		}
+
+		function isPumpOwnedVanillaCube(entity, pump, paintCubeState) {
+			return isPumpEntity(pump) &&
+				entity?.pump === pump &&
+				isRetainableLiveVanillaCubeEntity(entity, paintCubeState)
+		}
+
+		function collectSelectedPumpAttachments(game, pumps, paintCubeState, includeStable) {
+			const result = new Map()
+			for (const pump of Array.from(pumps || [])) {
+				if (!isPumpEntity(pump)) continue
+				for (const candidate of game.stuff || []) {
+					if (
+						isUnfinishedPumpCube(candidate, pump) ||
+						(includeStable === true && isPumpOwnedVanillaCube(candidate, pump, paintCubeState))
+					) {
+						result.set(candidate, pump)
+					}
+				}
+			}
+			return result
+		}
+
+		function createPumpCubeStates(game, pumps, identityFor, paintCubeState) {
+			const selected = new Set(Array.from(pumps || []).filter(isPumpEntity))
+			if (!selected.size) return []
+			const vicinity = selectedPumpVicinityCells(selected)
+			const result = []
+			for (const cube of game?.stuff || []) {
+				if (safeName(cube?.name) !== 'cube') continue
+				const position = normalizePosition(cube?.position)
+				if (!position || (!selected.has(cube?.pump) && !vicinity.has(cellKey(position[0], position[1])))) continue
+				result.push(capturePumpCubeState(cube, identityFor, paintCubeState, {
+					selectedOwner: selected.has(cube?.pump),
+					inSelectedPumpVicinity: vicinity.has(cellKey(position[0], position[1]))
+				}))
+			}
+			return result.sort(comparePumpCubeStates)
+		}
+
+		function selectedPumpVicinityCells(pumps) {
+			const result = new Set()
+			for (const pump of pumps || []) {
+				const origin = normalizePosition(pump?.position)
+				if (!origin) continue
+				for (const offset of [].concat(pump?.soi || [], pump?.soe || [])) {
+					const du = Number(offset?.[0])
+					const dv = Number(offset?.[1])
+					if (!Number.isInteger(du) || !Number.isInteger(dv)) continue
+					result.add(cellKey(origin[0] + du, origin[1] + dv))
+				}
+			}
+			return result
+		}
+
+		function ignorableSelectedPumpTerminalCube(entity, selectedPumps, vicinity, paintCubeState) {
+			const position = normalizePosition(entity?.position)
+			const owner = entity?.pump
+			if (
+				!position ||
+				!selectedPumps?.has?.(owner) ||
+				!vicinity?.has?.(cellKey(position[0], position[1]))
+			) return false
+			const live = liveVanillaCubeClassification(entity, paintCubeState)
+			return live.name === 'cube' &&
+				live.state === 3 &&
+				live.killme === true &&
+				live.resourcesValid === true &&
+				live.hasWorldEditorPaint === false &&
+				live.paint === null &&
+				live.paintError === null
+		}
+
+		function capturePumpCubeState(cube, identityFor, paintCubeState, context) {
+			const owner = cube?.pump
+			const live = liveVanillaCubeClassification(cube, paintCubeState)
+			return {
+				identity: String(identityFor(cube) || ''),
+				position: normalizePosition(cube?.position) || [0, 0],
+				state: finiteInteger(cube?.state, -1),
+				resources: fingerprint(Array.isArray(cube?.resources) ? cube.resources : null),
+				killme: live.killme === true,
+				resourcesValid: live.resourcesValid === true,
+				paintFree: live.hasWorldEditorPaint === false && live.paint === null && live.paintError === null,
+				selectedOwner: context?.selectedOwner === true,
+				inSelectedPumpVicinity: context?.inSelectedPumpVicinity === true,
+				pump: isPumpEntity(owner) ? {
+					identity: String(identityFor(owner) || ''),
+					name: safeName(owner.name),
+					position: normalizePosition(owner.position) || [0, 0]
+				} : null
+			}
+		}
+
+		function pumpAttachmentsSafe(game, entity, attachedCubeOwners, paintCubeState) {
+			const attached = []
+			for (const pair of attachedCubeOwners || []) {
+				if (pair[1] === entity) attached.push(pair[0])
+			}
+			return attached.length > 0 && attached.every(function (cube) {
+				return attachedCubeRemovalSafe(cube, entity, paintCubeState)
+			})
+		}
+
+		function attachedCubeRemovalSafe(entity, pump, paintCubeState) {
+			const numericFields = [
+				'fill',
+				'maxFill',
+				'reversePause',
+				'reverseTimer',
+				'reverseSpeed',
+				'unveilSpeed',
+				'unveilProgress',
+				'broken',
+				'baseBreakPower',
+				'breakPower',
+				'shakePower'
+			]
+			return isPumpOwnedVanillaCube(entity, pump, paintCubeState) &&
+				(safeName(pump?.name) === 'pump' || safeName(pump?.name) === 'pump2') &&
+				!!normalizePosition(entity?.position) &&
+				!!normalizePosition(pump?.position) &&
+				numericFields.every(function (field) { return Number.isFinite(Number(entity?.[field])) }) &&
+				Array.isArray(entity?.resources) &&
+				entity.resources.length === 64 &&
+				entity.resources.every(function (resource) {
+					return Number.isInteger(resource) && resource >= 0
+				})
 		}
 
 		function footprintCrossesMask(footprint, mask) {
@@ -2370,31 +4679,52 @@ ModLoader.register({
 
 		function signatureDescriptor(entry) {
 			return Object.assign({}, entry, {
-				save: comparableDeletionSave(entry?.save)
+				save: comparableDeletionSave(entry?.save, entry)
 			})
 		}
 
-		function signatureProtectedDescriptor(entry) {
+		function signatureProtectedDescriptor(entry, paintCubeState) {
 			const descriptor = signatureDescriptor(entry)
+			if (isDynamicOrdinaryStableCubeDescriptor(entry)) {
+				descriptor.dynamicOrdinaryCube = true
+			}
+			if (cutRetainedCubeDescriptor(entry, paintCubeState, 'protected')) {
+				descriptor.cutRetainableCube = true
+			}
 			delete descriptor.save
 			return descriptor
 		}
 
-		function comparableDeletionSave(value) {
+		function comparableDeletionSave(value, descriptor) {
 			const save = jsonClone(value)
-			if (save?.par && typeof save.par === 'object') delete save.par.soul
+			if (!save?.par || typeof save.par !== 'object') return save
+			delete save.par.soul
+			const layer = descriptor ? normalizeRemovalLayer(descriptor?.layer, descriptor) : ''
+			if (layer === 'building') {
+				for (const field of BUILDING_RUNTIME_SAVE_FIELDS) {
+					if (Object.prototype.hasOwnProperty.call(save.par, field)) save.par[field] = 'building-runtime'
+				}
+				const name = safeName(descriptor?.name || save?.name)
+				if ((name === 'pump' || name === 'pump2') && Object.prototype.hasOwnProperty.call(save.par, 'depth')) {
+					save.par.depth = 'building-runtime'
+				}
+			} else if (layer === 'attached-cube') {
+				for (const field of ATTACHED_CUBE_RUNTIME_SAVE_FIELDS) {
+					if (Object.prototype.hasOwnProperty.call(save.par, field)) save.par[field] = 'attached-cube-runtime'
+				}
+			}
 			return save
 		}
 
-		function sameDeletionSave(left, right) {
+		function sameDeletionSave(left, right, descriptor) {
 			return samePlain(
-				comparableDeletionSave(left),
-				comparableDeletionSave(right)
+				comparableDeletionSave(left, descriptor),
+				comparableDeletionSave(right, descriptor)
 			)
 		}
 
 		function matchesDeletionSave(actual, expected, descriptor, paintCubeState) {
-			if (sameDeletionSave(actual, expected)) return true
+			if (sameDeletionSave(actual, expected, descriptor)) return true
 			const layer = normalizeRemovalLayer(descriptor?.layer, descriptor)
 			if (layer === 'surge') return matchesSurgeDeletionSave(actual, expected)
 			if (layer !== 'painted') return false
@@ -2406,8 +4736,8 @@ ModLoader.register({
 					!expectedRuntime ||
 					actualRuntime.broken + EPSILON < expectedRuntime.broken ||
 					!sameDeletionSave(
-						compatibilitySave(actual, paintCubeState),
-						compatibilitySave(expected, paintCubeState)
+						compatibilitySave(actual, paintCubeState, descriptor),
+						compatibilitySave(expected, paintCubeState, descriptor)
 					)
 				) return false
 				const actualPaint = actualRuntime.paint
@@ -2467,6 +4797,28 @@ ModLoader.register({
 				if (Number.isFinite(Number(save.par?.life))) entity.lifeTimer = Number(save.par.life)
 				if (Number.isFinite(Number(save.par?.maxLife))) entity.maxLifeTimer = Number(save.par.maxLife)
 			}
+			entity.position = position
+			entity.init?.()
+			return entity
+		}
+
+		function restoreAttachedCubeSave(game, saved, pump) {
+			const save = jsonClone(saved)
+			const position = normalizePosition(save?.position)
+			if (
+				!position ||
+				safeName(save?.name) !== 'cube' ||
+				!save?.par ||
+				!Array.isArray(save.par.resources) ||
+				save.par.resources.length !== 64
+			) return null
+			const entity = game.addEntity('cube', position, {
+				pump,
+				resources: jsonClone(save.par.resources)
+			}, { skipShopUpdate: true })
+			if (!entity) return null
+			for (const key of Object.keys(save.par)) entity[key] = jsonClone(save.par[key])
+			entity.pump = pump
 			entity.position = position
 			entity.init?.()
 			return entity
@@ -2683,6 +5035,90 @@ ModLoader.register({
 			})
 		}
 
+		function dynamicCubeCompatibilityValue(value, paintCubeState) {
+			const compatible = planCompatibilityValue(value, paintCubeState)
+			return Object.assign({}, compatible, {
+				removals: (compatible.removals || []).filter(function (entry) {
+					return !isDynamicOrdinaryStableCubeDescriptor(entry)
+				}),
+				protectedTargets: (compatible.protectedTargets || []).filter(function (entry) {
+					return entry?.dynamicOrdinaryCube !== true
+				})
+			})
+		}
+
+		function pumpDependencyCompatibilityValue(value, paintCubeState) {
+			const compatible = dynamicCubeCompatibilityValue(value, paintCubeState)
+			return Object.assign({}, compatible, {
+				removals: (compatible.removals || []).filter(function (entry) {
+					return normalizeRemovalLayer(entry?.layer, entry) !== 'attached-cube'
+				}),
+				protectedTargets: (compatible.protectedTargets || []).filter(function (entry) {
+					return normalizeRemovalLayer(entry?.layer, entry) !== 'attached-cube'
+				})
+			})
+		}
+
+		function dynamicStandaloneSurgeCompatibilityValue(value, paintCubeState) {
+			const compatible = pumpDependencyCompatibilityValue(value, paintCubeState)
+			const relationSurges = relationSurgeIdentities(compatible.relations)
+			return Object.assign({}, compatible, {
+				removals: (compatible.removals || []).filter(function (entry) {
+					return !isDynamicStandaloneSurgeDescriptor(entry, relationSurges, 'removal')
+				}),
+				protectedTargets: (compatible.protectedTargets || []).filter(function (entry) {
+					return !isDynamicStandaloneSurgeDescriptor(entry, relationSurges, 'protected')
+				})
+			})
+		}
+
+		function cutRetainedCubeCompatibilityValue(value, paintCubeState) {
+			const filtered = Object.assign({}, value, {
+				removals: (value?.removals || []).filter(function (entry) {
+					return !cutRetainedCubeDescriptor(entry, paintCubeState, 'removal')
+				}),
+				protectedTargets: (value?.protectedTargets || []).filter(function (entry) {
+					return !cutRetainedCubeDescriptor(entry, paintCubeState, 'protected')
+				})
+			})
+			return planCompatibilityValue(filtered, paintCubeState)
+		}
+
+		function cutRetainedCubeDescriptor(value, paintCubeState, disposition) {
+			if (safeName(value?.name || value?.save?.name) !== 'cube') return false
+			const layer = normalizeRemovalLayer(value?.layer, value)
+			if (layer === 'attached-cube') return disposition === 'removal'
+			if (disposition === 'protected' && value?.cutRetainableCube === true) return true
+			const fields = value?.save?.par
+			if (!fields || typeof fields !== 'object' || fields.killme === true) return false
+			const state = Number(fields.state)
+			if (
+				(state !== 0 && state !== 1 && state !== 2) ||
+				!validOrdinaryCubeResources(fields.resources)
+			) return false
+			let paint = null
+			try { paint = paintCubeState?.normalizePaint?.(value.save) || null } catch (error) {}
+			if (paint) {
+				return paint.version === paintCubeState?.growPaintVersion ||
+					(state === 2 && Number(fields.fill) === 64)
+			}
+			return !Object.prototype.hasOwnProperty.call(fields, 'worldEditorPaint') && layer === 'cube'
+		}
+
+		function relationSurgeIdentities(relations) {
+			return new Set((relations || []).map(function (relation) {
+				return String(relation?.surge?.identity || '')
+			}).filter(Boolean))
+		}
+
+		function isDynamicStandaloneSurgeDescriptor(value, relationSurges, disposition) {
+			if (
+				normalizeRemovalLayer(value?.layer, value) !== 'surge' ||
+				relationSurges?.has?.(String(value?.identity || ''))
+			) return false
+			return disposition === 'removal' || value?.dynamicStandaloneSurge === true
+		}
+
 		function compatibilityDescriptor(value, paintCubeState) {
 			return Object.assign({}, value, {
 				save: compatibilitySave(value?.save, paintCubeState, value)
@@ -2690,8 +5126,12 @@ ModLoader.register({
 		}
 
 		function compatibilitySave(value, paintCubeState, descriptor) {
+			const layer = descriptor ? normalizeRemovalLayer(descriptor?.layer, descriptor) : ''
+			if (layer === 'building' || layer === 'attached-cube') {
+				return comparableDeletionSave(value, descriptor)
+			}
 			if (
-				normalizeRemovalLayer(descriptor?.layer, descriptor) === 'surge' &&
+				layer === 'surge' &&
 				Number.isFinite(surgeSaveLife(value)) &&
 				surgeSaveLife(value) > 0
 			) return surgeSaveWithoutRuntimeState(value)
@@ -2778,6 +5218,17 @@ ModLoader.register({
 			return result.sort(compareSurgeRuntimeStates)
 		}
 
+		function createStrictSurgeRuntimeStates(value) {
+			const relationSurges = relationSurgeIdentities(value?.relations)
+			const strict = Object.assign({}, value, {
+				removals: (value?.removals || []).filter(function (entry) {
+					return normalizeRemovalLayer(entry?.layer, entry) !== 'surge' ||
+						relationSurges.has(String(entry?.identity || ''))
+				})
+			})
+			return createSurgeRuntimeStates(strict)
+		}
+
 		function normalizeSurgeRuntimeStates(value) {
 			if (!Array.isArray(value)) return []
 			return value.map(function (entry) {
@@ -2810,20 +5261,285 @@ ModLoader.register({
 			return result.sort(compareGrowStates)
 		}
 
-		function plansMatch(beforeValue, afterValue, paintCubeState) {
+		function plansMatch(
+			beforeValue,
+			afterValue,
+			paintCubeState,
+			resolvePumpCubeState,
+			resolveOrdinaryCubeState,
+			options
+		) {
 			const beforeSignature = String(beforeValue?.planSignature || beforeValue?.signature || '')
 			const afterSignature = String(afterValue?.signature || '')
 			if (beforeSignature && beforeSignature === afterSignature) return true
+			const standardCompatibility = !!beforeValue?.compatibilitySignature &&
+				beforeValue.compatibilitySignature === afterValue?.compatibilitySignature
+			const dynamicCubeCompatibility = !!beforeValue?.dynamicCubeSignature &&
+				beforeValue.dynamicCubeSignature === afterValue?.dynamicCubeSignature &&
+				compatibleOrdinaryCubeRuntimeStates(
+					beforeValue.ordinaryCubeStates,
+					afterValue?.ordinaryCubeStates,
+					resolveOrdinaryCubeState
+				)
+			const pumpDependencyCompatibility = !!beforeValue?.pumpDependencySignature &&
+				beforeValue.pumpDependencySignature === afterValue?.pumpDependencySignature &&
+				compatiblePumpCubeStates(beforeValue, afterValue, resolvePumpCubeState) &&
+				compatibleOrdinaryCubeRuntimeStates(
+					beforeValue.ordinaryCubeStates,
+					afterValue?.ordinaryCubeStates,
+					resolveOrdinaryCubeState
+				)
+			const dynamicSurgeCompatibility = options?.allowDynamicStandaloneSurges === true &&
+				!!beforeValue?.dynamicSurgeSignature &&
+				beforeValue.dynamicSurgeSignature === afterValue?.dynamicSurgeSignature &&
+				compatiblePumpCubeStates(beforeValue, afterValue, resolvePumpCubeState) &&
+				compatibleOrdinaryCubeRuntimeStates(
+					beforeValue.ordinaryCubeStates,
+					afterValue?.ordinaryCubeStates,
+					resolveOrdinaryCubeState
+				)
+			const cutRetainedCubeCompatibility = options?.allowCutRetainedCubeRebase === true &&
+				!!beforeValue?.cutRetainedCubeSignature &&
+				beforeValue.cutRetainedCubeSignature === afterValue?.cutRetainedCubeSignature
 			if (
-				!beforeValue?.compatibilitySignature ||
-				beforeValue.compatibilitySignature !== afterValue?.compatibilitySignature
+				!standardCompatibility &&
+				!dynamicCubeCompatibility &&
+				!pumpDependencyCompatibility &&
+				!dynamicSurgeCompatibility &&
+				!cutRetainedCubeCompatibility
 			) return false
-			if (!monotonicPaintedRuntimeStates(beforeValue.paintedStates, afterValue?.paintedStates)) return false
-			if (!monotonicSurgeRuntimeStates(beforeValue.surgeStates, afterValue?.surgeStates)) return false
+			if (
+				!cutRetainedCubeCompatibility &&
+				!monotonicPaintedRuntimeStates(beforeValue.paintedStates, afterValue?.paintedStates)
+			) return false
+			if (!monotonicSurgeRuntimeStates(
+				dynamicSurgeCompatibility ? beforeValue.strictSurgeStates : beforeValue.surgeStates,
+				dynamicSurgeCompatibility ? afterValue?.strictSurgeStates : afterValue?.surgeStates
+			)) return false
+			if (cutRetainedCubeCompatibility) return true
 			const beforeGrow = normalizeGrowStates(beforeValue.growStates)
 			const afterGrow = normalizeGrowStates(afterValue?.growStates)
 			if (!beforeGrow.length && !afterGrow.length) return true
 			return monotonicGrowStates(beforeGrow, afterGrow, paintCubeState)
+		}
+
+		function diagnosePlansMatch(
+			beforeValue,
+			afterValue,
+			paintCubeState,
+			resolvePumpCubeState,
+			resolveOrdinaryCubeState,
+			options
+		) {
+			const beforeSignature = String(beforeValue?.planSignature || beforeValue?.signature || '')
+			const afterSignature = String(afterValue?.signature || '')
+			const signatureMatch = !!beforeSignature && beforeSignature === afterSignature
+			const ordinaryRuntimeMatch = compatibleOrdinaryCubeRuntimeStates(
+				beforeValue?.ordinaryCubeStates,
+				afterValue?.ordinaryCubeStates,
+				resolveOrdinaryCubeState
+			)
+			const pumpRuntimeMatch = compatiblePumpCubeStates(beforeValue, afterValue, resolvePumpCubeState)
+			const branches = {
+				standard: {
+					signatureMatch: !!beforeValue?.compatibilitySignature &&
+						beforeValue.compatibilitySignature === afterValue?.compatibilitySignature
+				},
+				dynamicCube: {
+					signatureMatch: !!beforeValue?.dynamicCubeSignature &&
+						beforeValue.dynamicCubeSignature === afterValue?.dynamicCubeSignature,
+					ordinaryRuntimeMatch
+				},
+				pumpDependency: {
+					signatureMatch: !!beforeValue?.pumpDependencySignature &&
+						beforeValue.pumpDependencySignature === afterValue?.pumpDependencySignature,
+					pumpRuntimeMatch,
+					ordinaryRuntimeMatch
+				},
+				dynamicSurge: {
+					enabled: options?.allowDynamicStandaloneSurges === true,
+					signatureMatch: !!beforeValue?.dynamicSurgeSignature &&
+						beforeValue.dynamicSurgeSignature === afterValue?.dynamicSurgeSignature,
+					pumpRuntimeMatch,
+					ordinaryRuntimeMatch
+				},
+				cutRetainedCube: {
+					enabled: options?.allowCutRetainedCubeRebase === true,
+					signatureMatch: !!beforeValue?.cutRetainedCubeSignature &&
+						beforeValue.cutRetainedCubeSignature === afterValue?.cutRetainedCubeSignature
+				}
+			}
+			branches.standard.accepted = branches.standard.signatureMatch
+			branches.dynamicCube.accepted = branches.dynamicCube.signatureMatch && ordinaryRuntimeMatch
+			branches.pumpDependency.accepted = branches.pumpDependency.signatureMatch &&
+				pumpRuntimeMatch && ordinaryRuntimeMatch
+			branches.dynamicSurge.accepted = branches.dynamicSurge.enabled &&
+				branches.dynamicSurge.signatureMatch && pumpRuntimeMatch && ordinaryRuntimeMatch
+			branches.cutRetainedCube.accepted = branches.cutRetainedCube.enabled &&
+				branches.cutRetainedCube.signatureMatch
+			const compatibilityAccepted = Object.keys(branches).some(function (name) {
+				return branches[name].accepted === true
+			})
+			const paintedRuntimeMatch = monotonicPaintedRuntimeStates(
+				beforeValue?.paintedStates,
+				afterValue?.paintedStates
+			)
+			const surgeRuntimeMatch = monotonicSurgeRuntimeStates(
+				branches.dynamicSurge.accepted ? beforeValue?.strictSurgeStates : beforeValue?.surgeStates,
+				branches.dynamicSurge.accepted ? afterValue?.strictSurgeStates : afterValue?.surgeStates
+			)
+			const beforeGrow = normalizeGrowStates(beforeValue?.growStates)
+			const afterGrow = normalizeGrowStates(afterValue?.growStates)
+			const growRuntimeMatch = (!beforeGrow.length && !afterGrow.length) ||
+				monotonicGrowStates(beforeGrow, afterGrow, paintCubeState)
+			let stage = 'accepted'
+			if (!signatureMatch) {
+				if (!compatibilityAccepted) stage = 'compatibility-branches'
+				else if (!branches.cutRetainedCube.accepted && !paintedRuntimeMatch) stage = 'painted-runtime'
+				else if (!surgeRuntimeMatch) stage = 'surge-runtime'
+				else if (!branches.cutRetainedCube.accepted && !growRuntimeMatch) stage = 'grow-runtime'
+			}
+			return {
+				stage,
+				signatureMatch,
+				compatibilityAccepted,
+				compatibilityBranches: branches,
+				runtimeChecks: {
+					ordinaryCube: ordinaryRuntimeMatch,
+					pumpCube: pumpRuntimeMatch,
+					painted: paintedRuntimeMatch,
+					surge: surgeRuntimeMatch,
+					grow: growRuntimeMatch
+				}
+			}
+		}
+
+		function diagnosticPlanTargetDifferences(beforeValue, afterValue, enrich) {
+			return {
+				removal: diagnosticTargetSetDifference(
+					diagnosticTargetEntries(beforeValue, 'removal'),
+					diagnosticTargetEntries(afterValue, 'removal'),
+					enrich
+				),
+				protected: diagnosticTargetSetDifference(
+					diagnosticTargetEntries(beforeValue, 'protected'),
+					diagnosticTargetEntries(afterValue, 'protected'),
+					enrich
+				)
+			}
+		}
+
+		function diagnosticTargetEntries(value, kind) {
+			if (kind === 'removal' && Array.isArray(value?.removals)) return value.removals
+			if (kind === 'protected' && Array.isArray(value?.protectedTargets)) return value.protectedTargets
+			return Array.isArray(value?.diagnosticTargets?.[kind]) ? value.diagnosticTargets[kind] : []
+		}
+
+		function diagnosticTargetSetDifference(beforeValue, afterValue, enrich) {
+			const before = new Map((beforeValue || []).map(function (entry) {
+				return [diagnosticTargetKey(entry), entry]
+			}))
+			const after = new Map((afterValue || []).map(function (entry) {
+				return [diagnosticTargetKey(entry), entry]
+			}))
+			const result = { added: [], removed: [], changed: [] }
+			for (const key of Array.from(new Set(
+				Array.from(before.keys()).concat(Array.from(after.keys()))
+			)).sort()) {
+				const oldEntry = before.get(key) || null
+				const newEntry = after.get(key) || null
+				const oldSummary = oldEntry ? diagnosticTargetSummary(oldEntry) : null
+				const newSummary = newEntry ? diagnosticTargetSummary(newEntry) : null
+				if (oldEntry && newEntry && samePlain(oldSummary, newSummary)) continue
+				const difference = { before: oldSummary, after: newSummary }
+				const extra = typeof enrich === 'function' ? enrich(newEntry || oldEntry) : null
+				if (extra && typeof extra === 'object') Object.assign(difference, extra)
+				if (!oldEntry) result.added.push(difference)
+				else if (!newEntry) result.removed.push(difference)
+				else result.changed.push(difference)
+			}
+			return result
+		}
+
+		function diagnosticTargetKey(entry) {
+			const identity = String(entry?.identity || '')
+			if (identity) return 'identity:' + identity
+			const position = normalizePosition(entry?.position) || [0, 0]
+			return [
+				'name:' + safeName(entry?.name || entry?.save?.name),
+				'position:' + position[0] + ',' + position[1]
+			].join('|')
+		}
+
+		function diagnosticTargetSummary(entry) {
+			const savedState = Number(entry?.save?.par?.state)
+			const directState = entry?.state === null || entry?.state === undefined
+				? NaN
+				: Number(entry.state)
+			const pumpIdentity = entry?.pump
+				? String(entry.pump.identity || '') || null
+				: String(entry?.pumpIdentity || '') || null
+			const pumpName = entry?.pump ? safeName(entry.pump.name) : safeName(entry?.pumpName)
+			const pumpPosition = entry?.pump
+				? normalizePosition(entry.pump.position)
+				: normalizePosition(entry?.pumpPosition)
+			return {
+				identity: String(entry?.identity || ''),
+				name: safeName(entry?.name || entry?.save?.name),
+				layer: normalizeRemovalLayer(entry?.layer, entry),
+				position: normalizePosition(entry?.position),
+				reason: String(entry?.reason || ''),
+				state: Number.isFinite(savedState)
+					? savedState
+					: Number.isFinite(directState) ? directState : null,
+				pumpIdentity,
+				pumpName: pumpName || null,
+				pumpPosition
+			}
+		}
+
+		function compatiblePumpCubeStates(beforeValue, afterValue, resolvePumpCubeState) {
+			const before = normalizePumpCubeStates(beforeValue?.pumpCubeStates)
+			const after = normalizePumpCubeStates(afterValue?.pumpCubeStates)
+			const afterByIdentity = new Map(after.map(function (entry) {
+				return [entry.identity, entry]
+			}))
+			for (const oldEntry of before) {
+				if (oldEntry.state !== 0 && oldEntry.state !== 1) continue
+				const newEntry = afterByIdentity.get(oldEntry.identity) ||
+					(typeof resolvePumpCubeState === 'function' ? resolvePumpCubeState(oldEntry.identity) : null)
+				if (!newEntry || newEntry.state === 2) continue
+				if (qualifiedPumpCubeTerminalTransition(oldEntry, newEntry)) continue
+				if (
+					(newEntry.state !== 0 && newEntry.state !== 1) ||
+					!samePumpCubeAnchor(oldEntry, newEntry) ||
+					newEntry.state < oldEntry.state
+				) return false
+			}
+			return true
+		}
+
+		function qualifiedPumpCubeTerminalTransition(before, after) {
+			return (before?.state === 0 || before?.state === 1) &&
+				before?.killme !== true &&
+				before?.resourcesValid === true &&
+				before?.paintFree === true &&
+				before?.selectedOwner === true &&
+				before?.inSelectedPumpVicinity === true &&
+				after?.state === 3 &&
+				after?.killme === true &&
+				after?.resourcesValid === true &&
+				after?.paintFree === true &&
+				after?.selectedOwner === true &&
+				after?.inSelectedPumpVicinity === true &&
+				samePumpCubeAnchor(before, after)
+		}
+
+		function samePumpCubeAnchor(before, after) {
+			return comparePositions(before?.position, after?.position) === 0 &&
+				String(before?.pump?.identity || '') === String(after?.pump?.identity || '') &&
+				safeName(before?.pump?.name) === safeName(after?.pump?.name) &&
+				comparePositions(before?.pump?.position || [0, 0], after?.pump?.position || [0, 0]) === 0
 		}
 
 		function monotonicPaintedRuntimeStates(beforeValue, afterValue) {
@@ -2908,6 +5624,15 @@ ModLoader.register({
 			)
 		}
 
+		function comparePumpCubeStates(left, right) {
+			const leftPosition = normalizePosition(left?.position) || [0, 0]
+			const rightPosition = normalizePosition(right?.position) || [0, 0]
+			return (
+				String(left?.identity || '').localeCompare(String(right?.identity || '')) ||
+				comparePositions(leftPosition, rightPosition)
+			)
+		}
+
 		function growPhaseOrder(value) {
 			return ({ growing: 0, revealing: 1, stable: 2 })[String(value || '')] ?? -1
 		}
@@ -2941,10 +5666,44 @@ ModLoader.register({
 					return {
 						name: safeName(entry?.name),
 						position: normalizePosition(entry?.position) || [0, 0],
-						fingerprint: fingerprint(entry?.save)
+						fingerprint: fingerprint(entry?.save),
+						fields: saveFieldFingerprints(entry?.save)
 					}
 				})
 			}
+		}
+
+		function comparePlanSignatures(beforeSignature, afterSignature) {
+			try {
+				const before = JSON.parse(String(beforeSignature || ''))
+				const after = JSON.parse(String(afterSignature || ''))
+				const difference = comparePlanFingerprints(
+					createPlanFingerprints(before),
+					createPlanFingerprints(after)
+				)
+				if (difference.changedComponents.includes('protectedTargets')) {
+					difference.beforeProtected = signatureTargetSummary(before.protectedTargets)
+					difference.afterProtected = signatureTargetSummary(after.protectedTargets)
+				}
+				return difference
+			} catch (error) {
+				return {
+					available: false,
+					changedComponents: ['unknown'],
+					changedRemovalSaves: []
+				}
+			}
+		}
+
+		function signatureTargetSummary(value) {
+			return (value || []).map(function (entry) {
+				return {
+					name: safeName(entry?.name || entry?.save?.name),
+					layer: normalizeRemovalLayer(entry?.layer, entry),
+					position: normalizePosition(entry?.position),
+					reason: String(entry?.reason || '')
+				}
+			})
 		}
 
 		function normalizePlanFingerprints(value) {
@@ -2968,7 +5727,8 @@ ModLoader.register({
 					return {
 						name: safeName(entry?.name),
 						position: normalizePosition(entry?.position) || [0, 0],
-						fingerprint: String(entry?.fingerprint || '')
+						fingerprint: String(entry?.fingerprint || ''),
+						fields: normalizeFieldFingerprints(entry?.fields)
 					}
 				})
 				: []
@@ -3010,7 +5770,8 @@ ModLoader.register({
 				changedRemovalSaves.push({
 					name: entry.name,
 					position: entry.position,
-					change: !oldEntry ? 'added' : !newEntry ? 'removed' : 'changed'
+					change: !oldEntry ? 'added' : !newEntry ? 'removed' : 'changed',
+					fields: changedSaveFields(oldEntry?.fields, newEntry?.fields)
 				})
 			}
 			return {
@@ -3018,6 +5779,37 @@ ModLoader.register({
 				changedComponents,
 				changedRemovalSaves
 			}
+		}
+
+		function saveFieldFingerprints(value) {
+			const fields = value?.par && typeof value.par === 'object' ? value.par : {}
+			return Object.keys(fields).sort().map(function (name) {
+				return { name, fingerprint: fingerprint(fields[name]) }
+			})
+		}
+
+		function normalizeFieldFingerprints(value) {
+			if (!Array.isArray(value)) return []
+			return value.map(function (entry) {
+				return {
+					name: String(entry?.name || ''),
+					fingerprint: String(entry?.fingerprint || '')
+				}
+			}).filter(function (entry) { return !!entry.name }).sort(function (left, right) {
+				return left.name.localeCompare(right.name)
+			})
+		}
+
+		function changedSaveFields(beforeValue, afterValue) {
+			const before = new Map(normalizeFieldFingerprints(beforeValue).map(function (entry) {
+				return [entry.name, entry.fingerprint]
+			}))
+			const after = new Map(normalizeFieldFingerprints(afterValue).map(function (entry) {
+				return [entry.name, entry.fingerprint]
+			}))
+			return Array.from(new Set(Array.from(before.keys()).concat(Array.from(after.keys())))).sort().filter(function (name) {
+				return before.get(name) !== after.get(name)
+			})
 		}
 
 		function fingerprintTarget(entry) {
@@ -3116,6 +5908,13 @@ ModLoader.register({
 
 		function normalizeOrigin(value) {
 			return String(value || '') === 'cut' ? 'cut' : 'delete'
+		}
+
+		function cutRetainedCubeRebaseAllowed(origin, source, direction) {
+			return direction === 'forward' &&
+				normalizeOrigin(origin) === 'cut' &&
+				source?.removeCubes !== true &&
+				source?.removePaintedCubes !== true
 		}
 
 		function normalizeRequestedPlane(value, fallback) {
