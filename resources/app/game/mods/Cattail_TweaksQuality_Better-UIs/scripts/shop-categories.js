@@ -825,7 +825,7 @@ ModLoader.register({
 	font-size: calc(var(--unit) * .72);
 	line-height: 1.35;
 	margin: 0 0 calc(var(--unit) * .5);
-	padding: calc(var(--unit) * .15) calc(var(--unit) * .2) calc(var(--unit) * .5);
+	padding: calc(var(--unit) * .325) calc(var(--unit) * .2);
 }
 .shop.minimized .cattail-shop-category-desc {
 	display: none;

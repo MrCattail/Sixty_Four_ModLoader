@@ -12,17 +12,25 @@ const readme = fs.readFileSync(readmePath, 'utf8')
 
 assert.match(source, /version: '0\.4\.0'/)
 assert.match(source, /const SETTINGS_API_VERSION = 1/)
-assert.match(source, /const SETTINGS_API_TYPES = Object\.freeze\(\[ 'boolean', 'select', 'number', 'slider', 'color', 'string', 'array', 'object', 'resourceColors' \]\)/)
+assert.match(source, /const SETTINGS_API_TYPES = Object\.freeze\(\[ 'boolean', 'select', 'number', 'slider', 'color', 'string', 'array', 'object', 'resourceColors', 'action' \]\)/)
 assert.match(source, /settings: createUiSettingsApi\(modId\)/)
 assert.match(source, /const createUiSettingsApi = function \(modId\) \{[\s\S]*?version: SETTINGS_API_VERSION[\s\S]*?register\(definitions\)[\s\S]*?createControl\(definition, options\)[\s\S]*?createField\(definition, options\)[\s\S]*?createForm\(options\)[\s\S]*?scroll: Object\.freeze\(\{[\s\S]*?attach\(target, options\)[\s\S]*?tooltip: Object\.freeze\(\{[\s\S]*?attach\(target, value, options\)[\s\S]*?detach\(target\)/)
 
 assert.match(source, /const normalizeSettingsDefinition = function \(definition, options\) \{[\s\S]*?item\.settingsApiVersion = SETTINGS_API_VERSION[\s\S]*?item\.preserveOptionTypes = true/)
+assert.match(source, /const isSettingsActionItem = function \(item\)[\s\S]*?getConfigType\(item\) === 'action'/)
+assert.match(source, /else if \(rawType === 'action'\) \{[\s\S]*?item\.type = 'action'[\s\S]*?typeof item\.onAction !== 'function'[\s\S]*?Action settings require an onAction handler/)
 assert.match(source, /return type === 'colorpalette' \|\| type === 'color-palette' \|\| type === 'resourcecolors' \|\| type === 'resource-colors'/)
 assert.match(source, /const registerSettingsDefinitions = function \(modId, definitions\) \{[\s\S]*?if \(existing\.has\(item\.key\)\) throw new Error\('Duplicate settings key: '[\s\S]*?config\.schema\.push\(item\)[\s\S]*?requestAnimationFrame\(refreshOpenPanel\)[\s\S]*?config\.schema = config\.schema\.filter[\s\S]*?requestAnimationFrame\(refreshOpenPanel\)/)
-assert.match(source, /config\.values\[item\.key\] = parseStoredConfig\(localStorage\.getItem\(storageKey\(modId, item\.key\)\), cloneConfigValue\(item\.default\)\)/)
+assert.match(source, /if \(!isSettingsActionItem\(item\) && config\.values\[item\.key\] === undefined\) config\.values\[item\.key\] = parseStoredConfig\(localStorage\.getItem\(storageKey\(modId, item\.key\)\), cloneConfigValue\(item\.default\)\)/)
 
 assert.match(source, /const createSettingsControlCore = function \(definition, options\) \{[\s\S]*?getValue\(\)[\s\S]*?setValue\(value, config\)[\s\S]*?reset\(config\)[\s\S]*?setDisabled\(disabled\)[\s\S]*?validate\(\)[\s\S]*?destroy\(\)/)
+assert.match(source, /const createSettingsActionControlCore = function \(item, options\) \{[\s\S]*?modloader-action-button modloader-settings-action-button[\s\S]*?aria-busy[\s\S]*?Promise\.resolve\(\)\.then[\s\S]*?item\.onAction[\s\S]*?pending[\s\S]*?success[\s\S]*?error[\s\S]*?destroy\(\)/)
+assert.match(source, /if \(isSettingsActionItem\(item\)\) return createSettingsActionControlCore\(item, options\)/)
 assert.match(source, /const createSettingsForm = function \(modId, options\) \{[\s\S]*?const persist = config\.persist === 'change' \? 'change' : 'manual'[\s\S]*?if \(bindConfig && kind === 'input'\) dispatchConfigPreview[\s\S]*?if \(bindConfig && kind === 'change' && persist === 'change'\)[\s\S]*?save\(\)[\s\S]*?setConfigValue\(modId, item\.key, value\)[\s\S]*?get dirty\(\)/)
+assert.match(source, /const valueItems = schema\.filter\(function \(item\) \{ return !isSettingsActionItem\(item\) \}\)/)
+assert.match(source, /validate\(\) \{[\s\S]*?for \(const \[key, field\] of fields\) \{[\s\S]*?if \(isSettingsActionItem\(field\.item\)\) continue/)
+assert.match(source, /save\(\) \{[\s\S]*?for \(const item of valueItems\)/)
+assert.match(source, /get dirty\(\) \{[\s\S]*?for \(const item of valueItems\)/)
 assert.match(source, /if \(item\.dividerBefore \|\| item\.separatorBefore \|\| sectionId !== currentSectionId\) \{[\s\S]*?currentSection = null[\s\S]*?currentSectionId = sectionId/)
 assert.match(source, /const validateSettingsConfigValue = function \(item, value\) \{[\s\S]*?Choose one of the available options[\s\S]*?typeof item\.validate === 'function'[\s\S]*?result\.valid === false/)
 assert.match(source, /readNumberConfigValue\(item, input\.value, type, \{ enforceRange: true, min: item\.min, max: item\.max \}\)/)
@@ -31,12 +39,18 @@ assert.match(source, /if \(item\?\.settingsApiVersion === SETTINGS_API_VERSION\)
 assert.match(source, /const createSettingsFieldCore = function \(definition, options\)/)
 assert.match(source, /configScroll = element\('div', 'modloader-mod-config-scroll'\)/)
 assert.doesNotMatch(source, /configScroll = element\('div', '[^']*modloader-settings-surface/)
-assert.match(source, /const fieldHandle = createSettingsFieldCore\(item, \{[\s\S]*?apiV1: false[\s\S]*?descriptionDisplayMode: inlineDescriptions \? 'inline' : 'hover'/)
+assert.match(source, /fieldHandle = createSettingsFieldCore\(item, \{[\s\S]*?apiV1: false[\s\S]*?descriptionDisplayMode: inlineDescriptions \? 'inline' : 'hover'/)
+assert.match(source, /const persistOnChange = item\.persist === 'change'[\s\S]*?if \(persistOnChange && kind === 'change' && payload\.valid\)[\s\S]*?setConfigValue\(mod\.id, item\.key, payload\.value\)[\s\S]*?model\.initial = cloneConfigValue\(payload\.value\)/)
+assert.match(source, /if \(isSettingsActionItem\(item\)\)[\s\S]*?rowConfigModels\.push\(model\)[\s\S]*?else \{[\s\S]*?configModels\.push\(model\)/)
 assert.match(source, /const ensureSettingsSurfaceStyle = function \(panelStyle\) \{[\s\S]*?\.modloader-settings-surface[\s\S]*?modloader-settings-surface-style/)
 assert.match(source, /\.modloader-settings-scroll \{[^}]*scrollbar-gutter: stable[^}]*scrollbar-width: thin[^}]*scrollbar-color: var\(--modloader-settings-scroll-thumb\) transparent/)
 assert.match(source, /\.modloader-settings-scroll\.modloader-settings-scroll-light \{[^}]*--modloader-settings-scroll-thumb:/)
 assert.match(source, /\.modloader-settings-scroll::-webkit-scrollbar \{ width: 4px; height: 4px; \}/)
 assert.doesNotMatch(source, /attachShadow\s*\(/)
+assert.match(source, /\.modloader-action-button:focus-visible[^}]*--modloader-focus-border/)
+assert.match(source, /\.modloader-settings-action-status\.pending[^}]*--modloader-text-muted/)
+assert.match(source, /\.modloader-settings-action-status\.success[^}]*--modloader-ok-text/)
+assert.match(source, /\.modloader-settings-action-status\.error[^}]*--modloader-error-text/)
 
 assert.match(source, /const initializeSettingsSurface = function \(surface, options\) \{[\s\S]*?settingsSurfaceRegistry\.set[\s\S]*?retainSettingsTooltipRoot\(surface\)[\s\S]*?settingsSurfaceRegistry\.delete\(surface\)/)
 assert.match(source, /const syncSettingsSurfaceTheme = function \(surface\) \{[\s\S]*?record\.theme === 'auto' \? getPanelThemeMode\(\) : record\.theme[\s\S]*?modloader-panel-theme-light/)
@@ -62,6 +76,9 @@ assert.match(readme, /theme: 'global'/)
 assert.match(readme, /outside a Settings surface or the ModLoader\s+panel[\s\S]*?light tooltip in Reality[\s\S]*?dark tooltip in the Void[\s\S]*?falls back\s+to the current ModLoader theme/i)
 assert.match(readme, /delayMs: 600/)
 assert.match(readme, /pointer delay[\s\S]*?keyboard focus remains immediate/i)
+assert.match(readme, /type: 'action'[\s\S]*?pendingText[\s\S]*?successText[\s\S]*?errorText[\s\S]*?onAction/)
+assert.match(readme, /Actions do not participate in[\s\S]*?values[\s\S]*?dirty[\s\S]*?validation[\s\S]*?save[\s\S]*?localStorage/i)
+assert.match(readme, /registered `Ctrl\+M` field[\s\S]*?persist: 'change'[\s\S]*?other fields remain staged/i)
 
 const extractConstFunction = function (name, nextName) {
 	const pattern = new RegExp(`\\tconst ${name} = function \\([\\s\\S]*?(?=\\n\\tconst ${nextName} =)`, 'm')
@@ -227,4 +244,77 @@ assert.equal(deferInertialScroll(list, { target: nested }, 20), true)
 const plain = { style: {}, computedStyle: { overflowY: 'visible' }, closest() { return null }, parentElement: list }
 assert.equal(deferInertialScroll(list, { target: plain }, 20), false)
 
-console.log('Settings API v1 contract passed: registration, shared renderer, typed values, validation, persistence, themes, scrolling, tooltips, and cleanup.')
+const createActionControl = vm.runInNewContext(`(() => {
+	class FakeElement {
+		constructor(tag, className, text) {
+			this.tagName = tag
+			this.className = className || ''
+			this.textContent = text || ''
+			this.dataset = {}
+			this.attributes = {}
+			this.listeners = {}
+			this.children = []
+			this.disabled = false
+		}
+		append(...children) { this.children.push(...children) }
+		setAttribute(name, value) { this.attributes[name] = String(value) }
+		addEventListener(type, handler) { this.listeners[type] = handler }
+		removeEventListener(type, handler) { if (this.listeners[type] === handler) delete this.listeners[type] }
+	}
+	const element = (tag, className, text) => new FakeElement(tag, className, text)
+	const getSettingsDefinitionText = (item, property, fallback) => typeof item[property] === 'string' ? item[property] : (fallback || '')
+	const cloneConfigSchemaItem = item => Object.assign({}, item)
+	${extractConstFunction('createSettingsActionControlCore', 'createSettingsControlCore')}
+	return createSettingsActionControlCore
+})()`)
+
+;(async function () {
+	let resolveAction
+	const item = {
+		key: 'demoAction',
+		type: 'action',
+		label: 'Demo action',
+		pendingText: 'Pending',
+		successText: 'Success',
+		errorText: 'Failed: {value}',
+		onAction() { return new Promise(resolve => { resolveAction = resolve }) }
+	}
+	const control = createActionControl(item, { modId: 'demo' })
+	const pendingRun = control.run()
+	assert.equal(control.pending, true)
+	assert.equal(control.status, 'pending')
+	assert.equal(control.input.disabled, true)
+	assert.equal(control.input.attributes['aria-busy'], 'true')
+	await Promise.resolve()
+	resolveAction()
+	await pendingRun
+	assert.equal(control.pending, false)
+	assert.equal(control.status, 'success')
+	assert.equal(control.input.disabled, false)
+	assert.equal(control.input.attributes['aria-busy'], 'false')
+	assert.throws(() => control.setValue('x'), /do not have values/)
+
+	item.onAction = function () { throw 'boom' }
+	await assert.rejects(control.run(), /boom/)
+	assert.equal(control.status, 'error')
+	assert.equal(control.error.message, 'boom')
+	assert.equal(control.element.children[1].textContent, 'Failed: boom')
+	control.clearStatus()
+	assert.equal(control.status, '')
+
+	let resolveLate
+	item.onAction = function () { return new Promise(resolve => { resolveLate = resolve }) }
+	const lateRun = control.run()
+	await Promise.resolve()
+	control.destroy()
+	assert.equal(control.pending, false)
+	assert.equal(control.input.listeners.click, undefined)
+	resolveLate()
+	await lateRun
+	assert.equal(control.status, 'pending')
+
+	console.log('Settings API v1 contract passed: registration, actions, shared renderer, typed values, validation, persistence, themes, scrolling, tooltips, and cleanup.')
+})().catch(function (error) {
+	console.error(error)
+	process.exitCode = 1
+})

@@ -67,6 +67,14 @@ loader logs. The panel can open the `mods` folder, import mod zip packages by
 file drop or paste, and delete mod folders after an in-panel confirmation. Menu
 labels follow the current game language where ModLoader translations exist.
 
+The panel header keeps its quick controls in this order: Menu Settings, theme,
+hide mode, Hide to edge, and Close. Dark mode shows a sun action for switching
+to light mode; light mode shows a moon action for switching to dark mode. The
+hide-mode pin is tilted while auto-hide is active and upright in manual mode.
+Both shortcuts update the existing `modloader:panelState` immediately and stay
+in sync with Menu Settings. Manual mode stops the auto-hide timer but still
+allows **Hide to edge** to be used explicitly.
+
 The lower-left status line also shows the loader version, enabled mod count,
 and `Ctrl+M` reminder.
 
@@ -498,7 +506,7 @@ through `api.ui.settings`. The API is bound to the calling mod, uses
 ```js
 api.ui.settings.types
 // boolean, select, number, slider, color, string,
-// array, object, resourceColors
+// array, object, resourceColors, action
 ```
 
 ### Register runtime settings
@@ -532,7 +540,40 @@ const unregister = api.ui.settings.register([
 unregister()
 ```
 
-Static `mod.json` fields continue to use the existing compatibility normalizer.
+A registered `Ctrl+M` field can set `persist: 'change'` to save each valid final
+interaction immediately. Only that explicit field changes its persistence mode;
+other fields remain staged for **Save Config** or **Save & Reload**.
+
+`action` adds an immediate Mod-owned command to the same Settings renderer:
+
+```js
+const unregisterAction = api.ui.settings.register({
+  key: 'openSourceFile',
+  type: 'action',
+  label: 'Source file',
+  description: 'Open this Mod\'s editable source file.',
+  buttonLabel: 'Open source file',
+  pendingText: 'Opening...',
+  successText: 'Source file opened.',
+  errorText: 'Could not open the source file: {value}',
+  async onAction({ modId, key, control, event }) {
+    await openOwnedSourceFile()
+  }
+})
+```
+
+The shared action control accepts synchronous or asynchronous `onAction`
+handlers. It disables itself while pending, exposes `run()`, `clearStatus()`,
+`pending`, `status`, and `error` on its control/field handle, and shows localized
+pending, success, or error status. `destroy()` removes its listener and prevents
+an outstanding promise from updating destroyed UI.
+
+Actions do not participate in config values, dirty state, validation, save,
+`localStorage`, config preview/change events, or reload decisions. Their
+definitions and functions remain in the runtime schema only; do not declare an
+executable handler in static JSON.
+
+Static `mod.json` value fields continue to use the existing compatibility normalizer.
 The v1 schema standardizes `key`, `type`, `label`, `description`, `default`,
 `section`, `sectionLabel`, `disabled`, and an optional synchronous
 `validate(value)` callback. Numeric controls accept `min`, `max`, `step`, and
@@ -575,7 +616,9 @@ control.destroy()
 
 A config-bound form stages changes by default. `input` reports live preview,
 `change` marks the final interaction, and only `save()` writes through
-`api.config`. Set `persist: 'change'` to save each valid final interaction.
+`api.config`. Set the form-level `persist: 'change'` to save each valid final
+interaction. Action fields render and run inside a form but are omitted from
+`values()`, `dirty`, `validate()`, `save()`, and reset operations.
 
 ```js
 const form = api.ui.settings.createForm({

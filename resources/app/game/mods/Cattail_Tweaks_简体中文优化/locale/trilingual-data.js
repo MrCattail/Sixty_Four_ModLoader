@@ -575,7 +575,7 @@
 				"description": {
 					"en": "An everlasting mineable cube. Responds to most destabilizers and resonators. Should be connected to the Inverse Chasm via conductors.",
 					"sch": "一个永久的可开采立方体。对大多数去稳定器和共振器做出响应。应通过导体连接到逆裂缝。",
-					"modsch": "一座能无视深度在垂直多个地质层中汲取资源的矿井。本体相当于一个永久的可开采的矿方体。不同的资源梯度对应不同的的资源和种类。受大多数挖矿机/解构加速器的效果影响。提示：可以通过导线连接到逆裂缝。"
+					"modsch": "一座能无视深度在垂直多个地质层中汲取资源的矿井。本体相当于一个永久的可开采的矿方体。不同的资源梯度对应不同的的资源和种类。受大多数挖矿机/解构加速器的效果影响。提示：可以用导线连接到逆裂缝。"
 				}
 			},
 			"chasm": {
@@ -599,7 +599,7 @@
 				"description": {
 					"en": "Connects the Inverse Chasm to industrial silos.",
 					"sch": "将逆裂缝与工业筒仓连接起来。",
-					"modsch": "能输送资源的通道。提示：可以将逆裂缝与高级筒仓连接起来。"
+					"modsch": "能在机器之间输送资源的通道。提示：可以将逆裂缝与高级筒仓连接起来。"
 				}
 			},
 			"pump": {
@@ -611,7 +611,7 @@
 				"description": {
 					"en": "Extracts resources and places them all around itself.",
 					"sch": "提取资源并将其放置在自身周围。",
-					"modsch": "能挖掘资源并将其放置在四周。"
+					"modsch": "能开采资源并将矿方体放置在四周。"
 				}
 			},
 			"pump2": {
@@ -623,7 +623,7 @@
 				"description": {
 					"en": "An extracting channel upgrade. Excavates a lot of resources fast and places them further around itself.",
 					"sch": "提取通道升级。快速挖掘大量资源并将其放置在自身周围更远的地方。",
-					"modsch": "矿井 LV1 升级版。能快速挖掘大量资源并能将其放置在四周更远的地方。"
+					"modsch": "矿井 LV1 升级版。能快速挖掘大量资源并能将矿方体放置在四周更远的地方。"
 				}
 			},
 			"vault": {
@@ -659,7 +659,7 @@
 				"description": {
 					"en": "Place this next to a cube to break it twice as fast. Requires an Elmerine to operate. Additional destabilizers increase the effect.",
 					"sch": "将周围资源立方体的破坏速度提高至2倍。需要1个埃尔梅林才能运作。额外的不稳定器会增加效果。",
-					"modsch": "能将解构相邻矿方体的力量提高至2倍。需要投入1个[黄]稀土才能运作。多个解构加速器能叠加效果。"
+					"modsch": "放置在矿方体旁边，破坏矿方体的力量提高至2倍。需要投入1个[黄]稀土才能运作。多个解构加速器能叠加效果。"
 				}
 			},
 			"destabilizer2": {
@@ -671,7 +671,7 @@
 				"description": {
 					"en": "A destabilizer upgrade. Quadruples the power of resource-crushing process. Requires 64 Elmerine to operate. Additional destabilizers increase the effect.",
 					"sch": "去稳定器的升级版。可以将资源粉碎过程的威力提高至4倍。需要64个埃尔梅林才能运作。额外的不稳定器可以增加效果。",
-					"modsch": "解构加速器的升级版。能将解构相邻矿方体的力量提高至4倍。需要投入64个[黄]稀土才能运作。多个解构加速器能叠加效果。"
+					"modsch": "解构加速器的升级版。放置在矿方体旁边，破坏矿方体的力量提高至4倍。需要投入64个[黄]稀土才能运作。多个解构加速器能叠加效果。"
 				}
 			},
 			"destabilizer2a": {
@@ -683,7 +683,7 @@
 				"description": {
 					"en": "An industrial destabilizer upgrade. Boosts the power of resource-crushing process by 625 times when a Hell Gem is present in the extracted cube. Otherwise, it provides no benefit. Requires 1 Hell Gem to operate. Additional destabilizers increase the effect.",
 					"sch": "工业去稳定器的升级版。当开采的立方体中存在地狱宝石时，资源粉碎过程的威力提高至625倍，否则不会提供任何好处。需要1颗地狱宝石才能运作。额外的不稳定器可以增加效果。",
-					"modsch": "解构加速器 LV2 的升级版。当开采的矿方体中存在[绿]地心晶体时，解构矿方体的力量会提高至625倍；反之不进行任何力量加成。需要1颗[绿]地心晶体才能运作。多台解构加速器会叠加效果。"
+					"modsch": "解构加速器 LV2 的升级版。放置在矿方体旁边，当开采的矿方体中存在[绿]地心晶体时，破坏矿方体的力量提高至625倍；反之不进行任何力量加成。需要1颗[绿]地心晶体才能运作。多台解构加速器会叠加效果。"
 				}
 			},
 			"doublechannel": {
@@ -695,7 +695,7 @@
 				"description": {
 					"en": "Place this next to the cube-extracting machine to extract cubes twice as fast. Additional coolers increase the effect.",
 					"sch": "将其放置在立方体开采装置旁边，开采速度提高至2倍。额外的冷却器可增强效果。",
-					"modsch": "能让相邻的矿井的抬升矿方体的速度提高至2倍。多台风冷器能叠加效果。"
+					"modsch": "放置在矿井旁边，矿井开采速度可以提高至2倍。多台风冷器能叠加效果。"
 				}
 			},
 			"doublechannel2": {
@@ -707,7 +707,7 @@
 				"description": {
 					"en": "A channel cooler upgrade. Triples the flow in a source channel if placed next to it. Additional coolers increase the effect.",
 					"sch": "通道冷却器升级。如果放置在资源通道旁边，则其流量将增加至3倍。额外的冷却器可增强效果。",
-					"modsch": "风冷器 LV1 的升级版。能让相邻的矿井的抬升矿方体的速度提高至3倍。多台风冷器能叠加效果。"
+					"modsch": "风冷器 LV1 的升级版。放置在矿井旁边，矿井开采速度可以提高至3倍。多台风冷器能叠加效果。"
 				}
 			},
 			"valve": {
@@ -719,7 +719,7 @@
 				"description": {
 					"en": "Prevents the cube-extracting machine from resetting to the original position if placed next to it. Requires a Charonite to operate.",
 					"sch": "如果放置在立方体开采装置旁边，可防止开采装置重置到原始位置。需要1块查伦石才能运作。",
-					"modsch": "能防止相邻的矿井泄压并停止。需要1块[灰]卡戎碳才能运作。"
+					"modsch": "放置在矿井旁边，矿井不会因泄压自动归位。需要1块[灰]卡戎碳才能运作。"
 				}
 			},
 			"auxpump": {
@@ -731,7 +731,7 @@
 				"description": {
 					"en": "A reverse valve upgrade. Provides pressure to a source channel if placed next to it. Requires 8 Elmerine to operate. Additional pumps do not increase the pressure in a source channel.",
 					"sch": "反向阀的升级版。如果放置在资源通道旁边，则会为通道提供压力。需要8个埃尔梅林才能运作。额外的泵不会增加通道中的压力。",
-					"modsch": "辅助泵 LV1 的升级版。能为相邻的矿井持续提供压力。需要8个[黄]稀土才能运作。多个辅助泵并不会叠加效果。"
+					"modsch": "辅助泵 LV1 的升级版。放置在矿井旁边，能为矿井提供更强的压力。需要8个[黄]稀土才能运作。多个辅助泵并不会叠加效果。"
 				}
 			},
 			"auxpump2": {
@@ -743,7 +743,7 @@
 				"description": {
 					"en": "An auxiliary pump upgrade. Provides quadrupled pressure to a source channel if placed next to it. Requires 256 Elmerine and 4 Beta-Pylene to operate. Multiple stations do not increase the flow in a source channel.",
 					"sch": "辅助泵的升级版。如果放置在资源通道旁边，可提供4倍压力。需要256个埃尔梅林和4个贝塔派伦才能运作。多个抽水站并不会增加通道中的流量。",
-					"modsch": "辅助泵 LV2 的升级版。能为相邻的矿井持续提供4倍压力。需要256个[黄]稀土和4个[红]高能聚合物才能运作。多个辅助泵并不会叠加效果。"
+					"modsch": "辅助泵 LV2 的升级版。放置在矿井旁边，能为矿井提供4倍的压力。需要256个[黄]稀土和4个[红]高能聚合物才能运作。多个辅助泵并不会叠加效果。"
 				}
 			},
 			"entropic": {
@@ -755,7 +755,7 @@
 				"description": {
 					"en": "Periodically crushes resources if placed next to a cube. Requires a Qanetite to operate.",
 					"sch": "如果放置在立方体旁边，则会定期粉碎资源。需要1块卡内特石才能运作。",
-					"modsch": "能定期解构相邻的矿方体。需要1块[紫]硅晶才能运作。"
+					"modsch": "放置在矿方体旁边，能脉冲式破坏矿方体。需要1块[紫]硅晶才能运作。"
 				}
 			},
 			"entropic2": {
@@ -767,7 +767,7 @@
 				"description": {
 					"en": "An entropy resonator upgrade. Crushes resources 3 times faster. Requires a Chromalit to operate.",
 					"sch": "熵共振器的升级版。粉碎资源的速度提高至3倍。需要1个铬马利特才能运作。",
-					"modsch": "熵增挖矿机 LV1 的升级版。解构矿方体的速度提高至3倍。需要1个[青]核能气体才能运作。"
+					"modsch": "熵增挖矿机 LV1 的升级版。放置在矿方体旁边，破坏矿方体的速度提高至3倍。需要1个[青]核能气体才能运作。"
 				}
 			},
 			"entropic2a": {
@@ -779,7 +779,7 @@
 				"description": {
 					"en": "An entropy resonator upgrade. Crushes resources at the moment they appear on the surface with 600% power. But just once per cube. Requires 8 Chromalits to operate.",
 					"sch": "熵共振器的升级版。在资源出现在表面的那一刻以600%的力量进行粉碎。但每个立方体仅限一次。需要8个铬马利特才能运作。",
-					"modsch": "熵增挖矿机 LV1 的升级变种版。在矿方体出现在表面的那一刻以熵增挖矿机LV1的 600% 的力量进行冲击。但每个矿方体仅限冲击一次。需要8个[青]核能气体才能运作。"
+					"modsch": "熵增挖矿机 LV1 的升级变种版。放置在矿方体旁边，在矿方体出现在表面的那一刻以熵增挖矿机LV1的 600% 的力量进行冲击。但每个矿方体仅限冲击一次。需要8个[青]核能气体才能运作。"
 				}
 			},
 			"entropic3": {
@@ -791,7 +791,7 @@
 				"description": {
 					"en": "An entropy resonator II upgrade. When annihilation occurs the resonator crushes cubes around it with immense power.",
 					"sch": "熵共振器 II的升级版。当湮灭发生时，共振器会以巨大的力量粉碎周围的立方体。",
-					"modsch": "熵增挖矿机 LV2 的升级版。每次湮灭发生，挖矿机都会以巨大的力量解构周围的矿方体。"
+					"modsch": "熵增挖矿机 LV2 的升级版。放置在矿方体旁边，每次湮灭发生，挖矿机都会以巨大的力量解构周围的矿方体。"
 				}
 			},
 			"converter32": {
@@ -1031,7 +1031,7 @@
 				"description": {
 					"en": "Consumes adjacent broken resources. After accumulating 1024 resources, it releases everything with an additional bonus. The amount of the bonus increases with each consecutive release, reaching up to 100%. If no resources are consumed in 16 seconds, the effect resets.",
 					"sch": "消耗相邻的损坏资源立方体。累积1024资源后，它会释放所有资源并附带额外奖励。连续释放可使奖励金额增加，最高可达100%。如果16秒内没有消耗任何资源，效果就会重设。",
-					"modsch": "吸收并存储邻近的破碎矿方体，碎矿总储量达到 1024 后，它会释放所有资源并附带精炼后的额外资源。连续释放可使精炼资源增加，最高可达原资源的100%。如果16秒内没有吸收任何资源，效果就会重置。"
+					"modsch": "吸收并存储相邻的破碎矿方体，碎矿总储量达到 1024 后，它会释放所有资源并附带精炼后的额外资源。连续释放可使精炼资源增加，最高可达原资源的100%。如果16秒内没有吸收任何资源，效果就会重置。"
 				}
 			},
 			"preheater": {
@@ -1043,7 +1043,7 @@
 				"description": {
 					"en": "Increases the speed of any resource conversion machine if placed next to one. Each converter increases the preheater's speed boost, up to 300%, if 8 machines are affected.",
 					"sch": "如果放置在任何资源转换机旁边则可以增加该机器的转换速度。每增加一台转换机，预热器的速度提升就会增加。如果影响到8台机器，最高可达300%。",
-					"modsch": "增加相邻的转换类机器的转换速度。每增加一台转换类机器，预热器的速度提升就会增加。如果同时预热到8台转换类机器，预热器最高加速效果可达300%。"
+					"modsch": "放置在任意转换类机器旁边，增加其转换速度。周围的转换类机器越多，预热器的速度加速效果越高。如果同时预热到8台转换类机器，预热器最高加速效果可达300%。"
 				}
 			},
 			"hollow": {
