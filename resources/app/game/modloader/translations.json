@@ -128,7 +128,17 @@
         "translationImportModFailures": "Failures: {failures}",
         "descriptionDisplayMode": "Description display",
         "descriptionDisplayHover": "Hover",
-        "descriptionDisplayInline": "Inline"
+        "descriptionDisplayInline": "Inline",
+        "shortcutTips": "Shortcut tips",
+        "shortcutTipsEnabled": "On",
+        "shortcutTipsDisabled": "Off",
+        "shortcutTipsMods": "Shortcut visibility by Mod",
+        "shortcutTipsToggle": "Show keyboard shortcuts",
+        "shortcutSourceGame": "Original game",
+        "shortcutSourceModLoader": "ModLoader",
+        "shortcutSourceMods": "Mods",
+        "shortcutCategoryOther": "Other",
+        "shortcutContextInactive": "Not available in the current context"
       },
       "mods": {
         "Cattail_Tweaks_简体中文优化": {
@@ -527,7 +537,17 @@
         "translationImportModFailures": "失败：{failures}",
         "descriptionDisplayMode": "提示显示",
         "descriptionDisplayHover": "悬浮",
-        "descriptionDisplayInline": "直接显示"
+        "descriptionDisplayInline": "直接显示",
+        "shortcutTips": "快捷键提示",
+        "shortcutTipsEnabled": "开启",
+        "shortcutTipsDisabled": "关闭",
+        "shortcutTipsMods": "按 Mod 设置快捷键可见性",
+        "shortcutTipsToggle": "显示键盘快捷键",
+        "shortcutSourceGame": "原游戏",
+        "shortcutSourceModLoader": "ModLoader",
+        "shortcutSourceMods": "Mod",
+        "shortcutCategoryOther": "其他",
+        "shortcutContextInactive": "当前情境下不可用"
       },
       "mods": {
         "Cattail_Tweaks_简体中文优化": {
@@ -922,7 +942,17 @@
         "translationImportModFailures": "失败：{failures}",
         "descriptionDisplayMode": "提示显示",
         "descriptionDisplayHover": "悬浮",
-        "descriptionDisplayInline": "直接显示"
+        "descriptionDisplayInline": "直接显示",
+        "shortcutTips": "快捷键提示",
+        "shortcutTipsEnabled": "开启",
+        "shortcutTipsDisabled": "关闭",
+        "shortcutTipsMods": "按 Mod 设置快捷键可见性",
+        "shortcutTipsToggle": "显示键盘快捷键",
+        "shortcutSourceGame": "原游戏",
+        "shortcutSourceModLoader": "ModLoader",
+        "shortcutSourceMods": "Mod",
+        "shortcutCategoryOther": "其他",
+        "shortcutContextInactive": "当前情境下不可用"
       },
       "mods": {
         "Cattail_Tweaks_简体中文优化": {
@@ -1317,7 +1347,17 @@
         "translationImportModFailures": "失敗：{failures}",
         "descriptionDisplayMode": "提示顯示",
         "descriptionDisplayHover": "懸浮",
-        "descriptionDisplayInline": "直接顯示"
+        "descriptionDisplayInline": "直接顯示",
+        "shortcutTips": "快捷鍵提示",
+        "shortcutTipsEnabled": "開啟",
+        "shortcutTipsDisabled": "關閉",
+        "shortcutTipsMods": "按 Mod 設定快捷鍵可見性",
+        "shortcutTipsToggle": "顯示鍵盤快捷鍵",
+        "shortcutSourceGame": "原遊戲",
+        "shortcutSourceModLoader": "ModLoader",
+        "shortcutSourceMods": "Mod",
+        "shortcutCategoryOther": "其他",
+        "shortcutContextInactive": "目前情境下不可用"
       },
       "mods": {
         "Cattail_Tweaks_简体中文优化": {
@@ -1591,7 +1631,17 @@
         "translationImportModFailures": "Failures: {failures}",
         "descriptionDisplayMode": "Показ описаний",
         "descriptionDisplayHover": "При наведении",
-        "descriptionDisplayInline": "В строке"
+        "descriptionDisplayInline": "В строке",
+        "shortcutTips": "Подсказки клавиш",
+        "shortcutTipsEnabled": "Вкл.",
+        "shortcutTipsDisabled": "Выкл.",
+        "shortcutTipsMods": "Видимость подсказок по модам",
+        "shortcutTipsToggle": "Показать горячие клавиши",
+        "shortcutSourceGame": "Оригинальная игра",
+        "shortcutSourceModLoader": "ModLoader",
+        "shortcutSourceMods": "Моды",
+        "shortcutCategoryOther": "Другое",
+        "shortcutContextInactive": "Недоступно в текущем контексте"
       },
       "mods": {
         "Cattail_Tweaks_简体中文优化": {
@@ -1865,7 +1915,17 @@
         "translationImportModFailures": "Fehler: {failures}",
         "descriptionDisplayMode": "Beschreibungen",
         "descriptionDisplayHover": "Bei Hover",
-        "descriptionDisplayInline": "Inline"
+        "descriptionDisplayInline": "Inline",
+        "shortcutTips": "Tastenkürzel",
+        "shortcutTipsEnabled": "Ein",
+        "shortcutTipsDisabled": "Aus",
+        "shortcutTipsMods": "Sichtbarkeit nach Mod",
+        "shortcutTipsToggle": "Tastenkürzel anzeigen",
+        "shortcutSourceGame": "Originalspiel",
+        "shortcutSourceModLoader": "ModLoader",
+        "shortcutSourceMods": "Mods",
+        "shortcutCategoryOther": "Sonstiges",
+        "shortcutContextInactive": "Im aktuellen Kontext nicht verfügbar"
       },
       "mods": {
         "Cattail_Tweaks_简体中文优化": {
@@ -2139,7 +2199,17 @@
         "translationImportModFailures": "Falhas: {failures}",
         "descriptionDisplayMode": "Exibir descrições",
         "descriptionDisplayHover": "Ao passar",
-        "descriptionDisplayInline": "Em linha"
+        "descriptionDisplayInline": "Em linha",
+        "shortcutTips": "Dicas de atalhos",
+        "shortcutTipsEnabled": "Ativado",
+        "shortcutTipsDisabled": "Desativado",
+        "shortcutTipsMods": "Visibilidade de atalhos por Mod",
+        "shortcutTipsToggle": "Mostrar atalhos de teclado",
+        "shortcutSourceGame": "Jogo original",
+        "shortcutSourceModLoader": "ModLoader",
+        "shortcutSourceMods": "Mods",
+        "shortcutCategoryOther": "Outros",
+        "shortcutContextInactive": "Indisponível no contexto atual"
       },
       "mods": {
         "Cattail_Tweaks_简体中文优化": {
@@ -2413,7 +2483,17 @@
         "translationImportModFailures": "Errori: {failures}",
         "descriptionDisplayMode": "Mostra descrizioni",
         "descriptionDisplayHover": "Al passaggio",
-        "descriptionDisplayInline": "In linea"
+        "descriptionDisplayInline": "In linea",
+        "shortcutTips": "Suggerimenti scorciatoie",
+        "shortcutTipsEnabled": "Attivo",
+        "shortcutTipsDisabled": "Disattivo",
+        "shortcutTipsMods": "Visibilità scorciatoie per Mod",
+        "shortcutTipsToggle": "Mostra scorciatoie da tastiera",
+        "shortcutSourceGame": "Gioco originale",
+        "shortcutSourceModLoader": "ModLoader",
+        "shortcutSourceMods": "Mod",
+        "shortcutCategoryOther": "Altro",
+        "shortcutContextInactive": "Non disponibile nel contesto attuale"
       },
       "mods": {
         "Cattail_Tweaks_简体中文优化": {
@@ -2687,7 +2767,17 @@
         "translationImportModFailures": "Fallos: {failures}",
         "descriptionDisplayMode": "Mostrar descripciones",
         "descriptionDisplayHover": "Al pasar",
-        "descriptionDisplayInline": "En línea"
+        "descriptionDisplayInline": "En línea",
+        "shortcutTips": "Consejos de atajos",
+        "shortcutTipsEnabled": "Activado",
+        "shortcutTipsDisabled": "Desactivado",
+        "shortcutTipsMods": "Visibilidad de atajos por Mod",
+        "shortcutTipsToggle": "Mostrar atajos de teclado",
+        "shortcutSourceGame": "Juego original",
+        "shortcutSourceModLoader": "ModLoader",
+        "shortcutSourceMods": "Mods",
+        "shortcutCategoryOther": "Otros",
+        "shortcutContextInactive": "No disponible en el contexto actual"
       },
       "mods": {
         "Cattail_Tweaks_简体中文优化": {
@@ -2961,7 +3051,17 @@
         "translationImportModFailures": "Echecs : {failures}",
         "descriptionDisplayMode": "Affichage descriptions",
         "descriptionDisplayHover": "Au survol",
-        "descriptionDisplayInline": "En ligne"
+        "descriptionDisplayInline": "En ligne",
+        "shortcutTips": "Aide des raccourcis",
+        "shortcutTipsEnabled": "Activée",
+        "shortcutTipsDisabled": "Désactivée",
+        "shortcutTipsMods": "Visibilité des raccourcis par Mod",
+        "shortcutTipsToggle": "Afficher les raccourcis clavier",
+        "shortcutSourceGame": "Jeu d’origine",
+        "shortcutSourceModLoader": "ModLoader",
+        "shortcutSourceMods": "Mods",
+        "shortcutCategoryOther": "Autre",
+        "shortcutContextInactive": "Indisponible dans le contexte actuel"
       },
       "mods": {
         "Cattail_Tweaks_简体中文优化": {
@@ -3235,7 +3335,17 @@
         "translationImportModFailures": "Fouten: {failures}",
         "descriptionDisplayMode": "Beschrijvingen",
         "descriptionDisplayHover": "Bij aanwijzen",
-        "descriptionDisplayInline": "Inline"
+        "descriptionDisplayInline": "Inline",
+        "shortcutTips": "Sneltoetstips",
+        "shortcutTipsEnabled": "Aan",
+        "shortcutTipsDisabled": "Uit",
+        "shortcutTipsMods": "Zichtbaarheid per Mod",
+        "shortcutTipsToggle": "Sneltoetsen tonen",
+        "shortcutSourceGame": "Originele spel",
+        "shortcutSourceModLoader": "ModLoader",
+        "shortcutSourceMods": "Mods",
+        "shortcutCategoryOther": "Overig",
+        "shortcutContextInactive": "Niet beschikbaar in de huidige context"
       },
       "mods": {
         "Cattail_Tweaks_简体中文优化": {
@@ -3509,7 +3619,17 @@
         "translationImportModFailures": "Selhani: {failures}",
         "descriptionDisplayMode": "Zobrazení popisů",
         "descriptionDisplayHover": "Při najetí",
-        "descriptionDisplayInline": "V řádku"
+        "descriptionDisplayInline": "V řádku",
+        "shortcutTips": "Nápověda zkratek",
+        "shortcutTipsEnabled": "Zapnuto",
+        "shortcutTipsDisabled": "Vypnuto",
+        "shortcutTipsMods": "Viditelnost zkratek podle Modu",
+        "shortcutTipsToggle": "Zobrazit klávesové zkratky",
+        "shortcutSourceGame": "Původní hra",
+        "shortcutSourceModLoader": "ModLoader",
+        "shortcutSourceMods": "Mody",
+        "shortcutCategoryOther": "Ostatní",
+        "shortcutContextInactive": "V aktuálním kontextu není k dispozici"
       },
       "mods": {
         "Cattail_Tweaks_简体中文优化": {
@@ -3783,7 +3903,17 @@
         "translationImportModFailures": "Bledy: {failures}",
         "descriptionDisplayMode": "Wyświetlanie opisów",
         "descriptionDisplayHover": "Po najechaniu",
-        "descriptionDisplayInline": "W linii"
+        "descriptionDisplayInline": "W linii",
+        "shortcutTips": "Podpowiedzi skrótów",
+        "shortcutTipsEnabled": "Wł.",
+        "shortcutTipsDisabled": "Wył.",
+        "shortcutTipsMods": "Widoczność skrótów według Modów",
+        "shortcutTipsToggle": "Pokaż skróty klawiaturowe",
+        "shortcutSourceGame": "Oryginalna gra",
+        "shortcutSourceModLoader": "ModLoader",
+        "shortcutSourceMods": "Mody",
+        "shortcutCategoryOther": "Inne",
+        "shortcutContextInactive": "Niedostępne w bieżącym kontekście"
       },
       "mods": {
         "Cattail_Tweaks_简体中文优化": {
@@ -4057,7 +4187,17 @@
         "translationImportModFailures": "Failures: {failures}",
         "descriptionDisplayMode": "説明表示",
         "descriptionDisplayHover": "ホバー",
-        "descriptionDisplayInline": "直接表示"
+        "descriptionDisplayInline": "直接表示",
+        "shortcutTips": "ショートカットヒント",
+        "shortcutTipsEnabled": "オン",
+        "shortcutTipsDisabled": "オフ",
+        "shortcutTipsMods": "Modごとのショートカット表示",
+        "shortcutTipsToggle": "キーボードショートカットを表示",
+        "shortcutSourceGame": "オリジナルゲーム",
+        "shortcutSourceModLoader": "ModLoader",
+        "shortcutSourceMods": "Mod",
+        "shortcutCategoryOther": "その他",
+        "shortcutContextInactive": "現在の状況では使用できません"
       },
       "mods": {
         "Cattail_Tweaks_简体中文优化": {
@@ -4331,7 +4471,17 @@
         "translationImportModFailures": "Failures: {failures}",
         "descriptionDisplayMode": "설명 표시",
         "descriptionDisplayHover": "호버",
-        "descriptionDisplayInline": "바로 표시"
+        "descriptionDisplayInline": "바로 표시",
+        "shortcutTips": "단축키 안내",
+        "shortcutTipsEnabled": "켜기",
+        "shortcutTipsDisabled": "끄기",
+        "shortcutTipsMods": "Mod별 단축키 표시",
+        "shortcutTipsToggle": "키보드 단축키 표시",
+        "shortcutSourceGame": "원본 게임",
+        "shortcutSourceModLoader": "ModLoader",
+        "shortcutSourceMods": "Mod",
+        "shortcutCategoryOther": "기타",
+        "shortcutContextInactive": "현재 상황에서 사용할 수 없음"
       },
       "mods": {
         "Cattail_Tweaks_简体中文优化": {
@@ -4605,7 +4755,17 @@
         "translationImportModFailures": "Failures: {failures}",
         "descriptionDisplayMode": "การแสดงคำอธิบาย",
         "descriptionDisplayHover": "เมื่อวางเมาส์",
-        "descriptionDisplayInline": "แสดงใต้รายการ"
+        "descriptionDisplayInline": "แสดงใต้รายการ",
+        "shortcutTips": "คำแนะนำปุ่มลัด",
+        "shortcutTipsEnabled": "เปิด",
+        "shortcutTipsDisabled": "ปิด",
+        "shortcutTipsMods": "การแสดงปุ่มลัดแยกตาม Mod",
+        "shortcutTipsToggle": "แสดงปุ่มลัดแป้นพิมพ์",
+        "shortcutSourceGame": "เกมต้นฉบับ",
+        "shortcutSourceModLoader": "ModLoader",
+        "shortcutSourceMods": "Mod",
+        "shortcutCategoryOther": "อื่น ๆ",
+        "shortcutContextInactive": "ใช้ไม่ได้ในบริบทปัจจุบัน"
       },
       "mods": {
         "Cattail_Tweaks_简体中文优化": {
@@ -4879,7 +5039,17 @@
         "translationImportModFailures": "Hibak: {failures}",
         "descriptionDisplayMode": "Leírás megjelenítése",
         "descriptionDisplayHover": "Rámutatáskor",
-        "descriptionDisplayInline": "Sorban"
+        "descriptionDisplayInline": "Sorban",
+        "shortcutTips": "Gyorsbillentyű-tippek",
+        "shortcutTipsEnabled": "Be",
+        "shortcutTipsDisabled": "Ki",
+        "shortcutTipsMods": "Gyorsbillentyűk láthatósága Modonként",
+        "shortcutTipsToggle": "Billentyűparancsok megjelenítése",
+        "shortcutSourceGame": "Eredeti játék",
+        "shortcutSourceModLoader": "ModLoader",
+        "shortcutSourceMods": "Modok",
+        "shortcutCategoryOther": "Egyéb",
+        "shortcutContextInactive": "A jelenlegi helyzetben nem érhető el"
       },
       "mods": {
         "Cattail_Tweaks_简体中文优化": {
@@ -5153,7 +5323,17 @@
         "translationImportModFailures": "Failures: {failures}",
         "descriptionDisplayMode": "Aprakstu rādīšana",
         "descriptionDisplayHover": "Uzvedot peli",
-        "descriptionDisplayInline": "Rindā"
+        "descriptionDisplayInline": "Rindā",
+        "shortcutTips": "Īsinājumtaustiņu padomi",
+        "shortcutTipsEnabled": "Ieslēgts",
+        "shortcutTipsDisabled": "Izslēgts",
+        "shortcutTipsMods": "Īsinājumtaustiņu redzamība pēc Mod",
+        "shortcutTipsToggle": "Rādīt īsinājumtaustiņus",
+        "shortcutSourceGame": "Oriģinālā spēle",
+        "shortcutSourceModLoader": "ModLoader",
+        "shortcutSourceMods": "Modifikācijas",
+        "shortcutCategoryOther": "Cits",
+        "shortcutContextInactive": "Pašreizējā kontekstā nav pieejams"
       },
       "mods": {
         "Cattail_Tweaks_简体中文优化": {
@@ -5427,7 +5607,17 @@
         "translationImportModFailures": "Erori: {failures}",
         "descriptionDisplayMode": "Afișare descrieri",
         "descriptionDisplayHover": "La trecere",
-        "descriptionDisplayInline": "În linie"
+        "descriptionDisplayInline": "În linie",
+        "shortcutTips": "Sugestii pentru scurtături",
+        "shortcutTipsEnabled": "Pornit",
+        "shortcutTipsDisabled": "Oprit",
+        "shortcutTipsMods": "Vizibilitatea scurtăturilor după Mod",
+        "shortcutTipsToggle": "Afișează scurtăturile de tastatură",
+        "shortcutSourceGame": "Jocul original",
+        "shortcutSourceModLoader": "ModLoader",
+        "shortcutSourceMods": "Moduri",
+        "shortcutCategoryOther": "Altele",
+        "shortcutContextInactive": "Indisponibil în contextul actual"
       },
       "mods": {
         "Cattail_Tweaks_简体中文优化": {
@@ -5701,7 +5891,17 @@
         "translationImportModFailures": "Feil: {failures}",
         "descriptionDisplayMode": "Vis beskrivelser",
         "descriptionDisplayHover": "Ved peking",
-        "descriptionDisplayInline": "Inline"
+        "descriptionDisplayInline": "Inline",
+        "shortcutTips": "Snarveistips",
+        "shortcutTipsEnabled": "På",
+        "shortcutTipsDisabled": "Av",
+        "shortcutTipsMods": "Snarveissynlighet per Mod",
+        "shortcutTipsToggle": "Vis tastatursnarveier",
+        "shortcutSourceGame": "Originalspillet",
+        "shortcutSourceModLoader": "ModLoader",
+        "shortcutSourceMods": "Modifikasjoner",
+        "shortcutCategoryOther": "Annet",
+        "shortcutContextInactive": "Ikke tilgjengelig i gjeldende kontekst"
       },
       "mods": {
         "Cattail_Tweaks_简体中文优化": {

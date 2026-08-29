@@ -2,7 +2,7 @@
 	'use strict'
 
 	const state = {
-		version: '0.4.0',
+		version: '0.5.0',
 		booted: false,
 		mods: [],
 		modById: {},
@@ -47,6 +47,18 @@
 		uiButtons: {},
 		uiDocks: {},
 		uiProceduralIconRenderers: {},
+		shortcutEntries: {},
+		shortcutDiagnostics: [],
+		shortcutDiagnosticKeys: new Set(),
+		shortcutGeneration: 1,
+		shortcutSettings: { enabled: true, mods: {} },
+		shortcutOpen: false,
+		shortcutButton: null,
+		shortcutPanel: null,
+		shortcutUiInstalled: false,
+		shortcutRefreshFrame: 0,
+		shortcutMutationObserver: null,
+		shortcutResizeObserver: null,
 		gameHudHidden: false,
 		gameHudSnapshot: null,
 		gameHudItems: {},
@@ -161,7 +173,9 @@
 	const applyStatusCorner = function (el, corner) {
 		const vertical = corner.startsWith('top') ? 'top' : 'bottom'
 		const horizontal = corner.endsWith('left') ? 'left' : 'right'
-		el.style.left = horizontal === 'left' ? `${STATUS_MARGIN}px` : 'auto'
+		const shortcutOffset = corner === 'bottom-left' ? getShortcutStatusLeft() : STATUS_MARGIN
+		el.classList.toggle('modloader-shortcut-status-offset', corner === 'bottom-left' && shortcutOffset > STATUS_MARGIN)
+		el.style.left = horizontal === 'left' ? `${shortcutOffset}px` : 'auto'
 		el.style.right = horizontal === 'right' ? `${STATUS_MARGIN}px` : 'auto'
 		el.style.top = vertical === 'top' ? `${STATUS_MARGIN}px` : 'auto'
 		el.style.bottom = vertical === 'bottom' ? `${STATUS_MARGIN}px` : 'auto'
@@ -386,6 +400,7 @@
 		const changed = state.vanillaGameHudHidden !== hidden
 		state.vanillaGameHudHidden = hidden
 		applyVanillaGameHudVisibilityToDocks()
+		requestShortcutRefresh()
 		if (changed && typeof window !== 'undefined') {
 			window.dispatchEvent(new CustomEvent('modloader:vanilla-game-hud', { detail: { hidden, game } }))
 		}
@@ -2830,6 +2845,7 @@
 		state.gameHudHidden = hidden
 		applyGameHudBodyClass()
 		syncGameHudEntries()
+		requestShortcutRefresh()
 		window.dispatchEvent(new CustomEvent('modloader:game-hud', { detail: { hidden, game } }))
 		return state.gameHudHidden
 	}
@@ -3555,6 +3571,7 @@
 			icons: createUiIconsApi(modId),
 			theme: createUiThemeApi(),
 			settings: createUiSettingsApi(modId),
+			shortcuts: createUiShortcutsApi(modId),
 			pages: createUiPagesApi(modId)
 		}
 	}
@@ -3648,7 +3665,17 @@
 		snapshotDetectedReason: 'Detected issue',
 		descriptionDisplayMode: 'Description display',
 		descriptionDisplayHover: 'Hover',
-		descriptionDisplayInline: 'Inline'
+		descriptionDisplayInline: 'Inline',
+		shortcutTips: 'Shortcut tips',
+		shortcutTipsEnabled: 'On',
+		shortcutTipsDisabled: 'Off',
+		shortcutTipsMods: 'Shortcut visibility by Mod',
+		shortcutTipsToggle: 'Show keyboard shortcuts',
+		shortcutSourceGame: 'Original game',
+		shortcutSourceModLoader: 'ModLoader',
+		shortcutSourceMods: 'Mods',
+		shortcutCategoryOther: 'Other',
+		shortcutContextInactive: 'Not available in the current context'
 	})
 	Object.assign(PANEL_TEXT.sch, {
 		devTools: 'DevTools',
@@ -3704,7 +3731,17 @@
 		snapshotDetectedReason: '\u68c0\u6d4b\u5230\u7684\u95ee\u9898',
 		descriptionDisplayMode: '\u63d0\u793a\u663e\u793a',
 		descriptionDisplayHover: '\u60ac\u6d6e',
-		descriptionDisplayInline: '\u76f4\u63a5\u663e\u793a'
+		descriptionDisplayInline: '\u76f4\u63a5\u663e\u793a',
+		shortcutTips: '\u5feb\u6377\u952e\u63d0\u793a',
+		shortcutTipsEnabled: '\u5f00\u542f',
+		shortcutTipsDisabled: '\u5173\u95ed',
+		shortcutTipsMods: '\u6309 Mod \u8bbe\u7f6e\u5feb\u6377\u952e\u53ef\u89c1\u6027',
+		shortcutTipsToggle: '\u663e\u793a\u952e\u76d8\u5feb\u6377\u952e',
+		shortcutSourceGame: '\u539f\u6e38\u620f',
+		shortcutSourceModLoader: 'ModLoader',
+		shortcutSourceMods: 'Mod',
+		shortcutCategoryOther: '\u5176\u4ed6',
+		shortcutContextInactive: '\u5f53\u524d\u60c5\u5883\u4e0b\u4e0d\u53ef\u7528'
 	})
 	PANEL_TEXT.modsch = PANEL_TEXT.sch
 	PANEL_TEXT.tch = PANEL_TEXT.sch
@@ -3845,6 +3882,561 @@
 		if (!values) return text
 		for (const key in values) text = text.replace(new RegExp('\\{' + key + '\\}', 'g'), values[key])
 		return text
+	}
+
+	const SHORTCUT_API_VERSION = 1
+	const SHORTCUT_SOURCE_ORDER = Object.freeze([ 'game', 'loader', 'mod' ])
+	const SHORTCUT_MAX_ALTERNATIVES = 8
+	const SHORTCUT_MAX_CHORD_TOKENS = 6
+	const SHORTCUT_DIAGNOSTIC_LIMIT = 100
+	const SHORTCUT_TOKEN_ALIASES = Object.freeze({
+		control: 'Ctrl', ctrl: 'Ctrl', alt: 'Alt', option: 'Alt', shift: 'Shift', meta: 'Meta', command: 'Meta', cmd: 'Meta', win: 'Meta',
+		space: 'Space', spacebar: 'Space', enter: 'Enter', return: 'Enter', escape: 'Esc', esc: 'Esc', tab: 'Tab', backspace: 'Backspace',
+		delete: 'Delete', del: 'Delete', insert: 'Insert', home: 'Home', end: 'End', pageup: 'PageUp', pagedown: 'PageDown', capslock: 'CapsLock',
+		arrowup: 'ArrowUp', up: 'ArrowUp', arrowdown: 'ArrowDown', down: 'ArrowDown', arrowleft: 'ArrowLeft', left: 'ArrowLeft', arrowright: 'ArrowRight', right: 'ArrowRight',
+		wheelup: 'WheelUp', wheeldown: 'WheelDown', bracketleft: '[', bracketright: ']', comma: ',', period: '.', slash: '/', backslash: '\\',
+		semicolon: ';', quote: "'", backquote: '`', minus: '-', equal: '=', plus: '+'
+	})
+
+	const shortcutEntryKey = function (modId, id) {
+		return String(modId || 'anonymous') + ':' + String(id || '')
+	}
+
+	const pushShortcutDiagnostic = function (code, message, details, uniqueKey) {
+		const key = String(uniqueKey || code + ':' + message)
+		if (state.shortcutDiagnosticKeys.has(key)) return
+		state.shortcutDiagnosticKeys.add(key)
+		state.shortcutDiagnostics.push({ code, message, details: details || null })
+		if (state.shortcutDiagnostics.length > SHORTCUT_DIAGNOSTIC_LIMIT) state.shortcutDiagnostics.shift()
+		warn(message, details || '')
+	}
+
+	const normalizeShortcutToken = function (value) {
+		const text = String(value ?? '').trim()
+		if (!text) return ''
+		const alias = SHORTCUT_TOKEN_ALIASES[text.toLowerCase()]
+		if (alias) return alias
+		if (/^[a-z]$/i.test(text)) return text.toUpperCase()
+		if (/^[0-9]$/.test(text)) return text
+		if (/^f(?:[1-9]|1[0-9]|2[0-4])$/i.test(text)) return text.toUpperCase()
+		if (/^mouse[1-5]$/i.test(text)) return 'Mouse' + text.slice(-1)
+		return ''
+	}
+
+	const normalizeShortcutChord = function (value) {
+		let values = Array.isArray(value) ? value.slice() : [ value ]
+		if (values.length === 1 && typeof values[0] === 'string' && values[0] !== '+' && values[0].includes('+')) {
+			values = values[0].split(/\s*\+\s*/)
+		}
+		if (!values.length || values.length > SHORTCUT_MAX_CHORD_TOKENS) throw new Error('Shortcut chords require 1-' + SHORTCUT_MAX_CHORD_TOKENS + ' tokens.')
+		const chord = values.map(normalizeShortcutToken)
+		if (chord.some(function (token) { return !token })) throw new Error('Shortcut keys contain an unsupported token.')
+		return chord
+	}
+
+	const normalizeShortcutKeys = function (value) {
+		let alternatives
+		if (typeof value === 'string') alternatives = [ [ value ] ]
+		else if (Array.isArray(value) && value.length && value.every(function (item) { return typeof item === 'string' })) alternatives = [ value ]
+		else if (Array.isArray(value) && value.length && value.every(Array.isArray)) alternatives = value
+		else throw new Error('Shortcut keys must be a token, a chord array, or an array of chord arrays.')
+		if (alternatives.length > SHORTCUT_MAX_ALTERNATIVES) throw new Error('Shortcut keys allow at most ' + SHORTCUT_MAX_ALTERNATIVES + ' alternatives.')
+		return alternatives.map(normalizeShortcutChord)
+	}
+
+	const isShortcutTextValue = function (value, optional) {
+		if (optional && (value === undefined || value === null || value === '')) return true
+		if (typeof value === 'function') return true
+		if (typeof value === 'string') return !!value.trim()
+		if (!isLocaleObject(value)) return false
+		const values = Object.values(value)
+		return values.length > 0 && values.every(function (text) { return typeof text === 'string' }) && values.some(function (text) { return !!text.trim() })
+	}
+
+	const normalizeShortcutOrder = function (value, fallback) {
+		const number = Number(value)
+		return Number.isFinite(number) ? number : fallback
+	}
+
+	const normalizeShortcutCategory = function (value) {
+		if (value === undefined || value === null) return { id: 'other', label: null, order: 100 }
+		if (!isLocaleObject(value)) throw new Error('Shortcut category must be an object.')
+		const id = String(value.id || '').trim()
+		if (!/^[a-z0-9][a-z0-9._-]{0,79}$/i.test(id)) throw new Error('Shortcut category id is invalid.')
+		if (!isShortcutTextValue(value.label, false)) throw new Error('Shortcut category label is required.')
+		return { id, label: value.label, order: normalizeShortcutOrder(value.order, 100) }
+	}
+
+	const normalizeShortcutEntry = function (modId, options, source, generation) {
+		if (!isLocaleObject(options)) throw new Error('Shortcut registration must be an object.')
+		const id = String(options.id || '').trim()
+		if (!/^[a-z0-9][a-z0-9._-]{0,99}$/i.test(id)) throw new Error('Shortcut id is invalid.')
+		if (!isShortcutTextValue(options.description, false)) throw new Error('Shortcut description is required.')
+		if (!isShortcutTextValue(options.context, true)) throw new Error('Shortcut context must be localized text or a text function.')
+		if (options.visible !== undefined && typeof options.visible !== 'boolean' && typeof options.visible !== 'function') throw new Error('Shortcut visible must be a boolean or function.')
+		if (options.active !== undefined && typeof options.active !== 'boolean' && typeof options.active !== 'function') throw new Error('Shortcut active must be a boolean or function.')
+		return {
+			id,
+			key: shortcutEntryKey(modId, id),
+			modId: String(modId || 'anonymous'),
+			source: SHORTCUT_SOURCE_ORDER.includes(source) ? source : 'mod',
+			keys: normalizeShortcutKeys(options.keys),
+			description: options.description,
+			context: options.context,
+			visible: options.visible === undefined ? true : options.visible,
+			active: options.active === undefined ? true : options.active,
+			order: normalizeShortcutOrder(options.order, 100),
+			category: normalizeShortcutCategory(options.category),
+			generation,
+			raw: Object.assign({}, options)
+		}
+	}
+
+	const shortcutTextSignature = function (value) {
+		if (typeof value === 'function') return 'function'
+		if (typeof value === 'string') return value
+		try { return JSON.stringify(value) } catch (error) { return String(value) }
+	}
+
+	const shortcutCategoryMatches = function (a, b) {
+		return !!a && !!b && a.id === b.id && a.order === b.order && shortcutTextSignature(a.label) === shortcutTextSignature(b.label)
+	}
+
+	const shortcutKeysSignature = function (keys) {
+		return keys.map(function (chord) { return chord.join('+') }).join(' / ')
+	}
+
+	const recordShortcutConflicts = function (entry) {
+		for (const key in state.shortcutEntries) {
+			const other = state.shortcutEntries[key]
+			if (!other || other.key === entry.key) continue
+			if (shortcutKeysSignature(other.keys) === shortcutKeysSignature(entry.keys)) {
+				const pair = [ other.key, entry.key ].sort().join('|')
+				pushShortcutDiagnostic('duplicate-combination', 'Shortcut combination is registered more than once: ' + shortcutKeysSignature(entry.keys), { entries: pair }, 'duplicate-combination:' + pair + ':' + shortcutKeysSignature(entry.keys))
+			}
+			if (other.modId !== entry.modId && other.source === 'mod' && entry.source === 'mod' && other.category.id === entry.category.id && !shortcutCategoryMatches(other.category, entry.category)) {
+				const pair = [ other.modId, entry.modId ].sort().join('|')
+				pushShortcutDiagnostic('category-conflict', 'Shortcut category metadata conflicts for ' + entry.category.id + '; the conflicting Mod will be isolated.', { mods: pair }, 'category-conflict:' + entry.category.id + ':' + pair)
+			}
+		}
+	}
+
+	const inertShortcutHandle = function () {
+		return Object.freeze({ update() { return false }, unregister() { return false } })
+	}
+
+	const createShortcutHandle = function (modId, id, generation) {
+		return Object.freeze({
+			update(patch) { return updateShortcut(modId, id, generation, patch) },
+			unregister() { return unregisterShortcut(modId, id, generation) }
+		})
+	}
+
+	const registerShortcut = function (modId, options, source) {
+		const generation = state.shortcutGeneration++
+		let entry
+		try {
+			entry = normalizeShortcutEntry(modId, options, source, generation)
+		} catch (error) {
+			pushShortcutDiagnostic('invalid-registration', 'Ignoring invalid shortcut registration from ' + (modId || 'anonymous') + ': ' + error.message, null, 'invalid-registration:' + (modId || 'anonymous') + ':' + String(options?.id || generation))
+			return inertShortcutHandle()
+		}
+		const previous = state.shortcutEntries[entry.key]
+		if (previous) pushShortcutDiagnostic('duplicate-id', 'Replacing duplicate shortcut id ' + entry.id + ' from ' + entry.modId + '.', null, 'duplicate-id:' + entry.key + ':' + generation)
+		const sibling = Object.values(state.shortcutEntries).find(function (candidate) { return candidate.modId === entry.modId && candidate.key !== entry.key })
+		if (sibling && !shortcutCategoryMatches(sibling.category, entry.category)) {
+			pushShortcutDiagnostic('mod-category-conflict', 'A Mod may declare only one shortcut category; keeping the existing category for ' + entry.modId + '.', null, 'mod-category-conflict:' + entry.modId)
+			entry.category = sibling.category
+		}
+		state.shortcutEntries[entry.key] = entry
+		recordShortcutConflicts(entry)
+		requestShortcutRefresh()
+		requestAnimationFrame(refreshOpenPanel)
+		return createShortcutHandle(entry.modId, entry.id, generation)
+	}
+
+	const updateShortcut = function (modId, id, generation, patch) {
+		const key = shortcutEntryKey(modId, id)
+		const current = state.shortcutEntries[key]
+		if (!current || current.generation !== generation || !isLocaleObject(patch)) return false
+		if (patch.id !== undefined && String(patch.id) !== current.id) {
+			pushShortcutDiagnostic('immutable-id', 'Shortcut ids cannot be changed by update().', { modId, id }, 'immutable-id:' + key)
+			return false
+		}
+		let next
+		try {
+			next = normalizeShortcutEntry(modId, Object.assign({}, current.raw, patch, { id: current.id }), current.source, generation)
+		} catch (error) {
+			pushShortcutDiagnostic('invalid-update', 'Ignoring invalid shortcut update from ' + modId + ': ' + error.message, { id }, 'invalid-update:' + key + ':' + error.message)
+			return false
+		}
+		state.shortcutEntries[key] = next
+		if (Object.prototype.hasOwnProperty.call(patch, 'category')) {
+			for (const siblingKey in state.shortcutEntries) {
+				const sibling = state.shortcutEntries[siblingKey]
+				if (sibling.modId !== next.modId || sibling.key === key) continue
+				sibling.category = next.category
+				sibling.raw = Object.assign({}, sibling.raw, { category: patch.category })
+			}
+		}
+		recordShortcutConflicts(next)
+		requestShortcutRefresh()
+		return true
+	}
+
+	const unregisterShortcut = function (modId, id, generation) {
+		const key = shortcutEntryKey(modId, id)
+		const current = state.shortcutEntries[key]
+		if (!current || current.generation !== generation) return false
+		delete state.shortcutEntries[key]
+		requestShortcutRefresh()
+		requestAnimationFrame(refreshOpenPanel)
+		return true
+	}
+
+	const createUiShortcutsApi = function (modId) {
+		return Object.freeze({
+			version: SHORTCUT_API_VERSION,
+			register(options) { return registerShortcut(modId, options, 'mod') },
+			refresh() { requestShortcutRefresh() }
+		})
+	}
+
+	const getShortcutModOrder = function (modId) {
+		const mod = state.modById[modId]
+		const path = mod?.path || modId
+		const index = state.panelModOrder.indexOf(path)
+		return index >= 0 ? index : Number.MAX_SAFE_INTEGER
+	}
+
+	const getShortcutModName = function (modId) {
+		const mod = state.modById[modId]
+		return getLocalizedModName(mod) || String(modId || '')
+	}
+
+	const getRegisteredShortcutModIds = function () {
+		return Array.from(new Set(Object.values(state.shortcutEntries).filter(function (entry) { return entry.source === 'mod' }).map(function (entry) { return entry.modId }))).sort(function (a, b) {
+			return (getShortcutModOrder(a) - getShortcutModOrder(b)) || getShortcutModName(a).localeCompare(getShortcutModName(b)) || a.localeCompare(b)
+		})
+	}
+
+	const resolveShortcutText = function (value, entry, fallback) {
+		let resolved = value
+		if (typeof value === 'function') {
+			try {
+				resolved = value(Object.freeze({ modId: entry.modId, id: entry.id, game: state.game, state }))
+			} catch (error) {
+				pushShortcutDiagnostic('text-error', 'Shortcut text provider failed for ' + entry.key + ': ' + error.message, null, 'text-error:' + entry.key + ':' + error.message)
+				resolved = ''
+			}
+		}
+		return pickLocalizedText(resolved, getLocaleCandidates()) || fallback || ''
+	}
+
+	const evaluateShortcutPredicate = function (value, entry, fallback, kind) {
+		if (typeof value !== 'function') return value === undefined ? fallback : value !== false
+		try { return value(Object.freeze({ modId: entry.modId, id: entry.id, game: state.game, state })) !== false }
+		catch (error) {
+			pushShortcutDiagnostic(kind + '-error', 'Shortcut ' + kind + ' predicate failed for ' + entry.key + ': ' + error.message, null, kind + '-error:' + entry.key + ':' + error.message)
+			return false
+		}
+	}
+
+	const getVisibleShortcutEntries = function () {
+		loadPanelState()
+		return Object.values(state.shortcutEntries).filter(function (entry) {
+			return state.shortcutSettings.mods[entry.modId] !== false && evaluateShortcutPredicate(entry.visible, entry, true, 'visible')
+		})
+	}
+
+	const getShortcutSourceLabel = function (source) {
+		if (source === 'game') return t('shortcutSourceGame')
+		if (source === 'loader') return t('shortcutSourceModLoader')
+		return t('shortcutSourceMods')
+	}
+
+	const getShortcutCategoryLabel = function (category, entry) {
+		return resolveShortcutText(category?.label, entry, t('shortcutCategoryOther'))
+	}
+
+	const sortShortcutEntries = function (entries) {
+		return entries.slice().sort(function (a, b) {
+			return (getShortcutModOrder(a.modId) - getShortcutModOrder(b.modId)) || getShortcutModName(a.modId).localeCompare(getShortcutModName(b.modId)) || (a.order - b.order) || a.id.localeCompare(b.id)
+		})
+	}
+
+	const buildShortcutViewModel = function (entries) {
+		const sections = []
+		for (const source of SHORTCUT_SOURCE_ORDER) {
+			const sourceEntries = entries.filter(function (entry) { return entry.source === source })
+			if (!sourceEntries.length) continue
+			const categories = []
+			if (source !== 'mod') {
+				categories.push({ category: null, mods: [ { modId: source, name: getShortcutSourceLabel(source), entries: sortShortcutEntries(sourceEntries) } ] })
+			} else {
+				const byMod = new Map()
+				for (const entry of sourceEntries) {
+					if (!byMod.has(entry.modId)) byMod.set(entry.modId, [])
+					byMod.get(entry.modId).push(entry)
+				}
+				const canonical = new Map()
+				const groups = new Map()
+				const modIds = Array.from(byMod.keys()).sort(function (a, b) { return (getShortcutModOrder(a) - getShortcutModOrder(b)) || a.localeCompare(b) })
+				for (const modId of modIds) {
+					const modEntries = sortShortcutEntries(byMod.get(modId))
+					const category = modEntries[0].category
+					let groupKey = category.id
+					if (!canonical.has(category.id)) canonical.set(category.id, category)
+					else if (!shortcutCategoryMatches(canonical.get(category.id), category)) groupKey += '::' + modId
+					if (!groups.has(groupKey)) groups.set(groupKey, { category, mods: [] })
+					groups.get(groupKey).mods.push({ modId, name: getShortcutModName(modId), entries: modEntries })
+				}
+				categories.push(...Array.from(groups.values()).sort(function (a, b) { return (a.category.order - b.category.order) || a.category.id.localeCompare(b.category.id) }))
+			}
+			sections.push({ source, label: getShortcutSourceLabel(source), categories })
+		}
+		return sections
+	}
+
+	const ensureShortcutStyle = function () {
+		if (document.getElementById('modloader-shortcut-style')) return
+		const style = document.createElement('style')
+		style.id = 'modloader-shortcut-style'
+		style.textContent = `
+			#modloader-shortcut-button { appearance:none; position:absolute; left:calc(var(--unit) * 3.35); bottom:calc(var(--unit) * .5); z-index:2; width:calc(var(--unit) * 2.5); height:calc(var(--unit) * 2.5); box-sizing:border-box; display:none; place-items:center; padding:0; border:1px solid rgba(255,255,255,.34); border-radius:50%; background:rgba(24,25,29,.92); color:#fff; box-shadow:0 4px 10px rgba(0,0,0,.2); font:700 calc(var(--unit) * 1.35)/1 Montserrat,Arial,sans-serif; cursor:pointer; user-select:none; }
+			#modloader-shortcut-button:hover { transform:translateY(-1px); box-shadow:0 6px 14px rgba(0,0,0,.26); }
+			#modloader-shortcut-button:focus-visible { outline:2px solid #fff; outline-offset:2px; }
+			#modloader-shortcut-button.modloader-shortcut-theme-light { border-color:rgba(0,0,0,.12); background:#fff; color:#202126; box-shadow:0 4px 8px rgba(0,0,0,.1); }
+			#modloader-shortcut-panel { position:fixed; z-index:2; display:none; box-sizing:border-box; overflow-x:hidden; overflow-y:auto; padding:4px 6px 10px 16px; border:0; background:transparent; color:#fff; scrollbar-width:thin; scrollbar-color:rgba(255,255,255,.72) transparent; font-family:Montserrat,Arial,sans-serif; text-shadow:none; direction:rtl; outline:none; }
+			#modloader-shortcut-panel::-webkit-scrollbar { width:5px; }
+			#modloader-shortcut-panel::-webkit-scrollbar-track { background:transparent; }
+			#modloader-shortcut-panel::-webkit-scrollbar-thumb { border-radius:3px; background:rgba(255,255,255,.72); }
+			#modloader-shortcut-panel.modloader-shortcut-panel-open { display:block; }
+			.modloader-shortcut-source { margin:0 0 16px; direction:ltr; }
+			.modloader-shortcut-source-title { margin:0 0 9px; font-size:18px; font-weight:800; letter-spacing:.08em; text-transform:uppercase; }
+			.modloader-shortcut-category-title { margin:12px 0 7px; font-size:16px; font-weight:700; opacity:.86; }
+			.modloader-shortcut-mod-title { margin:9px 0 6px; font-size:15px; font-weight:650; opacity:.74; }
+			.modloader-shortcut-row { display:grid; grid-template-columns:minmax(116px,max-content) minmax(0,1fr); align-items:center; gap:14px; min-height:37px; padding:4px 0; }
+			.modloader-shortcut-row-inactive { opacity:.7; }
+			.modloader-shortcut-keys { display:inline-flex; align-items:center; flex-wrap:wrap; gap:6px; min-width:0; }
+			.modloader-shortcut-chord { display:inline-flex; align-items:center; gap:5px; }
+			.modloader-shortcut-key { display:inline-grid; place-items:center; box-sizing:border-box; min-width:32px; height:30px; padding:0 8px; border:1px solid rgba(0,0,0,.2); border-radius:6px; background:#fff; color:#17181b; box-shadow:0 2px 0 #ffe0b5,0 3px 7px rgba(0,0,0,.22); font:700 13.25px/1 Montserrat,Arial,sans-serif; }
+			.modloader-shortcut-key-space { min-width:112px; }
+			.modloader-shortcut-space-mark { width:16px; height:5px; border:1.5px solid #17181b; border-top:0; border-radius:0 0 3px 3px; }
+			.modloader-shortcut-plus,.modloader-shortcut-or { font-size:13.25px; font-weight:800; opacity:.82; }
+			.modloader-shortcut-description { min-width:0; font-size:15px; line-height:1.35; }
+			.modloader-shortcut-context { display:block; margin-top:2px; font-size:12px; opacity:.78; }
+			.mobile #modloader-shortcut-button,.mobile #modloader-shortcut-panel { display:none !important; }
+		`
+		document.head.appendChild(style)
+	}
+
+	const renderShortcutKeys = function (keys) {
+		const wrap = element('span', 'modloader-shortcut-keys')
+		keys.forEach(function (chord, chordIndex) {
+			if (chordIndex) wrap.appendChild(element('span', 'modloader-shortcut-or', '/'))
+			const chordElement = element('span', 'modloader-shortcut-chord')
+			chord.forEach(function (token, tokenIndex) {
+				if (tokenIndex) chordElement.appendChild(element('span', 'modloader-shortcut-plus', '+'))
+				const key = element('span', 'modloader-shortcut-key' + (token === 'Space' ? ' modloader-shortcut-key-space' : ''))
+				if (token === 'Space') {
+					const mark = element('span', 'modloader-shortcut-space-mark')
+					mark.setAttribute('aria-label', 'Space')
+					key.appendChild(mark)
+				} else key.textContent = token
+				chordElement.appendChild(key)
+			})
+			wrap.appendChild(chordElement)
+		})
+		return wrap
+	}
+
+	const renderShortcutPanel = function (panel, entries) {
+		panel.innerHTML = ''
+		for (const section of buildShortcutViewModel(entries)) {
+			const source = element('section', 'modloader-shortcut-source')
+			source.appendChild(element('div', 'modloader-shortcut-source-title', section.label))
+			for (const category of section.categories) {
+				if (section.source === 'mod') source.appendChild(element('div', 'modloader-shortcut-category-title', getShortcutCategoryLabel(category.category, category.mods[0].entries[0])))
+				for (const mod of category.mods) {
+					if (section.source === 'mod') source.appendChild(element('div', 'modloader-shortcut-mod-title', mod.name))
+					for (const entry of mod.entries) {
+						const active = evaluateShortcutPredicate(entry.active, entry, true, 'active')
+						const row = element('div', 'modloader-shortcut-row' + (active ? '' : ' modloader-shortcut-row-inactive'))
+						row.appendChild(renderShortcutKeys(entry.keys))
+						const description = element('span', 'modloader-shortcut-description', resolveShortcutText(entry.description, entry, entry.id))
+						if (!active) description.appendChild(element('span', 'modloader-shortcut-context', resolveShortcutText(entry.context, entry, t('shortcutContextInactive'))))
+						row.appendChild(description)
+						source.appendChild(row)
+					}
+				}
+			}
+			panel.appendChild(source)
+		}
+	}
+
+	const observeShortcutLayoutNode = function (node) {
+		if (!node || !state.shortcutResizeObserver) return
+		try { state.shortcutResizeObserver.observe(node) } catch (error) {}
+	}
+
+	const shortcutMutationAffectsLayout = function (records) {
+		return records.some(function (record) {
+			const target = record.target
+			if (target === document.body || target?.matches?.('.messenger,.chatIcon') || target?.closest?.('.messenger,.chatIcon')) return true
+			return [ ...record.addedNodes, ...record.removedNodes ].some(function (node) {
+				return node?.matches?.('.messenger,.chatIcon') || node?.querySelector?.('.messenger,.chatIcon')
+			})
+		})
+	}
+
+	const refreshShortcutLayout = function () {
+		const panel = state.shortcutPanel
+		if (!panel || !state.shortcutOpen) return
+		const game = state.game
+		const pixelRatio = Number(game?.pixelRatio) || Number(window.devicePixelRatio) || 1
+		const canvasRect = game?.canvas?.getBoundingClientRect?.() || { left: 0, top: 0 }
+		let top = Math.max(72, window.innerHeight * .12)
+		if (Array.isArray(game?.resourceHomes) && game.resourceHomes.length && Number(game?.screenUnit) > 0) {
+			const maxY = Math.max(...game.resourceHomes.map(function (home) { return Number(home?.[1]) || 0 }))
+			top = canvasRect.top + (maxY + Number(game.screenUnit) * .55) / pixelRatio
+		}
+		const messenger = document.querySelector('.messenger')
+		const chatIcon = document.querySelector('.chatIcon')
+		observeShortcutLayoutNode(messenger)
+		observeShortcutLayoutNode(chatIcon)
+		let bottom = window.innerHeight - 72
+		let widthSource = 0
+		let left = 8
+		if (messenger) {
+			const rect = messenger.getBoundingClientRect()
+			const style = typeof getComputedStyle === 'function' ? getComputedStyle(messenger) : null
+			widthSource = rect.width
+			left = rect.left
+			if (rect.height > 0 && style?.display !== 'none' && style?.visibility !== 'hidden') bottom = Math.min(bottom, rect.top - 10)
+		}
+		if (chatIcon) {
+			const rect = chatIcon.getBoundingClientRect()
+			if (!widthSource && rect.width) widthSource = rect.width * 8.8
+			if (!messenger) left = rect.left
+			bottom = Math.min(bottom, rect.top - 10)
+		}
+		const unitCss = Number(game?.screenUnit) > 0 ? Number(game.screenUnit) / pixelRatio : 18
+		const width = Math.max(180, Math.min(440, widthSource || unitCss * 22, window.innerWidth - left - 12))
+		const availableHeight = Math.floor(bottom - top)
+		panel.style.left = Math.round(Math.max(4, left)) + 'px'
+		panel.style.top = Math.round(top) + 'px'
+		panel.style.width = Math.round(width) + 'px'
+		panel.style.maxHeight = Math.max(0, availableHeight) + 'px'
+		const unavailable = availableHeight < 96
+		panel.style.visibility = unavailable ? 'hidden' : 'visible'
+		panel.style.pointerEvents = unavailable ? 'none' : 'auto'
+		panel.setAttribute('aria-hidden', unavailable ? 'true' : 'false')
+	}
+
+	const getShortcutStatusLeft = function () {
+		const button = state.shortcutButton
+		if (!button || !button.isConnected || button.style.display === 'none') return STATUS_MARGIN
+		const rect = button.getBoundingClientRect?.()
+		if (rect?.right > 0) return Math.ceil(rect.right + STATUS_MARGIN)
+		const pixelRatio = Number(state.game?.pixelRatio) || Number(window.devicePixelRatio) || 1
+		const unit = Number(state.game?.screenUnit) > 0 ? Number(state.game.screenUnit) / pixelRatio : 18
+		return Math.ceil(unit * 5.85 + STATUS_MARGIN)
+	}
+
+	const syncShortcutStatusPosition = function () {
+		const status = document.getElementById('modloader-status')
+		if (status && !state.statusDragging) applyStatusCorner(status, readStatusCorner())
+	}
+
+	const ensureShortcutUi = function () {
+		if (!document.body) return null
+		ensureShortcutStyle()
+		let button = document.getElementById('modloader-shortcut-button')
+		if (!button) {
+			button = element('button')
+			button.id = 'modloader-shortcut-button'
+			button.type = 'button'
+			button.textContent = '?'
+			button.setAttribute('aria-controls', 'modloader-shortcut-panel')
+			document.body.appendChild(button)
+		}
+		let panel = document.getElementById('modloader-shortcut-panel')
+		if (!panel) {
+			panel = element('div')
+			panel.id = 'modloader-shortcut-panel'
+			panel.tabIndex = -1
+			panel.setAttribute('role', 'dialog')
+			document.body.appendChild(panel)
+		}
+		state.shortcutButton = button
+		state.shortcutPanel = panel
+		if (!state.shortcutUiInstalled) {
+			state.shortcutUiInstalled = true
+			button.addEventListener('click', function (event) {
+				event.preventDefault()
+				event.stopPropagation()
+				const opening = !state.shortcutOpen
+				state.shortcutOpen = opening
+				requestShortcutRefresh()
+				if (opening) requestAnimationFrame(function () { state.shortcutPanel?.focus?.() })
+				else {
+					const activeElement = document.activeElement
+					if (activeElement === button || activeElement === panel) activeElement.blur?.()
+				}
+			})
+			window.addEventListener('resize', requestShortcutRefresh)
+			if (typeof MutationObserver !== 'undefined') {
+				state.shortcutMutationObserver = new MutationObserver(function (records) {
+					if (shortcutMutationAffectsLayout(records)) requestShortcutRefresh()
+				})
+				state.shortcutMutationObserver.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: [ 'class', 'style' ] })
+			}
+			if (typeof ResizeObserver !== 'undefined') state.shortcutResizeObserver = new ResizeObserver(requestShortcutRefresh)
+			registerGameHudItem('ModLoader', { id: 'shortcut-tips-button', element: button, side: 'bottom', managed: true })
+			registerGameHudItem('ModLoader', { id: 'shortcut-tips-panel', element: panel, side: 'left', managed: true })
+			setPanelTooltipText(button, t('shortcutTipsToggle'))
+			installPanelTooltips(button)
+		}
+		return { button, panel }
+	}
+
+	const refreshShortcutUi = function () {
+		loadPanelState()
+		const allEntries = Object.values(state.shortcutEntries)
+		const entries = state.shortcutSettings.enabled !== false ? getVisibleShortcutEntries() : []
+		if (!allEntries.length && !state.shortcutButton) {
+			syncShortcutStatusPosition()
+			return
+		}
+		const ui = ensureShortcutUi()
+		if (!ui) return
+		const mobile = !!state.game?.isMobile || document.body.classList.contains('mobile')
+		const available = entries.length > 0 && state.shortcutSettings.enabled !== false && !mobile
+		const show = available && !state.vanillaGameHudHidden
+		if (!available) state.shortcutOpen = false
+		ui.button.style.display = show ? 'grid' : 'none'
+		ui.button.classList.toggle('modloader-shortcut-theme-light', getPanelThemeMode() === 'light')
+		ui.button.setAttribute('aria-expanded', show && state.shortcutOpen ? 'true' : 'false')
+		setPanelTooltipText(ui.button, t('shortcutTipsToggle'))
+		ui.panel.classList.toggle('modloader-shortcut-theme-light', getPanelThemeMode() === 'light')
+		ui.panel.classList.toggle('modloader-shortcut-panel-open', show && state.shortcutOpen)
+		ui.panel.style.display = show && state.shortcutOpen ? 'block' : 'none'
+		ui.panel.setAttribute('aria-label', t('shortcutTips'))
+		ui.panel.setAttribute('aria-hidden', show && state.shortcutOpen ? 'false' : 'true')
+		if (show && state.shortcutOpen) {
+			renderShortcutPanel(ui.panel, entries)
+			refreshShortcutLayout()
+		}
+		syncShortcutStatusPosition()
+	}
+
+	const requestShortcutRefresh = function () {
+		if (state.shortcutRefreshFrame) return
+		state.shortcutRefreshFrame = requestAnimationFrame(function () {
+			state.shortcutRefreshFrame = 0
+			refreshShortcutUi()
+		})
 	}
 
 	const CONFIG_INLINE_TEXT = {
@@ -7870,6 +8462,7 @@
 				state.game = this
 				showStatus()
 				requestAnimationFrame(refreshOpenPanel)
+				requestShortcutRefresh()
 				return result
 			}
 		}, 'modloader')
@@ -8090,6 +8683,13 @@
 				state.panelSettings.sortConfigSections = stored.settings.sortConfigSections !== false
 				state.panelSettings.renderApiEnabled = stored.settings.renderApiEnabled !== false
 			}
+			if (isObject(stored.shortcuts)) {
+				state.shortcutSettings.enabled = stored.shortcuts.enabled !== false
+				if (isObject(stored.shortcuts.mods)) {
+					state.shortcutSettings.mods = {}
+					for (const modId in stored.shortcuts.mods) state.shortcutSettings.mods[String(modId)] = stored.shortcuts.mods[modId] !== false
+				}
+			}
 			if (isValidPanelEdge(stored.hiddenSide)) state.panelHiddenSide = stored.hiddenSide
 			else if (activeTab) state.panelHiddenSide = activeTab.edge
 			const restoreAutomatically = stored.restoreAsTab === true && isPanelAutoHideEnabled()
@@ -8112,7 +8712,8 @@
 				tabPositions: state.panelTabPositions,
 				modOrder: state.panelModOrder,
 				configSectionOrder: state.panelConfigSectionOrder,
-				settings: state.panelSettings
+				settings: state.panelSettings,
+				shortcuts: { enabled: state.shortcutSettings.enabled !== false, mods: state.shortcutSettings.mods }
 			}))
 		} catch (error) {}
 	}
@@ -8315,6 +8916,7 @@
 		panel.classList.toggle('modloader-panel-manual-hide', !isPanelAutoHideEnabled())
 		panel.classList.toggle('modloader-panel-description-inline', shouldShowPanelDescriptionsInline())
 		refreshSettingsSurfaceThemes()
+		requestShortcutRefresh()
 		syncPanelSettingsPageState(panel)
 		if (!isPanelAutoHideEnabled()) clearPanelAutoHideTimer()
 	}
@@ -8376,6 +8978,17 @@
 		}
 	}
 
+	let panelTooltipOwner = null
+	const claimPanelTooltipOwner = function (owner) {
+		panelTooltipOwner = owner || null
+		return panelTooltipOwner
+	}
+	const releasePanelTooltipOwner = function (owner) {
+		if (owner && panelTooltipOwner !== owner) return false
+		panelTooltipOwner = null
+		return true
+	}
+
 	const getPanelTooltipElement = function () {
 		let tooltip = document.getElementById('modloader-panel-tooltip')
 		if (!tooltip) {
@@ -8388,11 +9001,13 @@
 		return tooltip
 	}
 
-	const hidePanelTooltip = function () {
+	const hidePanelTooltip = function (owner) {
+		if (!releasePanelTooltipOwner(owner)) return false
 		const tooltip = document.getElementById('modloader-panel-tooltip')
-		if (!tooltip) return
+		if (!tooltip) return true
 		tooltip.classList.remove('active')
 		tooltip.setAttribute('aria-hidden', 'true')
+		return true
 	}
 
 	const syncPanelTooltipLayout = function (tooltip) {
@@ -8458,14 +9073,15 @@
 		return getPanelThemeMode() === 'light'
 	}
 
-	const showPanelTooltip = function (target, point) {
+	const showPanelTooltip = function (target, point, owner) {
 		const text = String(target?.dataset?.modloaderPanelTooltip || '').trim()
 		const isDescription = target?.dataset?.modloaderPanelTooltipKind === 'description'
 		const settingsSurface = target.closest?.('.modloader-settings-surface')
 		const descriptionMode = settingsSurface?.dataset?.modloaderSettingsDescriptionMode || getPanelDescriptionDisplayMode()
-		if (!text || (isDescription && descriptionMode === 'inline')) return hidePanelTooltip()
+		if (!text || (isDescription && descriptionMode === 'inline')) return hidePanelTooltip(owner)
 		const panel = settingsSurface || target.closest?.('#modloader-panel')
 		const tooltip = getPanelTooltipElement()
+		claimPanelTooltipOwner(owner)
 		tooltip.textContent = text
 		const tooltipLight = resolvePanelTooltipLightTheme(target, panel)
 		tooltip.classList.toggle('modloader-panel-tooltip-light', tooltipLight)
@@ -8483,8 +9099,11 @@
 	const installPanelTooltips = function (root, addCleanup) {
 		if (!root) return function () {}
 		if (root.__modloaderPanelTooltipCleanup) root.__modloaderPanelTooltipCleanup()
+		const owner = Object.freeze({ root })
 		let activeTarget = null
 		let activePoint = null
+		let pointerActive = false
+		let focusActive = false
 		let ready = false
 		let frame = 0
 		let delayTimer = 0
@@ -8503,7 +9122,7 @@
 			frame = requestAnimationFrame(function () {
 				frame = 0
 				if (activeTarget !== target || !ready) return
-				showPanelTooltip(target, activePoint)
+				showPanelTooltip(target, activePoint, owner)
 			})
 		}
 		const beginReveal = function (target, delayMs) {
@@ -8519,12 +9138,15 @@
 			else reveal()
 		}
 		const clear = function () {
+			const hadActiveTarget = !!activeTarget
 			activeTarget = null
 			activePoint = null
+			pointerActive = false
+			focusActive = false
 			ready = false
 			clearDelay()
 			clearFrame()
-			hidePanelTooltip()
+			if (hadActiveTarget) hidePanelTooltip(owner)
 		}
 		const pointFromEvent = function (event) {
 			if (!Number.isFinite(event?.clientX) || !Number.isFinite(event?.clientY)) return null
@@ -8532,12 +9154,11 @@
 		}
 		const activate = function (event) {
 			const target = getPanelTooltipTarget(event.target, root)
-			if (!target) {
-				if (event.type === 'focusin') clear()
-				return
-			}
+			if (!target) return
 			const point = pointFromEvent(event)
 			if (target === activeTarget) {
+				if (event.type === 'focusin') focusActive = true
+				else pointerActive = true
 				activePoint = point || activePoint
 				if (event.type === 'focusin' && !ready) beginReveal(target, 0)
 				else if (ready) sync(target)
@@ -8545,9 +9166,11 @@
 			}
 			clearDelay()
 			clearFrame()
-			hidePanelTooltip()
+			hidePanelTooltip(owner)
 			activeTarget = target
 			activePoint = point
+			pointerActive = event.type !== 'focusin'
+			focusActive = event.type === 'focusin'
 			const delayMs = event.type === 'focusin' ? 0 : getPanelTooltipDelayMs(target)
 			beginReveal(target, delayMs)
 		}
@@ -8559,8 +9182,13 @@
 		}
 		const deactivate = function (event) {
 			if (!activeTarget) return
+			const target = getPanelTooltipTarget(event.target, root)
+			if (!target || target !== activeTarget) return
 			const next = getPanelTooltipTarget(event.relatedTarget, root)
 			if (next === activeTarget) return
+			if (event.type === 'focusout') focusActive = false
+			else pointerActive = false
+			if (pointerActive || focusActive) return
 			clear()
 		}
 		root.addEventListener('pointerover', activate)
@@ -9112,6 +9740,26 @@
 				clearPanelAutoHideTimer()
 			}
 		})
+		addSettingsRow(t('shortcutTips'), [
+			{ value: true, label: t('shortcutTipsEnabled') },
+			{ value: false, label: t('shortcutTipsDisabled') }
+		], state.shortcutSettings.enabled !== false, function (value) {
+			state.shortcutSettings.enabled = value !== false
+			requestShortcutRefresh()
+		})
+		const shortcutModIds = getRegisteredShortcutModIds()
+		if (shortcutModIds.length) {
+			settingsPage.appendChild(element('div', 'modloader-panel-settings-title modloader-panel-settings-subtitle', t('shortcutTipsMods')))
+			for (const modId of shortcutModIds) {
+				addSettingsRow(getShortcutModName(modId), [
+					{ value: true, label: t('show') },
+					{ value: false, label: t('hide') }
+				], state.shortcutSettings.mods[modId] !== false, function (value) {
+					state.shortcutSettings.mods[modId] = value !== false
+					requestShortcutRefresh()
+				})
+			}
+		}
 		const addSettingsButtonRow = function (label, buttons) {
 			const row = element('div', 'modloader-panel-settings-row')
 			row.appendChild(element('span', '', label))
@@ -11135,6 +11783,7 @@
 				requestAnimationFrame(syncUiDocks)
 				requestAnimationFrame(syncGameHudEntries)
 				requestAnimationFrame(function () { syncVanillaGameHudVisibility(context) })
+				requestShortcutRefresh()
 			}
 
 			const hooks = state.hooks[name] || []

@@ -421,6 +421,26 @@ function testSourceContracts() {
 	assert.match(shellSource, /\[data-toolbar-style="compact"\][^{]*\.cattail-world-editor-blueprint-mode\[data-active="true"\]\s*\{[^}]*background:\s*transparent !important;[^}]*box-shadow:\s*inset 0 -3px 0 var\(--world-editor-hell-gem-3, #4CB96B\) !important;/s)
 	assert.match(shellSource, /--world-editor-draw-pink-glass:[\s\S]*?var\(--world-editor-draw-pink-1\)[\s\S]*?--world-editor-draw-pink-glass-hover:/)
 	assert.match(shellSource, /--world-editor-draw-pink-glass-shadow:[\s\S]*?var\(--world-editor-draw-pink-1\)[\s\S]*?--world-editor-draw-pink-glass-shadow-hover:/)
+	assert.match(shellSource, /const TOOLBAR_CHROME_SCALE = 1\.08/)
+	assert.match(shellSource, /const toolbarChromeScale = roundedScale \* TOOLBAR_CHROME_SCALE/)
+	assert.match(shellSource, /--world-editor-toolbar-chrome-scale',\s*String\(TOOLBAR_CHROME_SCALE\)/)
+	assert.match(shellSource, /--world-editor-toolbar-chrome-layout-width',[\s\S]*?\(viewportWidth - 24\) \/ toolbarChromeScale/)
+	assert.match(
+		shellSource,
+		/\.cattail-world-editor-shell__status-bar,\s*\.cattail-world-editor-shell__toolbar-bar\s*\{[^}]*zoom:\s*var\(--world-editor-toolbar-chrome-scale,\s*1\.08\);/s
+	)
+	assert.match(
+		shellSource,
+		/\.cattail-world-editor-shell\[data-theme="reality"\] \.cattail-world-editor-shell__status-bar,\s*\.cattail-world-editor-shell\[data-theme="reality"\] \.cattail-world-editor-shell__toolbar-bar\s*\{[^}]*--world-editor-shell-bg:\s*#FFFFFF;[^}]*background:\s*#FFFFFF;[^}]*backdrop-filter:\s*none;[^}]*-webkit-backdrop-filter:\s*none;/s
+	)
+	assert.match(shellSource, /--world-editor-toolbar-chrome-layout-width/)
+	assert.match(shellSource, /writeStyleProperty\(rootStyle, '--world-editor-toolbar-chrome-scale', previousToolbarChromeScale\)/)
+	assert.match(shellSource, /writeStyleProperty\(rootStyle, '--world-editor-toolbar-chrome-layout-width', previousToolbarChromeWidth\)/)
+	assert.doesNotMatch(
+		shellSource,
+		/\.cattail-world-editor-shell\s*\{[^}]*--world-editor-shell-bg:\s*#FFFFFF;/s,
+		'opaque white stays scoped to the reality status and toolbar bars'
+	)
 	assert.match(shellSource, /\.cattail-world-editor-shell__tool--draw\[data-active="true"\]\s*\{[^}]*background:\s*var\(--world-editor-draw-pink-glass\);[^}]*backdrop-filter:\s*var\(--world-editor-glass-backdrop\);[^}]*box-shadow:\s*var\(--world-editor-draw-pink-glass-shadow\);/s)
 	assert.match(shellSource, /\.cattail-world-editor-shell__tool--draw\[data-active="true"\]:hover:not\(:disabled\):not\(\[aria-disabled="true"\]\)\s*\{[^}]*background:\s*var\(--world-editor-draw-pink-glass-hover\);[^}]*box-shadow:\s*var\(--world-editor-draw-pink-glass-shadow-hover\);/s)
 	assert.match(shellSource, /\[data-toolbar-style="compact"\][^{]*\.cattail-world-editor-transform-button\[data-active="true"\]\s*\{[^}]*background:\s*var\(--world-editor-shell-active\) !important;/s)
@@ -442,7 +462,7 @@ function testSourceContracts() {
 	assert.match(shellSource, /overflow-x:\s*hidden/)
 	assert.match(shellSource, /box-sizing:\s*content-box/)
 	assert.match(shellSource, /padding:\s*6px/)
-	assert.match(shellSource, /max-width:\s*calc\(var\(--world-editor-toolbar-layout-width/)
+	assert.match(shellSource, /max-width:\s*calc\(var\(--world-editor-toolbar-chrome-layout-width/)
 	assert.match(shellSource, /border-radius:\s*12px/)
 	assert.match(shellSource, /width \.22s cubic-bezier\(\.22, \.75, \.24, 1\)/)
 	assert.match(shellSource, /flex-basis \.22s cubic-bezier\(\.22, \.75, \.24, 1\)/)

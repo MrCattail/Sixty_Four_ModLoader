@@ -11,6 +11,7 @@ const {
 } = require('./verify-4b-1a.js')
 
 const STATE_KEY = Symbol.for('cattail.world-editor.blueprint-state')
+const TRANSFORM_KEY = Symbol.for('cattail.world-editor.blueprint-transform')
 const I18N_KEY = Symbol.for('cattail.world-editor.i18n')
 const STATE_SOURCE = 'scripts/core/blueprint-state.js'
 const SESSION_SOURCE = 'scripts/blueprint-session.js'
@@ -132,6 +133,24 @@ function schemaEightLinkedBlueprint(stabilizerName = 'stabilizer') {
 		production: null,
 		summary: { entityCount: 1, surgeCount: 1, paintedCubeCount: 0 }
 	}
+}
+
+function installTransform(runtime) {
+	let definition = null
+	const register = runtime.sandbox.ModLoader.register
+	runtime.sandbox.ModLoader.register = function (value) {
+		definition = value
+	}
+	try {
+		vm.runInContext(source(TRANSFORM_SOURCE), runtime.sandbox, { filename: TRANSFORM_SOURCE })
+	} finally {
+		runtime.sandbox.ModLoader.register = register
+	}
+	assert.ok(definition)
+	definition.init()
+	const transform = runtime.sandbox[TRANSFORM_KEY]
+	assert.ok(transform)
+	return transform
 }
 
 function installStabilizerRuntime(game) {
@@ -524,6 +543,46 @@ async function testSchemaEightStabilizerLinkPlacementAndHistory() {
 	shatteredRuntime.dispose()
 }
 
+async function testLegacyFullTransformsRemainPlannable() {
+	const runtime = loadRuntime({ creative: true })
+	const state = runtime.sandbox[STATE_KEY]
+	const transform = installTransform(runtime)
+
+	for (const schemaVersion of [3, 5, 6]) {
+		const sourceBlueprint = fullBlueprint([
+			record('silo', [0, 0], { fill: 16 })
+		], {
+			schemaVersion,
+			emptyCells: [[1, 0]]
+		})
+		if (schemaVersion === 6) {
+			sourceBlueprint.emptyCells = [[1, 0]]
+			sourceBlueprint.surges = []
+		}
+		const normalized = state.normalizeBlueprint(sourceBlueprint)
+		assert.ok(normalized, 'schema ' + schemaVersion + ' source should normalize')
+		assert.equal(Object.hasOwn(normalized, 'paintedCubes'), false)
+
+		assert.equal(transform.bind(normalized, 'legacy-full-schema-' + schemaVersion), true)
+		transform.setExecutionMode('full', 'legacy-full-schema-' + schemaVersion)
+		assert.equal(transform.snapshot().executionMode, 'full')
+		assert.equal(transform.rotateClockwise('legacy-full-schema-' + schemaVersion + '-rotate'), true)
+		let transformed = transform.snapshot().blueprint
+		assert.equal(Object.hasOwn(transformed, 'paintedCubes'), false)
+		assert.ok(state.normalizeBlueprint(transformed))
+		assert.ok(await plan(runtime, transformed, [20, 20]))
+
+		assert.equal(transform.mirrorU('legacy-full-schema-' + schemaVersion + '-mirror'), true)
+		transformed = transform.snapshot().blueprint
+		assert.equal(Object.hasOwn(transformed, 'paintedCubes'), false)
+		assert.ok(state.normalizeBlueprint(transformed))
+		assert.ok(await plan(runtime, transformed, [20, 20]))
+	}
+
+	transform.dispose('test-complete')
+	runtime.dispose()
+}
+
 function testManifestI18nAndStaticContracts() {
 	const manifest = JSON.parse(source('mod.json'))
 	assert.equal(manifest.version, '0.6.0')
@@ -580,9 +639,10 @@ async function run() {
 	await testFullReplacementRebaseEmptySyncAndLegacy()
 	await testFullEmptySyncIgnoresNaturalResourceDrift()
 	await testSchemaEightStabilizerLinkPlacementAndHistory()
+	await testLegacyFullTransformsRemainPlannable()
 	testManifestI18nAndStaticContracts()
 	console.log(
-		'World Editor 4D verification passed: schema 5 normalization, full-state colors, stable Cube, Creative gating, Waypoint order, empty sync, live-state rebasing, undo/redo, legacy schema 3, 20 languages, and manifest scope.'
+		'World Editor 4D verification passed: schema 5 normalization, full-state colors, stable Cube, Creative gating, Waypoint order, empty sync, live-state rebasing, undo/redo, legacy schema 3/5/6 transforms, 20 languages, and manifest scope.'
 	)
 }
 

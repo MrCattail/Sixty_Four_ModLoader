@@ -126,7 +126,7 @@ The page cannot import a file, restore a snapshot, or overwrite a Steam save.
 
 ## Installation Library API
 
-ModLoader 0.4.0 exposes Library API `1.1.0` for persistent, install-wide,
+ModLoader 0.5.0 exposes Library API `1.1.0` for persistent, install-wide,
 Mod-owned document collections. A Mod must declare each named library in its
 enabled `mod.json`; the main process validates the declaration and owns every
 filesystem operation:
@@ -283,6 +283,78 @@ wants to handle its own animation and only needs the hide/show callbacks.
 Game-corner buttons registered with `api.ui.registerCornerButton()` are treated
 as game HUD by default when they use a `game-*` dock. Pass `gameHud: false` to
 opt out, or `hudSide` to choose a different hide edge.
+
+## Mod Keyboard Shortcut API v1
+
+ModLoader 0.5.0 exposes a display-only shortcut registry at
+`api.ui.shortcuts`. It does not listen for, execute, block, or remap the Mod's
+actual controls. A Mod keeps ownership of its keyboard handling and registers
+only the player-facing description:
+
+```js
+const shortcut = api.ui.shortcuts.register({
+  id: 'open-editor',
+  keys: 'V',
+  description: {
+    en: 'Open or close World Editor',
+    sch: '打开或关闭世界编辑器'
+  },
+  order: 10,
+  category: {
+    id: 'editors',
+    label: { en: 'Editors', sch: '编辑器' },
+    order: 20
+  },
+  visible: () => api.config.get('enabled', true),
+  active: () => !document.querySelector('.splash'),
+  context: { en: 'Available during gameplay', sch: '在游戏中可用' }
+})
+
+shortcut.update({ keys: [['Ctrl', 'V'], ['Meta', 'V']] })
+shortcut.unregister()
+```
+
+`id`, `keys`, and `description` are required. `id` is stable within the bound
+Mod API. Registering the same id again atomically replaces the current entry;
+an older handle cannot update or unregister that replacement. Invalid entries
+return an inert handle and add a diagnostic warning. The public bound API always
+registers under the `Mod` source; the reserved `Original game` and `ModLoader`
+sources cannot be selected through registration options.
+
+`keys` accepts one token (`'V'`), one chord (`['Alt', 'Shift']`), or alternatives
+(`[['Ctrl', 'Z'], ['Meta', 'Z']]`). Supported tokens include letters, digits,
+`F1`-`F24`, modifiers, navigation/editing keys, punctuation, `Mouse1`-`Mouse5`,
+`WheelUp`, `WheelDown`, and `Space`. Tokens are normalized and rendered as safe
+keycaps; `Space` uses the ModLoader spacebar symbol. Raw HTML is never accepted.
+The same combination may be displayed by multiple entries and only produces a
+diagnostic warning.
+
+`description`, `context`, and `category.label` accept a plain string, a locale
+map, or a function returning either. `visible: false` hides a feature that is
+disabled. `active: false` keeps the entry visible and adds its `context` text;
+when no context is provided, ModLoader uses its localized inactive message.
+Dynamic values are reevaluated on open, register/update/unregister, language,
+settings, HUD, chat/layout, and window changes. Call
+`api.ui.shortcuts.refresh()` after a Mod-specific state change.
+
+Each Mod should use one category `{ id, label, order }`. Display order is source
+(`Original game`, `ModLoader`, `Mods`), category number, the Mod order from
+`Ctrl+M`, shortcut `order`, and stable ids as tie-breakers. Matching category ids
+with matching metadata merge; conflicting metadata is warned and isolated so
+one Mod cannot rename or reorder another Mod's category.
+
+The desktop `?` button appears beside the chat button only while at least one
+visible registration exists. The transparent list uses a left-side scrollbar
+and stays between the Canvas resource row and the chat area. Opening or using
+chat does not close the shortcut list; the list instead shortens above the
+messenger and remains scrollable. Mouse interactions outside the list do not
+close it; click `?` again to close it explicitly. `Esc` is not handled by the
+shortcut list and remains available to the game without changing the list's open
+state. `H` hides and restores it with the game HUD. Splash, credits, mobile
+layout, an empty registry, and the global disabled setting hide the entry point.
+Reloading starts closed.
+`Ctrl+M` -> Menu Settings contains the global switch and one persistent
+visibility switch for each currently registered Mod.
 
 ## Render Layers API
 
@@ -499,7 +571,7 @@ Custom palettes can provide `resources`, `rows`, or `colors` entries with `id`,
 
 ## Settings UI API v1
 
-ModLoader 0.4.0 exposes the same settings controls used by the `Ctrl+M` panel
+ModLoader 0.5.0 exposes the same settings controls used by the `Ctrl+M` panel
 through `api.ui.settings`. The API is bound to the calling mod, uses
 `api.ui.settings.version === 1`, and supports these canonical types:
 
@@ -744,6 +816,11 @@ to the current ModLoader theme. Pass `theme: 'global'` to make an external
 tooltip follow the current ModLoader dark/light selection instead. Other theme
 values also use the default plane behavior. `delayMs` adds an optional
 pointer delay from `0` to `10000` milliseconds; keyboard focus remains immediate.
+After reveal, a tooltip remains visible while pointer ownership or keyboard focus
+still belongs to its target, and it closes only after an actual target exit by
+both input paths, an owning-root scroll/resize, or explicit teardown. The shared
+portal owner prevents exit, scroll, or cleanup from an unrelated root from hiding
+the tooltip that another root currently owns.
 The shared portal uses the tooltip's own single glass surface, so its background,
 border, inset highlight, blur, and shadow do not require a separate opaque
 silhouette or a clipped custom path. One rendered line keeps the original

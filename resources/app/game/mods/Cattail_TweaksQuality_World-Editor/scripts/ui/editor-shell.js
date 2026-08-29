@@ -31,6 +31,7 @@ ModLoader.register({
 		const UI_SCALE_BASE_WIDTH = 1600
 		const UI_SCALE_BASE_HEIGHT = 1000
 		const UI_SCALE_MIN = .5
+		const TOOLBAR_CHROME_SCALE = 1.08
 		const LARGE_TOOLBAR_CONFIG_KEY = 'largeToolbarCards'
 		const LARGE_TOOLBAR_SCROLL_RESIDUAL_PROPERTY = '--world-editor-large-toolbar-scroll-residual'
 		const LARGE_TOOLBAR_CARD_WIDTH = 120
@@ -221,6 +222,8 @@ ModLoader.register({
 			const rootStyle = document.documentElement?.style
 			const previousScale = readStyleProperty(rootStyle, '--world-editor-ui-scale')
 			const previousToolbarWidth = readStyleProperty(rootStyle, '--world-editor-toolbar-layout-width')
+			const previousToolbarChromeScale = readStyleProperty(rootStyle, '--world-editor-toolbar-chrome-scale')
+			const previousToolbarChromeWidth = readStyleProperty(rootStyle, '--world-editor-toolbar-chrome-layout-width')
 			const resourceThemeProperties = createResourceThemeProperties(game)
 			const previousResourceThemeProperties = new Map()
 			for (const [property, value] of Object.entries(resourceThemeProperties)) {
@@ -848,11 +851,18 @@ ModLoader.register({
 					)
 				)
 				const roundedScale = Math.round(scale * 1000) / 1000
+				const toolbarChromeScale = roundedScale * TOOLBAR_CHROME_SCALE
 				writeStyleProperty(rootStyle, '--world-editor-ui-scale', String(roundedScale))
+				writeStyleProperty(rootStyle, '--world-editor-toolbar-chrome-scale', String(TOOLBAR_CHROME_SCALE))
 				writeStyleProperty(
 					rootStyle,
 					'--world-editor-toolbar-layout-width',
 					Math.max(0, (viewportWidth - 24) / scale) + 'px'
+				)
+				writeStyleProperty(
+					rootStyle,
+					'--world-editor-toolbar-chrome-layout-width',
+					Math.max(0, (viewportWidth - 24) / toolbarChromeScale) + 'px'
 				)
 				shell.dataset.uiScale = String(roundedScale)
 				toolbarScroller.refresh('ui-scale')
@@ -1576,6 +1586,8 @@ ModLoader.register({
 				if (typeof releaseEconomyHud === 'function') releaseEconomyHud()
 				writeStyleProperty(rootStyle, '--world-editor-ui-scale', previousScale)
 				writeStyleProperty(rootStyle, '--world-editor-toolbar-layout-width', previousToolbarWidth)
+				writeStyleProperty(rootStyle, '--world-editor-toolbar-chrome-scale', previousToolbarChromeScale)
+				writeStyleProperty(rootStyle, '--world-editor-toolbar-chrome-layout-width', previousToolbarChromeWidth)
 				for (const [property, value] of previousResourceThemeProperties) {
 					writeStyleProperty(rootStyle, property, value)
 				}
@@ -3224,21 +3236,29 @@ ModLoader.register({
 					box-shadow: var(--world-editor-shell-shadow);
 					backdrop-filter: blur(14px) saturate(1.12);
 					-webkit-backdrop-filter: blur(14px) saturate(1.12);
+					zoom: var(--world-editor-toolbar-chrome-scale, 1.08);
 					transition: background .18s ease, border-color .18s ease, color .18s ease, box-shadow .18s ease;
+				}
+				.cattail-world-editor-shell[data-theme="reality"] .cattail-world-editor-shell__status-bar,
+				.cattail-world-editor-shell[data-theme="reality"] .cattail-world-editor-shell__toolbar-bar {
+					--world-editor-shell-bg: #FFFFFF;
+					background: #FFFFFF;
+					backdrop-filter: none;
+					-webkit-backdrop-filter: none;
 				}
 				.cattail-world-editor-shell__status-bar {
 					display: flex;
 					align-items: center;
 					gap: 14px;
 					width: max-content;
-					max-width: 100%;
+					max-width: min(100%, var(--world-editor-toolbar-chrome-layout-width, 100%));
 					min-width: 0;
 					padding: 10px 14px;
 				}
 				.cattail-world-editor-shell__toolbar-bar {
 					display: flex;
 					width: max-content;
-					max-width: 100%;
+					max-width: min(100%, var(--world-editor-toolbar-chrome-layout-width, 100%));
 					padding: 8px 10px;
 				}
 				.cattail-world-editor-shell__identity {
@@ -3899,7 +3919,7 @@ ModLoader.register({
 					position: relative;
 					box-sizing: content-box;
 					width: var(--world-editor-large-toolbar-width, 120px);
-					max-width: calc(var(--world-editor-toolbar-layout-width, calc(100vw - 24px)) - 14px);
+					max-width: calc(var(--world-editor-toolbar-chrome-layout-width, var(--world-editor-toolbar-layout-width, calc(100vw - 24px))) - 14px);
 					padding: 6px;
 					border-radius: 12px;
 					overflow: visible;

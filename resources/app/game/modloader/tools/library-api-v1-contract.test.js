@@ -294,7 +294,7 @@ async function runDialogStoreContract() {
 
 async function run() {
 	const modLoader = sandbox.window.ModLoader
-	assert.equal(modLoader.version, '0.4.0')
+	assert.equal(modLoader.version, '0.5.0')
 	const modApi = modLoader.forMod('library-contract-mod')
 	assert.equal(modApi.storage.version, '1.0.0')
 	assert.equal(modApi.storage.libraries.version, '1.1.0')
