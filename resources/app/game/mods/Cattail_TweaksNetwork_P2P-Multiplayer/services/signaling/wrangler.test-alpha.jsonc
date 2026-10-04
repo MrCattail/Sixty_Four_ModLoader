@@ -1,0 +1,31 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "cattail-p2p-signaling-alpha-test",
+  "main": "src/index.js",
+  "compatibility_date": "2026-08-04",
+  "durable_objects": {
+    "bindings": [
+      { "name": "ROOMS", "class_name": "P2PRoom" },
+      { "name": "ADMISSION", "class_name": "P2PAdmission" }
+    ]
+  },
+  "exports": {
+    "P2PRoom": { "type": "durable-object", "storage": "sqlite" },
+    "P2PAdmission": { "type": "durable-object", "storage": "sqlite" }
+  },
+  "vars": {
+    "INTERNAL_AUTH": "test-only-internal-auth-secret-0123456789",
+    "ALPHA_INVITE_SIGNING_SECRET": "test-only-alpha-signing-secret-0123456789",
+    "ALLOWED_ORIGINS": "null,file://",
+    "ALLOW_MISSING_ORIGIN": "false",
+    "ALLOW_INSECURE_LOCAL_INTERNAL_AUTH": "false",
+    "SERVICE_DISABLED": "false",
+    "ALPHA_INVITE_REQUIRED": "true",
+    "ROOM_CREATIONS_PER_DAY": "2",
+    "TURN_GRANTS_PER_DAY": "2",
+    "TURN_DISABLED": "true",
+    "TURN_TTL_SECONDS": "900",
+    "TURN_REFRESH_AFTER_SECONDS": "600",
+    "TURN_GRANTS_PER_ROOM_PER_DAY": "2"
+  }
+}

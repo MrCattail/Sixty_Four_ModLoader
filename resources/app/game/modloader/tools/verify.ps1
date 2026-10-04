@@ -182,6 +182,11 @@ $modFeatureContractTests = @(
 		path = 'mods\Cattail_TweaksQuality_World-Editor\tests\verify-4a-2a.js'
 		description = 'World Editor 4A-2a creative mode contract'
 		pattern = 'save persistence, in-place identity, fork identity removal, input and full-mode gates'
+	},
+	[ordered]@{
+		path = 'mods\Cattail_TweaksQuality_World-Editor\tests\verify-shortcut-hints.js'
+		description = 'World Editor Shortcut API consumer contract'
+		pattern = '16 localized functional shortcuts, dynamic contexts, feature detection, refresh, and cleanup'
 	}
 )
 foreach ($contract in $modFeatureContractTests) {

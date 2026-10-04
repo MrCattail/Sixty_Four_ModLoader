@@ -80,6 +80,8 @@ A typical blueprint workflow is:
 
 `Esc` does not always exit immediately. It first closes the topmost dialog or menu and cancels an active selection, drag, resize, or blueprint preview. If no temporary operation remains but selections still exist, the first `Esc` clears all selections while keeping World Editor open. Only the next `Esc` exits once no selection remains.
 
+With ModLoader `0.5.0` or later, World Editor registers 16 functional entries with the display-only Shortcut API under one localized `World Editing` category. The list follows the live game language, hides when World Editor is disabled, and keeps temporarily unavailable actions visible with a contextual reason instead of moving them around. The registered set covers the keyboard actions above plus `Ctrl` + left-click and `Z` + wheel; the global `H` HUD shortcut, pure pointer gestures, and standard dialog or list navigation remain owned by their existing systems. The Shortcut API only explains existing controls—it does not execute, remap, or intercept input. Older compatible ModLoader versions continue to run World Editor without this optional hint list.
+
 ## Status Bar and Toolbar
 
 The top of World Editor contains two separate glass panels.

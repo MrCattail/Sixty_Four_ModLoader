@@ -30,9 +30,30 @@ assert.match(source, /#modloader-shortcut-panel \{[^}]*text-shadow:none;/)
 assert.match(source, /\.modloader-shortcut-source-title \{[^}]*font-size:18px;/)
 assert.match(source, /\.modloader-shortcut-description \{[^}]*font-size:15px;/)
 assert.match(source, /\.modloader-shortcut-key \{[^}]*min-width:32px;[^}]*height:30px;/)
+assert.match(source, /\.modloader-shortcut-key \{[^}]*border:1px solid rgba\(0,0,0,\.2\);/)
 assert.match(source, /\.modloader-shortcut-key \{[^}]*box-shadow:0 2px 0 #ffe0b5,0 3px 7px rgba\(0,0,0,\.22\);/)
 assert.match(source, /\.modloader-shortcut-key-space \{[^}]*min-width:112px;/)
 assert.match(source, /\.modloader-shortcut-space-mark \{[^}]*width:16px;[^}]*height:5px;[^}]*border:1\.5px solid #17181b;[^}]*border-top:0;[^}]*border-radius:0 0 3px 3px;/)
+assert.match(source, /const SHORTCUT_MOUSE_VISUALS = Object\.freeze\(\{\s*Mouse1: 'left',\s*Mouse2: 'right',\s*Mouse3: 'side-forward',\s*Mouse4: 'side-back',\s*Mouse5: 'middle',\s*WheelUp: 'wheel-up',\s*WheelDown: 'wheel-down'\s*\}\)/)
+assert.match(source, /const renderShortcutMouseToken = function/)
+assert.match(source, /mouse\.setAttribute\('aria-hidden', 'true'\)/)
+assert.match(source, /key\.setAttribute\('role', 'img'\)/)
+assert.match(source, /key\.setAttribute\('aria-label', token\)/)
+assert.match(source, /key\.setAttribute\('title', token\)/)
+assert.match(source, /if \(mouseVisual\) key\.appendChild\(renderShortcutMouseToken\(mouseVisual\)\)/)
+assert.match(source, /\.modloader-shortcut-key-mouse \{[^}]*width:34px;[^}]*height:30px;[^}]*justify-content:flex-end;[^}]*background:transparent;[^}]*box-shadow:none;/)
+assert.match(source, /\.modloader-shortcut-mouse \{[^}]*width:28px;[^}]*height:30px;[^}]*border:1px solid rgba\(0,0,0,\.2\);[^}]*border-radius:10px;[^}]*background:#fff;[^}]*box-shadow:0 2px 0 #ffe0b5,0 3px 7px rgba\(0,0,0,\.22\);[^}]*overflow:visible;/)
+assert.doesNotMatch(source, /\.modloader-shortcut-mouse::before/)
+assert.doesNotMatch(source, /\.modloader-shortcut-mouse::after/)
+assert.match(source, /\.modloader-shortcut-mouse-side \{[^}]*left:-3px;[^}]*width:3px;[^}]*height:6px;[^}]*border:1px solid rgba\(0,0,0,\.2\);[^}]*border-radius:2px 0 0 2px;[^}]*background:#fff;/)
+assert.match(source, /\.modloader-shortcut-mouse-side\.modloader-shortcut-mouse-side-forward \{ top:8px; \}/)
+assert.match(source, /\.modloader-shortcut-mouse-side\.modloader-shortcut-mouse-side-back \{ top:16px; \}/)
+assert.doesNotMatch(source, /(?:^|\n)\s*\.modloader-shortcut-mouse-side-forward \{ top:8px; \}/)
+assert.doesNotMatch(source, /(?:^|\n)\s*\.modloader-shortcut-mouse-side-back \{ top:16px; \}/)
+assert.match(source, /\.modloader-shortcut-mouse-wheel \{[^}]*border:1px solid rgba\(0,0,0,\.2\);[^}]*background:#fff;/)
+assert.match(source, /\.modloader-shortcut-mouse-left \.modloader-shortcut-mouse-button-left,[^}]*\.modloader-shortcut-mouse-wheel-down \.modloader-shortcut-mouse-wheel \{ background:#ffe0b5; \}/)
+assert.match(source, /\.modloader-shortcut-mouse-wheel-up \.modloader-shortcut-mouse-wheel::after \{[^}]*rotate\(-135deg\);/)
+assert.match(source, /\.modloader-shortcut-mouse-wheel-down \.modloader-shortcut-mouse-wheel::after \{[^}]*rotate\(45deg\);/)
 assert.match(source, /\.modloader-shortcut-row \{[^}]*min-height:37px;/)
 assert.match(source, /modloader-shortcut-space-mark/)
 assert.match(source, /modloader-shortcut-status-offset/)
@@ -43,6 +64,22 @@ assert.match(readme, /## Mod Keyboard Shortcut API v1/)
 assert.match(readme, /api\.ui\.shortcuts\.register/)
 assert.match(readme, /WheelUp/)
 assert.match(readme, /Space/)
+assert.match(readme, /`Mouse1` is the left button, `Mouse2` is the right button/)
+assert.match(readme, /`Mouse3` is the\s+forward side button, `Mouse4` is the rear side button/)
+assert.match(readme, /`Mouse5` is the\s+clickable middle wheel/)
+assert.match(readme, /`WheelUp` and `WheelDown` use the same mouse silhouette\s+with a directional wheel arrow/)
+assert.match(readme, /near-square `28 x 30 px` body\s+inside a `34 x 30 px` slot/)
+assert.match(readme, /two `3 x 6 px` side buttons fully outside its left edge/)
+assert.match(readme, /narrow along the horizontal axis and use a `2 px 0 0 2 px` radius/)
+assert.match(readme, /only the two\s+exposed left corners are rounded while the two corners touching the body remain\s+square/)
+assert.match(readme, /forward button starts at\s+`8 px` and the rear button at `16 px`/)
+assert.match(readme, /centered around the body midpoint with a\s+`2 px` gap/)
+assert.match(readme, /Both external side buttons keep a\s+`1 px solid rgba\(0, 0, 0, \.2\)` gray outline/)
+assert.match(readme, /same `1 px solid rgba\(0, 0, 0, \.2\)` outer edge as a\s+normal\s+keycap/)
+assert.match(readme, /a `10 px`\s+body radius and no internal button separators/)
+assert.match(readme, /wheel keeps a permanent\s+`1 px solid rgba\(0, 0, 0, \.2\)` gray outline\s+in every\s+mouse-token state/)
+assert.match(readme, /Inactive main-button regions blend into the white body/)
+assert.match(readme, /external side buttons remain white and outlined until `Mouse3` or\s+`Mouse4` fills\s+the corresponding button yellow/)
 assert.match(readme, /Mouse interactions outside the list do not\s+close it/)
 assert.match(readme, /`Esc` is not handled by the\s+shortcut list and remains available to the game without changing the list's open\s+state/)
 
@@ -178,6 +215,17 @@ assert.deepEqual(
 assert.equal(replacement.update({ keys: [ 'Shift', 'Space' ], order: 5 }), true)
 assert.deepEqual(Array.from(modLoader.state.shortcutEntries['alpha:open-editor'].keys[0]), [ 'Shift', 'Space' ])
 
+const pointerPreview = alphaApi.register({
+	id: 'pointer-preview',
+	keys: [['Mouse1'], ['Mouse2'], ['Mouse3'], ['Mouse4'], ['Mouse5'], ['WheelUp'], ['WheelDown']],
+	description: 'Pointer preview',
+	category: { id: 'editor', label: 'Editors', order: 10 }
+})
+assert.deepEqual(
+	Array.from(modLoader.state.shortcutEntries['alpha:pointer-preview'].keys, chord => Array.from(chord)),
+	[['Mouse1'], ['Mouse2'], ['Mouse3'], ['Mouse4'], ['Mouse5'], ['WheelUp'], ['WheelDown']]
+)
+
 const betaApi = modLoader.forMod('beta').ui.shortcuts
 const duplicateCombo = betaApi.register({
 	id: 'more-info',
@@ -195,6 +243,7 @@ assert.equal(invalid.unregister(), false)
 assert.equal(modLoader.state.shortcutEntries['alpha:unsafe'], undefined)
 
 assert.equal(duplicateCombo.unregister(), true)
+assert.equal(pointerPreview.unregister(), true)
 assert.equal(replacement.unregister(), true)
 assert.equal(Object.keys(modLoader.state.shortcutEntries).length, 0)
 

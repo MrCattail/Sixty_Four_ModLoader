@@ -3897,6 +3897,15 @@
 		wheelup: 'WheelUp', wheeldown: 'WheelDown', bracketleft: '[', bracketright: ']', comma: ',', period: '.', slash: '/', backslash: '\\',
 		semicolon: ';', quote: "'", backquote: '`', minus: '-', equal: '=', plus: '+'
 	})
+	const SHORTCUT_MOUSE_VISUALS = Object.freeze({
+		Mouse1: 'left',
+		Mouse2: 'right',
+		Mouse3: 'side-forward',
+		Mouse4: 'side-back',
+		Mouse5: 'middle',
+		WheelUp: 'wheel-up',
+		WheelDown: 'wheel-down'
+	})
 
 	const shortcutEntryKey = function (modId, id) {
 		return String(modId || 'anonymous') + ':' + String(id || '')
@@ -4223,12 +4232,43 @@
 			.modloader-shortcut-key { display:inline-grid; place-items:center; box-sizing:border-box; min-width:32px; height:30px; padding:0 8px; border:1px solid rgba(0,0,0,.2); border-radius:6px; background:#fff; color:#17181b; box-shadow:0 2px 0 #ffe0b5,0 3px 7px rgba(0,0,0,.22); font:700 13.25px/1 Montserrat,Arial,sans-serif; }
 			.modloader-shortcut-key-space { min-width:112px; }
 			.modloader-shortcut-space-mark { width:16px; height:5px; border:1.5px solid #17181b; border-top:0; border-radius:0 0 3px 3px; }
+			.modloader-shortcut-key-mouse { min-width:34px; width:34px; height:30px; padding:0; border:0; border-radius:0; justify-content:flex-end; background:transparent; box-shadow:none; }
+			.modloader-shortcut-mouse { position:relative; display:block; box-sizing:border-box; width:28px; height:30px; border:1px solid rgba(0,0,0,.2); border-radius:10px; background:#fff; box-shadow:0 2px 0 #ffe0b5,0 3px 7px rgba(0,0,0,.22); overflow:visible; }
+			.modloader-shortcut-mouse-button { position:absolute; z-index:1; top:1px; width:13px; height:12px; background:#fff; }
+			.modloader-shortcut-mouse-button-left { left:1px; border-radius:9px 0 0 0; }
+			.modloader-shortcut-mouse-button-right { right:1px; border-radius:0 9px 0 0; }
+			.modloader-shortcut-mouse-side { position:absolute; z-index:3; left:-3px; box-sizing:border-box; width:3px; height:6px; border:1px solid rgba(0,0,0,.2); border-radius:2px 0 0 2px; background:#fff; }
+			.modloader-shortcut-mouse-side.modloader-shortcut-mouse-side-forward { top:8px; }
+			.modloader-shortcut-mouse-side.modloader-shortcut-mouse-side-back { top:16px; }
+			.modloader-shortcut-mouse-wheel { position:absolute; z-index:4; left:50%; top:3px; box-sizing:border-box; width:7px; height:10px; border:1px solid rgba(0,0,0,.2); border-radius:4px; background:#fff; transform:translateX(-50%); }
+			.modloader-shortcut-mouse-left .modloader-shortcut-mouse-button-left,
+			.modloader-shortcut-mouse-right .modloader-shortcut-mouse-button-right,
+			.modloader-shortcut-mouse-side-forward .modloader-shortcut-mouse-side-forward,
+			.modloader-shortcut-mouse-side-back .modloader-shortcut-mouse-side-back,
+			.modloader-shortcut-mouse-middle .modloader-shortcut-mouse-wheel,
+			.modloader-shortcut-mouse-wheel-up .modloader-shortcut-mouse-wheel,
+			.modloader-shortcut-mouse-wheel-down .modloader-shortcut-mouse-wheel { background:#ffe0b5; }
+			.modloader-shortcut-mouse-wheel-up .modloader-shortcut-mouse-wheel::after,
+			.modloader-shortcut-mouse-wheel-down .modloader-shortcut-mouse-wheel::after { content:""; position:absolute; left:50%; top:50%; width:3px; height:3px; border:solid #17181b; border-width:0 1.5px 1.5px 0; transform-origin:center; }
+			.modloader-shortcut-mouse-wheel-up .modloader-shortcut-mouse-wheel::after { transform:translate(-50%,-35%) rotate(-135deg); }
+			.modloader-shortcut-mouse-wheel-down .modloader-shortcut-mouse-wheel::after { transform:translate(-50%,-65%) rotate(45deg); }
 			.modloader-shortcut-plus,.modloader-shortcut-or { font-size:13.25px; font-weight:800; opacity:.82; }
 			.modloader-shortcut-description { min-width:0; font-size:15px; line-height:1.35; }
 			.modloader-shortcut-context { display:block; margin-top:2px; font-size:12px; opacity:.78; }
 			.mobile #modloader-shortcut-button,.mobile #modloader-shortcut-panel { display:none !important; }
 		`
 		document.head.appendChild(style)
+	}
+
+	const renderShortcutMouseToken = function (visual) {
+		const mouse = element('span', 'modloader-shortcut-mouse modloader-shortcut-mouse-' + visual)
+		mouse.setAttribute('aria-hidden', 'true')
+		mouse.appendChild(element('span', 'modloader-shortcut-mouse-button modloader-shortcut-mouse-button-left'))
+		mouse.appendChild(element('span', 'modloader-shortcut-mouse-button modloader-shortcut-mouse-button-right'))
+		mouse.appendChild(element('span', 'modloader-shortcut-mouse-side modloader-shortcut-mouse-side-forward'))
+		mouse.appendChild(element('span', 'modloader-shortcut-mouse-side modloader-shortcut-mouse-side-back'))
+		mouse.appendChild(element('span', 'modloader-shortcut-mouse-wheel'))
+		return mouse
 	}
 
 	const renderShortcutKeys = function (keys) {
@@ -4238,8 +4278,15 @@
 			const chordElement = element('span', 'modloader-shortcut-chord')
 			chord.forEach(function (token, tokenIndex) {
 				if (tokenIndex) chordElement.appendChild(element('span', 'modloader-shortcut-plus', '+'))
-				const key = element('span', 'modloader-shortcut-key' + (token === 'Space' ? ' modloader-shortcut-key-space' : ''))
-				if (token === 'Space') {
+				const mouseVisual = SHORTCUT_MOUSE_VISUALS[token]
+				const key = element('span', 'modloader-shortcut-key' + (mouseVisual ? ' modloader-shortcut-key-mouse' : token === 'Space' ? ' modloader-shortcut-key-space' : ''))
+				if (mouseVisual) {
+					key.setAttribute('role', 'img')
+					key.setAttribute('aria-label', token)
+					key.setAttribute('title', token)
+				}
+				if (mouseVisual) key.appendChild(renderShortcutMouseToken(mouseVisual))
+				else if (token === 'Space') {
 					const mark = element('span', 'modloader-shortcut-space-mark')
 					mark.setAttribute('aria-label', 'Space')
 					key.appendChild(mark)

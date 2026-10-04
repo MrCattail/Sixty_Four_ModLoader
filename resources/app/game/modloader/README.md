@@ -325,7 +325,31 @@ sources cannot be selected through registration options.
 (`[['Ctrl', 'Z'], ['Meta', 'Z']]`). Supported tokens include letters, digits,
 `F1`-`F24`, modifiers, navigation/editing keys, punctuation, `Mouse1`-`Mouse5`,
 `WheelUp`, `WheelDown`, and `Space`. Tokens are normalized and rendered as safe
-keycaps; `Space` uses the ModLoader spacebar symbol. Raw HTML is never accepted.
+keycaps or controlled mouse diagrams; `Space` uses the ModLoader spacebar symbol.
+Raw HTML is never accepted.
+
+Mouse tokens use one consistent top-down mouse diagram instead of a text keycap.
+`Mouse1` is the left button, `Mouse2` is the right button, `Mouse3` is the
+forward side button, `Mouse4` is the rear side button, and `Mouse5` is the
+clickable middle wheel. `WheelUp` and `WheelDown` use the same mouse silhouette
+with a directional wheel arrow. The diagram uses a near-square `28 x 30 px` body
+inside a `34 x 30 px` slot so its height matches a normal keycap. The body aligns
+right, leaving two `3 x 6 px` side buttons fully outside its left edge. They are
+narrow along the horizontal axis and use a `2 px 0 0 2 px` radius: only the two
+exposed left corners are rounded while the two corners touching the body remain
+square. The forward button starts at `8 px` and the rear button at `16 px`,
+centered around the body midpoint with a `2 px` gap.
+Both external side buttons keep a `1 px solid rgba(0, 0, 0, .2)` gray outline.
+The body uses the same `1 px solid rgba(0, 0, 0, .2)` outer edge as a normal
+keycap, a `10 px` body radius and no internal button separators.
+The wheel keeps a permanent `1 px solid rgba(0, 0, 0, .2)` gray outline in every
+mouse-token state. Inactive main-button regions blend into the white body; both
+external side buttons remain white and outlined until `Mouse3` or `Mouse4` fills
+the corresponding button yellow. Mouse5 and wheel directions fill the outlined
+wheel yellow, and wheel directions add the dark arrow inside that yellow region.
+The target region uses the same yellow accent as the keycap bottom edge; the
+token remains available through the element's accessible label and title
+without visible `Mouse1`/`WheelUp` text.
 The same combination may be displayed by multiple entries and only produces a
 diagnostic warning.
 
