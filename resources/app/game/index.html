@@ -6,43 +6,60 @@
         <link rel="manifest" href="/manifest.json">
         <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
         <link rel="stylesheet" href="./font/montserrat.css" type="text/css" charset="utf-8" />
-        <!-- <script type="text/javascript" src="scripts/bezier.js?v=2"></script>
-        <script type="text/javascript" src="scripts/ui.js?v=6"></script>
-        <script type="text/javascript" src="scripts/sprites.js?v=3"></script>
-        <script type="text/javascript" src="scripts/stuff.js?v=4"></script>
-        <script type="text/javascript" src="scripts/words.js?v=4"></script>
-        <script type="text/javascript" src="scripts/codex.js?v=3"></script>
-        <script type="text/javascript" src="scripts/osimp.js?v=1"></script> -->
+        <style>
+        	.loading {
+	            position: absolute;
+	            top: 50%;
+	            left: 50%;
+	            transform: translate(-50%, -50%);
+	            font: 400 2em 'Montserrat';
+	            letter-spacing: .6em;
+	            animation: loadingSpin .9s linear infinite;
+	        }
+        	@keyframes loadingSpin {
+        		0% {transform: translate(-50%, -50%) rotate(0deg)}
+        		100% {transform: translate(-50%, -50%) rotate(360deg)}
+        	}
+        </style>
         <script type="text/javascript" src="scripts/game.js?v=10"></script>
         <script type="text/javascript" src="modloader/loader.js?v=1"></script>
-        <!-- <script type="text/javascript" src="scripts/mobile.js"></script> -->
-        <!-- <link rel="stylesheet" type="text/css" href="cascade.css"> -->
-        <!-- <script type="text/javascript" src="scripts/post.js?v=3"></script> -->
 </head>
 
 <body>
-
+<div class="loading"><nobr>SIXTY FOUR</nobr></div>
 <canvas class="canvas"></canvas>
-<div class="shop"></div>
-<script type="text/javascript">
+<!-- <div class="shop"></div> -->
+<div class="store"></div>
+<script>var DEBUG</script>
+<script type="module">
 
-        let game
-        window.onload = _=>{
-                try {
-                        const spaceport = require(`electron`).ipcRenderer
-                        if (spaceport){
-                                window.onerror = (ev, so, li, co, er)=>{
-                                        spaceport.send(`gameError`, er)
-                                }
-                                spaceport.on(`hereYouGoSir`, (e,d)=>{
-                                        game = new Game(document.querySelector(`.canvas`), d)
-                                })
-                                spaceport.send(`getMyStuff`, `please`)
-                        }
-                } catch (e){
-                        game = new Game(document.querySelector(`.canvas`))
-                }
-        }
+let game
+window.onload = _=>{
+	try {
+		const spaceport = require(`electron`).ipcRenderer
+		if (spaceport){
+			window.onerror = (ev, so, li, co, er)=>{
+				spaceport.send(`gameError`, er)
+			}
+			spaceport.on(`console`, (e,d)=>{
+				console.log(d)
+			})
+			spaceport.on(`hereYouGoSir`, (e,d)=>{
+				stopSpinning()
+				game = new Game(document.querySelector(`.canvas`), d)
+				DEBUG = game
+			})
+			spaceport.send(`getMyStuff`, `please`)
+		}
+	} catch (e){
+		stopSpinning()
+		game = new Game(document.querySelector(`.canvas`))
+		DEBUG = game
+	}
+}
+function stopSpinning(){
+	document.querySelector(`.loading`)?.remove()
+}
 
 </script>
 </body>

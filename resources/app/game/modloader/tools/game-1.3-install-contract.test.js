@@ -1,0 +1,106 @@
+'use strict'
+
+// Copies vanilla source only. Never starts Electron, Steam, a game profile, or a Mod.
+const assert = require('node:assert/strict')
+const fs = require('node:fs')
+const os = require('node:os')
+const path = require('node:path')
+const crypto = require('node:crypto')
+const cp = require('node:child_process')
+const vm = require('node:vm')
+const root = path.resolve(process.argv[2] || path.join(__dirname, '../../../../..'))
+const suite = fs.mkdtempSync(path.join(os.tmpdir(), 'sixtyfour-loader-13-'))
+const core = ['resources/app/main.js', 'resources/app/game/index.html', 'resources/app/game/scripts/game.js', 'resources/app/game/scripts/ui.js', 'resources/app/game/scripts/sprites.js']
+const digest = file => crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex')
+const hashes = dir => core.map(p => digest(path.join(dir, p)))
+const baseline = hashes(root)
+const patcher = path.join(root, 'modloader-installer/patch-source.ps1')
+function fixture(name) {
+    const dir = path.join(suite, name)
+    for (const p of core) {
+        fs.mkdirSync(path.dirname(path.join(dir, p)), { recursive: true })
+        fs.copyFileSync(path.join(root, p), path.join(dir, p))
+    }
+    fs.mkdirSync(path.join(dir, 'resources/app/game/mods'), { recursive: true })
+    fs.writeFileSync(path.join(dir, 'resources/app/game/mods/enabled.json'), '{"mods":[]}')
+    return dir
+}
+function ps(args, ok = true) {
+    // Windows PowerShell must resolve its own modules, not an inherited pwsh 7 runtime.
+    const env = { ...process.env }
+    for (const key of Object.keys(env)) if (key.toLowerCase() === 'psmodulepath') delete env[key]
+    const result = cp.spawnSync('powershell.exe', ['-NoProfile', '-ExecutionPolicy', 'Bypass', ...args], { encoding: 'utf8', timeout: 120000, windowsHide: true, env })
+    if (ok) assert.equal(result.status, 0, result.error?.message || result.stdout + result.stderr)
+    else assert.notEqual(result.status, 0, 'expected rejection')
+    return result
+}
+const clean = fixture('clean')
+ps(['-File', patcher, '-GameRoot', clean, '-CheckOnly'])
+assert.deepEqual(hashes(clean), baseline, 'preflight does not write')
+ps(['-File', patcher, '-GameRoot', clean])
+for (const p of core.filter(p => p.endsWith('.js'))) {
+    const result = cp.spawnSync(process.execPath, ['--check', path.join(clean, p)], { encoding: 'utf8' })
+    assert.equal(result.status, 0, result.stderr)
+}
+const patched = hashes(clean)
+ps(['-File', patcher, '-GameRoot', clean])
+assert.deepEqual(hashes(clean), patched, 'repeat patch is byte-identical')
+const gameText = fs.readFileSync(path.join(clean, core[2]), 'utf8')
+assert.ok(gameText.indexOf('stage(`beforeGamePrepare`') < gameText.indexOf('await this.prepareSavedGameData(preload)'), 'early lifecycle precedes native migration')
+assert.match(gameText, /return window\.ModLoader\?\.applySave\(saveState, this\) \|\| saveState/)
+assert.doesNotMatch(gameText, /this\.getLanguageId\(/)
+const assembleMatch = gameText.match(/^\tassembleSave\(\)\{\n[\s\S]*?^\t\}/m)
+assert.ok(assembleMatch)
+const assemble = vm.runInNewContext('({' + assembleMatch[0] + '}).assembleSave', { window: { ModLoader: { applySave(save) { save.testMetadata = 'kept'; return save } } } })
+const assembled = assemble.call({ stuff: [], store: { existed: {} }, messenger: {}, achiever: { fired: [] } })
+assert.equal(typeof assembled, 'object', 'patched native assembly remains an object')
+assert.equal(assembled.testMetadata, 'kept')
+const drift = fixture('late-anchor-drift')
+const ui = path.join(drift, core[3])
+fs.writeFileSync(ui, fs.readFileSync(ui, 'utf8').replace('image.src = `img/shop/${e.isDark', 'image.src = `img/changed/${e.isDark'))
+const driftBefore = hashes(drift)
+ps(['-File', patcher, '-GameRoot', drift], false)
+assert.deepEqual(hashes(drift), driftBefore, 'late preflight failure leaves all files unchanged')
+const legacy = fixture('unsupported')
+const legacyGame = path.join(legacy, core[2])
+fs.writeFileSync(legacyGame, fs.readFileSync(legacyGame, 'utf8').replace('this.version = `1.3`', 'this.version = `1.2.1`'))
+const legacyBefore = hashes(legacy)
+ps(['-File', patcher, '-GameRoot', legacy], false)
+assert.deepEqual(hashes(legacy), legacyBefore, 'unsupported version is rejected without writes')
+const locked = fixture('write-failure')
+const quote = value => "'" + value.replace(/'/g, "''") + "'"
+const lockPath = path.join(locked, core[4])
+ps(['-Command', `$ErrorActionPreference='Stop'; $handle=[IO.File]::Open(${quote(lockPath)},[IO.FileMode]::Open,[IO.FileAccess]::Read,[IO.FileShare]::Read); try { & ${quote(patcher)} -GameRoot ${quote(locked)} } finally { $handle.Dispose() }`], false)
+assert.deepEqual(hashes(locked), baseline, 'write failure restores already-written files')
+const install = fixture('installed')
+ps(['-File', path.join(root, 'modloader-installer/install.ps1'), '-GameRoot', install, '-SourceRoot', root, '-SkipMods'])
+const installedHashes = hashes(install)
+const backupId = fs.readFileSync(path.join(install, 'resources/app/game/modloader/state/install-backups/latest-install.txt'), 'utf8').trim()
+ps(['-File', path.join(root, 'modloader-installer/install.ps1'), '-GameRoot', install, '-SourceRoot', root, '-SkipMods', '-Force'])
+assert.deepEqual(hashes(install), installedHashes, 'repeat installation is idempotent')
+ps(['-File', path.join(root, 'modloader-installer/uninstall.ps1'), '-GameRoot', install, '-BackupId', backupId, '-ConfirmUninstall'])
+assert.deepEqual(hashes(install), baseline, 'uninstall restores exact original core bytes')
+assert.equal(fs.existsSync(path.join(install, 'resources/app/game/modloader/loader.js')), true, 'ordinary uninstall preserves runtime and tools')
+const faultSource = path.join(suite, 'fault-source')
+for (const rel of ['modloader-installer', 'resources/app/game/modloader']) {
+    fs.cpSync(path.join(root, rel), path.join(faultSource, rel), { recursive: true, filter: src => !['state', 'backups'].includes(path.basename(src)) })
+}
+fs.writeFileSync(path.join(faultSource, 'resources/app/game/modloader/tools/verify.ps1'), 'exit 17')
+fs.mkdirSync(path.join(faultSource, 'resources/app/game/mods/new-test-mod'), { recursive: true })
+fs.writeFileSync(path.join(faultSource, 'resources/app/game/mods/enabled.json'), '{"mods":[]}')
+fs.writeFileSync(path.join(faultSource, 'resources/app/game/mods/new-test-mod/payload.txt'), 'test payload only')
+const rollback = fixture('verification-rollback')
+const oldLoader = path.join(rollback, 'resources/app/game/modloader/loader.js')
+fs.mkdirSync(path.dirname(oldLoader), { recursive: true })
+fs.writeFileSync(oldLoader, 'old runtime bytes')
+fs.mkdirSync(path.join(rollback, 'resources/app/game/mods/old-test-mod'), { recursive: true })
+fs.writeFileSync(path.join(rollback, 'resources/app/game/mods/old-test-mod/keep.txt'), 'original mod')
+const oldRuntimeHash = digest(oldLoader)
+ps(['-File', path.join(root, 'modloader-installer/install.ps1'), '-GameRoot', rollback, '-SourceRoot', faultSource, '-ReplaceMods', '-Force'], false)
+assert.deepEqual(hashes(rollback), baseline, 'verification failure rolls back all game hooks')
+assert.equal(digest(oldLoader), oldRuntimeHash, 'verification failure restores overwritten runtime')
+assert.equal(fs.readFileSync(path.join(rollback, 'resources/app/game/mods/old-test-mod/keep.txt'), 'utf8'), 'original mod')
+assert.equal(fs.existsSync(path.join(rollback, 'resources/app/game/mods/new-test-mod/payload.txt')), false, 'failed install removes new payload')
+assert.deepEqual(hashes(root), baseline, 'official game source untouched')
+fs.writeFileSync(path.join(suite, 'result.json'), JSON.stringify({ status: 'passed', officialRoot: root, fixtureRoot: suite, cases: ['preflight', 'patch syntax', 'object assembly', 'idempotence', 'late anchor failure', 'unsupported version', 'write rollback', 'installer', 'loader verification', 'repeat install', 'uninstall', 'verification failure rollback'] }, null, 2))
+console.log('Game 1.3 installer contract passed. Fixtures: ' + suite)

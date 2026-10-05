@@ -2,6 +2,15 @@
 
 This loader keeps vanilla game files as stable as possible.
 
+## Game 1.3 development status
+
+The current adapter targets the desktop game **1.3 only**. The installer rejects
+other game versions before writing. ModLoader remains `0.5.0`; these development
+changes have passed source-copy, mocked runtime, and an isolated offline Electron
+smoke test. They have not been installed into the working game's entry files;
+player acceptance and Steam Cloud validation remain pending. Existing Mods
+still need their own 1.3 compatibility work before being enabled.
+
 ## Enable Mods
 
 Edit `mods/enabled.json`:
@@ -53,11 +62,31 @@ vanilla scripts exist.
 
 ## Main Hooks
 
+- `beforeGamePrepare`
 - `beforeVanillaScripts`
 - `afterVanillaScripts`
 - `afterData`
 - `afterWords`
 - `afterGameInit`
+
+`beforeGamePrepare` receives the native preload object before
+`prepareSavedGameData()`. It checks the desktop game version and boots manifest,
+language, and JSON patch registration. `beforeVanillaScripts` retains its
+idempotent boot call. Normal Mod JavaScript entries still load in
+`afterVanillaScripts`; registering an early hook from those entries is too late
+for the current startup. This stage alone is not a persistence sandbox.
+
+In 1.3, `applyLoadedSave`, `beforeSaveLoad`, `applySave`, and `beforeSaveWrite`
+receive and return the **state object**, not a legacy encoded save string or the
+outer slot/history envelope. Non-object hook results are rejected. ModLoader
+preserves unknown fields within loaded `state.modloader`; Mods remain responsible
+for their own top-level fields. Native slot history and `permanents` stay under
+the game's ownership.
+
+The native `Store` card image path uses the resource resolver. Shared Game HUD
+visibility tracks `game.store`, including store rebuilds and pointer interaction
+while hidden. Open category and category scroll state are restored even if the
+store rebuilds while hidden. Rendering in 1.3's new views still needs separate validation.
 
 ## In-Game Diagnostics
 
@@ -111,6 +140,16 @@ creates and persists it before enabling snapshot writes, binds it to the current
 trusted account or installation scope, and never accepts a save id from a Mod.
 A reset starts a new save lineage; older snapshots remain visible to the local
 administrator.
+
+For 1.3, a newly assigned identity is confirmed only after awaiting `saveGame()`
+and reading `readFromSlot(currentSlotId).stack[0].state.modloader.saveInstanceId`.
+An existing identity is read back without forcing a save. Failed persistence,
+readback mismatch, disabled saving, and a changed active slot prevent activation;
+stale asynchronous completions cannot replace a newer renderer context. The main
+bridge clears the previous context when the renderer requests startup data.
+Readback confirms local slot storage, not Steam Cloud synchronization. Copy/import,
+history rollback, and new-game-plus lineage policy still require explicit
+consumer-side adaptation; the existing reset contract does not settle them.
 
 Operations reject with `ModLoaderSnapshotError` and one of these stable codes:
 `UNAVAILABLE`, `NO_ACTIVE_SAVE`, `INVALID_PAYLOAD`, `TOO_LARGE`, `NOT_FOUND`,
@@ -807,6 +846,11 @@ requested; set either option to `false` to disable it. Text areas, native select
 controls, explicitly marked `[data-modloader-scroll-native]` elements, and
 nested scroll areas keep their own wheel behavior. Destroying a form also
 detaches its scroll surface automatically.
+
+The built-in Ctrl+M Menu Settings area also uses this scroll API. Its expanded
+height remains capped at `min(42vh, 420px)`, with the shared theme-aware scrollbar
+and inertial wheel behavior. Rebuilding the panel after a settings change retains
+the settings scroll position; panel teardown releases the scroll listeners.
 
 ### Tooltips and lifecycle
 

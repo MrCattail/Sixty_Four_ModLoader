@@ -1,3 +1,5 @@
+//containment vessel and catalytic refinery price to the power of 2
+
 //zoom
 //align store horizontally
 //Click a cube and build, not only autoclickers
@@ -12,7 +14,6 @@
 //+Drag on cubes as well
 //+Stars in stab hints
 //+Close chat on other buttons
-//+Sound when machine is placed
 //+Remove delete from shop
 //+Ending animation + remove ui + centered credits
 
@@ -83,6 +84,93 @@ class Exhaust extends VFX {
 			ctx.closePath()
 
 			ctx.fill(`evenodd`)
+
+		}
+
+	}
+
+}
+
+class Ripple extends VFX {
+
+	constructor(master, payload){
+
+		super(master, payload)
+
+		this.time = 0
+		this.maxEndTime = 500
+		this.uv = payload?.source || [0,0]
+		this.maxRadius = 1.5
+		this.color = `#F00`
+
+	}
+
+	render(){
+
+		if (this.visibility[this.master.plane]){
+
+			const f = (this.time / this.maxEndTime) ** .5
+			const p = this.master.uvToXYUntranslated(this.uv)
+
+			// const dx = .866 * this.master.unit * (1 + this.maxRadius * f)
+			// const dy = .5 * this.master.unit * (1 + this.maxRadius * f)
+			const u = this.master.unit
+			const r = u * (1 + this.maxRadius * f)
+
+			const ctx = this.master.ctx
+			ctx.save()
+			ctx.translate(p[0], p[1])
+			ctx.scale(.866,.5)
+			ctx.globalCompositeOperation = `difference`
+
+			const fill = ctx.createRadialGradient(0,0,0,0,0, r)
+			fill.addColorStop(.5, `#FFFF`)
+			fill.addColorStop(1, `#FFF0`)
+			ctx.strokeStyle = fill
+
+			//Grid
+			ctx.globalAlpha = 1-f
+			ctx.lineWidth = u * .04 * (1-f)
+			
+			ctx.beginPath()
+			ctx.moveTo(-u,-u*2)
+			ctx.lineTo(u*2,u)
+			ctx.stroke()
+
+			ctx.beginPath()
+			ctx.moveTo(-u*2,-u)
+			ctx.lineTo(u,u*2)
+			ctx.stroke()
+
+			ctx.beginPath()
+			ctx.moveTo(-u*2,u)
+			ctx.lineTo(u,-u*2)
+			ctx.stroke()
+
+			ctx.beginPath()
+			ctx.moveTo(-u,u*2)
+			ctx.lineTo(u*2,-u)
+			ctx.stroke()
+
+			//Ripple
+			ctx.strokeStyle = `#FFF3`
+			ctx.lineWidth = u * .1 * (1-f)
+
+			// ctx.beginPath()
+			// ctx.lineTo(0,-r)
+			// ctx.lineTo(r,0)
+			// ctx.lineTo(0,r)
+			// ctx.lineTo(-r,0)
+			// ctx.closePath()
+			// ctx.stroke()
+
+			ctx.beginPath()
+			ctx.arc(0,0,r,0,Math.PI*2)
+			ctx.closePath()
+			ctx.stroke()
+
+
+			ctx.restore()
 
 		}
 
@@ -387,6 +475,104 @@ class Impact extends VFX {
 
 }
 
+class CompleteTransaction extends VFX {
+
+	constructor(master, p){
+
+		super(master, {visibility: [1,0]})
+
+		this.time = 0
+		this.maxEndTime = 1600
+		this.uv = p
+
+		this.branches = []
+		for (let i = 0; i < 60; i++){
+
+			this.branches.push({
+				offset: Math.random() * 2 - 1,
+				weight: Math.random(),
+			})
+
+		}
+
+	}
+
+	render() {
+
+		const ff = 1 - this.time / this.maxEndTime
+		const f = ff > .8 ? 1 : (ff / .8) ** .5
+		const f2 = ff ** 2
+		const f3 = f2 < .3 ? 0 : (f2 - .3) / .7
+		// const f4 = ff ** 8
+		const ctx = this.master.ctx
+		const xy = this.master.uvToXYUntranslated(this.uv)
+		const u = this.master.unit * 1.2
+		const h3 = this.master.h * 3
+		const bu = Math.max(.01, u * .6 * f3)
+
+		const grad = ctx.createRadialGradient(xy[0], xy[1], u * f3 + u * f2, xy[0], xy[1], u + u * 4 * f)
+		grad.addColorStop(0, `#112f`)
+		grad.addColorStop(1, `#f000`)
+
+		ctx.fillStyle = grad
+
+		ctx.globalAlpha = ff > .2 ? 1 : ff ** .2 * 5
+
+		//Base
+		ctx.beginPath()
+		ctx.arc(xy[0], xy[1], u*6, 0, Math.PI * 2)
+		ctx.closePath()
+		ctx.fill()
+
+		ctx.fillStyle = ctx.strokeStyle = `#112`
+		ctx.lineWidth = bu
+
+		//Ellipse
+		ctx.beginPath()
+		ctx.ellipse(xy[0], xy[1], u*2 + u*12 * (1-f2), u + u*6 * (1-f2), 0, 0, Math.PI * 2)
+		ctx.closePath()
+		ctx.stroke()
+
+		//Seal
+		const a = f3 ** 2 * .4
+		const dia = u * 10
+		ctx.save()
+		ctx.globalAlpha = ff
+		ctx.translate(xy[0], xy[1]-u/2)
+		ctx.rotate(a)
+		ctx.drawImage(this.master.images[`img/seal_outer.png`], -dia/2, -dia/2, dia, dia)
+		ctx.rotate(-a*2)
+		ctx.drawImage(this.master.images[`img/seal_inner.png`], -dia/2, -dia/2, dia, dia)
+		ctx.restore()
+
+		//Stem
+		ctx.fillRect(xy[0] - u * 2 * f3, xy[1]-h3, u * 4 * f3, h3)
+
+		//Branches
+		if (f3 > 0) {
+			for (let i=0; i < this.branches.length; i++){
+
+				const b = this.branches[i]
+				ctx.lineWidth = b.weight * bu
+
+				ctx.beginPath()
+				ctx.moveTo(xy[0] + b.offset * u * .5, xy[1])
+				ctx.lineTo(xy[0] + b.offset * u * 32, xy[1] - h3)
+				ctx.stroke()
+
+			}
+		}
+
+
+		ctx.globalAlpha = 1
+
+		
+
+
+	}
+
+}
+
 class ResourceTransfer extends VFX {
 
 	constructor(master, payload){
@@ -624,68 +810,6 @@ class ChasmTransfer extends VFX {
 			ctx.stroke()
 		}
 
-		// if (this.visibility[this.master.plane] && this.path.length > 1){
-
-		// 	const deviance = .05
-		// 	const delta = 2
-		// 	const t = this.time / this.maxEndTime
-		// 	const center = (this.path.length - 1) * t
-
-		// 	const ctx = this.master.ctx
-
-		// 	ctx.lineCap = `round`
-		// 	ctx.lineWidth = Math.max(0, (1 - Math.abs(.5 - t) * 2)) ** 4 * this.master.pixelRatio * 8
-
-		// 	let xyf, xyl
-		// 	const idf = Math.max(Math.floor(center - delta), 0)
-		// 	const fromStart = idf === 0
-		// 	if (fromStart){
-		// 		xyf = this.master.uvToXYUntranslated(this.path[idf])
-		// 	} else {
-		// 		const xyf0 = this.master.uvToXYUntranslated(this.path[idf])
-		// 		const xyf1 = this.master.uvToXYUntranslated(this.path[idf + 1])
-		// 		xyf = [xyf0[0] + (xyf1[0] - xyf0[0]) * (center % 1), xyf0[1] + (xyf1[1] - xyf0[1]) * (center % 1)]
-		// 	}
-
-		// 	const idl = Math.min(Math.floor(center + delta), this.path.length - 1)
-		// 	const toEnd = idl === this.path.length - 1
-		// 	if (toEnd){
-		// 		xyl = this.master.uvToXYUntranslated(this.path[idl])
-		// 	} else {
-		// 		const xyl0 = this.master.uvToXYUntranslated(this.path[idl])
-		// 		const xyl1 = this.master.uvToXYUntranslated(this.path[idl - 1])
-		// 		xyl = [xyl0[0] + (xyl1[0] - xyl0[0]) * (center % 1), xyl0[1] + (xyl1[1] - xyl0[1]) * (center % 1)]
-		// 	}
-
-		// 	let dx0 = 0, dy0 = 0, dx1 = 0, dy1 = 0
-
-		// 	if (fromStart){
-		// 		dx0 = (Math.random() * 2 - 1) * this.master.unit * deviance * 2
-		// 		dy0 = (Math.random() * 2 - 1) * this.master.unit * deviance * 2
-		// 	}
-		// 	if (toEnd){
-		// 		dx1 = (Math.random() * 2 - 1) * this.master.unit * deviance * 2
-		// 		dy1 = (Math.random() * 2 - 1) * this.master.unit * deviance * 2
-		// 	}
-
-			
-
-		// 	for (let r = 0; r < this.resources.length; r++){
-		// 		if (this.resources[r]){
-		// 			ctx.strokeStyle = this.master.codex.resources[r].triplet[1]
-		// 			ctx.beginPath()
-		// 			ctx.moveTo(xyf[0] + dx0, xyf[1] + dy0)
-		// 			for (let i = idf + 1; i < idl; i++){
-		// 				const xy = this.master.uvToXYUntranslated(this.path[i])
-		// 				ctx.lineTo(xy[0] + ((i * this.master.time.lt * 57.319 * (r + 367.13) % 1) * 2 - 1) * this.master.unit * deviance, xy[1] + ((i * this.master.time.lt * 793.567 * (r + 17.2) % 1) * 2 - 1) * this.master.unit * deviance)
-		// 			}
-		// 			ctx.lineTo(xyl[0] + dx1, xyl[1] + dy1)
-		// 			ctx.stroke()
-		// 		}
-		// 	}
-
-		// }
-
 	}
 
 }
@@ -697,6 +821,7 @@ class Lightning extends VFX {
 		super(master, payload)
 
 		this.color = payload.color || `#FFF`
+		this.seed = this.master.stats.totalPlayTime + 64
 
 		const force = 4 * this.master.unit
 		this.resources = payload.resources
@@ -722,35 +847,169 @@ class Lightning extends VFX {
 		if (this.visibility[this.master.plane]){
 
 			const t = this.time / this.maxEndTime
+			const u = this.master.unit
 
 			this.master.ctx.strokeStyle = this.color
 			this.master.ctx.lineCap = `round`
 			this.master.ctx.lineWidth = (1 - t) * this.master.pixelRatio * 4
+
 			this.master.ctx.beginPath()
-			const p0 = this.path.getXY(0)
-			this.master.ctx.moveTo(p0[0], p0[1])
-			for (let f = .05; f <= 1; f+=.05){
-				const p = this.path.getXY(f)
-				const r1 = (Math.random() * 2 - 1) * this.master.unit * .1
-				const r2 = (Math.random() * 2 - 1) * this.master.unit * .1
-				this.master.ctx.lineTo(p[0] + r1, p[1] + r2)
+			for (let f = 0; f <= 1; f += .01){
+
+				const xy = this.path.getXY(f)
+				const affect = 1 - Math.abs(.5 - f) * 2
+				const noiseScale = .002
+				const timeScale = 8e-5
+				const scale = 2
+
+				const xnoise1 = (this.master.resourceNoise.noise3_Classic(xy[0] * noiseScale + this.seed + 64, xy[1] * noiseScale + this.seed + 64, this.master.stats.totalPlayTime * timeScale)) * u * scale * affect
+				const ynoise1 = (this.master.resourceNoise.noise3_Classic(xy[0] * noiseScale + this.seed + 64, xy[1] * noiseScale + this.seed + 64, this.master.stats.totalPlayTime * timeScale + 7845) * .5 + .5) * u * scale * affect
+				const xnoise2 = (this.master.resourceNoise.noise3_Classic(xy[0] * noiseScale * 10 + this.seed + 64, xy[1] * noiseScale * 10 + this.seed + 64, this.master.stats.totalPlayTime * timeScale * 40)) * u * scale * affect * .05
+				const ynoise2 = (this.master.resourceNoise.noise3_Classic(xy[0] * noiseScale * 10 + this.seed + 64, xy[1] * noiseScale * 10 + this.seed + 64, this.master.stats.totalPlayTime * timeScale * 40 + 7845)) * u * scale * affect * .05
+
+				xy[0] += (xnoise1 + xnoise2)
+				xy[1] -= 1.6 * (ynoise1 + ynoise2)
+
+				const r1 = (Math.random() * 2 - 1) * this.master.unit * .02
+				const r2 = (Math.random() * 2 - 1) * this.master.unit * .02
+
+				this.master.ctx.lineTo(xy[0] + r1, xy[1] + r2)
+
 			}
 			this.master.ctx.stroke()
+
+			// this.master.ctx.beginPath()
+			// const p0 = this.path.getXY(0)
+			// this.master.ctx.moveTo(p0[0], p0[1])
+			// for (let f = .05; f <= 1; f+=.05){
+			// 	const p = this.path.getXY(f)
+			// 	const r1 = (Math.random() * 2 - 1) * this.master.unit * .1
+			// 	const r2 = (Math.random() * 2 - 1) * this.master.unit * .1
+			// 	this.master.ctx.lineTo(p[0] + r1, p[1] + r2)
+			// }
+			// this.master.ctx.stroke()
 
 			if (t < .33 && !this.master.chillMode){
 				this.master.ctx.save()
 				this.master.ctx.globalAlpha = (1 - t*3) * .1
-				// this.master.ctx.fillStyle = `rgba(255,255,255,${(1 - t*3) * .1})`
 				this.master.ctx.fillStyle = this.color
 				this.master.ctx.fillRect(0,0,this.master.w,this.master.h)
 				this.master.ctx.restore()
-
 			}
 
 		}
 
 	}
 
+}
+
+class Discharge extends VFX{
+	// this.vfx.push(new Discharge(this, {fromA: fromA, fromB: fromB, visibility: visibility, color: color, time: time}))
+	constructor(master, payload){
+
+		super(master, payload)
+
+		this.color = payload.color
+		this.seed = this.master.stats.totalPlayTime + 64
+
+		this.force = payload.force * this.master.unit
+
+		this.fromA = payload.fromA
+		this.fromB = payload.fromB
+		this.toA = payload.toA
+		this.toB = payload.toB
+		// this.forces = [force * (Math.random() * 2 - 1), force * (Math.random() * 2 - 1), force * (Math.random() * 2 - 1), force * (Math.random() * 2 - 1)]
+
+		// const rd = payload?.destination ? payload.destination : this.master.resourceHomes[i]
+		// const rp = payload?.source ? payload.source : this.master.resourceHomes[i]
+		// const curve = new Bezier([
+		// 	[rp[0], rp[1]], 
+		// 	[rp[0] + force * (Math.random() * 2 - 1), rp[1] + force * (Math.random() * 2 - 1)],
+		// 	[rd[0] + force * (Math.random() * 2 - 1), rd[1] + force * (Math.random() * 2 - 1)],
+		// 	[rd[0], rd[1]]
+		// 	])
+		
+		// this.path = curve
+		// this.oncomplete = payload?.f ? payload.f : _=>{this.master.addResourcesFromArray(payload.resources)}
+
+		this.maxEndTime = payload.time
+		this.time = 0
+		
+	}
+
+	render(){
+
+		if (this.visibility[this.master.plane]){
+
+			const u = this.master.unit
+			const t = this.time / this.maxEndTime
+			const rpw = [this.fromA[0] + (this.fromB[0] - this.fromA[0]) * t, this.fromA[1] + (this.fromB[1] - this.fromA[1]) * t]
+			const rdw = [this.toA[0] + (this.toB[0] - this.toA[0]) * t, this.toA[1] + (this.toB[1] - this.toA[1]) * t]
+
+			const rp = this.master.uvToXYUntranslated(rpw)
+			const rd = this.master.uvToXYUntranslated(rdw)
+
+			this.path = new Bezier([
+				[rp[0], rp[1]], 
+				[rp[0], rp[1] - this.force],
+				[rd[0], rd[1] - this.force],
+				[rd[0], rd[1]]
+			])
+
+			// this.master.ctx.fillRect(0,0,100,100)
+
+			this.master.ctx.strokeStyle = this.color
+			this.master.ctx.lineCap = `round`
+			this.master.ctx.lineWidth = (1 - t**4) * this.master.pixelRatio * 4
+
+			this.master.ctx.beginPath()
+			for (let f = 0; f <= 1; f += .01){
+
+				const xy = this.path.getXY(f)
+				const wxy = this.master.xyToUV(xy)
+				const affect = 1 - Math.abs(.5 - f) * 2
+				// const noiseScale = .002
+				// const timeScale = 8e-5
+				// const scale = 2
+
+				// const xnoise1 = (this.master.resourceNoise.noise3_Classic(xy[0] * noiseScale + this.seed + 64, xy[1] * noiseScale + this.seed + 64, this.master.stats.totalPlayTime * timeScale)) * u * scale * affect
+				// const ynoise1 = (this.master.resourceNoise.noise3_Classic(xy[0] * noiseScale + this.seed + 64, xy[1] * noiseScale + this.seed + 64, this.master.stats.totalPlayTime * timeScale + 7845) * .5 + .5) * u * scale * affect
+				// const xnoise2 = (this.master.resourceNoise.noise3_Classic(xy[0] * noiseScale * 10 + this.seed + 64, xy[1] * noiseScale * 10 + this.seed + 64, this.master.stats.totalPlayTime * timeScale * 40)) * u * scale * affect * .05
+				// const ynoise2 = (this.master.resourceNoise.noise3_Classic(xy[0] * noiseScale * 10 + this.seed + 64, xy[1] * noiseScale * 10 + this.seed + 64, this.master.stats.totalPlayTime * timeScale * 40 + 7845)) * u * scale * affect * .05
+
+				// xy[0] += (xnoise1 + xnoise2)
+				// xy[1] -= 1.6 * (ynoise1 + ynoise2)
+
+				// const r1 = (Math.random() * 2 - 1) * this.master.unit * .02
+				// const r2 = (Math.random() * 2 - 1) * this.master.unit * .02
+
+				// this.master.ctx.lineTo(xy[0] + r1, xy[1] + r2)
+
+				///////
+
+				// const wxy = line.getXY(j)
+				// const xy = this.master.uvToXY(wxy)
+				// const affect = 1 - Math.abs(.5 - j) * 2
+				const noiseScale = .5
+				const timeScale = 3e-4
+				const scale = 1.6
+
+				const xnoise1 = (this.master.resourceNoise.noise3_Classic(wxy[0] * noiseScale + this.seed * 64 + 64, wxy[1] * noiseScale + this.seed * 64 + 64, this.master.stats.totalPlayTime * timeScale)) * u * scale * affect
+				const ynoise1 = (this.master.resourceNoise.noise3_Classic(wxy[0] * noiseScale + this.seed * 64 + 64, wxy[1] * noiseScale + this.seed * 64 + 64, this.master.stats.totalPlayTime * timeScale + 7845) * .5 + .5) * u * scale * affect
+				const xnoise2 = (this.master.resourceNoise.noise3_Classic(wxy[0] * noiseScale * 10 + this.seed * 64 + 64, wxy[1] * noiseScale * 10 + this.seed * 64 + 64, this.master.stats.totalPlayTime * timeScale * 40)) * u * scale * affect * .05
+				const ynoise2 = (this.master.resourceNoise.noise3_Classic(wxy[0] * noiseScale * 10 + this.seed * 64 + 64, wxy[1] * noiseScale * 10 + this.seed * 64 + 64, this.master.stats.totalPlayTime * timeScale * 40 + 7845)) * u * scale * affect * .05
+
+				xy[0] += (xnoise1 + xnoise2)
+				xy[1] -= 1.6 * (ynoise1 + ynoise2)
+
+				this.master.ctx.lineTo(xy[0], xy[1])
+
+			}
+			this.master.ctx.stroke()
+
+		}
+
+	}
 }
 
 class DarkWave extends VFX {
@@ -789,31 +1048,37 @@ class Game {
 
 	constructor(canvas, preload){
 
-		//Preload
+		this.version = `1.3`
 		this.isWindows = navigator.userAgent.indexOf(`Win`) !== -1
-		this.steamId = preload?.steamId || ``
-		this.hasSteam = this.steamId ? true : false
 
 		this.canvas = canvas
+		this.canvas.addEventListener(`contextmenu`, e=>{
+			e.preventDefault()
+		})
 		this.ctx = this.canvas.getContext(`2d`)
 
 		// Colored sprites back canvas
 		this.bcanvas = document.createElement(`canvas`)
 		this.bctx = this.bcanvas.getContext(`2d`)
 
-		this.languages = [`en`, `ru`, `de`, `ptbr`, `it`, `es`, `fr`, `nl`, `cz`, `pl`, `jp`, `kr`, `sch`, `tch`, `thai`, `hu`, `lv`, `ro`, `no`, `modsch`]
-		this.languageId = this.getLanguageId()
-		if (this.languageId === null) this.languageId = (preload && preload.languageId !== null) ? preload.languageId : 0
-		this.language = this.languages[this.languageId]
-
-		this.backups = []
-
 		this.pixelRatio = devicePixelRatio
+
+		this.languages = [`en`, `ru`, `de`, `ptbr`, `it`, `es`, `fr`, `nl`, `cz`, `pl`, `jp`, `kr`, `sch`, `tch`, `thai`, `hu`, `lv`, `ro`, `no`]
+
+		this.saveStackUpdateNeeded = false
+		this.maxSaveSlots = 8
+		this.maxSaveStack = 16
+		this.saveSlots = []
+
+		this.maxHoles = 6
+		this.orbPositions = [[6,6], [-8,2], [2,-8], [-2,8], [8,-2], [-6,-6]]
+
+		this.mobileScreenLimit = 420
+
 		this.translation = [0, 0]
 		this.translationMap = [0, 0, 0, 0]
-		const zoom = +localStorage.getItem(`abstractv03_zoom${this.steamId}`)
+
 		this.zoomRange = [.3, 2]
-		this.zoom = (zoom >= this.zoomRange[0] && zoom <= this.zoomRange[1]) ? zoom : 1
 
 		this.translationSpeed = this.pixelRatio
 		this.distanceToOrigins = 0
@@ -822,7 +1087,7 @@ class Game {
 		this.renderTime = {lt: performance.now(), dt: 0}
 		this.mouse = {
 			xy: [0,0],
-			offsetxy: [0,0],
+			sxy: [0,0],
 			cursorVisible: true,
 			state: 0,
 			positionChanged: false,
@@ -834,10 +1099,9 @@ class Game {
 		}
 
 		this.gamepadButtons = []
-		this.isMute = this.getMute()
 		this.globalSoundVolume = .6
 		this.chillMode = false
-		this.version = `1.2.1`
+		this.photofobia = false
 
 		this.stuff = []
 		this.stuffMap = {}
@@ -855,6 +1119,8 @@ class Game {
 		this.eraserType = 0
 		this.hellgemChunk = 64
 		this.renderLimitOfAKind = 96
+		this.clickPower = 1
+		this.extractionSpeed = 1
 		this.currentHint = {
 			entity: undefined,
 			element: undefined
@@ -867,6 +1133,7 @@ class Game {
 			finishedAt: performance.now(),
 			nextIn: 30000 + Math.random() * 1000 * 60 * 5
 		}
+		this.soundSources = new Set()
 
 		this.hollowSite = false
 		this.hollowHardness = 64
@@ -874,6 +1141,31 @@ class Game {
 		this.darkHollowEvents = []
 		this.hollowImage = new Image()
 		this.hollowImage.src = `img/hollowEvent.png`
+
+		this.memorycomplexCenter = [-1024, -1024]
+		this.memorycomplexRadius = 256
+		this.memoryComplexIsVisible = false
+		this.currentMemoryComplexStage = 0
+		this.unlockedMemoryStages = 0
+		this.memoryComplexStages = [
+			{
+				src: `img/complex_01.jpg`,
+				color: `#000`//`#050915`
+			},
+			{
+				src: `img/complex_02.jpg`,
+				color: `#232936`
+			},
+			{
+				src: `img/complex_03.jpg`,
+				color: `#232936`
+			},
+			{
+				src: `img/complex_04.jpg`,
+				color: `#000`,
+				beam: true
+			}
+		]
 
 		this.surgeSpawnTimer = 30000 + Math.random() * 120000
 
@@ -887,6 +1179,13 @@ class Game {
 			multiplyer: .1,
 			f: 0,
 			cooldown: 0
+		}
+		this.punch = {
+			state: 0,
+			offset: 0,
+			timer: 0,
+			maxTimer: 0,
+			maxOffset: 0
 		}
 
 		this.initAnalytics()
@@ -918,59 +1217,318 @@ class Game {
 			darkVisited: 0,
 			timeSinceLastDelete: Infinity,
 			excavatorWasBuilt: false,
+			orbsWerePresent: false,
 			gameIsFinished: false
 		}
-		// this.init(canvas, preload)
-		this.init(canvas, preload)
+
+		this.isMobile = false
+		this.init(preload)
 
 	}
 
-	async init(canvas, preload){
+	async prepareSavedGameData(steamData){
 
-		await window.ModLoader?.stage(`beforeVanillaScripts`, this)
-		await this.loadScripts()
-		await window.ModLoader?.stage(`afterVanillaScripts`, this)
-		await this.loadStyle(`cascade.css`)
+		//Conversion from legacy format
+		let preload = steamData
+		if (preload && !preload.slots){
+
+			let decoded = this.decodeSave(preload.save)
+			if (decoded === 0) decoded = null
+
+			const converted = {
+				steamId: preload.steamId, 
+				languageId: preload.languageId,
+				debug: preload.debug,
+				slots: {0: {
+					name: `Steam save`,
+					note: `steamLegacy`,
+					ownerHash: this.hash53(preload.steamId),
+					creationTimeStamp: Date.now(),
+					lastModified: Date.now(),
+					stack: [
+						{
+							isProtected: false,
+							permanents: {
+								glory: preload.steamAchievements,
+								// globalStats: {
+									completions: 0,
+									upgrades: 0,
+									orbUpgradeMap: [],
+								// }
+							},
+							state: decoded
+						}
+					]
+				}}
+			}
+
+			preload = converted
+		}
+
+		//Safeguard
+		this.preventSaving = steamData?.noSave
+		if (this.preventSaving) alert(`Your savegame is safe, but there is a problem with loading it from the cloud. A rare phenomenon really. I strongly recommend closing the game and starting it again in a minute or so. In any case saving won't work until then. If this problem persists, text me on discord. —Yesname`)
+
+		//Let's go
+		this.steamId = preload?.steamId || ``
+		this.preferences = this.getPreferences()
+		this.currentSlotId = this.preferences.currentSlotId !== undefined ? this.preferences.currentSlotId : 0
+
+		//DB
+		this.localDatabase = await this.getDatabase()
+
+		//Get the newest or fallback
+		const localIds = await this.getSlotList()
+		const cloudIds = preload?.slots ? Object.keys(preload.slots).map(Number) : []
+		const slotIds = new Set([...localIds, ...cloudIds])
+
+		if (slotIds.size){
+			for (const id of slotIds){
+				const ldata = await this.readFromSlot(id)
+				const cdata = preload?.slots?.[id]
+
+				let data = ldata
+				let localWriteNeeded = false
+				if (!ldata){
+					data = cdata
+					localWriteNeeded = true
+				} else if (cdata && cdata.lastModified >= ldata.lastModified){
+					data = cdata
+					localWriteNeeded = true
+				}
+
+				if (!data) continue
+
+				this.saveSlots[id] = data
+				if (localWriteNeeded && !this.preventSaving){
+					await this.writeToSlot(data, id)
+				}
+
+			}
+		} else {
+			//Fallback
+			const old = localStorage.getItem(`abstractv03${this.steamId}`)
+			this.saveSlots[0] = {
+				name: false,
+				ownerHash: this.hash53(this.steamId),
+				creationTimeStamp: Date.now(),
+				stack: [{
+					isProtected: false,
+					state: old ? this.decodeSave(old) : null,
+					permanents: this.fallbackAssemblePermanents()
+				}],
+				lastModified: Date.now()
+				
+			}
+			if (!this.preventSaving) await this.writeToSlot(this.saveSlots[0], 0)
+		}
+
+		//Select current slot
+		if (!this.saveSlots[this.currentSlotId]){
+			this.currentSlotId = 0
+		}
+
+		if (this.saveSlots[this.currentSlotId].ownerHash !== this.hash53(this.steamId)){
+			this.preventGlory = true
+			console.log(`Achievements disabled`)
+		}
+		
+	}
+
+	getDatabase() {
+	    return new Promise((resolve, reject) => {
+	        const request = indexedDB.open(`sixtyfour_warehouse`, 1)
+	        request.onupgradeneeded = _=> {
+	            const db = request.result
+	            if (!db.objectStoreNames.contains(`charps_memory_slots`)) {
+	                db.createObjectStore(`charps_memory_slots`)
+	            }
+	        }
+
+	        request.onsuccess = _=> resolve(request.result)
+	        request.onerror = _=> reject(request.error)
+	    })
+	}
+	async writeToSlot(data, slot){
+
+		//WIP
+		const cloudPromise = this.spaceport?.invoke ? this.spaceport.invoke('store', this.saveSlots) : Promise.resolve(false)
+		const localPromise = new Promise((resolve, reject) => {
+			const tx = this.localDatabase.transaction(`charps_memory_slots`, `readwrite`)
+			tx.objectStore(`charps_memory_slots`).put(data, [this.steamId, slot])
+			tx.oncomplete = resolve
+			tx.onerror = _=> reject(tx.error)
+		})
+
+		const [saved] = await Promise.all([
+	        cloudPromise,
+	        localPromise
+	    ])
+
+	    return saved
+
+		// if (this.spaceport?.send) this.spaceport.send(`store`, this.saveSlots)
+
+		// return new Promise((resolve, reject) => {
+		// 	const tx = this.localDatabase.transaction(`charps_memory_slots`, `readwrite`)
+		// 	tx.objectStore(`charps_memory_slots`).put(data, [this.steamId, slot])
+		// 	tx.oncomplete = resolve
+		// 	tx.onerror = _=> reject(tx.error)
+		// })
+	}
+	readFromSlot(slot) {
+		return new Promise((resolve, reject) => {
+			const tx = this.localDatabase.transaction(`charps_memory_slots`, `readonly`)
+			const store = tx.objectStore(`charps_memory_slots`)
+			const request = store.get([this.steamId, slot])
+			request.onsuccess = _=> resolve(request.result)
+			request.onerror = _=> reject(request.error)
+		})
+	}
+	deleteSlot(slot){
+		return new Promise((resolve, reject) => {
+			const tx = this.localDatabase.transaction(`charps_memory_slots`, `readwrite`)
+			tx.objectStore(`charps_memory_slots`).delete([this.steamId, slot])
+			tx.oncomplete = _=> resolve()
+			tx.onerror = _=> reject(tx.error)
+		})
+	}
+	getSlotList() {
+		return new Promise((resolve, reject) => {
+			const tx = this.localDatabase.transaction(`charps_memory_slots`, `readonly`)
+			const store = tx.objectStore(`charps_memory_slots`)
+			const range = IDBKeyRange.bound(
+	            [this.steamId, 0],
+	            [this.steamId, Number.MAX_SAFE_INTEGER]
+	        )
+	        const request = store.getAllKeys(range)
+			request.onsuccess = _=> resolve(request.result.map(key => key[1]))
+			request.onerror = _=> reject(request.error)
+		})
+	}
+	shiftSlots(slotId) {
+	    return new Promise((resolve, reject) => {
+
+	        const tx = this.localDatabase.transaction(`charps_memory_slots`,`readwrite`)
+	        const store = tx.objectStore(`charps_memory_slots`)
+	        const lastSlotId = this.saveSlots.length - 1
+
+	        for (let id = slotId; id < lastSlotId; id++) {
+	            store.put(this.saveSlots[id + 1], [this.steamId, id])
+	        }
+
+	        store.delete([this.steamId, lastSlotId])
+
+	        tx.oncomplete = () => resolve()
+	        tx.onerror = () => reject(tx.error)
+	        tx.onabort = () => reject(tx.error)
+	    })
+	}
+	async wipeSlot(slotId){
+
+		if (slotId === this.currentSlotId || !this.saveSlots[slotId]) return false
+
+	    await this.shiftSlots(slotId)
+	    this.saveSlots.splice(slotId, 1)
+
+	    if (this.currentSlotId > slotId) {
+	        this.currentSlotId--
+	        this.savePreferences()
+	    }
+
+	    if (this.spaceport?.invoke) {
+	        await this.spaceport.invoke(`store`, this.saveSlots)
+	    }
+
+	    return true
+
+	}
+
+	async init(preload){
+
+		preload = await window.ModLoader?.stage(`beforeGamePrepare`, this, preload) ?? preload
+		await this.prepareSavedGameData(preload)
+		
+		if (this.isMobile){
+			await this.loadScriptsMobile()
+			await this.loadStyle(`cascade_mobile.css`)
+			this.touchMode = 0
+		} else {
+			await window.ModLoader?.stage(`beforeVanillaScripts`, this)
+			await this.loadScripts()
+			await window.ModLoader?.stage(`afterVanillaScripts`, this)
+			await this.loadStyle(`cascade.css`)
+		}
+		
+		const slot = this.saveSlots[this.currentSlotId]
+		const permanents = slot.stack[0].permanents
 
 		this.resourceNoise = new OpenSimplex2S(64)
+		this.hasSteam = this.steamId ? true : false
+
+		this.languageId = this.preferences.languageId
+		// if (this.languageId === null) this.languageId = (preload && preload.languageId !== null) ? preload.languageId : 0
+		if (preload && preload.languageId !== null) this.languageId = preload.languageId
+		this.language = this.languages[this.languageId ?? 0]
+
+		this.isMute = this.preferences.mute
+		this.memorycomplex = permanents.memorycomplex
+		this.memoryBuffer = (this.memorycomplex && permanents.memory) ? permanents.memory : []
+
+		// Local fallback (prod don't need it)
+		this.unlockedMemoryStages = permanents.unlockedMemoryStages || 0
+		this.currentMemoryComplexStage = permanents.currentMemoryComplexStage || 0
+		this.completions = permanents.globalStats ? permanents.globalStats.completions : permanents.completions
+		this.orbUpgrades = permanents.globalStats ? permanents.globalStats.upgrades : permanents.upgrades
+		this.orbUpgradeMap = permanents.globalStats ? permanents.globalStats.orbUpgradeMap : permanents.orbUpgradeMap
+		this.currentOrbPositions = (this.memorycomplex && !slot.stack[0].state) ? (permanents.lastOrbPositions ?? new Array(6).fill(false)) : new Array(6).fill(false) //Will init with orbifolds
+		const zoom = this.preferences.zoom
+		this.zoom = (zoom >= this.zoomRange[0] && zoom <= this.zoomRange[1]) ? zoom : 1
 
 		try {
 			this.spaceport = require(`electron`).ipcRenderer
-			// this.spaceport.send(`getDebugInfo`)//rrrrrrrrrrr
 		} catch(e){
 			this.spaceport = {send:_=>false, isPlaceholder: true}
 		}
+		this.initAlfa()
 
-		this.languages = window.ModLoader?.applyLanguages(this.languages) || this.languages
-		const moddedLanguageId = this.getLanguageId()
-		if (moddedLanguageId !== null) this.languageId = moddedLanguageId
-		if (!this.languages[this.languageId]) this.languageId = 0
-		this.language = this.languages[this.languageId]
+        this.languages = window.ModLoader?.applyLanguages(this.languages) || this.languages
+        if (!this.languages[this.languageId]) this.languageId = 0
+        this.language = this.languages[this.languageId]
 
-		this.codex = window.ModLoader?.applyData(abstract_getCodex(), this) || abstract_getCodex()
-		this.images = this.preloadImages()
-		const words = window.ModLoader?.applyWords(abstract_getWords(), this) || abstract_getWords()
-		if (!words[this.language]) {
-			this.languageId = 0
-			this.language = this.languages[this.languageId] || `en`
-			localStorage.setItem(`abstractv03_language${this.steamId}`, this.languageId)
-		}
-		this.words = words[this.language]
-		this.words_en = words.en
+        const vanillaCodex = abstract_getCodex()
+        this.codex = window.ModLoader?.applyData(vanillaCodex, this) || vanillaCodex
+        this.images = this.preloadImages()
+        const vanillaWords = abstract_getWords()
+        const words = window.ModLoader?.applyWords(vanillaWords, this) || vanillaWords
+        if (!words[this.language]) {
+            this.languageId = 0
+            this.language = this.languages[this.languageId] || `en`
+        }
+        this.words = words[this.language]
+        this.words_en = words.en
 		this.initResources()
-		this.initScreenSize()
-		
-		const shopElement = document.querySelector(`.shop`)
-		this.shop = new Shop(shopElement, this)
+		this.updateMemoryComplexUI()
+
+		this.setCommonListeners()
+		if (this.isMobile){
+			this.initScreenSizeMobile()
+			this.store = new MobileStoreVersion(document.querySelector(`.store`), this)
+			this.explainer = new MobileExplainer(this, this.preferences.helpIsNeeded)
+			this.setListenersMobile() // setListenersTouch
+		} else {
+			this.initScreenSize()
+			this.store = new DesktopStoreVersion(document.querySelector(`.store`), this)
+			this.explainer = new DesktopExplainer(this, this.preferences.helpIsNeeded)
+			this.setListenersDesktop()
+			if (!this.hasSteam) this.showSteamWarning()
+		}
+
 		this.splash = new Splash(this)
 		this.messenger = new Messenger(this)
-		this.steamAchievements = preload?.steamAchievements
 		this.achiever = new Achiever(this)
-		this.explainer = new Explainer(this,localStorage.getItem(`abstractv03_helpIsNeeded${this.steamId}`))
-
-		if (!this.hasSteam) this.showSteamWarning()
-		this.setListeners()
-
+		this.achiever.setState(preload?.steamAchievements ?? permanents.glory ?? [])
+		
 		this.poleSprite = new Sprite({
 			master: this,
 			src: `img/pole.png`,
@@ -991,115 +1549,297 @@ class Game {
 
 		this.splash.show()
 
-		this.initialLoad(preload?.save)
-		
-		if (localStorage.getItem(`abstractv03_photofobia${this.steamId}`) === `true` ? true : false) this.togglePhotofobia()
-		if (localStorage.getItem(`abstractv03_chill${this.steamId}`) === `true` ? true : false) this.toggleChill()
+		//LOADING THE GAME
+		if (slot.stack[0].state){
+			const success = this.loadSave(slot.stack[0].state)
+			if (!success) this.prepopulate()
+		} else {
+			this.prepopulate()
+		}
+
+		this.initOrbifolds()
+
+		if (this.preferences.photofobia) this.togglePhotofobia()
+		if (this.preferences.chill) this.toggleChill()
 		if (!this.chillMode) this.splash.fireNotification(this.pronounce('splash', 'flashbang') || ``, this.splash.chill, true, true, 32000)
 
-		const lsgv = localStorage.getItem(`abstractv03_globalSoundVolume${this.steamId}`)
-		if (lsgv !== null) this.updateGlobalVolume(+lsgv)
+		this.updateGlobalVolume(this.preferences.globalSoundVolume)
 
 		this.updateMouseData(this.w2/2, this.h2/2)
-		this.processMousemove2()
-		await window.ModLoader?.stage(`afterGameInit`, this)
+		this.processMove()
+
+		//Memory complex check
+		if (!slot.stack[0].state){
+			if (this.completions > 16 && this.unlockedMemoryStages < 2){
+				this.unlockedMemoryStages = 2
+				this.triggerMemory(1)
+				this.codex.messages.postEvents[6].condition = _=>true
+			} else if (this.completions > 32 && this.unlockedMemoryStages < 3){
+				this.unlockedMemoryStages = 3
+				this.triggerMemory(2)
+				this.codex.messages.postEvents[7].condition = _=>true
+			} else if (this.completions > 64 && this.unlockedMemoryStages < 4){
+				this.unlockedMemoryStages = 4
+				this.triggerMemory(3)
+				this.codex.messages.postEvents[8].condition = _=>true
+			}
+		}
+
+        await window.ModLoader?.stage(`afterGameInit`, this)
+		//Pinhole test
+
+		if (this.onlyones.pinhole){
+			this.quickFinish()
+		}
 	}
 
-	async initMobile(canvas, preload){
+	// async initMobile(preload){
 
-		await window.ModLoader?.stage(`beforeVanillaScripts`, this)
-		await this.loadScripts()
-		await window.ModLoader?.stage(`afterVanillaScripts`, this)
-		await this.loadStyle(`cascade_mobile.css`)
+		//Only mobile-specific
+		//Keep it commented until mobile is ok
 
-		this.resourceNoise = new OpenSimplex2S(64)
+		// this.isMobile = true
+		// this.touchMode = 0 // 1 delete, 2 q, 3 e
+		// this.spaceport = {send:_=>false, isPlaceholder: true}
+		// this.initScreenSizeMobile()
 
-		this.isMobile = true
+		//OLD
 
-		this.touchMode = 0 // 1 delete, 2 q, 3 e
+		// await this.loadScriptsMobile()
+		// await this.loadStyle(`cascade_mobile.css`)
 
-		this.spaceport = {send:_=>false, isPlaceholder: true}
+		// this.resourceNoise = new OpenSimplex2S(64)
 
-		this.languages = window.ModLoader?.applyLanguages(this.languages) || this.languages
-		const moddedLanguageId = this.getLanguageId()
-		if (moddedLanguageId !== null) this.languageId = moddedLanguageId
-		if (!this.languages[this.languageId]) this.languageId = 0
-		this.language = this.languages[this.languageId]
+		// this.isMobile = true
 
-		this.codex = window.ModLoader?.applyData(abstract_getCodex(), this) || abstract_getCodex()
-		this.images = this.preloadImages()
-		const words = window.ModLoader?.applyWords(abstract_getWords(), this) || abstract_getWords()
-		if (!words[this.language]) {
-			this.languageId = 0
-			this.language = this.languages[this.languageId] || `en`
-			localStorage.setItem(`abstractv03_language${this.steamId}`, this.languageId)
+		// this.touchMode = 0 // 1 delete, 2 q, 3 e
+
+		// this.spaceport = {send:_=>false, isPlaceholder: true}
+		// this.initAlfa()
+
+		// this.codex = abstract_getCodex()
+		// this.images = this.preloadImages()
+		// const words = abstract_getWords()
+		// this.words = words[this.language]
+		// this.words_en = words.en
+		// this.initResources()
+		// this.initScreenSizeMobile()
+		
+		// const shopElement = document.querySelector(`.shop`)
+		// this.shop = new Shop(shopElement, this)
+		// // this.store = new Shop(shopElement, this) //WIP: transition to store
+		// this.splash = new Splash(this)
+		// this.messenger = new Messenger(this)
+		// // this.eternalGlory = preload?.steamAchievements ?? permanents.glory
+		// this.achiever = new Achiever(this)
+		// this.achiever.setState(preload?.steamAchievements ?? permanents.glory)
+		// this.explainer = new MobileExplainer(this, this.preferences.mobileExplainerPointer)
+
+		// this.setListenersTouch()
+
+		// this.poleSprite = new Sprite({
+		// 	master: this,
+		// 	src: `img/pole.png`,
+		// 	frames: [[0,0,128,192]],
+		// 	origins: [63,190],
+		// 	scale: 1,
+		// 	intervals: 100
+		// })
+
+		// this.updateLoop()
+		// this.clock = new Worker(`scripts/clock.js`)
+		// this.clock.addEventListener(`message`, m=>{
+		// 	this.updateLoop()
+		// })
+		// this.renderloop()
+		// setTimeout( _=>this.saveLoop(), 10000)
+		// setTimeout( _=>this.backupLoop(), 240000)
+
+		// this.splash.show()
+
+		// this.initialLoad(preload?.save)
+		
+		// if (this.preferences.photofobia) this.togglePhotofobia()
+		// if (this.preferences.chill) this.toggleChill()
+		// if (!this.chillMode) this.splash.fireWarningDisclaimer()
+
+		// this.updateGlobalVolume(this.preferences.globalSoundVolume)
+
+		// this.updateMouseData(this.w2/2, this.h2/2)
+		// this.processMousemove2()
+	// }
+
+	initOrbifolds(){
+
+		const totalHoles = Math.min(this.maxHoles, this.completions - this.orbUpgrades)
+
+		for (let i = 0; i < totalHoles; i++){
+			const e = this.entityAtCoordinates(this.orbPositions[i])
+			if (e && this.codex.entities[e.name].type !== `complete`) console.log(`That shouldn't be here...`)
+			if (!e){
+				
+				if (this.currentOrbPositions[i]){
+
+					const orb = this.addEntity(this.currentOrbPositions[i], this.orbPositions[i])
+					orb.tier = 1 + (this.orbUpgradeMap[i] ?? 0)
+					orb.init()
+
+				} else {
+
+					const hole = this.addEntity(`whitehole`, this.orbPositions[i])
+					hole.index = i
+					hole.tier = 1 + (this.orbUpgradeMap[i] ?? 0)
+					hole.init()
+
+				}
+			}
 		}
-		this.words = words[this.language]
-		this.words_en = words.en
-		this.initResources()
-		this.initScreenSizeMobile()
-		
-		const shopElement = document.querySelector(`.shop`)
-		this.shop = new Shop(shopElement, this)
-		this.splash = new Splash(this)
-		this.messenger = new Messenger(this)
-		this.steamAchievements = preload?.steamAchievements
-		this.achiever = new Achiever(this)
 
-		this.setListenersTouch()
+	}
 
-		this.poleSprite = new Sprite({
-			master: this,
-			src: `img/pole.png`,
-			frames: [[0,0,128,192]],
-			origins: [63,190],
-			scale: 1,
-			intervals: 100
-		})
+	getOrbIndex(e){
 
-		this.updateLoop()
-		this.clock = new Worker(`scripts/clock.js`)
-		this.clock.addEventListener(`message`, m=>{
-			this.updateLoop()
-		})
-		this.renderloop()
-		setTimeout( _=>this.saveLoop(), 10000)
-		setTimeout( _=>this.backupLoop(), 240000)
+		for (let i = 0; i < this.orbPositions.length; i++){
 
-		this.splash.show()
+			const p = this.orbPositions[i]
+			if (e.position[0] === p[0] && e.position[1] === p[1]) return i
 
-		this.initialLoad(preload?.save)
-		
-		if (localStorage.getItem(`abstractv03_photofobia${this.steamId}`) === `true` ? true : false) this.togglePhotofobia()
-		if (localStorage.getItem(`abstractv03_chill${this.steamId}`) === `true` ? true : false) this.toggleChill()
-		if (!this.chillMode) this.splash.fireNotification(this.pronounce('splash', 'flashbang') || ``, this.splash.chill, true, true, 32000)
+		}
 
-		const lsgv = localStorage.getItem(`abstractv03_globalSoundVolume${this.steamId}`)
-		if (lsgv !== null) this.updateGlobalVolume(+lsgv)
+		return null
 
-		this.updateMouseData(this.w2/2, this.h2/2)
-		this.processMousemove2()
-		await window.ModLoader?.stage(`afterGameInit`, this)
+	}
+
+	checkMemoryComplex(){
+
+		if (this.memorycomplex) return
+
+		let isComplete = true
+		for (let i = 0; i < 6; i++){
+			if (!this.currentOrbPositions[i]){
+				isComplete = false
+				break
+			}
+		}
+
+		if (isComplete && !this.memorycomplex){
+
+			console.log(`Memory complex`)
+			this.memorycomplex = true
+			this.unlockedMemoryStages = 1
+			this.triggerMemory(0)
+			this.codex.messages.postEvents[5].condition = _=>true
+
+		}
+
+	}
+
+	triggerMemory(id){
+
+		this.switchToMemory(id)
+
+		const origin = [(this.memorycomplexCenter[0] * 0.866 - this.memorycomplexCenter[1] * .866) * this.unit / this.zoom, (this.memorycomplexCenter[0] * .5 + this.memorycomplexCenter[1] * .5) * this.unit / this.zoom]
+		this.translation[0] = origin[0]
+		this.translation[1] = origin[1]
+
+		this.processMove()
+		this.updateGlobalPositioning()
+
+		this.zoom = 1
+			
+
+	}
+
+	switchToMemory(id){
+
+		if (id !== this.currentMemoryComplexStage) delete this.memoryComplexImage
+		this.currentMemoryComplexStage = id
+		this.updateMemoryComplexUI()
+
+
+	}
+
+	updateMemoryComplexUI(){
+
+		if (this.memoryComplexUI) this.memoryComplexUI.remove()
+
+		const ui = this.memoryComplexUI = document.createElement(`div`)
+		ui.classList.add(`memoryComplexVessel`)
+
+		const selector = document.createElement(`div`)
+		selector.classList.add(`memorySelectors`)
+
+		for (let i = 0; i < 4; i++){
+			const button = document.createElement(`div`)
+			button.classList.add(`memorySwitch`)
+			button.innerText = i + 1
+
+			let shouldWork = true
+			if (i === this.currentMemoryComplexStage) {button.classList.add(`selected`); shouldWork = false}
+			if (i >= this.unlockedMemoryStages) {button.classList.add(`disabled`); shouldWork = false}
+			selector.append(button)
+
+			if (shouldWork){
+				button.addEventListener(`click`, _=>{
+					this.switchToMemory(i)
+					this.updateGlobalPositioning()
+				})
+			}
+
+
+		}
+
+		ui.append(selector)
+
+		const header = document.createElement(`div`)
+		header.classList.add(`memoryHeader`)
+		header.innerText = this.pronounce(`memories`, `memory${this.currentMemoryComplexStage}`, `header`)
+		ui.append(header)
+
+		const lore = document.createElement(`div`)
+		lore.classList.add(`memoryLore`)
+		lore.innerHTML = this.pronounce(`memories`, `memory${this.currentMemoryComplexStage}`, `lore`)
+		ui.append(lore)
+
+		document.body.append(ui)
+
 	}
 
 	async loadScripts(){
 
 		return new Promise(async (resolve, reject) =>{
 
-			const scripts = [`scripts/bezier.js`, `scripts/ui.js`, `scripts/sprites.js`, `scripts/stuff.js`, `scripts/words.js`, `scripts/codex.js`, `scripts/osimp.js`, `scripts/mobile.js`]
+			const scripts = [`scripts/bezier.js`, `scripts/ui.js`, `scripts/sprites.js`, `scripts/stuff.js`, `scripts/words.js`, `scripts/codex.js`, `scripts/osimp.js`]
 			let counter = scripts.length
 
 			for (let i = 0; i < counter; i++){
 				await this.loadScript(scripts[i])
 			}
 
-			console.log(`Everything's loaded, starting the game...`)
+			console.log(`Desktop scripts are ready, starting the game...`)
 			resolve()
 
 		})
 	}
 
-	async loadScript(url,callback){
+	async loadScriptsMobile(){
+
+		return new Promise(async (resolve, reject) =>{
+
+			const scripts = [`scripts/bezier.js`, `scripts/ui.js`, `scripts/sprites.js`, `scripts/stuff.js`, `scripts/words_mobile.js`, `scripts/codex.js`, `scripts/osimp.js`]
+			let counter = scripts.length
+
+			for (let i = 0; i < counter; i++){
+				await this.loadScript(scripts[i])
+			}
+
+			console.log(`Mobile scripts are ready, starting the game...`)
+			resolve()
+
+		})
+	}
+
+	async loadScript(url){
 
 		return new Promise((resolve, reject) => {
 	        const script = document.createElement(`script`)
@@ -1135,6 +1875,191 @@ class Game {
 	    })
 	}
 
+	// getPermanents(){
+
+	// 	// return this.preparedData.permanents
+
+	// 	let json = localStorage.getItem(`abstractv03_permanents${this.steamId}`)
+	// 	if (!json) json = this.fallbackAssemblePermanents()
+	// 	return JSON.parse(json)
+
+	// }
+
+	getPreferences(){
+
+		let json = localStorage.getItem(`abstractv03_preferences${this.steamId}`)
+		return json ? JSON.parse(json) : this.fallbackGetPreferences()
+
+	}
+
+	fallbackGetPreferences(){
+		
+		const mute = localStorage.getItem(`abstractv03_mute${this.steamId}`)
+		const languageId = localStorage.getItem(`abstractv03_language${this.steamId}`)
+		const photofobia = localStorage.getItem(`abstractv03_photofobia${this.steamId}`)
+		const chill = localStorage.getItem(`abstractv03_chill${this.steamId}`)
+		const zoom = localStorage.getItem(`abstractv03_zoom${this.steamId}`)
+		const globalSoundVolume = localStorage.getItem(`abstractv03_globalSoundVolume${this.steamId}`)
+		const helpIsNeeded = localStorage.getItem(`abstractv03_helpIsNeeded${this.steamId}`)
+		const mobileExplainerPointer = localStorage.getItem(`abstractv03_mobileExplainerPointer`)
+
+		return {
+			mute: mute === `true`,
+			photofobia: photofobia === `true`,
+			chill: chill === `true`,
+			languageId: languageId === null ? null : +languageId,
+			zoom: zoom === null ? 1 : +zoom,
+			globalSoundVolume: globalSoundVolume === null ? .6 : +globalSoundVolume,
+			helpIsNeeded: helpIsNeeded === null ? true : +helpIsNeeded,
+			mobileExplainerPointer: mobileExplainerPointer === null ? 0 : +mobileExplainerPointer
+		}
+		
+	}
+
+	fallbackAssemblePermanents(){
+
+		const achievements = localStorage.getItem(`abstractv03_glory${this.steamId}`)
+
+		const permanents = {
+			glory: achievements ? JSON.parse(achievements) : null,
+			// globalStats: {
+				completions: 0,
+				upgrades: 0,
+				orbUpgradeMap: [],
+			// }
+		}
+
+		return permanents
+
+	}
+
+
+	assemblePermanents(){
+		return {
+			glory: this.achiever.fired,
+			// globalStats: {
+				completions: this.completions,
+				upgrades: this.orbUpgrades,
+				orbUpgradeMap: this.orbUpgradeMap,
+			// },
+			memorycomplex: this.memorycomplex,
+			memory: this.saveSlots[this.currentSlotId].stack[0]?.permanents.memory, //Just forward
+			lastOrbPositions: this.currentOrbPositions,
+			unlockedMemoryStages: this.unlockedMemoryStages || 0,
+			currentMemoryComplexStage: this.currentMemoryComplexStage || 0
+		}
+	}
+
+	assemblePreferences(){
+		return {
+			mute: this.splash.gameIsMute,
+			languageId: this.languageId,
+			currentSlotId: this.currentSlotId,
+			photofobia: this.photofobia ?? false,
+			chill: this.chillMode,
+			zoom: this.zoom,
+			globalSoundVolume: this.globalSoundVolume ** .5,
+			helpIsNeeded: this.explainer.finished ? -1 : this.explainer.next,
+			mobileExplainerPointer: this.explainer.finished ? -1 : this.explainer.next
+		}
+	}
+
+	savePermanents(withLayout){
+
+		const permanents = this.assemblePermanents()
+		if (withLayout) {
+			permanents.memory = this.assembleMemory()
+			permanents.lastOrbPositions = this.currentOrbPositions
+		}
+		localStorage.setItem(`abstractv03_permanents${this.steamId}`, JSON.stringify(permanents))
+
+	}
+
+	savePreferences(){
+
+		const preferences = this.assemblePreferences()
+		localStorage.setItem(`abstractv03_preferences${this.steamId}`, JSON.stringify(preferences))
+
+	}
+
+	initAlfa(){
+
+		this.alfa = {
+			resource: 100,
+			currentEvents: [],
+			prices: {
+				haste: 6,
+				insta: 6,
+				oiled: 6
+			}
+		}
+		this.alfa.startEvent = label => {
+
+			const events = {
+				haste: {
+					onstart: _=>{console.log(`Haste event started`)},
+					onupdate: _=>{this.time.dt *= 2},
+					onfinish: _=>{console.log(`Haste event finished`)},
+					remains: 120000
+				},
+				insta: {
+					onstart: _=>{
+						console.log(`Insta event started`)
+						this.clickPower = 1e3
+					},
+					onfinish: _=>{
+						this.clickPower = 1
+						console.log(`Insta event finished`)
+					},
+					remains: 120000
+				},
+				oiled: {
+					onstart: _=>{
+						console.log(`Oiled event started`)
+						this.extractionSpeed = 4
+					},
+					onfinish: _=>{
+						this.extractionSpeed = 1
+						console.log(`Oiled event finished`)
+					},
+					remains: 120000
+				}
+			}
+
+			const event = events[label]
+			
+			event.onstart()
+			this.alfa.currentEvents.push(event)
+		}
+		this.alfa.activate = label => {
+			const price = this.alfa.prices[label]
+			if (this.alfa.resource < price){
+				console.log(`You broke`)
+				return
+			}
+			this.alfa.resource -= price
+			this.alfa.startEvent(label)
+		}
+	}
+
+	updateAlfa(dt){
+
+		if (!this.alfa) return
+		for (let i = 0; i < this.alfa.currentEvents.length; i++){
+			const e = this.alfa.currentEvents[i]
+			if (e.onupdate) e.onupdate(dt)
+
+			e.remains -= dt
+			if (e.remains <= 0){
+				e.onfinish()
+				this.alfa.currentEvents.splice(i,1)
+				i--
+			}
+
+		}
+
+	}
+
 	pronounce(...props){
 
 		if (this.language === `en`){
@@ -1148,7 +2073,7 @@ class Game {
 	getWordBranch(a, en){
 		let out = en ? this.words_en : this.words
 		for (let i = 0; i < a.length; i++){
-			const next = out[a[i]]
+			const next = out?.[a[i]]
 			if (next === undefined) return undefined
 			out = next
 		}
@@ -1234,7 +2159,8 @@ class Game {
 
 		this.photofobia = !this.photofobia
 		this.splash.setPhotofobia(this.photofobia)
-		localStorage.setItem(`abstractv03_photofobia${this.steamId}`, this.photofobia)
+		this.savePreferences()
+		// localStorage.setItem(`abstractv03_photofobia${this.steamId}`, this.photofobia)
 
 	}
 
@@ -1242,7 +2168,8 @@ class Game {
 
 		this.chillMode = !this.chillMode
 		this.splash.chill.classList.toggle(`active`)
-		localStorage.setItem(`abstractv03_chill${this.steamId}`, this.chillMode)
+		this.savePreferences()
+		// localStorage.setItem(`abstractv03_chill${this.steamId}`, this.chillMode)
 
 	}
 
@@ -1279,14 +2206,14 @@ class Game {
 			const loadSuccess = this.loadSave((!local && cloud) || (cloud?.timestamp > local?.timestamp) ? cloud : local)
 			if (!loadSuccess) {
 				this.prepopulate()
-				this.splash.updateBackups()
+				// this.splash.updateBackups()
 			}
 		    this.cleanup()
 		} else {
 			const loadSuccess = this.loadSave()
 	     	if (!loadSuccess) {
 	     		this.prepopulate()
-	     		this.splash.updateBackups()
+	     		// this.splash.updateBackups()
 	     	}
 	     	this.cleanup()
 		}
@@ -1303,28 +2230,14 @@ class Game {
 		if (!this.entityAtCoordinates([-1024,1024]) ){
 			this.addEntity(`cookie`,[-1024,1024])
 		}
-		if (this.steamAchievements && this.steamAchievements.length){
-			this.achiever.setState(this.steamAchievements)
-		}
 	}
 
 	updateSteamAchievement(id,v){
 		this.spaceport?.send(`achieve`, id)
 	}
 
-	getMute(){
-		const mute = localStorage.getItem(`abstractv03_mute${this.steamId}`)
-		return mute === `true` ? true : false
-	}
-
-	getLanguageId(){
-		const id = +localStorage.getItem(`abstractv03_language${this.steamId}`)
-		if (id && this.languages[id]) return id
-		return null
-	}
-
 	changeLanguage(id){
-		console.log(id)
+
 		if (this.languages[id]){
 			this.languageId = id
 			this.language = this.languages[this.languageId]
@@ -1335,17 +2248,21 @@ class Game {
 			}
 			this.words = words[this.language]
 			this.words_en = words.en
-			this.splash.init({selected: this.splash.selected, selectedId: this.splash.selectedId})
-			this.splash.updateBackups()
+			this.splash[this.isMobile ? `initMobile` : `init`]({selected: this.splash.selected, selectedId: this.splash.selectedId})
+			// this.splash.updateBackups()
 			// this.shop.init()
-			this.shop.switchPlane(this.plane)
+			// this.shop.switchPlane(this.plane)//TST
+			this.switchPlane(this.plane)
+			this.store.reinit()
+			// this.shop.init(this.plane)
 			this.messenger.setState(this.messenger.firedEvents, this.messenger.shownMessages, this.messenger.messagesShown)
 
 			for (let i = 0; i < this.stuff.length; i++){
 				this.stuff[i].initHint()
 			}
 
-			localStorage.setItem(`abstractv03_language${this.steamId}`, this.languageId)
+			this.savePreferences()
+			// localStorage.setItem(`abstractv03_language${this.steamId}`, this.languageId)
 		}
 	}
 
@@ -1377,7 +2294,11 @@ class Game {
 		this.h = this.canvas.height = this.canvas.offsetHeight * this.pixelRatio
 		this.w2 = this.w / 2
 		this.h2 = this.h / 2
-		this.solidUnit = this.screenUnit = Math.min(this.h, this.w) * .16
+		// console.log(innerWidth > 420)
+		// const ratio = Math.min(this.w / this.h, this.h / this.w)
+		// const unitMult = ratio < 0 ? 1 : 1 - (ratio - .5)
+		const screenReference = Math.min(this.h, this.w, this.mobileScreenLimit * this.pixelRatio)
+		this.solidUnit = this.screenUnit = screenReference * .16
 		this.regularFont = `600 ` + this.screenUnit * .16 + `px Montserrat, sans-serif`
 		this.smallFont = `600 ` + this.screenUnit * .12 + `px Montserrat, sans-serif`
 		this.microFont = this.screenUnit * .09 + `px Montserrat, sans-serif`
@@ -1395,7 +2316,60 @@ class Game {
 		}
 	}
 
+	finishGame(){
+		this.playSound(`lightning`)
+		this.createHollowEvent(`#000`, 50000)
+		this.stats.gameIsFinished = true
+
+		if (this.voidsculpture) this.clearCell(this.voidsculpture.position)
+		if (this.orbifoldUI) this.closeOrbifolds()
+		for (let i = 0; i < this.stuff.length; i++){
+
+			const e = this.stuff[i]
+			if (this.codex.entities[e.name].type === `complete`){
+				this.clearCell(e.position)
+				if (this.entityAtCoordinates(e.position)) this.clearCell(e.position) //Double kill
+			}
+
+		}
+
+		this.store.vessel.style.display = `none`
+
+		this.hollowSite.spawnTimerBase = 2000
+		// this.master.playSound(`endingMusic`,undefined,undefined,undefined,true)
+		this.playMusic(`shallow_anne`)
+
+		//Mobile
+		if (this.store?.html.store) this.store.html.store.remove()
+		if (this.store?.html.eraser) this.store.html.eraser.remove()
+		if (this.store?.html.relocator) this.store.html.relocator.remove()
+
+		setTimeout(_=>this.rbrtimeup = true, 640)
+	}
+
+	quickFinish(){
+
+		// this.savePermanents(true)
+
+		// this.preventSaving = true
+		this.playSound(`lightning`)
+		// this.createHollowEvent(`#000`, 50000)
+		if (this.orbifoldUI) this.closeOrbifolds()
+		this.stats.gameIsFinished = true
+		this.halt = true
+
+		this.store.vessel.style.display = `none`
+		//Mobile
+		if (this.store?.html.store) this.store.html.store.remove()
+		if (this.store?.html.eraser) this.store.html.eraser.remove()
+		if (this.store?.html.relocator) this.store.html.relocator.remove()
+
+		this.deployOrbElement(true)
+
+	}
+
 	watchCredits(){
+
 		this.preventSaving = true
 		const texts = this.pronounce('credits')
 		const eonly = abstract_getWords().en.credits
@@ -1415,16 +2389,16 @@ class Game {
 		this.credits.classList.add(`credits`)
 		document.body.appendChild(this.credits)
 
-		// this.creditImage = document.createElement(`div`)
-		// this.creditImage.classList.add(`creditImage`)
-		// this.credits.appendChild(this.creditImage)
-
 		this.creditImage = document.createElement(`video`)
 		this.creditImage.classList.add(`tstv`)
-		this.creditImage.setAttribute(`autoplay`,`autoplay`)
-		this.creditImage.setAttribute(`playsinline`,``)
-		this.creditImage.innerHTML = `<source src="img/tst/${this.isMobile ? `sf_mobile` : `tst3`}.mp4" type="video/mp4">`////qqqqqqqqqqqq
-		this.credits.appendChild(this.creditImage)
+		this.creditImage.setAttribute(`muted`, ``)
+		this.creditImage.setAttribute(`autoplay`, ``)
+		this.creditImage.setAttribute(`playsinline`, ``)
+		this.creditImage.innerHTML = `<source src="img/tst/${this.isMobile ? `sf_mobile` : `tst3`}.mp4" type="video/mp4">`
+		this.creditImage.addEventListener('canplay', _=>{
+		    this.creditImage.play()
+		    this.credits.append(this.creditImage)
+		})
 
 		this.creditPillar = document.createElement(`div`)
 		this.creditPillar.classList.add(`creditPillar`)
@@ -1480,10 +2454,13 @@ class Game {
 			this.creditImage.style.opacity = 0
 		})
 
-		const speed = .02
-		let scrollAmount = -1000
+		const speed = this.isMobile ? .04 : .02
+		let scrollAmount = this.isMobile ? -2000 : -1000
 		let lt = performance.now()
-		let finalChord = false
+		// let finalChord = false
+
+		setTimeout(_=>{this.deployOrbElement()}, 50000) 
+
 		const scrollDown = p=>{
 
 			const edge = p.getBoundingClientRect().bottom < 0
@@ -1497,20 +2474,100 @@ class Game {
 			scrollAmount += speed * dt
 			p.style.transform = `translate(0,${innerHeight - scrollAmount}px)`
 
-			if (!finalChord && edge){
-				finalChord = document.createElement(`div`)
-				finalChord.classList.add(`finalChord`)
-				finalChord.innerHTML = `<span>T-1</span>`
-				this.credits.append(finalChord)
-				finalChord.onclick = _=>{
-					location.reload()
-				}
-				setTimeout(_=>{finalChord.style.opacity = 1},640)
-			}
+			// if (!finalChord && edge){
+			// 	finalChord = document.createElement(`div`)
+			// 	finalChord.classList.add(`finalChord`)
+			// 	finalChord.innerHTML = `<span>T-1</span>`
+			// 	this.credits.append(finalChord)
+			// 	finalChord.onclick = _=>{
+			// 		location.reload()
+			// 	}
+			// 	setTimeout(_=>{finalChord.style.opacity = 1}, this.isMobile ? 320 : 640)
+			// }
 
 		}
 		scrollDown(this.creditPillar)
 
+
+	}
+
+	deployOrbElement(quick){
+
+		const offerNewHole = (this.completions ?? 0) + 1 - (this.orbUpgrades ?? 0) <= this.maxHoles
+		const offerUpgrade = this.completions > 0
+
+		let wrap
+		if (quick){
+
+			const darkness = document.createElement(`div`)
+			darkness.classList.add(`orbVeil`)
+			document.body.append(darkness)
+
+			wrap = document.createElement(`div`)
+			wrap.classList.add(`orbResetWrap`)
+			darkness.append(wrap)
+
+			requestAnimationFrame(_=>{
+				darkness.style.backdropFilter = `blur(64px)`
+				darkness.style.background = `#000E`
+			})
+
+		} else {
+
+			wrap = document.createElement(`div`)
+			wrap.classList.add(`orbResetWrap`)
+			document.body.append(wrap)
+
+		}
+
+		if (offerNewHole){
+
+			const newHole = document.createElement(`div`)
+			newHole.classList.add(`orbResetButton`)
+			newHole.innerText = this.pronounce('random', 'newHole')
+			wrap.append(newHole)
+			newHole.style.animationDelay = `.5s`
+			requestAnimationFrame(_=>{
+				newHole.style.opacity = 1
+			})
+
+			newHole.addEventListener(`click`, _=>{
+
+				this.completions++
+				this.reset(true)
+				// this.savePermanents(true)
+				// this.spaceport.send(`reset`, ``)
+				// localStorage.removeItem(`abstractv03${this.steamId}`)
+				// setTimeout(_=>{location.reload()},400)
+
+			})
+
+		}
+
+		if (offerUpgrade){
+
+			const upgrade = document.createElement(`div`)
+			upgrade.classList.add(`orbResetButton`)
+			upgrade.innerText = this.pronounce('random', 'newUpgrade')
+			wrap.append(upgrade)
+			upgrade.style.animationDelay = `1.4s`
+			requestAnimationFrame(_=>{
+				upgrade.style.opacity = 1
+			})
+
+			upgrade.addEventListener(`click`,_=>{
+
+				this.completions++
+				this.orbUpgrades++
+				this.reset(true)
+				// this.savePermanents(true)
+				// this.spaceport.send(`reset`, ``)
+				// localStorage.removeItem(`abstractv03${this.steamId}`)
+				// setTimeout(_=>{location.reload()},400)
+
+			})
+
+		}
 
 	}
 
@@ -1523,15 +2580,49 @@ class Game {
 		}
 	}
 
+	popOrbifolds(e){
+
+		if (this.orbifoldUI) {
+			const same = this.orbifoldUI.worldXY[0] === e.position[0] && this.orbifoldUI.worldXY[1] === e.position[1]
+			this.closeOrbifolds()
+			if (!same) this.orbifoldUI = new OrbifoldMenu(this, e)
+		} else {
+			this.orbifoldUI = new OrbifoldMenu(this, e)
+		}
+
+	}
+
+	closeOrbifolds(){
+
+		if (!this.orbifoldUI) return
+		this.orbifoldUI.close()
+		delete this.orbifoldUI
+
+	}
+
 	switchPlane(p){
 
-		if (this.plane !== p){
-			this.shop.switchPlane(p)
-		}
 		if (this.plane === 0 && p === 1) this.stats.darkVisited++
 		this.plane = p ? 1 : 0
 
+		if (this.isMobile){
+
+			//WIP Mobile button handling
+
+			// this.shop.switchPlane(p)
+
+			// if (p){
+			// 	this.shop.mobileEraser.style.display = `none`
+			// 	this.shop.mobileRelocator.style.display = `none`
+			// } else {
+			// 	this.shop.mobileEraser.removeAttribute(`style`)
+			// 	this.shop.mobileRelocator.removeAttribute(`style`)
+			// }
+
+		}
+
 		this.removeHint()
+		this.updateGlobalPositioning()
 
 	}
 
@@ -1670,8 +2761,9 @@ class Game {
 
 		this.resources = new Array(10).fill(0)
 		this.resourcePops = new Array(10).fill(0)
-		// this.preGradient = new Array(10).fill(0)
 		this.resourcesSprites = []
+
+		// if (this.permanents.globalStats.completeStructures) this.resources[10] = this.permanents.globalStats.completeStructures
 
 		for (let i = 0; i < this.codex.resources.length; i++){
 			this.resourcesSprites.push(new Sprite({
@@ -1692,6 +2784,7 @@ class Game {
 	setResourceHomes(){
 
 		this.resourceHomes = []
+
 		for (let i = 0; i < this.resources.length; i++){
 			this.resourceHomes.push([this.screenUnit * (i+1) * .8, this.screenUnit])
 		}
@@ -1701,11 +2794,13 @@ class Game {
 
 		this.resourceHomes = []
 
+		const limit = Math.min(this.w, this.mobileScreenLimit * this.pixelRatio)
 		const margin = this.screenUnit / 2
-		const delta = (this.w - margin * 2) / (this.resources.length - 1)
+		const leftEdge = [this.w2 - limit / 2 + margin, this.screenUnit * 1.4]
+		const delta = (limit - margin * 2) / (this.resources.length - 1)
 
 		for (let i = 0; i < this.resources.length; i++){
-			this.resourceHomes.push([margin + delta * i, this.screenUnit * 1.4])
+			this.resourceHomes.push([leftEdge[0] + delta * i, leftEdge[1]])
 		}
 
 	}
@@ -1714,37 +2809,107 @@ class Game {
 
 	async exportSave(){
 
-		if (!this.preventSaving){
-			const save = this.assembleSave(true)
-			await navigator.clipboard.writeText(save)
-		}
+		// if (!this.preventSaving){
+		// 	const save = this.assembleSave()
+		// 	await navigator.clipboard.writeText(save)
+		// }
+
+		if (this.preventSaving) return null
+		await this.saveGame()
+
+		const raw = this.saveSlots[this.currentSlotId]
+		const serialized = JSON.stringify({
+			data: raw.stack[0], 
+			ownerHash: raw.ownerHash, 
+			creationTimeStamp: raw.creationTimeStamp, 
+			lastModified: raw.lastModified
+		})
+		const base = this.encodeSave(serialized)
+
+		await navigator.clipboard.writeText(base)
 
 	}
 
 	async loadSaveFromClipboard(){
 
+		// const encoded = await navigator.clipboard.readText()
+		// const state = this.decodeSave(encoded)
+		// if (!state) return
+		// delete state.timestamp
+		// const hope = this.encodeSave(JSON.stringify(state))
+		// this.importSave(hope)
+
 		const encoded = await navigator.clipboard.readText()
-		const state = this.decodeSave(encoded)
-		if (!state) return
-		delete state.timestamp
-		state.backups = this.backups
-		const hope = this.encodeSave(JSON.stringify(state))
-		this.importSave(hope)
+		let decoded = this.decodeSave(encoded)
+		if (decoded === 0){
+			return
+		}
 
-		// const text = this.decodeSave(encoded)
-		// if (text) this.importSave(encoded)
+		// let existingSlotId = null
+		// for (let i = 0; i < this.saveSlots.length; i++){
+		// 	const ss = this.saveSlots[i]
+		// 	if (ss.ownerHash === decoded.ownerHash && ss.creationTimeStamp === decoded.creationTimeStamp){
+		// 		existingSlotId = i
+		// 		break
+		// 	}
+		// }
 
-	}
-
-	importSave(data){
+		// console.log(existingSlotId)
 		
-		this.spaceport?.send(`save`, data)
-		localStorage.setItem(`abstractv03${this.steamId}`, data)
+		//Check for legacy
+		const legacy = !decoded.creationTimeStamp
+		if (legacy){
+			decoded = {
+				data: {
+					isProtected: false,
+					permanents: decoded.permanents ?? {
+						glory: decoded.glory || null,
+						// globalStats: {
+							completions: 0,
+							upgrades: 0,
+							orbUpgradeMap: [],
+						// }
+					},
+					state: decoded
+				}, 
+				ownerHash: 64, 
+				creationTimeStamp: Date.now(), 
+				lastModified: Date.now()
+			}
+		}
+
+		//Always create a new slot
+		const newId = this.saveSlots.length
+		const slot = {
+			name: this.pronounce(`splash`, `imported`) + ` ` + newId,
+			ownerHash: decoded.ownerHash,
+			creationTimeStamp: decoded.creationTimeStamp,
+			stack: [decoded.data],
+			lastModified: decoded.lastModified
+		}
+
+		await this.saveGame()
+
+		this.saveSlots[newId] = slot
+		this.currentSlotId = newId
+		this.savePreferences()
+
+		await this.writeToSlot(slot, this.currentSlotId)
+
 		location.reload()
 
 	}
 
-	loadSave( manual = this.decodeSave(localStorage.getItem(`abstractv03${this.steamId}`)) ){
+	// importSave(data){
+		
+	// 	this.spaceport?.send(`save`, data)
+	// 	localStorage.setItem(`abstractv03${this.steamId}`, data)
+	// 	location.reload()
+
+	// }
+
+	// loadSave( manual = this.decodeSave(localStorage.getItem(`abstractv03${this.steamId}`)) ){
+	loadSave( manual = this.saveSlots[this.currentSlotId].stack[0].state ){
 
 		if (!manual) return false
 
@@ -1759,7 +2924,7 @@ class Game {
 
 			//Just to make sure
 			for (let i in this.onlyones){
-				if (!this.codex.entities[i].onlyone) delete this.onlyones[i]
+				if (!this.codex.entities[i]?.onlyone) delete this.onlyones[i]
 			}
 
 			this.updateEraserType(manual.eraserType || 0)
@@ -1768,7 +2933,7 @@ class Game {
 			if (manual.slowdown) this.slowdown = manual.slowdown
 			if (manual.plane) {
 				this.plane = manual.plane
-				this.shop.switchPlane(this.plane)
+				this.switchPlane(this.plane)
 			}
 			if (manual.switchedplanes) this.switchedplanes = manual.switchedplanes
 			if (manual.bridge) this.bridge = manual.bridge
@@ -1778,23 +2943,21 @@ class Game {
 				this.messenger.setState(manual.messengerFiredEvents, manual.messengerShownMessages, manual.messengerShown)
 			}
 			if (manual.existed) {
-				this.shop.setExisted(manual.existed)
+				this.store.setExisted(manual.existed)
 			}
-			if (manual.glory) this.achiever.setState(this.steamAchievements || manual.glory)
+			if (manual.glory) this.achiever.setState(manual.glory)
 			if (manual.stats) {
 				for (let i in manual.stats)
 				this.stats[i] = manual.stats[i]
 			}
 
 			//Game is finished from the achievement
-			if(manual.glory[20]){
+			if (manual.glory && manual.glory[20]){
 				this.stats[20] = true
 			}
 
 			//Legacy for play and idle time
 			if (this.stats.totalPlayAndIdleTime < this.stats.totalPlayTime) this.stats.totalPlayAndIdleTime = this.stats.totalPlayTime
-
-			if (manual.backups) this.backups = manual.backups
 			if (manual.existed?.pump2) this.stats.excavatorWasBuilt = true
 			
 			for (let i = 0; i < manual.stuff.length; i++){
@@ -1808,7 +2971,7 @@ class Game {
 				if (entity){
 					try{
 						for (let j in s.par){
-							if (s.par[j] !== `resources`) entity[j] = s.par[j]
+							entity[j] = s.par[j]
 						}
 					} catch(e){console.log(s)}
 
@@ -1816,20 +2979,39 @@ class Game {
 				}
 
 			}
-			this.shop.updateElements()
-			this.splash.updateBackups()
 
-			const timeSinceLastSave = (Date.now() - manual.timestamp)
+			//Center on chancel
+			if (this.plane){
+				let origin = [0,0]
+				if (this.voidsculpture){
+					const uv = this.voidsculpture.position
+					origin = [(uv[0] * 0.866 - uv[1] * .866) * this.unit / this.zoom, (uv[0] * .5 + uv[1] * .5) * this.unit / this.zoom]
+				}
+				this.translation[0] = origin[0]
+				this.translation[1] = origin[1]
+			}
 
-			this.simulateIdleTime(timeSinceLastSave)
-			
+			this.store.compositionUpdate()
+
+			if (this.memorycomplex){
+				//Rewrite memory buffer for non-pristine saves
+				if (manual.memory) this.memoryBuffer = manual.memory
+			}
+
+			this.cleanup()
+
+			if (manual.timestamp){
+				const timeSinceLastSave = (Date.now() - manual.timestamp)
+				this.simulateIdleTime(timeSinceLastSave)
+			}
 
 			return true
-		} catch(e){
 
-			alert(`Sorry, there is a problem with loading the game. Game saving won't be available and all the progress will be lost on quit.
-				${e}`)
-			this.preventCloud = true
+		} catch(e){
+			console.log(e)
+			console.error(e.message)
+			// alert(`Sorry, there is a problem with loading the game. Game saving won't be available and all the progress will be lost on quit. ${e}`)
+			this.preventSaving = true
 			return false
 		}
 
@@ -1843,7 +3025,6 @@ class Game {
 		let timer = Math.min(Math.max(0, t), 28800000) // Limit for 8h
 		let elapsed = 0
 		let cancel = false
-
 
 		//Idle splash
 		const cover = document.createElement(`div`)
@@ -1886,21 +3067,25 @@ class Game {
 		})
 
 		
-		const startingDepth = this.stats.maxDepth
-		const stopDepths = [45,80,620,1690]
 		let nextStopAt = Infinity
-		for (let i = 0; i < stopDepths.length; i++){
-			if (startingDepth < stopDepths[i]){
-				nextStopAt = stopDepths[i]
-				break
-			}
-		}
-
 		let nextResourceId = -1
-		for (let i = 0; i < this.stats.totalResourcesMined.length; i++){
-			if (!this.stats.totalResourcesMined[i]){
-				nextResourceId = i
-				break
+		
+		if (this.completions < 1){
+			const startingDepth = this.stats.maxDepth
+			const stopDepths = [45,80,620,1690]
+
+			for (let i = 0; i < stopDepths.length; i++){
+				if (startingDepth < stopDepths[i]){
+					nextStopAt = stopDepths[i]
+					break
+				}
+			}
+
+			for (let i = 0; i < this.stats.totalResourcesMined.length; i++){
+				if (!this.stats.totalResourcesMined[i]){
+					nextResourceId = i
+					break
+				}
 			}
 		}
 
@@ -1954,28 +3139,20 @@ class Game {
 		
 	}
 
-	restoreBackup(n){
+	// restoreBackup(n){
 
-		if (!this.backups[n]) return
-		const state = this.decodeSave(this.backups[n].data)
-		if (!state) return
-		state.backups = this.backups
-		const hope = this.encodeSave(JSON.stringify(state))
-		this.importSave(hope)
+	// 	if (!this.backups[n]) return
+	// 	const state = this.decodeSave(this.backups[n].data)
+	// 	if (!state) return
+	// 	state.backups = this.backups
+	// 	const hope = this.encodeSave(JSON.stringify(state))
+	// 	this.importSave(hope)
 
-	}
+	// }
 
 	backupLoop(){
 
-		if (!this.preventSaving){
-			const save = this.assembleSave(true)
-			this.backups.unshift({
-				timestamp: Date.now(),
-				data: save
-			})
-			if (this.backups.length > 4) this.backups.pop()
-			this.splash.updateBackups()
-		}
+		this.saveStackUpdateNeeded = true
 		setTimeout(_=>{this.backupLoop()}, 240000)
 
 	}
@@ -2005,18 +3182,187 @@ class Game {
 
 	}
 
-	saveGame(){
-		if (!this.preventSaving){
-			localStorage.setItem(`abstractv03_zoom${this.steamId}`, this.zoom)
-			const save = this.assembleSave()
-			if (!this.preventCloud){
-				localStorage.setItem(`abstractv03${this.steamId}`, save)
-				this.spaceport?.send(`save`, save)
+	// saveGame(){
+	// 	if (!this.preventSaving){
+	// 		// this.UPDATE_saveGame()
+	// 		this.savePermanents()
+	// 		this.savePreferences()
+	// 		// localStorage.setItem(`abstractv03_zoom${this.steamId}`, this.zoom)
+	// 		// localStorage.setItem(`abstractv03_glory${this.steamId}`, JSON.stringify(this.achiever.fired))
+	// 		const save = this.assembleSave()
+			
+	// 		localStorage.setItem(`abstractv03${this.steamId}`, save)
+	// 		this.spaceport?.send(`save`, save)
+			
+	// 	}
+	// }
+
+	async saveGame(){
+
+		if (this.preventSaving) return
+
+		// WIP current slot should be a separate flag in preferences?
+		// Writing to the stack is conrolled by this.saveStackUpdateNeeded
+
+		//Select the slot or create one if none
+		if (!this.saveSlots[this.currentSlotId]){
+			this.saveSlots[this.currentSlotId] = {
+				name: false,
+				ownerHash: this.hash53(this.steamId),
+				creationTimeStamp: Date.now(),
+				stack: [],
+				lastModified: Date.now()
 			}
 		}
+		const slot = this.saveSlots[this.currentSlotId]
+
+		if (this.saveStackUpdateNeeded){
+			this.saveStackUpdateNeeded = false
+			//Clear the first stack position
+			//Warning: if there are lots of protected saves check performance
+			if (slot.stack.length >= this.maxSaveStack){
+				//Godspeed old save
+				for (let i = slot.stack.length - 1; i >= 0; i--){
+					const save = slot.stack[i]
+					if (!save.isProtected){
+						slot.stack.splice(i,1)
+						break
+					}
+				}
+			}
+			slot.stack.unshift(null)
+
+		}
+
+		//Write the save
+		slot.lastModified = Date.now()
+		slot.stack[0] = {
+			isProtected: false,
+			state: this.assembleSave(),
+			permanents: this.assemblePermanents()
+		}
+
+		await this.writeToSlot(slot, this.currentSlotId)
+		// this.spaceport?.send(`save`, slot)
+
+		// localStorage.setItem(this.getSlotKey(this.currentSlotId), JSON.stringify(slot))
 	}
 
-	assembleSave(backupless){
+	async reset(memoryNeeded = false){
+
+		//Create a new blank save for a new game
+		const slot = this.saveSlots[this.currentSlotId]
+		if (slot.stack.length >= this.maxSaveStack){
+			//Godspeed old save
+			for (let i = slot.stack.length - 1; i >= 0; i--){
+				const save = slot.stack[i]
+				if (!save.isProtected){
+					slot.stack.splice(i,1)
+					break
+				}
+			}
+		}
+
+		const freshSpawn = {
+			isProtected: false,
+			state: null,
+			permanents: this.assemblePermanents()
+		}
+
+		if (memoryNeeded){
+			freshSpawn.permanents.memory = this.assembleMemory()
+			freshSpawn.permanents.lastOrbPositions = this.currentOrbPositions
+		}
+
+		slot.stack.unshift(freshSpawn)
+		slot.lastModified = Date.now()
+
+		await this.writeToSlot(slot, this.currentSlotId)
+		// this.spaceport?.send(`save`, slot)
+
+		setTimeout(_=>{location.reload()},400)
+
+
+		// this.spaceport.send(`reset`, ``)
+
+
+		// this.savePermanents(true)
+		// this.spaceport.send(`reset`, ``)
+		// localStorage.removeItem(`abstractv03${this.steamId}`)
+		// setTimeout(_=>{location.reload()},400)
+
+	}
+
+	// getSlotKey(slotId = this.currentSlotId){
+	// 	return `charps_${this.steamId}_memory_slot${slotId}`
+	// }
+
+	// saveToSlot(slot = 0){
+
+	// 	const KEY = `abstractv03_slot${slot}`
+	// 	const save = this.assembleSave(true)
+	// 	localStorage.setItem(KEY, save)
+	// 	console.log(`Saved to slot ${slot}`)
+
+	// }
+
+	// loadFromSlot(slot = 0){
+
+	// 	const KEY = `abstractv03_slot${slot}`
+	// 	const string = localStorage.getItem(KEY)
+	// 	const data = this.decodeSave(string)
+
+	// 	if (!data) {
+	// 		console.log(`Slot ${slot} is empty`)
+	// 		return
+	// 	}
+
+	// 	delete data.timestamp
+		
+	// 	this.importSave(string)
+
+	// }
+
+	// assembleSave(backupless){
+
+	// 	const stuff = []
+	// 	for (let i = 0; i < this.stuff.length; i++){
+	// 		const string = this.getEntityString(this.stuff[i])
+	// 		if (string) stuff.push(string)
+	// 	}
+
+	// 	const string = JSON.stringify({
+	// 		stuff: stuff, 
+	// 		onlyones: this.onlyones, 
+	// 		resources: this.resources, 
+	// 		eraserType: this.eraserType,
+	// 		hollowHardness: this.hollowHardness,
+	// 		slowdown: this.slowdown,
+	// 		plane: this.plane,
+	// 		version: this.version,
+	// 		switchedplanes: this.switchedplanes,
+	// 		bridge: this.bridge,
+	// 		unlockedEntities: this.unlockedEntities,
+	// 		needNoHelp: this.needNoHelp,
+	// 		messengerShownMessages: this.messenger.shownMessages,
+	// 		messengerFiredEvents: this.messenger.firedEvents,
+	// 		messengerShown: this.messenger.messagesShown,
+	// 		// existed: this.shop.existed, //MOB
+	// 		existed: this.store.existed,
+	// 		glory: this.achiever.fired,
+	// 		stats: this.stats,
+	// 		timestamp: Date.now(),
+	// 		backups: backupless ? undefined : this.backups,
+	// 		permanents: this.assemblePermanents(),
+	// 		memory: this.memoryBuffer
+	// 	})
+
+	// 	return this.encodeSave(string)
+		
+
+	// }
+
+	assembleSave(){
 
 		const stuff = []
 		for (let i = 0; i < this.stuff.length; i++){
@@ -2024,7 +3370,7 @@ class Game {
 			if (string) stuff.push(string)
 		}
 
-		const saveState = window.ModLoader?.applySave({
+		const saveState = {
 			stuff: stuff, 
 			onlyones: this.onlyones, 
 			resources: this.resources, 
@@ -2036,42 +3382,17 @@ class Game {
 			switchedplanes: this.switchedplanes,
 			bridge: this.bridge,
 			unlockedEntities: this.unlockedEntities,
-			needNoHelp: this.needNoHelp,
 			messengerShownMessages: this.messenger.shownMessages,
 			messengerFiredEvents: this.messenger.firedEvents,
 			messengerShown: this.messenger.messagesShown,
-			existed: this.shop.existed,
+			existed: this.store.existed,
 			glory: this.achiever.fired,
 			stats: this.stats,
 			timestamp: Date.now(),
-			backups: backupless ? undefined : this.backups
-		}, this) || {
-			stuff: stuff, 
-			onlyones: this.onlyones, 
-			resources: this.resources, 
-			eraserType: this.eraserType,
-			hollowHardness: this.hollowHardness,
-			slowdown: this.slowdown,
-			plane: this.plane,
-			version: this.version,
-			switchedplanes: this.switchedplanes,
-			bridge: this.bridge,
-			unlockedEntities: this.unlockedEntities,
-			needNoHelp: this.needNoHelp,
-			messengerShownMessages: this.messenger.shownMessages,
-			messengerFiredEvents: this.messenger.firedEvents,
-			messengerShown: this.messenger.messagesShown,
-			existed: this.shop.existed,
-			glory: this.achiever.fired,
-			stats: this.stats,
-			timestamp: Date.now(),
-			backups: backupless ? undefined : this.backups
+			memory: this.memoryBuffer
 		}
-		const string = JSON.stringify(saveState)
 
-		return this.encodeSave(string)
-		
-
+		return window.ModLoader?.applySave(saveState, this) || saveState
 	}
 
 	decodeSave(s){
@@ -2125,8 +3446,84 @@ class Game {
 			par.broken = e.broken
 			par.state = 2
 		}
+		if (e.tier) par.tier = e.tier
+		if (e.rid) par.rid = e.rid
+		if (e.activeResourceId) par.activeResourceId = e.activeResourceId
+		if (e.entityName) par.entityName = e.entityName
 
-		return window.ModLoader?.applyEntitySave({name: e.name, position: e.position, par: par}, e, this) || {name: e.name, position: e.position, par: par}
+		const entityState = {name: e.name, position: e.position, par: par}
+		return window.ModLoader?.applyEntitySave(entityState, e, this) || entityState
+	}
+
+	async addNewSlot(){
+		const slot = {
+			name: false,
+			ownerHash: this.hash53(this.steamId),
+			creationTimeStamp: Date.now(),
+			stack: [{
+				isProtected: false,
+				state: null,
+				permanents: {
+					glory: null,
+					// globalStats: {
+						completions: 0,
+						upgrades: 0,
+						orbUpgradeMap: [],
+					// }
+				}
+			}],
+			lastModified: Date.now()
+		}
+
+		await this.saveGame()
+
+		const newId = this.saveSlots.length
+		this.saveSlots[newId] = slot
+		this.currentSlotId = newId
+		this.savePreferences()
+
+		await this.writeToSlot(slot, this.currentSlotId)
+
+		location.reload()
+	}
+
+	async loadSaveFromSlotStack(slotId, stackId){
+		
+		const slot = this.saveSlots[slotId]
+	    if (!slot?.stack[stackId]) return false
+
+	    if (this.currentSlotId !== slotId) {
+	        this.currentSlotId = slotId
+	        this.savePreferences()
+	    }
+
+	    const save = slot.stack.splice(stackId, 1)[0]
+	    slot.stack.unshift(save)
+	    slot.lastModified = Date.now()
+
+	    await this.writeToSlot(slot, slotId)
+
+	    location.reload()
+	    return true
+
+
+
+		// if (!this.saveSlots[slotId] || !this.saveSlots[slotId].stack[stackId]) return false
+
+		// const sameSlot = this.currentSlotId === slotId
+
+		// if (!sameSlot){
+		// 	this.currentSlotId = slotId
+		// 	this.savePreferences()
+		// }
+
+		// //Relocate save
+		// const slot = this.saveSlots[this.currentSlotId]
+		// const save = slot.stack.splice(stackId,1)[0]
+		// slot.stack.unshift(save)
+
+		// location.reload()
+
 	}
 
 	addWaypoint(e){
@@ -2172,6 +3569,25 @@ class Game {
 				this.translation[0] += delta[0] / this.zoom
 				this.translation[1] += delta[1] / this.zoom
 
+				this.updateGlobalPositioning()
+				this.playSound(`teleport`,undefined,undefined,undefined,true)
+				this.createHollowEvent(`#000`, this.voidsculpture ? 1000 : 10000)
+				this.stats.timesTeleported++
+
+				//Gamepad
+				const gamepad = navigator.getGamepads()[0]
+				if (gamepad && gamepad.vibrationActuator){
+					gamepad.vibrationActuator?.reset()
+					gamepad.vibrationActuator?.playEffect(`dual-rumble`,{
+					startDelay: 0,
+					  duration: 200,
+					  weakMagnitude: .2,
+					  strongMagnitude: 0,
+					})
+				}
+
+				break
+
 			}
 
 		}
@@ -2185,7 +3601,7 @@ class Game {
 		if (!this.entitiesInGame.mega1b && this.onlyones.mega1b) delete this.onlyones.mega1b
 		if (!this.entitiesInGame.mega1a && !this.entitiesInGame.mega1b && this.onlyones.mega1a) delete this.onlyones.mega1a
 		if (!this.entitiesInGame.mega1 && !this.entitiesInGame.mega1a && !this.entitiesInGame.mega1b && this.onlyones.mega1) delete this.onlyones.mega1
-		this.shop.check()
+		// this.shop.check()
 
 	}
 
@@ -2203,78 +3619,10 @@ class Game {
 
 	updateEraserType(t){
 		this.eraserType = t
-		this.shop.check()
+		// this.shop.check()
+		this.store.setEraserType(t)
 	}
 
-	initGlWithShader(){
-
-		this.glcanvas = document.createElement(`canvas`)
-		this.glcanvas.width = this.w
-		this.glcanvas.height = this.h
-		const gl = this.gl = this.glcanvas.getContext(`webgl2`, {premultipliedAlpha: false})
-
-		//Vertex Shader
-		const vshader = gl.createShader(gl.VERTEX_SHADER)
-		gl.shaderSource(vshader, 
-			`#version 300 es 
-			in vec2 a_position;
-			in vec2 a_texcoord;
-			uniform vec2 u_offset;
-			out vec2 v_texcoord;
-			void main(){
-				gl_Position = vec4(a_position + u_offset, 0.0, 1.0);
-				v_texcoord = a_texcoord;
-			}`)
-		gl.compileShader(vshader)
-		if (!gl.getShaderParameter(vshader, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(vshader))
-
-		//Fragment Shader
-		const fshader = gl.createShader(gl.FRAGMENT_SHADER)
-		gl.shaderSource(fshader, 
-			`#version 300 es
-
-			precision highp float;
-			in vec2 v_texcoord;
-			uniform sampler2D u_image;
-			uniform vec2 u_spriteoffset;
-			out vec4 pixelColor;
-
-			void main(void){
-				vec4 color = texture(u_image, v_texcoord + u_spriteoffset);
-				pixelColor = color; //vec4(v_texcoord, 0., 1.);
-			}`)
-		gl.compileShader(fshader)
-		if (!gl.getShaderParameter(fshader, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(fshader))
-
-		//Program
-		const program = gl.createProgram()
-		gl.attachShader(program, vshader)
-		gl.attachShader(program, fshader)
-		gl.linkProgram(program)
-		if (gl.getProgramParameter(program, gl.LINK_STATUS)){
-			gl.useProgram(program)
-		} else {
-			throw new Error(gl.getProgramInfoLog(program))
-		}
-		
-		this.glStuff = {
-			gl: gl,
-			textures: {}
-		}
-
-		this.glStuff.pal = gl.getAttribLocation(program, `a_position`)
-		gl.enableVertexAttribArray(this.glStuff.pal)
-		this.glStuff.tal = gl.getAttribLocation(program, `a_texcoord`)
-		gl.enableVertexAttribArray(this.glStuff.tal)
-
-		this.glStuff.uspriteoffset = gl.getUniformLocation(program, 'u_spriteoffset')
-		this.glStuff.uoffset = gl.getUniformLocation(program, 'u_offset')
-
-		gl.enable(gl.BLEND)
-		gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA)
-
-
-	}
 
 	getLoudnessFromXY(xy){
 		const distance = Math.max(Math.abs(xy[0] - this.w2), Math.abs(xy[1] - this.h2)) / this.w / 2
@@ -2287,6 +3635,7 @@ class Game {
 
 	pickupItem(name){
 
+
 		if (name === `eraser` || name === `eraser2` || name === `eraser3`){
 			this.itemInHand = {name: name, eraser: true}
 		} else {
@@ -2296,12 +3645,13 @@ class Game {
 		delete this.transportedEntity
 
 		if (!this.itemInHand.eraser){
-			this.itemInHandPriceTag = new Cloud(this)
+			this.interactionMode = `build`
+			this.itemInHandPriceTag = new Cloud({master: this})
 			this.itemInHandPriceTag.addResourceList(this.getRealPrice(this.itemInHand.name))
 			if (this.codex.entities[this.itemInHand.name].isUpgradeTo) {
 
 				// const refundPrice = this.getRealPrice(this.codex.entities[this.itemInHand.name].isUpgradeTo, true)
-				this.itemInHandPriceAndRefundTag = new Cloud(this)
+				this.itemInHandPriceAndRefundTag = new Cloud({master: this})
 				this.itemInHandPriceAndRefundTag.addResourceList(this.getRealPrice(this.itemInHand.name))
 				this.itemInHandPriceAndRefundTag.addLine()
 				this.itemInHandPriceAndRefundTag.addRefundList(this.codex.entities[this.itemInHand.name].isUpgradeTo)
@@ -2310,6 +3660,15 @@ class Game {
 			// console.log(this.codex.entities[this.itemInHand.name].isUpgradeTo)
 		}
 
+	}
+
+	//WIP new eraser 2
+	pickupEraser(){
+		if (!this.unlockedEntities.pump) return null //Never had a resource 3 (insecure)
+		this.interactionMode = `erase`
+		delete this.transportedEntity
+		delete this.itemInHand
+		return true
 	}
 
 	requestResources(r,d,f,skip){
@@ -2328,7 +3687,12 @@ class Game {
 		if (good) {
 
 			this.substractResourcesFromArray(r,skip)
+			// if (!r[10]) {
 			this.createResourceTransfer(r, false, this.uvToXYUntranslated(d), f ? f : _=>{}, undefined, skip)
+			// } else {
+			// 	this.createCompleteTransaction(d)
+			// 	this.playSound(`complete`)
+			// }
 			return true
 		}
 
@@ -2354,28 +3718,67 @@ class Game {
 
 	}
 
-	updateGlobalSounds(){
-
-		for (let i = 0; i < this.stuff.length; i++){
-			if (this.stuff[i].sfxPlaying) {
-
-				const screenxy = this.uvToXYUntranslated(this.stuff[i].position)
-				const pan = this.getPanValueFromX(screenxy[0])
-				const loudness = this.getLoudnessFromXY(screenxy)
-
-				this.setPanToSFX(this.stuff[i].sfxPlaying, pan)
-				this.setLoudnessToSFX(this.stuff[i].sfxPlaying, loudness)
-
-			}
+	updateGlobalPositioning(){
+		for (const s of this.soundSources){
+			this.updateSoundSource(s)
 		}
 
+		let D
+		if (this.memorycomplex){
+			const uvc = this.xyToUVUntranslated([0,0])
+			D = ((uvc[0] - this.memorycomplexCenter[0]) ** 2 + (uvc[1] - this.memorycomplexCenter[1]) ** 2) ** .5
+			this.memoryComplexIsVisible = D <= this.memorycomplexRadius
+		}
+
+		//Given I have mc
+		if (this.memoryComplexIsVisible ){
+			if (!this.store.vessel.classList.contains(`memory_faded`)){
+				this.store.vessel.classList.add(`memory_faded`)
+			}
+			if (!this.memoryComplexUI.classList.contains(`active`)) this.memoryComplexUI.classList.add(`active`)
+			this.memoryComplexUI.style.opacity = D < this.memorycomplexRadius / 2 ? 1 - 2 * D / this.memorycomplexRadius : 0
+		}
+
+		if (!this.memoryComplexIsVisible ){
+			if (this.store.vessel.classList.contains(`memory_faded`)){
+				this.store.vessel.classList.remove(`memory_faded`)
+			}
+			if (this.memoryComplexUI.classList.contains(`active`)) this.memoryComplexUI.classList.remove(`active`)
+		}
+
+	}
+
+	updateSoundSource(s){
+		const sxy = this.uvToXYUntranslated(s.position)
+		const pan = this.getPanValueFromX(sxy[0])
+		const loudness = this.getLoudnessFromXY(sxy)
+
+		s.pan.pan.value = pan
+		s.volume.gain.value = loudness * s.baseVolume
+
+		if (!s.audibility[this.plane] && !s.filterOn){
+			//Engage
+			s.filterOn = true
+			console.log(`engaged`)
+			s.volume.disconnect(this.sfx.master)
+			s.volume.connect(s.filter)
+			s.filter.connect(this.sfx.master)
+		} else if (s.audibility[this.plane] && s.filterOn){
+			//Disengage
+			s.filterOn = false
+			console.log(`disengaged`)
+			s.volume.disconnect(s.filter)
+			s.filter.disconnect(this.sfx.master)
+			s.volume.connect(this.sfx.master)
+		}
 	}
 
 	updateGlobalVolume(v = this.globalSoundVolume){
 		v = Math.max(0, Math.min(1, v))
 		this.globalSoundVolume = v ** 2
 		if (this.splash.soundSlider) this.splash.soundSlider.style.width = 100 * v + `%`
-		localStorage.setItem(`abstractv03_globalSoundVolume${this.steamId}`, v)
+		this.savePreferences()
+		// localStorage.setItem(`abstractv03_globalSoundVolume${this.steamId}`, v)
 
 	}
 
@@ -2429,8 +3832,12 @@ class Game {
 			{src: `sfx/recycle.mp3`, name: `recycle`, volume: .3},
 			{src: `sfx/buildup.mp3`, name: `buildup`, volume: 1},
 			{src: `sfx/scan.mp3`, name: `scan`, volume: .8, detune: 140},
-			{src: `sfx/impact.mp3`, name: `impact`, volume: .8, detune: 80}
+			{src: `sfx/impact.mp3`, name: `impact`, volume: .8, detune: 80},
+			{src: `sfx/collapsing.mp3`, name: `collapsing_drone`, volume: .5},
+			{src: `sfx/drone_exp.mp3`, name: `expanding`, volume: 1},
+			{src: `sfx/complete.mp3`, name: `complete`, volume: .8}
 		]
+
 		samples = window.ModLoader?.applySoundList(samples) || samples
 
 		for (let i = 0; i < samples.length; i++){
@@ -2540,6 +3947,58 @@ class Game {
 		}
 	}
 
+	addSoundSource(id, p, audibility = [1,0]){
+		
+		if (this.actx && this.actx.state !== `running`) this.actx.resume()
+		if (!this.sfx?.ready || this.preventNoise) return false
+
+		const source = this.actx.createBufferSource()
+		const volume = this.actx.createGain()
+		const pan = this.actx.createStereoPanner()
+		const filter = this.actx.createBiquadFilter()
+		filter.type = `lowpass`
+
+		pan.pan.value = 0
+		volume.gain.value = this.sfx.samples[id].volume ?? .5
+		source.buffer = this.sfx.samples[id].data
+		source.loop = true
+		if (this.sfx.samples[id].detune) source.detune.value = (Math.random() * 2 - 1) * this.sfx.samples[id].detune
+		
+		source.connect(pan).connect(volume).connect(this.sfx.master)
+		source.start(this.actx.currentTime)
+		
+		const soundSource = {
+			position: p,
+			source: source,
+			volume: volume,
+			pan: pan,
+			filter: filter,
+			baseVolume: this.sfx.samples[id].volume ?? .5,
+			filterOn: false,
+			audibility: audibility
+		}
+
+		this.soundSources.add(soundSource)
+
+		this.updateSoundSource(soundSource)
+		return soundSource
+	}
+
+	deleteSoundSource(s,t=1){
+
+		if (!this.soundSources.has(s)) {
+			console.warn(`Something wrong here with sounds`)
+			return false
+		}
+
+		s.volume.gain.exponentialRampToValueAtTime(.01, this.actx.currentTime + t)
+		s.source.stop(this.actx.currentTime + t)
+
+		this.soundSources.delete(s)
+
+		return true
+	}
+
 	playSound(id, panning, loudness, dark, forced){
 
 		if (this.preventNoise) return
@@ -2568,19 +4027,7 @@ class Game {
 				volume.connect(filter).connect(this.sfx.master)
 			}
 			this.sfx.stackSize++
-			// source.onended = _=>{
-			// 	source.disconnect()
-			// 	volume.disconnect()
-			// 	pan.disconnect()
-			// 	// source = null
-			// 	// volume = null
-			// 	// pan = null
-			// 	if (filter) {
-			// 		filter.disconnect()
-			// 		// filter = null
-			// 	}
-			// 	this.sfx.stackSize = Math.max(0, this.sfx.stackSize - 1)
-			// }
+
 			setTimeout(_=>{this.sfx.stackSize = Math.max(0, this.sfx.stackSize - 1)}, (this.sfx.samples[id].duration || source.buffer.duration) * 1000)
 			source.start(this.actx.currentTime)
 			source.stop(this.actx.currentTime + (this.sfx.samples[id].duration || source.buffer.duration))
@@ -2588,11 +4035,19 @@ class Game {
 
 	}
 
-	getRealPrice(name, sale){
+	isWithinMemoryComplex(uv){
+
+		//Manhattan
+		const safe = 8
+		return (uv[0] > this.memorycomplexCenter[0] - this.memorycomplexRadius - safe && uv[0] < this.memorycomplexCenter[0] + this.memorycomplexRadius + safe) && (uv[1] > this.memorycomplexCenter[1] - this.memorycomplexRadius - safe && uv[1] < this.memorycomplexCenter[1] + this.memorycomplexRadius + safe)
+
+	}
+
+	getRealPrice(name, sale, extra = 0){
 
 		// if (price[i]) this.resources[i] += Math.floor(price[i] * (this.eraserType === 2 ? 1 : this.eraserType === 1 ? .9 : .5))
 
-		const mult = this.codex.entities[name].priceExponent ? this.codex.entities[name].priceExponent ** Math.max(0, (this.entitiesInGame[name] || 0) - (sale ? 1 : 0)) : 1
+		const mult = this.codex.entities[name].priceExponent ? this.codex.entities[name].priceExponent ** Math.max(0, (this.entitiesInGame[name] + extra || 0) - (sale ? 1 : 0)) : 1
 		const sellMult = sale ? (this.eraserType === 2 ? 1 : this.eraserType === 1 ? .9 : .5) : 1
 		if (mult === 1) return this.codex.entities[name].price
 
@@ -2601,6 +4056,7 @@ class Game {
 			realPrice.push(this.codex.entities[name].price[i] * mult * sellMult)
 		}
 		return realPrice
+
 	}
 
 
@@ -2608,12 +4064,11 @@ class Game {
 
 		let can = true
 		const price = this.getRealPrice(name)
-		// const source = this.codex.entities[name].priceType ? this[this.codex.entities[name].priceType] : this.resources
 		const source = this.resources
 
 		for (let i = 0; i < price.length; i++){
 
-			if (price[i] && source[i] < price[i]){
+			if (price[i] && (!source[i] || source[i] < price[i])){
 				can = false
 				break
 			}
@@ -2631,7 +4086,7 @@ class Game {
 		const n = entity.getNeighbours()
 
 		this.entitiesInGame[entity.name]--
-		this.shop.updateElements()
+		this.store.compositionUpdate()
 
 		if (!entity.entitySpan) {
 			delete this.stuffMap[`u${entity.position[0]}v${entity.position[1]}`]
@@ -2653,17 +4108,23 @@ class Game {
 			}
 		}
 
+		//Orbifolds
+		if (this.codex.entities[entity.name].type === `complete` && entity.name !== `whitehole`){
+			const hole = this.addEntity(`whitehole`, entity.position)
+			hole.tier = entity.tier ?? 1
+			hole.init()
+		}
+
 		for (let i = 0; i < n.length; i++){
 			if (n[i]) n[i].init()
 		}
 
 	}
 
-	updateMouseData(x = this.mouse.offsetxy[0], y = this.mouse.offsetxy[1]){
+	updateMouseData(x = this.mouse.sxy[0], y = this.mouse.sxy[1], adjustTap){
 
-
-		this.mouse.offsetxy[0] = x
-		this.mouse.offsetxy[1] = y
+		this.mouse.sxy[0] = x
+		this.mouse.sxy[1] = y
 		this.mouse.xy[0] = x * this.pixelRatio
 		this.mouse.xy[1] = y * this.pixelRatio
 
@@ -2676,8 +4137,32 @@ class Game {
 		//What is there
 		const uv = this.xyToUV([x, y])
 		const targetCell = [Math.floor(uv[0]), Math.floor(uv[1])]
-		this.hoveredCell = targetCell
-		this.hoveredEntity = this.entityAtCoordinates(this.hoveredCell)
+
+		if (adjustTap){
+			//Tap adjust
+			const C = this.entityAtCoordinates(targetCell)
+			const B = this.entityAtCoordinates([targetCell[0] + 1, targetCell[1] + 1])
+			const R = this.entityAtCoordinates([targetCell[0] + 1, targetCell[1]])
+			const L = this.entityAtCoordinates([targetCell[0], targetCell[1] + 1])
+			const right = (uv[1] - Math.floor(uv[1])) < (uv[0] - Math.floor(uv[0]))
+
+			if (!C && (B && B instanceof Cube)){
+				this.hoveredCell = [targetCell[0] + 1, targetCell[1] + 1]
+				this.hoveredEntity = B
+			} else if (!C && (R && R instanceof Cube) && right) {
+				this.hoveredCell = [targetCell[0] + 1, targetCell[1]]
+				this.hoveredEntity = R
+			} else if (!C && (L && L instanceof Cube) && !right) {
+				this.hoveredCell = [targetCell[0], targetCell[1] + 1]
+				this.hoveredEntity = L
+			} else {
+				this.hoveredCell = targetCell
+				this.hoveredEntity = this.entityAtCoordinates(this.hoveredCell)
+			}
+		} else {
+			this.hoveredCell = targetCell
+			this.hoveredEntity = this.entityAtCoordinates(this.hoveredCell)
+		}
 
 		this.hoveredResource = false
 		const delta = this.screenUnit * .3
@@ -2705,6 +4190,26 @@ class Game {
 
 	processMousemove2(xy, dxy, click){
 
+		//OBSOLETE
+		//WIP REMOVE
+		console.log(`REMOVE`)
+
+		if (this.interactionMode === `erase` && click){
+
+			if (!this.eraseTarget || this.hoveredCell[0] !== this.eraseTarget[0] || this.hoveredCell[1] !== this.eraseTarget[1]){
+				this.eraseTarget = this.hoveredCell
+				this.updateEraseArea()
+			}
+				
+		} else if (this.interactionMode === `relocate` && click){
+
+			if (!this.relocationTarget || this.hoveredCell[0] !== this.relocationTarget[0] || this.hoveredCell[1] !== this.relocationTarget[1]){
+				this.relocationTarget = this.hoveredCell
+				this.updateRelocationArea()
+			}
+
+		}
+
 		//Conditioned update
 		if (xy){
 			this.updateMouseData(xy[0],xy[1])
@@ -2713,7 +4218,7 @@ class Game {
 				this.translation[1] -= dxy[1]
 			} else if (this.hoveredEntity && click === 1){
 				const n = this.hoveredEntity.name
-				const donotclick = (n === `cube` || n === `pump` || n === `pump2` || n === `waypoint` || n === `waypoint2` || n === `voidsculpture` || n === `strange` || n === `strange1` || n === `strange2` || n === `strange3` || n === `cookie` || n === `hollow`)
+				const donotclick = (n === `cube` || n === `pump` || n === `pump2` || n === `waypoint` || n === `waypoint2` || n === `voidsculpture` || n === `strange` || n === `strange1` || n === `strange2` || n === `strange3` || n === `cookie` || n === `hollow` || n === `malformed`)
 				if (!this.itemInHand && !this.plane && !donotclick){
 					this.hoveredEntity?.onmousedown()
 				}
@@ -2721,7 +4226,7 @@ class Game {
 		}
 
 		//Conditionless update
-		const uv = this.xyToUV([this.mouse.offsetxy[0], this.mouse.offsetxy[1]])
+		const uv = this.xyToUV([this.mouse.sxy[0], this.mouse.sxy[1]])
 		const targetCell = [Math.floor(uv[0]), Math.floor(uv[1])]
 		this.hoveredCell = targetCell
 		this.hoveredEntity = this.entityAtCoordinates(this.hoveredCell)
@@ -2748,141 +4253,258 @@ class Game {
 			const eraserOk = this.itemInHand.eraser && this.hoveredEntity && !this.hoveredEntity.indestructible && !(this.hoveredEntity instanceof Cube) && !((this.hoveredEntity instanceof Pump || this.hoveredEntity instanceof Gradient) && ((this.entitiesInGame[`pump`] || 0) + (this.entitiesInGame[`pump2`] || 0) + (this.entitiesInGame[`gradient`] || 0) < 2))
 			const newOk = !this.itemInHand.eraser && !this.hoveredEntity && !(up && this.codex.entities[up].onlyone) && !(up && (this.itemInHand.name === `flower` || this.itemInHand.name === `fruit` || this.itemInHand.name === `gradient_rem`))
 			const upgradeOk = this.hoveredEntity && !this.itemInHand.eraser && this.codex.entities[this.itemInHand.name]?.isUpgradeTo === this.hoveredEntity.name
-			this.canPlace = this.transportedEntity ? (!this.hoveredEntity || this.canRelocate(this.hoveredEntity)) : (base && (eraserOk || newOk || upgradeOk))
-		}
-
-	}
-
-	processTouchDown(){
-
-		this.mouse.state = 1
-
-		//Place
-		this.processMousemove2()
-
-		//===================
-
-		//Hitbox check
-		const cubeClicked = (this.hoveredEntity && this.hoveredEntity.name === `cube`)
-		if (!this.itemInHand || cubeClicked){
-
-			if (cubeClicked){
-				this.stats.totalCubeClicks++
-			}
-
-			// External hitboxes
-			let didntTouch = true
-			const uv = this.xyToUV([this.mouse.offsetxy[0], this.mouse.offsetxy[1]])
-			uv[0] += 1.7
-			uv[1] += 1.7
-			const targetCell = [Math.floor(uv[0]), Math.floor(uv[1])]
-			const entity = this.entityAtCoordinates(targetCell)
-			if (this.shouldBeFilled(entity)){
-				entity.refill()
-				didntTouch = false
-			}
-
-
-			if (didntTouch && this.hoveredEntity){
-				this.selectedEntity = this.hoveredEntity
-				if (!this.plane){
-					if (!this.shouldBeFilled(this.selectedEntity)) this.selectedEntity.onmousedown()
-				} else if (this.plane === 1 && this.selectedEntity.ondarkmousedown){
-					this.selectedEntity.ondarkmousedown()
+			// this.canPlace = this.transportedEntity ? (!this.hoveredEntity || this.canRelocate(this.hoveredEntity)) : (base && (eraserOk || newOk || upgradeOk))
+			let relocationOk = true
+			if (this.transportedEntity){
+				const span = this.transportedEntity.entitySpan
+				for (let x = -span; x <= span; x++){
+					for (let y = -span; y <= span; y++){
+						const xy = [this.hoveredCell[0] + x, this.hoveredCell[1] + y]
+						const e = this.entityAtCoordinates(xy)
+						if (!e || e === this.transportedEntity || (x === 0 && y === 0 && e.entitySpan === this.transportedEntity.entitySpan && this.canRelocate(e))) continue
+						relocationOk = false
+						break
+					}
 				}
-				
 			}
-
-			this.processMousemove2()
-
+			this.canPlace = this.transportedEntity ? relocationOk : (base && (eraserOk || newOk || upgradeOk))
+			
 		}
 
-		this.mouse.positionChanged = false
 	}
+
+	canPlaceEntityHere(e,p){
+
+		if (this.isWithinMemoryComplex(p)) return false
+
+		const name = e.name
+		const entityAtPoint = this.entityAtCoordinates(p)
+		let vacant = true
+		const span = e.entitySpan ?? 0
+		for (let x = -span; x <= span; x++){
+			for (let y = -span; y <= span; y++){
+				const xy = [p[0] + x, p[1] + y]
+				if (this.isWithinMemoryComplex(xy)) return false
+				const e = this.entityAtCoordinates(xy)
+				if (e) {
+					vacant = false
+					break
+				}
+			}
+		}
+		const up = this.codex.entities[name].isUpgradeTo
+		const legitUpgrade = entityAtPoint && up && up === entityAtPoint.name
+		const legitBuildNew = vacant && this.canAfford(name) && !(up && this.codex.entities[up].onlyone) && !(up && (name === `flower` || name === `fruit` || name === `gradient_rem`))
+
+		return legitUpgrade || legitBuildNew
+
+	}
+
+	canRelocateEntityHere(t,p){
+		//Skip canRelocate check given it is made earlier
+		let ok = true
+		if (t){
+			const span = t.entitySpan
+			for (let x = -span; x <= span; x++){
+				for (let y = -span; y <= span; y++){
+					const xy = [p[0] + x, p[1] + y]
+					const e = this.entityAtCoordinates(xy)
+					if (!e || e === t || (x === 0 && y === 0 && e.entitySpan === t.entitySpan && this.canRelocate(e))) continue
+					ok = false
+					break
+				}
+			}
+		}
+		return ok
+	}
+
+	// processTouchDown(){
+
+	// 	this.mouse.positionChanged = false
+	// 	this.mouse.originalPosition = [...this.mouse.xy]
+
+	// 	if (this.interactionMode === `erase`){
+	// 		this.eraseOrigin = this.hoveredCell
+	// 		this.eraseTarget = this.hoveredCell
+	// 		this.updateEraseArea()
+	// 		return
+	// 	}
+
+	// 	if (this.interactionMode === `relocate` && !this.relocationList){
+	// 		this.relocationOrigin = this.hoveredCell
+	// 		this.relocationTarget = this.hoveredCell
+	// 		this.updateRelocationArea()
+	// 		return
+	// 	}
+
+	// 	const cubeClicked = (this.hoveredEntity && this.hoveredEntity.name === `cube`)
+	// 	if (!this.itemInHand || cubeClicked){
+
+	// 		if (cubeClicked){
+	// 			this.stats.totalCubeClicks++
+	// 		}
+
+	// 		let didntTouch = true
+	// 		const uv = this.xyToUV([this.mouse.sxy[0], this.mouse.sxy[1]])
+	// 		uv[0] += 1.7
+	// 		uv[1] += 1.7
+
+	// 		const targetCell = [Math.floor(uv[0]), Math.floor(uv[1])]
+	// 		const entity = this.entityAtCoordinates(targetCell)
+
+	// 		if (shouldBeFilled(entity)){
+	// 			entity.refill()
+	// 			didntTouch = false
+	// 		}
+
+	// 		if (didntTouch && this.hoveredEntity){
+
+	// 			this.selectedEntity = this.hoveredEntity
+	// 			if (!this.plane){
+	// 				this.selectedEntity.onmousedown()
+	// 			} else if (this.plane === 1 && this.selectedEntity.ondarkmousedown){
+	// 				this.selectedEntity.ondarkmousedown()
+	// 			}
+				
+	// 		}
+
+	// 	}
+
+	// }
 
 	shouldBeFilled(entity){
 		return entity && !(entity instanceof Cube) && entity.fill === 0 && entity.state !== 1
 	}
 
-	processDown(rightclick){
-		if (!rightclick){
+	// processDown(rightclick){
+	// 	//WIP OBSOLETE?
+	// 	console.log(this.interactionMode)
 
-			this.mouse.state = 1
+	// 	if (this.interactionMode === `erase`){
+	// 		this.eraseOrigin = this.hoveredCell
+	// 		this.eraseTarget = this.hoveredCell
+	// 		this.updateEraseArea()
+	// 		return
+	// 	}
 
-			//Hitbox check
-			const cubeClicked = (this.hoveredEntity && this.hoveredEntity.name === `cube`)
-			if (!this.itemInHand || cubeClicked){
+	// 	// if (this.interactionMode === `relocate`){
+	// 	// 	this.relocationOrigin = this.hoveredCell
+	// 	// 	this.relocationTarget = this.hoveredCell
+	// 	// 	this.updateRelocationArea()
+	// 	// 	return
+	// 	// }
 
-				if (cubeClicked){
-					this.stats.totalCubeClicks++
-				}
+	// 	if (!rightclick){
 
-				let didntTouch = true
-				if (this.isMobile){
+	// 		this.mouse.state = 1
 
-					const uv = this.xyToUV([this.mouse.offsetxy[0], this.mouse.offsetxy[1]])
-					uv[0] += 1.7
-					uv[1] += 1.7
+	// 		//Hitbox check
+	// 		const cubeClicked = (this.hoveredEntity && this.hoveredEntity.name === `cube`)
+	// 		if (!this.itemInHand || cubeClicked){
 
-					const targetCell = [Math.floor(uv[0]), Math.floor(uv[1])]
-					const entity = this.entityAtCoordinates(targetCell)
+	// 			if (cubeClicked){
+	// 				this.stats.totalCubeClicks++
+	// 			}
 
-					if (entity && !(entity instanceof Cube) && entity.fill === 0 && entity.state !== 1){
-						entity.refill()
-						didntTouch = false
-					}
+	// 			let didntTouch = true
+	// 			if (this.isMobile){
 
-				}
+	// 				const uv = this.xyToUV([this.mouse.sxy[0], this.mouse.sxy[1]])
+	// 				uv[0] += 1.7
+	// 				uv[1] += 1.7
 
-				if (didntTouch && this.hoveredEntity){
-					// this.selectedCell = winner.position
-					this.selectedEntity = this.hoveredEntity
-					if (!this.plane){
-						this.selectedEntity.onmousedown()
-					} else if (this.plane === 1 && this.selectedEntity.ondarkmousedown){
-						this.selectedEntity.ondarkmousedown()
-					}
+	// 				const targetCell = [Math.floor(uv[0]), Math.floor(uv[1])]
+	// 				const entity = this.entityAtCoordinates(targetCell)
+
+	// 				if (entity && !(entity instanceof Cube) && entity.fill === 0 && entity.state !== 1){
+	// 					entity.refill()
+	// 					didntTouch = false
+	// 				}
+
+	// 			}
+
+	// 			if (didntTouch && this.hoveredEntity){
+	// 				// this.selectedCell = winner.position
+	// 				this.selectedEntity = this.hoveredEntity
+	// 				if (!this.plane){
+	// 					this.selectedEntity.onmousedown()
+	// 				} else if (this.plane === 1 && this.selectedEntity.ondarkmousedown){
+	// 					this.selectedEntity.ondarkmousedown()
+	// 				}
 					
-				}
+	// 			}
 
-				this.processMousemove2()
+	// 			this.processMousemove2()
 
-			}
+	// 		}
 
-		}
+	// 	}
 
-		this.mouse.positionChanged = false
-	}
+	// 	this.mouse.positionChanged = false
+	// }
 
 	processQ(){
-		if (this.itemInHand){
+
+		if (this.entitiesInGame.pinhole) return
+
+		if (this.orbifoldUI){
+			this.closeOrbifolds()
+		} else if (!this.itemInHand && this.store.isOpen && !this.hoveredEntity) {
+			this.store.closeTypes()
+		} else if (this.itemInHand || this.interactionMode){ //Like esc, don't close the store
 			delete this.itemInHand
 			delete this.transportedEntity
-		} else if (this.hoveredEntity && !this.plane){
-			this.shop.centerItem(this.hoveredEntity.name)
+			delete this.interactionMode
+			this.cleanupErase()
+			this.cleanupRelocation()
+		} else if (this.hoveredEntity && !this.plane){ // Copy
+			this.store.centerItem(this.hoveredEntity.name)
 			if (this.canAfford(this.hoveredEntity.name) && !this.onlyones[this.hoveredEntity.name] && this.codex.entities[this.hoveredEntity.name].canPurchase){
 				this.pickupItem(this.hoveredEntity.name)
 				this.pressedQOnMachine = true
 			}
-		} else if (!this.plane){
-			const eraser = this.eraserType === 1 ? `eraser2` : this.eraserType === 2 ? `eraser3` : `eraser`
-			if (this.canAfford(eraser)) {
-				this.pressedQOnBlank = true
-				this.pickupItem(eraser)
-			}
+		} else if (!this.plane){ //Eraser
+			this.store.closeTypes()
+			if (this.pickupEraser()) this.pressedQOnBlank = true
 		}
 	}
 
 	processE(){
 
-		if (this.entitiesInGame.mega3 > 0 && this.resources[4] >= 1 && this.hoveredEntity && this.canRelocate(this.hoveredEntity) && !this.plane && !this.entitiesInGame.pinhole){
-			
-			this.transportedEntity = this.hoveredEntity
-			this.itemInHand = new this.codex.entities[this.hoveredEntity.name].class(this)
-			delete this.itemInHandPriceTag
-			delete this.itemInHandPriceAndRefundTag
+		const ok = this.entitiesInGame.mega3 > 0 && !this.entitiesInGame.pinhole && !this.plane
+		if (!ok) return
+
+		if (this.interactionMode === `relocate`) {
+			delete this.interactionMode
+			delete this.itemInHand
+			delete this.transportedEntity
+			this.cleanupRelocation()
+			return
+		}
+
+		this.interactionMode = `relocate`
+
+		if (this.hoveredEntity){
+
+			if (this.canRelocate(this.hoveredEntity)){
+				this.relocationCandidatesList = [this.hoveredEntity]
+				this.pickupEntitiesForRelocation()
+			} else {
+				delete this.interactionMode
+			}
 
 		}
+
+
+		// const ok = this.entitiesInGame.mega3 > 0 && this.hoveredEntity && this.canRelocate(this.hoveredEntity) && !this.plane && !this.entitiesInGame.pinhole
+
+		// if (ok) {
+		// 	this.interactionMode = `relocate`
+		// 	this.transportedEntity = this.hoveredEntity
+		// 	this.itemInHand = new this.codex.entities[this.hoveredEntity.name].class(this)
+		// 	delete this.itemInHandPriceTag
+		// 	delete this.itemInHandPriceAndRefundTag
+		// }
 
 	}
 
@@ -2891,13 +4513,119 @@ class Game {
 		return (this.codex.entities[e.name].canPurchase || e.name === `stabilizer3`) && !(e.name === `flower` || e.name === `fruit` || e.name === `strange1` || e.name === `strange2` || e.name === `strange3` || e.name === `pump` || e.name === `pump2` || e.name === `cube` || e.name === `gradient_rem` || e.name === `puncture`)
 	}
 
+	massRelocate(entities,positions){
+
+		//WIP
+		//No big machines swap with entitySpan > 0
+
+		if (!entities.length || !positions.length || entities.length !== positions.length) return
+
+		//Swapping entities
+		const relocationSet = new Set(entities)
+		const swapList = []
+		const swapPositionList = []
+		for (let i = 0; i < entities.length; i++){
+			const se = this.entityAtCoordinates(positions[i])
+			if (!se || relocationSet.has(se)) continue
+			if (!this.canRelocate(se)) return
+			swapList.push(se)
+			swapPositionList.push([entities[i].position[0], entities[i].position[1]])
+		}
+
+		const e = [...entities, ...swapList]
+		const p = [...positions, ...swapPositionList]
+
+		//One chair two guys protection
+		const targetSet = new Set()
+		for (let i = 0; i < p.length; i++) {
+			const uvstring = `u${p[i][0]}v${p[i][1]}`
+			if (targetSet.has(uvstring)) return
+			targetSet.add(uvstring)
+		}
+
+		//Clean up map
+		for (let i = 0; i < e.length; i++){
+			delete this.stuffMap[`u${e[i].position[0]}v${e[i].position[1]}`]
+		}
+
+		//Collect all the old and new neighbors
+		let n = []
+		for (let i = 0; i < e.length; i++){
+			const locals = e[i].getNeighbours()
+			if (locals) n.push(...locals)
+		}
+
+		//Write entities position without triggering init
+		for (let i = 0; i < p.length; i++){
+			e[i].position = [...p[i]]
+		}
+
+		//Collect new neighbours
+		for (let i = 0; i < e.length; i++){
+			const locals = e[i].getNeighbours()
+			if (locals) n.push(...locals)
+		}
+
+		let neighbours = new Set(n)
+		neighbours.delete(undefined)
+		neighbours = Array.from(neighbours)
+
+		//Write to the map
+		for (let i = 0; i < p.length; i++){
+			if (this.stuffMap[`u${p[i][0]}v${p[i][1]}`]){
+				console.warn(`Something was overritten! It shouldn't happen.`)
+			}
+			this.stuffMap[`u${p[i][0]}v${p[i][1]}`] = e[i]
+		}
+
+		//Now trigger init
+		for (let i = 0; i < e.length; i++){
+			if (e[i].name === `gradient`){
+				e[i].penalty = .5
+			}
+			// e[i].init()
+			e[i].setPosition(e[i].position)
+			
+		}
+
+		//And for the neighbours
+		for (let i = 0; i < neighbours.length; i++){
+			neighbours[i].init()
+		}
+
+		this.stuff.sort((a,b)=>a.position[0] + a.position[1] - b.position[0] - b.position[1])
+
+		//SFX
+		this.playSound(`place`)
+		this.punchScreen()
+
+	}
+
 	relocate(e,p){
+
+		//WIP V2.0: trusted swappingEntities list
+		let okay = true
+		// const swappingEntities = new Map()
+		if (this.transportedEntity){
+			const span = this.transportedEntity.entitySpan
+			for (let x = -span; x <= span; x++){
+				for (let y = -span; y <= span; y++){
+					const xy = [p[0] + x, p[1] + y]
+					const e2 = this.entityAtCoordinates(xy)
+					if (!e2 || e2 === e || (x === 0 && y === 0 && e.entitySpan === e2.entitySpan && this.canRelocate(e2))) continue
+					okay = false
+					break
+				}
+			}
+		}
+
+		if (!okay) return
 
 		const n = e.getNeighbours()
 		const targetEntity = this.entityAtCoordinates(p)
-		if (targetEntity && (targetEntity.span || !(this.canRelocate(targetEntity)))) return
+		if (targetEntity && targetEntity !== e && (targetEntity.entitySpan > 0 || !(this.canRelocate(targetEntity)))) return
 
-		//Clean up without triigering ondelete
+		//Clean up without triggering ondelete
 		if (!e.entitySpan) {
 			delete this.stuffMap[`u${e.position[0]}v${e.position[1]}`]
 		} else {
@@ -2922,7 +4650,7 @@ class Game {
 		}
 
 		//swap
-		if (targetEntity) {
+		if (targetEntity && targetEntity !== e) {
 			this.stuffMap[`u${e.position[0]}v${e.position[1]}`] = targetEntity
 			targetEntity.setPosition([...e.position])
 		}
@@ -2933,6 +4661,7 @@ class Game {
 		const screenxy = this.uvToXYUntranslated(p)
 		const pan = this.getPanValueFromX(screenxy[0])
 		this.playSound(`place`, pan)
+		this.punchScreen()
 
 
 		this.stuff.sort((a,b)=>a.position[0] + a.position[1] - b.position[0] - b.position[1])
@@ -2954,16 +4683,42 @@ class Game {
 
 	processClick(){
 
-		// console.log(this.hoveredCell)
-		// this.spawnSurge()
-		// this.addEntity(`surge`, this.hoveredCell)
+		console.log(`DEPRECATED`)
+
+		//WIP: UNTANGLE and make universal checks for both move and place
+		//1. Have nothing
+		//1.1 Clicked empty
+		//1.2 Clicked entity
+
+		//2. Want to build, have item in hand
+		//2.1 Can build here
+		//2.1.1 Build on empty cell
+		//2.1.2 Upgrade hovered entity
+		//2.2 Can't build here
+		//2.2.1 Can't afford
+		//2.2.2 There's something there
+		//2.2.3 Can only build on specific entity
+
+		//3. Want to relocate, have transported entity
+		//3.1 Can place here
+		//3.1.1 Place on empty spot
+		//3.1.2 Can place and relocate what's there already
+		//3.2 Can't place here
+
+		//4. Want to destroy
+		//4.1 Can destroy
+		//4.2 Can't destroy
+
+
+
 
 		const ok = this.itemInHand && this.hoveredCell && this.canAfford(this.itemInHand.name) && !(this.itemInHand.eraser && (this.hoveredEntity instanceof Pump || this.hoveredEntity instanceof Gradient) && ((this.entitiesInGame[`pump`] || 0) + (this.entitiesInGame[`pump2`] || 0) + (this.entitiesInGame[`gradient`] || 0) < 2))
 		
-		if (this.transportedEntity && this.hoveredCell && this.resources[4] >= 1){
+		// if (this.transportedEntity && this.hoveredCell && this.resources[4] >= 1){
+		if (this.transportedEntity && this.hoveredCell){
 
 			//Relocation
-			this.requestResources([0,0,0,0,1], this.hoveredCell, false, true)
+			// this.requestResources([0,0,0,0,1], this.hoveredCell, false, true)
 			this.relocate(this.transportedEntity, this.hoveredCell)
 			if (this.itemInHand.name === `gradient`){
 				this.transportedEntity.penalty = .5
@@ -2994,9 +4749,13 @@ class Game {
 				const screenxy = this.uvToXYUntranslated(this.hoveredCell)
 				const pan = this.getPanValueFromX(screenxy[0])
 				this.playSound(`place`, pan)
+				this.punchScreen()
 
 				this.stats.machinesBuild++
-				if (this.shop.mobileToggle) this.shop.mobileToggle.classList.remove(`active`)
+				if (this.shop.mobileToggle) {
+					this.shop.mobileToggle.classList.remove(`active`)
+					this.shop.toggleAllButShop()
+				}
 				this.processMousemove2()
 
 				if (this.codex.entities[this.itemInHand.name].onlyone){
@@ -3075,9 +4834,13 @@ class Game {
 				const screenxy = this.uvToXYUntranslated(this.hoveredEntity.position)
 				const pan = this.getPanValueFromX(screenxy[0])
 				this.playSound(`place`, pan)
+				this.punchScreen()
 
 				this.stats.machinesBuild++
-				if (this.shop.mobileToggle) this.shop.mobileToggle.classList.remove(`active`)
+				if (this.shop.mobileToggle) {
+					this.shop.mobileToggle.classList.remove(`active`)
+					this.shop.toggleAllButShop()
+				}
 				if (this.codex.entities[this.itemInHand.name].onlyone) {
 					this.onlyones[this.itemInHand.name] = true
 					delete this.itemInHand
@@ -3092,7 +4855,10 @@ class Game {
 			//Cancel build mode if click on machine
 			} else if (this.itemInHand && this.hoveredEntity?.name !== `cube`) {
 				delete this.itemInHand
-				if (this.shop.mobileToggle) this.shop.mobileToggle.classList.remove(`active`)
+				if (this.shop.mobileToggle) {
+					this.shop.mobileToggle.classList.remove(`active`)
+					this.shop.toggleAllButShop()
+				}
 			}
 		}
 		
@@ -3115,6 +4881,13 @@ class Game {
 	}
 
 	processMouseup(){
+
+		if (this.interactionMode === `erase`){
+			this.finalizeErase()
+			delete this.interactionMode
+			return
+		}
+
 		this.mouse.state = 0
 		this.mouse.timer = this.mouse.maxTimer
 		if (this.selectedEntity && !this.plane) this.selectedEntity.onmouseup()
@@ -3134,24 +4907,29 @@ class Game {
 
 	doOnBlur(){
 
+		if (this.isInBackground) return
+
+		this.isInBackground = true
 		if (!this.isMute) this.fadeSound(0)
+		this.shiftPressed = false
 		this.altActive = false
+		document.body.classList.remove(`altHolded`)
 		this.translationMap[0] = 0
 		this.translationMap[1] = 0
 		this.translationMap[2] = 0
 		this.translationMap[3] = 0
-		this.processMouseout()
 
 		if (this.isMobile){
 			this.halt = true
-			if (this.actx) this.actx.suspend()
 			this.blurTimeStamp = Date.now()
 		}
 	}
-	doOnFocus(){
-		if (!this.isMute) this.fadeSound(1)
-		this.mouse.cursorVisible = true
 
+	doOnFocus(){
+
+		if (!this.isInBackground) return
+		
+		delete this.isInBackground
 		if (this.isMobile){
 			this.halt = false
 			if (this.actx) this.actx.resume()
@@ -3161,7 +4939,11 @@ class Game {
 				this.simulateIdleTime(delta)
 			}
 		}
+
+		if (!this.isMute) this.fadeSound(1)
+		this.mouse.cursorVisible = true
 	}
+
 	toggleSplash(){
 		if (this.splash.isShown){
 			if (!this.actx && !this.splash?.gameIsMute) this.initAudio()
@@ -3171,23 +4953,782 @@ class Game {
 		}
 	}
 
-	canEraseNow(){
-		return this.canAfford(this.eraserType === 1 ? `eraser2` : this.eraserType === 2 ? `eraser3` : `eraser`) && this.hoveredEntity && !(this.hoveredEntity instanceof Cube) && !this.hoveredEntity.indestructible && !((this.hoveredEntity instanceof Pump || this.hoveredEntity instanceof Gradient) && ((this.entitiesInGame[`pump`] || 0) + (this.entitiesInGame[`pump2`] || 0) + (this.entitiesInGame[`gradient`] || 0) < 2))
+	// canEraseNow(){
+	// 	return this.canAfford(this.eraserType === 1 ? `eraser2` : this.eraserType === 2 ? `eraser3` : `eraser`) && this.hoveredEntity && !(this.hoveredEntity instanceof Cube) && !this.hoveredEntity.indestructible && !((this.hoveredEntity instanceof Pump || this.hoveredEntity instanceof Gradient) && ((this.entitiesInGame[`pump`] || 0) + (this.entitiesInGame[`pump2`] || 0) + (this.entitiesInGame[`gradient`] || 0) < 2))
+	// }
+	//TST NEW ERASE
+	canEraseEntity(e){
+		return e && !(e instanceof Cube) && !e.indestructible && !((e instanceof Pump || e instanceof Gradient) && ((this.entitiesInGame[`pump`] || 0) + (this.entitiesInGame[`pump2`] || 0) + (this.entitiesInGame[`gradient`] || 0) < 2))
 	}
 
-	setListenersTouch(){
+	createRipple(c){
+		this.vfx.push(new Ripple(this, {source: c, visibility: [1,1]}))
+	}
 
-		//Common stuff
+	setListenersMobile(){
+
+		this.canvas.addEventListener(`touchstart`, e=>{
+
+			if (e.target === this.canvas) e.preventDefault()
+
+			const twoFingers = e.touches[1] !== undefined
+			const currentTouch = twoFingers ? e.touches[1] : e.touches[0]
+			if (twoFingers) {
+				this.mouse.fingerChanged = true
+				this.mouse.fingerDelta = ((e.touches[1].clientX - e.touches[0].clientX) ** 2 + (e.touches[1].clientY - e.touches[0].clientY) ** 2) ** .5
+			}
+
+			// this.mouse.state = 1
+			this.updatePointerState({sxy: [currentTouch.clientX, currentTouch.clientY], button: 1, isTap: true, adjustTap: true})
+			// this.updateMouseData(currentTouch.clientX, currentTouch.clientY, !this.touchMode)
+			this.mouse.positionChanged = false
+
+			this.createRipple(this.hoveredCell)
+
+			this.processDown()
+
+			//TST NEW DELETE
+			// if (this.touchMode === 1){
+			// 	this.eraseOrigin = this.hoveredCell
+			// 	this.eraseTarget = this.hoveredCell
+			// 	this.updateEraseArea()
+			// } else if (this.touchMode === 2 && !this.cloneAreaSelected){
+			// 	this.cloneOrigin = this.hoveredCell
+			// 	this.cloneTarget = this.hoveredCell
+			// 	this.updateCloneArea()
+			// }
+
+			//WIP LOOKS IMPORTANT
+			// this.mouse.currentAction = (this.touchMode === 1 && !this.plane && this.hoveredEntity) ? `erase` : (this.touchMode === 2 && !this.transportedEntity && this.entitiesInGame.mega3 > 0 && this.hoveredEntity && this.canRelocate(this.hoveredEntity) && !this.plane && !this.entitiesInGame.pinhole) ? `pickupForRelocation` : (this.transportedEntity && this.hoveredCell  && !this.plane) ? `relocate` : (this.itemInHand && this.hoveredCell && this.canAfford(this.itemInHand.name)) ? `build` : (this.hoveredLabel && !this.plane) ? `refill` : (this.hoveredEntity && this.hoveredEntity instanceof Cube && !this.plane) ? `break` : this.hoveredEntity ? `entity` : `empty`
+
+			// if (this.mouse.currentAction === `erase`){
+
+			// 	// const eraser = this.eraserType === 1 ? `eraser2` : this.eraserType === 2 ? `eraser3` : `eraser`
+			// 	// const eraserOk = this.canEraseNow()
+			// 	// if (eraserOk) this.pickupItem(eraser)
+
+
+			// } else if (this.mouse.currentAction === `pickupForRelocation`) {
+
+			// 	// this.transportedEntity = this.hoveredEntity
+			// 	// this.itemInHand = new this.codex.entities[this.hoveredEntity.name].class(this)
+			// 	// delete this.itemInHandPriceTag
+			// 	// delete this.itemInHandPriceAndRefundTag
+
+			// } else if (this.mouse.currentAction === `build`){
+
+			// 	this.pickupItem(this.itemInHand.name)
+
+			// } else if (this.mouse.currentAction === `refill`){
+			// 	this.hoveredLabel.refill()
+			// } else if ((this.mouse.currentAction === `entity` && !this.shouldBeFilled(this.hoveredEntity)) || this.mouse.currentAction === `break`){
+			// 	if (!this.plane) {
+			// 		this.hoveredEntity.onmousedown()
+			// 	} else if (this.hoveredEntity.ondarkmousedown){
+			// 		this.hoveredEntity.ondarkmousedown()
+			// 	}
+			// }
+
+			
+			
+		})
+
+		this.canvas.addEventListener(`touchend`, e=>{
+
+			e.preventDefault()
+
+			if (e.touches.length > 0) this.mouse.fingerChanged = true; else this.mouse.fingerChanged = false
+
+			// this.mouse.state = 0
+
+			this.updatePointerState({sxy: [e.changedTouches[0].clientX, e.changedTouches[0].clientY], button: this.mouse.state, isTap: true})
+
+			this.processUp()
+
+
+			//WIP: Move to processUp
+
+			// //TST NEW DELETE
+			// let legitClone = true, legitRelocate = true
+			// //Erase confirmation
+			// if (this.touchMode === 1 && this.eraseList){
+
+			// 	this.finalizeErase()
+
+			// // Clone/move area select
+			// } else if (this.touchMode === 2 && this.cloneList && !this.cloneAreaSelected){
+
+			// 	let canAfford = true
+			// 	for (let i = 0; i < this.totalCloneCost.length; i++){
+			// 		if (this.totalCloneCost[i] > this.resources[i]){
+			// 			canAfford = false
+			// 			break
+			// 		}
+			// 	}
+
+			// 	if (this.massRelocation) canAfford = true
+
+			// 	if (!canAfford || !this.cloneList.length){
+			// 		this.shop.toggleMobileRelocator()
+			// 		this.cleanupClone()
+			// 	} else {
+
+			// 		this.cloneAreaSelected = true
+			// 		this.cloneAreaOrigin = this.xyToUV([0,0])
+			// 		this.cloneEntitiesList = []
+			// 		this.cloneEntitiesPositionsList = []
+			// 		for (let i = 0; i < this.cloneList.length; i++){
+			// 			const e = new this.codex.entities[this.cloneList[i].name].class(this)
+			// 			const p = [...this.cloneList[i].position]
+			// 			this.cloneEntitiesPositionsList.push([...p])
+			// 			e.position = [...p]
+			// 			this.cloneEntitiesList.push(e)
+			// 		}
+
+			// 	}
+
+			// // Clone/move confirmation
+			// } else if (this.touchMode === 2 && this.cloneAreaSelected && !this.mouse.positionChanged){
+
+			// 	let clickedGreen = false
+
+			// 	for (let i = 0; i < this.cloneEntitiesList.length; i++){
+			// 		if (this.hoveredCell[0] === this.cloneEntitiesList[i].position[0] && this.hoveredCell[1] === this.cloneEntitiesList[i].position[1]){
+			// 			clickedGreen = true	
+			// 		}
+			// 	}
+
+			// 	if (this.massRelocation && clickedGreen){
+
+			// 		const dict = {}
+			// 		for (let i = 0; i < this.cloneList.length; i++){
+			// 			dict[`u${this.cloneList[i].position[0]}v${this.cloneList[i].position[1]}`] = true
+			// 		}
+
+			// 		let relocationCondition = true
+			// 		for (let i = 0; i < this.cloneEntitiesList.length; i++){
+			// 			if (!this.canRelocate(this.cloneList[i]) || (this.entityAtCoordinates(this.cloneEntitiesList[i].position) && !dict[`u${this.cloneEntitiesList[i].position[0]}v${this.cloneEntitiesList[i].position[1]}`])){
+			// 				relocationCondition = false
+			// 				break
+			// 			}
+			// 		}
+
+			// 		if (relocationCondition) {
+
+			// 			this.confirmMassRelocation()
+			// 		}
+
+			// 	} else if (clickedGreen) {
+
+			// 		let canAfford = true
+			// 		for (let i = 0; i < this.totalCloneCost.length; i++){
+			// 			if (this.totalCloneCost[i] > this.resources[i]){
+			// 				canAfford = false
+			// 				break
+			// 			}
+			// 		}
+
+			// 		if (canAfford){
+
+			// 			this.confirmMassClone()
+
+			// 		}
+
+			// 	}
+
+			// 	this.shop.toggleMobileRelocator()
+			// 	this.cleanupClone()
+			
+			// // Adjusting the placement
+			// } else if (this.touchMode === 2 && this.cloneAreaSelected && this.mouse.positionChanged){
+
+			// 	let canConfirm = true
+
+			// 	if (this.massRelocation){
+
+			// 		const dict = {}
+			// 		for (let i = 0; i < this.cloneList.length; i++){
+			// 			dict[`u${this.cloneList[i].position[0]}v${this.cloneList[i].position[1]}`] = true
+			// 		}
+
+			// 		for (let i = 0; i < this.cloneEntitiesList.length; i++){
+			// 			if (!this.canRelocate(this.cloneList[i]) || (this.entityAtCoordinates(this.cloneEntitiesList[i].position) && !dict[`u${this.cloneEntitiesList[i].position[0]}v${this.cloneEntitiesList[i].position[1]}`])){
+			// 				canConfirm = false
+			// 				break
+			// 			}
+			// 		}
+
+			// 	} else {
+
+			// 		for (let i = 0; i < this.totalCloneCost.length; i++){
+			// 			if (this.totalCloneCost[i] > this.resources[i]){
+			// 				canConfirm = false
+			// 				break
+			// 			}
+			// 		}
+
+			// 		if (canConfirm){
+
+			// 			let haveAtLeastOne = false
+
+			// 			for (let i = 0; i < this.cloneEntitiesList.length; i++){
+
+			// 				const e = this.cloneEntitiesList[i]
+			// 				const ee = this.entityAtCoordinates(e.position)
+			// 				const up = this.codex.entities[e.name].isUpgradeTo
+
+			// 				const isLegitUpgrade = ee && up && up === ee.name
+			// 				const isLegitBuild = !ee && !(up && this.codex.entities[up].onlyone) && !(up && (e.name === `flower` || e.name === `fruit` || e.name === `gradient_rem`))
+
+			// 				if (isLegitUpgrade || isLegitBuild){
+			// 					haveAtLeastOne = true
+			// 					break
+			// 				}
+
+			// 			}
+
+			// 			if (!haveAtLeastOne) canConfirm = false
+
+			// 		}
+
+			// 	}
+
+			// 	if (canConfirm) this.shop.mobileConfirmButton.classList.remove(`hidden`); else this.shop.mobileConfirmButton.classList.add(`hidden`)
+
+			// }
+
+			// if (this.mouse.currentAction === `build` && this.itemInHand && !this.mouse.positionChanged){
+
+			// 	const up = this.codex.entities[this.itemInHand.name].isUpgradeTo
+
+			// 	if (!this.hoveredEntity && !(up && this.codex.entities[up].onlyone) && !(up && (this.itemInHand.name === `flower` || this.itemInHand.name === `fruit` || this.itemInHand.name === `gradient_rem`))){
+
+			// 		const price = this.getRealPrice(this.itemInHand.name)
+
+			// 		this.requestResources(price, this.hoveredCell, false, true)
+
+			// 		const e = this.addEntity(this.itemInHand.name, this.hoveredCell)
+			// 		if (this.itemInHand.name === `gradient`){
+			// 			e.penalty = .5
+			// 			e.init()
+			// 		}
+			// 		this.stats.machinesBuild++
+
+			// 		//SFX
+			// 		const screenxy = this.uvToXYUntranslated(this.hoveredCell)
+			// 		const pan = this.getPanValueFromX(screenxy[0])
+			// 		this.playSound(`place`, pan)
+			// 		this.punchScreen()
+					
+			// 		this.updateMouseData()
+			// 		this.mouse.positionChanged = false
+
+			// 		if (this.codex.entities[this.itemInHand.name].onlyone){
+			// 			this.onlyones[this.itemInHand.name] = true
+			// 			this.shop.check()
+			// 			delete this.itemInHand
+			// 			this.shop.mobileToggle.classList.remove(`active`)
+			// 			this.shop.toggleAllButShop()
+			// 		// } else if (!this.canAfford(this.itemInHand?.name)){
+			// 		// 	delete this.itemInHand
+			// 		// 	this.shop.mobileToggle.classList.remove(`active`)
+			// 		// } else {
+			// 		// 	this.pickupItem(this.itemInHand.name)
+			// 		// }
+			// 		} else {
+			// 			delete this.itemInHand
+			// 			this.shop.mobileToggle.classList.remove(`active`)
+			// 			this.shop.toggleAllButShop()
+			// 		}
+
+			// 	} else if (this.hoveredEntity && up === this.hoveredEntity.name){
+
+			// 		if (this.itemInHand.name === `pinhole`){
+			// 			this.saveGame()
+			// 			this.preventSaving = true
+			// 		}
+					
+			// 		this.clearCell(this.hoveredCell)
+			// 		if (this.itemInHand.name !== `pinhole`) this.stats.timeSinceLastDelete = 0
+
+			// 		const price = this.getRealPrice(this.itemInHand.name)
+			// 		const refund = this.getRealPrice(this.hoveredEntity.name)
+					
+			// 		this.createResourceTransfer(refund, this.uvToXYUntranslated(this.hoveredCell), undefined, undefined, undefined, true)
+			// 		this.requestResources(price, this.hoveredCell, _=>{}, true)
+			// 		this.addEntity(this.itemInHand.name, this.hoveredEntity.position)
+			// 		this.stats.machinesBuild++
+
+			// 		//SFX
+			// 		const screenxy = this.uvToXYUntranslated(this.hoveredCell)
+			// 		const pan = this.getPanValueFromX(screenxy[0])
+			// 		this.playSound(`place`, pan)
+			// 		this.punchScreen()
+
+			// 		// if (this.shop.mobileToggle) this.shop.mobileToggle.classList.remove(`active`)
+
+			// 		if (this.codex.entities[this.itemInHand.name].onlyone) {
+			// 			this.onlyones[this.itemInHand.name] = true
+			// 			delete this.itemInHand
+			// 			this.shop.mobileToggle.classList.remove(`active`)
+			// 			this.shop.toggleAllButShop()
+			// 		// } else if (!this.canAfford(this.itemInHand?.name)){
+			// 		// 	delete this.itemInHand
+			// 		// 	this.shop.mobileToggle.classList.remove(`active`)
+			// 		// } else {
+			// 		// 	this.pickupItem(this.itemInHand.name)
+			// 		// }
+			// 		} else {
+			// 			delete this.itemInHand
+			// 			this.shop.mobileToggle.classList.remove(`active`)
+			// 			this.shop.toggleAllButShop()
+			// 		}
+			// 		this.shop.check()
+				
+			// 	} else if (this.itemInHand && this.hoveredEntity?.name !== `cube`) {
+			// 		delete this.itemInHand
+			// 		if (this.shop.mobileToggle) {
+			// 			this.shop.mobileToggle.classList.remove(`active`)
+			// 			this.shop.toggleAllButShop()
+			// 		}
+			// 	}
+			// } else if (this.mouse.currentAction === `entity`){
+			// 	this.hoveredEntity?.onmouseup()
+			// } else if (this.mouse.currentAction === `relocate` && !this.mouse.positionChanged){
+
+			// 	//Relocation
+			// 	// this.requestResources([0,0,0,0,1], this.hoveredCell, false, true)
+
+			// 	this.relocate(this.transportedEntity, this.hoveredCell)
+			// 	delete this.transportedEntity
+			// 	delete this.itemInHand
+
+			// 	this.touchMode = 0
+			// 	this.shop.updateMobileMenuState()
+
+			// }
+
+			// this.mouse.timer = this.mouse.maxTimer
+			// // if (this.selectedEntity && !this.plane) this.selectedEntity.onmouseup()
+			// this.selectedEntity = false
+			// if (this.itemInHand?.eraser) delete this.itemInHand
+
+			// delete this.mouse.currentAction
+		})
+
+		this.canvas.addEventListener(`touchmove`, e=>{
+			if (e.target === this.canvas) e.preventDefault()
+
+			if (e.touches[1]){
+
+				const fingerDelta = ((e.touches[1].clientX - e.touches[0].clientX) ** 2 + (e.touches[1].clientY - e.touches[0].clientY) ** 2) ** .5
+				const zoom = fingerDelta - this.mouse.fingerDelta
+				this.mouse.fingerDelta = fingerDelta
+
+			// 	this.zoom = Math.min(this.zoomRange[1], Math.max(this.zoomRange[0], this.zoom + zoom * .004))
+
+			} else {
+
+				if (this.mouse.fingerChanged) return
+				this.updatePointerState({sxy: [e.touches[0].clientX, e.touches[0].clientY], button: 1, isTap: true})
+				this.processMove()
+
+			}
+
+			// const prevEntity = this.hoveredEntity
+			// this.updateMouseData(e.touches[0].clientX, e.touches[0].clientY)
+			// const nextEntity = this.hoveredEntity
+
+			// if (prevEntity !== nextEntity && prevEntity?.onmouseup) prevEntity.onmouseup()
+
+			//TST NEW DELETE
+			// if (this.touchMode === 1){
+			// 	if (!this.eraseTarget || this.hoveredCell[0] !== this.eraseTarget[0] || this.hoveredCell[1] !== this.eraseTarget[1]){
+			// 		this.eraseTarget = this.hoveredCell
+			// 		this.updateEraseArea()
+			// 	}
+				
+			// } else if (this.touchMode === 2){
+			// 	if (!this.cloneAreaSelected){
+			// 		if (!this.cloneTarget || this.hoveredCell[0] !== this.cloneTarget[0] || this.hoveredCell[1] !== this.cloneTarget[1]){
+			// 			this.cloneTarget = this.hoveredCell
+			// 			this.updateCloneArea()
+			// 		}	
+			// 	} else {
+			// 		this.translation[0] -= this.mouse.delta[0] * this.pixelRatio / this.zoom
+			// 		this.translation[1] -= this.mouse.delta[1] * this.pixelRatio / this.zoom
+
+			// 		const currentPosition = this.xyToUV([0,0])
+			// 		const offset = [-Math.round(this.cloneAreaOrigin[0] - currentPosition[0]), -Math.round(this.cloneAreaOrigin[1] - currentPosition[1])]
+			// 		// let offsetChanged = this.cloneEntitiesList.length && (this.cloneEntitiesList[0].position[0] !== this.cloneEntitiesPositionsList[0][0] + offset[0] || this.cloneEntitiesList[0].position[1] !== this.cloneEntitiesPositionsList[0][1] + offset[1])
+					
+			// 		for (let i = 0; i < this.cloneEntitiesList.length; i++){
+			// 			this.cloneEntitiesList[i].position[0] = this.cloneEntitiesPositionsList[i][0] + offset[0]
+			// 			this.cloneEntitiesList[i].position[1] = this.cloneEntitiesPositionsList[i][1] + offset[1]
+			// 		}
+
+			// 		// console.log(offsetChanged)
+
+			// 	}
+				
+				
+			// } else {
+			// // if (this.mouse.currentAction !== `erase`){
+			// 	this.translation[0] -= this.mouse.delta[0] * this.pixelRatio / this.zoom
+			// 	this.translation[1] -= this.mouse.delta[1] * this.pixelRatio / this.zoom
+			// }
+			
+		})
+
+	}
+
+	finalizeErase(){
+
+		const xy = this.uvToXYUntranslated(this.hoveredCell)
+
+		for (let i = 0; i < this.eraseList.length; i++){
+
+			const e = this.eraseList[i]
+			let chainElement = this.codex.entities[e.name]
+			while (chainElement.isUpgradeTo){
+				delete this.onlyones[chainElement.isUpgradeTo]
+				chainElement = this.codex.entities[chainElement.isUpgradeTo]
+			}
+
+			if (this.codex.entities[e.name].isUpgradeTo){
+				delete this.onlyones[this.codex.entities[e.name].isUpgradeTo]
+			}
+
+			delete this.onlyones[e.name]
+
+			this.clearCell(e.position)
+			this.stats.machinesSold++
+
+			//Memory wipe
+			for (let i = 0; i < this.memoryBuffer.length; i++){
+				if (this.memoryBuffer[i].position[0] === e.position[0] && this.memoryBuffer[i].position[1] === e.position[1]){
+					this.memoryBuffer.splice(i,1)
+					break
+				}
+			}
+
+		}
+
+		this.createResourceTransfer(this.totalRefund, xy, undefined, undefined, undefined, true)
+
+		this.stats.timeSinceLastDelete = 0
+		this.hoveredEntity = undefined
+		this.updateMouseData()
+
+		//SFX
+		const pan = this.getPanValueFromX(xy[0])
+		this.playSound(`recycle`, pan)
+		
+		this.cleanupErase()
+
+	}
+
+	pickupEntitiesForRelocation(){
+
+		this.relocationList = []
+
+		// const xy = this.uvToXYUntranslated(this.hoveredCell)
+
+		for (let i = 0; i < this.relocationCandidatesList.length; i++){
+
+			const e = this.relocationCandidatesList[i]
+			if (this.canRelocate(e)) this.relocationList.push(e)
+
+		}
+
+		this.relocationOffsets = []
+		const center = [0,0]
+
+		for (let i = 0; i < this.relocationList.length; i++){
+
+			center[0] += this.relocationList[i].position[0]
+			center[1] += this.relocationList[i].position[1]
+
+		}
+
+		center[0] = Math.floor(center[0] / this.relocationList.length)
+		center[1] = Math.floor(center[1] / this.relocationList.length)
+
+		for (let i = 0; i < this.relocationList.length; i++){
+
+			this.relocationOffsets.push([
+				this.relocationList[i].position[0] - center[0],
+				this.relocationList[i].position[1] - center[1]
+			])
+
+		}
+
+		// this.stats.timeSinceLastDelete = 0
+		// this.shop.check()
+		// this.hoveredEntity = undefined
+		// this.updateMouseData()
+		// if (this.isMobile) this.shop.toggleMobileEraser()
+
+		//SFX
+		// const pan = this.getPanValueFromX(xy[0])
+		// this.playSound(`recycle`, pan)
+		
+		// this.cleanupErase()
+		this.cleanupRelocationArea()
+	}
+
+	confirmMassRelocation(){
+
+		const targetPositions = []
+		for (let i = 0; i < this.cloneEntitiesList.length; i++){
+			targetPositions.push([this.cloneEntitiesList[i].position[0], this.cloneEntitiesList[i].position[1]])
+		}
+
+		this.massRelocate(this.cloneList, targetPositions)
+
+	}
+
+	confirmMassClone(){
+
+		for (let i = 0; i < this.cloneEntitiesList.length; i++){
+
+			const e = this.cloneEntitiesList[i]
+			const ee = this.entityAtCoordinates(e.position)
+			const up = this.codex.entities[e.name].isUpgradeTo
+
+			const isLegitUpgrade = ee && up && up === ee.name
+			const isLegitBuild = !ee && !(up && this.codex.entities[up].onlyone) && !(up && (e.name === `flower` || e.name === `fruit` || e.name === `gradient_rem`))
+
+			if (isLegitUpgrade){
+
+				this.clearCell(e.position)
+				const price = this.getRealPrice(e.name)
+				const refund = this.getRealPrice(ee.name)
+				const xy = this.uvToXYUntranslated(e.position)
+				this.createResourceTransfer(refund, xy, undefined, undefined, undefined, true)
+				this.requestResources(price, e.position, _=>{}, true)
+				this.addEntity(e.name, e.position)
+
+				this.stats.machinesBuild++
+
+				if (this.codex.entities[e.name].onlyone) this.onlyones[e.name] = true
+
+			} else if (isLegitBuild){
+
+				const price = this.getRealPrice(e.name)
+				this.requestResources(price, e.position, false, true)
+				const ne = this.addEntity(e.name, e.position)
+				if (e.name === `gradient`){
+					ne.penalty = .5
+					ne.init()
+				}
+
+				this.stats.machinesBuild++
+				this.processMousemove2()
+				if (this.codex.entities[e.name].onlyone) this.onlyones[e.name] = true
+
+			}
+
+		}
+
+		//SFX
+		this.playSound(`place`)
+		this.punchScreen()
+		// this.shop.check()
+
+	}
+
+	updateEraseArea(){
+		
+		this.eraseList = [] //renderInColor
+		this.totalRefund = new Array(10).fill(0)
+		const extra = {}
+		if (!this.eraseOrigin || !this.eraseTarget) return
+		
+		const umin = Math.min(this.eraseTarget[0], this.eraseOrigin[0])
+		const umax = Math.max(this.eraseTarget[0], this.eraseOrigin[0])
+		const vmin = Math.min(this.eraseTarget[1], this.eraseOrigin[1])
+		const vmax = Math.max(this.eraseTarget[1], this.eraseOrigin[1])
+		const singleCell = this.eraseTarget[0] === this.eraseOrigin[0] && this.eraseTarget[1] === this.eraseOrigin[1]
+
+		const eraseSet = new Set()
+		for (let u = umin; u <= umax; u++){
+			for (let v = vmin; v <= vmax; v++){
+				const entity = this.entityAtCoordinates([u,v])
+				if (entity && this.canEraseEntity(entity) && !(!singleCell && (entity instanceof Pump || entity instanceof Gradient))) {
+					if (extra[entity.name]===undefined) extra[entity.name] = -1
+					extra[entity.name]++
+					const refund = this.getRealPrice(entity.name, true, -extra[entity.name])
+					for (let i = 0; i < refund.length; i++){
+						if (refund[i]) this.totalRefund[i] += refund[i]
+					}
+					eraseSet.add(entity)
+				}
+			}
+		}
+		this.eraseList = Array.from(eraseSet)
+
+		const hint = new Cloud({master:this})
+		hint.addRefundListFromArray(this.totalRefund)
+		this.eraseHint = hint
+
+		// if (hint.element !== this.currentHint.element){
+
+		// 	if (this.currentHint.element) document.body.removeChild(this.currentHint.element)
+		// 	this.currentHint.element = hint.element
+		// 	document.body.appendChild(this.currentHint.element)
+
+		// }
+
+	}
+
+	updateRelocationArea(){
+		
+		this.relocationCandidatesList = []
+		if (!this.relocationOrigin || !this.relocationTarget) return
+		
+		const umin = Math.min(this.relocationTarget[0], this.relocationOrigin[0])
+		const umax = Math.max(this.relocationTarget[0], this.relocationOrigin[0])
+		const vmin = Math.min(this.relocationTarget[1], this.relocationOrigin[1])
+		const vmax = Math.max(this.relocationTarget[1], this.relocationOrigin[1])
+		const singleCell = this.relocationTarget[0] === this.relocationOrigin[0] && this.relocationTarget[1] === this.relocationOrigin[1]
+
+		const relocationSet = new Set()
+		for (let u = umin; u <= umax; u++){
+			for (let v = vmin; v <= vmax; v++){
+				const entity = this.entityAtCoordinates([u,v])
+				if (entity && this.canRelocate(entity)) {
+					relocationSet.add(entity)
+				}
+			}
+		}
+		this.relocationCandidatesList = Array.from(relocationSet)
+
+		// const hint = new Cloud({master:this})
+		// hint.addRefundListFromArray(this.totalRefund)
+		// this.eraseHint = hint
+
+		// if (hint.element !== this.currentHint.element){
+
+		// 	if (this.currentHint.element) document.body.removeChild(this.currentHint.element)
+		// 	this.currentHint.element = hint.element
+		// 	document.body.appendChild(this.currentHint.element)
+
+		// }
+
+	}
+
+	updateCloneArea(){
+
+		this.cloneList = []
+		this.totalCloneCost = new Array(10).fill(0)
+		const extra = {}
+		if (!this.cloneOrigin || !this.cloneTarget) return
+		
+		const umin = Math.min(this.cloneTarget[0], this.cloneOrigin[0])
+		const umax = Math.max(this.cloneTarget[0], this.cloneOrigin[0])
+		const vmin = Math.min(this.cloneTarget[1], this.cloneOrigin[1])
+		const vmax = Math.max(this.cloneTarget[1], this.cloneOrigin[1])
+		const singleCell = this.cloneTarget[0] === this.cloneOrigin[0] && this.cloneTarget[1] === this.cloneOrigin[1]
+
+		for (let u = umin; u <= umax; u++){
+			for (let v = vmin; v <= vmax; v++){
+
+				const entity = this.entityAtCoordinates([u,v])
+				const condition = this.massRelocation ? (entity && this.canRelocate(entity)) : (entity && !this.onlyones[entity.name] && this.codex.entities[entity.name].canPurchase && !(entity.name === `flower` || entity.name === `fruit`))
+
+				if (condition) {
+					if (extra[entity.name]===undefined) extra[entity.name] = -1
+					extra[entity.name]++
+					const cost = this.getRealPrice(entity.name,false,extra[entity.name])
+					for (let i = 0; i < cost.length; i++){
+						if (cost[i]) this.totalCloneCost[i] += cost[i]
+					}
+					this.cloneList.push(entity)
+				}
+			}
+		}
+
+		if (this.massRelocation){
+			this.cloneHint = false
+		} else {
+			const hint = new Cloud({master:this})
+			hint.addResourceList(this.totalCloneCost)
+			this.cloneHint = hint
+		}
+
+		// if (hint.element !== this.currentHint.element){
+
+		// 	if (this.currentHint.element) document.body.removeChild(this.currentHint.element)
+		// 	this.currentHint.element = hint.element
+		// 	document.body.appendChild(this.currentHint.element)
+
+		// }
+
+	}
+
+	cleanupErase(){
+		delete this.eraseOrigin
+		delete this.eraseTarget
+		delete this.eraseList
+		delete this.totalRefund
+		delete this.eraseHint
+		this.removeHint()
+	}
+
+	cleanupRelocationArea(){
+		delete this.relocationOrigin
+		delete this.relocationTarget
+		delete this.relocationCandidatesList
+	}
+
+	cleanupRelocation(){
+		this.cleanupRelocationArea()
+		delete this.relocationList
+		delete this.relocationOffsets
+	}
+
+	cleanupClone(){
+		delete this.cloneOrigin
+		delete this.cloneTarget
+		delete this.cloneList
+		delete this.totalCloneCost
+		delete this.cloneHint
+		delete this.cloneAreaSelected
+		delete this.cloneAreaOrigin
+		delete this.cloneEntitiesList
+		delete this.cloneEntitiesPositionsList
+		this.shop.mobileConfirmButton.classList.add(`hidden`)
+		if (this.touchMode !== 2) this.shop.mobileRelocatorSwitch.remove()
+		this.removeHint()
+	}
+
+	//NEW==========================
+
+	setCommonListeners(){
+
 		if (!this.spaceport.isPlaceholder){
 			this.spaceport.on(`windowState`, (e,d)=>{
-               if (d === `blur`) this.doOnBlur()
-               if (d === `focus`) this.doOnFocus()
+                    if (d === `blur`) this.doOnBlur()
+                    if (d === `focus`) this.doOnFocus()
             })
 		}
 
 		addEventListener(`resize`, _=>{
 			cancelAnimationFrame(this.resizeAnimationFrame)
-			this.resizeAnimationFrame = requestAnimationFrame(_=>{this.initScreenSizeMobile()})
+			this.resizeAnimationFrame = requestAnimationFrame(_=>{this.initScreenSize()})
+		})
+
+		addEventListener(`gamepadconnected`, _=>{
+			this.gamepadIsConnected = true
+			// this.shop.gamePadHint.classList.add(`gamePadPresent`)
+		})
+
+		addEventListener(`gamepaddisconnected`, _=>{
+			this.gamepadIsConnected = false
+			// this.shop.gamePadHint.classList.remove(`gamePadPresent`)
+			this.splash.show()
+			this.splash.selected = false
 		})
 
 		addEventListener(`blur`, e=>{
@@ -3197,248 +5738,553 @@ class Game {
 			this.doOnFocus()
 		})
 
-
-		this.canvas.addEventListener(`touchstart`, e=>{
-
-			if (e.target === this.canvas) e.preventDefault()
-
-			this.mouse.state = 1
-
-			this.updateMouseData(e.touches[0].clientX, e.touches[0].clientY)
-			this.mouse.positionChanged = false
-
-			this.mouse.currentAction = (this.touchMode === 1 && !this.plane && this.hoveredEntity) ? `erase` : (this.touchMode === 2 && !this.transportedEntity && this.entitiesInGame.mega3 > 0 && this.resources[4] >= 1 && this.hoveredEntity && this.canRelocate(this.hoveredEntity) && !this.plane && !this.entitiesInGame.pinhole) ? `pickupForRelocation` : (this.transportedEntity && this.hoveredCell && this.resources[4] >= 1 && !this.plane) ? `relocate` : (this.itemInHand && this.hoveredCell && this.canAfford(this.itemInHand.name) && !this.plane) ? `build` : (this.hoveredLabel && !this.plane) ? `refill` : (this.hoveredEntity && this.hoveredEntity instanceof Cube && !this.plane) ? `break` : this.hoveredEntity ? `entity` : `empty`
-			// console.log(this.mouse.currentAction)
-
-			if (this.mouse.currentAction === `erase`){
-
-				const eraser = this.eraserType === 1 ? `eraser2` : this.eraserType === 2 ? `eraser3` : `eraser`
-				const eraserOk = this.canEraseNow()
-				if (eraserOk) this.pickupItem(eraser)
-
-
-			} else if (this.mouse.currentAction === `pickupForRelocation`) {
-
-				this.transportedEntity = this.hoveredEntity
-				this.itemInHand = new this.codex.entities[this.hoveredEntity.name].class(this)
-				delete this.itemInHandPriceTag
-				delete this.itemInHandPriceAndRefundTag
-
-			} else if (this.mouse.currentAction === `build`){
-
-				this.pickupItem(this.itemInHand.name)
-
-
-			} else if (this.mouse.currentAction === `refill`){
-				this.hoveredLabel.refill()
-			} else if ((this.mouse.currentAction === `entity` && !this.shouldBeFilled(this.hoveredEntity)) || this.mouse.currentAction === `break`){
-				if (!this.plane) {
-					this.hoveredEntity.onmousedown()
-				} else if (this.hoveredEntity.ondarkmousedown){
-					this.hoveredEntity.ondarkmousedown()
+		if (this.isMobile){
+			addEventListener(`visibilitychange`, e=>{
+				if (document.hidden){
+					this.doOnBlur()
+				} else {
+					this.doOnFocus()
 				}
-			}
+			})
+		}
 
-			
-			
+	}
+
+	setListenersDesktop(){
+		
+		this.canvas.addEventListener(`mouseenter`, e=>{
+			this.mouse.cursorVisible = true
+		})
+		this.canvas.addEventListener(`mouseout`, e=>{
+			this.processMouseout()
 		})
 
-		this.canvas.addEventListener(`touchend`, e=>{
+		//Keyboard events
+		addEventListener(`keydown`, e=>{
 
-			if (e.target === this.canvas) e.preventDefault()
+			this.gamepadControl = false
+			this.thereWasZoomAction = true
 
-			this.mouse.state = 0
+			if (e.code === `Escape`){
 
-			if (this.mouse.currentAction === `erase` && this.canEraseNow()){
-				
-				const price = this.getRealPrice(this.hoveredEntity.name, true)
-				const xy = this.uvToXYUntranslated(this.hoveredCell)
+				delete this.interactionMode
+				this.cleanupErase()
+				this.cleanupRelocation()
 
-				if (this.codex.entities[this.hoveredEntity.name].onlyone){
-
-					let chainElement = this.codex.entities[this.hoveredEntity.name]
-					while (chainElement.isUpgradeTo){
-						delete this.onlyones[chainElement.isUpgradeTo]
-						chainElement = this.codex.entities[chainElement.isUpgradeTo]
-					}
-
-					if (this.codex.entities[this.hoveredEntity.name].isUpgradeTo){
-						delete this.onlyones[this.codex.entities[this.hoveredEntity.name].isUpgradeTo]
-					}
-
-					delete this.onlyones[this.hoveredEntity.name]
-					this.shop.check()
-				}
-
-				//SFX
-				const pan = this.getPanValueFromX(xy[0])
-				this.playSound(`recycle`, pan)
-
-				this.createResourceTransfer(price, xy, undefined, undefined, undefined, true)
-
-				this.requestResources(this.getRealPrice(this.itemInHand.name), this.hoveredCell, false, true) //just the cost of erasing
-				this.clearCell(this.hoveredCell)
-				this.stats.machinesSold++
-				this.stats.timeSinceLastDelete = 0
-				this.hoveredEntity = undefined
-				this.updateMouseData()
-
-				this.shop.toggleMobileEraser()
-
-
-			} else if (this.mouse.currentAction === `build` && this.itemInHand && !this.mouse.positionChanged){
-
-				const up = this.codex.entities[this.itemInHand.name].isUpgradeTo
-				if (!this.hoveredEntity && !(up && this.codex.entities[up].onlyone) && !(up && (this.itemInHand.name === `flower` || this.itemInHand.name === `fruit` || this.itemInHand.name === `gradient`))){
-
-					const price = this.getRealPrice(this.itemInHand.name)
-
-					this.requestResources(price, this.hoveredCell, false, true)
-
-					this.addEntity(this.itemInHand.name, this.hoveredCell)
-					this.stats.machinesBuild++
-
-					//SFX
-					const screenxy = this.uvToXYUntranslated(this.hoveredCell)
-					const pan = this.getPanValueFromX(screenxy[0])
-					this.playSound(`place`, pan)
-					
-					this.updateMouseData()
-					this.mouse.positionChanged = false
-
-					if (this.codex.entities[this.itemInHand.name].onlyone){
-						this.onlyones[this.itemInHand.name] = true
-						this.shop.check()
-						delete this.itemInHand
-						this.shop.mobileToggle.classList.remove(`active`)
-					// } else if (!this.canAfford(this.itemInHand?.name)){
-					// 	delete this.itemInHand
-					// 	this.shop.mobileToggle.classList.remove(`active`)
-					// } else {
-					// 	this.pickupItem(this.itemInHand.name)
-					// }
-					} else {
-						delete this.itemInHand
-						this.shop.mobileToggle.classList.remove(`active`)
-					}
-
-				} else if (this.hoveredEntity && up === this.hoveredEntity.name){
-
-					if (this.itemInHand.name === `pinhole`){
-						this.saveGame()
-						this.preventSaving = true
-					}
-					
-					this.clearCell(this.hoveredCell)
-					if (this.itemInHand.name !== `pinhole`) this.stats.timeSinceLastDelete = 0
-
-					const price = this.getRealPrice(this.itemInHand.name)
-					const refund = this.getRealPrice(this.hoveredEntity.name)
-					
-					this.createResourceTransfer(refund, this.uvToXYUntranslated(this.hoveredCell), undefined, undefined, undefined, true)
-					this.requestResources(price, this.hoveredCell, _=>{}, true)
-					this.addEntity(this.itemInHand.name, this.hoveredEntity.position)
-					this.stats.machinesBuild++
-
-					//SFX
-					const screenxy = this.uvToXYUntranslated(this.hoveredCell)
-					const pan = this.getPanValueFromX(screenxy[0])
-					this.playSound(`place`, pan)
-
-					// if (this.shop.mobileToggle) this.shop.mobileToggle.classList.remove(`active`)
-
-					if (this.codex.entities[this.itemInHand.name].onlyone) {
-						this.onlyones[this.itemInHand.name] = true
-						delete this.itemInHand
-						this.shop.mobileToggle.classList.remove(`active`)
-					// } else if (!this.canAfford(this.itemInHand?.name)){
-					// 	delete this.itemInHand
-					// 	this.shop.mobileToggle.classList.remove(`active`)
-					// } else {
-					// 	this.pickupItem(this.itemInHand.name)
-					// }
-					} else {
-						delete this.itemInHand
-						this.shop.mobileToggle.classList.remove(`active`)
-					}
-					this.shop.check()
-				
-				} else if (this.itemInHand && this.hoveredEntity?.name !== `cube`) {
+				if (this.itemInHand) {
 					delete this.itemInHand
-					if (this.shop.mobileToggle) this.shop.mobileToggle.classList.remove(`active`)
+					delete this.transportedEntity
+				} else if (this.orbifoldUI) {
+					this.closeOrbifolds()
+				} else {
+					this.toggleSplash()
 				}
-			} else if (this.mouse.currentAction === `entity`){
-				this.hoveredEntity?.onmouseup()
-			} else if (this.mouse.currentAction === `relocate` && !this.mouse.positionChanged){
-
-				//Relocation
-				this.requestResources([0,0,0,0,1], this.hoveredCell, false, true)
-				this.relocate(this.transportedEntity, this.hoveredCell)
-				delete this.transportedEntity
-				delete this.itemInHand
-
-				this.touchMode = 0
-				this.shop.updateMobileMenuState()
-
+				
+			} else if (e.code === `KeyQ`){
+				this.processQ()
+			} else if (e.key === `Alt`){
+				e.preventDefault()
+				this.altActive = true
+				document.body.classList.add(`altHolded`)
+			} else if (e.code === `KeyE`){
+				this.processE()
+			} else if (e.code === `KeyW` || e.code === `ArrowUp`){
+				this.translationMap[0] = 1
+			} else if (e.code === `KeyD` || e.code === `ArrowRight`){
+				this.translationMap[1] = 1
+			} else if (e.code === `KeyS` || e.code === `ArrowDown`){
+				this.translationMap[2] = 1
+			} else if (e.code === `KeyA` || e.code === `ArrowLeft`){
+				this.translationMap[3] = 1
+			} else if (e.key === `Shift` || e.key === `Control`){
+				if (!this.zoomWhenShiftPressed) {
+					this.zoomWhenShiftPressed = this.zoom
+					delete this.thereWasZoomAction
+				}
+				this.shiftPressed = true
 			}
 
-			this.mouse.timer = this.mouse.maxTimer
-			// if (this.selectedEntity && !this.plane) this.selectedEntity.onmouseup()
-			this.selectedEntity = false
-			if (this.itemInHand?.eraser) delete this.itemInHand
-
-			// delete this.isBeingTouched
-
-			// if (!this.mouse.positionChanged){
-			// 	this.processClick()
-			// }
-
-			// this.processTouchUp()
-
-			delete this.mouse.currentAction
+		})
+		addEventListener(`keyup`, e=>{
+			if (e.code === `KeyW` || e.code === `ArrowUp`){
+				this.translationMap[0] = 0
+				// if (this.keyboardMovementHappening === 87) delete this.keyboardMovementHappening
+			} else if (e.code === `KeyD` || e.code === `ArrowRight`){
+				this.translationMap[1] = 0
+				// if (this.keyboardMovementHappening === 87) delete this.keyboardMovementHappening
+			} else if (e.code === `KeyS` || e.code === `ArrowDown`){
+				this.translationMap[2] = 0
+				// if (this.keyboardMovementHappening === 87) delete this.keyboardMovementHappening
+			} else if (e.code === `KeyA` || e.code === `ArrowLeft`){
+				this.translationMap[3] = 0
+				// if (this.keyboardMovementHappening === 87) delete this.keyboardMovementHappening
+			} else if (e.key === `Alt`){
+				this.altActive = false
+				document.body.classList.remove(`altHolded`)
+			} else if (e.key === `Shift` || e.key === `Control`){
+				this.shiftPressed = false
+				if (!this.thereWasZoomAction){
+					this.zoom = 1
+				}
+				delete this.zoomWhenShiftPressed
+			}
 		})
 
-		this.canvas.addEventListener(`touchmove`, e=>{
-			if (e.target === this.canvas) e.preventDefault()
+		//Wheel events
+		this.canvas.addEventListener('wheel', e=>{
+			e.preventDefault()
 
-			const prevEntity = this.hoveredEntity
-			this.updateMouseData(e.touches[0].clientX, e.touches[0].clientY)
-			const nextEntity = this.hoveredEntity
+			if (this.shiftPressed){
 
-			if (prevEntity !== nextEntity && prevEntity?.onmouseup) prevEntity.onmouseup()
+				if (!this.thereWasZoomAction) this.thereWasZoomAction = true
 
-			if (this.mouse.currentAction !== `erase`){
-			// if (this.mouse.currentAction !== `build` && this.mouse.currentAction !== `erase` && this.mouse.currentAction !== `break` && this.mouse.currentAction !== `relocate`){
-				this.translation[0] -= this.mouse.delta[0] * this.pixelRatio
-				this.translation[1] -= this.mouse.delta[1] * this.pixelRatio
+				const delta = [
+					e.wheelDeltaX * (this.isWindows ? .2 : .5),
+					e.wheelDeltaY * (this.isWindows ? .2 : .5)
+				]
+
+				this.zoomInOut(Math.abs(delta[1]) > Math.abs(delta[0]) ? delta[1] : delta[0])
+
+			} else {
+
+				const delta = [
+					e.wheelDeltaX * (this.isWindows ? .2 : .5) / this.zoom,
+					e.wheelDeltaY * (this.isWindows ? .2 : .5) / this.zoom
+				]
+
+				this.translation[0] -= delta[0]
+				this.translation[1] -= delta[1]
+
+				// this.processMousemove(e, delta)
+				// this.processMousemove2(
+				// 	[e.offsetX, e.offsetY],
+				// 	[delta[0], delta[1]],
+				// 	2
+				// )
+				this.updateMouseData()
+				this.processMove()
+				this.updateGlobalPositioning()
+
+
 			}
-			// if (e.touches.length > 1){
-			// 	const delta = [
-			// 		(e.touches[0].clientX - this.mouse.lastTouch[0]) * this.pixelRatio / this.zoom,
-			// 		(e.touches[0].clientY - this.mouse.lastTouch[1]) * this.pixelRatio / this.zoom,
-			// 	]
-			// 	// this.processMousemove(e.touches[0], delta)
-			// 	this.processMousemove2(
-			// 		[e.touches[0].clientX, e.touches[0].clientY],
-			// 		delta,
-			// 		2
-			// 	)
-			// } else {
-			// 	// this.processMousemove(e.touches[0])
-			// 	this.processMousemove2(
-			// 		[e.touches[0].clientX, e.touches[0].clientY],
-			// 		false,
-			// 		1
-			// 	)
-			// }
-			// this.mouse.lastTouch[0] = e.touches[0].clientX
-			// this.mouse.lastTouch[1] = e.touches[0].clientY
 			
+		})
+		
+		//Mouse events
+		this.canvas.addEventListener(`mousedown`,e=>{
+			this.updatePointerState({
+				sxy: [e.offsetX, e.offsetY],
+				button: e.buttons
+			})
+			this.processDown()
+
+		})
+		this.canvas.addEventListener(`mouseup`,e=>{
+			const lastButton = this.mouse.state
+			this.updatePointerState({
+				sxy: [e.offsetX, e.offsetY],
+				button: lastButton//e.buttons
+			})
+			this.processUp()
+			this.processMove()
+
+		})
+		this.canvas.addEventListener(`mousemove`,e=>{
+			this.updatePointerState({
+				sxy: [e.offsetX, e.offsetY],
+				button: e.buttons
+			})
+			this.processMove()
 		})
 
 	}
 
+	updatePointerState(p={}){
+
+		this.mouse.delta = [0,0]
+
+		if (p.button !== undefined){
+			this.mouse.state = p.button	
+		}
+		
+		if (p.sxy){
+			this.mouse.delta[0] = p.sxy[0] - this.mouse.sxy[0]
+			this.mouse.delta[1] = p.sxy[1] - this.mouse.sxy[1]
+			this.mouse.sxy[0] = p.sxy[0]
+			this.mouse.sxy[1] = p.sxy[1]
+			this.mouse.xy[0] = this.mouse.sxy[0] * this.pixelRatio
+			this.mouse.xy[1] = this.mouse.sxy[1] * this.pixelRatio
+		}
+
+		const uv = this.xyToUV(this.mouse.sxy)
+		const targetCell = [Math.floor(uv[0]), Math.floor(uv[1])]
+
+		//Update hover
+		if (p.adjustTap){
+			const C = this.entityAtCoordinates(targetCell)
+			const B = this.entityAtCoordinates([targetCell[0] + 1, targetCell[1] + 1])
+			const R = this.entityAtCoordinates([targetCell[0] + 1, targetCell[1]])
+			const L = this.entityAtCoordinates([targetCell[0], targetCell[1] + 1])
+			const right = (uv[1] - Math.floor(uv[1])) < (uv[0] - Math.floor(uv[0]))
+
+			if (!C && (B && B instanceof Cube)){
+				this.hoveredCell = [targetCell[0] + 1, targetCell[1] + 1]
+				this.hoveredEntity = B
+			} else if (!C && (R && R instanceof Cube) && right) {
+				this.hoveredCell = [targetCell[0] + 1, targetCell[1]]
+				this.hoveredEntity = R
+			} else if (!C && (L && L instanceof Cube) && !right) {
+				this.hoveredCell = [targetCell[0], targetCell[1] + 1]
+				this.hoveredEntity = L
+			} else {
+				this.hoveredCell = targetCell
+				this.hoveredEntity = this.entityAtCoordinates(this.hoveredCell)
+			}
+		} else {
+			this.hoveredCell = targetCell
+			this.hoveredEntity = this.entityAtCoordinates(this.hoveredCell)
+		}
+
+		//Update resource hover
+		this.hoveredResource = false
+		const delta = this.screenUnit * .3
+		for (let i = 0; i < this.resourceHomes.length; i++){
+			const home = this.resourceHomes[i]
+			if (this.mouse.xy[0] > home[0] - delta && this.mouse.xy[0] < home[0] + delta && this.mouse.xy[1] > home[1] - delta && this.mouse.xy[1] < home[1] + delta){
+				this.hoveredResource = i
+				break
+			}
+
+		}
+
+		// External fill labels for touch devices
+		if (this.isMobile){
+			const labelCell = [Math.floor(uv[0] + 1.7), Math.floor(uv[1] + 1.7)]
+			const entity = this.entityAtCoordinates(labelCell)
+			this.hoveredLabel = this.shouldBeFilled(entity) ? entity : false
+		}
+
+	}
+
+	processDown(){
+
+		this.mouse.positionChanged = false
+		this.mouse.originalPosition = [...this.mouse.xy]
+
+		if (this.interactionMode === `erase`){
+			this.eraseOrigin = this.hoveredCell
+			this.eraseTarget = this.hoveredCell
+			this.updateEraseArea()
+			return
+		}
+
+		if (this.interactionMode === `relocate` && !this.relocationList){
+			this.relocationOrigin = this.hoveredCell
+			this.relocationTarget = this.hoveredCell
+			this.updateRelocationArea()
+			return
+		}
+
+		if (this.isMobile && this.plane === 1 && this.hoveredEntity?.ondarkhover){
+			this.hoveredEntity.ondarkhover()
+		}//qqqqqqqqqqqq
+
+		//Default
+		if (this.mouse.state !== 2){
+
+			//Hitbox check
+			const cubeClicked = (this.hoveredEntity && this.hoveredEntity.name === `cube`)
+			if (!this.itemInHand || cubeClicked){
+
+				if (cubeClicked){
+					this.stats.totalCubeClicks++
+				}
+
+				let didntTouch = true
+				if (this.isMobile){
+
+					const uv = this.xyToUV([this.mouse.sxy[0], this.mouse.sxy[1]])
+					uv[0] += 1.7
+					uv[1] += 1.7
+
+					const targetCell = [Math.floor(uv[0]), Math.floor(uv[1])]
+					const entity = this.entityAtCoordinates(targetCell)
+
+					if (this.shouldBeFilled(entity)){
+						entity.refill()
+						didntTouch = false
+					}
+
+				}
+
+				if (didntTouch && this.hoveredEntity){
+
+					this.selectedEntity = this.hoveredEntity
+					if (!this.plane){
+						this.selectedEntity.onmousedown()
+					} else if (this.plane === 1 && this.selectedEntity.ondarkmousedown){
+						this.selectedEntity.ondarkmousedown()
+					}
+					
+				}
+
+			}
+
+		}
+
+	}
+
+	processUp(){
+
+		const click = !this.mouse.positionChanged
+
+		if (this.mouse.state === 2 || this.mouse.state === 3){
+			//RBM or LMB + RMB: esc
+			delete this.interactionMode
+			delete this.itemInHand
+			delete this.transportedEntity
+			this.cleanupErase()
+			this.cleanupRelocation()
+		}
+
+		if (this.interactionMode === `erase`){
+			this.finalizeErase()
+			delete this.interactionMode
+			return
+		} else if (this.interactionMode === `relocate`) {
+			if (this.relocationList){
+
+				if (this.canPlace && this.relocationOffsets){
+
+					const positions = []
+					for (let i = 0; i < this.relocationList.length; i++){
+						const p = [this.hoveredCell[0] + this.relocationOffsets[i][0], this.hoveredCell[1] + this.relocationOffsets[i][1]]
+						positions.push(p)
+					}
+					this.massRelocate(this.relocationList, positions)
+					delete this.interactionMode
+					this.cleanupRelocation()
+
+				} else {
+					delete this.interactionMode
+					this.cleanupRelocation()
+				}
+
+			} else {
+				if (!this.relocationCandidatesList.length){
+					this.cleanupRelocation()
+					delete this.interactionMode
+				} else {
+					this.pickupEntitiesForRelocation()
+				}
+			}
+			// if (!this.canRelocateEntityHere(this.transportedEntity, this.hoveredCell)) return
+			// this.relocate(this.transportedEntity, this.hoveredCell)
+			// if (this.itemInHand.name === `gradient`){
+			// 	this.transportedEntity.penalty = .5
+			// 	this.transportedEntity.init()
+			// }
+			// delete this.transportedEntity
+			// delete this.itemInHand
+			// delete this.interactionMode
+			return
+		} else if (this.interactionMode === `build` && click){
+			
+			//WIP: Deal with span
+			const ok = this.canPlaceEntityHere(this.itemInHand, this.hoveredCell)
+			if (!ok) return
+
+			const isUpgrade = this.hoveredEntity && this.codex.entities[this.itemInHand.name]?.isUpgradeTo === this.hoveredEntity?.name
+
+			if (isUpgrade){
+				if (this.itemInHand.name === `pinhole`){
+					this.saveGame()
+					this.preventSaving = true
+				}
+				
+				this.clearCell(this.hoveredCell)
+				if (this.itemInHand.name !== `pinhole`) this.stats.timeSinceLastDelete = 0
+
+				const price = this.getRealPrice(this.itemInHand.name)
+				const refund = this.getRealPrice(this.hoveredEntity.name)
+				
+				this.createResourceTransfer(refund, this.uvToXYUntranslated(this.hoveredCell), undefined, undefined, undefined, true)
+				this.requestResources(price, this.hoveredCell, _=>{}, true)
+				this.addEntity(this.itemInHand.name, this.hoveredEntity.position)
+			} else {
+				const price = this.getRealPrice(this.itemInHand.name)
+				this.requestResources(price, this.hoveredCell, false, true)
+
+				const e = this.addEntity(this.itemInHand.name, this.hoveredCell)
+				if (this.itemInHand.name === `gradient`){
+					e.penalty = .5
+					e.init()
+				}
+			}
+
+			//SFX
+			const screenxy = this.uvToXYUntranslated(this.hoveredCell)
+			const pan = this.getPanValueFromX(screenxy[0])
+			this.playSound(`place`, pan)
+			this.punchScreen()
+
+			this.stats.machinesBuild++
+			if (this.store.html.store) { // MOB DONE
+				delete this.interactionMode
+				delete this.itemInHand
+				this.store.html.store.classList.remove(`active`)
+				// this.shop.toggleAllButShop()
+			} else {
+				if (this.codex.entities[this.itemInHand.name].onlyone){
+					this.onlyones[this.itemInHand.name] = true
+					delete this.itemInHand
+					delete this.interactionMode
+				} else if (!this.canAfford(this.itemInHand?.name)){
+					delete this.itemInHand
+					delete this.interactionMode
+				} else {
+					this.pickupItem(this.itemInHand.name)
+				}
+			}
+
+			
+
+		}
+
+		//Default
+		this.mouse.timer = this.mouse.maxTimer
+		if (this.selectedEntity && !this.plane) this.selectedEntity.onmouseup()
+		this.selectedEntity = false
+		this.mouse.state = 0
+		
+	}
+
+	processMove(wheel){
+
+		//Always
+		this.mouse.positionChanged = this.mouse.originalPosition ? Math.abs(this.mouse.xy[0] - this.mouse.originalPosition[0]) + Math.abs(this.mouse.xy[1] - this.mouse.originalPosition[1]) > 1 : false
+
+		if (this.plane === 1 && this.hoveredEntity?.ondarkhover){
+			this.hoveredEntity.ondarkhover()
+		}
+
+		if (this.interactionMode === `erase` && this.mouse.state === 1){
+			if (!this.eraseTarget || this.hoveredCell[0] !== this.eraseTarget[0] || this.hoveredCell[1] !== this.eraseTarget[1]){
+				this.eraseTarget = this.hoveredCell
+				this.updateEraseArea()
+			}	
+		} else if (this.interactionMode === `build`){
+			this.canPlace = this.canPlaceEntityHere(this.itemInHand, this.hoveredCell)
+			
+		} else if (this.interactionMode === `relocate`){
+
+			if (this.relocationList && this.relocationOffsets && this.hoveredCell){
+				
+				//WIP: CHECK SWAPS OR SELF-INTERSECTIONS
+				const relocationSet = new Set(this.relocationList)
+				this.canPlace = true
+				for (let i = 0; i < this.relocationList.length; i++){
+
+					const position = [this.hoveredCell[0] + this.relocationOffsets[i][0], this.hoveredCell[1] + this.relocationOffsets[i][1]]
+					if (this.isWithinMemoryComplex(position)){
+						this.canPlace = false
+						break
+					}
+					const entityHere = this.entityAtCoordinates(position)
+
+					if (!entityHere) continue
+
+					let isInList = relocationSet.has(entityHere)//false
+					// for (let j = 0; j < this.relocationList.length; j++){
+					// 	if (this.relocationList[j] === entityHere){
+					// 		isInList = true
+					// 		break
+					// 	}
+					// }
+					if (!isInList){
+						if (!this.canRelocate(entityHere)){
+							this.canPlace = false
+							break
+						}
+
+						const swapTarget = this.relocationList[i].position
+
+						for (let j = 0; j < this.relocationList.length; j++){
+							if (i === j) continue
+							const alreadyBooked = [this.hoveredCell[0] + this.relocationOffsets[j][0], this.hoveredCell[1] + this.relocationOffsets[j][1]]
+							if (swapTarget[0] === alreadyBooked[0] && swapTarget[1] === alreadyBooked[1]){
+								this.canPlace = false
+								break
+							}
+						}
+					}
+					
+					if (!this.canPlace) break
+
+				}
+
+			} else if (!this.relocationTarget || this.hoveredCell[0] !== this.relocationTarget[0] || this.hoveredCell[1] !== this.relocationTarget[1]){
+				this.relocationTarget = this.hoveredCell
+				this.updateRelocationArea()
+			}
+			// this.canPlace = this.canRelocateEntityHere(this.transportedEntity, this.hoveredCell)
+		}
+
+
+		//  else if (this.itemInHand){
+
+		// 	//REM Replace with interaction mode
+		// 	//REM Replace with unified condition function
+		// 	this.canPlace = false
+		// 	const up = this.codex.entities[this.itemInHand.name].isUpgradeTo
+		// 	const base = this.hoveredCell && this.canAfford(this.itemInHand.name)
+		// 	const eraserOk = this.itemInHand.eraser && this.hoveredEntity && !this.hoveredEntity.indestructible && !(this.hoveredEntity instanceof Cube) && !((this.hoveredEntity instanceof Pump || this.hoveredEntity instanceof Gradient) && ((this.entitiesInGame[`pump`] || 0) + (this.entitiesInGame[`pump2`] || 0) + (this.entitiesInGame[`gradient`] || 0) < 2))
+		// 	const newOk = !this.itemInHand.eraser && !this.hoveredEntity && !(up && this.codex.entities[up].onlyone) && !(up && (this.itemInHand.name === `flower` || this.itemInHand.name === `fruit` || this.itemInHand.name === `gradient_rem`))
+		// 	const upgradeOk = this.hoveredEntity && !this.itemInHand.eraser && this.codex.entities[this.itemInHand.name]?.isUpgradeTo === this.hoveredEntity.name
+		// 	// this.canPlace = this.transportedEntity ? (!this.hoveredEntity || this.canRelocate(this.hoveredEntity)) : (base && (eraserOk || newOk || upgradeOk))
+		// 	///WIP HANDLE SPAN
+		// 	let relocationOk = true
+		// 	if (this.transportedEntity){
+		// 		const span = this.transportedEntity.entitySpan
+		// 		for (let x = -span; x <= span; x++){
+		// 			for (let y = -span; y <= span; y++){
+		// 				const xy = [this.hoveredCell[0] + x, this.hoveredCell[1] + y]
+		// 				const e = this.entityAtCoordinates(xy)
+		// 				if (!e || e === this.transportedEntity || (x === 0 && y === 0 && e.entitySpan === this.transportedEntity.entitySpan && this.canRelocate(e))) continue
+		// 				relocationOk = false
+		// 				break
+		// 			}
+		// 		}
+		// 	}
+		// 	this.canPlace = this.transportedEntity ? relocationOk : (base && (eraserOk || newOk || upgradeOk))
+
+		// }
+
+		//Camera Movement
+		const mobileTranslateCondition = this.isMobile && this.mouse.state === 1 && (this.interactionMode !== `relocate` || this?.relocationList) && this.interactionMode !== `erase`
+
+		if ((this.mouse.delta[0] || this.mouse.delta[1]) && (this.mouse.state === 2 || mobileTranslateCondition)){
+			this.translation[0] -= this.mouse.delta[0] * this.pixelRatio / this.zoom
+			this.translation[1] -= this.mouse.delta[1] * this.pixelRatio / this.zoom
+		}
+
+		//Brush refill
+		const he = this.hoveredEntity
+		if (he?.refill && he.state === 0 && this.mouse.state === 1){
+			// console.log(he.state)
+			he.onmousedown()
+		}
+		// if (he && he.fill)
+
+		//
+
+	}
+
+	//==============================
+
 	setListeners(){
+
+		//WIP REMOVE AFTER MOBILE
 
 		if (!this.spaceport.isPlaceholder){
 			this.spaceport.on(`windowState`, (e,d)=>{
@@ -3459,11 +6305,11 @@ class Game {
 
 		addEventListener(`gamepadconnected`, _=>{
 			this.gamepadIsConnected = true
-			this.shop.gamePadHint.classList.add(`gamePadPresent`)
+			// this.shop.gamePadHint.classList.add(`gamePadPresent`)
 		})
 		addEventListener(`gamepaddisconnected`, _=>{
 			this.gamepadIsConnected = false
-			this.shop.gamePadHint.classList.remove(`gamePadPresent`)
+			// this.shop.gamePadHint.classList.remove(`gamePadPresent`)
 			this.splash.show()
 			this.splash.selected = false
 		})
@@ -3484,6 +6330,10 @@ class Game {
 				if (this.itemInHand) {
 					delete this.itemInHand
 					delete this.transportedEntity
+				} else if (this.interactionMode){
+					delete this.interactionMode
+					this.cleanupErase()
+					this.cleanupRelocation()
 				} else {
 					this.toggleSplash()
 				}
@@ -3511,7 +6361,6 @@ class Game {
 					delete this.thereWasZoomAction
 				}
 				this.shiftPressed = true
-				
 			}
 
 		})
@@ -3546,57 +6395,57 @@ class Game {
 			
 		})
 
-		this.canvas.addEventListener(`touchstart`, e=>{
+		// this.canvas.addEventListener(`touchstart`, e=>{
 
-			if (e.target === this.canvas) e.preventDefault()
+		// 	if (e.target === this.canvas) e.preventDefault()
 
-			this.mouse.lastTouch[0] = e.touches[0].clientX
-			this.mouse.lastTouch[1] = e.touches[0].clientY
-			this.processMousemove2(
-				[e.touches[0].clientX, e.touches[0].clientY],
-				false,
-				1
-			)
+		// 	this.mouse.lastTouch[0] = e.touches[0].clientX
+		// 	this.mouse.lastTouch[1] = e.touches[0].clientY
+		// 	this.processMousemove2(
+		// 		[e.touches[0].clientX, e.touches[0].clientY],
+		// 		false,
+		// 		1
+		// 	)
 
-			this.mouse.positionChanged = false
+		// 	this.mouse.positionChanged = false
 			
-		})
+		// })
 
-		this.canvas.addEventListener(`touchend`, e=>{
+		// this.canvas.addEventListener(`touchend`, e=>{
 
-			if (e.target === this.canvas) e.preventDefault()
+		// 	if (e.target === this.canvas) e.preventDefault()
 
-			if (!this.mouse.positionChanged){
-				this.processClick()
-			}
+		// 	if (!this.mouse.positionChanged){
+		// 		this.processClick()
+		// 	}
 
-		})
+		// })
 
-		this.canvas.addEventListener(`touchmove`, e=>{
-			if (e.target === this.canvas) e.preventDefault()
-			if (e.touches.length > 1){
-				const delta = [
-					(e.touches[0].clientX - this.mouse.lastTouch[0]) * this.pixelRatio / this.zoom,
-					(e.touches[0].clientY - this.mouse.lastTouch[1]) * this.pixelRatio / this.zoom,
-				]
-				// this.processMousemove(e.touches[0], delta)
-				this.processMousemove2(
-					[e.touches[0].clientX, e.touches[0].clientY],
-					delta,
-					2
-				)
-			} else {
-				// this.processMousemove(e.touches[0])
-				this.processMousemove2(
-					[e.touches[0].clientX, e.touches[0].clientY],
-					false,
-					1
-				)
-			}
-			this.mouse.lastTouch[0] = e.touches[0].clientX
-			this.mouse.lastTouch[1] = e.touches[0].clientY
+		// this.canvas.addEventListener(`touchmove`, e=>{
+		// 	if (e.target === this.canvas) e.preventDefault()
+		// 	if (e.touches.length > 1){
+		// 		const delta = [
+		// 			(e.touches[0].clientX - this.mouse.lastTouch[0]) * this.pixelRatio / this.zoom,
+		// 			(e.touches[0].clientY - this.mouse.lastTouch[1]) * this.pixelRatio / this.zoom,
+		// 		]
+		// 		// this.processMousemove(e.touches[0], delta)
+		// 		this.processMousemove2(
+		// 			[e.touches[0].clientX, e.touches[0].clientY],
+		// 			delta,
+		// 			2
+		// 		)
+		// 	} else {
+		// 		// this.processMousemove(e.touches[0])
+		// 		this.processMousemove2(
+		// 			[e.touches[0].clientX, e.touches[0].clientY],
+		// 			false,
+		// 			1
+		// 		)
+		// 	}
+		// 	this.mouse.lastTouch[0] = e.touches[0].clientX
+		// 	this.mouse.lastTouch[1] = e.touches[0].clientY
 			
-		})
+		// })
 
 		this.canvas.addEventListener(`mousedown`, e=>{
 
@@ -3618,6 +6467,8 @@ class Game {
 			if (!this.mouse.positionChanged && e.button === 2 && this.itemInHand){
 				delete this.itemInHand
 				delete this.transportedEntity
+				delete this.interactionMode
+				this.cleanupErase()
 			}
 
 			this.processMouseup()
@@ -3721,6 +6572,11 @@ class Game {
 		this.stats.totalPlayTime += span
 		this.time.lt = now
 
+		//Scroll bug
+		if (document.body.scrollTop !== 0) {
+			document.body.scrollTop = 0
+		}
+
 		// this.time.dt = Math.min(now - this.time.lt, 1000)
 		// this.time.realDt = this.time.dt
 		// const realDt = this.time.dt
@@ -3785,7 +6641,10 @@ class Game {
 		//Ingame updates
 		this.currentlyExtracting = false
 		this.updateSlowdownEvent()
+		if (this.alfa) this.updateAlfa(this.time.dt)
+		this.updatePunch(this.time.dt)
 		this.updateUnfilled(this.time.dt)
+		this.updateMemories(this.time.dt)
 		this.updateEntities(this.time.dt)
 		this.updateResourceInteractions(this.time.dt)
 		this.updateVFX(this.time.dt)
@@ -3807,6 +6666,178 @@ class Game {
 		return true
 	}
 
+	updateMemories(dt){
+
+		if (!this.memoryBuffer.length) return
+
+		const MAXT = 1e4
+		const MINT = 1e3
+
+		for (let i = 0; i < this.memoryBuffer.length; i++){
+
+			const m = this.memoryBuffer[i]
+			if (m.terminate) {
+				this.memoryBuffer.splice(i,1)
+				i--
+				continue
+			}
+
+			const p = m.position
+			let en = m.entityName
+
+			if (m.timer === undefined) m.timer = MINT + (MAXT - MINT) * Math.random()
+
+			m.timer -= dt
+			if (m.timer <= 0){
+
+				m.timer = undefined
+
+				//////////////////////////////////////////////////////////////////////////////////////////
+
+				const allowed = [en]
+				const entityHere = this.entityAtCoordinates(p)
+				let onlyoneIsHere = false
+				if (entityHere?.name === en){
+					//Already has final machine
+					m.terminate = true
+					continue
+				} else if (entityHere?.name === `surge` || entityHere?.name === `cube`){
+					continue
+				}
+				if (entityHere) {
+					//Check if it is predecessor
+					let validUpgrade = false
+					if (this.codex.entities[en].isUpgradeTo){
+						let chainName = en
+						for (let j = 0; j < 1e2; j++){
+							const up = this.codex.entities[chainName].isUpgradeTo
+							if (!up) break
+							if (entityHere.name === up){
+								validUpgrade = true
+								if (this.onlyones[entityHere.name]) onlyoneIsHere = true
+								break
+							}
+							chainName = up
+							allowed.push(up)
+						}
+					}
+					if (!validUpgrade){
+						m.terminate = true
+						continue
+					}
+				} else if (this.codex.entities[en].isUpgradeTo) {
+					let chainName = en
+					for (let j = 0; j < 1e2; j++){
+						const up = this.codex.entities[chainName].isUpgradeTo
+						if (!up) break
+						chainName = up
+						allowed.push(up)
+					}
+				}
+
+				if (this.codex.entities[en].onlyone){
+
+					const alreadyBuilt = this.onlyones[en]
+					let thereIsParentSomewhere = false
+					let chainName = en
+					for (let j = 0; j < 1e2; j++){
+						const up = this.codex.entities[chainName].isUpgradeTo
+						if (!up) break
+						if (this.onlyones[up]){
+							thereIsParentSomewhere = true
+							break
+						}
+						chainName = up
+					}
+					if (alreadyBuilt || (thereIsParentSomewhere && !onlyoneIsHere)) {
+						m.terminate = true
+						continue
+					}
+
+				}
+
+				let affordableTarget = false
+				for (let j = 0; j < allowed.length; j++){
+					if (this.canAfford(allowed[j])){
+						affordableTarget = allowed[j]
+						break
+					}
+				}
+
+				if (!affordableTarget){
+					continue
+				}
+
+				//ALL GOOD, PROCEED
+				const sxy = this.uvToXYUntranslated(p)
+				const price = this.getRealPrice(affordableTarget)
+
+				if (entityHere){
+
+					//WIP SAVE PINHOLE
+
+					// if (affordableTarget === `pinhole`){
+					// 	this.saveGame()
+					// 	this.completions++
+					// 	this.orbUpgrades++
+					// 	this.savePermanents(true)
+					// 	this.spaceport.send(`reset`, ``)
+					// 	localStorage.removeItem(`abstractv03${this.steamId}`) //Wipe current save
+					// 	setTimeout(_=>{location.reload()},400)
+					// }
+
+					this.clearCell(p)
+					if (affordableTarget !== `pinhole`) this.stats.timeSinceLastDelete = 0
+
+					const refund = this.getRealPrice(entityHere.name)
+					this.createResourceTransfer(refund, sxy, undefined, undefined, undefined, true)
+					this.stats.machinesSold++
+
+				}
+
+				this.requestResources(price, p, false, true)
+				this.addEntity(affordableTarget, p)
+
+				this.createImpact(p, `#000`, [1,0])
+				const pan = this.getPanValueFromX(sxy[0])
+				this.playSound(`place`, pan)
+				this.playSound(`impact`, pan)
+				this.punchScreen()
+				this.stats.machinesBuild++
+
+				if (this.codex.entities[affordableTarget].onlyone){
+
+					this.onlyones[affordableTarget] = true
+					if (this.itemInHand && this.itemInHand.name === affordableTarget) delete this.itemInHand
+					
+					let chainName = affordableTarget
+					for (let j = 0; j < 1e2; j++){
+						const up = this.codex.entities[chainName].isUpgradeTo
+						if (!up) break
+						this.onlyones[up] = true
+						chainName = up
+					}
+				}
+
+				////////////
+				if (affordableTarget === `pinhole`){
+					this.completions++
+					this.orbUpgrades++
+					this.reset(true)
+				}
+				/////////////
+
+				if (affordableTarget === en){
+					m.terminate = true
+					continue
+				}
+
+			}
+
+		}
+
+	}
+
 	updateMusic(dt){
 		const m = this.music
 		if (m.playing || this.pinhole) return
@@ -3826,8 +6857,8 @@ class Game {
 
 	updateAutoClicker(dt){
 
-		if (!this.mouse.automate || !this.mouse.state || !this.hoveredEntity || !(this.hoveredEntity instanceof Cube || this.hoveredEntity instanceof Hollow)) return
-		//cube, hollow cube
+		if (this.interactionMode || !this.mouse.automate || !this.mouse.state || !this.hoveredEntity || !(this.hoveredEntity instanceof Cube || this.hoveredEntity instanceof Hollow || this.hoveredEntity instanceof Malformed)) return
+		//cube, hollow cube, malformed
 
 		this.mouse.timer -= dt
 		if (this.mouse.timer <= 0){
@@ -3840,6 +6871,8 @@ class Game {
 	}
 
 	updateGamepad(dt){
+
+		//WIP UPDATE
 
 		if (!this.gamepadIsConnected) return
 		const gamepad = navigator.getGamepads()[0]
@@ -3878,13 +6911,13 @@ class Game {
 
 		//Mouse
 		if (gamepad.axes && gamepad.axes[2] !== undefined && gamepad.axes[3] !== undefined && Math.abs(gamepad.axes[2]) > deadzone || Math.abs(gamepad.axes[3]) > deadzone){
-			const x = Math.min(this.w / this.pixelRatio, Math.max(0, this.mouse.offsetxy[0] + (Math.max(0, Math.abs(gamepad.axes[2]) - deadzone)) * Math.sign(gamepad.axes[2]) / freezone * dt * this.pixelRatio * .4))
-			const y = Math.min(this.h / this.pixelRatio, Math.max(0, this.mouse.offsetxy[1] + (Math.max(0, Math.abs(gamepad.axes[3]) - deadzone)) * Math.sign(gamepad.axes[3]) / freezone * dt * this.pixelRatio * .4))
+			const x = Math.min(this.w / this.pixelRatio, Math.max(0, this.mouse.sxy[0] + (Math.max(0, Math.abs(gamepad.axes[2]) - deadzone)) * Math.sign(gamepad.axes[2]) / freezone * dt * this.pixelRatio * .4))
+			const y = Math.min(this.h / this.pixelRatio, Math.max(0, this.mouse.sxy[1] + (Math.max(0, Math.abs(gamepad.axes[3]) - deadzone)) * Math.sign(gamepad.axes[3]) / freezone * dt * this.pixelRatio * .4))
 			this.updateMouseData(x,y)
 			this.processMousemove2()
 		}
 		
-		//Main action
+		//Main action WIP GAMEPAD SHOP CONNECT
 		const mainAction = v=>{
 			if (this.splash.isShown){
 				if (v) {
@@ -4124,6 +7157,32 @@ class Game {
 
 	}
 
+	updatePunch(dt){
+		if (this.punch.state){
+
+			this.punch.timer += dt
+			if (this.punch.timer >= this.punch.maxTimer){
+				this.punch.state = 0
+				this.punch.offset = 0
+				return
+			}
+
+			const f = Math.min(1, this.punch.timer / this.punch.maxTimer)
+			
+			// this.punch.offset = f ** .5 * this.punch.maxOffset
+			// this.punch.offset = (-2 * (f - .3) ** 2 + 1) * this.punch.maxOffset
+			this.punch.offset = (1 - f**2) * this.punch.maxOffset
+
+		}
+	}
+
+	punchScreen(force = 1, time = 60){
+		this.punch.maxOffset = this.unit * .06 * force
+		this.punch.timer = 0
+		this.punch.maxTimer = time
+		this.punch.state = 1
+	}
+
 	updateResourceInteractions(dt){
 
 		//Halflife
@@ -4237,13 +7296,19 @@ class Game {
 		if (this.translationMap[3]) {this.translation[0] -= mult * dt * this.translationSpeed * this.translationMap[3] / this.zoom; updated = true}
 
 		if (updated){
-			this.processMousemove2()
-			this.updateGlobalSounds()
+			this.processMove()
+			this.updateGlobalPositioning()
 		}
 
 		//Distance to origin
 		if (this.hoveredCell){
 			this.distanceToOrigins = Math.min( (this.hoveredCell[0] ** 2 + this.hoveredCell[1] ** 2)**.5, ((this.hoveredCell[0] + 100) ** 2 + (this.hoveredCell[1] + 100) ** 2)**.5 )
+		}
+
+		if (this.orbifoldUI){
+
+			this.orbifoldUI.updatePosition()
+
 		}
 
 	}
@@ -4271,50 +7336,237 @@ class Game {
 			}
 			
 			this.ctx.save()
-			this.ctx.translate(this.w2, this.h2)
-			
+			this.ctx.translate(this.w2, this.h2 + this.punch.offset)
+
 			//HIGHLIGHT
 			this.renderConductors(this.renderTime.dt)
 			this.ctx.translate(-this.w2, -this.h2)
 			this.renderChasmVFX()
 			this.ctx.translate(this.w2, this.h2)
-			this.renderEntities(this.renderTime.dt) //111111111111111
+
+			// this.renderEntities(this.renderTime.dt) //PLANNING MODE?
+			// this.renderEntitiesAbstract(this.renderTime.dt)
+
+			const showItemInHand = this.itemInHand && this.hoveredCell
+			const ifNotMobileOrWhileTap = !this.isMobile || this.mouse.state === 1
+			const clearView = showItemInHand || this.touchMode || this.altActive || this.interactionMode === `erase` || this.interactionMode === `relocate`
+
+			if (clearView) {
+				this.renderEntitiesAbstract(this.renderTime.dt)
+			} else {
+				this.renderEntities(this.renderTime.dt)
+			}
+
+			//MEMORIES
+			for (let i = 0; i < this.memoryBuffer.length; i++){
+				const position = this.memoryBuffer[i].position
+				const xy = this.uvToXY(position)
+
+				const seed = this.stats.totalPlayTime / 60 + position[0] + position[1]
+				const phase = (seed % (Math.PI * 2)) / Math.PI / 2
+				const r = this.unit * .02 + (Math.sin(seed) * .5 + .5) * this.unit * .05
+
+				this.ctx.fillStyle = `#112`
+				this.ctx.beginPath()
+				this.ctx.arc(xy[0], xy[1], r, 0, Math.PI * 2)
+				this.ctx.closePath()
+				this.ctx.fill()
+			}
 
 			//Alt mode
 			if (this.altActive && !this.plane) {
-				this.ctx.fillStyle = `#FFFC`
-				this.ctx.fillRect(-this.w2, -this.h2, this.w, this.h)
+				// this.ctx.fillStyle = `#FFFC`
+				// this.ctx.fillRect(-this.w2, -this.h2, this.w, this.h)
 
 				if (this.hoveredEntity && !(this.hoveredEntity instanceof Cube)){
 					this.renderSOI(this.hoveredEntity)
 					this.hoveredEntity.render(0)
-					this.renderAffected(this.hoveredEntity.name)
+					this.renderAffected(this.hoveredEntity)
 				}
 
 			}
 
-			const mobileHighlightCondition = !this.isMobile || this.mouse.state === 1
-			if (this.itemInHand && this.hoveredCell && mobileHighlightCondition){
+			if (this.interactionMode === `build` && this.hoveredCell && ifNotMobileOrWhileTap){
 				this.renderAvailability()
 				this.renderSOI(this.hoveredCell)
+			} else if (this.interactionMode === `erase` && this.hoveredCell && !this.eraseList?.length){
+				if (this.hoveredEntity && this.canEraseEntity(this.hoveredEntity)){
+					this.renderEntityInColor(`bad`, this.hoveredEntity)
+				}
 			}
-			if (this.hoveredCell && mobileHighlightCondition) this.renderHoveredCell()
 
-			const showItemInHand = this.itemInHand && this.hoveredCell && !this.itemInHand.eraser
-			if (showItemInHand && mobileHighlightCondition){
+			if (this.hoveredCell && ifNotMobileOrWhileTap) this.renderHoveredCell()
 
+			//TST NEW ERASE
+			if (this.eraseList){
+				for (let i = 0; i < this.eraseList.length; i++){
+					this.renderEntityInColor(`bad`, this.eraseList[i])
+				}
+
+				if (this.eraseOrigin && this.eraseTarget){
+
+					const umin = Math.min(this.eraseTarget[0], this.eraseOrigin[0])
+					const umax = Math.max(this.eraseTarget[0], this.eraseOrigin[0])
+					const vmin = Math.min(this.eraseTarget[1], this.eraseOrigin[1])
+					const vmax = Math.max(this.eraseTarget[1], this.eraseOrigin[1])
+
+					const dx = .866 * this.unit
+					const dy = .5 * this.unit
+
+					const xyA = this.uvToXY([umin, vmin])
+					const xyB = this.uvToXY([umax, vmin])
+					const xyC = this.uvToXY([umax, vmax])
+					const xyD = this.uvToXY([umin, vmax])
+
+					this.ctx.save()
+
+					this.ctx.setLineDash([this.pixelRatio * 8, this.pixelRatio * 10])
+					this.ctx.lineWidth = this.pixelRatio * 3
+					this.ctx.strokeStyle = `#FF241C`
+					//this.unit * .03
+
+					this.ctx.beginPath()
+					this.ctx.moveTo(xyA[0], xyA[1] - dy)
+					this.ctx.lineTo(xyB[0] + dx, xyB[1])
+					this.ctx.lineTo(xyC[0], xyC[1] + dy)
+					this.ctx.lineTo(xyD[0] - dx, xyD[1])
+					this.ctx.closePath()
+					this.ctx.stroke()
+
+					this.ctx.restore()
+
+				}
+			} else if (this.relocationCandidatesList){
+				for (let i = 0; i < this.relocationCandidatesList.length; i++){
+					this.renderEntityInColor(`good`, this.relocationCandidatesList[i])
+				}
+				if (this.relocationOrigin && this.relocationTarget){
+
+					const umin = Math.min(this.relocationTarget[0], this.relocationOrigin[0])
+					const umax = Math.max(this.relocationTarget[0], this.relocationOrigin[0])
+					const vmin = Math.min(this.relocationTarget[1], this.relocationOrigin[1])
+					const vmax = Math.max(this.relocationTarget[1], this.relocationOrigin[1])
+
+					const dx = .866 * this.unit
+					const dy = .5 * this.unit
+
+					const xyA = this.uvToXY([umin, vmin])
+					const xyB = this.uvToXY([umax, vmin])
+					const xyC = this.uvToXY([umax, vmax])
+					const xyD = this.uvToXY([umin, vmax])
+
+					this.ctx.save()
+
+					this.ctx.setLineDash([this.pixelRatio * 8, this.pixelRatio * 10])
+					this.ctx.lineWidth = this.pixelRatio * 3
+					this.ctx.strokeStyle = `#24AA1C`
+
+					this.ctx.beginPath()
+					this.ctx.moveTo(xyA[0], xyA[1] - dy)
+					this.ctx.lineTo(xyB[0] + dx, xyB[1])
+					this.ctx.lineTo(xyC[0], xyC[1] + dy)
+					this.ctx.lineTo(xyD[0] - dx, xyD[1])
+					this.ctx.closePath()
+					this.ctx.stroke()
+
+					this.ctx.restore()
+
+				}
+			} else if (this.relocationList && this.relocationOffsets){
+
+				// this.canPlace = true //WIP set in mouse move after check
 				const c = this.canPlace ? `#09D35055` : this.getColorWave([236,20,1,.5],[220,220,220,.9])
+				for (let i = 0; i < this.relocationList.length; i++){
 
-				// if (!this.isMobile){
-				// this.ctx.save()
-				// this.ctx.globalAlpha = .5
-				// if (this.plane) {this.itemInHand.darkrender(0, this.hoveredCell)} else {this.itemInHand.render(0, this.hoveredCell)}
+					// this.renderEntityInColor(`good`, this.relocationList[i])
+					
+					this.relocationList[i].renderColored(0, [this.hoveredCell[0] + this.relocationOffsets[i][0], this.hoveredCell[1] + this.relocationOffsets[i][1]], c)
+
+				}
+
+			}
+			if (this.cloneList && !this.cloneAreaSelected){
+
+				let canAfford = true
+				for (let i = 0; i < this.totalCloneCost.length; i++){
+					if (this.totalCloneCost[i] > this.resources[i]){
+						canAfford = false
+						break
+					}
+				}
+				if (this.massRelocation) canAfford = true
+
+				for (let i = 0; i < this.cloneList.length; i++){
+					const color = canAfford ? `good` : `bad`
+					this.renderInColor(color, this.cloneList[i].position)
+				}
+				if (this.cloneOrigin && this.cloneTarget){
+
+					const umin = Math.min(this.cloneTarget[0], this.cloneOrigin[0])
+					const umax = Math.max(this.cloneTarget[0], this.cloneOrigin[0])
+					const vmin = Math.min(this.cloneTarget[1], this.cloneOrigin[1])
+					const vmax = Math.max(this.cloneTarget[1], this.cloneOrigin[1])
+
+					const dx = .866 * this.unit
+					const dy = .5 * this.unit
+
+					const xyA = this.uvToXY([umin, vmin])
+					const xyB = this.uvToXY([umax, vmin])
+					const xyC = this.uvToXY([umax, vmax])
+					const xyD = this.uvToXY([umin, vmax])
+
+					this.ctx.save()
+
+					this.ctx.setLineDash([this.pixelRatio * 8, this.pixelRatio * 10])
+					this.ctx.lineWidth = this.pixelRatio * 3
+					this.ctx.strokeStyle = `#30CE6F`
+
+					this.ctx.beginPath()
+					this.ctx.moveTo(xyA[0], xyA[1] - dy)
+					this.ctx.lineTo(xyB[0] + dx, xyB[1])
+					this.ctx.lineTo(xyC[0], xyC[1] + dy)
+					this.ctx.lineTo(xyD[0] - dx, xyD[1])
+					this.ctx.closePath()
+					this.ctx.stroke()
+
+					this.ctx.restore()
+
+				}
+			} else if (this.cloneEntitiesList && this.cloneAreaSelected){
+				if (this.massRelocation){
+
+					const dict = {}
+					for (let i = 0; i < this.cloneList.length; i++){
+						dict[`u${this.cloneList[i].position[0]}v${this.cloneList[i].position[1]}`] = true
+					}
+
+					let relocationCondition = true
+					for (let i = 0; i < this.cloneEntitiesList.length; i++){
+						if (!this.canRelocate(this.cloneList[i]) || (this.entityAtCoordinates(this.cloneEntitiesList[i].position) && !dict[`u${this.cloneEntitiesList[i].position[0]}v${this.cloneEntitiesList[i].position[1]}`])){
+							relocationCondition = false
+							break
+						}
+					}
+
+					for (let i = 0; i < this.cloneEntitiesList.length; i++){
+						this.cloneEntitiesList[i].render()
+						const color = relocationCondition ? `good` : `bad`
+						this.renderInColor(color, this.cloneEntitiesList[i].position)
+					}
+				} else {
+					for (let i = 0; i < this.cloneEntitiesList.length; i++){
+						this.cloneEntitiesList[i].render()
+						const color = this.canPlaceEntityHere(this.cloneEntitiesList[i], this.cloneEntitiesList[i].position) ? `good` : `bad`
+						this.renderInColor(color, this.cloneEntitiesList[i].position)
+					}
+				}
+			}
+
+			//Render Clone List
+			if (showItemInHand && ifNotMobileOrWhileTap){
+				const c = this.canPlace ? `#09D35055` : this.getColorWave([236,20,1,.5],[220,220,220,.9])
 				if (this.plane) {this.itemInHand.darkrenderColored(0, this.hoveredCell, c)} else {this.itemInHand.renderColored(0, this.hoveredCell, c)}
-				// this.ctx.restore()
-				// }
-				
-				this.renderAffected(this.itemInHand.name)
-
+				this.renderAffected(this.itemInHand)
 			}
 
 			//Pinhole
@@ -4337,9 +7589,6 @@ class Game {
 
 				ctx.closePath()
 
-				// ctx.clip()
-				// ctx.drawImage(this.spaceImage,-this.spaceImage.naturalWidth/2,-this.spaceImage.naturalHeight/2)
-
 				ctx.fill()
 				ctx.restore()
 
@@ -4347,31 +7596,76 @@ class Game {
 
 			this.ctx.restore()
 
-			if (this.isMobile && showItemInHand) {
-				this.renderGrid()
-				this.ctx.save()
-				this.ctx.translate(this.w/2, this.h/4)
+			if (this.mouse.cursorVisible) this.renderCursor(clearView)
+			if (clearView) this.renderGrid()
+			if (this.isMobile) {
+				
+				if (showItemInHand){
 
-				const grad = this.ctx.createRadialGradient(0,0,this.screenUnit * 1.6,0,0,this.screenUnit * 3)
-				grad.addColorStop(0, `#2244`)
-				grad.addColorStop(1, `#4480`)
-				this.ctx.fillStyle = grad
-				this.ctx.beginPath()
-				this.ctx.arc(0,0,this.screenUnit * 3, 0, Math.PI * 2)
-				this.ctx.fill()
+					const circleScale = 2.2
+					const radius = this.screenUnit * circleScale
+					const cutoff = radius * .533
+					const itemScale = circleScale * .4
 
-				this.ctx.fillStyle = `#FFF`
-				this.ctx.beginPath()
-				this.ctx.arc(0,0,this.screenUnit * 1.6, 0, Math.PI * 2)
-				this.ctx.fill()
+					this.ctx.save()
+					this.ctx.translate(this.w/2, this.h/4)
 
-				this.ctx.scale(1.2 / this.zoom, 1.2 / this.zoom)
-				this.itemInHand.render(0, this.xyToUVUntranslated())
+					const grad = this.ctx.createRadialGradient(0,0,cutoff,0,0,radius)
+					grad.addColorStop(0, `#2244`)
+					grad.addColorStop(1, `#4480`)
+					this.ctx.fillStyle = grad
+					this.ctx.beginPath()
+					this.ctx.arc(0,0,radius, 0, Math.PI * 2)
+					this.ctx.fill()
 
-				this.ctx.restore()
+					this.ctx.fillStyle = `#FFF`
+					this.ctx.beginPath()
+					this.ctx.arc(0,0,cutoff, 0, Math.PI * 2)
+					this.ctx.fill()
+
+					this.ctx.scale(itemScale / this.zoom, itemScale / this.zoom)
+					this.itemInHand.render(0, this.xyToUVUntranslated())
+
+					this.ctx.restore()
+				}
 			}
 
 			this.renderVFX()
+
+			//Touch mode modes (relocation, eraser)
+			if (this.isMobile && this.interactionMode === `erase`){
+
+				const fill = this.ctx.createLinearGradient(0, 0, 0, this.h)
+				fill.addColorStop(0, `#FF241CFF`)
+				fill.addColorStop(1, `#FFB97F00`)
+
+				this.ctx.save()
+				this.ctx.globalCompositeOperation = `multiply`
+				this.ctx.fillStyle = fill
+				this.ctx.fillRect(0, 0, this.w, this.h)
+
+				this.ctx.globalCompositeOperation = `source-over`
+				this.ctx.font = `600 ` + this.screenUnit * .5 + `px Montserrat, sans-serif`
+				this.ctx.textAlign = `center`
+				this.ctx.fillStyle = `#FFF`
+				this.ctx.fillText(this.pronounce('entities', this.eraserType === 1 ? `eraser2` : this.eraserType === 2 ? `eraser3` : `eraser`, 'name'), this.w2, this.h * .25)
+
+				this.ctx.restore()
+
+			} else if (this.isMobile && this.interactionMode === `relocate`){
+
+				const fill = this.ctx.createLinearGradient(0, 0, 0, this.h)
+				fill.addColorStop(0, this.massRelocation ? `#30F1FFFF` : `#C7FF7EFF`)
+				fill.addColorStop(1, this.massRelocation ? `#CEFFB400` : `#FFF5B400`)
+				this.ctx.save()
+				this.ctx.globalCompositeOperation = `multiply`
+				this.ctx.fillStyle = fill
+				this.ctx.fillRect(0, 0, this.w, this.h)
+
+				this.ctx.restore()
+
+			}
+			
 
 			if (!this.plane){
 
@@ -4392,61 +7686,11 @@ class Game {
 
 			}
 
-			//Touch mode modes (relocation, erasr)
-			if (this.touchMode === 1){
-
-				// const weight = this.unit / 8
-
-				// this.ctx.strokeStyle = this.ctx.fillStyle = `#FB1A38`
-				// this.ctx.lineWidth = weight * 2
-				// this.ctx.strokeRect(0,0,this.w,this.h)
-
-				// const fill = this.ctx.createLinearGradient(0, this.h, 0, this.h2)
-				// fill.addColorStop(0, `#FF241CFF`)
-				// fill.addColorStop(1, `#FFB97F00`)
-				// this.ctx.save()
-				// this.ctx.globalCompositeOperation = `multiply`
-				// this.ctx.fillStyle = fill
-				// this.ctx.fillRect(0, this.h2, this.w, this.h2)
-				// this.ctx.restore()
-
-				const fill = this.ctx.createLinearGradient(0, 0, 0, this.h)
-				fill.addColorStop(0, `#FF241CFF`)
-				fill.addColorStop(1, `#FFB97F00`)
-				this.ctx.save()
-				this.ctx.globalCompositeOperation = `multiply`
-				this.ctx.fillStyle = fill
-				this.ctx.fillRect(0, 0, this.w, this.h)
-				this.ctx.restore()
-
-			} else if (this.touchMode === 2){
-
-				// const weight = this.unit / 8
-
-				// this.ctx.strokeStyle = this.ctx.fillStyle = `#5E78E2`
-				// this.ctx.lineWidth = weight * 2
-				// this.ctx.strokeRect(0,0,this.w,this.h)
-
-				const fill = this.ctx.createLinearGradient(0, 0, 0, this.h)
-				fill.addColorStop(0, `#30F1FFFF`)
-				fill.addColorStop(1, `#CEFFB400`)
-				this.ctx.save()
-				this.ctx.globalCompositeOperation = `multiply`
-				this.ctx.fillStyle = fill
-				this.ctx.fillRect(0, 0, this.w, this.h)
-				this.ctx.restore()
-
-			}
-			
-
-			if (this.mouse.cursorVisible) this.renderCursor()
-
-
 			//Hint position update
 			if (this.currentHint.element && !this.isMobile){
 
-				this.currentHint.element.style.left = this.mouse.offsetxy[0] + `px`
-				this.currentHint.element.style.top = this.mouse.offsetxy[1] + `px`
+				this.currentHint.element.style.left = this.mouse.sxy[0] + `px`
+				this.currentHint.element.style.top = this.mouse.sxy[1] + `px`
 
 			}
 
@@ -4455,6 +7699,166 @@ class Game {
 				this.ctx.fillRect(0,0,this.w,this.h)
 			}
 
+			if (this.attractor) this.renderAttractor(this.attractor)
+
+			//MEMORY COMPLEX
+			if (this.memoryComplexIsVisible && !this.plane){
+				this.ctx.save()
+				this.ctx.translate(this.w2, this.h2 + this.punch.offset)
+				this.renderMemoryComplex()
+				this.ctx.restore()
+			}
+
+
+	}
+
+	renderMemoryComplex(){
+		const mc = this.memoryComplexStages[this.currentMemoryComplexStage]
+		if (!mc) return
+
+		const C = this.uvToXY(this.memorycomplexCenter)
+		// const R = this.memorycomplexRadius * this.unit
+		const uvc = this.xyToUVUntranslated([0,0])
+
+		const f0 = this.memorycomplexRadius
+		const f1 = this.memorycomplexRadius * .5
+		const D = ((uvc[0] - this.memorycomplexCenter[0]) ** 2 + (uvc[1] - this.memorycomplexCenter[1]) ** 2) ** .5
+		const F = Math.max(0, Math.min(1, (D - f0) / (f1 - f0)))
+
+		if (F > 0) {
+			this.ctx.globalAlpha = F
+			this.ctx.fillStyle = mc.color
+			this.ctx.fillRect(-this.w2,-this.h2,this.w,this.h)
+			this.ctx.globalAlpha = 1
+		}
+
+		//Cache check
+		if (!this.memoryComplexImage){
+			this.memoryComplexImage = new Image()
+			this.memoryComplexImage.src = mc.src
+			this.memoryComplexImageSize = 50
+			this.memoryComplexImageAspect = .75
+			this.memoryComplexImage.onload = _=>{
+				this.memoryComplexImageAspect = this.memoryComplexImage.naturalHeight / this.memoryComplexImage.naturalWidth
+			}
+		}
+
+		const w = this.unit*this.memoryComplexImageSize
+		const h = this.unit*this.memoryComplexImageSize * this.memoryComplexImageAspect
+
+		this.ctx.drawImage(this.memoryComplexImage, C[0] - w/2, C[1] - h/2, w, h)
+
+		if (mc.beam){
+
+			const bw = this.unit * 6.093
+			const offsetX = this.unit * .315
+			const offsetY = this.unit * 16
+			const bh = this.unit * this.memorycomplexRadius
+
+			this.ctx.fillStyle = `#FFF`
+			this.ctx.fillRect(C[0] + offsetX - bw/2, C[1] - bh, bw, bh - offsetY)
+
+		}
+
+		//Cursor
+		this.ctx.fillStyle = `#FFF`
+		const radius = this.pixelRatio * 3
+		this.ctx.beginPath()
+		this.ctx.arc(this.mouse.xy[0] - this.w2, this.mouse.xy[1] - this.h2, radius, 0, Math.PI * 2)
+		this.ctx.closePath()
+		this.ctx.fill()
+	}
+
+	renderAttractor(A){
+
+		if (!A) return
+
+		let target
+		let cell = false
+
+		if (A.getBoundingClientRect && A.isConnected){
+			const bcr = A.getBoundingClientRect()
+			target = [(bcr.x + bcr.width / 2) * this.pixelRatio, (bcr.y + bcr.height / 2) * this.pixelRatio]
+		} else if (A.position){
+			target = this.uvToXYUntranslated(A.position)
+			cell = true
+		}
+
+		if (!target) return
+
+		//Cell highlight
+		if (cell){
+			const dx = .866 * this.unit
+			const dy = .5 * this.unit
+			const f = (Math.sin(performance.now() * 1e-2) * .5 + .5)
+			const o = Math.max(0, Math.round(f * .6 * 255)).toString(16).toUpperCase().padStart(2, `0`)
+
+			this.ctx.strokeStyle = `#FFBF2B`
+			this.ctx.fillStyle = `#FFBF2B${o}`
+			this.ctx.beginPath()
+			this.ctx.moveTo(target[0], target[1] - dy)
+			this.ctx.lineTo(target[0] + dx, target[1])
+			this.ctx.lineTo(target[0], target[1] + dy)
+			this.ctx.lineTo(target[0] - dx, target[1])
+			this.ctx.closePath()
+			this.ctx.fill()
+
+			const s = .2
+			const l = .8
+			const b = 1 + f * .4
+
+			this.ctx.lineWidth = this.unit * .05
+
+			this.ctx.beginPath()
+			this.ctx.moveTo(target[0] - dx * s * b, target[1] - dy * l * b)
+			this.ctx.lineTo(target[0], target[1] - dy * b)
+			this.ctx.lineTo(target[0] + dx * s * b, target[1] - dy * l * b)
+			this.ctx.stroke()
+
+			this.ctx.beginPath()
+			this.ctx.moveTo(target[0] + dx * l * b, target[1] - dy * s * b)
+			this.ctx.lineTo(target[0] + dx * b, target[1])
+			this.ctx.lineTo(target[0] + dx * l * b, target[1] + dy * s * b)
+			this.ctx.stroke()
+
+			this.ctx.beginPath()
+			this.ctx.moveTo(target[0] - dx * s * b, target[1] + dy * l * b)
+			this.ctx.lineTo(target[0], target[1] + dy * b)
+			this.ctx.lineTo(target[0] + dx * s * b, target[1] + dy * l * b)
+			this.ctx.stroke()
+
+			this.ctx.beginPath()
+			this.ctx.moveTo(target[0] - dx * l * b, target[1] - dy * s * b)
+			this.ctx.lineTo(target[0] - dx * b, target[1])
+			this.ctx.lineTo(target[0] - dx * l * b, target[1] + dy * s * b)
+			this.ctx.stroke()
+		} else {
+
+			const R = this.w2
+			const bands = 4
+			const interval = 4000
+			const f = 1 - (performance.now() % interval) / interval
+			const grad = this.ctx.createRadialGradient(0,0,0,0,0,R)
+			grad.addColorStop(0,`#FFF0`)
+			grad.addColorStop(.2,`#FFBF2B`)
+			grad.addColorStop(1,`#FFF0`)
+			this.ctx.save()
+			this.ctx.translate(target[0], target[1])
+
+			this.ctx.strokeStyle = grad
+
+			for (let i = 0; i < bands; i++){
+				const ff = ((f + (1 / bands) * i) % 1) ** 4
+				this.ctx.lineWidth = this.unit * .2 * ff
+				this.ctx.beginPath()
+				this.ctx.arc(0,0,R * ff, 0, Math.PI * 2)
+				this.ctx.closePath()
+				this.ctx.stroke()
+			}
+
+		}
+		
+		this.ctx.restore()
 
 	}
 
@@ -4576,98 +7980,145 @@ class Game {
 
 	}
 
-	renderAffected(name){
+	renderAffected(entity){
+		const name = entity.name
 		const list = this.codex.entities[name].affected
-		if (list){
-			const color = `#53B976`
-			const n = []
-			const o = this.hoveredCell
-			let hasAffected = false
-			const r = this.unit * .05
-			const xy0 = this.uvToXY(o)
+		if (!list) return
 
-			for (let i = 0; i < 9; i++){
-				const du = -1 + i % 3
-				const dv = -1 + Math.floor(i / 3)
-				const m = this.stuffMap[`u${o[0] + du}v${o[1] + dv}`]
-				const conductorok = (name === `conductor` || m?.name === `conductor`) ? i%2 : 1
+		const color = `#53B976`
+		const n = []
+		const o = this.hoveredCell
+		const r = this.unit * .05
 
-				if (m && conductorok) n.push(m)
-			}
+		const xy0 = this.uvToXY(o)
 
-			this.ctx.strokeStyle = color
-			this.ctx.lineWidth = r * .5
+		const width = 3 + entity.entitySpan * 2
+		const width2 = width ** 2
+		const from = -(1 + entity.entitySpan)
+		const swing = width * .16 * this.unit
 
-			for (let i = 0; i < n.length; i++){
+		for (let i = 0; i < width2; i++){
+			const du = from + i % width
+			const dv = from + Math.floor(i / width)
+			const m = this.stuffMap[`u${o[0] + du}v${o[1] + dv}`]
+			if (!m || !list[m.name] || m === entity) continue
+			const conductorok = (name === `conductor` || m?.name === `conductor`) ? i%2 : 1
+			if (conductorok) n.push(m)
+		}
 
-				if (list[n[i].name]){
+		if (!n.length) return
 
-					hasAffected = true
-					const xy = this.uvToXY(n[i].position)
+		this.ctx.strokeStyle = color
+		this.ctx.lineWidth = r * .5
 
+		//Lines and circles on targets
+		for (let i = 0; i < n.length; i++){
+
+			const xy = this.uvToXY(n[i].position)
+
+			this.ctx.beginPath()
+			this.ctx.moveTo(xy0[0], xy0[1])
+			this.ctx.bezierCurveTo(xy0[0], xy0[1] + swing, xy[0], xy[1] + swing, xy[0], xy[1])
+			this.ctx.stroke()
+
+			this.ctx.fillStyle = color
+			this.ctx.beginPath()
+			this.ctx.arc(xy[0], xy[1], r, 0, Math.PI * 2)
+			this.ctx.closePath()
+			this.ctx.fill()
+			this.ctx.fillStyle = `#FFF`
+			this.ctx.beginPath()
+			this.ctx.arc(xy[0], xy[1], r - this.ctx.lineWidth, 0, Math.PI * 2)
+			this.ctx.closePath()
+			this.ctx.fill()
+
+		}
+
+		//Circle on origin
+		this.ctx.fillStyle = color
+		this.ctx.beginPath()
+		this.ctx.arc(xy0[0], xy0[1], r, 0, Math.PI * 2)
+		this.ctx.closePath()
+		this.ctx.fill()
+		this.ctx.fillStyle = `#FFF`
+		this.ctx.beginPath()
+		this.ctx.arc(xy0[0], xy0[1], r - this.ctx.lineWidth, 0, Math.PI * 2)
+		this.ctx.closePath()
+		this.ctx.fill()
+
+	}
+
+	renderCursor(clear){
+
+
+		if (!this.plane){
+			const hint = this.eraseList?.length ? this.eraseHint : this.cloneList?.length ? this.cloneHint : (this.interactionMode === `erase` && !this.eraseList?.length ? this.hoveredEntity?.getSellHint() : (this.itemInHand && this.hoveredEntity && this.hoveredEntity.name === this.codex.entities[this.itemInHand.name].isUpgradeTo) ? this.itemInHandPriceAndRefundTag : this.itemInHand ? this.itemInHandPriceTag : this.hoveredEntity?.getHint())
+			const canHit = this.hoveredEntity && this.hoveredEntity.canHit()
+
+			if (!this.touchMode){
+
+				if (this.showUnfilled) this.renderUnfilled()
+				if (this.isMobile && !clear) this.renderActions()
+
+				this.ctx.save()
+				this.ctx.translate(this.mouse.xy[0], this.mouse.xy[1])
+
+				if (this.interactionMode === `erase`){
+
+					const big = this.hoveredEntity && this.canEraseEntity(this.hoveredEntity)
+					const radius = this.pixelRatio * (big ? 10 : 6)
+					this.ctx.lineWidth = this.pixelRatio * (big ? 3 : 2)
+					this.ctx.strokeStyle = `#000`
 					this.ctx.beginPath()
-					this.ctx.moveTo(xy0[0], xy0[1])
-					// this.ctx.lineTo(xy[0], xy[1])
-					this.ctx.bezierCurveTo(xy0[0], xy0[1] + this.unit * .3, xy[0], xy[1] + this.unit * .3, xy[0], xy[1])
+					this.ctx.moveTo(-radius, -radius)
+					this.ctx.lineTo(radius, radius)
+					this.ctx.stroke()
+					this.ctx.beginPath()
+					this.ctx.moveTo(radius, -radius)
+					this.ctx.lineTo(-radius, radius)
 					this.ctx.stroke()
 
-					this.ctx.fillStyle = color
+				} else if (this.interactionMode === `relocate`){
+
+					const big = this.hoveredEntity && this.canRelocate(this.hoveredEntity)
+					const length = this.pixelRatio * (big ? 20 : 12)
+					const slength = length * .3
+					this.ctx.lineWidth = this.pixelRatio * (big ? 3 : 2)
+					this.ctx.strokeStyle = this.ctx.fillStyle = `#000`
 					this.ctx.beginPath()
-					this.ctx.arc(xy[0], xy[1], r, 0, Math.PI * 2)
+					this.ctx.moveTo(0, -slength)
+					this.ctx.lineTo(0, -length)
+					this.ctx.stroke()
+					this.ctx.beginPath()
+					this.ctx.moveTo(-slength, slength-length)
+					this.ctx.lineTo(0, -length)
+					this.ctx.lineTo(slength, slength-length)
+					this.ctx.stroke()
+					this.ctx.beginPath()
+					this.ctx.arc(0,0,slength * .6,0,Math.PI * 2)
 					this.ctx.closePath()
 					this.ctx.fill()
-					this.ctx.fillStyle = `#FFF`
+
+
+				} else {
+
+					const radius = this.pixelRatio * (canHit ? 12 : 6)
+					this.ctx.fillStyle = canHit ? `#000` : `#FFF`
 					this.ctx.beginPath()
-					this.ctx.arc(xy[0], xy[1], r - this.ctx.lineWidth, 0, Math.PI * 2)
+					this.ctx.arc(0, 0, radius, 0, Math.PI * 2)
+					this.ctx.closePath()
+					this.ctx.fill()
+					this.ctx.fillStyle = canHit ? `#FFF` : `#000`
+					this.ctx.beginPath()
+					this.ctx.arc(0, 0, radius * .8, 0, Math.PI * 2)
 					this.ctx.closePath()
 					this.ctx.fill()
 
 				}
 
-			}
-
-			if (hasAffected){
-
-				this.ctx.fillStyle = color
-				this.ctx.beginPath()
-				this.ctx.arc(xy0[0], xy0[1], r, 0, Math.PI * 2)
-				this.ctx.closePath()
-				this.ctx.fill()
-				this.ctx.fillStyle = `#FFF`
-				this.ctx.beginPath()
-				this.ctx.arc(xy0[0], xy0[1], r - this.ctx.lineWidth, 0, Math.PI * 2)
-				this.ctx.closePath()
-				this.ctx.fill()
+				this.ctx.restore()
 
 			}
-
-		}
-
-	}
-
-	renderCursor(){
-
-		if (!this.plane){
-			const hint = this.itemInHand?.eraser ? this.hoveredEntity?.getSellHint() : (this.itemInHand && this.hoveredEntity && this.hoveredEntity.name === this.codex.entities[this.itemInHand.name].isUpgradeTo) ? this.itemInHandPriceAndRefundTag : this.itemInHand ? this.itemInHandPriceTag : this.hoveredEntity?.getHint()
-			const canHit = this.hoveredEntity && this.hoveredEntity.canHit()
-
-			if (this.showUnfilled) this.renderUnfilled()
-			if (this.isMobile) this.renderActions()
-
-			this.ctx.save()
-			this.ctx.translate(this.mouse.xy[0], this.mouse.xy[1])
-
-			const radius = this.pixelRatio * (canHit ? 12 : 6)
-			this.ctx.fillStyle = canHit ? `#000` : `#FFF`
-			this.ctx.beginPath()
-			this.ctx.arc(0, 0, radius, 0, Math.PI * 2)
-			this.ctx.closePath()
-			this.ctx.fill()
-			this.ctx.fillStyle = canHit ? `#FFF` : `#000`
-			this.ctx.beginPath()
-			this.ctx.arc(0, 0, radius * .8, 0, Math.PI * 2)
-			this.ctx.closePath()
-			this.ctx.fill()
 
 			if (hint){
 
@@ -4691,12 +8142,12 @@ class Game {
 				this.removeHint()
 			}
 
-			this.ctx.restore()
-
 		} else if (this.plane === 1){
 
 			const hint = this.hoveredEntity?.getDarkHint()
 			const canHit = this.hoveredEntity?.canDarkHit()
+
+			if (this.showUnfilled) this.renderExit()
 
 			this.ctx.save()
 			this.ctx.translate(this.mouse.xy[0], this.mouse.xy[1])
@@ -4757,10 +8208,69 @@ class Game {
 
 	removeHint(){
 		if (this.currentHint.element) {
+			if (this.currentHint.element.onremove) this.currentHint.element.onremove()
 			document.body.removeChild(this.currentHint.element)
 			this.currentHint.element = undefined
 			this.currentHint.entity = undefined
 		}
+	}
+
+	isAndroid(){
+
+		const ua = navigator.userAgent ?? ``
+		const plat = navigator.userAgentData?.platform ?? navigator.platform ?? ``
+		return /Android/i.test(ua) ?? /Android/i.test(plat)
+
+	}
+
+	renderExit(){
+
+		this.ctx.save()
+		const margin = this.pixelRatio * 26
+		const size = this.pixelRatio * 28
+
+		//Wells
+		const color = this.getColorWave([10,10,20,1],[255,255,255,1])
+
+		for (let i = 0; i < this.idleStuff.length; i++){
+
+			if (!(this.idleStuff[i] instanceof Voidsculpture)) continue
+
+			const coords = this.uvToXYUntranslated(this.idleStuff[i].position)
+			const vector = [this.mouse.xy[0] - coords[0], this.mouse.xy[1] - coords[1]]
+			const length = (vector[0] ** 2 + vector[1] ** 2) ** .5
+
+			if (length > this.unit * 6){
+				this.ctx.strokeStyle = color
+				this.ctx.lineWidth = this.pixelRatio * 4
+				vector[0] /= length
+				vector[1] /= length
+				this.ctx.beginPath()
+				this.ctx.moveTo(this.mouse.xy[0] - vector[0] * margin * 1.8, this.mouse.xy[1] - vector[1] * margin * 1.8)
+				this.ctx.lineTo(this.mouse.xy[0] - vector[0] * size * 2, this.mouse.xy[1] - vector[1] * size * 2)
+				this.ctx.stroke()
+
+			} else {
+
+				this.ctx.fillStyle = color
+				this.ctx.strokeStyle = color
+				this.ctx.lineWidth = this.pixelRatio * 2
+				this.ctx.beginPath()
+				this.ctx.moveTo(this.mouse.xy[0], this.mouse.xy[1])
+				this.ctx.lineTo(coords[0], coords[1])
+				this.ctx.stroke()
+
+				this.ctx.beginPath()
+				this.ctx.arc(coords[0], coords[1], this.pixelRatio * 2, 0, Math.PI * 2)
+				this.ctx.closePath()
+				this.ctx.fill()
+
+			}
+
+		}
+
+		this.ctx.restore()
+
 	}
 
 	renderUnfilled(){
@@ -4927,18 +8437,45 @@ class Game {
 	}
 
 	renderAvailability(){
-		const good = this.plane ? `#FFF6` : `#0F06`
-		const bad = this.getColorWave([236,20,1,.5],[220,220,220,.9])
-		// this.drawPrism(this.hoveredCell, 1, 0, this.canPlace ? good : bad)
+
+		this.renderInColor(this.canPlace ? `good` : `bad`, this.hoveredCell)
+
+		// const good = this.plane ? `#FFF6` : `#0F06`
+		// const bad = this.getColorWave([236,20,1,.5],[220,220,220,.9])
+		// // this.drawPrism(this.hoveredCell, 1, 0, this.canPlace ? good : bad)
+
+		// const dx = .866 * this.unit
+		// const dy = .5 * this.unit
+
+		// // this.ctx.save()
+		// const xy = this.uvToXY(this.hoveredCell)
+		// // this.ctx.translate(xy[0], xy[1])
+
+		// this.ctx.fillStyle = this.canPlace ? good : bad
+		// this.ctx.beginPath()
+		// this.ctx.moveTo(xy[0], xy[1] - dy)
+		// this.ctx.lineTo(xy[0] + dx, xy[1])
+		// this.ctx.lineTo(xy[0], xy[1] + dy)
+		// this.ctx.lineTo(xy[0] - dx, xy[1])
+		// this.ctx.closePath()
+		// this.ctx.fill()
+
+		// // this.ctx.restore()
+
+	}
+
+	renderInColor(color=`good`, uv=[0,0]){
+
+		const colors = {
+			good: this.plane ? `#FFF6` : `#0F06`,
+			bad: this.getColorWave([236,20,1,.5],[220,220,220,.9])
+		}
 
 		const dx = .866 * this.unit
 		const dy = .5 * this.unit
+		const xy = this.uvToXY(uv)
 
-		// this.ctx.save()
-		const xy = this.uvToXY(this.hoveredCell)
-		// this.ctx.translate(xy[0], xy[1])
-
-		this.ctx.fillStyle = this.canPlace ? good : bad
+		this.ctx.fillStyle = colors[color]
 		this.ctx.beginPath()
 		this.ctx.moveTo(xy[0], xy[1] - dy)
 		this.ctx.lineTo(xy[0] + dx, xy[1])
@@ -4947,8 +8484,19 @@ class Game {
 		this.ctx.closePath()
 		this.ctx.fill()
 
-		// this.ctx.restore()
+	}
 
+	renderEntityInColor(color = `good`, entity){
+		if (!entity?.position) return
+		const span = entity.entitySpan ?? 0
+		for (let dx = -span; dx <= span; dx++){
+			for (let dy = -span; dy <= span; dy++){
+
+				const p = [entity.position[0] + dx, entity.position[1] + dy]
+				this.renderInColor(color, p)
+
+			}
+		}
 	}
 
 	renderResources(){
@@ -4960,7 +8508,7 @@ class Game {
 		glow.addColorStop(.5, `#FFFF`)
 		glow.addColorStop(1, `#FFF0`)
 
-		for (let i = 0; i < this.resources.length; i++){
+		for (let i = 0; i < 10; i++){ //Show only main resources
 
 			if (this.resources[i]){
 
@@ -5033,7 +8581,7 @@ class Game {
 					if (this.entitiesInGame.mega1 > 0 || this.entitiesInGame.mega1a > 0 || this.entitiesInGame.mega1b > 0){
 						const shift2 = -this.screenUnit * 1.03
 						const value = this.analytics.average[i][0]
-						const average = `+\u2009${this.makeReadable(value)}\u2009/\u2009s`
+						const average = `+ ${this.makeReadable(value)} / s`
 						const averageMeasure = this.ctx.measureText(average)
 						this.ctx.fillStyle = `#FFF`
 						if (this.ctx.roundRect){
@@ -5049,7 +8597,7 @@ class Game {
 
 						const shift3 = -this.screenUnit * 1.2
 						const value2 = this.analytics.average[i][1]
-						const average2 = `–\u2009${this.makeReadable(-value2)}\u2009/\u2009s`
+						const average2 = `– ${this.makeReadable(-value2)} / s`
 						const averageMeasure2 = this.ctx.measureText(average2)
 						this.ctx.fillStyle = `#FFF`
 						if (this.ctx.roundRect){
@@ -5151,7 +8699,7 @@ class Game {
 							ctx.fillRect(0, lh, shortWidth + dx, 1)
 
 							ctx.globalAlpha = 1
-							ctx.fillText(this.makeReadable(v) + `\u2009/\u2009s`, shortWidth + padding, lh)
+							ctx.fillText(this.makeReadable(v) + ` / s`, shortWidth + padding, lh)
 
 						}
 
@@ -5247,6 +8795,35 @@ class Game {
 		return `A lot`
 	}
 
+	getRoman(n){
+		if (!Number.isInteger(n) || n > 3999) return n
+
+		const symbols = [
+			[1000, "M"],
+		    [900, "CM"],
+		    [500, "D"],
+		    [400, "CD"],
+		    [100, "C"],
+		    [90, "XC"],
+		    [50, "L"],
+		    [40, "XL"],
+		    [10, "X"],
+		    [9, "IX"],
+		    [5, "V"],
+		    [4, "IV"],
+		    [1, "I"]
+		]
+		let roman = ``
+		for (const [v,s] of symbols){
+			while (n >= v) {
+				roman += s
+				n -= v
+			}
+		}
+
+		return roman
+	}
+
 	addResourcesFromArray(a,skipAnalytics){
 
 		const f = this.analytics.frame || []
@@ -5287,7 +8864,6 @@ class Game {
 
 	renderConductors(dt){
 		if (!this.plane){
-
 			const c = Array.from(this.conductors)
 			for (let i = 0; i < c.length; i++){
 				if (this.isVisible(c[i])) c[i].render(dt)
@@ -5302,11 +8878,51 @@ class Game {
 
 			for (let i = 0; i < this.stuff.length; i++){
 
-				// if (this.stuff[i].name !== `conductor` && this.isVisible(this.stuff[i])) this.stuff[i].render(dt)
+				if (this.stuff[i].name !== `conductor` && this.isVisible(this.stuff[i])) {
+
+					this.stuff[i].render(dt)					
+					
+				}
+				
+			}
+
+		} else if (this.plane === 1){
+
+			for (let i = 0; i < this.stuff.length; i++){
+
+				if (this.isVisible(this.stuff[i])) this.stuff[i].darkrender(dt)
+
+			}
+
+		}
+
+	}
+
+	renderEntitiesAbstract(dt){
+
+		const dx = .9 * .866 * this.unit
+		const dy = .9 * .5 * this.unit
+
+		if (!this.plane){
+
+			for (let i = 0; i < this.stuff.length; i++){
 
 				if (this.stuff[i].name !== `conductor` && this.isVisible(this.stuff[i])) {
 
+					const xy = this.uvToXY(this.stuff[i].position)
+					const mult = (this.stuff[i].entitySpan ?? 0) * 2 + 1
+
+					this.ctx.save()
+					this.ctx.beginPath()
+					this.ctx.moveTo(xy[0], xy[1] - dy * mult)
+					this.ctx.lineTo(xy[0] + dx * mult, xy[1])
+					this.ctx.lineTo(xy[0], xy[1] + dy * mult)
+					this.ctx.lineTo(xy[0] - dx * mult, xy[1])
+					// this.ctx.arc(0,0,300,0,Math.PI*2)
+					this.ctx.closePath()
+					this.ctx.clip()
 					this.stuff[i].render(dt)
+					this.ctx.restore()
 					
 				}
 				
@@ -5341,8 +8957,10 @@ class Game {
 			const puncture = this.stuff[i] instanceof Puncture
 			const stab = (this.stuff[i] instanceof Stabilizer && !this.stuff[i].surge)
 			const surge = (this.stuff[i] instanceof Surge && !this.stuff[i].stabilizer)
+			const exit = (this.stuff[i] instanceof Voidsculpture && this.plane)
+			const strange = (!this.entitiesInGame.strange1 && this.stuff[i] instanceof Strange && this.resources[6])
 
-			if (well || puncture || stab || surge){
+			if (well || puncture || stab || surge || exit || strange){
 				this.idleStuff.push(this.stuff[i])
 			}
 		}
@@ -5400,43 +9018,65 @@ class Game {
 		const rt = this.xyToUV([this.w,0])
 		const lb = this.xyToUV([0,this.h])
 
-		lt[0] = Math.floor(lt[0]) + .5
-		lt[1] = Math.floor(lt[1]) + .5
-		rb[0] = Math.floor(rb[0]) + .5
-		rb[1] = Math.floor(rb[1]) + .5
-		rt[0] = Math.floor(rt[0]) + .5
-		rt[1] = Math.floor(rt[1]) + .5
-		lb[0] = Math.floor(lb[0]) + .5
-		lb[1] = Math.floor(lb[1]) + .5
+		lt[0] = Math.floor(lt[0])// + .5
+		lt[1] = Math.floor(lt[1])// + .5
+		rb[0] = Math.floor(rb[0])// + .5
+		rb[1] = Math.floor(rb[1])// + .5
+		rt[0] = Math.floor(rt[0])// + .5
+		rt[1] = Math.floor(rt[1])// + .5
+		lb[0] = Math.floor(lb[0])// + .5
+		lb[1] = Math.floor(lb[1])// + .5
 
 		this.ctx.save()
 		this.ctx.strokeStyle = `#1129`
 		// this.ctx.setLineDash([8,8])
 		this.ctx.lineWidth = this.pixelRatio
 
-		for (let y = rt[1]; y <= lb[1]; y++){
+		for (let y = rt[1] + .5; y <= lb[1] + .5; y++){
 			this.ctx.beginPath()
-			const xy0 = this.uvToXYUntranslated([lt[0],y])
-			this.ctx.moveTo(xy0[0], xy0[1])
-			const xy1 = this.uvToXYUntranslated([rb[0],y])
-			this.ctx.lineTo(xy1[0], xy1[1])
+			const xy0 = this.uvToXYUntranslated([lt[0] + .5,y])
+			this.ctx.moveTo(xy0[0] + .5, xy0[1] + .5)
+			const xy1 = this.uvToXYUntranslated([rb[0] + .5,y])
+			this.ctx.lineTo(xy1[0] + .5, xy1[1] + .5)
 			this.ctx.stroke()
 		}
-		for (let x = lt[0]; x <= rb[0]; x++){
+		for (let x = lt[0] + .5; x <= rb[0] + .5; x++){
 			this.ctx.beginPath()
-			const xy0 = this.uvToXYUntranslated([x,rt[1]])
-			this.ctx.moveTo(xy0[0], xy0[1])
-			const xy1 = this.uvToXYUntranslated([x,lb[1]])
-			this.ctx.lineTo(xy1[0], xy1[1])
+			const xy0 = this.uvToXYUntranslated([x,rt[1] + .5])
+			this.ctx.moveTo(xy0[0] + .5, xy0[1] + .5)
+			const xy1 = this.uvToXYUntranslated([x,lb[1] + .5])
+			this.ctx.lineTo(xy1[0] + .5, xy1[1] + .5)
 			this.ctx.stroke()
 		}
 		this.ctx.restore()
 
-		//DEBUG
-		// if (this.selectedCell){
-		// 	this.drawCube([this.selectedCell[0] + .5, this.selectedCell[1] + .5], .1)
-		// }
+		//Available spots
+		if (this.itemInHand && !this.transportedEntity && !(this.itemInHand.name === `eraser` || this.itemInHand.name === `eraser2` || this.itemInHand.name === `eraser3`)){
 		
+			const dx = .866 * this.unit
+			const dy = .5 * this.unit
+
+			for (let y = rt[1]; y < lb[1]; y++){
+				for (let x = lt[0]; x < rb[0]; x++){
+
+					const e = this.stuffMap[`u${x}v${y}`]
+					if (!e) continue
+
+					if (this.codex.entities[this.itemInHand.name].isUpgradeTo === e.name) continue
+
+					this.ctx.fillStyle = `#1125`
+					const xy = this.uvToXYUntranslated([x,y])
+
+					this.ctx.beginPath()
+					this.ctx.moveTo(xy[0], xy[1] - dy)
+					this.ctx.lineTo(xy[0] + dx, xy[1])
+					this.ctx.lineTo(xy[0], xy[1] + dy)
+					this.ctx.lineTo(xy[0] - dx, xy[1])
+					this.ctx.closePath()
+					this.ctx.fill()
+				}
+			}
+		}
 
 	}
 
@@ -5570,7 +9210,6 @@ class Game {
 			}
 
 			if (entity){
-
 				this.stuff.push(entity)
 				if (!entity.entitySpan) {
 					this.stuffMap[`u${position[0]}v${position[1]}`] = entity
@@ -5606,7 +9245,9 @@ class Game {
 					this.entitiesInGame[entity.name]++
 				}
 
-				if (!options.skipShopUpdate && name !== `cube`) this.shop.updateElements()
+				if (!options.skipShopUpdate && name !== `cube`) {
+					this.store.compositionUpdate()
+				}
 
 			}
 
@@ -5652,7 +9293,7 @@ class Game {
 
 			const cp = this.uvToXYUntranslated(this.chasm.position)
 
-			for (let i = 0; i < this.resources.length; i++){
+			for (let i = 0; i < 10; i++){
 
 				if (!this.resources[i]) continue
 
@@ -5707,6 +9348,11 @@ class Game {
 
 	}
 
+	createCompleteTransaction(p){
+		const transaction = new CompleteTransaction(this, p)
+		this.vfx.push(transaction)
+	}
+
 	createChasmTransfer(r,path,f,v,skipIndex){
 
 		const transfer = new ChasmTransfer(this, {resources: r, path: path, f: f, visibility: v, skipIndex: skipIndex})
@@ -5717,6 +9363,12 @@ class Game {
 	createLightning(r,p,d,f,v,c){
 
 		this.vfx.push(new Lightning(this, {resources: r, source: p, destination: d, f: f, visibility: v, color: c}))
+
+	}
+
+	createDischarge(fromA=[0,0],fromB=[0,0],toA=[1,0],toB=[1,0], force = 4, visibility=[1,0],color = `#000`,time = 500 + Math.random() * 1000){
+		// World coordinates. WIP: should do the same for lightning actually
+		this.vfx.push(new Discharge(this, {fromA: fromA, fromB: fromB, toA: toA, toB: toB, force: force, visibility: visibility, color: color, time: time}))
 
 	}
 
@@ -5876,7 +9528,7 @@ class Game {
 		resources[rid] = amount
 		const colors = this.codex.resources[rid].surgeTriplet ? this.codex.resources[rid].surgeTriplet : this.codex.resources[rid].triplet
 
-		const origin = this.xyToUV(this.mouse.offsetxy)
+		const origin = this.xyToUV(this.mouse.sxy)
 		const radius = 6
 
 		for (let i = 0; i < 32; i++){
@@ -5898,6 +9550,64 @@ class Game {
 
 		}
 
+	}
+
+	assembleMemory(){
+
+		const memory = []
+		const exceptions = new Set([`flower`, `fruit`])
+
+		for (let i = 0; i < this.stuff.length; i++){
+
+			const e = this.stuff[i]
+
+			if (!this.codex.entities[e.name]?.canPurchase || exceptions.has(e.name)) continue
+
+			memory.push({
+				entityName: e.name,
+				position: e.position
+			})
+
+		}
+
+		return memory
+
+	}
+
+	playMemory(m){
+
+		this.memoryBuffer = m
+
+		// for (let i = 0; i < m.length; i++){
+
+		// 	if (this.entityAtCoordinates(m[i].position)) continue
+
+		// 	const memory = this.addEntity(`memory`, m[i].position)
+		// 	memory.entityName = m[i].name
+
+		// }
+
+	}
+
+	hash53(str, seed = 0) {
+		let a = 0x9e3779b1 ^ seed
+		let b = 0x85ebca77 ^ seed
+
+		for (let i = 0; i < str.length; i++) {
+			const c = str.charCodeAt(i)
+			a = Math.imul(a ^ c, 0x27d4eb2d)
+			b = Math.imul(b ^ c, 0x165667b1)
+			a ^= b >>> 15
+			b ^= a >>> 13
+		}
+
+		a = Math.imul(a ^ (a >>> 16), 0x85ebca6b)
+		b = Math.imul(b ^ (b >>> 13), 0xc2b2ae35)
+
+		a ^= b >>> 16
+		b ^= a >>> 15
+
+		return (b & 0x1fffff) * 0x100000000 + (a >>> 0)
 	}
 
 }

@@ -5,8 +5,8 @@ class Sprite {
 		this.master = args.master
 		this.bcanvas = this.master.bcanvas
 		this.bctx = this.master.bctx
-		args.src = window.ModLoader?.resolveAsset(args.src) || args.src
 
+		args.src = window.ModLoader?.resolveAsset(args.src) || args.src
 		if (this.master.images[args.src]){
 			this.img = this.master.images[args.src]
 		} else {

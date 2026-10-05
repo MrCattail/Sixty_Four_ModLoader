@@ -13,6 +13,8 @@
 		languages: [],
 		log: [],
 		orphanEntities: [],
+		loadedSaveMetadata: {},
+		snapshotActivationSerial: 0,
 		enabledConfig: { mods: [] },
 		enabledEntries: [],
 		issues: [],
@@ -2566,6 +2568,7 @@
 		style.id = 'modloader-game-hud-style'
 		style.textContent = [
 			'body.modloader-game-hud-ready .shop,',
+			'body.modloader-game-hud-ready .store,',
 			'body.modloader-game-hud-ready .shopToggle,',
 			'body.modloader-game-hud-ready .chatIcon,',
 			'body.modloader-game-hud-ready .messenger,',
@@ -2581,6 +2584,8 @@
 			'body.modloader-game-hud-ready .modloader-ui-dock-game-top-right,',
 			'body.modloader-game-hud-ready .modloader-game-hud-item { transition: transform .26s cubic-bezier(.2,.8,.2,1), opacity .18s ease, filter .26s ease; will-change: transform, opacity; }',
 			'body.modloader-game-hud-hidden .shop { transform: translateX(calc(100% + 32px)); opacity: 0; pointer-events: none; }',
+			'body.modloader-game-hud-hidden .store { opacity: 0; visibility: hidden; }',
+			'body.modloader-game-hud-hidden .store, body.modloader-game-hud-hidden .store * { pointer-events: none !important; }',
 			'body.modloader-game-hud-hidden .shopToggle,',
 			'body.modloader-game-hud-hidden .chatIcon,',
 			'body.modloader-game-hud-hidden .explainer,',
@@ -2666,11 +2671,14 @@
 
 	const captureVanillaGameHudState = function (game) {
 		const messenger = game?.messenger
-		const shop = game?.shop
+		const shop = game?.store || game?.shop
 		const vessel = shop?.vessel
 		return {
 			messengerShown: messenger?.messagesShown === 1,
 			messengerScrollTop: messenger?.element?.scrollTop || 0,
+			storeCategories: shop === game?.store && shop?.html?.types ? Object.fromEntries(Object.entries(shop.html.types).map(function ([id, category]) {
+				return [id, { closed: !!category.button?.classList?.contains('closed'), scrollTop: category.wrap?.scrollTop || 0 }]
+			})) : null,
 			shopScrollTop: vessel?.scrollTop || 0,
 			shopMinimized: !!vessel?.classList?.contains('minimized'),
 			shopToggleToggled: !!shop?.shopToggle?.classList?.contains('toggled'),
@@ -2688,7 +2696,7 @@
 		game.removeHint?.()
 		game.hoveredResource = false
 		game.hoveredLabel = false
-		const shop = game.shop
+		const shop = game.store || game.shop
 		if (shop?.vessel?.classList?.contains('visible')) shop.vessel.classList.remove('visible')
 		shop?.mobileToggle?.classList?.remove('active')
 	}
@@ -2696,7 +2704,7 @@
 	const restoreVanillaGameHudState = function (game, snapshot) {
 		if (!game || !snapshot) return
 		const messenger = game.messenger
-		const shop = game.shop
+		const shop = game.store || game.shop
 		const vessel = shop?.vessel
 		if (vessel) {
 			vessel.classList.toggle('minimized', !!snapshot.shopMinimized)
@@ -2705,6 +2713,17 @@
 		}
 		shop?.shopToggle?.classList?.toggle('toggled', !!snapshot.shopToggleToggled)
 		shop?.mobileToggle?.classList?.toggle('active', !!snapshot.mobileToggleActive)
+		if (snapshot.storeCategories && shop === game.store && shop?.html?.types) {
+			for (const [id, saved] of Object.entries(snapshot.storeCategories)) {
+				const category = shop.html.types[id]
+				if (!category?.button) continue
+				category.button.classList.toggle('closed', saved.closed)
+				if (!saved.closed && !category.button.classList.contains('hidden')) shop.adjustWrap?.(category.wrap)
+			}
+			shop.isOpen = Object.values(shop.html.types).some(function (category) {
+				return category.button && !category.button.classList.contains('closed') && !category.button.classList.contains('hidden')
+			})
+		}
 		if (shop?.items?.length) {
 			for (const item of shop.items) item?.html?.classList?.remove('selected')
 			shop.selectedId = Math.min(Math.max(0, snapshot.shopSelectedId || 0), shop.items.length - 1)
@@ -2719,6 +2738,10 @@
 		const restoreScroll = function () {
 			if (vessel) vessel.scrollTop = snapshot.shopScrollTop || 0
 			if (messenger?.element) messenger.element.scrollTop = snapshot.messengerScrollTop || 0
+			for (const [id, saved] of Object.entries(snapshot.storeCategories || {})) {
+				const wrap = shop?.html?.types?.[id]?.wrap
+				if (wrap) wrap.scrollTop = saved.scrollTop || 0
+			}
 		}
 		requestAnimationFrame(restoreScroll)
 		setTimeout(restoreScroll, 140)
@@ -2927,6 +2950,13 @@
 		if (game) state.game = game
 		if (!state.vanillaGameHudSyncInstalled) {
 			state.vanillaGameHudSyncInstalled = true
+			if (typeof Store !== 'undefined' && Store.prototype) {
+				patchVanillaGameHudSyncMethod(Store.prototype, 'compositionUpdate', function (store) { return store.master })
+			}
+			if (typeof DesktopStoreVersion !== 'undefined' && DesktopStoreVersion.prototype) {
+				patchVanillaGameHudSyncMethod(DesktopStoreVersion.prototype, 'reinit', function (store) { return store.master })
+				patchVanillaGameHudSyncMethod(DesktopStoreVersion.prototype, 'visibilityUpdate', function (store) { return store.master })
+			}
 			if (typeof Shop !== 'undefined' && Shop.prototype) {
 				patchVanillaGameHudSyncMethod(Shop.prototype, 'init', function (shop) { return shop.master })
 				patchVanillaGameHudSyncMethod(Shop.prototype, 'check', function (shop) { return shop.master })
@@ -4662,7 +4692,7 @@
 			#modloader-panel.modloader-panel-hidden-bottom .modloader-panel-tab { border-radius: 8px 8px 0 0; }
 			#modloader-panel .modloader-panel-tab-logo { width: 24px; height: 24px; border-radius: 5px; background: url('img/logo/sheet.png'); background-size: 400% 200%; box-shadow: inset 0 0 0 1px rgba(255,255,255,.14), 0 2px 8px rgba(0,0,0,.22); }
 			#modloader-panel .modloader-panel-settings-page { display: grid; gap: 9px; max-height: 0; margin: 0; padding: 0; border-top: 1px solid transparent; border-bottom: 1px solid transparent; opacity: 0; overflow: hidden; pointer-events: none; transform: translateY(-5px); transition: max-height .28s cubic-bezier(.18, .86, .2, 1), margin-bottom .28s cubic-bezier(.18, .86, .2, 1), padding-top .28s cubic-bezier(.18, .86, .2, 1), padding-bottom .28s cubic-bezier(.18, .86, .2, 1), border-color .24s ease, opacity .2s ease, transform .28s cubic-bezier(.18, .86, .2, 1); }
-			#modloader-panel .modloader-panel-settings-page.active { max-height: min(42vh, 420px); margin-bottom: 12px; padding: 10px 0 11px; border-color: var(--modloader-border); opacity: 1; pointer-events: auto; transform: translateY(0); }
+			#modloader-panel .modloader-panel-settings-page.active { max-height: min(42vh, 420px); overflow-x: hidden; overflow-y: auto; margin-bottom: 12px; padding: 10px 0 11px; border-color: var(--modloader-border); opacity: 1; pointer-events: auto; transform: translateY(0); }
 			#modloader-panel .modloader-panel-settings-title { color: var(--modloader-text-strong); font-weight: 600; }
 			#modloader-panel .modloader-panel-settings-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; color: var(--modloader-text); }
 			#modloader-panel .modloader-panel-settings-actions { display: inline-flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; }
@@ -9623,6 +9653,7 @@
 			document.body.appendChild(panel)
 		}
 
+		const settingsScrollTop = panel.querySelector('.modloader-panel-settings-page')?.scrollTop || 0
 		if (panel.__modloaderCleanup) panel.__modloaderCleanup()
 		panel.innerHTML = ''
 		const cleanupFns = []
@@ -9895,6 +9926,8 @@
 			}
 		])
 		panel.appendChild(settingsPage)
+		addCleanup(api.ui.settings.scroll.attach(settingsPage))
+		settingsPage.scrollTop = settingsScrollTop
 
 		const panelMouseEnter = function () { clearPanelAutoHideTimer() }
 		const panelMouseLeave = function () { schedulePanelAutoHide(panel) }
@@ -11340,6 +11373,7 @@
 	}
 
 	const establishLoadedSnapshotIdentity = function (save) {
+		state.snapshotActivationSerial++
 		const loaded = String(save?.modloader?.saveInstanceId || '').trim().toLowerCase()
 		if (SNAPSHOT_SAVE_ID_PATTERN.test(loaded)) {
 			state.snapshotSaveInstanceId = loaded
@@ -11397,8 +11431,14 @@
 		}
 	}
 
-	const verifyPersistedSnapshotIdentity = function (game, saveInstanceId) {
+	const verifyPersistedSnapshotIdentity = async function (game, saveInstanceId, slotId = game?.currentSlotId) {
 		try {
+			if (game?.version === '1.3') {
+				if (typeof game.readFromSlot !== 'function' || slotId === undefined) return false
+				const slot = await game.readFromSlot(slotId)
+				return game.currentSlotId === slotId &&
+					String(slot?.stack?.[0]?.state?.modloader?.saveInstanceId || '').toLowerCase() === saveInstanceId
+			}
 			const key = `abstractv03${game?.steamId || ''}`
 			const encoded = localStorage.getItem(key)
 			if (!encoded || typeof game?.decodeSave !== 'function') return false
@@ -11409,14 +11449,15 @@
 		}
 	}
 
-	const persistSnapshotIdentity = function (game) {
+	const persistSnapshotIdentity = async function (game) {
 		const saveInstanceId = ensureCurrentSnapshotIdentity()
-		if (!state.snapshotIdentityNeedsPersistence) return
+		const slotId = game?.currentSlotId
+		if (!state.snapshotIdentityNeedsPersistence && game?.version !== '1.3') return
 		if (!game || typeof game.saveGame !== 'function' || game.preventSaving || game.preventCloud) {
 			throw new ModLoaderSnapshotError('UNAVAILABLE', 'Snapshot storage is unavailable.')
 		}
-		game.saveGame()
-		if (!verifyPersistedSnapshotIdentity(game, saveInstanceId)) {
+		if (state.snapshotIdentityNeedsPersistence) await game.saveGame()
+		if (!await verifyPersistedSnapshotIdentity(game, saveInstanceId, slotId) || state.snapshotSaveInstanceId !== saveInstanceId) {
 			throw new ModLoaderSnapshotError('UNAVAILABLE', 'Snapshot storage is unavailable.')
 		}
 		state.snapshotIdentityNeedsPersistence = false
@@ -11424,21 +11465,29 @@
 
 	const activateSnapshotContext = async function (game) {
 		if (state.snapshotContextReady && state.snapshotContextGame === game && state.snapshotContextToken) return state.snapshotCapabilities
+		const activationSerial = ++state.snapshotActivationSerial
 		state.snapshotContextReady = false
 		state.snapshotContextToken = ''
 		state.snapshotContextGame = game || null
 		try {
 			ensureCurrentSnapshotIdentity()
-			persistSnapshotIdentity(game)
+			const saveInstanceId = state.snapshotSaveInstanceId
+			const slotId = game?.currentSlotId
+			await persistSnapshotIdentity(game)
+			if (state.snapshotActivationSerial !== activationSerial) return null
 			const result = await invokeSnapshotIpc('modloader:snapshots:activate', {
-				saveInstanceId: state.snapshotSaveInstanceId
+				saveInstanceId
 			})
+			if (state.snapshotActivationSerial !== activationSerial || state.snapshotSaveInstanceId !== saveInstanceId || state.snapshotContextGame !== game || game?.currentSlotId !== slotId) {
+				throw new ModLoaderSnapshotError('UNAVAILABLE', 'The active save changed during snapshot activation.')
+			}
 			state.snapshotContextToken = String(result?.token || '')
 			state.snapshotCapabilities = clone(result?.capabilities || {})
 			state.snapshotContextReady = !!state.snapshotContextToken
 			state.snapshotIssueReported = false
 			return state.snapshotCapabilities
 		} catch (error) {
+			if (state.snapshotActivationSerial !== activationSerial) return null
 			state.snapshotCapabilities = null
 			if (!state.snapshotIssueReported) {
 				state.snapshotIssueReported = true
@@ -11813,6 +11862,11 @@
 
 		async stage(name, context, payload) {
 			if (context?.language) state.game = context
+			if (name === 'beforeGamePrepare') {
+				if (context?.version !== '1.3' || context?.isMobile) throw new Error('ModLoader requires the desktop game 1.3.')
+				state.game = context
+				await api.boot()
+			}
 			if (name === 'beforeVanillaScripts') await api.boot()
 			if (name === 'afterVanillaScripts') {
 				await api.loadEntries()
@@ -11927,9 +11981,13 @@
 		},
 
 		applyLoadedSave(save, game) {
+			if (!save || typeof save !== 'object' || Array.isArray(save)) throw new TypeError('Expected a game save state object.')
+			state.loadedSaveMetadata = clone(save.modloader || {})
 			state.orphanEntities = Array.isArray(save?.modloader?.orphanEntities) ? save.modloader.orphanEntities.slice() : []
 			establishLoadedSnapshotIdentity(save)
 			const loaded = runHookSync('beforeSaveLoad', save, game)
+			if (!loaded || typeof loaded !== 'object' || Array.isArray(loaded)) throw new TypeError('beforeSaveLoad must preserve the save state object.')
+			state.loadedSaveMetadata = clone(loaded.modloader || {})
 			return setSnapshotSaveIdentity(loaded, state.snapshotSaveInstanceId)
 		},
 
@@ -11946,13 +12004,15 @@
 		},
 
 		applySave(save, game) {
-			save.modloader = save.modloader || {}
+			if (!save || typeof save !== 'object' || Array.isArray(save)) throw new TypeError('Expected a game save state object.')
+			save.modloader = Object.assign({}, clone(state.loadedSaveMetadata), save.modloader || {})
 			save.modloader.version = state.version
 			save.modloader.enabledMods = {}
 			for (const mod of state.mods) save.modloader.enabledMods[saveSafeText(mod.id)] = saveSafeText(mod.manifest.version || true)
 			if (state.orphanEntities.length) save.modloader.orphanEntities = state.orphanEntities.slice()
 			setSnapshotSaveIdentity(save, ensureCurrentSnapshotIdentity())
 			const prepared = runHookSync('beforeSaveWrite', save, game)
+			if (!prepared || typeof prepared !== 'object' || Array.isArray(prepared)) throw new TypeError('beforeSaveWrite must preserve the save state object.')
 			return setSnapshotSaveIdentity(prepared, state.snapshotSaveInstanceId)
 		},
 

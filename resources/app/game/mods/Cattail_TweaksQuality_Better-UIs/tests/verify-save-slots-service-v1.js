@@ -1,331 +1,126 @@
+// Dependency-free service contract for the regular verifier. The complementary
+// verify-save-slots-native-browser.js exercises real IndexedDB and rendered UI.
 const assert = require('node:assert/strict')
 const fs = require('node:fs')
 const path = require('node:path')
 const vm = require('node:vm')
+const { webcrypto } = require('node:crypto')
+const root = path.resolve(__dirname, '../../..')
+const source = fs.readFileSync(path.resolve(__dirname, '../scripts/save-slots.js'), 'utf8')
+const native = fs.readFileSync(path.join(root, 'scripts/game.js'), 'utf8')
+const clone = value => JSON.parse(JSON.stringify(value))
+const id = '11111111-1111-4111-8111-111111111111'
+const world = () => ({ stuff: [], resources: [64], timestamp: 100, modloader: { saveInstanceId: id, keep: true } })
+const permanent = { glory: [1], completions: 3, upgrades: 4, orbUpgradeMap: [2], memory: { keep: true } }
+const slot = (name = 'Main') => ({ name, ownerHash: 42, creationTimeStamp: 1, lastModified: 100, stack: [{ state: world(), permanents: clone(permanent), isProtected: false }] })
+const entry = name => ({ name, data: Buffer.from(JSON.stringify(world()), 'binary').toString('base64'), nameConflict: 'reject' })
 
-const MOD_ROOT = path.resolve(__dirname, '..')
-const SOURCE = fs.readFileSync(path.join(MOD_ROOT, 'scripts/save-slots.js'), 'utf8')
-const SERVICE_KEY = Symbol.for('cattail.better-uis.save-slots')
-
-function encode(value) {
-	return Buffer.from(JSON.stringify(value), 'binary').toString('base64')
-}
-
-function decode(value) {
-	try {
-		return JSON.parse(Buffer.from(String(value || ''), 'base64').toString('binary'))
-	} catch (error) {
-		return 0
-	}
-}
-
-function createStorage(seed) {
-	const values = new Map(Object.entries(seed || {}))
-	return {
-		values,
-		api: {
-			getItem(key) {
-				return values.has(String(key)) ? values.get(String(key)) : null
-			},
-			setItem(key, value) {
-				values.set(String(key), String(value))
-			},
-			removeItem(key) {
-				values.delete(String(key))
-			}
+function database(initial) {
+	const state = { values: new Map(initial.map((s, i) => [JSON.stringify(['synthetic', i]), clone(s)])), abortIndex: null }
+	state.api = { transaction(storeName, mode) {
+		assert.equal(storeName, 'charps_memory_slots')
+		const draft = new Map(state.values)
+		let aborted = false
+		const request = result => { const r = { result }; queueMicrotask(() => r.onsuccess?.()); return r }
+		const tx = { error: null,
+			abort() { aborted = true; tx.error = new Error('synthetic abort'); queueMicrotask(() => tx.onabort?.()) },
+			objectStore() { return {
+				put(value, key) { if (state.abortIndex === key[1]) { state.abortIndex = null; throw new Error('synthetic abort') }; draft.set(JSON.stringify(key), clone(value)) },
+				delete(key) { draft.delete(JSON.stringify(key)) },
+				get(key) { const value = state.values.get(JSON.stringify(key)); return request(value ? clone(value) : undefined) },
+				getAllKeys() { return request([...state.values.keys()].map(JSON.parse)) }
+			} }
 		}
-	}
+		queueMicrotask(() => { if (!aborted) { if (mode === 'readwrite') state.values = draft; tx.oncomplete?.() } })
+		return tx
+	} }
+	return state
 }
-
-function createRuntime(storage, options = {}) {
-	let definition = null
-	const hooks = new Map()
-	const reloads = []
-	const sandbox = {
-		console: { info() {}, warn() {}, log() {} },
-		Symbol,
-		Object,
-		Array,
-		Map,
-		Set,
-		WeakMap,
-		Promise,
-		JSON,
-		Date,
-		Math,
-		Error,
-		TypeError,
-		Number,
-		String,
-		Boolean,
-		RegExp,
-		parseInt,
-		parseFloat,
-		isFinite,
-		localStorage: storage.api,
-		setTimeout(callback) {
-			reloads.push(callback)
-			return reloads.length
-		},
-		clearTimeout() {},
-		location: { reload() {} },
-		ModLoader: {
-			register(value) {
-				definition = value
-			}
-		}
+async function runtime(options = {}) {
+	const slots = options.slots || [slot()]
+	const db = options.db || database(slots)
+	const storage = options.storage || new Map([['abstractv03synthetic', 'legacy-auto'], ['abstractv03_saveSlotssynthetic', 'legacy-manual']])
+	const hooks = new Map(); const reloads = []; const cloud = []
+	const sandbox = { console: { warn() {}, log() {} }, crypto: webcrypto, TextEncoder, TextDecoder, Uint8Array,
+		atob, btoa, setTimeout(fn) { reloads.push(fn) }, location: { reload() {} },
+		localStorage: { getItem: key => storage.get(key) ?? null, setItem: (key, value) => storage.set(key, String(value)), removeItem: key => storage.delete(key) },
+		IDBKeyRange: { bound: () => null }, document: { getElementById: () => null, createElement: () => ({}), head: { append() {} } }
 	}
-	sandbox.globalThis = sandbox
+	sandbox.ModLoader = { register(definition) {
+		definition.init({ id: definition.id, config: { get: () => options.enabled !== false }, ui: { pages: { register() {}, isActive: () => false, refresh() {} } },
+			on(name, fn) { if (!hooks.has(name)) hooks.set(name, []); hooks.get(name).push(fn) }, patch(target, name, wrapper) { target[name] = wrapper(target[name]) } })
+	} }
 	vm.createContext(sandbox)
-	vm.runInContext(SOURCE, sandbox, { filename: 'save-slots.js' })
-	assert.ok(definition)
-	const pages = {
-		register() {},
-		isActive() { return false },
-		refresh() {}
-	}
-	definition.init({
-		id: definition.id,
-		config: { get() { return options.enabled !== false } },
-		ui: { pages },
-		on(name, listener) {
-			if (!hooks.has(name)) hooks.set(name, [])
-			hooks.get(name).push(listener)
-		},
-		patch() {}
+	vm.runInContext(native.slice(native.indexOf('class Game {')) + '\nglobalThis.NativeGame = Game', sandbox)
+	const game = Object.assign(Object.create(sandbox.NativeGame.prototype), {
+		version: '1.3', steamId: 'synthetic', currentSlotId: options.index || 0, saveSlots: clone(slots), localDatabase: db.api, maxSaveStack: 16,
+		assembleSave: () => world(), assemblePermanents: () => clone(permanent),
+		savePreferences() { storage.set('abstractv03_preferencessynthetic', JSON.stringify({ currentSlotId: this.currentSlotId })) },
+		spaceport: { async invoke(channel, value) { assert.equal(channel, 'store'); cloud.push(clone(value)); return !options.cloudFailure } }
 	})
-	return {
-		sandbox,
-		reloads,
-		service: sandbox[SERVICE_KEY],
-		async stage(name, payload, game) {
-			for (const listener of hooks.get(name) || []) await listener(payload, game)
-		}
-	}
+	vm.runInContext(source, sandbox)
+	for (const fn of hooks.get('afterVanillaScripts') || []) await fn()
+	for (const fn of hooks.get('afterGameInit') || []) await fn(null, game)
+	return { game, service: sandbox[Symbol.for('cattail.better-uis.save-slots')], db, storage, cloud, reloads }
 }
-
-function createGame(options = {}) {
-	const sends = []
-	return {
-		steamId: options.steamId || 'player-1',
-		preventSaving: false,
-		preventCloud: false,
-		decodeSave: decode,
-		spaceport: {
-			send(type, data) {
-				if (options.throwOnSend) throw new Error('send failed')
-				sends.push({ type, data })
-			}
-		},
-		sends
-	}
+async function main() {
+	let passed = 0
+	const test = async (name, work) => { await work(); passed++; console.log('PASS', name) }
+	await test('ready snapshot, native source and unchanged public v1 methods', async () => {
+		const r = await runtime(); const state = r.service.snapshot()
+		assert.equal(state.ready, true); assert.equal(state.manualSlotCount, 20); assert.equal(state.emptyCount, 19)
+		assert.equal(state.source.saveInstanceId, id); assert.equal(r.service.version, 1)
+		assert.equal(r.service.capabilities().atomicBatchScope, 'local-indexeddb')
+		assert.ok(Object.isFrozen(state)); assert.equal(state.slots.some(s => 'data' in s), false)
+	})
+	await test('batch native activation persists independent identity and current permanents', async () => {
+		const r = await runtime(); const result = await r.service.createAndActivate({ entries: [entry('one'), entry('two')], activateEntry: 1 })
+		assert.equal(result.activeIndex, 2); assert.equal(result.reloadScheduled, true); assert.equal(r.reloads.length, 1)
+		assert.equal(r.game.preventSaving, true); assert.equal(r.game.saveSlots.length, 3)
+		const saved = await r.game.readFromSlot(2)
+		assert.notEqual(saved.stack[0].state.modloader.saveInstanceId, id); assert.deepEqual(saved.stack[0].permanents, permanent)
+		assert.equal(saved.ownerHash, 42); assert.equal(r.cloud.at(-1).length, 3)
+		assert.equal(r.storage.get('abstractv03synthetic'), 'legacy-auto'); assert.equal(r.storage.get('abstractv03_saveSlotssynthetic'), 'legacy-manual')
+		const restored = await runtime({ slots: r.game.saveSlots, index: 2, db: r.db, storage: r.storage })
+		assert.equal(restored.service.snapshot().ready, true)
+		assert.equal(r.storage.has('abstractv03_saveSlotsNativeActivationsynthetic'), false)
+		await restored.service.settle({ game: restored.game }); assert.equal(restored.service.snapshot().ready, true)
+	})
+	await test('argument, name, format, conflict and capacity errors preserve existing slots', async () => {
+		const r = await runtime()
+		for (const [args, code] of [
+			[{ entries: [], activateEntry: 0 }, 'INVALID_ARGUMENT'],
+			[{ entries: [entry('')], activateEntry: 0 }, 'INVALID_NAME'],
+			[{ entries: [entry('Main')], activateEntry: 0 }, 'NAME_CONFLICT'],
+			[{ entries: [{ ...entry('bad'), data: undefined }], activateEntry: 0 }, 'INVALID_SAVE'],
+			[{ entries: [{ ...entry('bad'), data: '{"oops":true}' }], activateEntry: 0 }, 'INVALID_SAVE']
+		]) await assert.rejects(r.service.createAndActivate(args), e => e.code === code)
+		assert.equal(r.game.saveSlots.length, 1)
+		const full = await runtime({ slots: Array.from({ length: 20 }, (_, i) => slot(String(i))) })
+		await assert.rejects(full.service.createAndActivate({ entries: [entry('extra')], activateEntry: 0 }), e => e.code === 'INSUFFICIENT_EMPTY_SLOTS')
+	})
+	await test('atomic local batch abort restores availability without publishing partial data', async () => {
+		const r = await runtime(); r.db.abortIndex = 2
+		await assert.rejects(r.service.createAndActivate({ entries: [entry('one'), entry('two')], activateEntry: 1 }), e => e.code === 'WRITE_FAILED')
+		assert.equal(r.game.saveSlots.length, 1); assert.equal(r.db.values.size, 1); assert.equal(r.game.currentSlotId, 0)
+		assert.equal(r.game.preventSaving, undefined); assert.equal(r.service.snapshot().ready, true); assert.equal(r.reloads.length, 0)
+	})
+	await test('cloud false retains locally persisted batch', async () => {
+		const r = await runtime({ cloudFailure: true }); await r.service.createAndActivate({ entries: [entry('new')], activateEntry: 0 })
+		assert.equal(r.db.values.size, 2); assert.equal(r.game.currentSlotId, 1)
+	})
+	await test('mismatched persisted activation remains pending and not ready', async () => {
+		const storage = new Map([['abstractv03_saveSlotsNativeActivationsynthetic', JSON.stringify({ schema: 2, steamId: 'synthetic', index: 1, saveInstanceId: id })]])
+		const r = await runtime({ storage }); assert.equal(r.service.snapshot().ready, false); assert.equal(r.service.snapshot().error.code, 'VERIFY_FAILED')
+		assert.equal(storage.has('abstractv03_saveSlotsNativeActivationsynthetic'), true)
+	})
+	await test('concurrent batch calls rejected; blocked and disabled service gates', async () => {
+		const r = await runtime(); const first = r.service.createAndActivate({ entries: [entry('a')], activateEntry: 0 })
+		await assert.rejects(r.service.createAndActivate({ entries: [entry('b')], activateEntry: 0 }), e => e.code === 'TRANSACTION_ACTIVE'); await first
+		const blocked = await runtime(); blocked.game.preventSaving = true
+		await assert.rejects(blocked.service.createAndActivate({ entries: [entry('c')], activateEntry: 0 }), e => e.code === 'SAVING_BLOCKED')
+		assert.equal((await runtime({ enabled: false })).service, undefined)
+	})
+	console.log(`Better UIs native Save Slots service v1: ${passed} checks passed.`)
 }
-
-async function verifyCreateFinalizeAndConflict() {
-	const steamId = 'player-1'
-	const autoKey = 'abstractv03' + steamId
-	const slotsKey = 'abstractv03_saveSlots' + steamId
-	const originalId = '11111111-1111-4111-8111-111111111111'
-	const creativeId = '22222222-2222-4222-8222-222222222222'
-	const original = encode({ timestamp: 10, resources: [], modloader: { saveInstanceId: originalId } })
-	const creative = encode({
-		timestamp: 20,
-		resources: [],
-		modloader: {
-			worldEditor: { schema: 1, creativeMode: true, entryMode: 'forked', createdAt: 20 }
-		}
-	})
-	const storage = createStorage({ [autoKey]: original })
-	const runtime = createRuntime(storage)
-	const game = createGame({ steamId })
-	await runtime.stage('afterGameInit', null, game)
-
-	const before = runtime.service.snapshot()
-	assert.equal(before.ready, true)
-	assert.equal(before.emptyCount, 10)
-	assert.equal(before.slots.some(slot => Object.hasOwn(slot, 'data')), false)
-
-	const result = await runtime.service.createAndActivate({
-		entries: [
-			{ name: '主存档', data: original, nameConflict: 'allow' },
-			{ name: '主存档创造模式', data: creative, nameConflict: 'reject' }
-		],
-		activateEntry: 1
-	})
-	assert.equal(result.activated, true)
-	assert.equal(result.activeIndex, 1)
-	assert.equal(game.preventSaving, true)
-	assert.equal(storage.api.getItem(autoKey), creative)
-	assert.equal(game.sends.length, 1)
-
-	let slots = JSON.parse(storage.api.getItem(slotsKey))
-	assert.equal(slots[0].name, '主存档')
-	assert.equal(decode(slots[0].data).modloader.saveInstanceId, originalId)
-	assert.equal(slots[1].name, '主存档创造模式')
-	assert.ok(slots[1].pendingActivation?.token)
-	assert.equal(decode(slots[1].data).modloader.saveInstanceId, undefined)
-
-	const activeAfterReload = decode(creative)
-	activeAfterReload.timestamp = 30
-	activeAfterReload.modloader.saveInstanceId = creativeId
-	storage.api.setItem(autoKey, encode(activeAfterReload))
-	const reloaded = createRuntime(storage)
-	const reloadedGame = createGame({ steamId })
-	await reloaded.stage('afterGameInit', null, reloadedGame)
-
-	slots = JSON.parse(storage.api.getItem(slotsKey))
-	assert.equal(slots[1].pendingActivation, undefined)
-	assert.equal(decode(slots[1].data).modloader.saveInstanceId, creativeId)
-	assert.equal(reloaded.service.snapshot().source.name, '主存档创造模式')
-	assert.equal(reloaded.service.snapshot().pendingActivation, false)
-
-	await assert.rejects(
-		reloaded.service.createAndActivate({
-			entries: [
-				{ name: '主存档', data: original, nameConflict: 'allow' },
-				{ name: '主存档创造模式', data: creative, nameConflict: 'reject' }
-			],
-			activateEntry: 1
-		}),
-		error => error?.code === 'NAME_CONFLICT'
-	)
-}
-
-async function verifyRollbackOnActivationFailure() {
-	const steamId = 'player-2'
-	const autoKey = 'abstractv03' + steamId
-	const slotsKey = 'abstractv03_saveSlots' + steamId
-	const original = encode({
-		timestamp: 10,
-		resources: [],
-		modloader: { saveInstanceId: '33333333-3333-4333-8333-333333333333' }
-	})
-	const creative = encode({
-		timestamp: 20,
-		resources: [],
-		modloader: { worldEditor: { schema: 1, creativeMode: true, entryMode: 'forked', createdAt: 20 } }
-	})
-	const storage = createStorage({ [autoKey]: original })
-	const runtime = createRuntime(storage)
-	const game = createGame({ steamId, throwOnSend: true })
-	await runtime.stage('afterGameInit', null, game)
-
-	await assert.rejects(
-		runtime.service.createAndActivate({
-			entries: [
-				{ name: 'Original', data: original, nameConflict: 'allow' },
-				{ name: 'Original创造模式', data: creative, nameConflict: 'reject' }
-			],
-			activateEntry: 1
-		}),
-		error => error?.code === 'ACTIVATE_FAILED'
-	)
-	assert.equal(storage.api.getItem(autoKey), original)
-	assert.equal(storage.api.getItem(slotsKey), null)
-	assert.equal(game.preventSaving, false)
-	assert.equal(runtime.service.snapshot().emptyCount, 10)
-}
-
-async function verifyFinalizationRejectsWrongActiveSave() {
-	const steamId = 'player-3'
-	const autoKey = 'abstractv03' + steamId
-	const original = encode({
-		timestamp: 10,
-		modloader: { saveInstanceId: '44444444-4444-4444-8444-444444444444' }
-	})
-	const creative = encode({
-		timestamp: 20,
-		modloader: { worldEditor: { schema: 1, creativeMode: true, entryMode: 'forked', createdAt: 20 } }
-	})
-	const storage = createStorage({ [autoKey]: original })
-	const runtime = createRuntime(storage)
-	await runtime.stage('afterGameInit', null, createGame({ steamId }))
-	await runtime.service.createAndActivate({
-		entries: [
-			{ name: 'Original', data: original, nameConflict: 'allow' },
-			{ name: 'Original创造模式', data: creative, nameConflict: 'reject' }
-		],
-		activateEntry: 1
-	})
-
-	storage.api.setItem(autoKey, encode({
-		timestamp: 30,
-		modloader: {
-			saveInstanceId: '55555555-5555-4555-8555-555555555555',
-			worldEditor: { schema: 1, creativeMode: true, entryMode: 'forked', createdAt: 999 }
-		}
-	}))
-	const reloaded = createRuntime(storage)
-	await reloaded.stage('afterGameInit', null, createGame({ steamId }))
-	const state = reloaded.service.snapshot()
-	assert.equal(state.ready, false)
-	assert.equal(state.pendingActivation, true)
-	assert.equal(state.error.code, 'VERIFY_FAILED')
-}
-
-async function verifyFinalizationIsIdempotentAfterSlotWrite() {
-	const steamId = 'player-4'
-	const autoKey = 'abstractv03' + steamId
-	const slotsKey = 'abstractv03_saveSlots' + steamId
-	const pendingKey = 'abstractv03_saveSlotsPendingActivation' + steamId
-	const original = encode({
-		timestamp: 10,
-		modloader: { saveInstanceId: '66666666-6666-4666-8666-666666666666' }
-	})
-	const creative = encode({
-		timestamp: 20,
-		modloader: { worldEditor: { schema: 1, creativeMode: true, entryMode: 'forked', createdAt: 20 } }
-	})
-	const storage = createStorage({ [autoKey]: original })
-	const runtime = createRuntime(storage)
-	await runtime.stage('afterGameInit', null, createGame({ steamId }))
-	await runtime.service.createAndActivate({
-		entries: [
-			{ name: 'Original', data: original, nameConflict: 'allow' },
-			{ name: 'Original创造模式', data: creative, nameConflict: 'reject' }
-		],
-		activateEntry: 1
-	})
-
-	const active = decode(creative)
-	active.timestamp = 30
-	active.modloader.saveInstanceId = '77777777-7777-4777-8777-777777777777'
-	const activeData = encode(active)
-	storage.api.setItem(autoKey, activeData)
-	const slots = JSON.parse(storage.api.getItem(slotsKey))
-	slots[1] = {
-		name: slots[1].name,
-		data: activeData,
-		timestamp: 30,
-		createdAt: slots[1].createdAt,
-		updatedAt: 30
-	}
-	storage.api.setItem(slotsKey, JSON.stringify(slots))
-	assert.ok(storage.api.getItem(pendingKey))
-
-	const reloaded = createRuntime(storage)
-	await reloaded.stage('afterGameInit', null, createGame({ steamId }))
-	assert.equal(storage.api.getItem(pendingKey), null)
-	assert.equal(reloaded.service.snapshot().ready, true)
-	assert.equal(reloaded.service.snapshot().source.saveInstanceId, active.modloader.saveInstanceId)
-}
-
-async function verifyDisabledService() {
-	const storage = createStorage()
-	const runtime = createRuntime(storage, { enabled: false })
-	assert.equal(runtime.service, undefined)
-}
-
-Promise.resolve()
-	.then(verifyCreateFinalizeAndConflict)
-	.then(verifyRollbackOnActivationFailure)
-	.then(verifyFinalizationRejectsWrongActiveSave)
-	.then(verifyFinalizationIsIdempotentAfterSlotWrite)
-	.then(verifyDisabledService)
-	.then(function () {
-		console.log('Better UIs Save Slots Service v1 verification passed.')
-	})
-	.catch(function (error) {
-		console.error(error)
-		process.exitCode = 1
-	})
+main().catch(error => { console.error(error); process.exitCode = 1 })

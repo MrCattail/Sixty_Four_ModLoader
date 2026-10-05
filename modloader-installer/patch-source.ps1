@@ -1,8 +1,10 @@
 param(
-	[string]$GameRoot
+	[string]$GameRoot,
+	[switch]$CheckOnly
 )
 
 $ErrorActionPreference = 'Stop'
+$script:PendingWrites = @()
 
 function Resolve-GameRoot {
 	param([string]$Path)
@@ -47,8 +49,8 @@ function Apply-Required {
 		[string]$Description
 	)
 
-	if (-not $Text.Contains($Old)) {
-		throw "Could not patch $Description. The game file may have changed or was edited by another tool."
+	if ([regex]::Matches($Text, [regex]::Escape($Old)).Count -ne 1) {
+		throw "Could not patch $Description uniquely. The game file may have changed or was edited by another tool."
 	}
 	return $Text.Replace($Old, $New)
 }
@@ -75,10 +77,11 @@ function Insert-BeforeStandaloneLine {
 	)
 
 	$pattern = '(?m)^' + [regex]::Escape($Line) + '$'
-	$match = [regex]::Match($Text, $pattern)
-	if (-not $match.Success) {
+	$lineMatches = [regex]::Matches($Text, $pattern)
+	if ($lineMatches.Count -ne 1) {
 		throw "Could not patch $Description. The game file may have changed or was edited by another tool."
 	}
+	$match = $lineMatches[0]
 	return $Text.Insert($match.Index, $Insertion)
 }
 
@@ -96,8 +99,8 @@ function Update-TextFile {
 	$before = Read-TextFile -Path $path
 	$after = & $Patch $before
 	if ($after -ne $before) {
-		Write-TextFile -Path $path -Text $after
-		Write-Host "Patched $RelativePath"
+		$script:PendingWrites += [pscustomobject]@{ Path=$path; Text=$after; Before=[IO.File]::ReadAllBytes($path) }
+		Write-Host "Planned $RelativePath"
 	} else {
 		Write-Host "Already patched $RelativePath"
 	}
@@ -110,10 +113,16 @@ function Assert-Contains {
 	)
 
 	$path = Join-Path $script:TargetRoot $RelativePath
-	if (-not (Test-Path -LiteralPath $path)) {
-		throw "Patch verification failed: missing $RelativePath for $Description"
+	$pending = @($script:PendingWrites | Where-Object { $_.Path -eq $path })
+	if ($pending.Count) {
+		$text = $pending[0].Text
+	} else {
+		if (-not (Test-Path -LiteralPath $path)) {
+			if ($RelativePath -notlike 'resources\app\game\modloader\*') { throw "Missing $RelativePath" }
+			$path = Join-Path (Split-Path -Parent $PSScriptRoot) $RelativePath
+		}
+		$text = Read-TextFile -Path $path
 	}
-	$text = Read-TextFile -Path $path
 	if (-not $text.Contains($Pattern)) {
 		throw "Patch verification failed: missing $Description in $RelativePath"
 	}
@@ -138,8 +147,11 @@ function Patch-IndexHtml {
 function Patch-GameJs {
 	param([string]$Text)
 
+	if (-not $Text.Contains('ModLoader?.stage(`beforeGamePrepare`')) {
+		$Text = Apply-Required $Text "`t`tawait this.prepareSavedGameData(preload)" "`t`tpreload = await window.ModLoader?.stage(``beforeGamePrepare``, this, preload) ?? preload`n`t`tawait this.prepareSavedGameData(preload)" 'early preparation lifecycle'
+	}
 	if (-not $Text.Contains('ModLoader?.stage(`beforeVanillaScripts`')) {
-		$loadScriptsPattern = '(?m)^(\t\t)await this\.loadScripts\(\)\n(\t\tawait this\.loadStyle\(`cascade(?:_mobile)?\.css`\)\n)'
+		$loadScriptsPattern = '(?m)^(\t+)await this\.loadScripts\(\)\n(\t+await this\.loadStyle\(`cascade\.css`\)\n)'
 		if (-not [regex]::IsMatch($Text, $loadScriptsPattern)) {
 			throw 'Could not patch vanilla script stage hooks. The game file may have changed or was edited by another tool.'
 		}
@@ -157,18 +169,17 @@ function Patch-GameJs {
 		$oldDataPattern = '(?m)^\t\tthis\.codex = abstract_getCodex\(\)\n\t\tthis\.images = this\.preloadImages\(\)\n\t\tconst words = abstract_getWords\(\)\n\t\tthis\.words = words\[this\.language\]\n(?:\t\tthis\.words_en = words\.en\n)?'
 		$newData = @'
         this.languages = window.ModLoader?.applyLanguages(this.languages) || this.languages
-        const moddedLanguageId = this.getLanguageId()
-        if (moddedLanguageId !== null) this.languageId = moddedLanguageId
         if (!this.languages[this.languageId]) this.languageId = 0
         this.language = this.languages[this.languageId]
 
-        this.codex = window.ModLoader?.applyData(abstract_getCodex(), this) || abstract_getCodex()
+        const vanillaCodex = abstract_getCodex()
+        this.codex = window.ModLoader?.applyData(vanillaCodex, this) || vanillaCodex
         this.images = this.preloadImages()
-        const words = window.ModLoader?.applyWords(abstract_getWords(), this) || abstract_getWords()
+        const vanillaWords = abstract_getWords()
+        const words = window.ModLoader?.applyWords(vanillaWords, this) || vanillaWords
         if (!words[this.language]) {
             this.languageId = 0
             this.language = this.languages[this.languageId] || `en`
-            localStorage.setItem(`abstractv03_language${this.steamId}`, this.languageId)
         }
         this.words = words[this.language]
         this.words_en = words.en
@@ -180,11 +191,10 @@ function Patch-GameJs {
 	}
 
 	if (-not $Text.Contains('afterGameInit')) {
-		$afterMousePattern = '(?m)^\t\tthis\.updateMouseData\(this\.w2/2, this\.h2/2\)\n\t\tthis\.processMousemove2\(\)\n'
+		$afterMousePattern = '(?m)^\t\t//Pinhole test$'
 		$newAfterMouse = @'
-        this.updateMouseData(this.w2/2, this.h2/2)
-        this.processMousemove2()
         await window.ModLoader?.stage(`afterGameInit`, this)
+		//Pinhole test
 '@
 		if (-not [regex]::IsMatch($Text, $afterMousePattern)) {
 			throw 'Could not patch afterGameInit hook. The game file may have changed or was edited by another tool.'
@@ -253,13 +263,15 @@ function Patch-GameJs {
 	}
 
 	if (-not $Text.Contains('ModLoader?.applySave')) {
-        $Text = Apply-Required $Text "`t`tconst string = JSON.stringify({" "`t`tconst saveState = {" "save hook start"
-		$saveEndPattern = '(?m)^\t\t\}\)\n\n\t\treturn this\.encodeSave\(string\)'
-		if (-not [regex]::IsMatch($Text, $saveEndPattern)) {
-			throw 'Could not patch save hook finish. The game file may have changed or was edited by another tool.'
-		}
-        $Text = [regex]::Replace($Text, $saveEndPattern, "`t`t}`n`t`tconst string = JSON.stringify(window.ModLoader?.applySave(saveState, this) || saveState)`n`n`t`treturn this.encodeSave(string)", 1)
+		$savePattern = '(?ms)^\tassembleSave\(\)\{\n.*?^\t\}'
+		if ([regex]::Matches($Text, $savePattern).Count -ne 1) { throw 'Expected one active 1.3 assembleSave method.' }
+		$Text = [regex]::Replace($Text, $savePattern, {
+			param($match)
+			$body = Apply-Required $match.Value "`t`treturn {" "`t`tconst saveState = {" 'object save start'
+			Apply-Required $body "`n`t}" "`n`t`treturn window.ModLoader?.applySave(saveState, this) || saveState`n`t}" 'object save return'
+		}, 1)
 	}
+	$Text = $Text.Replace('if (!this.codex.entities[i].onlyone)', 'if (!this.codex.entities[i]?.onlyone)')
 
 	if (-not $Text.Contains('ModLoader?.applyEntitySave')) {
 		$oldEntitySave = '		return {name: e.name, position: e.position, par: par}'
@@ -307,24 +319,21 @@ function Patch-SpritesJs {
 function Patch-UiJs {
 	param([string]$Text)
 
-	if ($Text.Contains('ModLoader?.resolveAsset(this.master.codex.entities[params.id]?.shopImage')) {
+	if ($Text.Contains('ModLoader?.resolveAsset(e.shopImage')) {
 		return $Text
 	}
-
-	$shopImagePattern = '(?m)^(\t+)image\.src = `img/shop/\$\{params\.isDark \? params\.id \+ ._dark. : params\.id\}\.jpg`'
-	if (-not [regex]::IsMatch($Text, $shopImagePattern)) {
-		throw 'Could not patch shop icon asset hook. The game file may have changed or was edited by another tool.'
-	}
-	$shopPath = '`img/shop/${params.isDark ? params.id + String.fromCharCode(95, 100, 97, 114, 107) : params.id}.jpg`'
-    return [regex]::Replace($Text, $shopImagePattern, {
-        param($match)
-        $indent = $match.Groups[1].Value
-        $indent + "image.src = window.ModLoader?.resolveAsset(this.master.codex.entities[params.id]?.shopImage || " + $shopPath + ") || this.master.codex.entities[params.id]?.shopImage || " + $shopPath
-    }, 1)
+	$old = 'image.src = `img/shop/${e.isDark ? id + ''_dark'' : id}.jpg`'
+	$new = 'image.src = window.ModLoader?.resolveAsset(e.shopImage || `img/shop/${e.isDark ? id + ''_dark'' : id}.jpg`) || e.shopImage || `img/shop/${e.isDark ? id + ''_dark'' : id}.jpg`'
+	return Apply-Required $Text $old $new 'active Store image hook'
 }
 
 function Patch-MainJs {
 	param([string]$Text)
+	# The 1.3 main process uses tabs in bodies formerly indented with two spaces.
+	$Text = [regex]::Replace($Text, '(?m)^\t+', { param($m) '  ' * $m.Length })
+	if (-not $Text.Contains('clearSnapshotContext(e.sender) // reload')) {
+		$Text = Apply-Required $Text 'ipcMain.on(`getMyStuff`, async (e,d)=>{' "ipcMain.on(``getMyStuff``, async (e,d)=>{`n  ModLoaderMainProcess.clearSnapshotContext(e.sender) // reload" 'reload snapshot context'
+	}
 
 	$removedLegacyMainProcess = $false
 	$legacyStart = $Text.IndexOf('function getModloaderWindowWorkArea(bounds){')
@@ -347,7 +356,7 @@ function Patch-MainJs {
 		$Text = $Text.Replace("runtimeLog('did-fail-load'", "ModLoaderMainProcess.runtimeLog('did-fail-load'")
 	}
 
-	if (-not $Text.Contains('ModLoaderMainProcess')) {
+	if (-not $Text.Contains("const ModLoaderMainProcess = require('./game/modloader/main-process.js')")) {
 		$Text = Apply-Required $Text "const path = require('path')" "const path = require('path')`nconst ModLoaderMainProcess = require('./game/modloader/main-process.js')" 'main-process bridge require'
 	}
 
@@ -521,6 +530,9 @@ ipcMain.on(`modloader:toggle-devtools`, ()=>{
 
 $script:TargetRoot = Resolve-GameRoot -Path $GameRoot
 
+$gameSource = Read-TextFile -Path (Join-Path $script:TargetRoot 'resources\app\game\scripts\game.js')
+if ($gameSource -notmatch 'this\.version\s*=\s*`1\.3`') { throw 'This installer supports game 1.3 only.' }
+
 Update-TextFile -RelativePath 'resources\app\game\index.html' -Patch { param($Text) Patch-IndexHtml $Text }
 Update-TextFile -RelativePath 'resources\app\game\scripts\game.js' -Patch { param($Text) Patch-GameJs $Text }
 Update-TextFile -RelativePath 'resources\app\game\scripts\sprites.js' -Patch { param($Text) Patch-SpritesJs $Text }
@@ -544,4 +556,24 @@ Assert-Contains -RelativePath 'resources\app\game\modloader\main-process.js' -Pa
 Assert-Contains -RelativePath 'resources\app\game\modloader\main-process.js' -Pattern 'modloader:libraries:runtime' -Description 'Library API v1 main process bridge'
 Assert-Contains -RelativePath 'resources\app\game\modloader\library-store.js' -Pattern "const API_VERSION = '1.0.0'" -Description 'Library store v1 module'
 
-Write-Host 'ModLoader source hooks are installed.'
+if ($CheckOnly) {
+	Write-Host 'All 1.3 patch checks passed; no files written.'
+	return
+}
+# All transformations and required runtime checks have succeeded. Preserve exact
+# original bytes if an I/O failure occurs while publishing the five-file plan.
+foreach ($entry in $script:PendingWrites) {
+	if ([Convert]::ToBase64String([IO.File]::ReadAllBytes($entry.Path)) -cne [Convert]::ToBase64String($entry.Before)) { throw "Changed since preflight: $($entry.Path)" }
+}
+$written = @()
+try {
+	foreach ($entry in $script:PendingWrites) {
+		$written += $entry
+		Write-TextFile -Path $entry.Path -Text $entry.Text
+	}
+} catch {
+	$failure = $_
+	foreach ($entry in $written) { [IO.File]::WriteAllBytes($entry.Path, $entry.Before) }
+	throw $failure
+}
+Write-Host 'ModLoader 1.3 source hooks are installed.'

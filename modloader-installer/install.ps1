@@ -3,7 +3,8 @@ param(
 	[string]$SourceRoot,
 	[switch]$Force,
 	[switch]$SkipMods,
-	[switch]$ReplaceMods
+	[switch]$ReplaceMods,
+	[switch]$FullVerification
 )
 
 $ErrorActionPreference = 'Stop'
@@ -78,6 +79,9 @@ function Copy-DirectoryContents {
 	Get-ChildItem -LiteralPath $Source -Recurse -File | ForEach-Object {
 		$relative = $_.FullName.Substring($sourceRoot.Length).TrimStart('\')
 		if ($exclude[$relative.ToLowerInvariant()]) { return }
+		foreach ($prefix in $ExcludeRelative) {
+			if ($prefix.EndsWith('\') -and $relative.StartsWith($prefix, [StringComparison]::OrdinalIgnoreCase)) { return }
+		}
 
 		$destination = Join-Path $Target $relative
 		$resolvedDestination = Resolve-Path -LiteralPath $destination -ErrorAction SilentlyContinue
@@ -117,9 +121,13 @@ if ($SkipMods -and $ReplaceMods) {
 
 $targetGame = Join-Path $targetRoot 'resources\app\game'
 $sourceGame = Join-Path $sourceRoot 'resources\app\game'
+$patcher = Join-Path $sourceRoot 'modloader-installer\patch-source.ps1'
+# Complete the source plan before creating backups, copying runtime files, or replacing mods.
+& powershell -NoProfile -ExecutionPolicy Bypass -File $patcher -GameRoot $targetRoot -CheckOnly
+if ($LASTEXITCODE) { throw "ModLoader 1.3 preflight failed (exit $LASTEXITCODE); target was not changed." }
 $stateRoot = Join-Path $targetGame 'modloader\state'
 $backupRoot = Join-Path $stateRoot 'install-backups'
-$stamp = Get-Date -Format 'yyyyMMdd-HHmmss'
+$stamp = (Get-Date -Format 'yyyyMMdd-HHmmss-fff') + '-' + [Guid]::NewGuid().ToString('N').Substring(0,8)
 $backupPath = Join-Path $backupRoot $stamp
 
 $trackedFiles = @(
@@ -130,6 +138,19 @@ $trackedFiles = @(
 	'resources\app\game\scripts\sprites.js',
 	'resources\app\game\mods\enabled.json'
 )
+$uninstallFiles = $trackedFiles.Clone()
+# Back up every file the installer can overwrite, not just the five game hooks.
+$copyRoots = @('resources\app\game\modloader', 'modloader-installer')
+if (-not $SkipMods) { $copyRoots += 'resources\app\game\mods' }
+foreach ($relativeRoot in $copyRoots) {
+	$copySource = Join-Path $sourceRoot $relativeRoot
+	Get-ChildItem -LiteralPath $copySource -Recurse -File -Force | ForEach-Object {
+		$relative = $_.FullName.Substring($sourceRoot.Length).TrimStart('\')
+		if ($relative -like 'resources\app\game\modloader\state\*' -or $relative -like 'resources\app\game\modloader\backups\*') { return }
+		$trackedFiles += $relative
+	}
+}
+$trackedFiles = @($trackedFiles | Select-Object -Unique)
 
 if ((Test-Path -LiteralPath (Join-Path $targetGame 'modloader\loader.js')) -and -not $Force) {
 	throw 'ModLoader appears to be installed already. Re-run with -Force to reinstall after backing up current files.'
@@ -173,7 +194,10 @@ $manifest = [ordered]@{
 	backupId = $stamp
 	gameRoot = $targetRoot
 	sourceRoot = $sourceRoot
-	files = $manifestFiles
+	# Keep ordinary uninstall limited to the established core/enabled list.
+	# Installation failure recovery additionally restores every overwritten file.
+	files = @($manifestFiles | Where-Object { $_.relativePath -in $uninstallFiles })
+	rollbackFiles = $manifestFiles
 	fullModsBackup = $fullModsBackup
 }
 
@@ -183,7 +207,7 @@ $stamp | Set-Content -LiteralPath (Join-Path $backupRoot 'latest-install.txt') -
 
 try {
 Copy-DirectoryContents -Source (Join-Path $sourceGame 'modloader') -Target (Join-Path $targetGame 'modloader') -ExcludeRelative @(
-	'state\install-backups\latest-install.txt'
+	'state\', 'backups\'
 )
 
 $patcher = Join-Path $sourceRoot 'modloader-installer\patch-source.ps1'
@@ -236,13 +260,22 @@ if (Test-Path -LiteralPath $sourceInstaller) {
 
 $verify = Join-Path $targetGame 'modloader\tools\verify.ps1'
 if (Test-Path -LiteralPath $verify) {
-	& powershell -NoProfile -ExecutionPolicy Bypass -File $verify
+	if ($FullVerification) { & powershell -NoProfile -ExecutionPolicy Bypass -File $verify }
+	else { & powershell -NoProfile -ExecutionPolicy Bypass -File $verify -LoaderOnly }
+	if ($LASTEXITCODE) { throw "Installed verification failed (exit $LASTEXITCODE)." }
+} else {
+	throw 'Installed verification tool is missing.'
 }
 } catch {
 	Write-Host ""
 	Write-Host "ModLoader install failed: $($_.Exception.Message)" -ForegroundColor Red
 	Write-Host "Restoring backed-up core files from: $backupPath"
 	Restore-InstallBackup -ManifestFiles $manifestFiles -TargetRoot $targetRoot -BackupPath $backupPath
+	if ($fullModsBackup) {
+		# Recreate all pre-existing files removed by -ReplaceMods. Each destination
+		# is an original backup entry underneath the explicit game directory.
+		Copy-DirectoryContents -Source (Join-Path $backupPath $fullModsBackup) -Target (Join-Path $targetRoot $fullModsBackup)
+	}
 	throw
 }
 

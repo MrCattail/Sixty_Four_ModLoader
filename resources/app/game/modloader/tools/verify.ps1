@@ -1,14 +1,17 @@
+param([switch]$LoaderOnly)
 . "$PSScriptRoot\common.ps1"
 
 $checks = @(
 	[ordered]@{ file = 'index.html'; pattern = 'modloader/loader.js'; description = 'index loads ModLoader' },
 	[ordered]@{ file = 'scripts\game.js'; pattern = 'ModLoader?.stage(`beforeVanillaScripts`'; description = 'game beforeVanillaScripts hook' },
+	[ordered]@{ file = 'scripts\game.js'; pattern = 'ModLoader?.stage(`beforeGamePrepare`'; description = 'game early 1.3 preparation hook' },
+	[ordered]@{ file = 'scripts\game.js'; pattern = 'return window.ModLoader?.applySave(saveState, this) || saveState'; description = '1.3 object save contract' },
 	[ordered]@{ file = 'scripts\game.js'; pattern = 'ModLoader?.applyData'; description = 'game data hook' },
 	[ordered]@{ file = 'scripts\game.js'; pattern = 'ModLoader?.applyWords'; description = 'game words hook' },
 	[ordered]@{ file = 'scripts\game.js'; pattern = 'ModLoader?.applySave'; description = 'game save hook' },
 	[ordered]@{ file = 'scripts\game.js'; pattern = 'ModLoader?.applySoundList'; description = 'audio sample hook' },
 	[ordered]@{ file = 'scripts\sprites.js'; pattern = 'ModLoader?.resolveAsset'; description = 'sprite asset hook' },
-	[ordered]@{ file = 'scripts\ui.js'; pattern = 'ModLoader?.resolveAsset'; description = 'shop icon asset hook' },
+	[ordered]@{ file = 'scripts\ui.js'; pattern = 'ModLoader?.resolveAsset(e.shopImage'; description = 'active 1.3 Store icon asset hook' },
 	[ordered]@{ file = '..\main.js'; pattern = 'ModLoaderMainProcess.attachWindow(win, { accountId: STEAMID })'; description = 'main process bridge and trusted account scope' },
 	[ordered]@{ file = '..\main.js'; pattern = 'ModLoaderMainProcess.getMainWindowOptions'; description = 'main window before-create options hook' },
 	[ordered]@{ file = '..\main.js'; pattern = 'ModLoaderMainProcess.afterMainWindowCreated(win)'; description = 'main window after-create hook' },
@@ -130,6 +133,7 @@ if (Test-Path -LiteralPath $renderApiContractTestPath) {
 }
 
 $snapshotContractTests = @(
+	[ordered]@{ file = 'game-1.3-runtime-contract.test.js'; description = 'Game 1.3 foundational runtime contract'; pattern = 'object save, asynchronous identity readback, early lifecycle, Store HUD' },
 	[ordered]@{ file = 'ui-page-menu-scroll-contract.test.js'; description = 'UI page menu scroll contract'; pattern = 'automatic max-height, inertial wheel, ModLoader scrollbar styling' },
 	[ordered]@{ file = 'panel-description-display-mode-contract.test.js'; description = 'Panel description display mode contract'; pattern = 'hover default, inline descriptions, translated settings' },
 	[ordered]@{ file = 'panel-header-quick-toggles-contract.test.js'; description = 'Panel header quick toggles contract'; pattern = 'button order, sun/moon, pin states, persistence, manual edge hiding, themes, translations' },
@@ -144,6 +148,7 @@ $snapshotContractTests = @(
 	[ordered]@{ file = 'library-api-v1-contract.test.js'; description = 'Library API 1.1 runtime contract'; pattern = 'bound named handle, safe dialogs, no path leakage, declared extensions, size and symlink rejection, atomic revision-matched export' }
 )
 foreach ($contract in $snapshotContractTests) {
+	if ($LoaderOnly -and $contract.file -eq 'chinese-optimization-open-translation-contract.test.js') { continue }
 	$contractPath = Join-Path $PSScriptRoot $contract.file
 	if (-not (Test-Path -LiteralPath $contractPath)) {
 		$results += [ordered]@{
@@ -190,6 +195,7 @@ $modFeatureContractTests = @(
 	}
 )
 foreach ($contract in $modFeatureContractTests) {
+	if ($LoaderOnly) { continue }
 	$contractPath = Join-Path $GameRoot $contract.path
 	if (-not (Test-Path -LiteralPath $contractPath)) {
 		$results += [ordered]@{
@@ -235,7 +241,7 @@ try {
 
 $optimizedChineseFolder = -join @('Cattail_Tweaks_', [char]0x7b80, [char]0x4f53, [char]0x4e2d, [char]0x6587, [char]0x4f18, [char]0x5316)
 $optimizedChineseRoot = Join-Path $GameRoot (Join-Path 'mods' $optimizedChineseFolder)
-if (Test-Path -LiteralPath $optimizedChineseRoot) {
+if (-not $LoaderOnly -and (Test-Path -LiteralPath $optimizedChineseRoot)) {
     if ($enabledNames -notcontains $optimizedChineseFolder) {
         $warnings += 'Optimized Simplified Chinese locale is installed but disabled; enable it in Ctrl+M and Save & Reload before selecting Simplified Chinese [optimized].'
     } else {

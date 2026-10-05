@@ -1,5 +1,12 @@
 # Sixty Four ModLoader Installer
 
+This development adapter supports desktop game **1.3 only**. Its source-copy
+installation, rollback and Loader checks pass. An isolated offline Electron smoke
+test also passes; player acceptance, Steam Cloud and individual Mod compatibility
+are still pending. The live game has not been patched by this
+development task. The installation instructions below describe an explicit
+installation action, not a required step for continuing source development.
+
 Run these scripts from PowerShell. `GameRoot` is the game's `win-unpacked`
 folder, for example:
 
@@ -66,13 +73,31 @@ local install.
 
 The installer:
 
-- backs up core files to `resources/app/game/modloader/state/install-backups/`
+- checks all five source transformations and required runtime anchors before writing
+- backs up every file it can overwrite to `resources/app/game/modloader/state/install-backups/`
 - patches the local game files with the ModLoader hooks
 - copies `modloader/`
 - copies `modloader-installer/` into the game folder for future updates
 - copies mod folders and templates
 - keeps an existing `mods/enabled.json`
-- runs `verify.ps1`
+- runs `verify.ps1 -LoaderOnly` and treats a nonzero exit as installation failure
+
+`patch-source.ps1 -GameRoot <target> -CheckOnly` performs the source preflight
+without writing. All transformations are prepared before source writes; an I/O
+failure restores already-written source files from their original bytes. An
+installation failure additionally restores overwritten runtime/installer/Mod
+files, removes newly copied files, and restores a replaced Mods folder. This is
+failure recovery, not a guarantee against process termination or power loss.
+
+Runtime `state/` and `backups/` are excluded from copying. `-SkipMods` preserves
+the target Mods directory. Add `-FullVerification` only when the consumer Mods
+required by the full verifier are present and ready for that check. Loader-only
+verification deliberately does not claim consumer compatibility.
+
+The backup manifest keeps the established core/enabled list in `files` for
+ordinary uninstall and the full installation recovery list in `rollbackFiles`.
+Backup IDs include milliseconds and a random suffix, so repeated installs do not
+reuse a backup directory.
 
 ModLoader 0.3.0 also installs the main-process Library API v1 store module and
 verifies its IPC bridge. Manifest-declared installation libraries, such as a

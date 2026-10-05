@@ -3,1031 +3,708 @@ ModLoader.register({
 	init(api) {
 		const SERVICE_KEY = Symbol.for('cattail.better-uis.save-slots')
 		if (api.config.get('enableSaveSlots', true) === false) {
-			const previous = globalThis[SERVICE_KEY]
-			if (previous?.owner === api.id) delete globalThis[SERVICE_KEY]
+			if (globalThis[SERVICE_KEY]?.owner === api.id) delete globalThis[SERVICE_KEY]
 			return
 		}
-
 		const serviceVersion = 1
-		const manualSlotCount = 10
+		const manualSlotCount = 20
 		const maxNameLength = 64
-		const autoConfirmationIndex = 'auto'
-		const sourceMarkerMaxAge = 10 * 60 * 1000
-		const controlCharacterPattern = /[\u0000-\u001f\u007f]/
-		let activeSplash = null
+		const pageShell = api.ui.pages
+		const contexts = new WeakMap()
 		let activeGame = null
+		let activeSplash = null
 		let pendingConfirmation = null
 		let pendingImport = null
-		let transactionActive = false
-		let activationScheduled = false
-		let settlingGame = null
-		let settlingPromise = null
-		let verifiedSource = null
-		let lastSettleError = null
-		const pageShell = api.ui.pages
+		let statusKey = ''
+		let statusDetail = ''
+		let baseSave = null
 
 		class SaveSlotsServiceError extends Error {
-			constructor(code, message) {
-				super(message)
-				this.name = 'SaveSlotsServiceError'
-				this.code = String(code || 'INVALID_ARGUMENT')
-			}
+			constructor(code, message) { super(message); this.name = 'SaveSlotsServiceError'; this.code = code }
 		}
-
+		function fail(code, message) { throw new SaveSlotsServiceError(code, message) }
+		function clone(value) { return JSON.parse(JSON.stringify(value)) }
+		function context(game) {
+			if (!contexts.has(game)) contexts.set(game, { queue: Promise.resolve(), busy: 0, activating: false, error: null, cloudSaved: null, persistedIdentity: '' })
+			return contexts.get(game)
+		}
+		function enqueue(game, work) {
+			if (!game) return Promise.reject(new SaveSlotsServiceError('NOT_READY', 'Save slots are not ready.'))
+			const ctx = context(game)
+			ctx.busy++
+			const result = ctx.queue.catch(() => {}).then(work)
+			ctx.queue = result.catch(() => {})
+			return result.finally(() => { ctx.busy--; refreshOpenSlotsPage(game) })
+		}
+		function requireWritable(game) {
+			if (game?.version !== '1.3' || !Array.isArray(game.saveSlots) || !game.localDatabase) fail('NOT_READY', 'Native 1.3 slots are not ready.')
+			if (context(game).error) throw context(game).error
+			if (context(game).activating) fail('TRANSACTION_ACTIVE', 'A save is being activated.')
+			if (game.preventSaving || game.preventCloud) fail('SAVING_BLOCKED', 'Saving is currently blocked.')
+		}
+		function mutate(game, work) {
+			return enqueue(game, async () => { requireWritable(game); return work() }).catch(error => {
+				throw error instanceof SaveSlotsServiceError ? error : new SaveSlotsServiceError('WRITE_FAILED', String(error?.message || error))
+			})
+		}
+		async function saveCurrent(game) {
+			requireWritable(game)
+			await (baseSave || game.saveGame).call(game)
+		}
+		function nativeSlots(game) { return Array.isArray(game?.saveSlots) ? game.saveSlots : [] }
+		function source(game) {
+			const slot = nativeSlots(game)[game.currentSlotId]
+			const id = normalizeSaveInstanceId(slot?.stack?.[0]?.state?.modloader?.saveInstanceId)
+			return slot && id && context(game).persistedIdentity === id ? { index: game.currentSlotId, name: slotTitle(game, slot, game.currentSlotId), saveInstanceId: id } : null
+		}
+		function serviceSnapshot() {
+			const game = activeGame
+			const ctx = game ? context(game) : null
+			const slots = nativeSlots(game)
+			const length = Math.max(manualSlotCount, slots.length)
+			const emptyIndices = game ? availableIndices(game) : []
+			const summaries = Array.from({ length }, (_, index) => {
+				const slot = slots[index]
+				return Object.freeze({ index, occupied: !!slot, name: String(slot?.name || ''), timestamp: recordTime(slot?.stack?.[0], slot), pendingActivation: !!ctx?.activating })
+			})
+			return Object.freeze({ version: serviceVersion, ready: !!game && game.version === '1.3' && !!game.localDatabase && !ctx.busy && !ctx.activating && !ctx.error && !game.preventSaving,
+				manualSlotCount, maxNameLength, emptyCount: game ? emptyIndices.length : 0,
+				emptyIndices: Object.freeze(game ? emptyIndices : []), slots: Object.freeze(game ? summaries : []),
+				source: game && source(game) ? Object.freeze(source(game)) : null, pendingActivation: !!ctx?.activating,
+				error: ctx?.error ? Object.freeze({ code: ctx.error.code, message: ctx.error.message }) : null })
+		}
 		const service = Object.freeze({
-			owner: api.id,
-			version: serviceVersion,
-			capabilities() {
-				const state = serviceSnapshot()
-				return Object.freeze({
-					version: serviceVersion,
-					ready: state.ready,
-					manualSlotCount,
-					maxNameLength,
-					atomicBatch: true,
-					verifiedSource: true,
-					lineageFinalization: true,
-					createAndActivate: true
-				})
-			},
-			snapshot() {
-				return serviceSnapshot()
-			},
-			settle(options) {
-				return settleService(options?.game || activeGame)
-			},
-			createAndActivate(options) {
-				return createAndActivate(options)
-			}
+			owner: api.id, version: serviceVersion,
+			capabilities() { return Object.freeze({ version: serviceVersion, ready: serviceSnapshot().ready, manualSlotCount, maxNameLength,
+				atomicBatch: true, atomicBatchScope: 'local-indexeddb', verifiedSource: true, lineageFinalization: true, createAndActivate: true, storage: 'native-1.3' }) },
+			snapshot: serviceSnapshot,
+			settle(options) { return settleService(options?.game || activeGame) },
+			createAndActivate
 		})
-
-		const previousService = globalThis[SERVICE_KEY]
-		if (previousService && previousService !== service && previousService.owner !== api.id) {
-			console.warn('[Save Slots] Replacing an existing save-slot service.')
-		}
-		Object.defineProperty(globalThis, SERVICE_KEY, {
-			value: service,
-			configurable: true,
-			writable: true
-		})
+		Object.defineProperty(globalThis, SERVICE_KEY, { value: service, configurable: true, writable: true })
 
 		pageShell.register({
-			id: 'saveSlots',
-			prefix: 'cattail-save-slots',
-			width: '1760px',
-			contentClass: 'cattail-save-slots-list',
-			scrollbarVisibleClass: 'cattail-save-slots-scrollbar-visible',
-			contentHeight: '790px',
-			mobileContentHeight: '620px',
-			contentOffset: '318px',
-			mobileContentOffset: '300px',
+			id: 'saveSlots', prefix: 'cattail-save-slots', width: '1760px', contentClass: 'cattail-save-slots-list',
+			scrollbarVisibleClass: 'cattail-save-slots-scrollbar-visible', contentHeight: '790px', mobileContentHeight: '620px',
+			contentOffset: '318px', mobileContentOffset: '300px',
 			inertialScroll: { friction: .88, directInfluence: .30, tailInfluence: .13, maxVelocity: 34, stopThreshold: .35 },
 			insertBefore(splash, menu) { return menu?.querySelector('.resetProgressbar')?.closest('.menuItem') },
-			menuLabel(game) { return text(game, 'menu') },
-			title(game) { return text(game, 'title') },
-			backLabel(game) { return text(game, 'back') },
-			onOpen(ctx) {
-				activeSplash = ctx.splash
-				ensureAutoSave(ctx.game)
-			},
-			onClose() {
-				pendingConfirmation = null
-				pendingImport = null
-				activeSplash = null
-			},
-			canCloseOnEscape(ctx, event) {
-				return !event.target?.classList?.contains('cattail-save-slots-name-input')
-			},
-			renderBeforeContent(ctx) {
-				return renderTransferBar(ctx.splash, ctx.page)
-			},
-			renderContent(ctx) {
-				activeSplash = ctx.splash
-				renderSlotsContent(ctx)
-			}
+			menuLabel(game) { return text(game, 'menu') }, title(game) { return text(game, 'title') }, backLabel(game) { return text(game, 'back') },
+			onOpen(ctx) { activeSplash = ctx.splash; activeGame = ctx.game; runUI(() => mutate(ctx.game, () => saveCurrent(ctx.game))) },
+			onClose() { pendingConfirmation = null; pendingImport = null; activeSplash = null },
+			canCloseOnEscape(ctx, event) { return !event.target?.classList?.contains('cattail-save-slots-name-input') },
+			renderBeforeContent(ctx) { return renderTransferBar(ctx.splash, ctx.page) },
+			renderContent(ctx) { activeSplash = ctx.splash; activeGame = ctx.game; renderSlotsContent(ctx) }
 		})
-
-		api.on('afterVanillaScripts', function () {
+		api.on('afterVanillaScripts', () => {
 			installStyles()
 			if (typeof Game === 'undefined') return
-			api.patch(Game.prototype, 'saveGame', function (original) {
+			api.patch(Game.prototype, 'saveGame', original => {
+				baseSave = original
 				return function (...args) {
-					const before = localStorage.getItem(autoKey(this))
-					const result = original.apply(this, args)
-					if (!this.preventSaving && localStorage.getItem(autoKey(this)) === before) writeAutoSave(this)
-					refreshOpenSlotsPage(this)
-					return result
+					return enqueue(this, async () => {
+						if (context(this).activating || context(this).error) return
+						return original.apply(this, args)
+					}).catch(error => { showError(error); throw error })
 				}
 			})
+			api.patch(Game.prototype, 'writeToSlot', original => async function (...args) {
+				const result = await original.apply(this, args)
+				context(this).cloudSaved = result === true
+				if (args[1] === this.currentSlotId && args[0] === this.saveSlots[this.currentSlotId]) context(this).persistedIdentity = normalizeSaveInstanceId(args[0]?.stack?.[0]?.state?.modloader?.saveInstanceId)
+				if (result !== true) statusKey = 'localOnly'
+				else if (statusKey === 'localOnly') statusKey = 'saved'
+				return result
+			})
+		})
+		api.on('afterGameInit', async (payload, game) => {
+			try { await settleService(game) } catch (error) { showError(error) }
 		})
 
-		api.on('afterGameInit', async function (payload, game) {
-			try {
-				await settleService(game)
-			} catch (error) {
-				console.warn('[Save Slots] Pending activation could not be finalized.', error)
-			}
-		})
-
-		function serviceSnapshot() {
-			if (!activeGame) {
-				return Object.freeze({
-					version: serviceVersion,
-					ready: false,
-					manualSlotCount,
-					maxNameLength,
-					emptyCount: 0,
-					emptyIndices: Object.freeze([]),
-					slots: Object.freeze([]),
-					source: null,
-					pendingActivation: false,
-					error: publicServiceError(lastSettleError)
-				})
-			}
-			const slots = readManualSlots(activeGame)
-			const emptyIndices = []
-			const summaries = slots.map(function (slot, index) {
-				if (!slot) {
-					emptyIndices.push(index)
-					return Object.freeze({ index, occupied: false, name: '', timestamp: null, pendingActivation: false })
-				}
-				return Object.freeze({
-					index,
-					occupied: true,
-					name: String(slot.name || ''),
-					timestamp: safeTimestamp(slot.timestamp || slot.updatedAt),
-					pendingActivation: !!slot.pendingActivation
-				})
-			})
-			return Object.freeze({
-				version: serviceVersion,
-				ready: !transactionActive && !activationScheduled && !lastSettleError && !slots.some(function (slot) {
-					return !!slot?.pendingActivation
-				}),
-				manualSlotCount,
-				maxNameLength,
-				emptyCount: emptyIndices.length,
-				emptyIndices: Object.freeze(emptyIndices),
-				slots: Object.freeze(summaries),
-				source: verifiedSource ? Object.freeze({ ...verifiedSource }) : null,
-				pendingActivation: slots.some(function (slot) { return !!slot?.pendingActivation }),
-				error: publicServiceError(lastSettleError)
-			})
-		}
-
-		function publicServiceError(error) {
-			if (!error) return null
-			return Object.freeze({
-				code: String(error.code || 'VERIFY_FAILED'),
-				message: String(error.message || 'Save-slot operation failed.')
-			})
-		}
-
-		function settleService(game) {
-			if (!game) return Promise.resolve(serviceSnapshot())
-			if (settlingPromise && settlingGame === game) return settlingPromise
-			if (activeGame !== game) {
-				verifiedSource = null
-				lastSettleError = null
-			}
+		async function settleService(game) {
+			if (!game) return serviceSnapshot()
 			activeGame = game
-			settlingGame = game
-			settlingPromise = Promise.resolve().then(function () {
-				lastSettleError = null
-				finalizePendingActivation(game)
-				consumeSourceMarker(game)
-				refreshOpenSlotsPage(game)
-				return serviceSnapshot()
-			}).catch(function (error) {
-				lastSettleError = normalizeServiceError(error, 'VERIFY_FAILED')
-				throw lastSettleError
-			}).finally(function () {
-				if (settlingGame === game) {
-					settlingGame = null
-					settlingPromise = null
-				}
-			})
-			return settlingPromise
-		}
-
-		async function createAndActivate(options) {
-			if (transactionActive || activationScheduled) {
-				throw new SaveSlotsServiceError('TRANSACTION_ACTIVE', 'A save-slot transaction is already active.')
-			}
-			transactionActive = true
-			let publishedRaw = null
-			let previousManualRaw = null
-			let previousAutoRaw = null
-			let previousPendingRaw = null
-			let previousPreventSaving = false
-			let game = null
-			try {
-				game = activeGame
-				if (!game) throw new SaveSlotsServiceError('NOT_READY', 'Save slots are not ready.')
-				await settleService(game)
-				if (game.preventSaving || game.preventCloud) {
-					throw new SaveSlotsServiceError('SAVING_BLOCKED', 'Saving is currently blocked.')
-				}
-				const entries = normalizeTransactionEntries(game, options?.entries)
-				const activateEntry = Number(options?.activateEntry)
-				if (!Number.isInteger(activateEntry) || activateEntry < 0 || activateEntry >= entries.length) {
-					throw new SaveSlotsServiceError('INVALID_ARGUMENT', 'activateEntry must identify one entry.')
-				}
-
-				previousManualRaw = localStorage.getItem(slotsKey(game))
-				previousAutoRaw = localStorage.getItem(autoKey(game))
-				previousPendingRaw = localStorage.getItem(pendingMarkerKey(game))
-				previousPreventSaving = !!game.preventSaving
-				const currentSlots = readManualSlots(game)
-				const emptyIndices = []
-				for (let index = 0; index < manualSlotCount; index++) {
-					if (!currentSlots[index]) emptyIndices.push(index)
-				}
-				if (emptyIndices.length < entries.length) {
-					throw new SaveSlotsServiceError('INSUFFICIENT_EMPTY_SLOTS', 'Not enough empty manual save slots are available.')
-				}
-				const occupiedNames = currentSlots.filter(Boolean).map(function (slot) { return String(slot.name || '').trim() })
-				const acceptedNames = occupiedNames.slice()
-				for (const entry of entries) {
-					if (entry.nameConflict === 'reject' && acceptedNames.includes(entry.name)) {
-						throw new SaveSlotsServiceError('NAME_CONFLICT', 'A save slot already uses this name.')
-					}
-					acceptedNames.push(entry.name)
-				}
-
-				const issuedAt = Date.now()
-				const activationToken = createActivationToken()
-				const nextSlots = currentSlots.slice()
-				const receipts = entries.map(function (entry, entryIndex) {
-					const index = emptyIndices[entryIndex]
-					const timestamp = safeTimestamp(entry.decoded?.timestamp) || issuedAt
-					const slot = {
-						name: entry.name,
-						data: entry.data,
-						timestamp,
-						createdAt: issuedAt,
-						updatedAt: issuedAt
-					}
-					if (entryIndex === activateEntry) {
-						slot.pendingActivation = {
-							schema: 1,
-							token: activationToken,
-							issuedAt
-						}
-					}
-					nextSlots[index] = slot
-					return { index, name: entry.name, timestamp }
-				})
-
-				publishedRaw = serializeManualSlots(nextSlots)
-				localStorage.setItem(slotsKey(game), publishedRaw)
-				if (localStorage.getItem(slotsKey(game)) !== publishedRaw) {
-					throw new SaveSlotsServiceError('WRITE_FAILED', 'Manual save slots could not be written.')
-				}
-				const verifiedSlots = readManualSlots(game)
-				for (let entryIndex = 0; entryIndex < entries.length; entryIndex++) {
-					const receipt = receipts[entryIndex]
-					const verified = verifiedSlots[receipt.index]
-					if (
-						!verified ||
-						verified.name !== entries[entryIndex].name ||
-						verified.data !== entries[entryIndex].data ||
-						!decodeSlot(game, verified.data)
-					) {
-						throw new SaveSlotsServiceError('VERIFY_FAILED', 'A newly written manual save slot could not be verified.')
-					}
-				}
-				const activeReceipt = receipts[activateEntry]
-				const activeSlot = verifiedSlots[activeReceipt.index]
-				if (activeSlot?.pendingActivation?.token !== activationToken) {
-					throw new SaveSlotsServiceError('VERIFY_FAILED', 'The pending activation token could not be verified.')
-				}
-
-				const pendingMarkerRaw = JSON.stringify({
-					schema: 1,
-					type: 'batch-activation',
-					token: activationToken,
-					steamId: String(game.steamId || ''),
-					index: activeReceipt.index,
-					name: activeReceipt.name,
-					issuedAt,
-					slotUpdatedAt: activeSlot.updatedAt
-				})
-				localStorage.setItem(pendingMarkerKey(game), pendingMarkerRaw)
-				if (localStorage.getItem(pendingMarkerKey(game)) !== pendingMarkerRaw) {
-					throw new SaveSlotsServiceError('WRITE_FAILED', 'The pending activation marker could not be written.')
-				}
-				game.preventSaving = true
-				localStorage.setItem(autoKey(game), activeSlot.data)
-				if (localStorage.getItem(autoKey(game)) !== activeSlot.data) {
-					throw new SaveSlotsServiceError('ACTIVATE_FAILED', 'The active save could not be written.')
-				}
+			return enqueue(game, async () => {
+				const ctx = context(game)
+				if (ctx.activating) return serviceSnapshot()
 				try {
-					game.spaceport?.send?.('save', activeSlot.data)
+					const raw = localStorage.getItem(activationKey(game))
+					const slot = nativeSlots(game)[game.currentSlotId]
+					const saved = await game.readFromSlot(game.currentSlotId)
+					const savedId = normalizeSaveInstanceId(saved?.stack?.[0]?.state?.modloader?.saveInstanceId)
+					ctx.persistedIdentity = savedId && savedId === normalizeSaveInstanceId(slot?.stack?.[0]?.state?.modloader?.saveInstanceId) ? savedId : ''
+					if (raw) {
+						const marker = JSON.parse(raw)
+						if (marker.schema !== 2 || marker.index !== game.currentSlotId || marker.steamId !== String(game.steamId || '') ||
+							!marker.saveInstanceId || slot?.stack?.[0]?.state?.modloader?.saveInstanceId !== marker.saveInstanceId ||
+							saved?.stack?.[0]?.state?.modloader?.saveInstanceId !== marker.saveInstanceId) {
+							fail('VERIFY_FAILED', 'The activated save does not match its persisted identity.')
+						}
+						localStorage.removeItem(activationKey(game))
+					}
+					ctx.error = null
 				} catch (error) {
-					throw new SaveSlotsServiceError('ACTIVATE_FAILED', 'The active save could not be dispatched.')
+					ctx.error = error instanceof SaveSlotsServiceError ? error : new SaveSlotsServiceError('VERIFY_FAILED', String(error?.message || error))
+					throw ctx.error
 				}
-				activationScheduled = true
-				setTimeout(function () {
-					try {
-						globalThis.location?.reload?.()
-					} catch (error) {
-						console.warn('[Save Slots] Reload could not be started.', error)
-					}
-				}, 100)
-				return Object.freeze({
-					activated: true,
-					entries: Object.freeze(receipts.map(function (receipt) { return Object.freeze({ ...receipt }) })),
-					activeIndex: activeReceipt.index,
-					reloadScheduled: true
-				})
-			} catch (error) {
-				const failure = normalizeServiceError(error, 'WRITE_FAILED')
-				if (publishedRaw !== null && game) {
-					try {
-						rollbackTransaction(game, {
-							publishedRaw,
-							previousManualRaw,
-							previousAutoRaw,
-							previousPendingRaw,
-							previousPreventSaving
-						})
-					} catch (rollbackError) {
-						transactionActive = false
-						activationScheduled = false
-						throw normalizeServiceError(rollbackError, 'ROLLBACK_FAILED')
-					}
-				}
-				transactionActive = false
-				activationScheduled = false
-				throw failure
-			}
+			}).then(() => serviceSnapshot())
 		}
 
-		function normalizeTransactionEntries(game, value) {
-			if (!Array.isArray(value) || !value.length || value.length > manualSlotCount) {
-				throw new SaveSlotsServiceError('INVALID_ARGUMENT', 'entries must be a non-empty array.')
-			}
-			return value.map(function (entry) {
-				if (!entry || typeof entry !== 'object' || Array.isArray(entry)) {
-					throw new SaveSlotsServiceError('INVALID_ARGUMENT', 'Each entry must be an object.')
-				}
-				const name = normalizeServiceName(entry.name)
-				const data = entry.data
-				if (typeof data !== 'string' || !data) {
-					throw new SaveSlotsServiceError('INVALID_SAVE', 'Each entry must contain an encoded save.')
-				}
-				const decoded = decodeSlot(game, data)
-				if (!decoded || typeof decoded !== 'object' || Array.isArray(decoded)) {
-					throw new SaveSlotsServiceError('INVALID_SAVE', 'An encoded save could not be decoded.')
-				}
-				const nameConflict = entry.nameConflict === 'allow' ? 'allow' : entry.nameConflict === 'reject' ? 'reject' : null
-				if (!nameConflict) {
-					throw new SaveSlotsServiceError('INVALID_ARGUMENT', 'nameConflict must be allow or reject.')
-				}
-				return { name, data, decoded, nameConflict }
+		// Commit the changed native records in one local transaction. Cloud failure never
+		// discards successfully persisted local data. The original timers remain intact.
+		function writeLocalCollection(game, previous, next) {
+			return new Promise((resolve, reject) => {
+				const tx = game.localDatabase.transaction('charps_memory_slots', 'readwrite')
+				const store = tx.objectStore('charps_memory_slots')
+				tx.oncomplete = resolve
+				tx.onerror = () => reject(tx.error || new Error('IndexedDB write failed.'))
+				tx.onabort = () => reject(tx.error || new Error('IndexedDB transaction aborted.'))
+				try {
+					for (let i = 0; i < Math.max(previous.length, next.length); i++) {
+						if (previous[i] === next[i]) continue
+						if (next[i]) store.put(next[i], [game.steamId, i])
+						else store.delete([game.steamId, i])
+					}
+				} catch (error) { tx.abort(); reject(error) }
 			})
 		}
-
-		function normalizeServiceName(value) {
-			if (typeof value !== 'string') throw new SaveSlotsServiceError('INVALID_NAME', 'Save-slot names must be strings.')
-			const name = value.trim()
-			if (!name || name.length > maxNameLength || controlCharacterPattern.test(name)) {
-				throw new SaveSlotsServiceError('INVALID_NAME', 'The save-slot name is invalid.')
+		async function persistCollection(game, next, activeIndex = game.currentSlotId) {
+			const previous = game.saveSlots
+			const previousIndex = game.currentSlotId
+			await writeLocalCollection(game, previous, next)
+			game.saveSlots = next
+			if (activeIndex !== previousIndex) {
+				try { game.currentSlotId = activeIndex; game.savePreferences() }
+				catch (error) {
+					game.currentSlotId = previousIndex
+					try {
+						await writeLocalCollection(game, next, previous)
+						game.saveSlots = previous
+						game.savePreferences()
+					} catch (rollbackError) {
+						game.preventSaving = true
+						context(game).error = new SaveSlotsServiceError('ROLLBACK_FAILED', 'Could not restore the previous slot selection. Restart before continuing.')
+						throw context(game).error
+					}
+					throw error
+				}
 			}
+			context(game).persistedIdentity = normalizeSaveInstanceId(next[activeIndex]?.stack?.[0]?.state?.modloader?.saveInstanceId)
+			let cloudSaved = false
+			try { cloudSaved = await game.spaceport?.invoke?.('store', game.saveSlots) === true }
+			catch (error) { console.warn('[Save Slots] Cloud write failed; local records are retained.', error) }
+			context(game).cloudSaved = cloudSaved
+			statusKey = cloudSaved ? 'saved' : 'localOnly'
+			statusDetail = ''
+			return cloudSaved
+		}
+		function availableIndices(game) {
+			const slots = nativeSlots(game)
+			if (slots.filter(Boolean).length >= manualSlotCount) return []
+			return Array.from({ length: manualSlotCount }, (_, i) => i).filter(i => !slots[i])
+		}
+		function checkCapacity(game, count) {
+			const indices = availableIndices(game)
+			if (!count || count > indices.length) fail('INSUFFICIENT_EMPTY_SLOTS', text(game, 'full'))
+			return indices
+		}
+		function normalName(value, allowEmpty = false) {
+			if (typeof value !== 'string') fail('INVALID_NAME', 'The save name must be text.')
+			const name = value.trim()
+			if ((!allowEmpty && !name) || name.length > maxNameLength || /[\u0000-\u001f\u007f]/.test(name)) fail('INVALID_NAME', 'The save name is invalid.')
 			return name
 		}
-
-		function rollbackTransaction(game, state) {
-			const currentManualRaw = localStorage.getItem(slotsKey(game))
-			if (currentManualRaw !== state.publishedRaw && currentManualRaw !== state.previousManualRaw) {
-				throw new SaveSlotsServiceError('ROLLBACK_FAILED', 'Manual save slots changed before rollback.')
-			}
-			if (currentManualRaw === state.publishedRaw) restoreStorageValue(slotsKey(game), state.previousManualRaw)
-			restoreStorageValue(autoKey(game), state.previousAutoRaw)
-			restoreStorageValue(pendingMarkerKey(game), state.previousPendingRaw)
-			game.preventSaving = !!state.previousPreventSaving
-			if (
-				localStorage.getItem(slotsKey(game)) !== state.previousManualRaw ||
-				localStorage.getItem(autoKey(game)) !== state.previousAutoRaw ||
-				localStorage.getItem(pendingMarkerKey(game)) !== state.previousPendingRaw ||
-				!!game.preventSaving !== !!state.previousPreventSaving
-			) {
-				throw new SaveSlotsServiceError('ROLLBACK_FAILED', 'The previous save-slot state could not be restored.')
-			}
+		function normalizeSaveInstanceId(value) { return /^[0-9a-f-]{16,128}$/i.test(String(value || '')) ? String(value).toLowerCase() : '' }
+		function newIdentity() {
+			if (!globalThis.crypto?.getRandomValues) fail('NOT_READY', 'Secure save identity generation is unavailable.')
+			if (crypto.randomUUID) return crypto.randomUUID()
+			return Array.from(crypto.getRandomValues(new Uint8Array(16)), n => n.toString(16).padStart(2, '0')).join('')
 		}
-
-		function restoreStorageValue(key, value) {
-			if (value === null || value === undefined) localStorage.removeItem(key)
-			else localStorage.setItem(key, value)
+		function forkSlot(slot) {
+			const copy = clone(slot)
+			const identities = new Map()
+			for (const record of copy.stack) {
+				if (!record.state) continue
+				const oldId = normalizeSaveInstanceId(record.state.modloader?.saveInstanceId)
+				if (!identities.has(oldId)) identities.set(oldId, newIdentity())
+				record.state.modloader = { ...(record.state.modloader || {}), saveInstanceId: identities.get(oldId) }
+			}
+			copy.lastModified = Date.now()
+			return copy
 		}
-
-		function finalizePendingActivation(game) {
-			const raw = localStorage.getItem(pendingMarkerKey(game))
-			const slots = readManualSlots(game)
-			const pendingIndices = []
-			for (let index = 0; index < slots.length; index++) {
-				if (slots[index]?.pendingActivation) pendingIndices.push(index)
+		function validWorld(value) { return value && typeof value === 'object' && !Array.isArray(value) && Array.isArray(value.stuff) && Array.isArray(value.resources) }
+		function validRecord(value) {
+			return value && typeof value === 'object' && !Array.isArray(value) && (value.state === null || validWorld(value.state)) &&
+				value.permanents && typeof value.permanents === 'object' && !Array.isArray(value.permanents)
+		}
+		function decodeInput(game, raw) {
+			if (typeof raw !== 'string') {
+				if (!raw || typeof raw !== 'object') fail('INVALID_SAVE', text(game, 'importInvalid'))
+				return clone(raw)
 			}
-			if (!raw) {
-				if (pendingIndices.length) {
-					throw new SaveSlotsServiceError('VERIFY_FAILED', 'A pending save slot has no activation marker.')
-				}
-				return false
+			const content = raw.trim()
+			if (!content) fail('INVALID_SAVE', text(game, 'importInvalid'))
+			const header = /^CattailSaveSlots:v([12])\s*\n/.exec(content)
+			if (header) {
+				const value = JSON.parse(decodeBase64(content.slice(header[0].length)))
+				if (value?.version !== Number(header[1])) fail('INVALID_SAVE', 'Backup header and version disagree.')
+				return value
 			}
-
-			let marker = null
+			try { return JSON.parse(content) } catch (_) {}
+			const value = game.decodeSave(content)
+			if (!value || typeof value !== 'object') fail('INVALID_SAVE', text(game, 'importInvalid'))
+			return clone(value)
+		}
+		function normalizeSlot(game, input) {
+			const value = decodeInput(game, input)
+			let slot
+			if (Array.isArray(value?.stack)) {
+				if (!value.stack.length || !value.stack.every(validRecord)) fail('INVALID_SAVE', text(game, 'importInvalid'))
+				slot = clone(value)
+			} else if (validRecord(value?.data)) {
+				slot = { name: value.name || '', ownerHash: value.ownerHash, creationTimeStamp: value.creationTimeStamp, lastModified: value.lastModified, stack: [clone(value.data)] }
+			} else if (typeof value?.data === 'string') {
+				if (value.pendingActivation) fail('INVALID_SAVE', 'An unfinished legacy activation must be resolved before migration.')
+				slot = normalizeSlot(game, value.data)
+				slot.name = typeof value.name === 'string' ? value.name : ''
+				slot.creationTimeStamp = safeTimestamp(value.createdAt) || slot.creationTimeStamp
+			} else if (validWorld(value)) {
+				slot = { name: '', ownerHash: 64, creationTimeStamp: Date.now(), lastModified: Date.now(), stack: [{ isProtected: false,
+					state: clone(value), permanents: clone(value.permanents || { glory: value.glory || null, completions: 0, upgrades: 0, orbUpgradeMap: [] }) }] }
+			} else fail('INVALID_SAVE', text(game, 'importInvalid'))
+			if (!slot.stack.every(validRecord)) fail('INVALID_SAVE', text(game, 'importInvalid'))
+			slot.name = normalName(typeof slot.name === 'string' ? slot.name : '', true)
+			slot.ownerHash = Number.isFinite(slot.ownerHash) ? slot.ownerHash : 64
+			slot.creationTimeStamp = safeTimestamp(slot.creationTimeStamp) || Date.now()
+			slot.lastModified = safeTimestamp(slot.lastModified) || slot.creationTimeStamp
+			return slot
+		}
+		function parseImportedSlots(game, raw) {
+			const payload = decodeInput(game, raw)
+			let values
+			if (Array.isArray(payload)) values = payload.filter(value => value != null)
+			else if (payload?.type === 'Cattail_TweaksQuality_Saves-Slots' && payload.version === 2) {
+				if (!Array.isArray(payload.slots)) fail('INVALID_SAVE', text(game, 'importInvalid'))
+				values = payload.slots.filter(value => value != null)
+			} else if (Array.isArray(payload?.manual) || Array.isArray(payload?.slots)) {
+				if (payload.version !== undefined && payload.version !== 1) fail('INVALID_SAVE', 'Unsupported backup version.')
+				values = (payload.manual || payload.slots).filter(value => value != null)
+				const auto = payload.auto || payload.autosave
+				if (auto) values.unshift(auto)
+			} else values = [payload]
+			if (!values.length) fail('INVALID_SAVE', text(game, 'importInvalid'))
+			return { slots: values.map(value => normalizeSlot(game, value)) }
+		}
+		async function appendSlots(game, slots, activateEntry = null) {
+			const indices = checkCapacity(game, slots.length)
+			const next = game.saveSlots.slice()
+			const receipts = slots.map((slot, i) => {
+				const copy = forkSlot(slot)
+				copy.name ||= text(game, 'defaultSlotName', { index: indices[i] + 1 })
+				next[indices[i]] = copy
+				return { index: indices[i], name: copy.name, timestamp: recordTime(copy.stack[0], copy) }
+			})
+			if (activateEntry !== null) {
+				await activateCollection(game, next, receipts[activateEntry].index)
+			} else await persistCollection(game, next)
+			return receipts
+		}
+		async function createAndActivate(options) {
+			const game = activeGame
+			if (!game) fail('NOT_READY', 'Save slots are not ready.')
+			if (context(game).busy || context(game).activating) fail('TRANSACTION_ACTIVE', 'A save-slot transaction is already active.')
+			return mutate(game, async () => {
+				const entries = options?.entries
+				const index = options?.activateEntry
+				if (!Array.isArray(entries) || !entries.length || !Number.isInteger(index) || index < 0 || index >= entries.length) fail('INVALID_ARGUMENT', 'Invalid activation batch.')
+				checkCapacity(game, entries.length)
+				const names = game.saveSlots.filter(Boolean).map(slot => String(slot.name || '').trim())
+				const slots = entries.map(entry => {
+					const name = normalName(entry?.name)
+					if (!['allow', 'reject'].includes(entry.nameConflict)) fail('INVALID_ARGUMENT', 'nameConflict must be allow or reject.')
+					if (entry.nameConflict === 'reject' && names.includes(name)) fail('NAME_CONFLICT', 'A save slot already uses this name.')
+					names.push(name)
+					const decoded = decodeInput(game, entry.data)
+					const slot = normalizeSlot(game, decoded)
+					// The legacy service passes a world-only creative fork of the current
+					// game. Carry its current NG+ state unless a complete record was supplied.
+					if (validWorld(decoded) && !decoded.permanents) {
+						slot.stack[0].permanents = clone(game.assemblePermanents())
+						slot.ownerHash = game.saveSlots[game.currentSlotId]?.ownerHash ?? game.hash53(game.steamId)
+					}
+					slot.name = name
+					return slot
+				})
+				await saveCurrent(game)
+				const receipts = await appendSlots(game, slots, index)
+				return Object.freeze({ activated: true, entries: Object.freeze(receipts.map(Object.freeze)), activeIndex: receipts[index].index, reloadScheduled: true })
+			})
+		}
+		function activationKey(game) { return `abstractv03_saveSlotsNativeActivation${game.steamId}` }
+		async function activateCollection(game, next, index) {
+			const identity = normalizeSaveInstanceId(next[index]?.stack?.[0]?.state?.modloader?.saveInstanceId)
+			const oldMarker = localStorage.getItem(activationKey(game))
+			// Identity-bearing activations are verified against IndexedDB after reload.
+			if (identity) localStorage.setItem(activationKey(game), JSON.stringify({ schema: 2, steamId: String(game.steamId || ''), index, saveInstanceId: identity }))
+			const ctx = context(game)
+			const blocked = game.preventSaving
+			game.preventSaving = true
+			ctx.activating = true
 			try {
-				marker = JSON.parse(raw)
+				await persistCollection(game, next, index)
 			} catch (error) {
-				throw new SaveSlotsServiceError('VERIFY_FAILED', 'The pending activation marker is invalid.')
+				ctx.activating = false
+				if (!ctx.error) game.preventSaving = blocked
+				if (oldMarker === null) localStorage.removeItem(activationKey(game))
+				else localStorage.setItem(activationKey(game), oldMarker)
+				throw error
 			}
-			const age = Date.now() - Number(marker?.issuedAt)
-			if (
-				marker?.schema !== 1 ||
-				marker?.type !== 'batch-activation' ||
-				typeof marker?.token !== 'string' ||
-				!marker.token ||
-				String(marker?.steamId || '') !== String(game.steamId || '') ||
-				!Number.isInteger(marker?.index) ||
-				marker.index < 0 ||
-				marker.index >= manualSlotCount ||
-				!Number.isFinite(age) ||
-				age < -60000
-			) {
-				throw new SaveSlotsServiceError('VERIFY_FAILED', 'The pending activation marker failed validation.')
-			}
-			const slot = slots[marker.index]
-			if (!slot || slot.name !== String(marker.name || '')) {
-				throw new SaveSlotsServiceError('VERIFY_FAILED', 'The pending manual save slot changed before finalization.')
-			}
-			const activeData = localStorage.getItem(autoKey(game))
-			const activeDecoded = decodeSlot(game, activeData)
-			const saveInstanceId = normalizeSaveInstanceId(activeDecoded?.modloader?.saveInstanceId)
-			const activeCreativeIdentity = creativeForkIdentity(activeDecoded)
-			if (!activeData || !activeDecoded || !saveInstanceId || !activeCreativeIdentity) {
-				throw new SaveSlotsServiceError('VERIFY_FAILED', 'The active save has no persisted save identity.')
-			}
-			if (!slot.pendingActivation) {
-				if (
-					pendingIndices.length ||
-					slot.data !== activeData ||
-					normalizeSaveInstanceId(slot.decoded?.modloader?.saveInstanceId) !== saveInstanceId ||
-					creativeForkIdentity(slot.decoded) !== activeCreativeIdentity
-				) {
-					throw new SaveSlotsServiceError('VERIFY_FAILED', 'A completed activation marker could not be reconciled.')
+			setTimeout(() => globalThis.location.reload(), 100)
+		}
+		function activateRecord(game, slot, record) {
+			return mutate(game, async () => {
+				const index = game.saveSlots.indexOf(slot)
+				if (index < 0 || !slot.stack.includes(record)) fail('STALE_SAVE', text(game, 'changed'))
+				const selected = clone(record)
+				await saveCurrent(game)
+				const next = game.saveSlots.slice()
+				const copy = clone(slot)
+				const position = slot.stack.indexOf(record)
+				if (position >= 0) copy.stack.splice(position, 1)
+				copy.stack.unshift(selected)
+				if (position < 0) trimHistory(game, copy.stack)
+				copy.lastModified = Date.now()
+				next[index] = copy
+				await activateCollection(game, next, index)
+			})
+		}
+		function copyCurrent(game, targetSlot = null) {
+			return mutate(game, async () => {
+				const targetIndex = targetSlot === null ? null : game.saveSlots.indexOf(targetSlot)
+				if (targetIndex === -1) fail('STALE_SAVE', text(game, 'changed'))
+				if (targetSlot === null) checkCapacity(game, 1)
+				await saveCurrent(game)
+				const current = game.saveSlots[game.currentSlotId]
+				if (targetIndex === null) return appendSlots(game, [{ ...clone(current), name: '', stack: [clone(current.stack[0])], creationTimeStamp: Date.now() }])
+				if (targetIndex === game.currentSlotId) return
+				const target = game.saveSlots[targetIndex]
+				if (!target) fail('STALE_SAVE', text(game, 'changed'))
+				const next = game.saveSlots.slice()
+				const copy = clone(target)
+				copy.stack.unshift(forkSlot({ stack: [current.stack[0]] }).stack[0])
+				trimHistory(game, copy.stack)
+				copy.ownerHash = current.ownerHash
+				copy.lastModified = Date.now()
+				next[targetIndex] = copy
+				return persistCollection(game, next)
+			})
+		}
+		function trimHistory(game, stack) {
+			if (stack.length <= (game.maxSaveStack || 16)) return
+			for (let i = stack.length - 1; i > 0; i--) if (!stack[i].isProtected) { stack.splice(i, 1); break }
+		}
+		function changeSlot(game, slot, action, value) {
+			return mutate(game, async () => {
+				const index = game.saveSlots.indexOf(slot)
+				if (index < 0) fail('STALE_SAVE', text(game, 'changed'))
+				if (action === 'copy') {
+					checkCapacity(game, 1)
+					await saveCurrent(game)
+					const suffix = ' — ' + text(game, 'copy')
+					return appendSlots(game, [{ ...clone(slot), name: slotTitle(game, slot, index).slice(0, maxNameLength - suffix.length) + suffix }])
 				}
-				removeVerifiedPendingMarker(game)
-				verifiedSource = { index: marker.index, name: slot.name, saveInstanceId }
-				return true
-			}
-			if (
-				pendingIndices.length !== 1 ||
-				pendingIndices[0] !== marker.index ||
-				slot.pendingActivation.token !== marker.token ||
-				safeTimestamp(slot.updatedAt) !== safeTimestamp(marker.slotUpdatedAt) ||
-				normalizeSaveInstanceId(slot.decoded?.modloader?.saveInstanceId) ||
-				creativeForkIdentity(slot.decoded) !== activeCreativeIdentity
-			) {
-				throw new SaveSlotsServiceError('VERIFY_FAILED', 'The active save does not match the pending creative copy.')
-			}
-
-			const now = Date.now()
-			const nextSlots = slots.slice()
-			nextSlots[marker.index] = {
-				name: slot.name,
-				data: activeData,
-				timestamp: safeTimestamp(activeDecoded.timestamp) || now,
-				createdAt: safeTimestamp(slot.createdAt) || now,
-				updatedAt: now
-			}
-			const nextRaw = serializeManualSlots(nextSlots)
-			localStorage.setItem(slotsKey(game), nextRaw)
-			const verified = readManualSlots(game)[marker.index]
-			if (
-				localStorage.getItem(slotsKey(game)) !== nextRaw ||
-				!verified ||
-				verified.data !== activeData ||
-				verified.pendingActivation ||
-				normalizeSaveInstanceId(verified.decoded?.modloader?.saveInstanceId) !== saveInstanceId ||
-				creativeForkIdentity(verified.decoded) !== activeCreativeIdentity
-			) {
-				throw new SaveSlotsServiceError('VERIFY_FAILED', 'The active save identity could not be written back to its manual slot.')
-			}
-			removeVerifiedPendingMarker(game)
-			verifiedSource = {
-				index: marker.index,
-				name: verified.name,
-				saveInstanceId
-			}
-			return true
+				if (action === 'delete' && index === game.currentSlotId) fail('ACTIVE_SLOT', text(game, 'activeDelete'))
+				await saveCurrent(game)
+				const next = game.saveSlots.slice()
+				let activeIndex = game.currentSlotId
+				if (action === 'delete') { next.splice(index, 1); if (activeIndex > index) activeIndex-- }
+				else if (action === 'rename') next[index] = { ...slot, name: normalName(value, true), lastModified: Date.now() }
+				else fail('INVALID_ARGUMENT', 'Unknown slot operation.')
+				return persistCollection(game, next, activeIndex)
+			})
 		}
-
-		function removeVerifiedPendingMarker(game) {
-			localStorage.removeItem(pendingMarkerKey(game))
-			if (localStorage.getItem(pendingMarkerKey(game)) !== null) {
-				throw new SaveSlotsServiceError('VERIFY_FAILED', 'The completed activation marker could not be removed.')
+		async function legacyPreview(game) {
+			const raw = localStorage.getItem(slotsKey(game))
+			if (!raw) fail('INVALID_SAVE', text(game, 'noLegacy'))
+			const values = JSON.parse(raw)
+			if (!Array.isArray(values)) fail('INVALID_SAVE', text(game, 'importInvalid'))
+			const slots = []
+			for (let i = 0; i < values.length; i++) {
+				if (!values[i]) continue
+				const bytes = new TextEncoder().encode(String(game.steamId || '') + ':' + i + ':' + JSON.stringify(values[i]))
+				const digest = await crypto.subtle.digest('SHA-256', bytes)
+				const key = Array.from(new Uint8Array(digest), n => n.toString(16).padStart(2, '0')).join('')
+				if (game.saveSlots.some(slot => slot?.betterUIs?.legacyImportKey === key)) continue
+				const slot = normalizeSlot(game, values[i])
+				slot.betterUIs = { ...(slot.betterUIs || {}), legacyImportKey: key }
+				slots.push(slot)
 			}
+			if (!slots.length) fail('INVALID_SAVE', text(game, 'noLegacy'))
+			return { slots, legacyRaw: raw }
 		}
-
-		function creativeForkIdentity(decoded) {
-			const value = decoded?.modloader?.worldEditor
-			if (
-				!value ||
-				value.schema !== 1 ||
-				value.creativeMode !== true ||
-				value.entryMode !== 'forked'
-			) {
-				return ''
-			}
-			const createdAt = safeTimestamp(value.createdAt)
-			return createdAt ? String(createdAt) : ''
+		function applyImportedSlots(game, imported) {
+			return mutate(game, async () => {
+				if (imported.legacyRaw !== undefined && localStorage.getItem(slotsKey(game)) !== imported.legacyRaw) fail('STALE_SAVE', text(game, 'changed'))
+				if (imported.slots.some(slot => slot.betterUIs?.legacyImportKey && game.saveSlots.some(existing => existing?.betterUIs?.legacyImportKey === slot.betterUIs.legacyImportKey))) fail('STALE_SAVE', text(game, 'changed'))
+				checkCapacity(game, imported.slots.length)
+				await saveCurrent(game)
+				return appendSlots(game, imported.slots)
+			})
 		}
-
-		function normalizeSaveInstanceId(value) {
-			const saveInstanceId = String(value || '').trim().toLowerCase()
-			return /^[0-9a-f-]{16,128}$/i.test(saveInstanceId) ? saveInstanceId : ''
+		function buildExportPayload(game) {
+			return { type: 'Cattail_TweaksQuality_Saves-Slots', version: 2, exportedAt: new Date().toISOString(),
+				steamId: String(game.steamId || ''), slotCount: manualSlotCount, currentSlotId: game.currentSlotId, slots: clone(game.saveSlots) }
 		}
-
-		function consumeSourceMarker(game) {
-			const raw = localStorage.getItem(sourceMarkerKey(game))
-			if (!raw) return
-			localStorage.removeItem(sourceMarkerKey(game))
-			try {
-				const marker = JSON.parse(raw)
-				const age = Date.now() - Number(marker?.issuedAt)
-				const slot = readManualSlots(game)[marker?.index]
-				const current = decodeSlot(game, localStorage.getItem(autoKey(game)))
-				const currentId = normalizeSaveInstanceId(current?.modloader?.saveInstanceId)
-				const slotId = normalizeSaveInstanceId(slot?.decoded?.modloader?.saveInstanceId)
-				if (
-					marker?.schema !== 1 ||
-					String(marker?.steamId || '') !== String(game.steamId || '') ||
-					!Number.isFinite(age) ||
-					age < -60000 ||
-					age > sourceMarkerMaxAge ||
-					!slot ||
-					slot.name !== marker.name ||
-					safeTimestamp(slot.updatedAt) !== safeTimestamp(marker.slotUpdatedAt) ||
-					!currentId ||
-					currentId !== slotId ||
-					currentId !== normalizeSaveInstanceId(marker.saveInstanceId)
-				) {
-					return
-				}
-				verifiedSource = { index: marker.index, name: slot.name, saveInstanceId: currentId }
-			} catch (error) {
-				console.warn('[Save Slots] Source marker could not be verified.', error)
-			}
+		function safeTimestamp(value) { const n = Number(value); return Number.isFinite(n) && n > 0 ? n : null }
+		function recordTime(record, slot) { return safeTimestamp(record?.state?.timestamp) || (record === slot?.stack?.[0] ? safeTimestamp(slot?.lastModified) : null) }
+		function slotsKey(game) { return `abstractv03_saveSlots${game.steamId}` }
+		function slotTitle(game, slot, index) { return slot?.name || text(game, 'defaultSlotName', { index: index + 1 }) }
+		function showError(error) {
+			console.warn('[Save Slots]', error)
+			statusKey = 'operationFailed'
+			statusDetail = String(error?.message || error)
+			if (activeGame) refreshOpenSlotsPage(activeGame, true)
 		}
-
-		function writeSourceMarker(game, index, slot) {
-			const saveInstanceId = normalizeSaveInstanceId(slot?.decoded?.modloader?.saveInstanceId)
-			if (!Number.isInteger(index) || !slot || !saveInstanceId) {
-				localStorage.removeItem(sourceMarkerKey(game))
-				return
-			}
-			localStorage.setItem(sourceMarkerKey(game), JSON.stringify({
-				schema: 1,
-				steamId: String(game.steamId || ''),
-				index,
-				name: String(slot.name || ''),
-				slotUpdatedAt: safeTimestamp(slot.updatedAt),
-				saveInstanceId,
-				issuedAt: Date.now()
-			}))
-		}
-
-		function normalizeServiceError(error, fallbackCode) {
-			if (error instanceof SaveSlotsServiceError) return error
-			return new SaveSlotsServiceError(fallbackCode || 'WRITE_FAILED', String(error?.message || 'Save-slot operation failed.'))
-		}
-
-		function createActivationToken() {
-			try {
-				if (globalThis.crypto?.randomUUID) return globalThis.crypto.randomUUID().toLowerCase()
-			} catch (error) {}
-			return Date.now().toString(36) + '-' + Math.random().toString(36).slice(2) + '-' + Math.random().toString(36).slice(2)
-		}
-
-		function refreshOpenSlotsPage(game) {
-			if (!activeSplash || activeSplash.master !== game) return
-			if (!pageShell.isActive('saveSlots')) return
+		async function runUI(work) { try { return await work() } catch (error) { showError(error) } }
+		function refreshOpenSlotsPage(game, force = false) {
+			if (!activeSplash || activeSplash.master !== game || !pageShell.isActive('saveSlots')) return
 			const page = activeSplash.element?.querySelector('.cattail-save-slots-page')
-			if (!page || page.querySelector('.cattail-save-slots-name-input') || pendingConfirmation) return
+			if (!force && (pendingConfirmation || pendingImport || page?.querySelector('.cattail-save-slots-name-input'))) return
+			const list = page?.querySelector('.cattail-save-slots-list')
+			const top = list?.scrollTop || 0
 			pageShell.refresh('saveSlots')
+			const next = activeSplash.element?.querySelector('.cattail-save-slots-list')
+			if (next) next.scrollTop = top
 		}
-
-		function renderSlotsPage() {
-			pageShell.refresh('saveSlots')
-		}
+		function renderSlotsPage() { if (activeGame) refreshOpenSlotsPage(activeGame, true) }
 
 		function renderSlotsContent(ctx) {
 			const game = ctx.game
-			const manualSlots = readManualSlots(game)
-			const autoSlot = getAutoSlot(game)
-			ctx.content.append(renderAutoSlot(ctx.splash, ctx.page, autoSlot))
-
-			const strongRule = document.createElement('div')
-			strongRule.className = 'cattail-save-slots-rule-strong'
-			ctx.content.append(strongRule)
-
-			for (let i = 0; i < manualSlotCount; i++) ctx.content.append(renderManualSlot(ctx.splash, ctx.page, manualSlots, i))
+			const slots = nativeSlots(game)
+			ctx.content.append(renderNativeRow(game, slots[game.currentSlotId], game.currentSlotId, true))
+			const rule = document.createElement('div')
+			rule.className = 'cattail-save-slots-rule-strong'
+			ctx.content.append(rule)
+			for (let index = 0; index < Math.max(manualSlotCount, slots.length); index++) ctx.content.append(renderNativeRow(game, slots[index], index))
 		}
-		function ensureAutoSave(game) {
-			writeAutoSave(game)
-		}
-
-		function writeAutoSave(game) {
-			if (!game || game.preventSaving || typeof game.assembleSave !== 'function') return null
-			const data = game.assembleSave()
-			localStorage.setItem(autoKey(game), data)
-			game.spaceport?.send('save', data)
-			return data
-		}
-
-		function renderAutoSlot(splash, page, autoSlot) {
-			const confirmation = pendingConfirmation?.index === autoConfirmationIndex ? pendingConfirmation : null
-			const actions = []
-			if (autoSlot.data && confirmation) {
-				actions.push({
-					key: 'load',
-					confirm: true,
-					ok: function () {
-						pendingConfirmation = null
-						loadSlot(splash.master, autoSlot.data)
-					},
-					cancel: function () {
-						pendingConfirmation = null
-						renderSlotsPage(splash, page)
-					}
-				})
-			} else {
-				actions.push({ key: 'load', disabled: !autoSlot.data, run: function () {
-					pendingConfirmation = { type: 'load', index: autoConfirmationIndex }
-					renderSlotsPage(splash, page)
-				} })
-				actions.push({ key: 'overwrite', run: function () { overwriteAutoSlot(splash.master); renderSlotsPage(splash, page) } })
-				actions.push({ key: 'rename', disabled: true })
-				actions.push({ key: 'delete', disabled: true })
-			}
-			return renderSlotRow({
-				game: splash.master,
-				slot: autoSlot.data ? autoSlot : null,
-				isAuto: true,
-				title: autoSlot.data ? text(splash.master, 'autoSlotName') : text(splash.master, 'autoEmpty'),
-				time: autoSlot.timestamp,
-				onPrimary: function () {
-					if (!autoSlot.data) return
-					pendingConfirmation = { type: 'load', index: autoConfirmationIndex }
-					renderSlotsPage(splash, page)
-				},
-				actions
-			})
-		}
-
-		function renderManualSlot(splash, page, slots, index) {
-			const slot = slots[index] || null
-			const actions = []
-			const confirmation = pendingConfirmation?.index === index ? pendingConfirmation : null
-			if (slot) {
-				if (slot.pendingActivation) {
-					actions.push({ key: 'finalizing', disabled: true })
-				} else if (confirmation) {
-					actions.push({
-						key: confirmation.type,
-						confirm: true,
-						ok: function () {
-							if (confirmation.type === 'load') {
-								pendingConfirmation = null
-								loadSlot(splash.master, slot.data, index, slot)
-								return
-							}
-							if (confirmation.type === 'overwrite') saveManualSlot(splash.master, slots, index, slot.name)
-							if (confirmation.type === 'delete') {
-								slots[index] = null
-								writeManualSlots(splash.master, slots)
-							}
-							pendingConfirmation = null
-							renderSlotsPage(splash, page)
-						},
-						cancel: function () {
-							pendingConfirmation = null
-							renderSlotsPage(splash, page)
-						}
-					})
-				} else {
-					actions.push({ key: 'load', run: function () {
-						pendingConfirmation = { type: 'load', index }
-						renderSlotsPage(splash, page)
-					} })
-					actions.push({ key: 'overwrite', run: function () {
-						pendingConfirmation = { type: 'overwrite', index }
-						renderSlotsPage(splash, page)
-					} })
-					actions.push({ key: 'rename', run: function () { renderRenameSlot(splash, page, slots, index, slot) } })
-					actions.push({ key: 'delete', run: function () {
-						pendingConfirmation = { type: 'delete', index }
-						renderSlotsPage(splash, page)
-					} })
-				}
-			} else {
-				actions.push({ key: 'newSlot', run: function () {
-					saveManualSlot(splash.master, slots, index)
-					renderSlotsPage(splash, page)
-				} })
-			}
-
-			return renderSlotRow({
-				game: splash.master,
-				slot,
-				isAuto: false,
-				title: slot ? slotTitle(splash.master, slot, index) : text(splash.master, 'emptySlot', { index: index + 1 }),
-				time: slot?.timestamp || slot?.updatedAt,
-				onPrimary: function () {
-					if (slot?.pendingActivation) return
-					if (slot) {
-						pendingConfirmation = { type: 'load', index }
-						renderSlotsPage(splash, page)
-					} else {
-						saveManualSlot(splash.master, slots, index)
-						renderSlotsPage(splash, page)
-					}
-				},
-				actions
-			})
-		}
-
-		function renderSlotRow(options) {
+		function renderNativeRow(game, slot, index, isAuto = false) {
 			const row = document.createElement('div')
-			row.className = `cattail-save-slots-row${options.isAuto ? ' cattail-save-slots-auto' : ''}${options.slot ? '' : ' cattail-save-slots-empty'}`
-
-			const info = document.createElement('button')
-			info.type = 'button'
+			row.className = `cattail-save-slots-row${isAuto ? ' cattail-save-slots-auto' : ''}${slot ? '' : ' cattail-save-slots-empty'}`
+			row.dataset.slotIndex = String(index)
+			const title = isAuto ? text(game, 'autoSlotName') : slot ? slotTitle(game, slot, index) : text(game, 'emptySlot', { index: index + 1 })
+			const rowKey = isAuto ? 'auto' : index
+			const select = type => { pendingConfirmation = { index: rowKey, type, slot, record: slot?.stack?.[0] }; renderSlotsPage() }
+			const info = actionButton('', false, () => slot ? select('load') : copyCurrent(game))
 			info.className = 'cattail-save-slots-info'
-			info.onclick = options.onPrimary
-
 			const name = document.createElement('div')
 			name.className = 'cattail-save-slots-name'
-			name.textContent = options.title
+			name.textContent = title
 			const time = document.createElement('div')
 			time.className = 'cattail-save-slots-time'
-			time.textContent = formatTime(options.time) || text(options.game, 'noTime')
+			time.textContent = (slot ? formatTime(recordTime(slot.stack?.[0], slot)) : '') + (!isAuto && slot && index === game.currentSlotId ? ' · ' + text(game, 'current') : '')
 			info.append(name, time)
-
 			const resources = document.createElement('div')
 			resources.className = 'cattail-save-slots-resources'
-			const decoded = options.slot?.decoded || decodeSlot(options.game, options.slot?.data)
-			const resourceNodes = renderResourceSummary(options.game, decoded)
-			for (const node of resourceNodes) resources.append(node)
-			if (!resourceNodes.length) {
-				const none = document.createElement('span')
-				none.className = 'cattail-save-slots-no-resources'
-				none.textContent = text(options.game, options.slot ? 'noResources' : 'emptyResourceHint')
-				resources.append(none)
-			}
-
+			for (const node of renderResourceSummary(game, slot?.stack?.[0]?.state)) resources.append(node)
+			const resourceArea = document.createElement('div')
+			resourceArea.className = 'cattail-save-slots-resource-area'
+			resourceArea.append(resources)
+			if (slot?.stack?.length) resourceArea.append(renderTimeline(game, slot))
 			const actions = document.createElement('div')
 			actions.className = 'cattail-save-slots-actions'
-			for (let i = 0; i < options.actions.length; i++) {
-				if (options.actions[i].confirm) {
-					actions.append(confirmAction(options.game, options.actions[i]))
-					continue
+			const confirmation = pendingConfirmation?.index === rowKey ? pendingConfirmation : null
+			if (confirmation) {
+				actions.append(confirmAction(game, { key: confirmation.type,
+					ok: async () => {
+						pendingConfirmation = null
+						if (confirmation.type === 'load') await activateRecord(game, confirmation.slot, confirmation.record)
+						if (confirmation.type === 'delete') await changeSlot(game, confirmation.slot, 'delete')
+						if (confirmation.type === 'overwrite') {
+							await copyCurrent(game, confirmation.slot)
+						}
+						renderSlotsPage()
+					}, cancel: () => { pendingConfirmation = null; renderSlotsPage() } }))
+			} else {
+				const add = (key, disabled, work) => { if (actions.childNodes.length) actions.append(actionSeparator()); actions.append(actionButton(text(game, key), disabled, work)) }
+				if (!slot) add('newSlot', !availableIndices(game).length, () => copyCurrent(game))
+				else if (isAuto) { add('save', false, () => mutate(game, () => saveCurrent(game))); add('load', false, () => select('load')) }
+				else {
+					add('load', false, () => select('load'))
+					add('overwrite', false, () => select('overwrite'))
+					add('copy', !availableIndices(game).length, () => changeSlot(game, slot, 'copy'))
+					add('rename', false, () => renderRenameSlot(game, row, slot))
+					add('delete', index === game.currentSlotId, () => select('delete'))
 				}
-				if (i) actions.append(actionSeparator())
-				actions.append(actionButton(text(options.game, options.actions[i].key), !!options.actions[i].disabled, options.actions[i].run))
 			}
-
-			row.append(info, resources, actions)
+			row.append(info, resourceArea, actions)
 			return row
 		}
-
-		function renderRenameSlot(splash, page, slots, index, slot) {
-			renderSlotsPage(splash, page)
-			const rows = page.querySelectorAll('.cattail-save-slots-row:not(.cattail-save-slots-auto)')
-			const row = rows[index]
-			if (!row) return
-			row.innerHTML = ''
+		function renderTimeline(game, slot) {
+			const timeline = document.createElement('div')
+			timeline.className = 'cattail-save-slots-timeline'
+			timeline.setAttribute('aria-label', text(game, 'history'))
+			const entries = slot.stack.map((record, index) => ({ record, index, time: recordTime(record, slot) }))
+			entries.sort((a, b) => (a.time || 0) - (b.time || 0) || b.index - a.index)
+			timeline.style.setProperty('--node-count', entries.length)
+			// Container breakpoints choose a balanced subset of labels. All dots remain.
+			// Minimum track widths account for the two 32px side margins.
+			const labelSets = [[2, 0], [3, 176], [5, 296], [7, 416], [10, 596], [16, 956]].map(([capacity, width]) => {
+				let count = Math.min(entries.length, capacity)
+				while (count > 2 && Math.floor((entries.length - 1) / (count - 1)) * width / (entries.length - 1) < 60) count--
+				const positions = new Set(Array.from({ length: count }, (_, i) => count === 1 ? 0 : Math.round(i * (entries.length - 1) / (count - 1))))
+				return { capacity, positions }
+			})
+			const track = document.createElement('div')
+			track.className = 'cattail-save-slots-timeline-track'
+			timeline.append(track)
+			entries.forEach(({ record, index, time }, position) => {
+				const button = actionButton('', false, () => activateRecord(game, slot, record))
+				button.className = 'cattail-save-slots-timeline-node' + (index === 0 ? ' is-current' : '')
+				button.style.setProperty('--position', entries.length === 1 ? .5 : position / (entries.length - 1))
+				for (const { capacity, positions } of labelSets) button.style.setProperty(`--label-${capacity}`, positions.has(position) ? 'visible' : 'hidden')
+				const timestamp = time ? formatTime(time) : text(game, 'noTime')
+				button.title = timestamp + (index === 0 ? ' · ' + text(game, 'latest') : '')
+				button.setAttribute('aria-label', text(game, 'load') + ': ' + button.title)
+				const dot = document.createElement('span')
+				dot.className = 'cattail-save-slots-timeline-dot'
+				const label = document.createElement('span')
+				label.className = 'cattail-save-slots-timeline-label'
+				label.textContent = time ? timestamp.slice(5).replace(' ', '\n') : text(game, 'noTime')
+				button.append(dot, label)
+				timeline.append(button)
+			})
+			return timeline
+		}
+		function renderRenameSlot(game, row, slot) {
+			row.replaceChildren()
 			row.classList.add('cattail-save-slots-editing')
-
 			const input = document.createElement('input')
 			input.className = 'cattail-save-slots-name-input'
 			input.type = 'text'
-			input.value = slot.name || text(splash.master, 'defaultSlotName', { index: index + 1 })
-			input.maxLength = 64
+			input.value = slot.name || ''
+			input.maxLength = maxNameLength
 			input.spellcheck = false
 			input.autocomplete = 'off'
-			input.autocorrect = 'off'
-			input.autocapitalize = 'off'
-			input.setAttribute('spellcheck', 'false')
-			input.setAttribute('data-gramm', 'false')
-			input.setAttribute('data-gramm_editor', 'false')
-			input.setAttribute('data-enable-grammarly', 'false')
-
+			const saveName = async () => { await changeSlot(game, slot, 'rename', input.value); renderSlotsPage() }
 			const actions = document.createElement('div')
 			actions.className = 'cattail-save-slots-actions'
-			const saveName = function () {
-				slot.name = input.value.trim()
-				writeManualSlots(splash.master, slots)
-				renderSlotsPage(splash, page)
-			}
-			actions.append(actionButton(text(splash.master, 'save'), false, saveName))
-			actions.append(actionSeparator())
-			actions.append(actionButton(text(splash.master, 'cancel'), false, function () { renderSlotsPage(splash, page) }))
-
-			const stopTypingEvent = function (event) { event.stopPropagation() }
-			const typeText = function (value) {
-				if (!value) return
-				const start = input.selectionStart ?? input.value.length
-				const end = input.selectionEnd ?? start
-				const next = input.value.slice(0, start) + value + input.value.slice(end)
-				input.value = next.slice(0, input.maxLength)
-				const caret = Math.min(start + value.length, input.value.length)
-				input.setSelectionRange(caret, caret)
-			}
-			const handleTypingKey = function (event) {
+			actions.append(actionButton(text(game, 'save'), false, saveName), actionSeparator(), actionButton(text(game, 'cancel'), false, renderSlotsPage))
+			for (const name of ['keyup', 'keypress', 'beforeinput', 'paste', 'input', 'compositionstart', 'compositionupdate', 'compositionend', 'mousedown', 'pointerdown', 'click', 'touchstart']) input.addEventListener(name, event => event.stopPropagation(), true)
+			input.addEventListener('keydown', event => {
 				event.stopPropagation()
-				if (event.key === 'Enter') {
-					event.preventDefault()
-					saveName()
-					return
-				}
-				if (event.key === 'Escape') {
-					event.preventDefault()
-					renderSlotsPage(splash, page)
-					return
-				}
-				if (event.ctrlKey || event.metaKey || event.altKey || event.isComposing) return
-				if (event.key && /^[ -~]$/.test(event.key)) {
-					event.preventDefault()
-					typeText(event.key)
-				}
-			}
-			input.addEventListener('keydown', handleTypingKey, true)
-			input.addEventListener('keyup', stopTypingEvent, true)
-			input.addEventListener('keypress', stopTypingEvent, true)
-			input.addEventListener('beforeinput', stopTypingEvent, true)
-			input.addEventListener('paste', function (event) {
-				event.stopPropagation()
-				event.preventDefault()
-				typeText(event.clipboardData?.getData('text') || '')
+				if (event.isComposing) return
+				if (event.key === 'Enter') { event.preventDefault(); runUI(saveName) }
+				if (event.key === 'Escape') { event.preventDefault(); renderSlotsPage() }
 			}, true)
-			input.addEventListener('input', stopTypingEvent, true)
-			input.addEventListener('compositionstart', stopTypingEvent, true)
-			input.addEventListener('compositionupdate', stopTypingEvent, true)
-			input.addEventListener('compositionend', stopTypingEvent, true)
-			input.addEventListener('mousedown', stopTypingEvent, true)
-			input.addEventListener('pointerdown', stopTypingEvent, true)
-			input.addEventListener('click', stopTypingEvent, true)
-			input.addEventListener('touchstart', stopTypingEvent, true)
 			row.append(input, actions)
-			setTimeout(function () { input.focus(); input.select() }, 0)
+			setTimeout(() => { input.focus(); input.select() }, 0)
 		}
-
-		function renderTransferBar(splash, page) {
+		function renderTransferBar(splash) {
 			const game = splash.master
 			const bar = document.createElement('div')
 			bar.className = 'cattail-save-slots-transfer'
 			if (pendingImport) {
-				const status = document.createElement('span')
-				status.className = 'cattail-save-slots-transfer-status'
-				status.textContent = text(game, pendingImport.auto ? 'importConfirmWithAuto' : 'importConfirm', { count: pendingImport.filledCount })
-				const ok = actionButton('', false, function () {
-					const shouldReload = applyImportedSlots(game, pendingImport)
+				const imported = pendingImport
+				const preview = document.createElement('span')
+				preview.className = 'cattail-save-slots-transfer-status'
+				preview.textContent = text(game, 'importConfirm', { count: imported.slots.length }) + ' ' + imported.slots.map((slot, i) => slot.name || text(game, 'defaultSlotName', { index: i + 1 })).join(' · ')
+				bar.append(preview, actionButton(text(game, 'confirmImport'), false, async () => {
+					await applyImportedSlots(game, imported)
 					pendingImport = null
-					if (shouldReload) {
-						game.preventSaving = true
-						setTimeout(function () { location.reload() }, 100)
-						return
-					}
-					renderSlotsPage(splash, page)
-				})
-				ok.classList.add('cattail-save-slots-confirm-icon', 'cattail-save-slots-confirm-ok')
-				ok.setAttribute('aria-label', 'Confirm')
-				const cancel = actionButton('', false, function () {
-					pendingImport = null
-					renderSlotsPage(splash, page)
-				})
-				cancel.classList.add('cattail-save-slots-confirm-icon', 'cattail-save-slots-confirm-cancel')
-				cancel.setAttribute('aria-label', 'Cancel')
-				bar.append(status, ok, actionSeparator(), cancel)
-				return bar
+					renderSlotsPage()
+				}), actionSeparator(), actionButton(text(game, 'cancel'), false, () => { pendingImport = null; renderSlotsPage() }))
+			} else {
+				bar.append(actionButton(text(game, 'exportSlots'), false, () => exportSlotsFile(game)), actionSeparator(),
+					actionButton(text(game, 'importSlots'), false, () => chooseImportFile(game)), actionSeparator(),
+					actionButton(text(game, 'importClipboard'), false, async () => { setImportPreview(game, await navigator.clipboard.readText()) }))
+				if (localStorage.getItem(slotsKey(game))) bar.append(actionSeparator(), actionButton(text(game, 'migrateLegacy'), false, async () => {
+					pendingImport = await legacyPreview(game)
+					pendingConfirmation = null
+					renderSlotsPage()
+				}))
 			}
-			bar.append(actionButton(text(game, 'exportSlots'), false, function () { exportSlotsFile(game) }))
-			bar.append(actionSeparator())
-			bar.append(actionButton(text(game, 'importSlots'), false, function () { chooseImportFile(splash, page) }))
+			if (statusKey) {
+				const status = document.createElement('span')
+				status.className = 'cattail-save-slots-operation-status'
+				status.setAttribute('role', 'status')
+				status.textContent = text(game, statusKey) + (statusDetail ? ' ' + statusDetail : '')
+				bar.append(status)
+			}
 			return bar
 		}
-
-		function exportSlotsFile(game) {
-			const payload = buildExportPayload(game)
-			const content = encodeExportPayload(payload)
-			const blob = new Blob([content], { type: 'text/plain;charset=utf-8' })
-			const url = URL.createObjectURL(blob)
-			const link = document.createElement('a')
-			link.href = url
-			link.download = exportFileName()
-			document.body.append(link)
-			link.click()
-			link.remove()
-			setTimeout(function () { URL.revokeObjectURL(url) }, 1000)
+		function setImportPreview(game, content) {
+			pendingImport = parseImportedSlots(game, content)
+			pendingConfirmation = null
+			statusKey = ''
+			statusDetail = ''
+			renderSlotsPage()
 		}
-
-		function chooseImportFile(splash, page) {
+		function chooseImportFile(game) {
 			const input = document.createElement('input')
 			input.type = 'file'
 			input.accept = '.cattail-save-slots,.txt,.json,text/plain,application/json'
 			input.style.display = 'none'
-			input.onchange = function () {
+			input.onchange = () => {
 				const file = input.files?.[0]
 				input.remove()
 				if (!file) return
 				const reader = new FileReader()
-				reader.onload = function () {
-					const imported = parseImportedSlots(splash.master, String(reader.result || ''))
-					if (!imported) {
-						alert(text(splash.master, 'importInvalid'))
-						return
-					}
-					pendingConfirmation = null
-					pendingImport = imported
-					renderSlotsPage(splash, page)
-				}
-				reader.onerror = function () { alert(text(splash.master, 'importInvalid')) }
+				reader.onload = () => runUI(() => setImportPreview(game, String(reader.result || '')))
+				reader.onerror = () => showError(new Error(text(game, 'importInvalid')))
 				reader.readAsText(file)
 			}
+			input.oncancel = () => input.remove()
 			document.body.append(input)
 			input.click()
 		}
-
-		function buildExportPayload(game) {
-			const autoSlot = getAutoSlot(game)
-			const manualSlots = readManualSlots(game)
-			return {
-				type: 'Cattail_TweaksQuality_Saves-Slots',
-				version: 1,
-				exportedAt: new Date().toISOString(),
-				steamId: String(game?.steamId || ''),
-				slotCount: manualSlotCount,
-				auto: sanitizeSlot(game, autoSlot.data ? { data: autoSlot.data, timestamp: autoSlot.timestamp, createdAt: autoSlot.timestamp, updatedAt: autoSlot.timestamp } : null),
-				manual: emptySlots().map(function (_, index) { return sanitizeSlot(game, manualSlots[index]) })
+		function exportSlotsFile(game) {
+			return mutate(game, async () => {
+				await saveCurrent(game)
+				const content = 'CattailSaveSlots:v2\n' + encodeBase64(JSON.stringify(buildExportPayload(game)))
+				const url = URL.createObjectURL(new Blob([content], { type: 'text/plain;charset=utf-8' }))
+				const link = document.createElement('a')
+				link.href = url
+				link.download = exportFileName()
+				document.body.append(link)
+				link.click()
+				link.remove()
+				setTimeout(() => URL.revokeObjectURL(url), 1000)
+			})
+		}
+		function confirmAction(game, action) {
+			const wrap = document.createElement('span')
+			wrap.className = 'cattail-save-slots-confirm-action'
+			const label = document.createElement('span')
+			label.className = 'cattail-save-slots-confirm-label'
+			label.textContent = text(game, action.key)
+			const ok = actionButton('', false, action.ok)
+			ok.classList.add('cattail-save-slots-confirm-icon', 'cattail-save-slots-confirm-ok')
+			ok.setAttribute('aria-label', text(game, 'save'))
+			const cancel = actionButton('', false, action.cancel)
+			cancel.classList.add('cattail-save-slots-confirm-icon', 'cattail-save-slots-confirm-cancel')
+			cancel.setAttribute('aria-label', text(game, 'cancel'))
+			wrap.append(label, ok, actionSeparator(), cancel)
+			return wrap
+		}
+		function actionButton(label, disabled, onClick) {
+			const button = document.createElement('button')
+			button.type = 'button'
+			button.textContent = label
+			button.disabled = disabled || !!(activeGame && context(activeGame).activating)
+			button.onclick = async event => {
+				event.preventDefault()
+				event.stopPropagation()
+				if (button.disabled || typeof onClick !== 'function') return
+				button.disabled = true
+				try { await runUI(onClick) } finally { button.disabled = disabled || !!(activeGame && context(activeGame).activating) }
 			}
+			return button
 		}
-
-		function parseImportedSlots(game, raw) {
-			try {
-				const payload = decodeExportPayload(raw)
-				if (!payload || typeof payload !== 'object') return null
-				const sourceSlots = Array.isArray(payload) ? payload : (Array.isArray(payload.manual) ? payload.manual : (Array.isArray(payload.slots) ? payload.slots : null))
-				if (!sourceSlots) return null
-				const manual = emptySlots().map(function (_, index) { return sanitizeSlot(game, sourceSlots[index]) })
-				const auto = Array.isArray(payload) ? null : sanitizeSlot(game, payload.auto || payload.autosave)
-				return { auto, manual, filledCount: manual.filter(Boolean).length }
-			} catch (error) {
-				console.warn('[Save Slots] Could not import save slots.', error)
-				return null
-			}
-		}
-
-		function applyImportedSlots(game, imported) {
-			writeManualSlots(game, imported.manual)
-			if (imported.auto?.data) {
-				localStorage.setItem(autoKey(game), imported.auto.data)
-				game.spaceport?.send('save', imported.auto.data)
-				return true
-			}
-			return false
-		}
-
-		function sanitizeSlot(game, slot) {
-			if (!slot) return null
-			const data = typeof slot === 'string' ? slot : slot.data
-			if (typeof data !== 'string' || !data) return null
-			const decoded = decodeSlot(game, data)
-			if (!decoded) return null
-			return {
-				name: typeof slot.name === 'string' ? slot.name.slice(0, 64) : '',
-				data,
-				timestamp: safeTimestamp(slot.timestamp || decoded.timestamp),
-				createdAt: safeTimestamp(slot.createdAt || slot.timestamp || decoded.timestamp),
-				updatedAt: safeTimestamp(slot.updatedAt || slot.timestamp || decoded.timestamp)
-			}
-		}
-
-		function safeTimestamp(value) {
-			const number = Number(value)
-			return Number.isFinite(number) && number > 0 ? number : null
-		}
-
-		function encodeExportPayload(payload) {
-			return 'CattailSaveSlots:v1\n' + encodeBase64(JSON.stringify(payload))
-		}
-
-		function decodeExportPayload(raw) {
-			const content = String(raw || '').trim()
-			if (!content) return null
-			if (content.startsWith('CattailSaveSlots:v1')) return JSON.parse(decodeBase64(content.slice('CattailSaveSlots:v1'.length).trim()))
-			return JSON.parse(content)
+		function actionSeparator() {
+			const separator = document.createElement('span')
+			separator.className = 'cattail-save-slots-action-separator'
+			separator.textContent = '|'
+			return separator
 		}
 
 		function encodeBase64(value) {
@@ -1049,152 +726,6 @@ ModLoader.register({
 			const pad = function (value) { return String(value).padStart(2, '0') }
 			return `Cattail_SaveSlots_${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}_${pad(date.getHours())}-${pad(date.getMinutes())}.cattail-save-slots`
 		}
-
-		function confirmAction(game, action) {
-			const wrap = document.createElement('span')
-			wrap.className = 'cattail-save-slots-confirm-action'
-			const label = document.createElement('span')
-			label.className = 'cattail-save-slots-confirm-label'
-			label.textContent = text(game, action.key)
-			const ok = actionButton('', false, action.ok)
-			ok.classList.add('cattail-save-slots-confirm-icon', 'cattail-save-slots-confirm-ok')
-			ok.setAttribute('aria-label', 'Confirm')
-			const cancel = actionButton('', false, action.cancel)
-			cancel.classList.add('cattail-save-slots-confirm-icon', 'cattail-save-slots-confirm-cancel')
-			cancel.setAttribute('aria-label', 'Cancel')
-			wrap.append(label, ok, actionSeparator(), cancel)
-			return wrap
-		}
-		function actionButton(label, disabled, onClick) {
-			const button = document.createElement('button')
-			button.type = 'button'
-			button.textContent = label
-			button.disabled = disabled
-			button.onclick = function (event) {
-				event.preventDefault()
-				event.stopPropagation()
-				if (!disabled && typeof onClick === 'function') onClick()
-			}
-			button.ontouchstart = button.onclick
-			return button
-		}
-
-		function actionSeparator() {
-			const separator = document.createElement('span')
-			separator.className = 'cattail-save-slots-action-separator'
-			separator.textContent = '|'
-			return separator
-		}
-
-		function saveManualSlot(game, slots, index, previousName) {
-			if (game.preventSaving) {
-				alert(game.pronounce?.('random', 'toolate') || text(game, 'cannotSave'))
-				return
-			}
-			const data = game.assembleSave()
-			const decoded = game.decodeSave(data)
-			const timestamp = decoded?.timestamp || Date.now()
-			slots[index] = { name: previousName || '', data, timestamp, createdAt: slots[index]?.createdAt || timestamp, updatedAt: timestamp }
-			writeManualSlots(game, slots)
-		}
-
-		function overwriteAutoSlot(game) {
-			if (game.preventSaving) {
-				alert(game.pronounce?.('random', 'toolate') || text(game, 'cannotSave'))
-				return
-			}
-			writeAutoSave(game)
-		}
-
-		function loadSlot(game, data, index, slot) {
-			if (!data) return
-			if (Number.isInteger(index) && slot) writeSourceMarker(game, index, slot)
-			else localStorage.removeItem(sourceMarkerKey(game))
-			game.preventSaving = true
-			game.spaceport?.send('save', data)
-			localStorage.setItem(autoKey(game), data)
-			setTimeout(function () { location.reload() }, 100)
-		}
-
-		function getAutoSlot(game) {
-			const data = localStorage.getItem(autoKey(game))
-			const decoded = data ? game.decodeSave(data) : null
-			return { data, decoded, timestamp: decoded?.timestamp || null }
-		}
-
-		function readManualSlots(game) {
-			try {
-				const raw = localStorage.getItem(slotsKey(game))
-				const parsed = raw ? JSON.parse(raw) : []
-				if (!Array.isArray(parsed)) return emptySlots()
-				return emptySlots().map(function (_, index) {
-					const slot = parsed[index]
-					if (!slot?.data) return null
-					const decoded = decodeSlot(game, slot.data)
-					return {
-						name: typeof slot.name === 'string' ? slot.name : '',
-						data: slot.data,
-						decoded,
-						timestamp: slot.timestamp || decoded?.timestamp || null,
-						createdAt: slot.createdAt || slot.timestamp || decoded?.timestamp || null,
-						updatedAt: slot.updatedAt || slot.timestamp || decoded?.timestamp || null,
-						pendingActivation: normalizePendingActivation(slot.pendingActivation)
-					}
-				})
-			} catch (error) {
-				console.warn('[Save Slots] Could not read save slots.', error)
-				return emptySlots()
-			}
-		}
-
-		function writeManualSlots(game, slots) {
-			localStorage.setItem(slotsKey(game), serializeManualSlots(slots))
-		}
-
-		function serializeManualSlots(slots) {
-			return JSON.stringify(emptySlots().map(function (_, index) {
-				const slot = slots[index]
-				if (!slot?.data) return null
-				const persisted = {
-					name: typeof slot.name === 'string' ? slot.name.slice(0, maxNameLength) : '',
-					data: slot.data,
-					timestamp: safeTimestamp(slot.timestamp),
-					createdAt: safeTimestamp(slot.createdAt),
-					updatedAt: safeTimestamp(slot.updatedAt)
-				}
-				const pendingActivation = normalizePendingActivation(slot.pendingActivation)
-				if (pendingActivation) persisted.pendingActivation = pendingActivation
-				return persisted
-			}))
-		}
-
-		function normalizePendingActivation(value) {
-			if (
-				!value ||
-				value.schema !== 1 ||
-				typeof value.token !== 'string' ||
-				!value.token ||
-				!safeTimestamp(value.issuedAt)
-			) {
-				return null
-			}
-			return {
-				schema: 1,
-				token: value.token,
-				issuedAt: safeTimestamp(value.issuedAt)
-			}
-		}
-
-		function emptySlots() { return new Array(manualSlotCount).fill(null) }
-		function autoKey(game) { return `abstractv03${game.steamId}` }
-		function slotsKey(game) { return `abstractv03_saveSlots${game.steamId}` }
-		function pendingMarkerKey(game) { return `abstractv03_saveSlotsPendingActivation${game.steamId}` }
-		function sourceMarkerKey(game) { return `abstractv03_saveSlotsSource${game.steamId}` }
-		function decodeSlot(game, data) {
-			if (!data) return null
-			try { return game.decodeSave(data) } catch (error) { console.warn('[Save Slots] Could not decode save preview.', error); return null }
-		}
-		function slotTitle(game, slot, index) { return slot.name || text(game, 'defaultSlotName', { index: index + 1 }) }
 
 		function renderResourceSummary(game, decoded) {
 			const resources = Array.isArray(decoded?.resources) ? decoded.resources : []
@@ -1291,11 +822,18 @@ ModLoader.register({
 			tch: {back: '返回', noTime: '沒有存檔時間', noResources: '沒有資源', emptyResourceHint: '空', exportSlots: '匯出全部', importSlots: '匯入檔案', importConfirm: '匯入 {count} 個手動存檔格？', importConfirmWithAuto: '匯入自動存檔和 {count} 個手動存檔格？', importInvalid: '無法匯入這個存檔格檔案。', finalizing: '正在完成'}
 		}
 
+		const NATIVE_LABELS = {
+			en: { importClipboard: 'Import from clipboard', migrateLegacy: 'Migrate old slots', confirmImport: 'Add slots', importConfirm: 'Add {count} new slots without switching?', copy: 'Copy', current: 'Playing', latest: 'Latest save', history: 'Save history', saved: 'Saved', localOnly: 'Saved locally. Steam cloud saving did not succeed.', operationFailed: 'Operation failed:', full: 'Not enough empty slots (20 slots maximum). Existing slots were kept.', changed: 'This save changed. Refresh and select it again.', activeDelete: 'Switch to another slot before deleting this slot.', noLegacy: 'No unmigrated old slots were found.' },
+			sch: { importClipboard: '从剪贴板导入', migrateLegacy: '迁入旧槽位', confirmImport: '添加槽位', importConfirm: '新增 {count} 个槽位，不切换当前游戏？', copy: '复制', current: '正在游玩', latest: '最新保存', history: '存档历史', saved: '已保存', localOnly: '已保存在本地，Steam 云保存未成功。', operationFailed: '操作失败：', full: '空槽不足（最多 20 个普通槽）；已有存档全部保留。', changed: '存档已变化，请刷新后重新选择。', activeDelete: '请先切换到其他槽，再删除此槽。', noLegacy: '没有尚未迁入的旧槽位。' },
+			tch: { importClipboard: '從剪貼簿匯入', migrateLegacy: '遷入舊槽位', confirmImport: '新增槽位', importConfirm: '新增 {count} 個槽位，不切換目前遊戲？', copy: '複製', current: '正在遊玩', latest: '最新儲存', history: '存檔歷史', saved: '已儲存', localOnly: '已儲存在本機，Steam 雲端儲存未成功。', operationFailed: '操作失敗：', full: '空槽不足（最多 20 個普通槽）；現有存檔全部保留。', changed: '存檔已變更，請重新整理後再選擇。', activeDelete: '請先切換到其他槽，再刪除此槽。', noLegacy: '沒有尚未遷入的舊槽位。' }
+		}
+		NATIVE_LABELS.modsch = NATIVE_LABELS.sch
+
 		function text(game, key, values) {
 			const language = game?.language || 'en'
 			const labels = LABELS[language] || LABELS.en
 			const extras = EXTRA_LABELS[language] || EXTRA_LABELS.en
-			let template = labels[key] || extras[key]
+			let template = NATIVE_LABELS[language]?.[key] || NATIVE_LABELS.en[key] || labels[key] || extras[key]
 			if (!template && key === 'autoSlotName') template = (labels.autoSlot || LABELS.en.autoSlot).replace(/\s*\{time\}/, '').replace(/[：:]\s*$/, '').trim()
 			if (!template && key === 'back') template = labels.cancel || LABELS.en.cancel
 			if (!template && (key === 'noTime' || key === 'noResources' || key === 'emptyResourceHint')) template = ''
@@ -1385,6 +923,31 @@ ModLoader.register({
 				.splash.mobile .cattail-save-slots-actions { justify-content:flex-end; font-size:min(4vw,15px); letter-spacing:1px; }
 				.splash.mobile .cattail-save-slots-back { font-size:min(5vw,20px); }
 				@media (max-width:860px) { .cattail-save-slots-page { padding-left:5vw; padding-right:5vw; } .cattail-save-slots-logo { font-size:34px; letter-spacing:10px; } .cattail-save-slots-row { grid-template-columns:1fr; gap:10px; } .cattail-save-slots-resources { justify-content:flex-start; } }
+				.cattail-save-slots-transfer { flex-wrap:wrap; white-space:normal; flex-shrink:0; letter-spacing:1px; }
+				.cattail-save-slots-transfer-status { max-width:100%; overflow-wrap:anywhere; }
+				.cattail-save-slots-operation-status { flex-basis:100%; text-align:center; font-size:14px; line-height:1.4; letter-spacing:0; overflow-wrap:anywhere; }
+				.cattail-save-slots-list { min-height:0; flex-shrink:1; }
+				.cattail-save-slots-row { grid-template-columns:minmax(180px,.85fr) minmax(240px,1.1fr) minmax(280px,1fr); column-gap:18px; row-gap:14px; }
+				.cattail-save-slots-actions { flex-wrap:wrap; font-size:15px; letter-spacing:0; }
+				.cattail-save-slots-confirm-action { min-width:0; gap:14px; }
+				.cattail-save-slots-confirm-label { margin-right:10px; }
+				.cattail-save-slots-resource-area { min-width:0; container:cattail-save-resources / inline-size; }
+				.cattail-save-slots-timeline { position:relative; min-width:0; margin:18px 32px 0; height:68px; }
+				.cattail-save-slots-timeline-track { position:absolute; top:10px; left:0; right:-14px; height:1px; background:#fff7; pointer-events:none; }
+				.cattail-save-slots-timeline-track:after { content:''; position:absolute; right:0; top:-3px; width:6px; height:6px; border-top:1px solid #fffb; border-right:1px solid #fffb; transform:rotate(45deg); }
+				.cattail-save-slots-timeline-node { --label-visibility:var(--label-2); position:absolute; left:calc(var(--position) * 100%); top:0; width:22px; height:22px; transform:translateX(-50%); appearance:none; border:0; padding:0; background:transparent; color:#fffb; cursor:pointer; }
+				.cattail-save-slots-timeline-dot { position:absolute; top:7px; left:8px; width:7px; height:7px; border-radius:50%; background:currentColor; }
+				.cattail-save-slots-timeline-label { position:absolute; top:25px; left:50%; transform:translateX(-50%); width:56px; visibility:var(--label-visibility); white-space:pre-line; font:11px/1.35 Montserrat,Arial,sans-serif; letter-spacing:0; text-align:center; pointer-events:none; }
+				.cattail-save-slots-timeline-node.is-current { color:#fff; }
+				.cattail-save-slots-timeline-node.is-current .cattail-save-slots-timeline-dot { outline:1px solid #fff7; outline-offset:3px; }
+				.cattail-save-slots-timeline-node:hover, .cattail-save-slots-timeline-node:focus-visible { color:#db91ad; outline:1px solid currentColor; outline-offset:2px; border-radius:50%; }
+				.cattail-save-slots-timeline-node:disabled { cursor:default; opacity:.4; }
+				@container cattail-save-resources (min-width:240px) { .cattail-save-slots-timeline-node { --label-visibility:var(--label-3); } }
+				@container cattail-save-resources (min-width:360px) { .cattail-save-slots-timeline-node { --label-visibility:var(--label-5); } }
+				@container cattail-save-resources (min-width:480px) { .cattail-save-slots-timeline-node { --label-visibility:var(--label-7); } }
+				@container cattail-save-resources (min-width:660px) { .cattail-save-slots-timeline-node { --label-visibility:var(--label-10); } }
+				@container cattail-save-resources (min-width:1020px) { .cattail-save-slots-timeline-node { --label-visibility:var(--label-16); } }
+				@media (max-width:860px) { .cattail-save-slots-row { grid-template-columns:1fr; } .cattail-save-slots-timeline { margin-left:28px; margin-right:28px; } .cattail-save-slots-name-input { grid-column:1; } .cattail-save-slots-transfer { font-size:14px; } }
 			`
 			document.head.append(style)
 		}

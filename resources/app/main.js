@@ -1,3 +1,6 @@
+//WIP STUFF TO DO
+
+
 //HID
 // const HID = require('node-hid')
 // const device = new HID.HID("/dev/hidraw3")
@@ -40,8 +43,8 @@ function saveAppOptions(){
 
 // DEFAULT SETUP
 let win, STEAMLANGUAGE = `english`, STEAMID = ``, client = {}
-let DEBUG = ``
-let recreatingWindow = false
+let DEBUG = `
+let recreatingWindow = false`
 
 // STEAMWORKS INIT
 // let DEBUG_C = `Undefined string`
@@ -81,19 +84,42 @@ const languages = {
 }
 
 // RENDERER COMMUNICATION
-ipcMain.on(`getMyStuff`, (e,d)=>{
-  if (d !== `please`) {
-    win.webContents.send(`hereYouGoSir`, null); 
+// Load save
+ipcMain.on(`getMyStuff`, async (e,d)=>{
+  ModLoaderMainProcess.clearSnapshotContext(e.sender) // reload
+ 	if (d !== `please`) {
+    win.webContents.send(`hereYouGoSir`, null)
     return
-  }
-  const stuff = {
-    steamId: STEAMID,
-    languageId: languages[STEAMLANGUAGE] === undefined ? null : languages[STEAMLANGUAGE],
-    save: getCloudSave(),
-    steamAchievements: getSteamAchievements(),
-    accumulatedPlayTime: getAccumulatedPlayTime(),
-    debug: DEBUG
-  }
+ 	}
+
+ 	//Legacy stuff
+ 	win.webContents.send(`console`, `Spaceport operational. Is there a new save file? ${client.cloud?.fileExists(`charpsMemory`) ? 'Yes' : 'No'}!`)
+ 	let stuff = false
+ 	if (client.cloud?.fileExists(`charpsMemory`)){
+
+ 		const slots = await getCloudSlots()
+
+ 		// New
+ 		stuff = {
+      steamId: STEAMID,
+      languageId: languages[STEAMLANGUAGE] === undefined ? null : languages[STEAMLANGUAGE],
+      slots: slots,
+      noSave: !slots,
+      debug: DEBUG
+   	}
+ 	} else {
+ 		//Legacy
+ 		win.webContents.send(`console`, `Sending legacy data...`)
+ 		stuff = {
+      steamId: STEAMID,
+      languageId: languages[STEAMLANGUAGE] === undefined ? null : languages[STEAMLANGUAGE],
+      save: getCloudSave(),
+      steamAchievements: getSteamAchievements(),
+      accumulatedPlayTime: getAccumulatedPlayTime(),
+      debug: DEBUG
+   	}
+ 	}
+
   win.webContents.send(`hereYouGoSir`, stuff)
 })
 
@@ -105,13 +131,31 @@ ipcMain.on(`save`, (e,d)=>{
   const load = client.cloud?.writeFile(`SFSaveFile`, d)
 })
 
+ipcMain.on(`store`, (e,slots)=>{
+  try {
+    const load = client.cloud?.writeFile(`charpsMemory`, JSON.stringify(slots))
+  } catch(e){
+    win.webContents.send(`console`, `Error! Error! Error! Can't serialize and write slots to the cloud.`)
+  }
+})
+//WIP
+ipcMain.handle(`store`, async (e, slots) => {
+    try {
+        const data = JSON.stringify(slots)
+        const success = client.cloud.writeFile('charpsMemory', data)
+        return success
+    } catch (e) {
+        console.error('Steam save failed:', e)
+        return false
+    }
+})
+
 ipcMain.on(`updateAccumulatedPlaytime`, (e,d)=>{
   const apt = client.cloud?.writeFile(`SFApt`, d+'')
 })
 
 ipcMain.on(`reset`, (e,d)=>{
-  ModLoaderMainProcess.clearSnapshotContext(e.sender)
-  client.cloud?.deleteFile(`SFSaveFile`)
+  // client.cloud?.deleteFile(`SFSaveFile`)
 })
 
 ipcMain.on(`quit`, (e,d)=>{
@@ -124,8 +168,8 @@ ipcMain.on(`updateStat`, (e,d)=>{
   }
 })
 ipcMain.on(`gameError`, (e,d)=>{
-  ModLoaderMainProcess.runtimeLog('gameError', d && (d.stack || d.message || d.toString ? d.toString() : d))
   TrackJS?.track(d)
+  ModLoaderMainProcess.runtimeLog('gameError', d && (d.stack || d.message || d.toString ? d.toString() : d))
 })
 ipcMain.on(`toggleFullscreen`, (e,d)=>{
   ModLoaderMainProcess.toggleMainWindowFullscreen()
@@ -133,10 +177,10 @@ ipcMain.on(`toggleFullscreen`, (e,d)=>{
 ipcMain.on(`openDiscord`, (e,d)=>{
   shell.openExternal(`https://discord.gg/7YXd3tScqS`)
 })
+
 ipcMain.on(`modloader:toggle-devtools`, ()=>{
   if (win && win.webContents) win.webContents.toggleDevTools()
 })
-
 //1111111111111111
 // ipcMain.on(`getDebugInfo`, (e,d)=>{
 //   win.webContents.send(`console`, `=START=`)
@@ -151,23 +195,47 @@ function getCloudSave(){
       return save
     } catch(e){
       console.log(`Couldn't read the save file.`)
+      DEBUG = e
       return false
     }
   } else {
     return false
   }
 }
+const sleep = ms => new Promise(resolve => setTimeout(resolve, ms))
+
+async function getCloudSlots(){
+  
+  const delays = [0, 100, 250, 500, 1000, 2000, 4000]
+  for (let i = 0; i < delays.length; i++) {
+
+    if (delays[i]) await sleep(delays[i])
+
+    try {
+      const save = client.cloud.readFile(`charpsMemory`)
+      console.log(`Cloud save read success on attempt ${i+1}`)
+      return JSON.parse(save)
+    } catch(e){
+      console.warn(`Cloud read failed, attempt ${i + 1}`)
+    }
+
+  }
+
+  console.warn(`Couldn't read the save file =(.`)
+  return false		
+}
+
 function getAccumulatedPlayTime(){
   if (client.cloud?.fileExists(`SFApt`)){
-    try {
-      const v = client.cloud.readFile(`SFApt`)
-      return +v
-    } catch(e){
-      console.log(`Couldn't read the file.`)
-      return 0
-    }
-  } else {
+  try {
+    const v = client.cloud.readFile(`SFApt`)
+    return +v
+  } catch(e){
+    console.log(`Couldn't read the file.`)
     return 0
+  }
+  } else {
+  return 0
   }
 }
 
@@ -175,7 +243,7 @@ function getSteamAchievements(){
   const list = [`FOOLSGOLD`, `DEEPPURPLE`, `BLOODOFTHELAND`, `GREENENERGY`, `HOTGLASS`, `HOLYCONCRETE`, `CANITDODISHES`, `WHERETHESUNDOESNTSHINE`, `WHOYOUGONNACALL`, `NIETZSCHE`, `64K`, `64M`, `64B`, `YOUMAYRESETNOW`, `PERPETUMSHMOBILE`, `NEEDABREAK`, `MUSTDESTROY`, `ARCHITECT`, `DESTROYER`, `HELLRAISER`, `ENDBEGINNING`, `COOKIECLICKER`, `DRUNKENSAILOR`, `MRMINE`, `ISTHEREALIMIT`, `SETHBRUNDLE`, `REDBLUEROCK`, `STRAIGHTTOHELL`, `SCRATCHTHESURFACE`, `ISITHOT`, `TOODEEP`, `SIXTYFOURDOWN`, `NEOPHOBIA`, `JACKPOT`]
   const map = []
   for (let i = 0; i < list.length; i++){
-    map.push((client.achievement?.isActivated(list[i])) ? 1 : 0)
+  map.push((client.achievement?.isActivated(list[i])) ? 1 : 0)
   }
   return map
 }
@@ -191,7 +259,6 @@ function recreateWindow(){
     recreatingWindow = false
   })
 }
-
 const createWindow = _=> {
   ModLoaderMainProcess.configureMainWindowHost({
     appOptions: options,
@@ -199,70 +266,52 @@ const createWindow = _=> {
     recreateWindow
   })
   const windowOptions = ModLoaderMainProcess.getMainWindowOptions({
-    width: 1280,
-    height: 920,
-    minWidth: 1024,
-    minHeight: 800,
-    icon: `appicon.png`,
-    autoHideMenuBar: true,
-    // titleBarStyle: 'hidden',
-    fullscreen: true,
-    webPreferences: {
-        contextIsolation: false,
-        nodeIntegration: true
-    }
+  width: 1280,
+  height: 920,
+  minWidth: 1024,
+  minHeight: 800,
+  icon: `appicon.png`,
+  autoHideMenuBar: true,
+  // titleBarStyle: 'hidden',
+  fullscreen: true,
+  webPreferences: {
+    // partition: 'dev-clean',//111111111111
+    contextIsolation: false,
+    nodeIntegration: true
+  }
   })
   win = new BrowserWindow(windowOptions)
-
   ModLoaderMainProcess.attachWindow(win, { accountId: STEAMID })
   ModLoaderMainProcess.afterMainWindowCreated(win)
 
+
   const isMac = process.platform === 'darwin'
   const temp = [
-    {
-      label: app.name,
-      submenu: [{role: 'about'},{role: isMac ? 'quit' : 'close'}]
-    },
-    {
-      label: 'View',
-      submenu: [
-        {role: 'togglefullscreen'},
-        {role: 'toggleDevTools'}
-      ]
-    }
+  {
+    label: app.name,
+    submenu: [{role: 'about'},{role: isMac ? 'quit' : 'close'}]
+  },
+  {
+    label: 'View',
+    submenu: [
+    {role: 'togglefullscreen'},
+    // {role: 'toggleDevTools'}
+    ]
+  }
   ]
   const menu = Menu.buildFromTemplate(temp)
   Menu.setApplicationMenu(menu)
-
-  globalShortcut.unregister('CommandOrControl+Shift+I')
-  globalShortcut.unregister('F12')
-  globalShortcut.register('CommandOrControl+Shift+I', _=>{
-    win.webContents.toggleDevTools()
-  })
-  globalShortcut.register('F12', _=>{
-    win.webContents.toggleDevTools()
-  })
-
-  win.webContents.on('console-message', (event, level, message, line, sourceId)=>{
-    ModLoaderMainProcess.runtimeLog('console', level, message, `${sourceId}:${line}`)
-  })
-  win.webContents.on('render-process-gone', (event, details)=>{
-    ModLoaderMainProcess.runtimeLog('render-process-gone', details)
-  })
-  win.webContents.on('did-fail-load', (event, errorCode, errorDescription, validatedURL)=>{
-    ModLoaderMainProcess.runtimeLog('did-fail-load', errorCode, errorDescription, validatedURL)
-  })
 
   //LOAD
   win.loadFile('./game/index.html')
 
   win.on('blur', ()=>{
-    // win.blur()
-    // win.webContents.send(`windowState`, `blur`)
+  // win.blur()
+  // win.webContents.send(`windowState`, `blur`)
   })
   win.on('focus', ()=>{
-    // win.focus()
-    // win.webContents.send(`windowState`, `focus`)
+  // win.focus()
+  // win.webContents.send(`windowState`, `focus`)
   })
   // win.webContents.openDevTools()//1111111111111111
 
@@ -272,9 +321,9 @@ app.whenReady().then(() => {
 
   createWindow()
   // if (process.platform !== 'darwin') globalShortcut.register("CommandOrControl+W", _=>{})
-	app.on('activate', () => {
-		if (BrowserWindow.getAllWindows().length === 0) createWindow()
-	})
+  app.on('activate', () => {
+    if (BrowserWindow.getAllWindows().length === 0) createWindow()
+  })
 })
 
 app.on('window-all-closed', () => {
@@ -282,10 +331,10 @@ app.on('window-all-closed', () => {
 })
 
 app.on('browser-window-focus', _=>{
-    globalShortcut.register("CommandOrControl+W", _=>{})
+  globalShortcut.register("CommandOrControl+W", _=>{})
 })
 app.on('browser-window-blur', function () {
-    globalShortcut.unregister("CommandOrControl+W")
+  globalShortcut.unregister("CommandOrControl+W")
 })
 
 // require('steamworks.js').electronEnableSteamOverlay()
