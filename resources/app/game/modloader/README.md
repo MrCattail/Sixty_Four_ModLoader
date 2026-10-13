@@ -7,8 +7,8 @@ This loader keeps vanilla game files as stable as possible.
 The current adapter targets the desktop game **1.3 only**. The installer rejects
 other game versions before writing. ModLoader remains `0.5.0`; these development
 changes have passed source-copy, mocked runtime, and an isolated offline Electron
-smoke test. They have not been installed into the working game's entry files;
-player acceptance and Steam Cloud validation remain pending. Existing Mods
+smoke test. The user has reinstalled the Loader into the working game on 2026-10-06;
+this does not complete every Mod or Steam Cloud validation. Existing Mods
 still need their own 1.3 compatibility work before being enabled.
 
 ## Enable Mods
@@ -106,6 +106,94 @@ allows **Hide to edge** to be used explicitly.
 
 The lower-left status line also shows the loader version, enabled mod count,
 and `Ctrl+M` reminder.
+
+## Temporary clear-view probe (2026-10-06)
+
+Fully restart Electron after installing these local diagnostic changes. In
+Ctrl+M → Menu Settings, use 清晰视图探针（临时）. 轻量记录 records coarse
+method/frame timings; 深入记录 also captures selected Chromium trace categories.
+Both start after 3 seconds, stop after 20 seconds and export locally. Compare
+ordinary → Alt held → released in small and large windows at the same camera.
+Stop/export and open-folder controls are on the same row. No F8 binding.
+
+自动裁剪／网格对照（60 秒） is an explicitly selected temporary intervention.
+After the 3-second countdown, keep Alt held in the reality plane with no item in
+hand and the same window/camera. Five 12-second phases run automatically:
+baseline → omit outer entity clip → omit native grid → omit both → baseline.
+The first 3 seconds after each observed phase change are excluded. Releasing Alt,
+losing focus, resizing, changing camera/mode, cancellation or drawing exceptions
+ends the intervention and restores the saved methods. Partial records are labeled.
+
+**线宽／线端对照（96 秒）** adds eight fixed 12-second phases:
+native → 0.5/round → 1.0/round → 1.01/round → 1.5/round → 1.5/butt →
+1.01/butt → native. All variants keep native color/alpha, geometry, offsets and
+the same private grid call site; only width/cap change inside save/restore.
+It does not run Chromium tracing. The existing 20/60/72-second modes remain.
+Fully restart Electron before using the new mode; an old main process cannot
+silently shorten it. Hold Alt at the same window/camera until automatic restore.
+
+**网格内部对照（72 秒）** provides the earlier protocol:
+native → omit only stroke submission → use the Tweaks width formula → remove
+only the native color alpha (same RGB) → combine width and alpha → native.
+All six phases last 12 seconds. Geometry, half-pixel offsets, inherited state,
+entity clipping and layer routing remain unchanged. This is diagnosis, not a fix.
+Release Alt, leave the window, or change camera/size/mode to stop and export.
+
+The optional diagnostics/clear-view-probe.js, clear-view-main.js,
+clear-view-ablation.js and clear-view-grid.js modules
+are not a permanent Mod API. Recording defaults off. Instance wrappers preserve
+call semantics and stop without clobbering later wrappers. There is no added
+Render API route for renderEntitiesAbstract. Light/deep modes only observe it.
+The automatic intervention uses a source-guarded 1.3 loop with only the outer
+clip omitted; entity drawing and its own clipping remain. A private gate at the
+existing renderGrid native-call site retains layer setup, callbacks and timing.
+This gate is inactive outside the automatic intervention, not a public Mod API.
+The grid protocol handles the guarded native call inside this same gate; its
+first/last phases invoke the original function. It does not patch Canvas methods.
+Twice per phase it captures bounded geometry/projection and actual context
+metadata (canvas identity/dimensions, transform, alpha/blend, dash, cap/join,
+filter and shadow). Sampling frames and neighboring intervals are excluded.
+Native phase stroke counts are geometry estimates, not intercepted calls;
+modified phases count their constructed lines and issued/omitted strokes.
+The 96-second protocol also records requested caps and effective width/cap read
+after variant assignment on the two metadata frames. Native phases remain
+unintercepted: their effective field is null, and inherited context plus guarded
+source describe their parameters. Reference flags check the earlier main canvas,
+identity transform, native width 1.5 and inherited round cap; these flags do not
+compare every Canvas property or prove an engine branch. Read the complete raw
+context when checking comparability. Non-identity transforms require mapping
+widths before interpreting a device-space threshold.
+
+Reports are saved under state/performance-probes/<session>/: summary.md,
+frames.json, session.json and optional trace.json. Method time includes native
+waits and current Mod wrappers; inclusive rows overlap. Callback intervals are
+not presentation timestamps. Missing GPU tracks remain unmeasured; subtracting
+JavaScript time from a frame interval does not produce GPU hardware time.
+Stable-control groups now permit dynamic entity counts and retain count ranges
+plus the old strict-equality sample count. Both interval endpoints must be valid;
+phase transitions and settling are excluded. Original recordings are not rewritten.
+The automatic run retains up to 24,000 frames and 48,000 root calls (64 MiB export
+limit); normal runs keep their existing limits. Method rolling samples remain
+4,096 and explicitly report overflow. Compare per-phase frame rows and first/last
+baselines; the game world continues updating and is not a frozen benchmark.
+
+A main-process deadline stops tracing independently of the renderer. Missing
+renderer data is explicitly incomplete. Trace buffers and sample arrays are
+bounded; capture completeness must be checked before interpreting the result.
+The shipped Electron 28 crashes in getTraceBufferUsage and, in an isolated
+A/B, with enable_argument_filter=true at trace flush; neither path is used.
+Selected trace categories may include local script paths, but no screenshots,
+heap dumps, network bodies or serialized saves are requested.
+
+For removal, close the game, move out all four optional modules, and restart.
+Keep reports separately. Remove only this diagnostic loader/main-process
+integration if fully reverting; never overwrite later edits with whole backups.
+Validation: tools/clear-view-probe-contract.test.js,
+tools/clear-view-ablation-contract.test.js and tools/clear-view-grid-contract.test.js,
+plus the existing LoaderOnly suite and isolated Electron tests. Player profiling
+and performance fixes remain separate. Chinese grid protocol instructions:
+Codex-md/clear_view_grid_probe_20261006.md; earlier modes:
+Codex-md/clear_view_probe_20261006.md.
 
 ## Storage Snapshot API
 

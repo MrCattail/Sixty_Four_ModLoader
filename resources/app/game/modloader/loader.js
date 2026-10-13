@@ -2299,17 +2299,24 @@
 		if (typeof Game === 'undefined' || !Game.prototype || typeof Game.prototype[methodName] !== 'function') return false
 		state.renderPatchedMethods[methodName] = true
 		api.patch(Game.prototype, methodName, function (original) {
+			if (methodName === 'renderGrid') clearViewNativeGrid = original
 			return function (...args) {
 				const game = this
+				const draw = function () {
+					if (methodName === 'renderGrid') clearViewProbe?.observeGrid(game)
+					if (methodName === 'renderGrid' && clearViewProbe?.interceptGrid(game, original, args)) return undefined
+					if (methodName === 'renderGrid' && clearViewProbe?.skipGrid(game, original)) return undefined
+					return original.apply(game, args)
+				}
 				return measureRenderTiming(methodName, function () {
 					const layerId = getRenderMethodLayer(methodName)
-					if (!isRenderApiEnabled() || !layerId || !hasRenderLayerDemand(layerId)) return original.apply(game, args)
+					if (!isRenderApiEnabled() || !layerId || !hasRenderLayerDemand(layerId)) return draw()
 					const manager = ensureRenderLayerManager(game)
 					const frameState = getRenderLayerFrameState(layerId, manager)
 					if (!frameState.shouldDraw) return undefined
 					try {
 						const result = withRenderLayer(game, layerId, function () {
-							return original.apply(game, args)
+							return draw()
 						})
 						frameState.drew = true
 						return result
@@ -5050,6 +5057,92 @@
 			state.modFileTools = null
 		}
 		return state.modFileTools
+	}
+
+	// Temporary diagnostics are lazy-loaded and never alter Render API routing.
+	let clearViewProbe = null
+	let clearViewNativeGrid = null
+	const getClearViewProbe = function () {
+		if (clearViewProbe) return clearViewProbe
+		const tools = getModFileTools()
+		if (!tools?.ipcRenderer) throw new Error('探针需要桌面游戏环境。')
+		const modulePath = tools.path.join(tools.gameRoot, 'modloader', 'diagnostics', 'clear-view-probe.js')
+		clearViewProbe = require(modulePath).createClient({
+			window, document, ipc: tools.ipcRenderer, getGame: () => state.game,
+			getNativeGrid: () => clearViewNativeGrid,
+			isMenuOpen: () => !!document.getElementById('modloader-panel') && !state.panelHidden,
+			closeMenu() { if (document.getElementById('modloader-panel')) togglePanel() },
+			metadata() { return { loaderVersion: state.version, mods: state.mods.map(mod => ({ id: mod.id, version: mod.manifest.version })), clearViewGridFix: { modLoaded: state.mods.some(mod => mod.id === 'Cattail_TweaksQuality_Tweaks'), configured: getConfigValue('Cattail_TweaksQuality_Tweaks', 'enableClearViewGridFix', true) }, renderApiEnabled: isRenderApiEnabled(), existingRenderTimingEnabled: !!state.renderTimingEnabled, resourceProfilerEnabled: !!window.cattailResourceSourceProfiler?.isEnabled?.() } },
+			notify(message) {
+				state.clearViewProbeMessage = message
+				updateClearViewProbeControls()
+				let toast = document.getElementById('modloader-probe-notice')
+				if (!toast) { toast = document.createElement('div'); toast.id = 'modloader-probe-notice'; document.body.appendChild(toast) }
+				toast.style.cssText = 'position:fixed;left:50%;top:12px;transform:translateX(-50%);z-index:2147483647;background:#171b20;color:#fff;padding:10px 16px;border-radius:8px;font:14px sans-serif;pointer-events:none;max-width:80vw;overflow-wrap:anywhere'
+				toast.textContent = message
+				clearTimeout(toast.__probeTimer)
+				toast.__probeTimer = setTimeout(() => toast.remove(), 2500)
+			},
+			onChange: () => updateClearViewProbeControls()
+		})
+		return clearViewProbe
+	}
+	const startClearViewOriginIfArmed = async function (game) {
+		const tools = getModFileTools()
+		if (!tools?.ipcRenderer || !tools.fs.existsSync(tools.path.join(tools.gameRoot, 'modloader', 'diagnostics', 'clear-view-origin.js'))) return
+		try {
+			const response = await tools.ipcRenderer.invoke('modloader:clear-view-probe', { action: 'consume-origin' })
+			if (!response?.ok) throw new Error(response?.error || 'Startup probe unavailable')
+			if (response.result) getClearViewProbe().startOrigin(game)
+		} catch (error) { warn('Startup origin probe skipped; game initialization continues.', error) }
+	}
+	const updateClearViewProbeControls = function (providedRoot) {
+		const root = providedRoot || document.getElementById('modloader-clear-view-probe')
+		if (!root) return
+		const phase = clearViewProbe?.status().phase || 'idle'
+		for (const button of root.querySelectorAll('button')) {
+			button.disabled = button.dataset.probeAction === 'start' ? phase !== 'idle' : button.dataset.probeAction === 'stop' ? !['arming', 'starting', 'recording', 'export-failed'].includes(phase) : false
+		}
+		root.querySelector('[data-probe-status]').textContent = state.clearViewProbeMessage || '默认关闭。启动来源记录需先预备再完整重启，读档后自动记录 30 秒。旧对照需持续按住 Alt，普通记录 20 秒。'
+	}
+	const renderClearViewProbeControls = function (parent) {
+		const tools = getModFileTools()
+		if (!tools?.fs.existsSync(tools.path.join(tools.gameRoot, 'modloader', 'diagnostics', 'clear-view-probe.js'))) return
+		const root = element('div', 'modloader-panel-settings-row')
+		root.id = 'modloader-clear-view-probe'
+		root.style.cssText = 'display:flex;flex-direction:column;align-items:stretch;gap:8px'
+		root.appendChild(element('strong', '', '清晰视图探针（临时）'))
+		const actions = element('div', 'modloader-panel-settings-actions')
+		actions.style.flexWrap = 'wrap'
+		for (const item of [
+			...(tools.fs.existsSync(tools.path.join(tools.gameRoot, 'modloader', 'diagnostics', 'clear-view-origin.js')) ? [
+				['预备下次启动来源记录', 'start', () => getClearViewProbe().armOrigin()],
+				['取消下次启动记录', 'cancel-origin', () => getClearViewProbe().cancelOrigin()]
+			] : []),
+			['线宽／线端对照（96 秒）', 'start', () => getClearViewProbe().start('grid-threshold')],
+			['网格内部对照（72 秒）', 'start', () => getClearViewProbe().start('grid-ablation')],
+			['自动裁剪／网格对照（60 秒）', 'start', () => getClearViewProbe().start('ablation')],
+			['轻量记录', 'start', () => getClearViewProbe().start('light')],
+			['深入记录', 'start', () => getClearViewProbe().start('deep')],
+			['停止并导出', 'stop', () => getClearViewProbe().finish()],
+			['打开记录文件夹', 'folder', () => getClearViewProbe().openFolder()]
+		]) {
+			const button = createPanelActionButton('devtools', item[0], item[0])
+			button.dataset.probeAction = item[1]
+			button.onclick = async function (event) {
+				event.preventDefault()
+				try { await item[2]() }
+				catch (error) { state.clearViewProbeMessage = error.message; updateClearViewProbeControls() }
+			}
+			actions.appendChild(button)
+		}
+		root.appendChild(actions)
+		const status = element('div')
+		status.dataset.probeStatus = 'true'
+		status.style.cssText = 'font-size:12px;line-height:1.5;overflow-wrap:anywhere'
+		root.appendChild(status)
+		parent.appendChild(root)
+		updateClearViewProbeControls(root)
 	}
 
 	const openDevToolsFromPanel = function () {
@@ -9885,6 +9978,7 @@
 			{ value: true, label: t('renderApiOn') },
 			{ value: false, label: t('renderApiOff') }
 		], isRenderApiEnabled(), function (value) { setRenderApiEnabled(value !== false) })
+		renderClearViewProbeControls(settingsPage)
 		addSettingsButtonRow(t('devTools'), [
 			{
 				icon: 'devtools',
@@ -11898,6 +11992,8 @@
 				}
 			}
 			if (name === 'afterVanillaScripts' || name === 'afterGameInit') installRenderApi(context)
+			if (name === 'afterVanillaScripts') await startClearViewOriginIfArmed(context)
+			if (name === 'afterGameInit') clearViewProbe?.gameReady(context)
 			return current
 		},
 

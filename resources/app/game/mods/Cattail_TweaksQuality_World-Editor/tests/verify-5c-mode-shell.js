@@ -39,7 +39,7 @@ function testManifestBoundary() {
 	]
 	assert.equal(manifest.version, '0.6.0')
 	assert.deepEqual(manifest.languages, expectedLanguages)
-	assert.equal(manifest.entry.length, 45)
+	assert.equal(manifest.entry.length, 47)
 	assert.equal(manifest.entry.includes('scripts/render/paint-cube-cursor.js'), true)
 	assert.equal(manifest.entry.includes('scripts/core/paint-cube-state.js'), true)
 	assert.equal(manifest.entry.includes('scripts/core/paint-cube-growth.js'), true)
@@ -150,6 +150,7 @@ function testNarrowWorldWriteAndNoSchemaExpansion() {
 	const allowedWorldWriters = new Set([
 		'scripts/core/blueprint-placement.js',
 		'scripts/core/selection-delete.js',
+		'scripts/core/native-tools.js',
 		'scripts/core/paint-cube-stroke.js'
 	])
 	const schemaSevenFiles = new Set([

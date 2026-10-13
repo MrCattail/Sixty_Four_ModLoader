@@ -3,6 +3,7 @@ ModLoader.register({
 	init(api) {
 		const CREATIVE_KEY = Symbol.for('cattail.world-editor.creative-mode')
 		const CREATIVE_ECONOMY_KEY = Symbol.for('cattail.world-editor.creative-economy')
+		const SAVE_ADAPTER_KEY = Symbol.for('cattail.world-editor.save-adapter')
 		const SAVE_SLOTS_KEY = Symbol.for('cattail.better-uis.save-slots')
 		const SAVE_ID_PATTERN = /^[0-9a-f-]{16,128}$/i
 		const CONTROL_CHARACTER_PATTERN = /[\u0000-\u001f\u007f]/
@@ -13,6 +14,7 @@ ModLoader.register({
 
 		api.on('beforeSaveLoad', function (save, game) {
 			if (game && (typeof game === 'object' || typeof game === 'function')) {
+				if (activeController?.game === game) activeController.dispose('save-loading')
 				loadedStates.set(game, normalizePersistedState(save?.modloader?.worldEditor))
 			}
 			return save
@@ -102,6 +104,9 @@ ModLoader.register({
 					throw createError('NOT_READY', 'Saving is not available.')
 				}
 				if (game.preventSaving || game.preventCloud) throw createError('SAVING_BLOCKED', 'Saving is currently blocked.')
+				if (globalThis[SAVE_ADAPTER_KEY]?.isNative(game)) {
+					return persistNativeMode(nextCreativeMode, entryMode, reason)
+				}
 
 				const previous = persisted
 				const previousAuto = readActiveEncodedSave(game)
@@ -164,7 +169,77 @@ ModLoader.register({
 				}
 			}
 
+			async function persistNativeMode(nextCreativeMode, entryMode, reason) {
+				const adapter = globalThis[SAVE_ADAPTER_KEY]
+				const context = adapter.capture(game)
+				const previous = persisted
+				const target = Object.freeze({
+					schema: 1,
+					creativeMode: !!nextCreativeMode,
+					entryMode: entryMode === 'forked' ? 'forked' : 'in-place',
+					createdAt: nextCreativeMode ? previous.creativeMode && previous.createdAt || Date.now() : previous.createdAt
+				})
+				busy = true
+				error = null
+				notify(reason + '-saving')
+				function assertLive() {
+					if (disposed || activeController !== controller) throw createError('SAVE_CONTEXT_CHANGED', 'The active save changed. Reload before trying again.')
+					adapter.assertCurrent(game, context)
+				}
+				function verify(record, expected) {
+					const value = record?.state?.modloader?.worldEditor
+					if (!value || value.schema !== 1 || value.creativeMode !== expected.creativeMode ||
+						value.entryMode !== expected.entryMode || value.createdAt !== expected.createdAt) {
+						throw createError('VERIFY_FAILED', 'The creative-mode state could not be verified.')
+					}
+				}
+				try {
+					await adapter.withSaveLock(game, context, async function (save) {
+						await adapter.readVerified(game, context)
+						assertLive()
+						pendingPersisted = target
+						try {
+							await save()
+							verify(await adapter.readVerified(game, context), target)
+							assertLive()
+						} catch (saveError) {
+							// Restore the mode through a fresh native save, never an old world image.
+							pendingPersisted = previous
+							try {
+								assertLive()
+								await save()
+								verify(await adapter.readVerified(game, context), previous)
+								assertLive()
+							} catch (recoveryError) {
+								ready = false
+								throw createError('ROLLBACK_FAILED', 'The save result is uncertain. Creative writes are blocked; reload the game.')
+							}
+							throw saveError
+						}
+						persisted = target
+						loadedStates.set(game, target)
+						pendingPersisted = null
+					})
+					assertLive()
+					busy = false
+					dialogOpen = false
+					notify(reason + '-complete')
+					return snapshot()
+				} catch (operationError) {
+					pendingPersisted = null
+					persisted = previous
+					busy = false
+					error = normalizeError(operationError, 'SAVE_FAILED')
+					if (error.code === 'SAVE_CONTEXT_CHANGED') ready = false
+					if (!disposed) notify(reason + '-failed')
+					throw error
+				}
+			}
+
 			async function createFork(options) {
+				if (globalThis[SAVE_ADAPTER_KEY]?.isNative(game)) {
+					throw createError('NATIVE_CREATIVE_DEFERRED', 'Creative copies are awaiting 1.3 support. Use the current save instead.')
+				}
 				if (disposed || !ready) throw error || createError('NOT_READY', 'Creative mode is not ready.')
 				if (busy) throw createError('BUSY', 'A creative-mode operation is already active.')
 				if (isEconomyBusy(game)) throw createError('BUSY', 'A creative shop operation is already active.')
@@ -253,6 +328,13 @@ ModLoader.register({
 				version: '1.0.0',
 				game,
 				snapshot,
+				canBypassUnlock(name) {
+					if (disposed || !ready || !persisted.creativeMode || !Array.isArray(game?.saveSlots)) return false
+					const definition = game.codex?.entities?.[name]
+					return definition?.canPurchase === true && definition.type !== 'complete' &&
+						!['pinhole', 'orbifold', 'memory', 'whitehole'].includes(String(name).toLowerCase()) &&
+						!/^eraser/i.test(String(name))
+				},
 				persistedState() {
 					return pendingPersisted || persisted
 				},
@@ -282,7 +364,10 @@ ModLoader.register({
 					return persistMode(false, persisted.entryMode || 'in-place', String(reason || 'disable'))
 				},
 				isInputBlocked() {
-					return !disposed && (dialogOpen || busy || pendingForkFinalization)
+					return !disposed && (dialogOpen || busy || pendingForkFinalization || !ready)
+				},
+				writeBlockedReason() {
+					return !disposed && !ready ? 'ROLLBACK_FAILED' : null
 				},
 				dispose(reason) {
 					if (disposed) return false
@@ -312,10 +397,14 @@ ModLoader.register({
 		}
 
 		function isEconomyBusy(game) {
+			const cut = globalThis[Symbol.for('cattail.world-editor.selection-cut')]
+			if (cut?.game === game && cut.isInputBlocked?.()) return true
+			const transactions = globalThis[Symbol.for('cattail.world-editor.transactions')]
+			if (transactions?.game === game && (transactions.isBusy?.() || transactions.isWriteBlocked?.())) return true
 			const economy = globalThis[CREATIVE_ECONOMY_KEY]
 			return !!(
 				economy?.game === game &&
-				(economy.isInputBlocked?.() || economy.snapshot?.().busy)
+				(economy.isWriteBlocked?.() || economy.snapshot?.().busy)
 			)
 		}
 

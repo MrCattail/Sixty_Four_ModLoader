@@ -4,6 +4,7 @@ const path = require('node:path')
 const vm = require('node:vm')
 
 const MOD_ROOT = path.resolve(__dirname, '..')
+const SAVE_ADAPTER_SOURCE = 'scripts/core/save-adapter.js'
 const CREATIVE_SOURCE = 'scripts/core/creative-mode.js'
 const I18N_SOURCE = 'scripts/i18n/editor-text.js'
 const SHELL_SOURCE = 'scripts/ui/editor-shell.js'
@@ -81,14 +82,18 @@ function loadCreative(storage, saveSlots) {
 	sandbox.globalThis = sandbox
 	if (saveSlots) sandbox[SAVE_SLOTS_KEY] = saveSlots
 	vm.createContext(sandbox)
-	vm.runInContext(source(CREATIVE_SOURCE), sandbox, { filename: CREATIVE_SOURCE })
-	assert.ok(definition)
-	definition.init({
+	const api = {
 		on(name, listener) {
 			if (!hooks.has(name)) hooks.set(name, [])
 			hooks.get(name).push(listener)
 		}
-	})
+	}
+	// Keep the legacy contract covered with the new adapter installed too.
+	for (const file of [SAVE_ADAPTER_SOURCE, CREATIVE_SOURCE]) {
+		vm.runInContext(source(file), sandbox, { filename: file })
+		assert.ok(definition)
+		definition.init(api)
+	}
 	return {
 		sandbox,
 		hooks,
@@ -254,6 +259,7 @@ function verifyIntegrationSources() {
 	const manifest = JSON.parse(source('mod.json'))
 	assert.equal(manifest.version, '0.6.0')
 	assert.equal(manifest.loaderVersion, '>=0.4.0')
+	assert.equal(manifest.entry.indexOf(SAVE_ADAPTER_SOURCE), manifest.entry.indexOf(CREATIVE_SOURCE) - 1)
 	assert.ok(manifest.entry.indexOf(CREATIVE_SOURCE) > manifest.entry.indexOf('scripts/core/editor-state.js'))
 	assert.ok(manifest.entry.indexOf(CREATIVE_SOURCE) < manifest.entry.indexOf('scripts/blueprint-session.js'))
 

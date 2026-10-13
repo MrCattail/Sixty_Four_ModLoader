@@ -1558,6 +1558,16 @@ ipcMain.on(`modloader:window:close`, (event, payload)=>{
 })
 function attachWindow(parentWindow, options){
   win = parentWindow
+  // Temporary probe: optional module; no recording until explicitly requested.
+  if (fs.existsSync(path.join(__dirname, 'diagnostics', 'clear-view-main.js'))) {
+    try {
+      if (!clearViewProbeService) clearViewProbeService = require('./diagnostics/clear-view-main.js').createService({
+        electron: require('electron'), getWindow: () => win,
+        outputRoot: path.join(__dirname, 'state', 'performance-probes')
+      })
+      clearViewProbeService.attachWindow(win)
+    } catch (error) { runtimeLog('clearViewProbeUnavailable', error.message) }
+  }
   configureSnapshotStore(options)
   configureLibraryStore(options)
   if (win?.on) {
@@ -1606,6 +1616,8 @@ function configureMainWindowHost(options){
 function configureAppWindowOptions(options, saveOptions, recreateWindow){
   configureMainWindowHost({ appOptions: options, saveAppOptions: saveOptions, recreateWindow })
 }
+
+let clearViewProbeService = null
 
 module.exports = {
   attachWindow,

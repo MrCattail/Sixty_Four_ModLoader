@@ -815,10 +815,13 @@ ModLoader.register({
 				if (phase === 'failed' && currentCreativeEconomy?.error?.code === 'EXECUTION_FAILED') {
 					key = 'creativeEconomyExecutionFailed'
 				}
+				if (currentCreativeEconomy?.writeBlockedReason) key = 'creativeNativeReloadRequired'
+				else if (phase === 'failed' && currentCreativeEconomy?.error?.code === 'NATIVE_CREATIVE_DEFERRED') key = 'creativeNativeDeferred'
 				const text = key ? i18n.t(source, key) : ''
 				economyStatus.dataset.phase = phase
 				economyStatus.dataset.active = key ? 'true' : 'false'
-				economyStatus.textContent = text
+				economyStatus.textContent = currentCreativeEconomy?.lastReason === 'native-tool-result' && currentCreativeEconomy?.error?.message
+					? text + ' ' + currentCreativeEconomy.error.message : text
 				economyStatus.title = currentCreativeEconomy?.error?.message || text
 				economyStatus.setAttribute('role', phase === 'failed' ? 'alert' : 'status')
 				economyStatus.setAttribute('aria-live', phase === 'failed' ? 'assertive' : 'polite')
@@ -1222,6 +1225,14 @@ ModLoader.register({
 				const dialog = createCreativeDialog('enable')
 				const enableCurrent = createDialogButton(dialog, 'creativeEnableCurrent', true, 'elmerine')
 				const createCopy = createDialogButton(dialog, 'creativeCreateCopy', true)
+				if (Array.isArray(game.saveSlots)) {
+					createCopy.disabled = true
+					const notice = document.createElement('div')
+					notice.id = 'world-editor-native-copy-notice'
+					createCopy.setAttribute('aria-describedby', notice.id)
+					notice.dataset.creativeText = 'creativeNativeCopyDeferred'
+					dialog.content.append(notice)
+				}
 				const cancel = createDialogButton(dialog, 'creativeCancel', false)
 				dialog.actions.append(enableCurrent, createCopy, cancel)
 				dialog.enableCurrent = enableCurrent
@@ -1240,7 +1251,7 @@ ModLoader.register({
 					}
 				})
 				createCopy.addEventListener('click', function () {
-					if (dialog.busy) return
+					if (dialog.busy || createCopy.disabled) return
 					openCreateCopyDialog()
 				})
 				cancel.addEventListener('click', function () {
@@ -1388,7 +1399,7 @@ ModLoader.register({
 				const textKeys = {
 					enable: {
 						title: 'creativeEnableTitle',
-						message: 'creativeEnableMessage'
+						message: Array.isArray(game.saveSlots) ? 'creativeNativeEnableMessage' : 'creativeEnableMessage'
 					},
 					copy: {
 						title: 'creativeCreateCopy',
@@ -1450,7 +1461,10 @@ ModLoader.register({
 			}
 
 			function showCreativeDialogError(dialog, operationError) {
-				dialog.showError(operationError?.message || i18n.t(game, 'creativeOperationFailed'))
+				const key = ['ROLLBACK_FAILED', 'SAVE_CONTEXT_CHANGED'].includes(operationError?.code)
+					? 'creativeNativeReloadRequired'
+					: operationError?.code === 'NATIVE_CREATIVE_DEFERRED' ? 'creativeNativeCopyDeferred' : null
+				dialog.showError(key ? i18n.t(game, key) : operationError?.message || i18n.t(game, 'creativeOperationFailed'))
 			}
 
 			function closeCreativeDialog(reason, force) {

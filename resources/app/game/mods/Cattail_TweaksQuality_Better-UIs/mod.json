@@ -12,6 +12,7 @@
     "gameLanguage": true
   },
   "entries": [
+    "scripts/classic-shop.js",
     "scripts/shop-categories.js",
     "scripts/save-slots.js",
     "scripts/language-menu.js",
@@ -23,11 +24,26 @@
     "Cattail_TweaksQuality_Shop-Categories"
   ],
   "config": {
+    "shopVersion": {
+      "type": "select",
+      "label": "Shop version",
+      "default": "1.3",
+      "options": [
+        "1.2.1",
+        "1.3"
+      ],
+      "valueLabels": {
+        "1.2.1": "1.2.1 shop",
+        "1.3": "1.3 shop"
+      },
+      "description": "Choose the classic list or the native categorized shop. Save and reload to apply. Both use game 1.3 rules.",
+      "section": "shopCategories"
+    },
     "enableShopCategories": {
       "type": "boolean",
       "label": "Shop categories",
       "default": true,
-      "description": "Show the optional categorized compact building shop view.",
+      "description": "Enable the eight-category compact view toggle in the 1.2.1 shop.",
       "section": "shopCategories"
     },
     "enableSaveSlots": {
@@ -59,9 +75,17 @@
       "name": "更好的UI界面",
       "description": "将商店分类、存档栏和语言菜单整合为一个界面优化 mod。",
       "config": {
+        "shopVersion": {
+          "label": "商店版本",
+          "description": "选择经典长列表或原生分类商店；保存后重载生效，两者均使用 1.3 游戏规则。",
+          "valueLabels": {
+            "1.2.1": "1.2.1 商店",
+            "1.3": "1.3 商店"
+          }
+        },
         "enableShopCategories": {
           "label": "商店分类",
-          "description": "可将建筑建造卡的视图切换至可按照分类进行收缩/展开。"
+          "description": "在 1.2.1 商店中启用八类紧凑视图切换。"
         },
         "enableSaveSlots": {
           "label": "存档栏",
@@ -81,9 +105,17 @@
       "name": "更好的UI界面",
       "description": "将商店分类、存档栏和语言菜单整合为一个界面优化 mod。",
       "config": {
+        "shopVersion": {
+          "label": "商店版本",
+          "description": "选择经典长列表或原生分类商店；保存后重载生效，两者均使用 1.3 游戏规则。",
+          "valueLabels": {
+            "1.2.1": "1.2.1 商店",
+            "1.3": "1.3 商店"
+          }
+        },
         "enableShopCategories": {
           "label": "建筑分类",
-          "description": "可将建筑建造卡的视图切换至可按照分类进行收缩/展开。"
+          "description": "在 1.2.1 商店中启用八类紧凑视图切换。"
         },
         "enableSaveSlots": {
           "label": "存档栏",
@@ -102,9 +134,17 @@
     "en": {
       "name": "Better UIs",
       "config": {
+        "shopVersion": {
+          "label": "Shop version",
+          "description": "Choose the classic list or the native categorized shop. Save and reload to apply. Both use game 1.3 rules.",
+          "valueLabels": {
+            "1.2.1": "1.2.1 shop",
+            "1.3": "1.3 shop"
+          }
+        },
         "enableShopCategories": {
           "label": "Shop categories",
-          "description": "Show the optional categorized compact building shop view."
+          "description": "Enable the eight-category compact view toggle in the 1.2.1 shop."
         },
         "enableSaveSlots": {
           "label": "Save slots",
@@ -123,8 +163,17 @@
     "ru": {
       "name": "Улучшенный интерфейс",
       "config": {
+        "shopVersion": {
+          "label": "Версия магазина",
+          "description": "Классический список или стандартные категории. Сохраните и перезагрузите. Правила игры — 1.3.",
+          "valueLabels": {
+            "1.2.1": "1.2.1 магазин",
+            "1.3": "1.3 магазин"
+          }
+        },
         "enableShopCategories": {
-          "label": "Категории магазина"
+          "label": "Категории магазина",
+          "description": "Переключатель компактного вида с восемью категориями в магазине 1.2.1."
         },
         "enableSaveSlots": {
           "label": "Ячейки сохранения"
@@ -140,8 +189,17 @@
     "de": {
       "name": "Bessere Oberflächen",
       "config": {
+        "shopVersion": {
+          "label": "Shop-Version",
+          "description": "Klassische Liste oder native Kategorien. Speichern und neu laden. Beide nutzen die Spielregeln von 1.3.",
+          "valueLabels": {
+            "1.2.1": "1.2.1 Shop",
+            "1.3": "1.3 Shop"
+          }
+        },
         "enableShopCategories": {
-          "label": "Shop-Kategorien"
+          "label": "Shop-Kategorien",
+          "description": "Umschalter für acht kompakte Kategorien im Shop 1.2.1 aktivieren."
         },
         "enableSaveSlots": {
           "label": "Speicherplätze"
@@ -157,8 +215,17 @@
     "ptbr": {
       "name": "Interfaces melhores",
       "config": {
+        "shopVersion": {
+          "label": "Versão da loja",
+          "description": "Lista clássica ou categorias nativas. Salve e recarregue. Ambas usam as regras de 1.3.",
+          "valueLabels": {
+            "1.2.1": "1.2.1 loja",
+            "1.3": "1.3 loja"
+          }
+        },
         "enableShopCategories": {
-          "label": "Categorias da loja"
+          "label": "Categorias da loja",
+          "description": "Ativar a alternância para oito categorias compactas na loja 1.2.1."
         },
         "enableSaveSlots": {
           "label": "Espaços de save"
@@ -174,8 +241,17 @@
     "it": {
       "name": "Interfacce migliori",
       "config": {
+        "shopVersion": {
+          "label": "Versione del negozio",
+          "description": "Elenco classico o categorie native. Salva e ricarica. Entrambi usano le regole di 1.3.",
+          "valueLabels": {
+            "1.2.1": "1.2.1 negozio",
+            "1.3": "1.3 negozio"
+          }
+        },
         "enableShopCategories": {
-          "label": "Categorie negozio"
+          "label": "Categorie negozio",
+          "description": "Attiva la vista compatta con otto categorie nel negozio 1.2.1."
         },
         "enableSaveSlots": {
           "label": "Slot salvataggio"
@@ -191,8 +267,17 @@
     "es": {
       "name": "Interfaces mejoradas",
       "config": {
+        "shopVersion": {
+          "label": "Versión de la tienda",
+          "description": "Lista clásica o categorías nativas. Guarda y recarga. Ambas usan las reglas de 1.3.",
+          "valueLabels": {
+            "1.2.1": "1.2.1 tienda",
+            "1.3": "1.3 tienda"
+          }
+        },
         "enableShopCategories": {
-          "label": "Categorías de tienda"
+          "label": "Categorías de tienda",
+          "description": "Activar la vista compacta de ocho categorías en la tienda 1.2.1."
         },
         "enableSaveSlots": {
           "label": "Ranuras de guardado"
@@ -208,8 +293,17 @@
     "fr": {
       "name": "Interfaces améliorées",
       "config": {
+        "shopVersion": {
+          "label": "Version de la boutique",
+          "description": "Liste classique ou catégories natives. Enregistrez puis rechargez. Les règles restent celles de 1.3.",
+          "valueLabels": {
+            "1.2.1": "1.2.1 boutique",
+            "1.3": "1.3 boutique"
+          }
+        },
         "enableShopCategories": {
-          "label": "Catégories de boutique"
+          "label": "Catégories de boutique",
+          "description": "Activer la vue compacte à huit catégories dans la boutique 1.2.1."
         },
         "enableSaveSlots": {
           "label": "Emplacements de sauvegarde"
@@ -225,8 +319,17 @@
     "nl": {
       "name": "Betere interfaces",
       "config": {
+        "shopVersion": {
+          "label": "Winkelversie",
+          "description": "Klassieke lijst of ingebouwde categorieën. Opslaan en herladen. Beide gebruiken de spelregels van 1.3.",
+          "valueLabels": {
+            "1.2.1": "1.2.1 winkel",
+            "1.3": "1.3 winkel"
+          }
+        },
         "enableShopCategories": {
-          "label": "Winkelcategorieën"
+          "label": "Winkelcategorieën",
+          "description": "Schakel de compacte weergave met acht categorieën in voor winkel 1.2.1."
         },
         "enableSaveSlots": {
           "label": "Opslagsleuven"
@@ -242,8 +345,17 @@
     "cz": {
       "name": "Lepší rozhraní",
       "config": {
+        "shopVersion": {
+          "label": "Verze obchodu",
+          "description": "Klasický seznam nebo původní kategorie. Uložte a načtěte znovu. Obě používají pravidla 1.3.",
+          "valueLabels": {
+            "1.2.1": "1.2.1 obchod",
+            "1.3": "1.3 obchod"
+          }
+        },
         "enableShopCategories": {
-          "label": "Kategorie obchodu"
+          "label": "Kategorie obchodu",
+          "description": "Zapnout kompaktní zobrazení osmi kategorií v obchodě 1.2.1."
         },
         "enableSaveSlots": {
           "label": "Pozice uložení"
@@ -259,8 +371,17 @@
     "pl": {
       "name": "Lepsze interfejsy",
       "config": {
+        "shopVersion": {
+          "label": "Wersja sklepu",
+          "description": "Klasyczna lista lub kategorie gry. Zapisz i przeładuj. Oba używają zasad wersji 1.3.",
+          "valueLabels": {
+            "1.2.1": "1.2.1 sklep",
+            "1.3": "1.3 sklep"
+          }
+        },
         "enableShopCategories": {
-          "label": "Kategorie sklepu"
+          "label": "Kategorie sklepu",
+          "description": "Włącz kompaktowy widok ośmiu kategorii w sklepie 1.2.1."
         },
         "enableSaveSlots": {
           "label": "Sloty zapisu"
@@ -276,8 +397,17 @@
     "jp": {
       "name": "UI改善",
       "config": {
+        "shopVersion": {
+          "label": "ショップのバージョン",
+          "description": "従来の一覧か標準のカテゴリ表示を選択。保存後に再読み込みすると反映されます。どちらも 1.3 のルールを使用します。",
+          "valueLabels": {
+            "1.2.1": "1.2.1 ショップ",
+            "1.3": "1.3 ショップ"
+          }
+        },
         "enableShopCategories": {
-          "label": "ショップ分類"
+          "label": "ショップ分類",
+          "description": "1.2.1 ショップで8カテゴリのコンパクト表示への切り替えを有効にする。"
         },
         "enableSaveSlots": {
           "label": "セーブスロット"
@@ -293,8 +423,17 @@
     "kr": {
       "name": "개선된 UI",
       "config": {
+        "shopVersion": {
+          "label": "상점 버전",
+          "description": "기존 목록 또는 기본 분류 상점을 선택합니다. 저장 후 다시 불러오면 적용됩니다. 두 모드 모두 1.3 규칙을 사용합니다.",
+          "valueLabels": {
+            "1.2.1": "1.2.1 상점",
+            "1.3": "1.3 상점"
+          }
+        },
         "enableShopCategories": {
-          "label": "상점 카테고리"
+          "label": "상점 카테고리",
+          "description": "1.2.1 상점에서 8개 분류의 간략 보기 전환을 활성화합니다."
         },
         "enableSaveSlots": {
           "label": "저장 슬롯"
@@ -310,8 +449,17 @@
     "tch": {
       "name": "更好的介面",
       "config": {
+        "shopVersion": {
+          "label": "商店版本",
+          "description": "選擇經典長列表或原生分類商店；儲存後重新載入生效，兩者均使用 1.3 遊戲規則。",
+          "valueLabels": {
+            "1.2.1": "1.2.1 商店",
+            "1.3": "1.3 商店"
+          }
+        },
         "enableShopCategories": {
-          "label": "商店分類"
+          "label": "商店分類",
+          "description": "在 1.2.1 商店中啟用八類緊湊檢視切換。"
         },
         "enableSaveSlots": {
           "label": "存檔欄"
@@ -327,8 +475,17 @@
     "thai": {
       "name": "UI ที่ดีขึ้น",
       "config": {
+        "shopVersion": {
+          "label": "เวอร์ชันร้านค้า",
+          "description": "เลือกรายการแบบเดิมหรือหมวดหมู่ของเกม บันทึกแล้วโหลดใหม่ ทั้งสองแบบใช้กฎของ 1.3",
+          "valueLabels": {
+            "1.2.1": "1.2.1 ร้านค้า",
+            "1.3": "1.3 ร้านค้า"
+          }
+        },
         "enableShopCategories": {
-          "label": "หมวดหมู่ร้านค้า"
+          "label": "หมวดหมู่ร้านค้า",
+          "description": "เปิดการสลับมุมมองแบบย่อ 8 หมวดหมู่ในร้านค้า 1.2.1"
         },
         "enableSaveSlots": {
           "label": "ช่องเซฟ"
@@ -344,8 +501,17 @@
     "hu": {
       "name": "Jobb felületek",
       "config": {
+        "shopVersion": {
+          "label": "Boltverzió",
+          "description": "Klasszikus lista vagy beépített kategóriák. Mentés és újratöltés szükséges. Mindkettő az 1.3 szabályait használja.",
+          "valueLabels": {
+            "1.2.1": "1.2.1 bolt",
+            "1.3": "1.3 bolt"
+          }
+        },
         "enableShopCategories": {
-          "label": "Bolt kategóriái"
+          "label": "Bolt kategóriái",
+          "description": "Nyolc kategóriás tömör nézet engedélyezése az 1.2.1 boltban."
         },
         "enableSaveSlots": {
           "label": "Mentési helyek"
@@ -361,8 +527,17 @@
     "lv": {
       "name": "Labākas saskarnes",
       "config": {
+        "shopVersion": {
+          "label": "Veikala versija",
+          "description": "Klasiskais saraksts vai spēles kategorijas. Saglabājiet un pārlādējiet. Abi izmanto 1.3 noteikumus.",
+          "valueLabels": {
+            "1.2.1": "1.2.1 veikals",
+            "1.3": "1.3 veikals"
+          }
+        },
         "enableShopCategories": {
-          "label": "Veikala kategorijas"
+          "label": "Veikala kategorijas",
+          "description": "Iespējot kompaktu astoņu kategoriju skatu 1.2.1 veikalā."
         },
         "enableSaveSlots": {
           "label": "Saglabāšanas vietas"
@@ -378,8 +553,17 @@
     "ro": {
       "name": "Interfețe mai bune",
       "config": {
+        "shopVersion": {
+          "label": "Versiunea magazinului",
+          "description": "Lista clasică sau categoriile native. Salvează și reîncarcă. Ambele folosesc regulile 1.3.",
+          "valueLabels": {
+            "1.2.1": "1.2.1 magazin",
+            "1.3": "1.3 magazin"
+          }
+        },
         "enableShopCategories": {
-          "label": "Categorii magazin"
+          "label": "Categorii magazin",
+          "description": "Activează vizualizarea compactă cu opt categorii în magazinul 1.2.1."
         },
         "enableSaveSlots": {
           "label": "Sloturi salvare"
@@ -395,8 +579,17 @@
     "no": {
       "name": "Bedre grensesnitt",
       "config": {
+        "shopVersion": {
+          "label": "Butikkversjon",
+          "description": "Klassisk liste eller spillets kategorier. Lagre og last inn på nytt. Begge bruker reglene fra 1.3.",
+          "valueLabels": {
+            "1.2.1": "1.2.1 butikk",
+            "1.3": "1.3 butikk"
+          }
+        },
         "enableShopCategories": {
-          "label": "Butikkategorier"
+          "label": "Butikkategorier",
+          "description": "Aktiver kompakt visning med åtte kategorier i 1.2.1-butikken."
         },
         "enableSaveSlots": {
           "label": "Lagringsplasser"

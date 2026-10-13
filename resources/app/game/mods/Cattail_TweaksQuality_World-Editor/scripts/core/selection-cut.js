@@ -89,11 +89,19 @@ ModLoader.register({
 				}
 			}
 
+			const saveAdapter = globalThis[Symbol.for('cattail.world-editor.save-adapter')]
+			function captureContext() { return saveAdapter?.isNative(game) ? saveAdapter.capture(game) : null }
+			function assertContext(context) {
+				if (disposed) throw cutError('INVALIDATED', 'Selection cut was cancelled.')
+				if (context) saveAdapter.assertCurrent(game, context)
+			}
+
 			async function plan(options) {
 				if (disposed) throw cutError('NOT_READY', 'Selection cut is unavailable.')
 				if (planning || busy || dialogOpen || deletion.isInputBlocked?.() || blueprint.snapshot?.().capturing) {
 					throw cutError('BUSY', 'Another World Editor operation is running.')
 				}
+				const saveContext = captureContext()
 				const token = ++planToken
 				planning = true
 				phase = 'planning'
@@ -109,6 +117,7 @@ ModLoader.register({
 					} catch (candidateError) {
 						throw normalizeCandidateError(candidateError)
 					}
+					assertContext(saveContext)
 					const effectiveOptions = normalizeCutOptions(requestedOptions, deletionPlan?.summary?.creative === true)
 					const result = deepFreeze({
 						schema: PLAN_SCHEMA,
@@ -138,8 +147,10 @@ ModLoader.register({
 				if (planning || busy || deletion.isInputBlocked?.() || blueprint.snapshot?.().capturing) {
 					return rejectedResult('BUSY', 'Another World Editor operation is running.')
 				}
+				let saveContext
 				let planRequest
 				try {
+					saveContext = captureContext()
 					planRequest = normalizePlan(planValue)
 				} catch (planError) {
 					return rejectedResult(planError?.code || 'INVALID_PLAN', planError?.message)
@@ -160,6 +171,7 @@ ModLoader.register({
 						options: normalizeCutOptions(requestedOptions, deletionPlan?.summary?.creative === true),
 						summary: summarizeCutPlan(deletionPlan, candidate)
 					}))
+					assertContext(saveContext)
 					lastPlan = planRequest
 				} catch (replanError) {
 					error = publicError(normalizeCandidateError(replanError), 'CUT_PLAN_FAILED')
@@ -173,12 +185,18 @@ ModLoader.register({
 				notify('selection-cut-copying')
 				let published
 				try {
+					assertContext(saveContext)
 					published = await blueprint.publishCut(planRequest.candidate, 'selection-cut-copied')
 				} catch (clipboardError) {
 					published = {
 						status: 'clipboard-failed',
 						error: publicError(clipboardError, 'CLIPBOARD_FAILED')
 					}
+				}
+				try { assertContext(saveContext) } catch (contextError) {
+					const copied = published?.status === 'ready' || published?.clipboard === 'ready'
+					if (copied) blueprint.completeCut(published.cutToken, { status: 'copied-only', error: publicError(contextError) }, 'selection-cut-copied-only')
+					published = { status: 'context-changed', clipboard: copied ? 'ready' : null, error: publicError(contextError) }
 				}
 				if (published?.status !== 'ready') {
 					const copied = published?.clipboard === 'ready'
@@ -232,6 +250,7 @@ ModLoader.register({
 				phase = 'deleting'
 				notify('selection-cut-deleting')
 				try {
+					assertContext(saveContext)
 					const deletionResult = await deletion.execute(
 						planRequest.deletionPlan,
 						normalizeInput(input),

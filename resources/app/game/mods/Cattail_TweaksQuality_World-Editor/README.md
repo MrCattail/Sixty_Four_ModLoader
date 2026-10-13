@@ -2,7 +2,55 @@
 
 > An in-game World Editor for *Sixty Four* with area selection, safe disassembly, palette-based painted-Cube Brush/Bucket/Eraser tools, blueprint copying, complete replication, undo/redo, and a local blueprint library.
 
-Current development version: `0.6.0`. The main feature set is complete, while interface polish and player acceptance testing are still in progress. Keep a recoverable manual save before using the editor on an important world.
+Current development version: `0.6.0`. Desktop game 1.3 support is being migrated in stages. The active-save Creative Mode switch and individual purchases/upgrades have passed player acceptance. Shared blueprint, selection deletion/cut, Draw and Undo/Redo transactions now support native 1.3 saves; player acceptance found a blueprint UI self-lock, which is now fixed. The subsequent purple previews on an initial save were caused by unlock restrictions. Creative Mode now permits ordinary locked buildings in blueprints and all three Store views. The user reported acceptance of the 13A checklist on 2026-10-07, including the requested mode/blueprint/history/save-reload flow; this is an overall report, not acceptance of every shop configuration, remaining selection/Draw transactions or Steam Cloud. Keep a recoverable manual save before using the editor on an important world.
+
+The native blueprint UI lets the transaction own its execution lock; it does not mark its own placement as an unrelated confirmation dialog. Genuine confirmation dialogs still block edits. The transaction regression executes the actual UI placement function as well as direct service calls; surrounding UI/rendering and world data remain test fixtures.
+
+## Desktop 1.3 Creative Mode
+
+- Enable or disable Creative Mode in the current save. The switch verifies the native slot identity, waits for the save, and reads it back before reporting success. The marker remains `slot.stack[0].state.modloader.worldEditor` (schema 1); it is not a permanent cross-playthrough flag.
+- Select and place ordinary purchasable buildings without materials or prior unlocks in the native Store or Better UIs classic/category views, and through supported blueprints. Upgrades neither charge materials nor issue a refund. Unique buildings, upgrade chains, plane restrictions, full footprints and Memory Complex exclusion remain enforced; special/ending objects stay protected.
+- Unlock permission exists only while the current world's Creative Mode is ready and enabled. It never fills or replaces the saved unlock table. Leaving Creative Mode refreshes Store cards and blueprint previews and cancels a held building that is still locked. Actually built buildings remain; genuine unlocks triggered by normal game progress are retained.
+- Show Creative Purchase Costs still controls reference prices. Price mods, including Reality Pack Flat Build Costs, supply those reference prices; the creative exemption is applied separately. Resource balances are not inflated.
+- Each purchase creates a recoverable snapshot containing both native `state` and `permanents`, then rechecks the active slot and target. Snapshot failure or a changed target prevents execution. An execution failure retains the snapshot and blocks further creative writes until reload.
+- In Creative Mode, native Q/Store demolition and E/Store relocation are available from an initial save. They use complete safety snapshots and shared Undo/Redo. Demolition issues no refund. Normal mode retains native progression, movement and refund behavior, without new native-tool history.
+- Creative copies, the Pinhole ending purchase and the legacy bulk-copy path remain blocked. Use existing World Editor blueprints for bulk copying.
+- Failed mode saves restore only the prior mode through a fresh native save. An uncertain recovery blocks creative writes and asks for reload; it never automatically overwrites the world with an earlier snapshot. Readback verifies local persistence, not actual Steam Cloud synchronization.
+- New 1.3 compatibility notices support English, Simplified Chinese/modsch and Traditional Chinese, with English fallback for other languages. The existing language catalog remains intact.
+
+Implementation: private `scripts/core/save-adapter.js` coordinates mode changes with pending native saves and validates slot/identity/load epoch; ordinary saves retain their native synchronous start. `creative-mode.js` owns the persisted switch and shared ordinary-building unlock exemption; `creative-economy.js` owns temporary Store presentation, held-item cleanup, reference prices, single `processUp` execution and deferred-action guards. `editor-shell.js`/`editor-text.js` provide notices. Loader and other Mods need no runtime changes for this batch.
+
+Verification: run `node tests/verify-1.3-creative.js` from this Mod directory. It copies the shipped Electron runtime to a new temporary folder, uses an isolated profile and synthetic world, and tests real native save/Store methods, IndexedDB and the disk SnapshotStore. It does not start the real game or access player data. Legacy regression entry points remain `verify-4a-2a.js` and `verify-4a-2b.js`.
+
+## Desktop 1.3 Native Creative Tools (18A)
+
+- **Normal mode:** E keeps the original mega3 requirement, movable types and movement rules. Native demolition retains its pump unlock and refund. Neither native operation adds editor history or a snapshot; editor writes still exclude conflicting inputs.
+- **Creative mode:** Q on blank ground follows its existing contextual branches into demolition; E enters relocation. The original Store buttons provide the same tools. No pump/mega3 progress is granted or written to the save. Closing Creative Mode cancels an unfinished preview and restores the native tool requirements; completed edits remain.
+- Creative demolition reuses safe selection deletion, filters protected objects, freezes the actual native candidates and never includes an unselected related object. A drag produces one transaction and no material refund. Native selection restrictions and last-extractor protection remain.
+- Creative relocation moves the same live objects, retaining production state and updating complete occupied footprints. Movable wide buildings may move to empty footprints; occupied swaps require both buildings to occupy a single cell. Native forbidden types, unsupported/attached/special objects, Memory Complex footprints and invalid planes remain protected.
+- Relocation Undo/Redo is available only in Creative Mode. Source identities, coordinates, full target occupancy, slot/identity/load epoch and protection are rechecked, including after asynchronous snapshots. Editor-controlled deletion/blueprint restoration can retain the relocation identity across mixed history; an outside replacement is still rejected.
+- Pending saves finish before edits; partial failures roll back only the affected positions in the same world. Uncertain recovery or a newly protected rollback destination keeps the physical snapshot and blocks editing/saving until reload. A changed world never receives the old objects.
+
+Implementation: private core/native-tools.js owns native tool entry conversion, previews, relocation history and trusted restoration identities. creative-economy.js routes supported inputs and refreshes the original Store controls; selection-delete.js accepts frozen native targets inside its existing transaction. blueprint-placement.js shares entity safety and restoration identity hooks. Existing creative-mode/transaction/save-adapter guards already provide mode and save exclusion and are unchanged. Localized tool messages use English, Simplified Chinese/modsch and Traditional Chinese with the established fallback.
+
+Validation: tests/verify-1.3-native-tools.js runs native Game Q/E, pointer down/move/up, actual Store buttons and Entity.setPosition with isolated entity/lifecycle/render fixtures, temporary IndexedDB and physical SnapshotStore. It covers normal/creative mode separation, full footprints, single-cell swaps, mixed blueprint/deletion history, source/target changes, cancellation, pending saves and injected execution/recovery failures in four shop/Flat Costs combinations. Full-game visuals and player acceptance are still pending; the earlier 13A acceptance does not cover 18A. Gradient Well's original grey-price investigation remains shelved per user request.
+
+## Desktop 1.3 Shared Transactions
+
+- Structure/full/painted blueprint placement, conflict replacement, empty-cell synchronization, supported selection deletion/cut, Stable/Grow Brush/Eraser/Bucket and their Undo/Redo use the same native save adapter. Existing formats, relation guards and the Brush 512/Bucket 4096 limits remain.
+- The transaction is bound to the slot object, slot ID, save identity, account and load epoch. Each operation reads the native slot and creates a complete encoded state/permanents snapshot before editing. Even matching save IDs in different slots cannot reuse an operation or history.
+- Pending native saves finish before an edit starts. Autosaves wait through editing and local recovery, including an open stroke; stale requests are discarded. Ordinary saves retain their synchronous initial capture, including the normal Pinhole checkpoint.
+- Recovery reverses only recorded changes in the same world. A slot/load change stops old continuations. Uncertain recovery keeps the physical snapshot and blocks editing and saving that world until reload; no snapshot is automatically imported.
+- Full footprints respect Memory Complex protection. Pinhole ending edits, Orbifold/Memory/whitehole/complete-type entities and unknown unsafe targets remain protected. Blueprint rejection identifies protected content; safe deletion retains protected objects and linked dependencies.
+- Normal blueprint and deletion quotes use the native price chain with simulated counts, including Flat Build Costs; Undo reverses the recorded delta. Creative edits neither spend nor refund resources. Native, classic and category Store views refresh after edits.
+- Shared transactions, Creative Mode changes and individual purchases exclude each other. A live stroke can continue or cancel itself. Cut rechecks the world before and after clipboard publication; a changed world yields copied-only and prevents deletion.
+- Blueprint guards capture unlock permission before asynchronous planning; changes invalidate old previews. Mode changes refresh the stationary preview immediately, and pinned previews also recheck natural unlocks. Actual placement and Redo recheck current eligibility after snapshots; normal mode still requires real unlocks.
+
+Implementation: save-adapter owns edit leases, save coordination and world context; editor-transactions owns all three entry paths and recovery. Blueprint preview/placement supplies protected-target and native-price checks; selection-delete/cut and paint-cube-stroke apply them to their existing adapters. Store batches use compositionUpdate and native pointer refresh uses processMove. The shared-transaction migration added no public Loader API. The later 18A native-tools adapter adds one private manifest entry (47 total), with the development version unchanged at 0.6.0.
+
+Verification: run node tests/verify-1.3-transactions.js and node tests/verify-1.3-creative.js. The transaction suite uses real native save/codecs/entity add/remove/map methods, temporary IndexedDB and disk SnapshotStore, with all three shop views and Flat Costs/register-order combinations. Initial locked/zero-resource worlds, mode transitions, saved unlock records, post-snapshot eligibility and history are covered. A separate test runs the complete preview controller with deterministic render/input fixtures to check immediate mode refresh, pinned natural-unlock refresh and subscription cleanup. Entity classes/world, selection UI, clipboard/library, Loader lifecycle/identity and Steam IPC are fixtures. Existing regression scripts additionally cover relations, transient Surge/growth drift and tool limits. Automated success does not replace game acceptance or actual cloud synchronization.
+
+The feature catalog below also describes earlier development stages; it does not imply that all editor features have passed game 1.3 acceptance.
 
 ## What World Editor Can Do
 
@@ -17,10 +65,10 @@ Main features include:
 - Control Include Cubes, Include Surges, and Include Cells independently.
 - Use four preview states to distinguish buildable cells, already-satisfied cells, replaceable conflicts, and protected content.
 - Safely disassemble selected buildings, or Cut a selection into a blueprint before removing eligible content.
-- Undo and redo World Editor placement, disassembly, and cut transactions.
+- Undo and redo World Editor placement, disassembly, and cut transactions; in 1.3 Creative Mode, also native demolition and relocation.
 - Enter Draw Mode to paint or flood-fill Cubes from a configurable ten-resource palette, or erase only Cubes previously painted by World Editor, with one atomic Undo/Redo entry per operation.
 - Save blueprints to an installation-wide library with List/Grid views, thumbnails, Details, Trash, Quarantine, and Problems management.
-- Perform editor economy operations for free in Creative Mode, either in the current save or in a separate creative copy.
+- Perform supported economy operations for free in Creative Mode. On 1.3, use the current save; separate creative copies remain pending.
 - Follow the current game language with buttons, statuses, messages, and dialogs localized into all 20 original game languages.
 
 ## Installation and Activation
@@ -35,7 +83,7 @@ Main features include:
 3. Enable `Cattail_TweaksQuality_World-Editor` in ModLoader, then fully start or reload the game.
 4. Enter a save and press `V` by itself to open World Editor.
 
-Creating a separate creative copy requires the Save Slots Service from Better UIs and at least one empty manual save slot. Dynamic Details is optional: the core editor works without it, while installing it allows selection and blueprint cards to show richer actual and theoretical production data.
+On earlier supported game versions, a separate creative copy requires the Save Slots Service from Better UIs and an empty manual save slot. That option is disabled on 1.3 pending migration. Dynamic Details is optional: it provides richer actual and theoretical production data in selection and blueprint cards.
 
 ## Quick Start
 
@@ -320,6 +368,7 @@ scripts/
     blueprint-preview-plan.js # 5A：结构/完整状态四级冲突、Cube/Surge、空地目标、安全替换与 Build Plan
     blueprint-placement.js # 5A：结构/完整蓝图建造、工具栏 Cube/Surge 状态、状态恢复、Waypoint 与 undo/redo
     selection-delete.js  # 5A：建筑及创造模式可选 Cube/Surge 的同一安全删除事务
+    native-tools.js      # 18A：桌面原生创造拆除/搬迁、完整占地保护与位置历史
     selection-cut.js     # 5A：完整源剪切、剪贴板优先与按模式保留/删除临时层
     input-controller.js  # 5A：V / Esc / Backspace、统一手势取消与输入保护
   input/
@@ -675,6 +724,8 @@ globalThis[Symbol.for('cattail.world-editor.blueprint')].snapshot().blueprint?.p
 
 ## 4A-2a 创造模式安全基础
 
+1.3 接续：当前存档开关已改为原生活动槽身份验证、串行异步保存和本地回读，私有 save-adapter 同时封装 state/permanents 快照。创造副本在 1.3 暂停。以下两入口/旧自动槽说明属于早期实现；当前支持边界以顶部 Desktop 1.3 Creative Mode 为准。
+
 - 创造模式状态按存档保存在 `save.modloader.worldEditor`，并通过独立的 `cattail.world-editor.creative-mode` 控制器发布。缺失、损坏或未知 schema 的旧存档默认保持关闭。
 - 顶部工具栏明确显示创造模式开关。开启时可以直接切换当前存档，也可以通过 Better UIs 创建独立创造副本；关闭时恢复正常材料消耗，现有建筑与蓝图不会删除。
 - 工具栏的已开启状态及创造模式开启/关闭窗口使用原版地心晶体的黄绿色强调色；名称输入框取得焦点时也使用同一黄绿色反馈。
@@ -698,12 +749,14 @@ globalThis[Symbol.for('cattail.better-uis.save-slots')]?.snapshot()
 
 ## 4A-2b 创造模式免费商店经济
 
+1.3 接续：原生 Store、经典长列/分类显示及 processUp 单体建造/升级已适配，升级不退款；18A 已接通原生创造拆除/搬迁及共享历史，玩家验收待完成；批量复制使用蓝图，Pinhole 结局继续延期。以下旧 processClick/Shop、移动端和批量能力记录不构成 1.3 验收；顶部列出当前支持和失败保护。
+
 - 创造模式下，原版商店的普通建造、升级、橡皮擦删除和搬迁均不消耗资源；升级与删除也不发放退款。普通模式继续使用原版同步结算。
 - 免费经济只存在于一次已经完成写前快照和目标重验的商店事务中。机器运行、资源补充、生产、Cube 操作、自动世界事件和其他非商店价格消费者保持原样。
 - 每次有效世界写入先用 `game.assembleSave(true)` 创建一份物理安全快照，再重验点击时冻结的格子、实体、平面、创造状态、运行时和存档身份。快照等待期间可以把鼠标移到其他格；原版动作会临时在冻结格执行，完成后恢复并刷新当前鼠标悬停。冻结格真的变为占用、原目标实体被替换、手持工具变化或其他安全条件失效时仍不会执行世界写入。
 - 快照等待期间只阻止新的商店/编辑器写入；相机、鼠标移动和非写入菜单仍可使用。快速重复输入不会排队，也不会创建第二份快照；方案只保证已经接受的第一笔不会因鼠标移向下一格而被误取消。
 - 鼠标、游戏手柄、桌面触控和移动端独立触屏路径共用同一事务协调器；搬迁仍调用当前完整 `processClick()` 补丁链，以兼容 Gradient 搬迁修复。
-- 解锁、唯一建筑、不可破坏实体、Cube、平面、最后一个 Pump/Gradient 和搬迁类型等原版限制继续生效。
+- 当前桌面 1.3 创造模式对普通可购买建筑提供临时解锁权限，蓝图和三种商店保持一致；普通模式仍按真实解锁进度。唯一建筑、不可破坏实体、Cube、平面、最后一个 Pump/Gradient 等保护保留，原生搬迁按顶部 18A 普通/创造模式边界执行。
 - World Editor 配置 `创造模式购买花费显示` 默认关闭并支持 hot 预览：
   - 关闭时，原商店、Better UIs 分类商店及鼠标旁的购买/升级/橡皮擦花费提示为空。
   - 开启时，显示关闭创造模式后当前完整 Mod 补丁链会计算出的参考花费；实际结算仍免费。

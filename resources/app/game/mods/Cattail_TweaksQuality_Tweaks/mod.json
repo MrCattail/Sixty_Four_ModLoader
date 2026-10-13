@@ -34,6 +34,8 @@
     "no"
   ],
   "entries": [
+    "scripts/remember-language.js",
+    "scripts/clear-view-grid-fix.js",
     "scripts/shift-ctrl-zoom-disable.js",
     "scripts/view-distance.js",
     "scripts/window-size-presets.js",
@@ -76,6 +78,48 @@
     "Cattail_TweaksQuality_Dynamic-Camera"
   ],
   "config": {
+    "enableClearViewGridFix": {
+      "type": "boolean",
+      "label": {
+        "en": "Clear-view grid stutter fix",
+        "sch": "清晰视图网格卡顿修复",
+        "modsch": "清晰视图网格卡顿修复",
+        "tch": "清晰視圖網格卡頓修復"
+      },
+      "default": true,
+      "description": {
+        "en": "Reduce grid stutter when holding Alt, selecting a building or moving one in game 1.3. Keeps the grid's width and color. Independent of Floor grid lines. Save and reload to apply changes.",
+        "sch": "修复 1.3 中按住 Alt、选中建筑或移动建筑时的网格卡顿，保留网格粗细和颜色。独立于“地板网格线”开关，保存并重新加载后生效。",
+        "modsch": "修复 1.3 中按住 Alt、选中建筑或移动建筑时的网格卡顿，保留网格粗细和颜色。独立于“地板网格线”开关，保存并重新加载后生效。",
+        "tch": "修復 1.3 中按住 Alt、選取建築或移動建築時的網格卡頓，保留網格粗細和顏色。獨立於「地板網格線」開關，儲存並重新載入後生效。"
+      },
+      "reloadPolicy": "reload",
+      "section": "renderPerformance"
+    },
+    "enableRememberLanguage": {
+      "type": "boolean",
+      "label": {
+        "en": "Remember game language",
+        "sch": "记住游戏语言",
+        "modsch": "记住游戏语言",
+        "tch": "記住遊戲語言"
+      },
+      "default": true,
+      "description": {
+        "en": "Keep your saved in-game language when loading game 1.3. If no valid saved choice is available, use the game's normal startup language. Turn off to restore the original behavior. Takes effect after saving and reloading.",
+        "sch": "加载 1.3 游戏时保留已保存的游戏内语言；没有有效选择时使用原版启动语言。关闭后恢复原版行为，保存并重新加载后生效。",
+        "modsch": "加载 1.3 游戏时保留已保存的游戏内语言；没有有效选择时使用原版启动语言。关闭后恢复原版行为，保存并重新加载后生效。",
+        "tch": "載入 1.3 遊戲時保留已儲存的遊戲內語言；沒有有效選擇時使用原版啟動語言。關閉後恢復原版行為，儲存並重新載入後生效。"
+      },
+      "reloadPolicy": "reload",
+      "section": "rememberLanguage",
+      "sectionLabel": {
+        "en": "Game language",
+        "sch": "游戏语言",
+        "modsch": "游戏语言",
+        "tch": "遊戲語言"
+      }
+    },
     "enableExplainerFix": {
       "type": "boolean",
       "label": "Explainer fix",

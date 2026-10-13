@@ -156,6 +156,10 @@ ModLoader.register({
 						}
 					})
 					requireCurrent(context)
+					if (Array.isArray(game.saveSlots)) {
+						const protectedRecord = plan.records.find(entry => ['memory-region', 'protected-special', 'protection-unavailable', 'locked'].includes(entry.reason) || (!RESTORABLE_NAMES.has(entry.name) && entry.sourceKind !== 'surge'))
+						if (protectedRecord) throw placementError('PROTECTED_TARGET', 'Blueprint contains a protected or unsupported target: ' + protectedRecord.name + ' (' + protectedRecord.reason + ').')
+					}
 					const proposal = createPlacementProposal(plan, {
 						replaceConflicts,
 						syncEmpty,
@@ -200,6 +204,10 @@ ModLoader.register({
 					validateRecord(record)
 					requireGameMethods(game)
 					const payload = record.payload
+					for (const target of payload.builds.concat(payload.removals, payload.transients)) {
+						const protection = planner.protectionReason?.(game, target.name, target.footprint)
+						if (protection) return denied('PROTECTED_TARGET', 'The target is protected: ' + protection)
+					}
 					traceProbe('adapter.preflight.start', {
 						operationId: context?.operationId,
 						direction,
@@ -214,6 +222,9 @@ ModLoader.register({
 						)
 					}
 					let resourcesCurrent = null
+					if (direction !== 'undo' && payload.builds.some(target => planner.isLocked?.(game, target.name))) {
+						return denied('PROTECTED_TARGET', 'A blueprint building is still locked in normal mode.')
+					}
 					if (direction === 'forward') {
 						resourcesCurrent = numericArray(game.resources)
 						const resourcesChanged = !sameNumericArray(resourcesCurrent, payload.resourcesBefore)
@@ -334,8 +345,10 @@ ModLoader.register({
 						removedSaves: new Map()
 					}
 					operations.set(context.operationId, state)
-					if (direction === 'undo') applyUndo(context, record, state)
-					else applyForward(context, record, state)
+					withDeferredShopUpdates(function () {
+						if (direction === 'undo') applyUndo(context, record, state)
+						else applyForward(context, record, state)
+					})
 					refreshWorld(game)
 					traceProbe('adapter.apply.complete', {
 						operationId: context?.operationId,
@@ -1036,6 +1049,8 @@ ModLoader.register({
 			function assessEntity(entity, details) {
 				if (!entity || typeof entity !== 'object') return assessment(false, 'missing')
 				const name = safeName(entity.name)
+				const protection = planner.protectionReason?.(game, name, entityFootprint(entity, entity.position))
+				if (protection) return assessment(false, protection)
 				if (!RESTORABLE_NAMES.has(name)) return assessment(false, 'unsupported-type')
 				if (name === 'cube') {
 					if (details?.blueprintMode !== 'full') return assessment(false, 'protected-cube')
@@ -1065,6 +1080,7 @@ ModLoader.register({
 					return assessment(false, 'attached-surge')
 				}
 				if (
+					details?.operation !== 'relocate' &&
 					(name === 'pump' || name === 'pump2' || name === 'gradient') &&
 					pumpFamilyCount(game) < 2
 				) {
@@ -1352,10 +1368,12 @@ ModLoader.register({
 
 			function withDeferredShopUpdates(callback) {
 				const restore = deferMethod(game?.shop, 'updateElements')
+				const restoreStore = deferMethod(game?.store, 'compositionUpdate')
 				try {
 					return callback()
 				} finally {
 					restore()
+					restoreStore()
 				}
 			}
 
@@ -1668,12 +1686,16 @@ ModLoader.register({
 					identity = createIdentity('entity')
 					identityByEntity.set(entity, identity)
 				}
+				const native = globalThis[Symbol.for('cattail.world-editor.native-tools')]
+				if (native?.game === game) native.rememberRestoration('placement', identity, entity)
 				return identity
 			}
 
 			function assignIdentity(entity, identity) {
 				if (!entity || !identity) throw placementError('APPLY_FAILED', 'An entity identity could not be assigned.')
 				identityByEntity.set(entity, identity)
+				const native = globalThis[Symbol.for('cattail.world-editor.native-tools')]
+				if (native?.game === game) native.restoreIdentity('placement', identity, entity)
 			}
 
 			function createIdentity(kind) {
@@ -1871,6 +1893,7 @@ ModLoader.register({
 		}
 
 		function priceFor(game, counts, name, sale) {
+			if (Array.isArray(game?.saveSlots)) return globalThis[Symbol.for('cattail.world-editor.blueprint-preview-plan')].quotePrice(game, counts, name, sale)
 			const definition = game.codex?.entities?.[name]
 			if (!definition || !Array.isArray(definition.price)) {
 				throw placementError('PRICE_UNAVAILABLE', 'A required building price is unavailable.')
@@ -2158,9 +2181,11 @@ ModLoader.register({
 						finiteOr(right?.position?.[0], 0) -
 						finiteOr(right?.position?.[1], 0)
 				})
+				game.store?.compositionUpdate?.()
 				game.shop?.updateElements?.()
 				game.shop?.check?.()
-				game.processMousemove2?.()
+				const refreshPointer = Array.isArray(game.saveSlots) ? game.processMove : game.processMousemove2
+				refreshPointer?.call(game)
 			} catch (refreshError) {
 				console.warn('[Cattail World Editor] Placement refresh failed.', refreshError)
 			}

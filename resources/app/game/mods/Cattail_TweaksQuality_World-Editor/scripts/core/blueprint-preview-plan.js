@@ -4,6 +4,7 @@ ModLoader.register({
 		const PLAN_KEY = Symbol.for('cattail.world-editor.blueprint-preview-plan')
 		const STATE_KEY = Symbol.for('cattail.world-editor.blueprint-state')
 		const PAINTED_KEY = Symbol.for('cattail.world-editor.blueprint-painted')
+		const CREATIVE_KEY = Symbol.for('cattail.world-editor.creative-mode')
 		const DEFAULT_CHUNK_SIZE = 512
 		const STATUS = Object.freeze({
 			BUILDABLE: 'buildable',
@@ -25,6 +26,9 @@ ModLoader.register({
 		const planner = Object.freeze({
 			version: '0.5.1',
 			status: STATUS,
+			protectionReason,
+			isLocked,
+			quotePrice,
 			statusPriority: STATUS_PRIORITY,
 			async build(game, blueprint, target, options) {
 				if (disposed) throw planError('planner-disposed')
@@ -115,6 +119,13 @@ ModLoader.register({
 					})
 				})
 			)
+			// Capture before yielding: a mixed-mode plan must never acquire a fresh guard.
+			const unlocks = {}
+			if (Array.isArray(game.saveSlots)) {
+				for (const source of sourceRecords) {
+					if (game.codex?.entities?.[source?.name]?.canPurchase === true) unlocks[source.name] = unlockSignature(game, source.name)
+				}
+			}
 			const waypointOrders = currentWaypointOrders(game, blueprint, normalizedTarget)
 			for (let index = 0; index < sourceRecords.length; index += 1) {
 				if (isCancelled()) throw planError('plan-cancelled')
@@ -213,6 +224,7 @@ ModLoader.register({
 			}
 
 			const guard = createGuard(game, guardCells, relevantNames, options)
+			guard.unlocks = unlocks
 			const statusCounts = countStatuses(records)
 			const cost = simulateCost(game, records, guard)
 			return {
@@ -280,7 +292,34 @@ ModLoader.register({
 			if (!normalizePosition(target)) throw planError('target-invalid')
 		}
 
+		function protectionReason(game, name, footprint) {
+			if (!Array.isArray(game?.saveSlots)) return null
+			if (game.codex?.entities?.[name]?.type === 'complete' || ['pinhole', 'orbifold', 'memory', 'whitehole'].includes(String(name).toLowerCase())) return 'protected-special'
+			if (!footprint || typeof game.isWithinMemoryComplex !== 'function') return 'protection-unavailable'
+			const bounds = [footprint.minU, footprint.minV, footprint.maxU, footprint.maxV]
+			if (!bounds.every(Number.isInteger) || footprint.maxU < footprint.minU || footprint.maxV < footprint.minV) return 'protection-unavailable'
+			for (let v = footprint.minV; v <= footprint.maxV; v += 1) {
+				for (let u = footprint.minU; u <= footprint.maxU; u += 1) {
+					if (game.isWithinMemoryComplex([u, v])) return 'memory-region'
+				}
+			}
+			return null
+		}
+
+		function unlockSignature(game, name) {
+			const creative = globalThis[CREATIVE_KEY]
+			return (!!game.unlockedEntities?.[name] ? '1' : '0') +
+				(creative?.game === game && creative.canBypassUnlock?.(name) === true ? '1' : '0')
+		}
+
+		function isLocked(game, name) {
+			return Array.isArray(game?.saveSlots) && game.codex?.entities?.[name]?.canPurchase === true &&
+				unlockSignature(game, name) === '00'
+		}
+
 		function classifyRecord(game, source, name, position, footprint, conflicts, options) {
+			const protection = protectionReason(game, name, footprint)
+			if (protection) return { status: STATUS.BLOCKED, reason: protection }
 			const definition = game.codex?.entities?.[name]
 			const isPainted = source.kind === 'painted-cube' && name === 'cube'
 			const isCube = (source.kind === 'cube' || isPainted) && name === 'cube'
@@ -293,6 +332,7 @@ ModLoader.register({
 					? { status: STATUS.BLOCKED, reason: 'surge-occupied' }
 					: { status: STATUS.BUILDABLE, reason: 'empty' }
 			}
+			if (!isCube && !isSurge && isLocked(game, name)) return { status: STATUS.BLOCKED, reason: 'locked' }
 			if (!isCube && (!definition || (definition.canPurchase !== true && !isShatteredStabilizer))) {
 				return { status: STATUS.BLOCKED, reason: 'unsupported' }
 			}
@@ -457,6 +497,9 @@ ModLoader.register({
 
 		function inspectGuard(game, guard) {
 			if (!game || !guard || !Array.isArray(guard.cells)) return guardResult('invalid')
+			for (const [name, signature] of Object.entries(guard.unlocks || {})) {
+				if (unlockSignature(game, name) !== signature) return guardResult('unlocks')
+			}
 			for (const entry of guard.cells) {
 				if (
 					(entry.includeDynamicEntity
@@ -556,7 +599,20 @@ ModLoader.register({
 			}
 		}
 
+		// Quote against the operation's simulated counts through the actual native
+		// price chain, including Reality Pack. No asynchronous work or count writes.
+		function quotePrice(game, counts, name, sale) {
+			const previous = game.entitiesInGame
+			try {
+				game.entitiesInGame = counts
+				const price = game.getRealPrice(name, sale === true)
+				if (!Array.isArray(price) || price.some(value => !Number.isFinite(value) || value < 0)) throw planError('price-unavailable')
+				return price.slice()
+			} finally { game.entitiesInGame = previous }
+		}
+
 		function simulatedPrice(game, counts, name) {
+			if (Array.isArray(game?.saveSlots)) return quotePrice(game, counts, name, false)
 			const definition = game.codex?.entities?.[name]
 			if (!definition || !Array.isArray(definition.price)) return null
 			const currentCount = Math.max(0, finiteOr(counts[name], 0))

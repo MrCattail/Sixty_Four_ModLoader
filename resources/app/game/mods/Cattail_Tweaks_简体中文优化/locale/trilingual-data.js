@@ -1,7 +1,7 @@
 (function (global) {
 	'use strict'
 
-	// en and sch are snapshots of the current vanilla words.js for side-by-side review.
+	// en and sch are snapshots of desktop 1.3 vanilla words.js for side-by-side review.
 	// Edit modsch values for the optimized in-game language. null means vanilla has no source entry.
 	global.__cattailTweaksSimplifiedChineseTrilingual = {
 		"splash": {
@@ -89,6 +89,36 @@
 				"en": "Bright flashing lights are part of this game. If you are sensitive to them, you may consider disabling flashes by clicking this icon.",
 				"sch": "游戏包含强光频闪画面。如果你对它们敏感请考虑通过点击此图标以禁用它们。",
 				"modsch": "游戏包含强光频闪效果。如果你对它们敏感请考虑通过点击此图标以禁用效果。"
+			},
+			"slot": {
+				"en": "Slot",
+				"sch": null,
+				"modsch": "存档槽"
+			},
+			"newslot": {
+				"en": "New game",
+				"sch": null,
+				"modsch": "新游戏"
+			},
+			"imported": {
+				"en": "Imported",
+				"sch": null,
+				"modsch": "已导入"
+			},
+			"importClipboard": {
+				"en": "Import from clipboard",
+				"sch": null,
+				"modsch": "从剪贴板导入"
+			},
+			"wipe": {
+				"en": "Delete this slot",
+				"sch": null,
+				"modsch": "删除此存档槽"
+			},
+			"switchslot": {
+				"en": "Switch to this slot",
+				"sch": null,
+				"modsch": "切换到此存档槽"
 			}
 		},
 		"achievements": [
@@ -279,9 +309,9 @@
 					"modsch": "需要休息吗？"
 				},
 				"description": {
-					"en": "Play for 64 hours",
+					"en": "Play for 64 hours in a single run",
 					"sch": "玩64小时",
-					"modsch": "玩64个小时"
+					"modsch": "在同一轮游戏中累计游玩 64 小时"
 				}
 			},
 			{
@@ -497,7 +527,7 @@
 				"description": {
 					"en": "Construct a gradient well on a site with five unique resources",
 					"sch": "在具有五种独特资源的场地上建造一个渐变井",
-					"modsch": "在一个同时具有五种不同资源的地点上建造一个梯度矿井"
+					"modsch": "在一个同时具有五种不同资源的地点上建造一个丰度矿井"
 				}
 			}
 		],
@@ -570,12 +600,12 @@
 				"name": {
 					"en": "Gradient well",
 					"sch": "渐变井",
-					"modsch": "梯度矿井"
+					"modsch": "丰度矿井"
 				},
 				"description": {
 					"en": "An everlasting mineable cube. Responds to most destabilizers and resonators. Should be connected to the Inverse Chasm via conductors.",
 					"sch": "一个永久的可开采立方体。对大多数去稳定器和共振器做出响应。应通过导体连接到逆裂缝。",
-					"modsch": "一座能无视深度在垂直多个地质层中汲取资源的矿井。本体相当于一个永久的可开采的矿方体。不同的资源梯度对应不同的的资源和种类。受大多数挖矿机/解构加速器的效果影响。提示：可以用导线连接到逆裂缝。"
+					"modsch": "一座能无视深度在垂直多个地质层中汲取资源的矿井。本体相当于一个永久的可开采的矿方体。不同的资源丰度对应不同的的资源和种类。受大多数挖矿机/解构加速器的效果影响。提示：可以用导线连接到逆裂缝。"
 				}
 			},
 			"chasm": {
@@ -1283,7 +1313,7 @@
 				"description": {
 					"en": "Knocks symbols off. Highlights potential puncture points. Spots get richer the farther you move from the center of the world.",
 					"sch": "敲掉符号。突出潜在的穿刺点。距离世界中心越远，点位越丰富。",
-					"modsch": "释放内核并振动一定范围内的现实结构。能收集范围内完全发光的符号，并探测范围内的资源梯度。距离世界中心越远，资源梯度点位越丰富。"
+					"modsch": "释放内核并振动一定范围内的现实结构。能收集范围内完全发光的符号，并探测范围内的资源丰度。距离世界中心越远，资源丰度点位越丰富。"
 				}
 			},
 			"puncture": {
@@ -1295,7 +1325,7 @@
 				"description": {
 					"en": "Creates a gradient channel: a foundation for a gradient well. If a well is constructed on top, resource gains are doubled. Relocating the well removes this bonus. Feeding Reality into a raw puncture resets your position.",
 					"sch": "创造渐变通道：渐变井的地基。如果在其上建造一口井，资源收益将翻倍。迁移井位将消除此加成。将现实注入原始穿刺点将重置你的位置。",
-					"modsch": "一座梯度矿井的地基。如果在其上建造一做梯度矿井，资源收益将翻倍。移动梯度矿井的位置将消除此加成。将材料“现实”注入进隧穿洞会将你传送到现实中心点。"
+					"modsch": "一座丰度矿井的地基。如果在其上建造一做丰度矿井，资源收益将翻倍。移动丰度矿井的位置将消除此加成。将材料“现实”注入进隧穿洞会将你传送到现实中心点。"
 				}
 			},
 			"waypoint2": {
@@ -1308,6 +1338,90 @@
 					"en": "An upgrade to waypoint. If one is connected to the inverse chasm via conductors, all others are linked to it as well, regardless of distance.",
 					"sch": "航点的升级。如果一个通过导体连接到逆裂缝，所有其他的都将连接到它，无论距离多远。",
 					"modsch": "传送点 LV1 的升级版。只要逆裂缝通过导线跟传送点 LV2 连接，所有资源都会被吸入传送点网络并最终流向逆裂缝。"
+				}
+			},
+			"whitehole": {
+				"name": {
+					"en": "Orifice",
+					"sch": null,
+					"modsch": "孔口"
+				},
+				"description": {
+					"en": "Enables you to pull out and contain a part of alien universe. Interact to choose topology. You can change topology at any time by disassembling.",
+					"sch": null,
+					"modsch": "让你可以拉取另一个宇宙的一部分，并且收容于此。与其交互，选择拓扑结构。你可以随时通过拆解建筑来重新选择拓扑结构。"
+				}
+			},
+			"collapsing": {
+				"name": {
+					"en": "Collapsing Orbifold",
+					"sch": null,
+					"modsch": "坍缩轨形"
+				},
+				"description": {
+					"en": "Periodically crushes all the cubes with unthinkable power. Affects the Malformed Orbifold. Higher tiers reduce the cooldown.",
+					"sch": null,
+					"modsch": "定期施加超乎想象的力量，破坏全图的矿方体。畸变轨形也会受到影响。等级越高，冷却时间越短。"
+				}
+			},
+			"malformed": {
+				"name": {
+					"en": "Malformed Orbifold",
+					"sch": null,
+					"modsch": "畸变轨形"
+				},
+				"description": {
+					"en": "Collects all the mined resources. Resources could be extracted with clicks, destabilizers, resonators, injectors and catalytic refineries. Higher tiers multiply resources.",
+					"sch": null,
+					"modsch": "把所有采出的资源集中收存。提取资源的方式包括点击，以及使用解构加速器、熵增挖矿机、地心晶体注入器和催化精炼厂。等级越高，资源倍率越高。"
+				}
+			},
+			"oversaturated": {
+				"name": {
+					"en": "Oversaturated Orbifold",
+					"sch": null,
+					"modsch": "过饱和轨形"
+				},
+				"description": {
+					"en": "Periodically recharges all the machines. Higher tiers reduce cooldown.",
+					"sch": null,
+					"modsch": "每隔一段时间，自动为全图机器进行补给。等级越高，冷却时间越短。"
+				}
+			},
+			"expanding": {
+				"name": {
+					"en": "Expanding Orbifold",
+					"sch": null,
+					"modsch": "膨胀轨形"
+				},
+				"description": {
+					"en": "Supplies all the extractors with pressure. Coolers increase the effect. Pumps vastly increase extractors descent rate but drain double the resources. Higher tiers increase the pressure.",
+					"sch": null,
+					"modsch": "为全图矿井提供压力。矿井风冷器可以增强供压效果。辅助泵可大幅加快矿井下钻，但自身的资源消耗速度也会翻倍。等级越高，提供的压力越大。"
+				}
+			},
+			"morphing": {
+				"name": {
+					"en": "Morphing Orbifold",
+					"sch": null,
+					"modsch": "变换轨形"
+				},
+				"description": {
+					"en": "Periodically accelerates all the converters within its range. The amount of acceleration depends on the distance. Higher tiers increase the acceleration.",
+					"sch": null,
+					"modsch": "定期加速作用范围内的所有转换器。距离越近，加速效果越强。等级越高，加速效果越强。"
+				}
+			},
+			"intercalating": {
+				"name": {
+					"en": "Intercalating Orbifold",
+					"sch": null,
+					"modsch": "插层轨形"
+				},
+				"description": {
+					"en": "Boosts Gradient Wells for a specific resource type. Other types are halved. Higher tiers increase the boost. Interact to select resource. Switches automatically after tier 6. Collects Reality.",
+					"sch": null,
+					"modsch": "提高丰度矿井的指定资源产出。其他资源的产出减半。等级越高，增幅越大。与其交互，选择要增产的资源。达到 6 级后，会自动选择增产资源。收集“现实”。"
 				}
 			}
 		},
@@ -2626,6 +2740,816 @@
 				"en": "I won't, Veen, I won't!",
 				"sch": "我不会，维恩，我不会！",
 				"modsch": "我不会，维恩，我不会！"
+			},
+			{
+				"en": "Hey! Are you still there?",
+				"sch": null,
+				"modsch": "人呢？还在吧？"
+			},
+			{
+				"en": "Sure, why?",
+				"sch": null,
+				"modsch": "嗯？找我有事？"
+			},
+			{
+				"en": "What’s you up to?",
+				"sch": null,
+				"modsch": "你在忙什么？"
+			},
+			{
+				"en": "Oh, well, I decided to do it one more time. But there’s a hole in the ground this time.",
+				"sch": null,
+				"modsch": "就……我想重新再来一次。不过这回地上多了个坑洞。"
+			},
+			{
+				"en": "Do what exactly?",
+				"sch": null,
+				"modsch": "什么东西再来一次？"
+			},
+			{
+				"en": "The usual, machines and stuff.",
+				"sch": null,
+				"modsch": "造机器啊，还是那些。"
+			},
+			{
+				"en": "Why?",
+				"sch": null,
+				"modsch": "怎么又弄这个？"
+			},
+			{
+				"en": "I don’t know, there’s not much to do here anyway.",
+				"sch": null,
+				"modsch": "没什么，反正闲着也是闲着。"
+			},
+			{
+				"en": "I mean… Why don’t you make something new? Like different machines maybe? Idk, does it make sense?",
+				"sch": null,
+				"modsch": "我是说，就不能换点花样？造点新机器什么的。懂我意思？"
+			},
+			{
+				"en": "What do you have in mind?",
+				"sch": null,
+				"modsch": "那你说说，造什么？"
+			},
+			{
+				"en": "Err… Nothing specific. I even don’t know how it works. Just curious.",
+				"sch": null,
+				"modsch": "呃……我哪知道。我连你怎么造的都不懂，就是好奇。"
+			},
+			{
+				"en": "But why do you ask anyway?",
+				"sch": null,
+				"modsch": "合着你就负责出题啊？"
+			},
+			{
+				"en": "I don’t know! Forget it. What’s with the hole?",
+				"sch": null,
+				"modsch": "就问问嘛！算了算了。地上那个洞，你研究明白了吗？"
+			},
+			{
+				"en": "Okay… It’s hard to explain, but it appears I can pull a part of other universe through this hole. And it has an effect on this one.",
+				"sch": null,
+				"modsch": "那个洞啊……有点难说。我好像能从里面把另一个宇宙的一部分拉过来。拉过来以后，还会影响这边的宇宙。"
+			},
+			{
+				"en": "Same old Charps, same old cryptic bullshit! Does this hole count as something new?",
+				"sch": null,
+				"modsch": "又开始了，夏普，又是我听不懂的天书。那这洞，算不算新花样？"
+			},
+			{
+				"en": "Well, yeah, I guess.",
+				"sch": null,
+				"modsch": "嗯……应该算吧。"
+			},
+			{
+				"en": "I've been thinking about what you said",
+				"sch": null,
+				"modsch": "你之前说的那事，我后来又想了想。"
+			},
+			{
+				"en": "Which is...",
+				"sch": null,
+				"modsch": "哪句？"
+			},
+			{
+				"en": "I think you're right. I can't build anything new. It's like I have some options and can only choose between them.",
+				"sch": null,
+				"modsch": "好像还真让你说中了。我能做的就那几样，挑来挑去，也变不出新东西。"
+			},
+			{
+				"en": "Okay, but what happens exactly when you, like, try to build something? Do you somehow see a list or what?",
+				"sch": null,
+				"modsch": "那么你具体是怎么选的？有个魔法菜单悬浮在你面前吗？"
+			},
+			{
+				"en": "Not really...",
+				"sch": null,
+				"modsch": "也不是吧……"
+			},
+			{
+				"en": "Let me think",
+				"sch": null,
+				"modsch": "我想想该怎么说。"
+			},
+			{
+				"en": "It just happens and then I realize it's there",
+				"sch": null,
+				"modsch": "就是……等我意识到的时候，它就已经出现了。"
+			},
+			{
+				"en": "But how do you choose what's supposed to be built? Do you close your eyes and make a wish or something?",
+				"sch": null,
+				"modsch": "要造什么，总得先想好吧？还是说，闭眼默念一句“我想要这个”？"
+			},
+			{
+				"en": "Heed the words I am to say! Industrial destabilizer, industrial destabilizer, industrial destabilizer is on the way!",
+				"sch": null,
+				"modsch": "听我召唤，速速现身！二级解构加速器，二级解构加速器，二级解构加速器！"
+			},
+			{
+				"en": "Funny, but no. I don't do anything special.",
+				"sch": null,
+				"modsch": "你倒挺会编。真没有，我没做什么特别的事。"
+			},
+			{
+				"en": "But you do something, right?",
+				"sch": null,
+				"modsch": "总不能什么都没干吧？"
+			},
+			{
+				"en": "Well, yeah... I don't know, I feel like trying to tell what I do to raise my hand or to look at something.",
+				"sch": null,
+				"modsch": "应该是吧，但这就跟抬个手或者眨个眼，都是下意识的。"
+			},
+			{
+				"en": "You're just a natural born sorcerer",
+				"sch": null,
+				"modsch": "合着是个天生的魔法师。"
+			},
+			{
+				"en": "Okay, you have to help my thinking.",
+				"sch": null,
+				"modsch": "来，帮我捋一捋。"
+			},
+			{
+				"en": "What if I can't think of anything new to build not just because of imagination or something, but because this stuff is something inherent to this place and something different just doesn't exist?",
+				"sch": null,
+				"modsch": "有没有可能，造不出新东西跟我的想象力无关，而是有些东西本来就属于这里，有些东西不可能存在？"
+			},
+			{
+				"en": "Does it make sense?",
+				"sch": null,
+				"modsch": "你觉得？"
+			},
+			{
+				"en": "Well, yeah, but how do you know all this stuff?",
+				"sch": null,
+				"modsch": "有可能，问题是你怎么知道这些的？"
+			},
+			{
+				"en": "What do you mean?",
+				"sch": null,
+				"modsch": "没太明白。"
+			},
+			{
+				"en": "How do you know what you can build and what you can't? For you to make a choice you have to know what's you options are, right?",
+				"sch": null,
+				"modsch": "就是你怎么知道哪些东西可以造，哪些你不能造？总得要知道有哪几样，才能做选择不是吗？"
+			},
+			{
+				"en": "Like, how do you know how to build something that you haven't build before?",
+				"sch": null,
+				"modsch": "就好比你头一回造机器的时候，你以前都没造过，怎么就知道该怎么造？"
+			},
+			{
+				"en": "Good point, but I do somehow.",
+				"sch": null,
+				"modsch": "你这么一问……还真是。可我就是知道。"
+			},
+			{
+				"en": "Do you?",
+				"sch": null,
+				"modsch": "你是知道，还是觉得自己知道？"
+			},
+			{
+				"en": "What are you trying to say?",
+				"sch": null,
+				"modsch": "什么意思？"
+			},
+			{
+				"en": "What if you don't?",
+				"sch": null,
+				"modsch": "有没有可能，压根就不是你造的？"
+			},
+			{
+				"en": "Then who's building it?",
+				"sch": null,
+				"modsch": "不是我在造，那是谁？"
+			},
+			{
+				"en": "I don't know, just a thought.",
+				"sch": null,
+				"modsch": "不知道，我就随便说说。"
+			},
+			{
+				"en": "There's no one around anyway.",
+				"sch": null,
+				"modsch": "反正我周围一个人都没有。"
+			},
+			{
+				"en": "I have an increasingly strong feeling with all these new created universes",
+				"sch": null,
+				"modsch": "随着这些宇宙一个个被造出来，我有种越来越强烈的感觉。"
+			},
+			{
+				"en": "But it's so weird, don't judge.",
+				"sch": null,
+				"modsch": "不过说出来有点怪，你先别笑。"
+			},
+			{
+				"en": "Me? Never!",
+				"sch": null,
+				"modsch": "我？我是那种人吗？"
+			},
+			{
+				"en": "I feel like I am someone. I mean someone real, not the one stuck here, but like normal person with a normal life.",
+				"sch": null,
+				"modsch": "我感觉到我是一个真正活着的人。不是眼下这个困在这里的我，而是在正常的世界里过着正常日子的人。"
+			},
+			{
+				"en": "It's something like a distant memory growing stronger and stronger with each universe.",
+				"sch": null,
+				"modsch": "感觉有一段很模糊的记忆，每多造一个宇宙，那段记忆就清晰一点。"
+			},
+			{
+				"en": "There is something, that is not a white plane with machines.",
+				"sch": null,
+				"modsch": "除了这片白茫茫的地方、这些机器，还有别的东西。"
+			},
+			{
+				"en": "Do you remember the beginning of our conversation?",
+				"sch": null,
+				"modsch": "你还记得一开始咱俩聊了什么吗？"
+			},
+			{
+				"en": "You were erraticaly touching some machine",
+				"sch": null,
+				"modsch": "我记得，当时你在瞎捣鼓一台机器。"
+			},
+			{
+				"en": "No, I mean all the stuff with coming over, police, guys waiting for me",
+				"sch": null,
+				"modsch": "不是，我说的是你叫我过去，还有警察、大家都在等我那些事。"
+			},
+			{
+				"en": "Yeah, it's funny because now it sounds like a total bullshit.",
+				"sch": null,
+				"modsch": "哦，那些啊。说来也好笑，我现在自己听着都觉得扯。"
+			},
+			{
+				"en": "Well, yeah. And now I'm almost sure at least some of that stuff should be real!",
+				"sch": null,
+				"modsch": "是挺扯的。可我现在几乎能肯定，至少有些事是真的！"
+			},
+			{
+				"en": "Because these new universes told you so?",
+				"sch": null,
+				"modsch": "怎么，新造的那些宇宙告诉你的？"
+			},
+			{
+				"en": "Well, in a nutshell because these new universes told me.",
+				"sch": null,
+				"modsch": "你别说，你真别说。就是它们告诉我的。"
+			},
+			{
+				"en": "What if they're messing with you?",
+				"sch": null,
+				"modsch": "什么意思呢？这是它们给你带来的幻觉吧？"
+			},
+			{
+				"en": "You'll see, let me make a few more.",
+				"sch": null,
+				"modsch": "让我再造几个，到时候你就明白了。"
+			},
+			{
+				"en": "I think maybe you could be right. Just MAYBE.",
+				"sch": null,
+				"modsch": "我认为你可能是对的。只是可能啦。"
+			},
+			{
+				"en": "At least I can't think of anything to disprove your point.",
+				"sch": null,
+				"modsch": "至少目前我找不出理由来反驳你。"
+			},
+			{
+				"en": "I'm intrigued!",
+				"sch": null,
+				"modsch": "哟，展开说说？"
+			},
+			{
+				"en": "I am not sure how to tell if I build all the stuff or I am just looking at stuff being built.",
+				"sch": null,
+				"modsch": "我想要搞明白，到底是不是我亲手造的这些东西。说不定我只是看着它们被造出来。"
+			},
+			{
+				"en": "In principle it should be simple: you flick the switch, the lights turn on. If you don't flick the switch, it's dark. Easy to check. But there's no switch here to flick.",
+				"sch": null,
+				"modsch": "要是跟开灯一样简单就好了，拨一下开关它就亮，反之则不亮。但这里没有给我这种机会去验证。"
+			},
+			{
+				"en": "If it just lights turn on without any switch, how do you tell if it was you?",
+				"sch": null,
+				"modsch": "灯可能到点就亮，你怎么知道灯是谁开的？"
+			},
+			{
+				"en": "There should be a switch. At least imaginary switch in your head.",
+				"sch": null,
+				"modsch": "有因才有果。要说是你开的，至少你心里得有个开关。"
+			},
+			{
+				"en": "I'm not sure if I have it.",
+				"sch": null,
+				"modsch": "关键我就是无法验证。"
+			},
+			{
+				"en": "Then why do you think it's you who turn on the lights?",
+				"sch": null,
+				"modsch": "那你为什么最初会觉得是自己造的？"
+			},
+			{
+				"en": "I'm not sure anymore.",
+				"sch": null,
+				"modsch": "确实，我现在心里没底了。"
+			},
+			{
+				"en": "Can you close your eyes and turn away to see if something is changed without you looking?",
+				"sch": null,
+				"modsch": "要不试一下闭上眼转身不看，过一会看看它们有没有变化？"
+			},
+			{
+				"en": "That'll be convenient. It's not like I'm looking at something. More like I'm experiencing it.",
+				"sch": null,
+				"modsch": "没你说得这么容易。我说“看”其实不太准，更像是心灵感知。"
+			},
+			{
+				"en": "Let's just assume that whoever turns the lights on, it doesn't matter because you have no way knowing it?",
+				"sch": null,
+				"modsch": "查又查不出来，要不就别管是谁开的灯了？当它无所谓好了。"
+			},
+			{
+				"en": "Guess I have no choice.",
+				"sch": null,
+				"modsch": "确实，继续纠结下去也没什么意义。"
+			},
+			{
+				"en": "Wow, that's so vivid!",
+				"sch": null,
+				"modsch": "哇啊！这里跟现实世界一样！"
+			},
+			{
+				"en": "I remember now!",
+				"sch": null,
+				"modsch": "我全都记起来了！"
+			},
+			{
+				"en": "The law has limits. Justice has none. It's the phrase from Ultimate Justice! Oh my god!",
+				"sch": null,
+				"modsch": "“法律有界，正义无疆。”是《终极正义》里的台词！天哪！"
+			},
+			{
+				"en": "That was unexpected. But yeah, I saw it too! Remember Charles and Vincent?",
+				"sch": null,
+				"modsch": "真是意想不到。我也看到了！你还记得夏尔斯和维森特吧？"
+			},
+			{
+				"en": "Yes! These cop guys! They packed a punch for sure! Do you remember the jump from a helicopter with a miniguns in both hands?",
+				"sch": null,
+				"modsch": "当然，就那俩猛得离谱的警察！还记得他们双持加特林机枪从直升机往下跳那一段吗？"
+			},
+			{
+				"en": "Of course! They landed with the sheer recoil from the miniguns. And Vincent was raining fire from a flamethrower all the time sitting on Vincent's neck!",
+				"sch": null,
+				"modsch": "对对对！他们利用机枪的后坐力成功落地了！维森特骑在夏尔斯肩上拿着喷火器杀出一条火路！"
+			},
+			{
+				"en": "Damn, how it's possible?",
+				"sch": null,
+				"modsch": "奇了怪了，我们是怎么回想起来的？"
+			},
+			{
+				"en": "Idk, let me process it for a bit.",
+				"sch": null,
+				"modsch": "别问我，我也得缓一缓。"
+			},
+			{
+				"en": "Wait...",
+				"sch": null,
+				"modsch": "等等……"
+			},
+			{
+				"en": "Charles and Vincent!!!",
+				"sch": null,
+				"modsch": "夏尔斯和维森特！！"
+			},
+			{
+				"en": "Yeah?",
+				"sch": null,
+				"modsch": "怎么了？"
+			},
+			{
+				"en": "Charps and...",
+				"sch": null,
+				"modsch": "夏普和..."
+			},
+			{
+				"en": "Veen! It can't be a coincidence, right?",
+				"sch": null,
+				"modsch": "维恩……不会这么巧吧？"
+			},
+			{
+				"en": "I'm sure it's not. Subconsious memory 100%.",
+				"sch": null,
+				"modsch": "这绝不可能是巧合。百分之一百是我们潜意识里的记忆。"
+			},
+			{
+				"en": "Wild! I remember watching The Ultimate Justice as a kid in grandma's house, but it's like it happened yesterday!",
+				"sch": null,
+				"modsch": "太神了。小时候在奶奶家看《终极正义》的事现在记忆犹新，就跟昨天才看过一般。"
+			},
+			{
+				"en": "Me too! I was watching it every weekend at grandma's in the summer! What a times!",
+				"sch": null,
+				"modsch": "我也是！一到暑假，每个周末都在奶奶家看。太让我怀念了。"
+			},
+			{
+				"en": "Wait, in the country? On Sundays?",
+				"sch": null,
+				"modsch": "等下，你奶奶是住在乡下吗？每个星期天看的？"
+			},
+			{
+				"en": "Yeah! How do you know?",
+				"sch": null,
+				"modsch": "是啊，你怎么会知道？"
+			},
+			{
+				"en": "While nibbling on a raspberry pie drinking milk? On a red couch turned 90 degrees to the black and white tv between two windows?",
+				"sch": null,
+				"modsch": "是不是还边吃树莓边喝牛奶？躺在红沙发上，两扇窗户中间放着那台黑白电视？"
+			},
+			{
+				"en": "Hold on!",
+				"sch": null,
+				"modsch": "你先打住！"
+			},
+			{
+				"en": "And there is a few tomatoes riping near the window, some of them are green and some are red, and you definitely will grab the red one after the show but it will turn out moldy?",
+				"sch": null,
+				"modsch": "窗边是不是还放着几个西红柿，有的还青着，有的已经红了？你看完电视，专门挑了个红的，结果一看发霉了？"
+			},
+			{
+				"en": "Why do you know this?",
+				"sch": null,
+				"modsch": "你在我家装监控了？"
+			},
+			{
+				"en": "Because I see it as clear as it was yesterday.",
+				"sch": null,
+				"modsch": "这些都是我回想到的记忆，每个细节都清清楚楚。"
+			},
+			{
+				"en": "Wait a second. Why do you have the same memory?",
+				"sch": null,
+				"modsch": "不对...怎么你跟我有共同的记忆？"
+			},
+			{
+				"en": "Oh, Charps, why do people have the same memory?",
+				"sch": null,
+				"modsch": "夏普，你想想，什么情况下两个人会有同一段记忆？"
+			},
+			{
+				"en": "I don't know! People usually don't have the same memory! What is this?!",
+				"sch": null,
+				"modsch": "我不知道！正常来说每个人的记忆都是不同的！怎么会这样？？"
+			},
+			{
+				"en": "Come on. You really don't understand what it means?",
+				"sch": null,
+				"modsch": "都说到这儿了，你还没明白？"
+			},
+			{
+				"en": "Stop speaking in riddles! You're driving me mad!",
+				"sch": null,
+				"modsch": "别打哑谜了！你快把我逼疯了！"
+			},
+			{
+				"en": "People do have the same memory, but only in one case.",
+				"sch": null,
+				"modsch": "两个人有同一段记忆，只有一种可能。"
+			},
+			{
+				"en": "If the people is in fact the single person.",
+				"sch": null,
+				"modsch": "那就是，这两个人其实是同一个人。"
+			},
+			{
+				"en": "Oh it's BULLSHIT!",
+				"sch": null,
+				"modsch": "胡扯！"
+			},
+			{
+				"en": "And when I went to sleep that day I spent an hour listening to the angry hum of the wasp nest inside the wall, when you punch it.",
+				"sch": null,
+				"modsch": "那天晚上我去睡觉，墙里的马蜂窝还在嗡嗡响。一捶墙，它们就怒气冲冲地叫——我听了整整一个钟头。"
+			},
+			{
+				"en": "It can't be true! Wait... No... It's wrong. Why in the world should I be talking to myself?",
+				"sch": null,
+				"modsch": "不可能！等会儿……不，不对。我怎么就成了在跟自己说话？"
+			},
+			{
+				"en": "Listen, I don't know. All I can tell is that we are the same person. That's it.",
+				"sch": null,
+				"modsch": "我也不清楚。我只能确定，咱俩是同一个人。就这样。"
+			},
+			{
+				"en": "But it's fun talking to you! It shouldn't be fun if I talk to myself and know all the answers!",
+				"sch": null,
+				"modsch": "可跟你聊天明明很有意思啊！如果跟我自己聊天哪有这么多惊喜和未知？"
+			},
+			{
+				"en": "You don't! And I don't know all of your questions. We are not the same anymore, but we were for sure.",
+				"sch": null,
+				"modsch": "我们以前是同一个人，但现在不是了；我猜不到你心里想着什么。"
+			},
+			{
+				"en": "Fuck! I am just afraid of loosing you, man. You are my best and only friend. I don't want to be alone!",
+				"sch": null,
+				"modsch": "害！我只是太害怕失去你了！你是我最好的朋友，也是唯一的朋友。我不想只有我自己孤零零的！"
+			},
+			{
+				"en": "Dude, calm down. You won't loose me! I'm here right now and I'm not you. Who cares what it was before? It's fine now!",
+				"sch": null,
+				"modsch": "别急啊，我这不是还在吗？我又不会消失。我是我，你是你。以前怎么样就随它去，咱们现在好好的就行！"
+			},
+			{
+				"en": "THIS IS BULLSHIT!",
+				"sch": null,
+				"modsch": "实在是太荒谬了！"
+			},
+			{
+				"en": "Yeah, you right.",
+				"sch": null,
+				"modsch": "行吧， 你说得对。"
+			},
+			{
+				"en": "Or...",
+				"sch": null,
+				"modsch": "还是说..."
+			},
+			{
+				"en": "Am I right?..",
+				"sch": null,
+				"modsch": "\"我\"是对的？"
+			},
+			{
+				"en": "That's my dude!",
+				"sch": null,
+				"modsch": "哈哈，不愧是你！"
+			},
+			{
+				"en": "In any case, that's too much for me today.",
+				"sch": null,
+				"modsch": "不管怎么说，今天这些事我是真消化不了了。"
+			},
+			{
+				"en": "Yeah...",
+				"sch": null,
+				"modsch": "可不是嘛……"
+			},
+			{
+				"en": "What is this place?",
+				"sch": null,
+				"modsch": "这是什么地方？"
+			},
+			{
+				"en": "It's so ugly and yet familiar",
+				"sch": null,
+				"modsch": "这里看上去不咋地，但是感觉很熟悉。"
+			},
+			{
+				"en": "I think it's home",
+				"sch": null,
+				"modsch": "我想……这是家。"
+			},
+			{
+				"en": "You live in a concrete labyrinth of leaning towers without streets?",
+				"sch": null,
+				"modsch": "你家就住这种地方？歪歪斜斜的高楼，连条街都没有，整个一混凝土迷宫？"
+			},
+			{
+				"en": "First of all, we both do. And seconly I don't think it was exactly like this. It's just an impression.",
+				"sch": null,
+				"modsch": "纠正一下，是我们住那儿。眼前的跟原貌的有点出入，这一个应该只是大概的印象。"
+			},
+			{
+				"en": "Bleak, but somehow cozy, right?",
+				"sch": null,
+				"modsch": "看着挺冷清，可又莫名觉得挺温馨，是吧？"
+			},
+			{
+				"en": "I don't know how that could be cosy, but you're not wrong.",
+				"sch": null,
+				"modsch": "虽然这地方的模样跟温馨沾不上边，但确实有那么点感觉。"
+			},
+			{
+				"en": "Look at this tower!",
+				"sch": null,
+				"modsch": "快看这座塔！"
+			},
+			{
+				"en": "Yeah?",
+				"sch": null,
+				"modsch": "怎么了？"
+			},
+			{
+				"en": "Do you see what's on the rooftop?",
+				"sch": null,
+				"modsch": "看到楼顶上是什么了吗？"
+			},
+			{
+				"en": "Air conditioning? Ventilation?",
+				"sch": null,
+				"modsch": "空调机？还是通风用的？"
+			},
+			{
+				"en": "No, it's the machines i've been building. Or at least was watching being built.",
+				"sch": null,
+				"modsch": "不是，那是我造的那些机器...呃...被我看着造出来的机器。"
+			},
+			{
+				"en": "Oh, that's what they look like? It is some filtration systems or vents.",
+				"sch": null,
+				"modsch": "哦，原来你那些机器长这样啊？这不就是过滤设备、通风口什么的吗？"
+			},
+			{
+				"en": "The big one looks exactly like Beta-Pylene Oxidizer. And the smaller ones are active channel coolers.",
+				"sch": null,
+				"modsch": "大的那台，跟高能聚合物氧化塔一模一样。小的那些就是矿井风冷器 LV2。"
+			},
+			{
+				"en": "I guess we found out where you inspiration comes from! We've been on this rooftop a few times.",
+				"sch": null,
+				"modsch": "看来你的灵感就来自这儿啊！咱俩以前上过这屋顶好几回呢。"
+			},
+			{
+				"en": "Yeah. And we've been working here.",
+				"sch": null,
+				"modsch": "是啊，咱们以前在这里工作。"
+			},
+			{
+				"en": "From 7 to 5 every day except weekends. Remember the security checkpoint woman?",
+				"sch": null,
+				"modsch": "我记得是朝七晚五双休。还记得安检口那个女的吗？"
+			},
+			{
+				"en": "Oh yeah, I think she is a robot.",
+				"sch": null,
+				"modsch": "哦，她啊。我都怀疑她是机器人。"
+			},
+			{
+				"en": "Or an alien sent to study us before the invasion",
+				"sch": null,
+				"modsch": "也可能是个外星人，入侵之前先派来摸摸咱们的底。"
+			},
+			{
+				"en": "Oh man, I even miss her right now",
+				"sch": null,
+				"modsch": "哎，我甚至有点想她了。"
+			},
+			{
+				"en": "Can't say the same for myself.",
+				"sch": null,
+				"modsch": "我可一点儿都不想。"
+			},
+			{
+				"en": "Oh Veen, I think that's it. It's where we are right now.",
+				"sch": null,
+				"modsch": "维恩，我想就是这儿了。咱们现在就在这里。"
+			},
+			{
+				"en": "I was working this night. That's the last memory.",
+				"sch": null,
+				"modsch": "这天晚上我在上班。之后的事我就想不起来了。"
+			},
+			{
+				"en": "Something happened. Do you remember what you were doing?",
+				"sch": null,
+				"modsch": "那晚出事了。你还记得当时在干什么吗？"
+			},
+			{
+				"en": "Yeah. Replacing thousands of breakers in that tube.",
+				"sch": null,
+				"modsch": "记得啊。当时在换那根管子里的断路器，足足几千个。"
+			},
+			{
+				"en": "I was almost sleeping after the first hour. It's so tedious and boring.",
+				"sch": null,
+				"modsch": "那活儿又单调又无聊，做了一个多小时我的眼皮都快撑不住了。"
+			},
+			{
+				"en": "Why was the stand operational that night?",
+				"sch": null,
+				"modsch": "那天晚上试验台为什么没停？"
+			},
+			{
+				"en": "I dont know, did I fall asleep in the end? It's funny that you can never tell when exactly you fall asleep.",
+				"sch": null,
+				"modsch": "不知道。我后来该不会真睡着了吧？说来好笑，你永远说不准自己是什么时候睡着的。"
+			},
+			{
+				"en": "Oh my god, if it's true, then we are just disassembled to subatomic particles.",
+				"sch": null,
+				"modsch": "不会吧……那咱们岂不是已经被分解成亚原子粒子了？"
+			},
+			{
+				"en": "Yeah, at this exact moment I am a plasma ball. But how is it possible? Why am I thinking now? Why we are still alive?",
+				"sch": null,
+				"modsch": "对，就在这一刻，我已经是一团等离子体了。可不应该啊……我还在思考，我们还活着，怎么可能？"
+			},
+			{
+				"en": "Maybe we don't. It looks like we got the coherency at last.",
+				"sch": null,
+				"modsch": "也许咱们已经死了。看来，相干终于实现了。"
+			},
+			{
+				"en": "What?",
+				"sch": null,
+				"modsch": "啥意思？"
+			},
+			{
+				"en": "Coherency on a scale. It's the only explanation of our existense. What if my brain doesn't exist, but all the information it was holding is not lost. At least for a moment.",
+				"sch": null,
+				"modsch": "大尺度的相干啊。这是我们能存在的唯一的可能性。也许我的大脑已经不存在了，原来那些信息却全都还在，至少这一瞬间还在。"
+			},
+			{
+				"en": "But human being is not just an information, it's the complex system evolving in time. This information should live somewhere to be self-aware.",
+				"sch": null,
+				"modsch": "可光有信息还不够吧？人是个随时间不断变化的复杂系统。这些信息总得有个载体，才能有自我意识啊。"
+			},
+			{
+				"en": "It lives everywhere. It must be almost intact, but it's not a property of the brain anymore, it's some sort of a huge coherent wavefunction. And it does not experience time and space.",
+				"sch": null,
+				"modsch": "这些信息现在无处不在，应该几乎都还完整，只是不再由大脑承载，而是以某种巨大的相干波函数存在。它不再经历时间，也不再经历空间。"
+			},
+			{
+				"en": "Like a photon.",
+				"sch": null,
+				"modsch": "跟光子一样？"
+			},
+			{
+				"en": "Yeah, something like that.",
+				"sch": null,
+				"modsch": "嗯，差不多吧。"
+			},
+			{
+				"en": "So...",
+				"sch": null,
+				"modsch": "那……"
+			},
+			{
+				"en": "What do we do?",
+				"sch": null,
+				"modsch": "我们接下来该做什么？"
+			},
+			{
+				"en": "Assuming we have an eternity here, we do all the stuff we can infinite times. Maybe let's watch a few more universes being created or whatever it is?",
+				"sch": null,
+				"modsch": "要是这儿真有无穷无尽的时间，那就把能干的事都干上无数遍呗。要不再看几个宇宙诞生之类的？"
+			},
+			{
+				"en": "Okay. But you know what? If I got here somehow, there is a way to get out.",
+				"sch": null,
+				"modsch": "好吧。不过我跟你说，既然我能进来，就肯定有办法出去。"
+			},
+			{
+				"en": "You have no idea what are you talking about.",
+				"sch": null,
+				"modsch": "说得倒轻巧，你自己都没弄明白呢。"
+			},
+			{
+				"en": "Yeah, but I have a few years to figure it out.",
+				"sch": null,
+				"modsch": "是这样，但我在这里有的是时间想办法。"
+			},
+			{
+				"en": "Alright, I'm in!",
+				"sch": null,
+				"modsch": "行，算我一个！"
+			},
+			{
+				"en": "As if you have a choice!",
+				"sch": null,
+				"modsch": "说得好像你有得选似的！"
 			}
 		],
 		"credits": [
@@ -2992,6 +3916,86 @@
 				"en": "Partially recharges all symbols.",
 				"sch": "部分补充所有符号。",
 				"modsch": "部分补充所有符号。"
+			},
+			"newHole": {
+				"en": "Reset and get +1 Orifice",
+				"sch": null,
+				"modsch": "重置并获得 1 个新孔口"
+			},
+			"newUpgrade": {
+				"en": "Reset and upgrade existing Orifice",
+				"sch": null,
+				"modsch": "重置并升级当前孔口"
+			},
+			"lowTier": {
+				"en": "REQUIRES TIER",
+				"sch": null,
+				"modsch": "所需等级："
+			},
+			"orificeUpgrade": {
+				"en": "Upgrade this Orifice to tier",
+				"sch": null,
+				"modsch": "此孔口升级至等级"
+			},
+			"tier": {
+				"en": "Tier",
+				"sch": null,
+				"modsch": "等级"
+			},
+			"noorbs": {
+				"en": "No orbifolds",
+				"sch": null,
+				"modsch": "本轮未使用轨形"
+			}
+		},
+		"memories": {
+			"memory0": {
+				"header": {
+					"en": "The Ultimate Justice",
+					"sch": null,
+					"modsch": "终极正义"
+				},
+				"lore": {
+					"en": "There's that old trashy tv-show about two cops. The city is is devoured by crime of course, everybody is corrupt except those two guys. Charles, the sheriff, and his partner Vincent would be considered criminals by todays standards though. Even a petty crime is enough for them to destoy half of the block to get you. Justice justifies everything.",
+					"sch": null,
+					"modsch": "有这么部俗套的老电视剧，讲的是两个警察的故事。满城罪恶，人人腐败，偏偏这两位出淤泥而不染。只是换成今天的眼光，夏尔斯警长和他的搭档维森特，恐怕也该被抓起来。甭管你犯的罪有多轻，只要是为了抓你，半个街区照毁不误。只要打着正义的旗号，干什么都能理直气壮。"
+				}
+			},
+			"memory1": {
+				"header": {
+					"en": "The Home",
+					"sch": null,
+					"modsch": "家"
+				},
+				"lore": {
+					"en": "Everything around is made of the same blocks. Scale doesn't matter. Something big is just more blocks, something small — less blocks. But spending a lot of time here teaches to notice the slightest variations and faint patterns to tell one place from another one.",
+					"sch": null,
+					"modsch": "周围的一切，都是用同样的方块搭出来的。东西无论大小，在构成上都没什么分别。无非是大东西用的方块多，小东西用的方块少。不过，时间久了，再细小的不同、再不起眼的规律也能看出来，地方自然就分得清了。"
+				}
+			},
+			"memory2": {
+				"header": {
+					"en": "The Tower",
+					"sch": null,
+					"modsch": "高塔"
+				},
+				"lore": {
+					"en": "There's a place called \"Field Coherence Research Facility\" usually referred as \"NII\". Every morning an enormous tidal wave of people rushes into the tower and every evening another wave washes everyone away and dissolves into the town. One breath a day. This is the only reason this town exists.",
+					"sch": null,
+					"modsch": "有个地方叫“场相干性研究所”，大家平时都叫它“NII”。每日清晨，大批人群如潮水般涌入高塔；傍晚，又随另一阵浪潮离开，消散在小镇各处。就像是每天呼吸一次的巨兽。这座小镇存在的理由，也就只有这一个。"
+				}
+			},
+			"memory3": {
+				"header": {
+					"en": "The Incident",
+					"sch": null,
+					"modsch": "事故"
+				},
+				"lore": {
+					"en": "An engineer is replacing all the fuses inside the Collapsed Topology Accelerator Arc Test Stand. They were testing the limits of wavefunction coherency on a large scale there. There are lots of fuses inside the accelerator pipe, much more than safeguards, working regulations and minutes of sleep for a single engineer. In general, a brain is just a collection of wavefunctions on a very large scale. The scale which is now proven to remain coherent for a single moment in time even with body being evaporated. For this brain in this exact moment the time and space doesn't exist. This mind is observing the existence of everything, just in a way it can.",
+					"sch": null,
+					"modsch": "“坍缩拓扑加速器弧段试验台”内部，一名工程师正逐一更换全部保险丝。这里的实验，是要探明波函数在大尺度下保持相干的极限。加速器管道里最不缺的就是保险丝：比防护措施多得多，比作业规程多得多，也远比一个工程师能睡上的分钟数多。说到底，大脑也不过是一个尺度极大的波函数集合。如今已经证实：即使肉体被蒸发，如此大尺度的整体也能在一瞬间维持相干。就在这一刻，时间和空间对大脑来说已经不复存在。意识会以它力所能及的方式观察世间万物。"
+				}
 			}
 		}
 	}

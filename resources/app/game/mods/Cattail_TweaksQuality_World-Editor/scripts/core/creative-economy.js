@@ -4,11 +4,13 @@ ModLoader.register({
 		const MOD_ID = api.id
 		const ECONOMY_KEY = Symbol.for('cattail.world-editor.creative-economy')
 		const CREATIVE_KEY = Symbol.for('cattail.world-editor.creative-mode')
+		const SAVE_ADAPTER_KEY = Symbol.for('cattail.world-editor.save-adapter')
 		const TRANSACTIONS_KEY = Symbol.for('cattail.world-editor.transactions')
 		const CONFIG_KEY = 'showCreativePurchaseCosts'
 		const COUNTDOWN_SELECTOR = '.cattail-build-countdown'
 		const COUNTDOWN_PRICE_CLASS = 'cattail-has-active-build-countdown'
 		const TARGET_UNAVAILABLE = Symbol('creative-target-unavailable')
+		const guardedControls = new WeakSet()
 		const DISPLAY_TIMES = Object.freeze({
 			success: 1500,
 			cancelled: 3000,
@@ -85,9 +87,17 @@ ModLoader.register({
 					const game = this
 					const args = Array.from(arguments)
 					const service = serviceFor(game)
+					if (isNative(game) && service) {
+						if (service.isInputBlocked()) return undefined
+						if (service.isCreativeActive() && !canBypassUnlock(game, args[0])) {
+							service.reportDeferred()
+							return undefined
+						}
+					}
 					const result = withReferencePrices(game, function () {
 						return original.apply(game, args)
 					})
+					service?.rememberCreativePickup?.(args[0])
 					service?.applyHeldPricePresentation?.()
 					return result
 				}
@@ -118,6 +128,12 @@ ModLoader.register({
 					const game = this
 					const args = Array.from(arguments)
 					const service = serviceFor(game)
+					if (isNative(game) && service && (service.isCreativeActive() || service.isInputBlocked())) {
+						if (service.isInputBlocked()) return undefined
+						if (nativeTools(game)) return nativeTools(game).start('relocate')
+						service.reportDeferred()
+						return undefined
+					}
 					if (!service?.isCreativeActive?.()) return original.apply(game, args)
 					if (service.isWriteBlocked()) return undefined
 					return withRelocationCredit(game, function () {
@@ -129,6 +145,16 @@ ModLoader.register({
 			patchGameMethod('processClick', function (original) {
 				return function () {
 					const service = serviceFor(this)
+					if (isNative(this) && service && (service.isCreativeActive() || service.isInputBlocked())) {
+						if (!service.isInputBlocked() && currentInputSource === 'gamepad' && this.interactionMode === 'build') {
+							const moved = this.mouse.positionChanged
+							this.mouse.positionChanged = false
+							this.mouse.state = 1
+							try { return this.processUp() } finally { this.mouse.positionChanged = moved; this.mouse.state = 0 }
+						}
+						// 1.3 mouse release owns the purchase. Do not execute the legacy click again.
+						if (this.itemInHand || this.interactionMode || service.isInputBlocked()) return undefined
+					}
 					const creativeActive = service?.isCreativeActive?.()
 					const intent = creativeActive
 						? captureIntent(this, currentInputSource, null)
@@ -167,6 +193,7 @@ ModLoader.register({
 
 			patchListenerRegistration('setListeners', false)
 			patchListenerRegistration('setListenersTouch', true)
+			installNativePatches()
 
 			if (typeof Shop !== 'undefined' && Shop.prototype) {
 				api.patch(Shop.prototype, 'check', function (original) {
@@ -242,6 +269,125 @@ ModLoader.register({
 					}
 				})
 			}
+		}
+
+		function nativeTools(game) {
+			const service = globalThis[Symbol.for('cattail.world-editor.native-tools')]
+			return service?.game === game && service.active() ? service : null
+		}
+
+		function isNative(game) {
+			return globalThis[SAVE_ADAPTER_KEY]?.isNative(game) === true
+		}
+
+		function installNativePatches() {
+			for (const name of ['pickupEraser', 'finalizeErase', 'massRelocate', 'pickupEntitiesForRelocation', 'confirmMassRelocation', 'confirmMassClone']) {
+				patchGameMethod(name, function (original) {
+					return function () {
+						const service = serviceFor(this)
+						if (isNative(this) && service && (service.isCreativeActive() || service.isInputBlocked())) {
+							if (service.isInputBlocked()) return undefined
+							const tools = nativeTools(this)
+							if (tools && ['pickupEraser', 'finalizeErase', 'massRelocate', 'pickupEntitiesForRelocation'].includes(name)) return tools.handle(name, Array.from(arguments), original)
+							service.reportDeferred()
+							return undefined
+						}
+						return original.apply(this, arguments)
+					}
+				})
+			}
+			for (const name of ['processDown', 'processMove']) {
+				patchGameMethod(name, function (original) {
+					return function () {
+						const service = serviceFor(this)
+						if (isNative(this) && service) {
+							if (service.isInputBlocked()) return undefined
+							if (service.isCreativeActive() && !nativeTools(this) && ['erase', 'relocate'].includes(this.interactionMode)) {
+								cancelNativeDeferred(this, service)
+								return undefined
+							}
+						}
+						return original.apply(this, arguments)
+					}
+				})
+			}
+			patchGameMethod('processUp', function (original) {
+				return function () {
+					const game = this
+					const service = serviceFor(game)
+					if (!isNative(game) || !service) return original.apply(game, arguments)
+					if (service.isInputBlocked()) {
+						resetNativePointer(game)
+						return undefined
+					}
+					if (!service.isCreativeActive()) return original.apply(game, arguments)
+					if (game.mouse?.state === 2 || game.mouse?.state === 3) return original.apply(game, arguments)
+					if (nativeTools(game) && ['erase', 'relocate'].includes(game.interactionMode)) {
+						try { return nativeTools(game).release(original, Array.from(arguments)) } finally { resetNativePointer(game) }
+					}
+					if (['erase', 'relocate'].includes(game.interactionMode) || game.cloneList?.length || game.itemInHand?.name === 'pinhole') {
+						cancelNativeDeferred(game, service)
+						return undefined
+					}
+					if (game.interactionMode !== 'build' || game.mouse?.positionChanged) return original.apply(game, arguments)
+					const intent = captureIntent(game, currentInputSource, null)
+					const args = Array.from(arguments)
+					resetNativePointer(game)
+					if (!intent) return undefined
+					return service.requestOperation(intent, function () {
+						const pointer = game.mouse && { state: game.mouse.state, positionChanged: game.mouse.positionChanged }
+						if (game.mouse) { game.mouse.state = 1; game.mouse.positionChanged = false }
+						try {
+							return runCreativeExecution(service, intent, function () { return original.apply(game, args) })
+						} finally {
+							if (game.mouse && pointer) Object.assign(game.mouse, pointer)
+						}
+					})
+				}
+			})
+			if (typeof Store !== 'undefined' && Store.prototype?.compositionUpdate) {
+				api.patch(Store.prototype, 'compositionUpdate', function (original) {
+					return function () {
+						const store = this
+						const args = arguments
+						const result = withReferencePrices(store.master, function () { return original.apply(store, args) })
+						serviceFor(store.master)?.applyNativeStorePresentation(store)
+						return result
+					}
+				})
+			}
+			if (typeof DesktopStoreVersion !== 'undefined' && DesktopStoreVersion.prototype?.visibilityUpdate) {
+				api.patch(DesktopStoreVersion.prototype, 'visibilityUpdate', function (original) {
+					return function () {
+						const service = serviceFor(this.master)
+						const store = this
+						const args = arguments
+						service?.resetNativeStoreUnlocks(store)
+						const result = service?.isCreativeActive()
+							? withQualificationPrices(this.master, function () { return original.apply(store, args) })
+							: original.apply(store, args)
+						service?.applyNativeStorePresentation(store)
+						return result
+					}
+				})
+			}
+		}
+
+		function resetNativePointer(game) {
+			if (game.mouse) { game.mouse.state = 0; game.mouse.timer = game.mouse.maxTimer }
+			game.selectedEntity = false
+		}
+
+		function cancelNativeDeferred(game, service) {
+			delete game.interactionMode
+			delete game.itemInHand
+			delete game.transportedEntity
+			game.cleanupErase?.()
+			game.cleanupRelocation?.()
+			// Native cleanupClone still dereferences the removed legacy Shop controls.
+			for (const key of ['cloneOrigin', 'cloneTarget', 'cloneList', 'totalCloneCost', 'cloneHint', 'cloneAreaSelected', 'cloneAreaOrigin', 'cloneEntitiesList', 'cloneEntitiesPositionsList']) delete game[key]
+			resetNativePointer(game)
+			service.reportDeferred()
 		}
 
 		function patchGameMethod(name, wrapper) {
@@ -346,16 +492,23 @@ ModLoader.register({
 			let lastReason = 'initialized'
 			let lastSnapshotId = null
 			let error = null
+			let terminalBlockedReason = null
 			let transactionToken = 0
 			let displayTimer = 0
 			let previewPurchaseCosts = null
 			let eraserHintCache = null
+			let nativeClassicView = null
+			let creativeHeldName = null
+			const temporaryStoreCards = new Map()
 			const listeners = new Set()
 			const snapshots = api.storage?.snapshots
 
 			const controller = creative?.game === game && typeof creative.snapshot === 'function'
 				? creative
 				: null
+			const stopClassicSubscription = globalThis[Symbol.for('cattail.better-uis.classic-shop')]?.subscribe(function (view) {
+				if (view?.master === game) nativeClassicView = view
+			})
 
 			const handleConfigPreview = function (event) {
 				const detail = event?.detail
@@ -377,6 +530,7 @@ ModLoader.register({
 					invalidateTransaction('creative-state-changed')
 				}
 				eraserHintCache = null
+				if (!state?.ready || !state?.creativeMode) clearCreativePickup()
 				refreshPricePresentation()
 				notify('creative-state-updated')
 			})
@@ -430,6 +584,9 @@ ModLoader.register({
 			}
 
 			function readWriteBlockedReason() {
+				if (terminalBlockedReason) return terminalBlockedReason
+				const modeReason = controller?.writeBlockedReason?.()
+				if (modeReason) return modeReason
 				const transactions = globalThis[TRANSACTIONS_KEY]
 				if (!transactions || transactions.game !== game) return null
 				if (typeof transactions.writeBlockedReason === 'function') {
@@ -439,7 +596,14 @@ ModLoader.register({
 			}
 
 			function isWriteBlocked() {
-				return readWriteBlockedReason() === 'ROLLBACK_FAILED'
+				return !!readWriteBlockedReason()
+			}
+
+			function transactionBusy() {
+				const cut = globalThis[Symbol.for('cattail.world-editor.selection-cut')]
+				if (cut?.game === game && cut.isInputBlocked?.()) return true
+				const transactions = globalThis[TRANSACTIONS_KEY]
+				return transactions?.game === game && transactions.isBusy?.() === true
 			}
 
 			async function requestOperation(intent, execute) {
@@ -455,6 +619,8 @@ ModLoader.register({
 				if (
 					disposed ||
 					busy ||
+					controller?.isInputBlocked?.() ||
+					transactionBusy() ||
 					!isCreativeActive() ||
 					typeof execute !== 'function' ||
 					!intent ||
@@ -482,8 +648,12 @@ ModLoader.register({
 					if (typeof game?.assembleSave !== 'function') {
 						throw createError('SAVE_UNAVAILABLE', 'The current save cannot be encoded.')
 					}
-					const data = game.assembleSave(true)
-					const saveIdentity = readSaveIdentity(game, data)
+					const adapter = globalThis[SAVE_ADAPTER_KEY]
+					const nativeContext = isNative(game) ? adapter.capture(game) : null
+					if (nativeContext) await adapter.readVerified(game, nativeContext)
+					if (!isCurrentToken(token)) return Object.freeze({ accepted: true, executed: false, reason: 'invalidated' })
+					const data = nativeContext ? adapter.encodeSnapshot(game, nativeContext) : game.assembleSave(true)
+					const saveIdentity = nativeContext ? nativeContext.saveId : readSaveIdentity(game, data)
 					if (typeof data !== 'string' && !(data instanceof Uint8Array)) {
 						throw createError('SAVE_UNAVAILABLE', 'The current save payload is invalid.')
 					}
@@ -495,6 +665,9 @@ ModLoader.register({
 						reason: REASONS[intent.operation],
 						tags: createSnapshotTags(intent)
 					})
+					if (!created || typeof created.id !== 'string' || !created.id) {
+						throw createError('SNAPSHOT_FAILED', 'Snapshot storage did not return a recovery point.')
+					}
 
 					if (!isCurrentToken(token)) {
 						await removeUnusedSnapshot(created, 'transaction-invalidated')
@@ -503,7 +676,8 @@ ModLoader.register({
 
 					phase = 'revalidating'
 					notify('creative-shop-' + intent.operation + '-revalidating')
-					const currentIdentity = readCurrentSaveIdentity(game)
+					if (nativeContext) adapter.assertCurrent(game, nativeContext)
+					const currentIdentity = nativeContext ? adapter.capture(game).saveId : readCurrentSaveIdentity(game)
 					if (
 						currentIdentity !== saveIdentity ||
 						!isFrozenIntentStillValid(game, intent) ||
@@ -547,6 +721,10 @@ ModLoader.register({
 						snapshotId: lastSnapshotId
 					})
 				} catch (operationError) {
+					if (executionStarted && isNative(game)) {
+						terminalBlockedReason = 'EXECUTION_FAILED'
+						lastSnapshotId = typeof created?.id === 'string' ? created.id : null
+					}
 					if (created && !executionStarted) await removeUnusedSnapshot(created, 'operation-failed')
 					if (!isCurrentToken(token)) {
 						return Object.freeze({ accepted: true, executed: false, reason: 'invalidated' })
@@ -642,6 +820,101 @@ ModLoader.register({
 				syncCompressedShopPrices(shop)
 			}
 
+			function reportDeferred() {
+				if (disposed || busy || isWriteBlocked()) return false
+				error = createError('NATIVE_CREATIVE_DEFERRED', 'This action is awaiting 1.3 creative-mode support.')
+				complete('failed', 'creative-native-deferred')
+				return false
+			}
+
+			function clearCreativePickup() {
+				const name = creativeHeldName
+				creativeHeldName = null
+				if (!name || game.itemInHand?.name !== name || game.unlockedEntities?.[name]) return
+				if (game.codex?.entities?.[name]?.shouldUnlock?.(game)) return
+				delete game.itemInHand
+				delete game.itemInHandPriceTag
+				delete game.itemInHandPriceAndRefundTag
+				if (game.interactionMode === 'build') delete game.interactionMode
+				resetNativePointer(game)
+			}
+
+			function resetNativeStoreUnlocks(store) {
+				for (const [name, card] of temporaryStoreCards) {
+					if (store?.html?.items?.[name] === card && !game.unlockedEntities?.[name]) card.classList.add('hidden')
+				}
+				temporaryStoreCards.clear()
+			}
+
+			function applyNativeStorePresentation(store) {
+				if (!store?.html || !isNative(game)) return
+				const active = isCreativeActive()
+				if (!active) resetNativeStoreUnlocks(store)
+				if (active) {
+					for (const [name, card] of Object.entries(store.html.items || {})) {
+						if (!canBypassUnlock(game, name) || game.unlockedEntities?.[name]) continue
+						const definition = game.codex.entities[name]
+						const type = definition.type || 'default'
+						const local = (type === 'dark' || definition.isDark === true) === (Number(game.plane) === 1)
+						const available = local && !game.onlyones?.[name] && !(definition.onlyone && Number(game.entitiesInGame?.[name]) > 0)
+						card.classList.toggle('hidden', !available)
+						card.classList.toggle('disabled', !available)
+						temporaryStoreCards.set(name, card)
+						const tab = store.html.types?.[type]
+						if (available && tab) {
+							tab.button.classList.remove('hidden', 'dim')
+						}
+					}
+				}
+				const text = globalThis[Symbol.for('cattail.world-editor.i18n')]?.t(game, 'creativeNativeDeferred') || 'Awaiting 1.3 creative-mode support.'
+				for (const control of [store.html.eraser, store.html.relocator, store.html.items?.pinhole]) {
+					if (!control) continue
+					if (!guardedControls.has(control) && control.addEventListener) {
+						guardedControls.add(control)
+						for (const type of ['mousedown', 'click', 'touchstart']) control.addEventListener(type, function (event) {
+							const current = serviceFor(store.master)
+							if (!current || (!current.isCreativeActive() && !current.isInputBlocked())) return
+							event.preventDefault()
+							event.stopImmediatePropagation()
+							const tools = nativeTools(store.master)
+							if (tools && control !== store.html.items?.pinhole && !current.isInputBlocked()) {
+								if (type === 'mousedown') tools.start(control === store.html.eraser ? 'erase' : 'relocate', { pickHovered: false })
+								return
+							}
+							current.reportDeferred()
+						}, true)
+					}
+					if (active && nativeTools(game) && control !== store.html.items?.pinhole) {
+						control.classList.toggle('hidden', !!game.plane || !!game.entitiesInGame?.pinhole)
+						control.classList.remove('disabled')
+						control.removeAttribute?.('aria-disabled')
+						if (control.hasAttribute?.('data-world-editor-title')) {
+							control.setAttribute('title', control.getAttribute('data-world-editor-title'))
+							control.removeAttribute('data-world-editor-title')
+						}
+					} else if (active) {
+						if (!control.hasAttribute?.('data-world-editor-title')) control.setAttribute?.('data-world-editor-title', control.getAttribute?.('title') || '')
+						control.classList.add('disabled')
+						control.setAttribute?.('aria-disabled', 'true')
+						control.setAttribute?.('title', text)
+					} else if (control.hasAttribute?.('data-world-editor-title')) {
+						control.setAttribute('title', control.getAttribute('data-world-editor-title'))
+						control.removeAttribute('data-world-editor-title')
+						control.removeAttribute('aria-disabled')
+						if (control !== store.html.items?.pinhole) control.classList.remove('disabled')
+					}
+				}
+				if (!active) { nativeClassicView?.sync(); return }
+				for (const [name, container] of Object.entries(store.html.priceContainers || {})) {
+					clearCountdown(container)
+					if (!showPurchaseCosts()) container.innerHTML = ''
+					for (const element of store.html.priceElements?.[name] || []) element?.classList?.add('available')
+				}
+				// Classic rows share these cards; categorized rows copy their current HTML.
+				if (game.shop?.items) applyShopPresentation(game.shop)
+				nativeClassicView?.sync()
+			}
+
 			function applyHeldPricePresentation() {
 				if (!isCreativeActive()) return
 				eraserHintCache = null
@@ -669,7 +942,7 @@ ModLoader.register({
 				})
 				const signature = eraserName + ':' + JSON.stringify(price || [])
 				if (eraserHintCache?.signature === signature) return eraserHintCache.hint
-				const hint = new Cloud(game)
+				const hint = new Cloud(isNative(game) ? { master: game } : game)
 				hint.addResourceList(price || [])
 				eraserHintCache = { signature, hint }
 				return hint
@@ -679,6 +952,13 @@ ModLoader.register({
 				if (disposed || !game) return
 				const shop = game.shop
 				try {
+					if (isNative(game) && game.store) {
+						game.store.compositionUpdate?.()
+						game.store.visibilityUpdate?.()
+						for (const tab of Object.values(game.store.html?.types || {})) {
+							if (!tab.button.classList.contains('closed')) game.store.adjustWrap?.(tab.wrap)
+						}
+					}
 					if (shop && typeof shop.updateElements === 'function') {
 						shop.updateElements()
 					} else if (shop && typeof shop.updatePrice === 'function') {
@@ -702,7 +982,7 @@ ModLoader.register({
 				const price = withReferencePrices(targetGame, function () {
 					return targetGame.getRealPrice(name)
 				})
-				const hint = new Cloud(targetGame)
+				const hint = new Cloud(isNative(targetGame) ? { master: targetGame } : targetGame)
 				hint.addResourceList(price || [])
 				targetGame.itemInHandPriceTag = hint
 				targetGame.itemInHandPriceAndRefundTag = hint
@@ -749,7 +1029,7 @@ ModLoader.register({
 					}
 				},
 				isInputBlocked() {
-					return !disposed && (busy || isWriteBlocked())
+					return !disposed && (busy || isWriteBlocked() || (isNative(game) && (transactionBusy() || controller?.isInputBlocked?.())))
 				},
 				isWriteBlocked,
 				isCreativeActive,
@@ -757,6 +1037,19 @@ ModLoader.register({
 				requestOperation,
 				applyItemPricePresentation,
 				applyShopPresentation,
+				applyNativeStorePresentation,
+				resetNativeStoreUnlocks,
+				rememberCreativePickup(name) {
+					creativeHeldName = isNative(game) && isCreativeActive() && canBypassUnlock(game, name) ? name : null
+				},
+				reportDeferred,
+				reportToolResult(result) {
+					if (disposed || busy) return
+					clearDisplayTimer()
+					error = result?.executed ? null : result?.error || createError('NATIVE_TOOL_FAILED', 'The native tool operation failed.')
+					lastSnapshotId = result?.snapshotId || null
+					complete(result?.executed ? 'success' : 'failed', 'native-tool-result')
+				},
 				applyHeldPricePresentation,
 				getCreativeEraserHint,
 				refreshPricePresentation,
@@ -765,6 +1058,8 @@ ModLoader.register({
 				},
 				dispose(reason) {
 					if (disposed) return false
+					clearCreativePickup()
+					resetNativeStoreUnlocks(game.store)
 					transactionToken += 1
 					disposed = true
 					busy = false
@@ -774,6 +1069,7 @@ ModLoader.register({
 					clearDisplayTimer()
 					window.removeEventListener('modloader:config-preview', handleConfigPreview)
 					if (typeof stopCreativeSubscription === 'function') stopCreativeSubscription()
+					if (typeof stopClassicSubscription === 'function') stopClassicSubscription()
 					listeners.clear()
 					lastReason = String(reason || 'disposed')
 					if (globalThis[ECONOMY_KEY] === service) delete globalThis[ECONOMY_KEY]
@@ -814,8 +1110,36 @@ ModLoader.register({
 			})
 		}
 
+		function canBypassUnlock(game, name) {
+			const creative = globalThis[CREATIVE_KEY]
+			return creative?.game === game && creative.canBypassUnlock?.(name) === true
+		}
+
 		function classifyOperation(game, touchAction) {
 			if (!game || !isSupportedCreativePlane(game.plane) || !normalizeCell(game.hoveredCell)) return null
+			if (isNative(game)) {
+				const item = game.itemInHand
+				const definition = game.codex?.entities?.[item?.name]
+				if (game.interactionMode !== 'build' || game.transportedEntity || game.cloneList?.length ||
+					!definition?.canPurchase || item.eraser || item.name === 'pinhole' || game.onlyones?.[item.name]) return null
+				if (!canBypassUnlock(game, item.name)) return null
+				const dark = definition.type === 'dark' || definition.isDark === true
+				if (dark !== (Number(game.plane) === 1)) return null
+				if (!game.canPlaceEntityHere(item, game.hoveredCell)) return null
+				const occupant = game.entityAtCoordinates(game.hoveredCell) || null
+				if (occupant !== (game.hoveredEntity || null)) return null
+				const upgrade = occupant && definition.isUpgradeTo === occupant.name
+				// Check every footprint cell, including cells after an occupied upgrade cell.
+				const span = item.entitySpan || 0
+				for (let u = -span; u <= span; u += 1) {
+					for (let v = -span; v <= span; v += 1) {
+						const cell = [game.hoveredCell[0] + u, game.hoveredCell[1] + v]
+						const entity = game.entityAtCoordinates(cell)
+						if (game.isWithinMemoryComplex(cell) || (entity && (!upgrade || entity !== occupant))) return null
+					}
+				}
+				return upgrade ? 'upgrade' : 'build'
+			}
 			if (touchAction && !['erase', 'build', 'relocate'].includes(touchAction)) return null
 
 			if ((!touchAction || touchAction === 'relocate') && game.transportedEntity && game.itemInHand) {
@@ -953,9 +1277,11 @@ ModLoader.register({
 				game.hoveredCell = previousCell
 				game.hoveredEntity = previousEntity
 				game.canPlace = previousCanPlace
-				if (refreshAfter && typeof game.processMousemove2 === 'function') {
+				const refreshPointer = isNative(game) ? game.processMove : game.processMousemove2
+				if (refreshAfter && typeof refreshPointer === 'function') {
 					try {
-						game.processMousemove2()
+						if (isNative(game) && previousCell) game.hoveredEntity = game.entityAtCoordinates(previousCell) || null
+						refreshPointer.call(game)
 					} catch (error) {
 						game.hoveredCell = previousCell
 						game.hoveredEntity = previousEntity
@@ -1023,11 +1349,24 @@ ModLoader.register({
 
 		function withQualificationPrices(game, callback) {
 			const previousGame = qualificationGame
+			const descriptor = Object.getOwnPropertyDescriptor(game, 'getRealPrice')
+			const priceMethod = game.getRealPrice
 			qualificationGame = game
 			qualificationDepth += 1
+			// Apply the exemption after every price mod, regardless of patch load order.
+			Object.defineProperty(game, 'getRealPrice', {
+				configurable: true, writable: true,
+				value: function (name) {
+					const value = priceMethod.apply(this, arguments)
+					const refund = currentExecution?.game === game && currentExecution.intent.operation === 'upgrade' && name === currentExecution.intent.hovered?.name
+					return !isReferencePriceScope(game) && (isShopEconomicName(game, name) || refund) ? zeroPrice(value) : value
+				}
+			})
 			try {
 				return callback()
 			} finally {
+				if (descriptor) Object.defineProperty(game, 'getRealPrice', descriptor)
+				else delete game.getRealPrice
 				qualificationDepth -= 1
 				qualificationGame = previousGame
 			}

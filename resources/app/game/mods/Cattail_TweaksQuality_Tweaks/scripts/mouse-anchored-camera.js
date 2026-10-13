@@ -28,8 +28,7 @@
 				const pivot = captureMousePivot(this)
 				const result = original.apply(this, args)
 				syncZoomUnit(this)
-				restoreMousePivot(this, pivot)
-				refreshMouseData(this, pivot)
+				if (restoreMousePivot(this, pivot)) refreshCameraState(this)
 				return result
 			}
 		})
@@ -39,10 +38,10 @@
 		api.patch(Game.prototype, 'useWaypoint', function (original) {
 			return function (waypoint, ...args) {
 				const target = isMouseAnchoredWaypointTeleportEnabled(api) ? getNextWaypoint(this, waypoint) : null
+				const xy = target ? getMouseScreenPoint(this) : null
 				const result = original.apply(this, [waypoint, ...args])
-				if (target) {
-					alignWorldPositionToMouse(this, target.position)
-					refreshMouseData(this)
+				if (target && xy && alignRenderedPositionToScreenPoint(this, target.position, xy)) {
+					refreshCameraState(this)
 				}
 				return result
 			}
@@ -60,9 +59,8 @@
 
 	function captureMousePivot(game) {
 		try {
-			if (!game?.mouse || !Array.isArray(game.mouse.offsetxy) || typeof game.xyToUV !== 'function') return null
-			const xy = [Number(game.mouse.offsetxy[0]), Number(game.mouse.offsetxy[1])]
-			if (!Number.isFinite(xy[0]) || !Number.isFinite(xy[1])) return null
+			const xy = getMouseScreenPoint(game)
+			if (!xy || typeof game.xyToUV !== 'function') return null
 			const uv = game.xyToUV(xy)
 			if (!Array.isArray(uv) || !Number.isFinite(uv[0]) || !Number.isFinite(uv[1])) return null
 			return { xy, uv: [uv[0], uv[1]] }
@@ -73,20 +71,22 @@
 
 	function restoreMousePivot(game, pivot) {
 		if (!pivot) return
-		alignWorldPointToScreenPoint(game, pivot.uv, pivot.xy)
+		return alignWorldPointToScreenPoint(game, pivot.uv, pivot.xy)
 	}
 
-	function alignWorldPositionToMouse(game, uv) {
-		if (!game?.mouse || !Array.isArray(game.mouse.offsetxy)) return
-		alignRenderedPositionToScreenPoint(game, uv, game.mouse.offsetxy)
+	function getMouseScreenPoint(game) {
+		// Desktop 1.3 stores unscaled pointer coordinates in sxy, not xy.
+		const point = game?.mouse?.sxy
+		if (!Array.isArray(point) || !Number.isFinite(point[0]) || !Number.isFinite(point[1])) return null
+		return [point[0], point[1]]
 	}
 
 	function alignWorldPointToScreenPoint(game, uv, xy) {
-		alignWorldPositionToScreenPoint(game, uv, xy, getProjectionOriginOffset(game))
+		return alignWorldPositionToScreenPoint(game, uv, xy, getProjectionOriginOffset(game))
 	}
 
 	function alignRenderedPositionToScreenPoint(game, uv, xy) {
-		alignWorldPositionToScreenPoint(game, uv, xy, null)
+		return alignWorldPositionToScreenPoint(game, uv, xy, null)
 	}
 
 	function alignWorldPositionToScreenPoint(game, uv, xy, projectionOffset) {
@@ -105,6 +105,7 @@
 			if (!Number.isFinite(zoom) || Math.abs(zoom) < minZoom) return
 			game.translation[0] += (projected[0] - target[0]) / zoom
 			game.translation[1] += (projected[1] - target[1]) / zoom
+			return true
 		} catch (error) {}
 	}
 
@@ -142,11 +143,14 @@
 		} catch (error) {}
 	}
 
-	function refreshMouseData(game, pivot) {
+	function refreshCameraState(game) {
+		// Recompute hover without fabricating mouse movement or changing buttons.
 		try {
-			const xy = pivot?.xy || game?.mouse?.offsetxy
-			if (!Array.isArray(xy) || typeof game?.updateMouseData !== 'function') return
-			game.updateMouseData(Number(xy[0]), Number(xy[1]))
+			game.updatePointerState?.()
+		} catch (error) {}
+		// Native teleport refreshed these before our final camera adjustment.
+		try {
+			game.updateGlobalPositioning?.()
 		} catch (error) {}
 	}
 

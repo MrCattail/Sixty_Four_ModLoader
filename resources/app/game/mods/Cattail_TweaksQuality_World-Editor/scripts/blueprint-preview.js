@@ -329,6 +329,13 @@ ModLoader.register({
 					if (placementLayerChanged && active && !paused && target) requestPlan('placement-layer-changed', 1)
 				}
 			})
+			let creativePermission = creative?.game === game && creative.snapshot?.().ready === true && creative.snapshot?.().creativeMode === true
+			const stopCreativeSubscription = creative?.game === game ? creative.subscribe?.(function (state) {
+				const next = state?.ready === true && state?.creativeMode === true
+				if (next === creativePermission) return
+				creativePermission = next
+				if (active && !paused && target) requestPlan('creative-permission-changed', 1)
+			}) : null
 			const stopTransformSubscription = transformAvailable ? transform.subscribe(function (state) {
 				const previousTransform = currentTransform
 				currentTransform = state
@@ -501,6 +508,7 @@ ModLoader.register({
 				}
 				if (typeof stopRuntimeSubscription === 'function') stopRuntimeSubscription()
 				if (typeof stopSessionSubscription === 'function') stopSessionSubscription()
+				if (typeof stopCreativeSubscription === 'function') stopCreativeSubscription()
 				if (typeof stopTransformSubscription === 'function') stopTransformSubscription()
 				if (typeof stopRendering === 'function') stopRendering()
 				if (typeof stopRenderLayer === 'function') stopRenderLayer()

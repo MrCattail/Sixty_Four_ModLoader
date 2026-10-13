@@ -140,7 +140,7 @@ function testMalformedStoredRecipeFallsBackWithoutWriteback() {
 function testSameToolbarAndPaletteContracts() {
 	assert.equal(manifest.version, '0.6.0')
 	assert.equal(manifest.loaderVersion, '>=0.4.0')
-	assert.equal(manifest.entry.length, 45)
+	assert.equal(manifest.entry.length, 47)
 	const stateIndex = manifest.entry.indexOf('scripts/core/paint-cube-state.js')
 	const blueprintPaintedIndex = manifest.entry.indexOf('scripts/core/blueprint-painted.js')
 	const growthIndex = manifest.entry.indexOf('scripts/core/paint-cube-growth.js')

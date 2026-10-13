@@ -247,7 +247,7 @@ function byId(result, id) {
 const manifest = JSON.parse(source(MANIFEST_SOURCE))
 assert.equal(manifest.version, '0.6.0', 'consumer registration must not bump the World Editor version')
 assert.equal(manifest.loaderVersion, '>=0.4.0', 'feature detection must preserve older ModLoader compatibility')
-assert.equal(manifest.entry.length, 45, 'shortcut hints must not add a manifest entry')
+assert.equal(manifest.entry.length, 47, 'shortcut hints must not add a manifest entry')
 
 const foundationSource = source(FOUNDATION_SOURCE)
 assert.doesNotMatch(foundationSource, /addEventListener\s*\(\s*['"](?:keydown|keyup|wheel|mousedown|mouseup)/, 'display-only registration must not add input handlers')
