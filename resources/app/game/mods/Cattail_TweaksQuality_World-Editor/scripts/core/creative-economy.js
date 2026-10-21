@@ -325,7 +325,7 @@ ModLoader.register({
 					if (nativeTools(game) && ['erase', 'relocate'].includes(game.interactionMode)) {
 						try { return nativeTools(game).release(original, Array.from(arguments)) } finally { resetNativePointer(game) }
 					}
-					if (['erase', 'relocate'].includes(game.interactionMode) || game.cloneList?.length || game.itemInHand?.name === 'pinhole') {
+					if (['erase', 'relocate'].includes(game.interactionMode) || game.cloneList?.length) {
 						cancelNativeDeferred(game, service)
 						return undefined
 					}
@@ -572,6 +572,7 @@ ModLoader.register({
 				const state = controller?.snapshot?.()
 				return !!(
 					!disposed &&
+					!isEnding(game) &&
 					state?.ready &&
 					state?.creativeMode &&
 					!state?.disposed
@@ -606,6 +607,78 @@ ModLoader.register({
 				return transactions?.game === game && transactions.isBusy?.() === true
 			}
 
+			async function requestPinhole(intent, execute) {
+				const adapter = globalThis[SAVE_ADAPTER_KEY]
+				const token = ++transactionToken
+				let context = null
+				let executionStarted = false
+				clearDisplayTimer()
+				busy = true
+				phase = 'checkpointing'
+				operation = 'pinhole'
+				input = intent.input
+				error = null
+				lastSnapshotId = null
+				notify('creative-pinhole-checkpointing')
+				function assertLive() {
+					adapter.assertCurrent(game, context)
+					if (!isCurrentToken(token) || !isFrozenIntentStillValid(game, intent) || isWriteBlocked() ||
+						controller?.isInputBlocked?.() || transactionBusy()) {
+						throw createError('PINHOLE_TARGET_CHANGED', 'The Pinhole target or active editor operation changed. Select Chasm again.')
+					}
+				}
+				try {
+					context = adapter.capture(game)
+					await adapter.withSaveLock(game, context, async function (save) {
+						assertLive()
+						await adapter.readVerified(game, context)
+						assertLive()
+						// Observe the exact native checkpoint at its write boundary. Reading
+						// only the identity could accept an older record from the same world.
+						let checkpoint = null
+						const descriptor = Object.getOwnPropertyDescriptor(game, 'writeToSlot')
+						const write = game.writeToSlot
+						Object.defineProperty(game, 'writeToSlot', { configurable: true, writable: true, value: function (slot, slotId) {
+							if (slot === context.slot && slotId === context.slotId) checkpoint = JSON.stringify(slot.stack[0])
+							return write.apply(this, arguments)
+						} })
+						try { await save() } finally {
+							if (descriptor) Object.defineProperty(game, 'writeToSlot', descriptor)
+							else delete game.writeToSlot
+						}
+						const stored = await adapter.readVerified(game, context)
+						assertLive()
+						if (!checkpoint || JSON.stringify(stored) !== checkpoint || stored.state.modloader?.worldEditor?.creativeMode !== true) {
+							throw createError('PINHOLE_CHECKPOINT_FAILED', 'The pre-ending native save could not be verified. Pinhole was not placed.')
+						}
+						// Native assembled stats/resources share live objects. Detach the
+						// verified record before the ending mutates them and reset rewrites history.
+						context.slot.stack[0] = JSON.parse(checkpoint)
+						phase = 'executing'
+						notify('creative-pinhole-executing')
+						assertLive()
+						const runtime = globalThis[Symbol.for('cattail.world-editor.runtime')]
+						if (runtime?.game === game) runtime.deactivate?.('pinhole-ending')
+						assertLive()
+						executionStarted = true
+						withFrozenIntentTarget(game, intent, execute)
+						if (!game.pinhole || !game.preventSaving) throw createError('PINHOLE_EXECUTION_FAILED', 'The native Pinhole ending did not start.')
+					})
+					complete('success', 'creative-pinhole-complete')
+					return Object.freeze({ accepted: true, executed: true, reason: 'complete', snapshotId: null })
+				} catch (operationError) {
+					if (executionStarted) {
+						terminalBlockedReason = 'PINHOLE_EXECUTION_FAILED'
+						adapter.blockSaving(game, context)
+					}
+					if (!isCurrentToken(token)) return Object.freeze({ accepted: true, executed: false, reason: 'invalidated' })
+					error = createError(executionStarted ? 'PINHOLE_EXECUTION_FAILED' : 'PINHOLE_CHECKPOINT_FAILED',
+						String(operationError?.message || 'The pre-ending native save could not be verified.'))
+					complete('failed', 'creative-pinhole-failed')
+					return Object.freeze({ accepted: true, executed: false, reason: 'failed', error: publicError(error) })
+				}
+			}
+
 			async function requestOperation(intent, execute) {
 				const writeBlockedReason = readWriteBlockedReason()
 				if (writeBlockedReason) {
@@ -628,6 +701,8 @@ ModLoader.register({
 				) {
 					return Object.freeze({ accepted: false, executed: false, reason: busy ? 'busy' : 'invalid' })
 				}
+
+				if (isNative(game) && intent.entityName === 'pinhole') return requestPinhole(intent, execute)
 
 				const token = ++transactionToken
 				let created = null
@@ -867,7 +942,7 @@ ModLoader.register({
 					}
 				}
 				const text = globalThis[Symbol.for('cattail.world-editor.i18n')]?.t(game, 'creativeNativeDeferred') || 'Awaiting 1.3 creative-mode support.'
-				for (const control of [store.html.eraser, store.html.relocator, store.html.items?.pinhole]) {
+				for (const control of [store.html.eraser, store.html.relocator]) {
 					if (!control) continue
 					if (!guardedControls.has(control) && control.addEventListener) {
 						guardedControls.add(control)
@@ -1029,7 +1104,7 @@ ModLoader.register({
 					}
 				},
 				isInputBlocked() {
-					return !disposed && (busy || isWriteBlocked() || (isNative(game) && (transactionBusy() || controller?.isInputBlocked?.())))
+					return !disposed && !isEnding(game) && (busy || isWriteBlocked() || (isNative(game) && (transactionBusy() || controller?.isInputBlocked?.())))
 				},
 				isWriteBlocked,
 				isCreativeActive,
@@ -1110,6 +1185,10 @@ ModLoader.register({
 			})
 		}
 
+		function isEnding(game) {
+			return !!(game?.pinhole || game?.credits || game?.stats?.gameIsFinished)
+		}
+
 		function canBypassUnlock(game, name) {
 			const creative = globalThis[CREATIVE_KEY]
 			return creative?.game === game && creative.canBypassUnlock?.(name) === true
@@ -1121,7 +1200,7 @@ ModLoader.register({
 				const item = game.itemInHand
 				const definition = game.codex?.entities?.[item?.name]
 				if (game.interactionMode !== 'build' || game.transportedEntity || game.cloneList?.length ||
-					!definition?.canPurchase || item.eraser || item.name === 'pinhole' || game.onlyones?.[item.name]) return null
+					!definition?.canPurchase || item.eraser || game.onlyones?.[item.name]) return null
 				if (!canBypassUnlock(game, item.name)) return null
 				const dark = definition.type === 'dark' || definition.isDark === true
 				if (dark !== (Number(game.plane) === 1)) return null
@@ -1129,6 +1208,8 @@ ModLoader.register({
 				const occupant = game.entityAtCoordinates(game.hoveredCell) || null
 				if (occupant !== (game.hoveredEntity || null)) return null
 				const upgrade = occupant && definition.isUpgradeTo === occupant.name
+				if (item.name === 'pinhole' && (Number(game.plane) !== 0 || !upgrade || occupant.name !== 'chasm' ||
+					!game.stuff?.includes(occupant) || game.entitiesInGame?.pinhole > 0 || isEnding(game))) return null
 				// Check every footprint cell, including cells after an occupied upgrade cell.
 				const span = item.entitySpan || 0
 				for (let u = -span; u <= span; u += 1) {

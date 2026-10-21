@@ -140,7 +140,9 @@ $snapshotContractTests = @(
 	[ordered]@{ file = 'settings-api-v1-contract.test.js'; description = 'Settings API v1 contract'; pattern = 'registration, actions, shared renderer, typed values, validation, persistence, themes, scrolling, tooltips, cleanup' },
 	[ordered]@{ file = 'shortcut-api-v1-contract.test.js'; description = 'Shortcut API v1 contract'; pattern = 'ownership, normalization, generation-safe handles, diagnostics, UI structure, documentation, and 20 languages' },
 	[ordered]@{ file = 'tooltip-lifecycle-contract.test.js'; description = 'Tooltip lifecycle contract'; pattern = 'persistent pointer/focus ownership, shared portal isolation, delays, and cleanup' },
+	[ordered]@{ file = 'chinese-optimization-traditional-contract.test.js'; description = 'Chinese Optimization modtch contract'; pattern = 'offline conversion, word coverage, language menus, Loader settings, source preservation' },
 	[ordered]@{ file = 'chinese-optimization-open-translation-contract.test.js'; description = 'Chinese Optimization open translation contract'; pattern = '20 languages, feature detection, immediate select, Explorer reveal, default association' },
+	[ordered]@{ file = 'chinese-optimization-author-export-contract.test.js'; description = 'Chinese Optimization author words export contract'; pattern = 'standalone source, complete translations, source preservation, save dialog, cancel, atomic failure, path guards' },
 	[ordered]@{ file = 'snapshot-container-v1-contract.test.js'; description = 'Snapshot export container v1 contract'; pattern = 'binary framing, metadata, checksum, corruption rejection' },
 	[ordered]@{ file = 'snapshot-store-v1-contract.test.js'; description = 'Snapshot store v1 contract'; pattern = 'validation, isolation, queueing, rotation, quarantine, cleanup' },
 	[ordered]@{ file = 'snapshot-api-v1-contract.test.js'; description = 'Storage Snapshot API v1 runtime contract'; pattern = 'bound Mod API, data types, safe errors, save identity, admin UI boundary' },
@@ -148,7 +150,7 @@ $snapshotContractTests = @(
 	[ordered]@{ file = 'library-api-v1-contract.test.js'; description = 'Library API 1.1 runtime contract'; pattern = 'bound named handle, safe dialogs, no path leakage, declared extensions, size and symlink rejection, atomic revision-matched export' }
 )
 foreach ($contract in $snapshotContractTests) {
-	if ($LoaderOnly -and $contract.file -eq 'chinese-optimization-open-translation-contract.test.js') { continue }
+	if ($LoaderOnly -and $contract.file -like 'chinese-optimization-*-contract.test.js') { continue }
 	$contractPath = Join-Path $PSScriptRoot $contract.file
 	if (-not (Test-Path -LiteralPath $contractPath)) {
 		$results += [ordered]@{

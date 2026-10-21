@@ -12,10 +12,14 @@
     "gameLanguage": true
   },
   "languages": [
-    "modsch"
+    "modsch",
+    "modtch"
   ],
   "entries": [
     "locale/trilingual-data.js",
+    "vendor/opencc-js/cn2t.js",
+    "scripts/traditional-converter.js",
+    "scripts/author-export.js",
     "scripts/trilingual-loader.js"
   ],
   "description": "Adds the 中文优化版 language extracted from the previous modified words.js.",
@@ -41,6 +45,15 @@
           "pendingText": "正在打开…",
           "successText": "已打开翻译文件。",
           "errorText": "无法打开翻译文件：{value}"
+        },
+        "exportAuthorWords": {
+          "sectionLabel": "翻译文件",
+          "label": "导出作者用 words.js",
+          "description": "将最新保存的简体译文及对应繁体写入独立副本，保留其他语言，供游戏作者使用。",
+          "buttonLabel": "导出作者用 words.js",
+          "pendingText": "正在准备导出…",
+          "successText": "已保存导出文件。",
+          "errorText": "无法导出 words.js：{value}"
         }
       }
     },
@@ -65,6 +78,15 @@
           "pendingText": "正在打开…",
           "successText": "已打开翻译文件。",
           "errorText": "无法打开翻译文件：{value}"
+        },
+        "exportAuthorWords": {
+          "sectionLabel": "翻译文件",
+          "label": "导出作者用 words.js",
+          "description": "将最新保存的简体译文及对应繁体写入独立副本，保留其他语言，供游戏作者使用。",
+          "buttonLabel": "导出作者用 words.js",
+          "pendingText": "正在准备导出…",
+          "successText": "已保存导出文件。",
+          "errorText": "无法导出 words.js：{value}"
         }
       }
     },
@@ -89,6 +111,15 @@
           "pendingText": "Opening…",
           "successText": "Translation file opened.",
           "errorText": "Could not open the translation file: {value}"
+        },
+        "exportAuthorWords": {
+          "sectionLabel": "Translation file",
+          "label": "Export words.js for the author",
+          "description": "Save a copy with the latest saved Simplified and Traditional translations. Keep all other languages.",
+          "buttonLabel": "Export words.js for the author",
+          "pendingText": "Preparing export…",
+          "successText": "Export saved.",
+          "errorText": "Could not export words.js: {value}"
         }
       }
     },
@@ -112,6 +143,15 @@
           "pendingText": "Открытие…",
           "successText": "Файл перевода открыт.",
           "errorText": "Не удалось открыть файл перевода: {value}"
+        },
+        "exportAuthorWords": {
+          "sectionLabel": "Translation file",
+          "label": "Export words.js for the author",
+          "description": "Save a copy with the latest saved Simplified and Traditional translations. Keep all other languages.",
+          "buttonLabel": "Export words.js for the author",
+          "pendingText": "Preparing export…",
+          "successText": "Export saved.",
+          "errorText": "Could not export words.js: {value}"
         }
       }
     },
@@ -135,6 +175,15 @@
           "pendingText": "Wird geöffnet…",
           "successText": "Übersetzungsdatei wurde geöffnet.",
           "errorText": "Übersetzungsdatei konnte nicht geöffnet werden: {value}"
+        },
+        "exportAuthorWords": {
+          "sectionLabel": "Translation file",
+          "label": "Export words.js for the author",
+          "description": "Save a copy with the latest saved Simplified and Traditional translations. Keep all other languages.",
+          "buttonLabel": "Export words.js for the author",
+          "pendingText": "Preparing export…",
+          "successText": "Export saved.",
+          "errorText": "Could not export words.js: {value}"
         }
       }
     },
@@ -158,6 +207,15 @@
           "pendingText": "Abrindo…",
           "successText": "Arquivo de tradução aberto.",
           "errorText": "Não foi possível abrir o arquivo de tradução: {value}"
+        },
+        "exportAuthorWords": {
+          "sectionLabel": "Translation file",
+          "label": "Export words.js for the author",
+          "description": "Save a copy with the latest saved Simplified and Traditional translations. Keep all other languages.",
+          "buttonLabel": "Export words.js for the author",
+          "pendingText": "Preparing export…",
+          "successText": "Export saved.",
+          "errorText": "Could not export words.js: {value}"
         }
       }
     },
@@ -181,6 +239,15 @@
           "pendingText": "Apertura…",
           "successText": "File di traduzione aperto.",
           "errorText": "Impossibile aprire il file di traduzione: {value}"
+        },
+        "exportAuthorWords": {
+          "sectionLabel": "Translation file",
+          "label": "Export words.js for the author",
+          "description": "Save a copy with the latest saved Simplified and Traditional translations. Keep all other languages.",
+          "buttonLabel": "Export words.js for the author",
+          "pendingText": "Preparing export…",
+          "successText": "Export saved.",
+          "errorText": "Could not export words.js: {value}"
         }
       }
     },
@@ -204,6 +271,15 @@
           "pendingText": "Abriendo…",
           "successText": "Archivo de traducción abierto.",
           "errorText": "No se pudo abrir el archivo de traducción: {value}"
+        },
+        "exportAuthorWords": {
+          "sectionLabel": "Translation file",
+          "label": "Export words.js for the author",
+          "description": "Save a copy with the latest saved Simplified and Traditional translations. Keep all other languages.",
+          "buttonLabel": "Export words.js for the author",
+          "pendingText": "Preparing export…",
+          "successText": "Export saved.",
+          "errorText": "Could not export words.js: {value}"
         }
       }
     },
@@ -227,6 +303,15 @@
           "pendingText": "Ouverture…",
           "successText": "Fichier de traduction ouvert.",
           "errorText": "Impossible d'ouvrir le fichier de traduction : {value}"
+        },
+        "exportAuthorWords": {
+          "sectionLabel": "Translation file",
+          "label": "Export words.js for the author",
+          "description": "Save a copy with the latest saved Simplified and Traditional translations. Keep all other languages.",
+          "buttonLabel": "Export words.js for the author",
+          "pendingText": "Preparing export…",
+          "successText": "Export saved.",
+          "errorText": "Could not export words.js: {value}"
         }
       }
     },
@@ -250,6 +335,15 @@
           "pendingText": "Bezig met openen…",
           "successText": "Vertaalbestand geopend.",
           "errorText": "Vertaalbestand kon niet worden geopend: {value}"
+        },
+        "exportAuthorWords": {
+          "sectionLabel": "Translation file",
+          "label": "Export words.js for the author",
+          "description": "Save a copy with the latest saved Simplified and Traditional translations. Keep all other languages.",
+          "buttonLabel": "Export words.js for the author",
+          "pendingText": "Preparing export…",
+          "successText": "Export saved.",
+          "errorText": "Could not export words.js: {value}"
         }
       }
     },
@@ -273,6 +367,15 @@
           "pendingText": "Otevírání…",
           "successText": "Soubor překladu byl otevřen.",
           "errorText": "Soubor překladu se nepodařilo otevřít: {value}"
+        },
+        "exportAuthorWords": {
+          "sectionLabel": "Translation file",
+          "label": "Export words.js for the author",
+          "description": "Save a copy with the latest saved Simplified and Traditional translations. Keep all other languages.",
+          "buttonLabel": "Export words.js for the author",
+          "pendingText": "Preparing export…",
+          "successText": "Export saved.",
+          "errorText": "Could not export words.js: {value}"
         }
       }
     },
@@ -296,6 +399,15 @@
           "pendingText": "Otwieranie…",
           "successText": "Plik tłumaczenia został otwarty.",
           "errorText": "Nie udało się otworzyć pliku tłumaczenia: {value}"
+        },
+        "exportAuthorWords": {
+          "sectionLabel": "Translation file",
+          "label": "Export words.js for the author",
+          "description": "Save a copy with the latest saved Simplified and Traditional translations. Keep all other languages.",
+          "buttonLabel": "Export words.js for the author",
+          "pendingText": "Preparing export…",
+          "successText": "Export saved.",
+          "errorText": "Could not export words.js: {value}"
         }
       }
     },
@@ -319,6 +431,15 @@
           "pendingText": "開いています…",
           "successText": "翻訳ファイルを開きました。",
           "errorText": "翻訳ファイルを開けませんでした：{value}"
+        },
+        "exportAuthorWords": {
+          "sectionLabel": "Translation file",
+          "label": "Export words.js for the author",
+          "description": "Save a copy with the latest saved Simplified and Traditional translations. Keep all other languages.",
+          "buttonLabel": "Export words.js for the author",
+          "pendingText": "Preparing export…",
+          "successText": "Export saved.",
+          "errorText": "Could not export words.js: {value}"
         }
       }
     },
@@ -342,6 +463,15 @@
           "pendingText": "여는 중…",
           "successText": "번역 파일을 열었습니다.",
           "errorText": "번역 파일을 열 수 없습니다: {value}"
+        },
+        "exportAuthorWords": {
+          "sectionLabel": "Translation file",
+          "label": "Export words.js for the author",
+          "description": "Save a copy with the latest saved Simplified and Traditional translations. Keep all other languages.",
+          "buttonLabel": "Export words.js for the author",
+          "pendingText": "Preparing export…",
+          "successText": "Export saved.",
+          "errorText": "Could not export words.js: {value}"
         }
       }
     },
@@ -365,6 +495,15 @@
           "pendingText": "正在開啟…",
           "successText": "已開啟翻譯檔案。",
           "errorText": "無法開啟翻譯檔案：{value}"
+        },
+        "exportAuthorWords": {
+          "sectionLabel": "翻譯檔案",
+          "label": "匯出作者用 words.js",
+          "description": "將最新儲存的簡體譯文及對應繁體寫入獨立副本，保留其他語言，供遊戲作者使用。",
+          "buttonLabel": "匯出作者用 words.js",
+          "pendingText": "正在準備匯出…",
+          "successText": "已儲存匯出檔案。",
+          "errorText": "無法匯出 words.js：{value}"
         }
       }
     },
@@ -388,6 +527,15 @@
           "pendingText": "กำลังเปิด…",
           "successText": "เปิดไฟล์คำแปลแล้ว",
           "errorText": "ไม่สามารถเปิดไฟล์คำแปลได้: {value}"
+        },
+        "exportAuthorWords": {
+          "sectionLabel": "Translation file",
+          "label": "Export words.js for the author",
+          "description": "Save a copy with the latest saved Simplified and Traditional translations. Keep all other languages.",
+          "buttonLabel": "Export words.js for the author",
+          "pendingText": "Preparing export…",
+          "successText": "Export saved.",
+          "errorText": "Could not export words.js: {value}"
         }
       }
     },
@@ -411,6 +559,15 @@
           "pendingText": "Megnyitás…",
           "successText": "A fordítási fájl megnyílt.",
           "errorText": "A fordítási fájl nem nyitható meg: {value}"
+        },
+        "exportAuthorWords": {
+          "sectionLabel": "Translation file",
+          "label": "Export words.js for the author",
+          "description": "Save a copy with the latest saved Simplified and Traditional translations. Keep all other languages.",
+          "buttonLabel": "Export words.js for the author",
+          "pendingText": "Preparing export…",
+          "successText": "Export saved.",
+          "errorText": "Could not export words.js: {value}"
         }
       }
     },
@@ -434,6 +591,15 @@
           "pendingText": "Atver…",
           "successText": "Tulkojuma fails ir atvērts.",
           "errorText": "Neizdevās atvērt tulkojuma failu: {value}"
+        },
+        "exportAuthorWords": {
+          "sectionLabel": "Translation file",
+          "label": "Export words.js for the author",
+          "description": "Save a copy with the latest saved Simplified and Traditional translations. Keep all other languages.",
+          "buttonLabel": "Export words.js for the author",
+          "pendingText": "Preparing export…",
+          "successText": "Export saved.",
+          "errorText": "Could not export words.js: {value}"
         }
       }
     },
@@ -457,6 +623,15 @@
           "pendingText": "Se deschide…",
           "successText": "Fișierul de traducere a fost deschis.",
           "errorText": "Fișierul de traducere nu a putut fi deschis: {value}"
+        },
+        "exportAuthorWords": {
+          "sectionLabel": "Translation file",
+          "label": "Export words.js for the author",
+          "description": "Save a copy with the latest saved Simplified and Traditional translations. Keep all other languages.",
+          "buttonLabel": "Export words.js for the author",
+          "pendingText": "Preparing export…",
+          "successText": "Export saved.",
+          "errorText": "Could not export words.js: {value}"
         }
       }
     },
@@ -480,6 +655,15 @@
           "pendingText": "Åpner…",
           "successText": "Oversettelsesfilen er åpnet.",
           "errorText": "Kunne ikke åpne oversettelsesfilen: {value}"
+        },
+        "exportAuthorWords": {
+          "sectionLabel": "Translation file",
+          "label": "Export words.js for the author",
+          "description": "Save a copy with the latest saved Simplified and Traditional translations. Keep all other languages.",
+          "buttonLabel": "Export words.js for the author",
+          "pendingText": "Preparing export…",
+          "successText": "Export saved.",
+          "errorText": "Could not export words.js: {value}"
         }
       }
     }

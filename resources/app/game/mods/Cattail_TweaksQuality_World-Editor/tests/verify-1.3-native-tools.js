@@ -1,7 +1,8 @@
 'use strict'
 
 // Native input/Store methods, IndexedDB and SnapshotStore run in the shipped
-// Electron runtime. Entity/render/lifecycle/Steam fixtures remain isolated.
+// Electron runtime. Store pickup also uses native constructors/initHint; Sprite
+// rendering and the other entity/lifecycle/Steam fixtures remain isolated.
 const fs = require('node:fs')
 const path = require('node:path')
 const { run } = require('./verify-1.3-creative.js')
@@ -35,6 +36,71 @@ function setupTools() {
 			}
 		})
 	} })
+}
+
+async function verifyShopConstruction() {
+	const get = name => window[Symbol.for('cattail.world-editor.' + name)]
+	const check = (ok, message) => { if (!ok) throw Error(message) }
+	const game = await newWorld(true)
+	// Use the actual constructor/initHint chain and native Cloud/Store DOM. Only
+	// Sprite allocation is inert: this test does not load images or render a world.
+	const codex = new Function('Sprite', 'Cloud', nativeConstructorSource)(class {
+		constructor(options) { Object.assign(this, options) }
+		switchSequence(sequence) { this.sequence = sequence }
+	}, Cloud)
+	game.codex = codex
+	game.unlockedEntities = {}
+	game.entitiesInGame = {}
+	game.store.reinit()
+	const names = Object.keys(codex.entities).filter(name => get('creative-mode').canBypassUnlock(name))
+	check(names.includes('silo') && names.includes('destabilizer') && names.includes('chasm'), 'real catalog contains reported constructor path')
+	let view
+	window[Symbol.for('cattail.better-uis.classic-shop')]?.subscribe(value => { view = value })()
+	const errors = []
+	const onError = event => { errors.push(event.error?.stack || event.message); event.preventDefault() }
+	window.addEventListener('error', onError)
+	function pick(name) {
+		delete game.itemInHand
+		delete game.interactionMode
+		game.plane = codex.entities[name].type === 'dark' ? 1 : 0
+		game.store.visibilityUpdate()
+		const card = game.store.html.items[name]
+		check(card && !card.classList.contains('hidden') && !card.classList.contains('disabled'), 'real card available: ' + name)
+		if (testConfig.enableShopCategories) {
+			view.centerCategory(name)
+			const row = view.vessel.querySelector('[data-shop-item="' + name + '"]')
+			check(row && !row.classList.contains('disabled'), 'categorized real card: ' + name)
+			row.click()
+		} else {
+			if (!view) {
+				game.store.closeTypes()
+				game.store.html.types[codex.entities[name].type || 'default'].button.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }))
+			}
+			card.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }))
+		}
+		check(!errors.length && game.interactionMode === 'build' && game.itemInHand?.name === name,
+			'actual constructor card pickup: ' + name + ' ' + errors.join('; '))
+		check(!game.stuff.includes(game.itemInHand), 'held preview is not a placed entity: ' + name)
+	}
+	try {
+		for (const name of names) pick(name)
+		check(game.resources.every(v => v === 0) && !game.stuff.length && !get('transactions').snapshot().undoCount, 'picking previews neither spends nor edits history/world')
+		pick('silo')
+		check(game.itemInHand.position === undefined, 'native silo remains unpositioned until placement')
+		// Temporary qualification must not become permanent progress.
+		game.unlockedEntities = {}
+		await get('creative-mode').disable()
+		check(!game.itemInHand && game.interactionMode !== 'build', 'mode exit clears still-locked native preview')
+		game.resources.fill(1e20)
+		for (const name of names) game.unlockedEntities[name] = true
+		for (const name of names) pick(name)
+		await get('creative-mode').enableInPlace()
+		game.resources.fill(0)
+		for (const name of names) pick(name)
+		return names.length
+	} finally {
+		window.removeEventListener('error', onError)
+	}
 }
 
 async function exercise() {
@@ -72,6 +138,29 @@ async function exercise() {
 	}
 	const history = async () => { ok(await get('transactions').undo({ input: 'keyboard' }), 'undo'); ok(await get('transactions').redo({ input: 'keyboard' }), 'redo') }
 	await runHook('afterVanillaScripts')
+	const constructorCount = await verifyShopConstruction()
+	results.push('actual native constructors and Store pickup in creative/normal/re-enabled modes: ' + constructorCount + ' buildings')
+	await fresh()
+	const malformed = add('silo', [0, 0])
+	delete malformed.position
+	check(!game.canRelocate(malformed) && !game.canEraseEntity(malformed), 'live unpositioned entity is rejected without throwing')
+	for (const invalid of [null, [], [NaN, 0], [0.5, 0], [Number.MAX_SAFE_INTEGER + 1, 0]]) {
+		malformed.position = invalid
+		check(!game.canRelocate(malformed) && !game.canEraseEntity(malformed), 'malformed live coordinates stay protected')
+	}
+	const detached = new game.codex.entities.silo.class(game)
+	delete detached.position
+	check(game.canRelocate(detached), 'constructor hint keeps the native movable-type result')
+	check(!get('native-tools').safe(detached, 'relocate'), 'constructor hint is not permission for an actual tool operation')
+	game.hoveredEntity = detached
+	game.processE()
+	check(game.interactionMode !== 'relocate' && !game.relocationList?.length, 'E refuses a detached preview without throwing')
+	game.relocationCandidatesList = [detached]
+	game.pickupEntitiesForRelocation()
+	check(!game.relocationList?.length, 'direct native pickup rejects the detached preview')
+	const detachedMove = await get('native-tools').handle('massRelocate', [[detached], [[3, 3]]])
+	check(!detachedMove.executed && !get('transactions').snapshot().undoCount, 'detached preview cannot be committed as a move')
+	results.push('invalid live entity coordinates fail closed without breaking input')
 	await fresh()
 	let entity = add('silo', [0, 0])
 	keyMove(entity)
@@ -333,7 +422,8 @@ const setterStart = stuffSource.indexOf('\tsetPosition(uv){')
 const setterEnd = stuffSource.indexOf('\n\tgetNeighbours()', setterStart)
 if (setterStart < 0 || setterEnd < 0) throw Error('Native Entity.setPosition source unavailable')
 const setter = stuffSource.slice(setterStart, setterEnd)
-const options = { label: 'native-tools', setup: new Function('window.nativeSetPositionSource = ' + JSON.stringify(setter) + '; (' + setup.toString() + ')(); (' + setupTools.toString() + ')();'), exercise, entries: [...entries, 'core/native-tools'] }
+const constructorSource = stuffSource + '\n' + fs.readFileSync(path.resolve(__dirname, '../../../scripts/codex.js'), 'utf8') + '\nreturn abstract_getCodex()'
+const options = { label: 'native-tools', setup: new Function('window.nativeConstructorSource = ' + JSON.stringify(constructorSource) + '; window.verifyShopConstruction = ' + verifyShopConstruction.toString() + '; window.nativeSetPositionSource = ' + JSON.stringify(setter) + '; (' + setup.toString() + ')(); (' + setupTools.toString() + ')();'), exercise, entries: [...entries, 'core/native-tools'] }
 if (process.argv.includes('--baseline')) {
 	const root = fs.readFileSync(path.join(require('os').tmpdir(), 'world-editor-18a-backup.txt'), 'utf8')
 	options.entries = entries

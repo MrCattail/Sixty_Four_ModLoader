@@ -81,7 +81,7 @@ function setup() {
 		game.stats.machinesSold = 0
 		game.resources = new Array(10).fill(1e12)
 		game.memoryBuffer = []
-		for (const name of ['silo', 'silo2', 'pinhole', 'pump', 'gradient', 'stabilizer', 'surge', 'cube', 'eraser', 'orbifold', 'memory', 'whitehole']) {
+		for (const name of ['silo', 'silo2', 'pinhole', 'pump', 'gradient', 'stabilizer', 'surge', 'cube', 'orbifold', 'memory', 'whitehole']) {
 			const span = name === 'silo2' ? 1 : 0
 			game.codex.entities[name] = { canPurchase: !['cube', 'surge', 'orbifold', 'memory', 'whitehole'].includes(name), type: 'default', price: new Array(10).fill(10), priceExponent: 1.2,
 				class: name === 'cube' ? Cube : class extends Entity { constructor(master, misc) { super(master, misc); this.name = name; this.entitySpan = span } } }
@@ -303,8 +303,8 @@ async function exercise() {
 	ok(await place(pair), 'normal two-building price chain')
 	check(game.resources[0] === (testConfig.enableFlatBuildCosts ? 9980 : 9978), 'native/Flat Costs sequential purchase prices')
 	check(game.entitiesInGame === countObject && game.entitiesInGame.silo === 2, 'price quotation restores live count object')
-	game.codex.entities.eraser.price = new Array(10).fill(1)
-	const expectedRefund = game.getRealPrice('silo', true)[0] - game.getRealPrice('eraser')[0]
+	check(!game.codex.entities.eraser, '1.3 fixture must not invent an eraser commodity')
+	const expectedRefund = game.getRealPrice('silo', true)[0]
 	const balance = game.resources[0]; select([0, 0])
 	ok(await get('selection-delete').execute(await get('selection-delete').planSelections(), 'api'), 'normal delete price chain')
 	check(Math.abs(game.resources[0] - balance - expectedRefund) < 1e-8, 'normal deletion uses native/refund price chain')

@@ -3787,8 +3787,37 @@
 	const TRANSLATION_CATALOG_KIND = 'sixty-four.modloader.translations'
 	const TRANSLATION_CATALOG_FORMAT_VERSION = 1
 	const TRANSLATION_CATALOG_META_KEY = '_meta'
+	// Registered variants derive game words after all Mod hooks and share display fallbacks.
+	const languageVariants = new Map()
+	const languageMenuLabels = new Map()
+	let languageMenuPatched = false
+	const getLanguageVariant = function () {
+		return languageVariants.get(String(state.game?.language || '').trim().toLowerCase())
+	}
+	const transformLocalizedText = function (text) {
+		const variant = getLanguageVariant()
+		return variant && typeof text === 'string' ? variant.transformText(text) : text
+	}
+	const transformLanguageWords = function (value, transform) {
+		if (typeof value === 'string') return transform(value)
+		if (Array.isArray(value)) return value.map(function (item) { return transformLanguageWords(item, transform) })
+		if (!value || typeof value !== 'object') return value
+		const out = {}
+		for (const key of Object.keys(value)) out[key] = transformLanguageWords(value[key], transform)
+		return out
+	}
+	const applyLanguageVariants = function (words) {
+		for (const [id, variant] of languageVariants) {
+			const source = words?.[variant.sourceLanguage]
+			if (!source || typeof source !== 'object') continue
+			const converted = transformLanguageWords(source, variant.transformText)
+			words[id] = deepMerge(isObject(words[id]) ? words[id] : {}, converted)
+			if (variant.languageName && words[id].splash) words[id].splash.language = variant.languageName
+		}
+		return words
+	}
 	const getPanelLanguage = function () {
-		const language = state.game?.language || ''
+		const language = getLanguageVariant()?.sourceLanguage || state.game?.language || ''
 		if (language === 'sch' || language === 'modsch') return 'sch'
 		if (language === 'tch') return 'tch'
 		return 'en'
@@ -3806,6 +3835,14 @@
 	}
 
 	const getCatalogPanelText = function (language, key) {
+		if (getLanguageVariant()) {
+			for (const candidate of getLocaleCandidates()) {
+				if (candidate === 'en' && language !== 'en' && PANEL_TEXT[language]?.[key]) continue
+				const value = state.translationCatalog?.languages?.[candidate]?.modloader?.[key]
+				if (typeof value === 'string' && value) return value
+			}
+			return ''
+		}
 		const group = getCatalogLanguageGroup(language)
 		const value = group?.modloader?.[key]
 		return typeof value === 'string' ? value : ''
@@ -3813,7 +3850,7 @@
 
 	const t = function (key, values) {
 		const language = getPanelLanguage()
-		const source = getCatalogPanelText(language, key) || PANEL_TEXT[language]?.[key] || PANEL_TEXT.en[key] || key
+		const source = transformLocalizedText(getCatalogPanelText(language, key) || PANEL_TEXT[language]?.[key] || PANEL_TEXT.en[key] || key)
 		return source.replace(/\{(\w+)\}/g, function (match, name) {
 			return values && values[name] !== undefined ? String(values[name]) : match
 		})
@@ -3833,6 +3870,7 @@
 		const panel = getPanelLanguage()
 		const out = []
 		addUniqueLocaleCandidate(out, raw)
+		addUniqueLocaleCandidate(out, getLanguageVariant()?.sourceLanguage)
 		addUniqueLocaleCandidate(out, panel)
 		if (raw === 'modsch' || panel === 'sch') {
 			addUniqueLocaleCandidate(out, 'modsch')
@@ -3850,12 +3888,12 @@
 	}
 
 	const pickLocalizedText = function (value, candidates) {
-		if (typeof value === 'string') return value
+		if (typeof value === 'string') return transformLocalizedText(value)
 		if (!isLocaleObject(value)) return ''
 		for (const language of candidates) {
-			if (typeof value[language] === 'string') return value[language]
+			if (typeof value[language] === 'string') return transformLocalizedText(value[language])
 		}
-		return typeof value.en === 'string' ? value.en : ''
+		return typeof value.en === 'string' ? transformLocalizedText(value.en) : ''
 	}
 
 	const getManifestTranslationRoot = function (manifest) {
@@ -5079,7 +5117,7 @@
 				let toast = document.getElementById('modloader-probe-notice')
 				if (!toast) { toast = document.createElement('div'); toast.id = 'modloader-probe-notice'; document.body.appendChild(toast) }
 				toast.style.cssText = 'position:fixed;left:50%;top:12px;transform:translateX(-50%);z-index:2147483647;background:#171b20;color:#fff;padding:10px 16px;border-radius:8px;font:14px sans-serif;pointer-events:none;max-width:80vw;overflow-wrap:anywhere'
-				toast.textContent = message
+				toast.textContent = transformLocalizedText(message)
 				clearTimeout(toast.__probeTimer)
 				toast.__probeTimer = setTimeout(() => toast.remove(), 2500)
 			},
@@ -5103,7 +5141,7 @@
 		for (const button of root.querySelectorAll('button')) {
 			button.disabled = button.dataset.probeAction === 'start' ? phase !== 'idle' : button.dataset.probeAction === 'stop' ? !['arming', 'starting', 'recording', 'export-failed'].includes(phase) : false
 		}
-		root.querySelector('[data-probe-status]').textContent = state.clearViewProbeMessage || '默认关闭。启动来源记录需先预备再完整重启，读档后自动记录 30 秒。旧对照需持续按住 Alt，普通记录 20 秒。'
+		root.querySelector('[data-probe-status]').textContent = transformLocalizedText(state.clearViewProbeMessage || '默认关闭。启动来源记录需先预备再完整重启，读档后自动记录 30 秒。旧对照需持续按住 Alt，普通记录 20 秒。')
 	}
 	const renderClearViewProbeControls = function (parent) {
 		const tools = getModFileTools()
@@ -5111,7 +5149,7 @@
 		const root = element('div', 'modloader-panel-settings-row')
 		root.id = 'modloader-clear-view-probe'
 		root.style.cssText = 'display:flex;flex-direction:column;align-items:stretch;gap:8px'
-		root.appendChild(element('strong', '', '清晰视图探针（临时）'))
+		root.appendChild(element('strong', '', transformLocalizedText('清晰视图探针（临时）')))
 		const actions = element('div', 'modloader-panel-settings-actions')
 		actions.style.flexWrap = 'wrap'
 		for (const item of [
@@ -5127,7 +5165,7 @@
 			['停止并导出', 'stop', () => getClearViewProbe().finish()],
 			['打开记录文件夹', 'folder', () => getClearViewProbe().openFolder()]
 		]) {
-			const button = createPanelActionButton('devtools', item[0], item[0])
+			const button = createPanelActionButton('devtools', transformLocalizedText(item[0]), transformLocalizedText(item[0]))
 			button.dataset.probeAction = item[1]
 			button.onclick = async function (event) {
 				event.preventDefault()
@@ -5143,6 +5181,83 @@
 		root.appendChild(status)
 		parent.appendChild(root)
 		updateClearViewProbeControls(root)
+	}
+
+	// Temporary periodic-stall capture: opt-in switch, no persistent config value.
+	let periodicStallProbe = null
+	const updatePeriodicStallProbeControls = function (providedRoot) {
+		const root = providedRoot || document.getElementById('modloader-periodic-stall-probe')
+		if (!root) return
+		const phase = periodicStallProbe?.status().phase || 'idle'
+		const busy = ['arming', 'starting', 'recording'].includes(phase)
+		root.querySelector('[data-stall-toggle]').checked = busy
+		root.querySelector('[data-stall-toggle]').disabled = ['stopping', 'export-failed'].includes(phase)
+		root.querySelector('[data-stall-mode]').disabled = phase !== 'idle'
+		root.querySelector('[data-stall-retry]').hidden = phase !== 'export-failed'
+		root.querySelector('[data-stall-retry]').style.display = phase === 'export-failed' ? '' : 'none'
+		root.querySelector('[data-stall-status]').textContent = transformLocalizedText(state.periodicStallProbeMessage || '默认关闭。开启后关闭菜单，3 秒后采集；到时自动关闭并保存本地记录。')
+	}
+	const getPeriodicStallProbe = function () {
+		if (periodicStallProbe) return periodicStallProbe
+		const tools = getModFileTools()
+		if (!tools?.ipcRenderer) throw new Error('探针需要桌面游戏环境。')
+		periodicStallProbe = require(tools.path.join(tools.gameRoot, 'modloader', 'diagnostics', 'periodic-stall-probe.js')).createClient({
+			window, document, ipc: tools.ipcRenderer, getGame: () => state.game,
+			isOtherBusy: () => !!clearViewProbe && clearViewProbe.status().phase !== 'idle',
+			isMenuOpen: () => !!document.getElementById('modloader-panel') && !state.panelHidden,
+			closeMenu() { if (document.getElementById('modloader-panel')) togglePanel() },
+			metadata() {
+				const game = state.game
+				const slots = Object.values(game?.saveSlots || {})
+				return { loaderVersion: state.version, mods: state.mods.map(mod => ({ id: mod.id, version: mod.manifest.version })),
+					renderApiEnabled: isRenderApiEnabled(), existingRenderTimingEnabled: !!state.renderTimingEnabled,
+					entityCount: game?.stuff?.length || 0, slotCount: slots.length,
+					historyEntryCount: slots.reduce((count, slot) => count + (slot?.stack?.length || 0), 0) }
+			},
+			onChange: () => updatePeriodicStallProbeControls(),
+			notify(message) {
+				state.periodicStallProbeMessage = message
+				updatePeriodicStallProbeControls()
+				let toast = document.getElementById('modloader-stall-notice')
+				if (!toast) { toast = document.createElement('div'); toast.id = 'modloader-stall-notice'; document.body.appendChild(toast) }
+				toast.style.cssText = 'position:fixed;left:50%;top:12px;transform:translateX(-50%);z-index:2147483647;background:#171b20;color:#fff;padding:10px 16px;border-radius:8px;font:14px sans-serif;pointer-events:none;max-width:80vw;overflow-wrap:anywhere'
+				toast.textContent = transformLocalizedText(message)
+				clearTimeout(toast.__probeTimer); toast.__probeTimer = setTimeout(() => toast.remove(), 2500)
+			}
+		})
+		return periodicStallProbe
+	}
+	const renderPeriodicStallProbeControls = function (parent) {
+		const tools = getModFileTools()
+		if (!tools?.fs.existsSync(tools.path.join(tools.gameRoot, 'modloader', 'diagnostics', 'periodic-stall-probe.js'))) return
+		const root = element('div', 'modloader-panel-settings-row')
+		root.id = 'modloader-periodic-stall-probe'
+		root.style.cssText = 'display:flex;flex-direction:column;align-items:stretch;gap:8px'
+		root.appendChild(element('strong', '', transformLocalizedText('周期卡顿探针（临时）')))
+		const label = element('label')
+		label.style.cssText = 'display:flex;align-items:center;gap:8px;cursor:pointer'
+		const toggle = document.createElement('input')
+		toggle.type = 'checkbox'; toggle.dataset.stallToggle = 'true'
+		label.appendChild(toggle); label.appendChild(document.createTextNode(transformLocalizedText('启用探针（到时自动关闭）'))); root.appendChild(label)
+		const actions = element('div', 'modloader-panel-settings-actions'); actions.style.flexWrap = 'wrap'
+		const mode = document.createElement('select'); mode.dataset.stallMode = 'true'; mode.setAttribute('aria-label', transformLocalizedText('探针记录模式'))
+		mode.style.cssText = 'max-width:100%;padding:8px 10px;border:1px solid var(--modloader-border,rgba(255,255,255,.18));border-radius:6px;background:var(--modloader-surface,#25292d);color:var(--modloader-control-text,#eee);font:inherit'
+		for (const [value, text] of [['120', '轻量记录 · 2 分钟'], ['300', '轻量记录 · 5 分钟'], ['deep', '深入记录 · 20 秒']]) {
+			const option = document.createElement('option'); option.value = value; option.textContent = transformLocalizedText(text); mode.appendChild(option)
+		}
+		actions.appendChild(mode)
+		const failure = error => { state.periodicStallProbeMessage = error.message; updatePeriodicStallProbeControls(root) }
+		toggle.onchange = async function () {
+			try { if (toggle.checked) await getPeriodicStallProbe().start({ deep: mode.value === 'deep', seconds: Number(mode.value) }); else await getPeriodicStallProbe().finish() }
+			catch (error) { failure(error) }
+		}
+		const retry = createPanelActionButton('devtools', transformLocalizedText('重试导出'), transformLocalizedText('重试导出')); retry.dataset.stallRetry = 'true'
+		retry.onclick = () => { void getPeriodicStallProbe().finish().catch(failure) }; actions.appendChild(retry)
+		const folder = createPanelActionButton('devtools', transformLocalizedText('打开周期卡顿记录'), transformLocalizedText('打开周期卡顿记录'))
+		folder.onclick = () => { void getPeriodicStallProbe().openFolder().catch(failure) }; actions.appendChild(folder)
+		root.appendChild(actions)
+		const status = element('div'); status.dataset.stallStatus = 'true'; status.style.cssText = 'font-size:12px;line-height:1.5;overflow-wrap:anywhere'; root.appendChild(status)
+		parent.appendChild(root); updatePeriodicStallProbeControls(root)
 	}
 
 	const openDevToolsFromPanel = function () {
@@ -8624,6 +8739,20 @@
 	}
 
 	const installLanguageBridge = function () {
+		// Native Splash reads abstract_getWords directly to list language names.
+		// Supply only cached labels here; running afterWords twice can repeat Mod effects.
+		if (!languageMenuPatched && typeof window.abstract_getWords === 'function') {
+			languageMenuPatched = true
+			api.patch(window, 'abstract_getWords', function (original) {
+				return function () {
+					const words = original.apply(this, arguments)
+					for (const [id, label] of languageMenuLabels) {
+						if (!words[id]) words[id] = { splash: { language: label } }
+					}
+					return words
+				}
+			}, 'modloader')
+		}
 		if (state.languagePatched || typeof Game === 'undefined') return
 		state.languagePatched = true
 		api.patch(Game.prototype, 'changeLanguage', function (original) {
@@ -9978,6 +10107,7 @@
 			{ value: true, label: t('renderApiOn') },
 			{ value: false, label: t('renderApiOff') }
 		], isRenderApiEnabled(), function (value) { setRenderApiEnabled(value !== false) })
+		renderPeriodicStallProbeControls(settingsPage)
 		renderClearViewProbeControls(settingsPage)
 		addSettingsButtonRow(t('devTools'), [
 			{
@@ -11960,6 +12090,9 @@
 				if (context?.version !== '1.3' || context?.isMobile) throw new Error('ModLoader requires the desktop game 1.3.')
 				state.game = context
 				await api.boot()
+				// This fixed Tweaks entry must detach the working save before native loading.
+				const tweaks = state.modById['Cattail_TweaksQuality_Tweaks']
+				if (tweaks?.path === 'Cattail_TweaksQuality_Tweaks' && getModEntryFiles(tweaks.manifest).includes('scripts/auto-save-stutter-fix.js')) await loadScript(tweaks.basePath + 'scripts/auto-save-stutter-fix.js')
 			}
 			if (name === 'beforeVanillaScripts') await api.boot()
 			if (name === 'afterVanillaScripts') {
@@ -12018,7 +12151,7 @@
 				id: modId,
 				on(name, fn) { api.on(name, fn, modId) },
 				registerEntity(id, klass, dataEntry) { api.registerEntity(id, klass, dataEntry, modId) },
-				registerLanguage(id) { api.registerLanguage(id) },
+				registerLanguage(id, options) { return api.registerLanguage(id, options) },
 				patch(target, methodName, wrapper) { return api.patch(target, methodName, wrapper, modId) },
 				appWindow: createAppWindowApi(),
 				windows: createWindowApi(modId),
@@ -12048,8 +12181,23 @@
 			state.entityPatches[id] = { klass, dataEntry: dataEntry || {}, modId: modId || 'anonymous' }
 		},
 
-		registerLanguage(id) {
+		registerLanguage(id, options) {
+			if (options) {
+				if (typeof id !== 'string' || !/^[a-z][a-z0-9-]*$/.test(id) ||
+					typeof options.sourceLanguage !== 'string' || !/^[a-z][a-z0-9-]*$/.test(options.sourceLanguage) ||
+					id === options.sourceLanguage || typeof options.transformText !== 'function') {
+					throw new TypeError('A language variant requires an id, a different sourceLanguage and transformText.')
+				}
+				// Only one derivation step is supported; registration order must not affect output.
+				if (languageVariants.has(options.sourceLanguage) ||
+					Array.from(languageVariants.values()).some(function (variant) { return variant.sourceLanguage === id })) {
+					throw new TypeError('Language variants must derive from a base language, not another variant.')
+				}
+				languageVariants.set(id, { sourceLanguage: options.sourceLanguage, transformText: options.transformText,
+					languageName: typeof options.languageName === 'string' ? options.languageName : '' })
+			}
 			if (id && state.languages.indexOf(id) === -1) state.languages.push(id)
+			if (options) return true
 		},
 
 		applyLanguages(languages) {
@@ -12073,7 +12221,13 @@
 
 		applyWords(words, game) {
 			for (const item of state.wordPatches) deepMerge(words, item.patch)
-			return runHookSync('afterWords', words, game)
+			const localized = applyLanguageVariants(runHookSync('afterWords', words, game))
+			languageMenuLabels.clear()
+			for (const id of state.languages) {
+				const label = localized?.[id]?.splash?.language
+				if (typeof label === 'string') languageMenuLabels.set(id, label)
+			}
+			return localized
 		},
 
 		applyLoadedSave(save, game) {

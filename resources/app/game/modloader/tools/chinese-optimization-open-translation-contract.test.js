@@ -75,6 +75,9 @@ const sandbox = {
 	}
 }
 sandbox.globalThis = sandbox
+for (const relative of ['vendor/opencc-js/cn2t.js', 'scripts/traditional-converter.js', 'scripts/author-export.js']) {
+	vm.runInNewContext(fs.readFileSync(path.join(modRoot, relative), 'utf8'), sandbox, { filename: relative })
+}
 vm.runInNewContext(source, sandbox, { filename: scriptPath })
 assert.ok(registeredMod, 'mod registers')
 
@@ -100,7 +103,7 @@ assert.equal(registrations.length, 0, 'older loaders do not receive unsupported 
 registeredMod.init(createApi(true))
 assert.equal(registrations.length, 1)
 const definitions = registrations[0]
-assert.equal(definitions.length, 2)
+assert.equal(definitions.length, 3)
 const mode = definitions.find(item => item.key === OPEN_MODE_KEY)
 const action = definitions.find(item => item.key === OPEN_ACTION_KEY)
 assert.equal(mode.type, 'select')

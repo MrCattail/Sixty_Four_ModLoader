@@ -40,9 +40,11 @@ async function runtime(options = {}) {
 	const slots = options.slots || [slot()]
 	const db = options.db || database(slots)
 	const storage = options.storage || new Map([['abstractv03synthetic', 'legacy-auto'], ['abstractv03_saveSlotssynthetic', 'legacy-manual']])
-	const hooks = new Map(); const reloads = []; const cloud = []
+	const hooks = new Map(); const reloads = []; const cloud = []; const events = []
 	const sandbox = { console: { warn() {}, log() {} }, crypto: webcrypto, TextEncoder, TextDecoder, Uint8Array,
 		atob, btoa, setTimeout(fn) { reloads.push(fn) }, location: { reload() {} },
+		CustomEvent: class { constructor(type, options) { this.type = type; this.detail = options.detail } },
+		dispatchEvent(event) { events.push(event) },
 		localStorage: { getItem: key => storage.get(key) ?? null, setItem: (key, value) => storage.set(key, String(value)), removeItem: key => storage.delete(key) },
 		IDBKeyRange: { bound: () => null }, document: { getElementById: () => null, createElement: () => ({}), head: { append() {} } }
 	}
@@ -61,9 +63,13 @@ async function runtime(options = {}) {
 	vm.runInContext(source, sandbox)
 	for (const fn of hooks.get('afterVanillaScripts') || []) await fn()
 	for (const fn of hooks.get('afterGameInit') || []) await fn(null, game)
-	return { game, service: sandbox[Symbol.for('cattail.better-uis.save-slots')], db, storage, cloud, reloads }
+	return { game, service: sandbox[Symbol.for('cattail.better-uis.save-slots')], db, storage, cloud, reloads, events }
 }
 async function main() {
+	const protectedArgs = r => ({
+		entries: [{ name: 'Protected copy', data: clone(r.game.saveSlots[0].stack[0]), nameConflict: 'reject' }], activateEntry: 0,
+		preserveSource: { record: clone(r.game.saveSlots[0].stack[0]), sourceIndex: 0, saveInstanceId: id, name: 'Main', assertCurrent() {} }
+	})
 	let passed = 0
 	const test = async (name, work) => { await work(); passed++; console.log('PASS', name) }
 	await test('ready snapshot, native source and unchanged public v1 methods', async () => {
@@ -120,6 +126,49 @@ async function main() {
 		const blocked = await runtime(); blocked.game.preventSaving = true
 		await assert.rejects(blocked.service.createAndActivate({ entries: [entry('c')], activateEntry: 0 }), e => e.code === 'SAVING_BLOCKED')
 		assert.equal((await runtime({ enabled: false })).service, undefined)
+	})
+	await test('protected fork capability preserves the manual head and adds a separate checkpoint', async () => {
+		const r = await runtime(), old = clone(r.game.saveSlots[0])
+		assert.equal(r.service.capabilities().protectedCurrentFork, true)
+		assert.equal(r.service.snapshot().fork.requiredSlots, 1)
+		const args = protectedArgs(r); args.preserveSource.record.state.resources = [321]; args.entries[0].data.state.resources = [321]
+		const result = await r.service.createAndActivate(args)
+		assert.equal(result.entries[0].index, 1); assert.equal(result.sourceIndex, 0)
+		assert.deepEqual(clone(r.game.saveSlots[0].stack[0]), old.stack[0])
+		assert.equal(r.game.saveSlots[0].stack[1].isProtected, true)
+		assert.equal(r.game.saveSlots[0].stack[1].state.resources[0], 321)
+		assert.equal(r.game.saveSlots[1].stack.length, 1)
+		assert.notEqual(r.game.saveSlots[1].stack[0].state.modloader.saveInstanceId, id)
+	})
+	await test('protected fork rejects unverified source and name conflicts without writes', async () => {
+		const r = await runtime(), before = clone(r.game.saveSlots)
+		const wrong = protectedArgs(r); wrong.preserveSource.sourceIndex = 1
+		await assert.rejects(r.service.createAndActivate(wrong), e => e.code === 'SAVE_CONTEXT_CHANGED')
+		const conflict = protectedArgs(r); conflict.entries[0].name = 'Main'
+		await assert.rejects(r.service.createAndActivate(conflict), e => e.code === 'NAME_CONFLICT')
+		assert.deepEqual(clone(r.game.saveSlots), before); assert.equal(r.reloads.length, 0)
+	})
+	await test('protected fork abort restores original database and allows retry', async () => {
+		const r = await runtime(), before = clone(r.game.saveSlots); r.db.abortIndex = 1
+		await assert.rejects(r.service.createAndActivate(protectedArgs(r)), e => e.code === 'WRITE_FAILED')
+		assert.deepEqual(clone(r.game.saveSlots), before); assert.equal(r.db.values.size, 1)
+		assert.equal(r.service.snapshot().ready, true); assert.equal(r.reloads.length, 0)
+		assert.equal((await r.service.createAndActivate(protectedArgs(r))).activated, true)
+	})
+	await test('local-only protected fork notice survives activation settlement', async () => {
+		const r = await runtime({ cloudFailure: true }); const result = await r.service.createAndActivate(protectedArgs(r))
+		assert.equal(result.cloudSaved, false)
+		const restored = await runtime({ slots: r.game.saveSlots, index: 1, db: r.db, storage: r.storage })
+		assert.equal(restored.service.snapshot().ready, true)
+		assert.equal(restored.service.snapshot().activationNotice.cloudSaved, false)
+		assert.equal(r.storage.has('abstractv03_saveSlotsNativeActivationsynthetic'), false)
+		await restored.game.saveGame()
+		assert.equal(restored.service.snapshot().activationNotice, null)
+		assert.equal(restored.events.length, 1)
+		assert.equal(restored.events[0].type, 'cattail:better-uis-save-status')
+		assert.equal(restored.events[0].detail.game, restored.game)
+		await restored.game.saveGame()
+		assert.equal(restored.events.length, 1, 'No repeated event after the notice is cleared')
 	})
 	console.log(`Better UIs native Save Slots service v1: ${passed} checks passed.`)
 }

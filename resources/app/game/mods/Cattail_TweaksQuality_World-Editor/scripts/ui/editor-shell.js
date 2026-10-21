@@ -17,6 +17,7 @@ ModLoader.register({
 		const TOOLBAR_SCROLL_PROBE_KEY = Symbol.for('cattail.world-editor.toolbar-scroll-probe')
 		const RESOURCE_HUD_PROBE_KEY = Symbol.for('cattail.world-editor.resource-hud-probe')
 		const SAVE_SLOTS_KEY = Symbol.for('cattail.better-uis.save-slots')
+		const SAVE_SLOTS_STATUS_EVENT = 'cattail:better-uis-save-status'
 		const PALETTE_ROW_CONTROLS_KEY = Symbol('cattail.world-editor.palette-row-controls')
 		const PALETTE_LIFECYCLE_KEY = Symbol('cattail.world-editor.palette-lifecycle')
 		const SHELL_ID = 'cattail-world-editor-shell'
@@ -806,6 +807,7 @@ ModLoader.register({
 				const phase = String(currentCreativeEconomy?.phase || 'idle')
 				let key = {
 					snapshotting: 'creativeEconomySnapshotting',
+					checkpointing: 'creativePinholeCheckpointing',
 					revalidating: 'creativeEconomyRevalidating',
 					executing: 'creativeEconomyExecuting',
 					success: 'creativeEconomySuccess',
@@ -817,6 +819,9 @@ ModLoader.register({
 				}
 				if (currentCreativeEconomy?.writeBlockedReason) key = 'creativeNativeReloadRequired'
 				else if (phase === 'failed' && currentCreativeEconomy?.error?.code === 'NATIVE_CREATIVE_DEFERRED') key = 'creativeNativeDeferred'
+				if (currentCreativeEconomy?.error?.code === 'PINHOLE_EXECUTION_FAILED') key = 'creativePinholeExecutionFailed'
+				else if (currentCreativeEconomy?.operation === 'pinhole' && phase === 'failed') key = 'creativePinholeCheckpointFailed'
+				if (!key && globalThis[SAVE_SLOTS_KEY]?.snapshot?.().activationNotice?.cloudSaved === false) key = 'creativeCopyLocalOnly'
 				const text = key ? i18n.t(source, key) : ''
 				economyStatus.dataset.phase = phase
 				economyStatus.dataset.active = key ? 'true' : 'false'
@@ -1225,12 +1230,12 @@ ModLoader.register({
 				const dialog = createCreativeDialog('enable')
 				const enableCurrent = createDialogButton(dialog, 'creativeEnableCurrent', true, 'elmerine')
 				const createCopy = createDialogButton(dialog, 'creativeCreateCopy', true)
-				if (Array.isArray(game.saveSlots)) {
+				if (Array.isArray(game.saveSlots) && !globalThis[SAVE_SLOTS_KEY]?.capabilities?.().protectedCurrentFork) {
 					createCopy.disabled = true
 					const notice = document.createElement('div')
 					notice.id = 'world-editor-native-copy-notice'
 					createCopy.setAttribute('aria-describedby', notice.id)
-					notice.dataset.creativeText = 'creativeNativeCopyDeferred'
+					notice.dataset.creativeText = 'creativeCopyUnavailable'
 					dialog.content.append(notice)
 				}
 				const cancel = createDialogButton(dialog, 'creativeCancel', false)
@@ -1303,30 +1308,33 @@ ModLoader.register({
 					}
 					const originalName = input.value.trim()
 					const creativeName = originalName + '创造模式'
+					const nativeCopy = Array.isArray(game.saveSlots)
+					const required = nativeCopy ? Number(slotsState?.fork?.requiredSlots) || 2 : 1
+					const needsOriginal = nativeCopy && slotsState?.fork?.sourceIndex < 0
 					preview.textContent = originalName
 						? formatTemplate(i18n.t(game, 'creativeCopyNamePreview'), { name: creativeName })
 						: ''
-					let statusKey = 'creativeCopyReady'
+					let statusKey = nativeCopy ? needsOriginal ? 'creativeCopyReadyNew' : 'creativeCopyReady' : 'creativeCopyReadyLegacy'
 					let available = true
 					if (!originalName || originalName.length > 60 || /[\u0000-\u001f\u007f]/.test(originalName)) {
 						statusKey = 'creativeNameRequired'
 						available = false
-					} else if (!slotsState?.ready || typeof saveSlots?.createAndActivate !== 'function') {
+					} else if (!slotsState?.ready || typeof saveSlots?.createAndActivate !== 'function' || (nativeCopy && !saveSlots.capabilities?.().protectedCurrentFork)) {
 						statusKey = 'creativeCopyUnavailable'
 						available = false
-					} else if (Number(slotsState.emptyCount) < 1) {
+					} else if (Number(slotsState.emptyCount) < required) {
 						copyStatus.textContent = formatTemplate(i18n.t(game, 'creativeCopyNeedsSlots'), {
-							count: Number(slotsState.emptyCount) || 0
+							count: Number(slotsState.emptyCount) || 0, required
 						})
 						createCopy.disabled = true
 						return
 					} else if (slotsState.slots?.some?.(function (slot) {
-						return slot?.occupied && slot.name === creativeName
+						return slot?.occupied && (slot.name === creativeName || (needsOriginal && slot.name === originalName))
 					})) {
 						statusKey = 'creativeCopyNameConflict'
 						available = false
 					}
-					copyStatus.textContent = i18n.t(game, statusKey)
+					copyStatus.textContent = formatTemplate(i18n.t(game, statusKey), { required, name: originalName })
 					createCopy.disabled = !available || dialog.busy
 				}
 
@@ -1348,11 +1356,11 @@ ModLoader.register({
 					if (dialog.busy || createCopy.disabled) return
 					setCreativeDialogBusy(dialog, true)
 					try {
-						await creative.createFork({
+						const result = await creative.createFork({
 							originalName: input.value,
 							reason: 'creative-dialog-copy'
 						})
-						copyStatus.textContent = i18n.t(game, 'creativeCopyReloading')
+						copyStatus.textContent = i18n.t(game, result?.cloudSaved === false ? 'creativeCopyLocalOnly' : 'creativeCopyReloading')
 					} catch (operationError) {
 						showCreativeDialogError(dialog, operationError)
 						setCreativeDialogBusy(dialog, false)
@@ -1491,6 +1499,11 @@ ModLoader.register({
 			compactStyleButton.addEventListener('click', handleCompactStyleClick)
 			largeStyleButton.addEventListener('click', handleLargeStyleClick)
 
+			const handleSaveSlotsStatus = function (event) {
+				if (event?.detail?.game !== game) return
+				refreshEconomyStatus(game)
+			}
+
 			const handleGameHud = function (event) {
 				if (event?.detail?.game && event.detail.game !== game) return
 				gameHudHidden = !!event?.detail?.hidden
@@ -1503,6 +1516,7 @@ ModLoader.register({
 				refreshVisibility()
 			}
 
+			window.addEventListener(SAVE_SLOTS_STATUS_EVENT, handleSaveSlotsStatus)
 			window.addEventListener('modloader:game-hud', handleGameHud)
 			window.addEventListener('modloader:vanilla-game-hud', handleVanillaGameHud)
 			window.addEventListener('modloader:config-preview', handleToolbarConfigPreview)
@@ -1542,6 +1556,7 @@ ModLoader.register({
 				closePaintPalette('shell-cleanup')
 				if (closeMountedPalette === mountedPaletteCloser) closeMountedPalette = null
 				if (creativeDialog) closeCreativeDialog('shell-cleanup', true)
+				window.removeEventListener(SAVE_SLOTS_STATUS_EVENT, handleSaveSlotsStatus)
 				window.removeEventListener('modloader:game-hud', handleGameHud)
 				window.removeEventListener('modloader:vanilla-game-hud', handleVanillaGameHud)
 				window.removeEventListener('modloader:config-preview', handleToolbarConfigPreview)

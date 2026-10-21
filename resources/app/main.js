@@ -59,6 +59,8 @@ try {
   console.log(`No Steam today: ${e}`)
 }
 
+ModLoaderMainProcess.configureSaveCloud(client.cloud)
+
 // LANGUAGE CODES
 const languages = {
   "english" : 0,
@@ -86,6 +88,7 @@ const languages = {
 // RENDERER COMMUNICATION
 // Load save
 ipcMain.on(`getMyStuff`, async (e,d)=>{
+  ModLoaderMainProcess.clearTweaksSlotStore(e.sender)
   ModLoaderMainProcess.clearSnapshotContext(e.sender) // reload
  	if (d !== `please`) {
     win.webContents.send(`hereYouGoSir`, null)
@@ -95,7 +98,7 @@ ipcMain.on(`getMyStuff`, async (e,d)=>{
  	//Legacy stuff
  	win.webContents.send(`console`, `Spaceport operational. Is there a new save file? ${client.cloud?.fileExists(`charpsMemory`) ? 'Yes' : 'No'}!`)
  	let stuff = false
- 	if (client.cloud?.fileExists(`charpsMemory`)){
+	if (client.cloud?.fileExists(`charpsMemory`) || ModLoaderMainProcess.hasSaveOverlay(client.cloud)){
 
  		const slots = await getCloudSlots()
 
@@ -104,6 +107,7 @@ ipcMain.on(`getMyStuff`, async (e,d)=>{
       steamId: STEAMID,
       languageId: languages[STEAMLANGUAGE] === undefined ? null : languages[STEAMLANGUAGE],
       slots: slots,
+      savePolicyLayout: slots?.policyLayout,
       noSave: !slots,
       debug: DEBUG
    	}
@@ -133,7 +137,12 @@ ipcMain.on(`save`, (e,d)=>{
 
 ipcMain.on(`store`, (e,slots)=>{
   try {
-    const load = client.cloud?.writeFile(`charpsMemory`, JSON.stringify(slots))
+    const cloud = client.cloud
+    if (cloud == null) return
+    ModLoaderMainProcess.dispatchSaveStore(e, slots, allSlots => {
+      const data = ModLoaderMainProcess.measureDiagnostic('cloud.serializeSlots', () => JSON.stringify(allSlots))
+      return ModLoaderMainProcess.measureDiagnostic('cloud.writeFile', () => cloud.writeFile(`charpsMemory`, data))
+    })
   } catch(e){
     win.webContents.send(`console`, `Error! Error! Error! Can't serialize and write slots to the cloud.`)
   }
@@ -141,9 +150,10 @@ ipcMain.on(`store`, (e,slots)=>{
 //WIP
 ipcMain.handle(`store`, async (e, slots) => {
     try {
-        const data = JSON.stringify(slots)
-        const success = client.cloud.writeFile('charpsMemory', data)
-        return success
+        return ModLoaderMainProcess.dispatchSaveStore(e, slots, allSlots => {
+          const data = ModLoaderMainProcess.measureDiagnostic('cloud.serializeSlots', () => JSON.stringify(allSlots))
+          return ModLoaderMainProcess.measureDiagnostic('cloud.writeFile', () => client.cloud.writeFile('charpsMemory', data))
+        })
     } catch (e) {
         console.error('Steam save failed:', e)
         return false
@@ -163,9 +173,11 @@ ipcMain.on(`quit`, (e,d)=>{
 })
 
 ipcMain.on(`updateStat`, (e,d)=>{
-  for (let i = 0; i < d.length; i++){
-    client.stats?.setInt(d[i].id, d[i].value)
-  }
+  ModLoaderMainProcess.measureDiagnostic('steam.updateStat', () => {
+    for (let i = 0; i < d.length; i++){
+      client.stats?.setInt(d[i].id, d[i].value)
+    }
+  })
 })
 ipcMain.on(`gameError`, (e,d)=>{
   TrackJS?.track(d)
@@ -212,9 +224,9 @@ async function getCloudSlots(){
     if (delays[i]) await sleep(delays[i])
 
     try {
-      const save = client.cloud.readFile(`charpsMemory`)
+      const save = client.cloud?.fileExists(`charpsMemory`) ? client.cloud.readFile(`charpsMemory`) : `[]`
       console.log(`Cloud save read success on attempt ${i+1}`)
-      return JSON.parse(save)
+      return ModLoaderMainProcess.readSaveOverlay(client.cloud, JSON.parse(save))
     } catch(e){
       console.warn(`Cloud read failed, attempt ${i + 1}`)
     }

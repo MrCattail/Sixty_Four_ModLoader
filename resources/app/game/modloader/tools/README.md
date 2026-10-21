@@ -32,6 +32,32 @@ mode by default. Full verification still includes those consumer suites. Run
 either mode against an explicitly installed test copy; the current development
 workspace intentionally retains unpatched native entry files.
 
+## Traditional Chinese locale checks
+
+Full verification includes `chinese-optimization-traditional-contract.test.js`.
+It runs real Loader/Mod/native lookup code in an isolated VM: all 752 fields and
+425 messages, native menu labels, late word hooks, source preservation, placeholder
+and value protection, locale fallback, and Loader panel/manifest/settings text.
+It does not boot Electron or access player saves. `-LoaderOnly` skips this Mod-dependent suite.
+
+The Chinese Mod also has `tests/verify-localization-1.3.cjs` for native reference
+and Simplified text regression checks. Its preserved-text hash was refreshed to
+the user-maintained Simplified input at the 2026-10-16 modtch approval; no source
+translations were changed to satisfy the old pre-review hash.
+
+## Author words.js export checks
+
+Full verification also runs `chinese-optimization-author-export-contract.test.js`.
+The Chinese Mod's Settings action reads the saved translation source, converts
+Traditional Chinese offline, and replaces only the native `sch`/`tch` objects in
+a standalone copy of the game's `words.js`. It uses the existing save-dialog IPC;
+there is no new Loader API or main-process handler. The contract checks 752 fields,
+425 messages and all 50 credits per locale, the other 17 languages and source bytes,
+fresh reads, cancellation, malformed input, protected paths/links and atomic-write
+failure. All file writes and dialog stubs use a temporary fixture, without starting
+the game. Native Save As and Explorer interaction still need player acceptance.
+`-LoaderOnly` skips this Mod-dependent suite.
+
 ## Game 1.3 foundation tests
 
 From the development root, with Node.js and Windows PowerShell available:

@@ -1563,10 +1563,21 @@ function attachWindow(parentWindow, options){
     try {
       if (!clearViewProbeService) clearViewProbeService = require('./diagnostics/clear-view-main.js').createService({
         electron: require('electron'), getWindow: () => win,
-        outputRoot: path.join(__dirname, 'state', 'performance-probes')
+        outputRoot: path.join(__dirname, 'state', 'performance-probes'),
+        isOtherBusy: () => !!periodicStallProbeService?.isBusy()
       })
       clearViewProbeService.attachWindow(win)
     } catch (error) { runtimeLog('clearViewProbeUnavailable', error.message) }
+  }
+  if (fs.existsSync(path.join(__dirname, 'diagnostics', 'periodic-stall-main.js'))) {
+    try {
+      if (!periodicStallProbeService) periodicStallProbeService = require('./diagnostics/periodic-stall-main.js').createService({
+        electron: require('electron'), getWindow: () => win,
+        outputRoot: path.join(__dirname, 'state', 'periodic-stall-probes'),
+        isOtherBusy: () => !!clearViewProbeService?.isBusy()
+      })
+      periodicStallProbeService.attachWindow(win)
+    } catch (error) { runtimeLog('periodicStallProbeUnavailable', error.message) }
   }
   configureSnapshotStore(options)
   configureLibraryStore(options)
@@ -1595,6 +1606,7 @@ function attachWindow(parentWindow, options){
   }
   const sender = win?.webContents
   if (sender?.once) sender.once('destroyed', ()=>{
+    clearTweaksSlotStore(sender)
     clearSnapshotContext(sender)
     clearLibrarySubscriptions(sender)
   })
@@ -1618,8 +1630,57 @@ function configureAppWindowOptions(options, saveOptions, recreateWindow){
 }
 
 let clearViewProbeService = null
+let periodicStallProbeService = null
+let tweaksSlotStore = null
+const tweaksSlotStoreProtocol = 'tweaks-save-policy-v2'
+let savePolicyCloud = null
+function configureSaveCloud(cloud) { savePolicyCloud = cloud }
+function savePolicyBackend() { return require('../mods/Cattail_TweaksQuality_Tweaks/scripts/main/auto-save-policy-store.js') }
+function hasSaveOverlay(cloud) { return cloud?.fileExists?.('cattail-save-policy-v2.json') === true }
+function readSaveOverlay(cloud, base) { return hasSaveOverlay(cloud) ? savePolicyBackend().readOverlay(cloud, base) : base }
+function clearTweaksSlotStore(sender) { tweaksSlotStore?.clear(sender) }
+function isMainSaveSender(event) {
+  return !!win && !win.isDestroyed() && event.sender === win.webContents &&
+    (!event.senderFrame || event.senderFrame === event.sender.mainFrame)
+}
+// No arbitrary main-process Mod entries: this private bridge loads only Tweaks'
+// fixed save backend, and only after its enabled renderer asks to start a session.
+ipcMain.handle('modloader:tweaks-slot-store', (event, request) => {
+  const unavailable = { protocol: tweaksSlotStoreProtocol, ok: false }
+  if (!isMainSaveSender(event) || request?.protocol !== tweaksSlotStoreProtocol) return unavailable
+  if (request.action === 'begin') {
+    if (request.gameVersion !== '1.3') return unavailable
+    const id = 'Cattail_TweaksQuality_Tweaks', modsDir = path.resolve(__dirname, '..', 'mods')
+    const enabled = normalizeEnabledEntries(readJsonFile(path.join(modsDir, 'enabled.json'), { mods: [] }))
+    if (!enabled.some(entry => entry.path === id)) return unavailable
+    const manifest = readJsonFile(path.join(modsDir, id, 'mod.json'), null)
+    if (manifest?.id !== id || !manifest.entries?.includes('scripts/auto-save-stutter-fix.js')) return unavailable
+    try {
+      if (!tweaksSlotStore) tweaksSlotStore = savePolicyBackend().createStore({ measure: measureDiagnostic })
+      return tweaksSlotStore.begin(event.sender, request.owner, savePolicyCloud)
+    } catch (error) { runtimeLog('tweaksSlotStoreUnavailable', error.message); return unavailable }
+  }
+  return unavailable
+})
+function dispatchSaveStore(event, slots, write) {
+  if (typeof slots?.protocol === 'string' && slots.protocol.startsWith('tweaks-') && slots.protocol !== tweaksSlotStoreProtocol) return { ok: false, reason: 'protocol' }
+  if (slots?.protocol === tweaksSlotStoreProtocol && (!isMainSaveSender(event) || !tweaksSlotStore)) {
+    return { protocol: tweaksSlotStoreProtocol, ok: false, reason: 'resync' }
+  }
+  return tweaksSlotStore ? tweaksSlotStore.store(event.sender, slots, write, savePolicyCloud) : write(slots)
+}
+// The optional temporary collector owns all timing; original calls always run.
+function measureDiagnostic(name, run) {
+  return periodicStallProbeService ? periodicStallProbeService.measure(name, run) : run()
+}
 
 module.exports = {
+  configureSaveCloud,
+  hasSaveOverlay,
+  readSaveOverlay,
+  dispatchSaveStore,
+  clearTweaksSlotStore,
+  measureDiagnostic,
   attachWindow,
   getMainWindowOptions,
   afterMainWindowCreated,

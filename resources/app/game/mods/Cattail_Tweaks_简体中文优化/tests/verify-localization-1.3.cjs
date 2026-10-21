@@ -47,6 +47,9 @@ function createConsumer(source = dataSource) {
 	let hook
 	const context = vm.createContext({ ModLoader: { register(value) { definition = value } } })
 	vm.runInContext(source, context, { timeout: 5000 })
+	for (const relative of ['vendor/opencc-js/cn2t.js', 'scripts/traditional-converter.js', 'scripts/author-export.js']) {
+		vm.runInContext(readUtf8(path.join(modRoot, relative)), context, { timeout: 5000 })
+	}
 	vm.runInContext(loaderSource, context, { timeout: 5000 })
 	assert.equal(definition?.id, 'Cattail_Tweaks_简体中文优化')
 	definition.init({ on(name, handler) { assert.equal(name, 'afterWords'); hook = handler } })
@@ -93,12 +96,13 @@ assert.deepEqual([...leaves.keys()].filter(label => !english.has(label)), ['cred
 assert.equal(data.credits[49].en, null)
 assert.equal(data.credits[49].sch, null)
 
-// Guard the approved narrow content change: 555 existing optimized strings stay intact.
+// Snapshot of the user-maintained Simplified text at modtch approval (2026-10-16).
+// The prior pre-review hash was stale before this change; do not restore old dialogue.
 const unchangedRows = [...leaves].filter(([label]) => !newPaths.has(label) && label !== 'achievements[15].description')
 	.map(([label, { value }]) => [label, value.modsch])
 	.sort((a, b) => a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0)
 assert.equal(unchangedRows.length, 555)
-assert.equal(crypto.createHash('sha256').update(serialize(unchangedRows)).digest('hex'), '8a686d50b9e52bd607a638ebbd15d9e133954aa14755dfdeb906758ed9244356', 'Unexpected change to preserved optimized text')
+assert.equal(crypto.createHash('sha256').update(serialize(unchangedRows)).digest('hex'), 'fb57302a4ac9ca103fdbc5b50b1cabc08126dd3000da2874dfe80154588465c6', 'Unexpected change to preserved optimized text')
 assert.match(data.achievements[15].description.modsch, /同一轮游戏/)
 assert.match(data.achievements[15].description.modsch, /64 小时/)
 assert.ok(data.messages[287].modsch.includes('二级解构加速器'), 'Spell dialogue uses the approved spoken machine name')

@@ -40,6 +40,15 @@
 	function installFloorGridLines(api) {
 		if (window[installedKey] || typeof Game === 'undefined') return
 		window[installedKey] = true
+		// Private Tweaks consumer: reuse the same style without enabling the
+		// persistent background grid. A persistent grid already supplies the lines.
+		window.__cattailTweaksFloorGridV1 = Object.freeze({
+			renderClearView(game, ctx) {
+				if (!game || game.halt) return false
+				if (shouldShowFloorGridLines(game, api)) return true
+				return renderFloorGridLines(game, api, ctx, { screenSpace: true, force: true }) === true
+			}
+		})
 		registerFloorGridLinesRenderApi(api)
 		api.patch(Game.prototype, 'renderConductors', function (original) {
 			return function (...args) {
@@ -72,7 +81,7 @@
 	}
 
 	function renderFloorGridLines(game, api, ctx = game?.ctx, options = {}) {
-		if (!shouldShowFloorGridLines(game, api)) return
+		if (options.force !== true && !shouldShowFloorGridLines(game, api)) return
 		if (!ctx || typeof game.xyToUV !== 'function') return
 		const toXY = options.screenSpace === true ? game.uvToXYUntranslated : game.uvToXY
 		if (typeof toXY !== 'function') return
@@ -83,21 +92,23 @@
 		const width = Math.max(0.5, Math.min((game.pixelRatio || 1) * 0.9, (game.unit || 1) * 0.015))
 
 		ctx.save()
-		ctx.strokeStyle = color
-		ctx.lineWidth = width
-		ctx.lineCap = 'butt'
-		ctx.lineJoin = 'miter'
-		for (let y = bounds.y0; y <= bounds.y1; y += step) {
-			const xy0 = toXY.call(game, [bounds.x0, y])
-			const xy1 = toXY.call(game, [bounds.x1, y])
-			drawGridLine(ctx, xy0, xy1)
-		}
-		for (let x = bounds.x0; x <= bounds.x1; x += step) {
-			const xy0 = toXY.call(game, [x, bounds.y0])
-			const xy1 = toXY.call(game, [x, bounds.y1])
-			drawGridLine(ctx, xy0, xy1)
-		}
-		ctx.restore()
+		try {
+			ctx.strokeStyle = color
+			ctx.lineWidth = width
+			ctx.lineCap = 'butt'
+			ctx.lineJoin = 'miter'
+			for (let y = bounds.y0; y <= bounds.y1; y += step) {
+				const xy0 = toXY.call(game, [bounds.x0, y])
+				const xy1 = toXY.call(game, [bounds.x1, y])
+				drawGridLine(ctx, xy0, xy1)
+			}
+			for (let x = bounds.x0; x <= bounds.x1; x += step) {
+				const xy0 = toXY.call(game, [x, bounds.y0])
+				const xy1 = toXY.call(game, [x, bounds.y1])
+				drawGridLine(ctx, xy0, xy1)
+			}
+		} finally { ctx.restore() }
+		return true
 	}
 
 	function shouldShowFloorGridLines(game, api) {
@@ -112,10 +123,10 @@
 			const rt = normalizeGridUv(game.xyToUV([game.w, 0]))
 			const lb = normalizeGridUv(game.xyToUV([0, game.h]))
 			return {
-				x0: Math.min(lt[0], rb[0]),
-				x1: Math.max(lt[0], rb[0]),
-				y0: Math.min(rt[1], lb[1]),
-				y1: Math.max(rt[1], lb[1])
+				x0: Math.min(lt[0], rb[0], rt[0], lb[0]),
+				x1: Math.max(lt[0], rb[0], rt[0], lb[0]),
+				y0: Math.min(lt[1], rb[1], rt[1], lb[1]),
+				y1: Math.max(lt[1], rb[1], rt[1], lb[1])
 			}
 		} catch (error) {
 			return null

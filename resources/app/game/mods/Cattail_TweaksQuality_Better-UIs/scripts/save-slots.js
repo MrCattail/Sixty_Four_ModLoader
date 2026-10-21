@@ -6,6 +6,8 @@ ModLoader.register({
 			if (globalThis[SERVICE_KEY]?.owner === api.id) delete globalThis[SERVICE_KEY]
 			return
 		}
+		const policy = game => game?.[Symbol.for('cattail.tweaks.save-policy')]
+		const isAuto = slot => slot?.tweaksSavePolicy?.role === 'auto'
 		const serviceVersion = 1
 		const manualSlotCount = 20
 		const maxNameLength = 64
@@ -52,10 +54,19 @@ ModLoader.register({
 			await (baseSave || game.saveGame).call(game)
 		}
 		function nativeSlots(game) { return Array.isArray(game?.saveSlots) ? game.saveSlots : [] }
+		function forkSourceIndex(game) {
+			if (policy(game)) return policy(game).sourceIndex()
+			const current = nativeSlots(game)[game?.currentSlotId]
+			if (!current) return -1
+			if (!isAuto(current)) return game.currentSlotId
+			return nativeSlots(game).findIndex(slot => slot && !isAuto(slot) && slot.tweaksSavePolicy?.id === current.tweaksSavePolicy?.sourceId)
+		}
 		function source(game) {
 			const slot = nativeSlots(game)[game.currentSlotId]
 			const id = normalizeSaveInstanceId(slot?.stack?.[0]?.state?.modloader?.saveInstanceId)
-			return slot && id && context(game).persistedIdentity === id ? { index: game.currentSlotId, name: slotTitle(game, slot, game.currentSlotId), saveInstanceId: id } : null
+			const manualIndex = policy(game)?.sourceIndex()
+			const named = nativeSlots(game)[manualIndex] || slot
+			return slot && id && context(game).persistedIdentity === id ? { index: game.currentSlotId, name: slotTitle(game, named, manualIndex >= 0 ? manualIndex : game.currentSlotId), saveInstanceId: id } : null
 		}
 		function serviceSnapshot() {
 			const game = activeGame
@@ -66,9 +77,11 @@ ModLoader.register({
 			const summaries = Array.from({ length }, (_, index) => {
 				const slot = slots[index]
 				return Object.freeze({ index, occupied: !!slot, name: String(slot?.name || ''), timestamp: recordTime(slot?.stack?.[0], slot), pendingActivation: !!ctx?.activating })
-			})
+			}).filter(item => !policy(game) || !isAuto(slots[item.index]))
 			return Object.freeze({ version: serviceVersion, ready: !!game && game.version === '1.3' && !!game.localDatabase && !ctx.busy && !ctx.activating && !ctx.error && !game.preventSaving,
 				manualSlotCount, maxNameLength, emptyCount: game ? emptyIndices.length : 0,
+				fork: Object.freeze({ sourceIndex: game ? forkSourceIndex(game) : -1, requiredSlots: game && forkSourceIndex(game) >= 0 ? 1 : 2 }),
+				activationNotice: ctx?.activationNotice || null,
 				emptyIndices: Object.freeze(game ? emptyIndices : []), slots: Object.freeze(game ? summaries : []),
 				source: game && source(game) ? Object.freeze(source(game)) : null, pendingActivation: !!ctx?.activating,
 				error: ctx?.error ? Object.freeze({ code: ctx.error.code, message: ctx.error.message }) : null })
@@ -76,7 +89,8 @@ ModLoader.register({
 		const service = Object.freeze({
 			owner: api.id, version: serviceVersion,
 			capabilities() { return Object.freeze({ version: serviceVersion, ready: serviceSnapshot().ready, manualSlotCount, maxNameLength,
-				atomicBatch: true, atomicBatchScope: 'local-indexeddb', verifiedSource: true, lineageFinalization: true, createAndActivate: true, storage: 'native-1.3' }) },
+				atomicBatch: true, atomicBatchScope: 'local-indexeddb', verifiedSource: true, lineageFinalization: true, createAndActivate: true,
+				protectedCurrentFork: !policy(activeGame) || typeof policy(activeGame).commitFork === 'function', storage: 'native-1.3' }) },
 			snapshot: serviceSnapshot,
 			settle(options) { return settleService(options?.game || activeGame) },
 			createAndActivate
@@ -102,16 +116,24 @@ ModLoader.register({
 			api.patch(Game.prototype, 'saveGame', original => {
 				baseSave = original
 				return function (...args) {
+					const captured = policy(this)?.capture()
+					if (policy(this) && !captured) return Promise.resolve(false)
+					if (captured) args = [captured]
 					return enqueue(this, async () => {
 						if (context(this).activating || context(this).error) return
-						return original.apply(this, args)
+						const result = await original.apply(this, args)
+						if (result === true) clearActivationNotice(this)
+						return result
 					}).catch(error => { showError(error); throw error })
 				}
 			})
 			api.patch(Game.prototype, 'writeToSlot', original => async function (...args) {
 				const result = await original.apply(this, args)
 				context(this).cloudSaved = result === true
-				if (args[1] === this.currentSlotId && args[0] === this.saveSlots[this.currentSlotId]) context(this).persistedIdentity = normalizeSaveInstanceId(args[0]?.stack?.[0]?.state?.modloader?.saveInstanceId)
+				if (args[1] === this.currentSlotId && args[0] === this.saveSlots[this.currentSlotId]) {
+					context(this).persistedIdentity = normalizeSaveInstanceId(args[0]?.stack?.[0]?.state?.modloader?.saveInstanceId)
+					if (result === true) clearActivationNotice(this)
+				}
 				if (result !== true) statusKey = 'localOnly'
 				else if (statusKey === 'localOnly') statusKey = 'saved'
 				return result
@@ -140,8 +162,19 @@ ModLoader.register({
 							saved?.stack?.[0]?.state?.modloader?.saveInstanceId !== marker.saveInstanceId) {
 							fail('VERIFY_FAILED', 'The activated save does not match its persisted identity.')
 						}
+						if (marker.fork) {
+							const copy = await game.readFromSlot(marker.fork.copyIndex)
+							const original = await game.readFromSlot(marker.fork.sourceIndex)
+							if (copy?.stack?.[0]?.state?.modloader?.saveInstanceId !== marker.saveInstanceId ||
+								!original?.stack?.some(record => record.isProtected && record.state?.modloader?.saveInstanceId === marker.fork.sourceId && record.state?.timestamp === marker.fork.timestamp)) {
+								fail('VERIFY_FAILED', 'The original checkpoint or activated copy could not be verified.')
+							}
+						}
 						localStorage.removeItem(activationKey(game))
 					}
+					const notice = JSON.parse(localStorage.getItem(activationNoticeKey(game)) || 'null')
+					ctx.activationNotice = notice?.saveInstanceId === savedId && notice.cloudSaved === false ? Object.freeze(notice) : null
+					if (ctx.activationNotice) statusKey = 'localOnly'
 					ctx.error = null
 				} catch (error) {
 					ctx.error = error instanceof SaveSlotsServiceError ? error : new SaveSlotsServiceError('VERIFY_FAILED', String(error?.message || error))
@@ -169,6 +202,12 @@ ModLoader.register({
 			})
 		}
 		async function persistCollection(game, next, activeIndex = game.currentSlotId) {
+			if (policy(game)) {
+				const saved = await policy(game).persistCollection(next, activeIndex)
+				context(game).persistedIdentity = normalizeSaveInstanceId(game.saveSlots[game.currentSlotId]?.stack?.[0]?.state?.modloader?.saveInstanceId)
+				context(game).cloudSaved = saved; statusKey = saved ? 'saved' : 'localOnly'; statusDetail = ''
+				return saved
+			}
 			const previous = game.saveSlots
 			const previousIndex = game.currentSlotId
 			await writeLocalCollection(game, previous, next)
@@ -200,7 +239,7 @@ ModLoader.register({
 		}
 		function availableIndices(game) {
 			const slots = nativeSlots(game)
-			if (slots.filter(Boolean).length >= manualSlotCount) return []
+			if (slots.filter(slot => slot && (!policy(game) || !isAuto(slot))).length >= manualSlotCount) return []
 			return Array.from({ length: manualSlotCount }, (_, i) => i).filter(i => !slots[i])
 		}
 		function checkCapacity(game, count) {
@@ -222,6 +261,7 @@ ModLoader.register({
 		}
 		function forkSlot(slot) {
 			const copy = clone(slot)
+			delete copy.tweaksSavePolicy
 			const identities = new Map()
 			for (const record of copy.stack) {
 				if (!record.state) continue
@@ -314,6 +354,7 @@ ModLoader.register({
 			if (!game) fail('NOT_READY', 'Save slots are not ready.')
 			if (context(game).busy || context(game).activating) fail('TRANSACTION_ACTIVE', 'A save-slot transaction is already active.')
 			return mutate(game, async () => {
+				if (options?.preserveSource) return createProtectedFork(game, options)
 				const entries = options?.entries
 				const index = options?.activateEntry
 				if (!Array.isArray(entries) || !entries.length || !Number.isInteger(index) || index < 0 || index >= entries.length) fail('INVALID_ARGUMENT', 'Invalid activation batch.')
@@ -337,11 +378,150 @@ ModLoader.register({
 				})
 				await saveCurrent(game)
 				const receipts = await appendSlots(game, slots, index)
-				return Object.freeze({ activated: true, entries: Object.freeze(receipts.map(Object.freeze)), activeIndex: receipts[index].index, reloadScheduled: true })
+				return Object.freeze({ activated: true, entries: Object.freeze(receipts.map(Object.freeze)), activeIndex: game.currentSlotId, reloadScheduled: true })
 			})
 		}
 		function activationKey(game) { return `abstractv03_saveSlotsNativeActivation${game.steamId}` }
+		function activationNoticeKey(game) { return `abstractv03_saveSlotsForkNotice${game.steamId}` }
+		function clearActivationNotice(game) {
+			const ctx = context(game)
+			const hadNotice = !!ctx.activationNotice
+			ctx.activationNotice = null
+			try { localStorage.removeItem(activationNoticeKey(game)) } catch (_) { /* A stale warning is safer than losing a successful save. */ }
+			// The editor may stay idle after saving; invalidate its displayed notice
+			// only when this state changes, without polling or refreshing the world.
+			if (hadNotice && typeof globalThis.CustomEvent === 'function') {
+				try { globalThis.dispatchEvent?.(new CustomEvent('cattail:better-uis-save-status', { detail: { game } })) }
+				catch (_) { /* A UI listener must not turn a successful save into a failure. */ }
+			}
+		}
+		async function createProtectedFork(game, options) {
+			const preserve = options.preserveSource, ctx = context(game), activePolicy = policy(game)
+			if (activePolicy && typeof activePolicy.commitFork !== 'function') fail('NOT_READY', 'The save policy does not support protected forks.')
+			if (options.activateEntry !== 0 || options.entries?.length !== 1 || typeof preserve.assertCurrent !== 'function') fail('INVALID_ARGUMENT', 'A protected fork requires one copy and a verified source.')
+			const previous = game.saveSlots, previousIndex = game.currentSlotId, owner = game.steamId
+			const manualIndex = forkSourceIndex(game), current = previous[previousIndex]
+			const sourceSlot = previous[manualIndex]
+			const sourceText = sourceSlot ? JSON.stringify(sourceSlot) : null
+			const currentStack = current?.stack
+			const sourceId = normalizeSaveInstanceId(preserve.record?.state?.modloader?.saveInstanceId)
+			function assertCurrent() {
+				preserve.assertCurrent()
+				if (game.steamId !== owner || game.saveSlots !== previous || game.currentSlotId !== previousIndex ||
+					game.saveSlots[previousIndex] !== current || current.stack !== currentStack || forkSourceIndex(game) !== manualIndex ||
+					(manualIndex >= 0 && JSON.stringify(game.saveSlots[manualIndex]) !== sourceText) ||
+					preserve.sourceIndex !== manualIndex || preserve.saveInstanceId !== sourceId || !sourceId ||
+					current.stack[0]?.state?.modloader?.saveInstanceId !== sourceId) fail('SAVE_CONTEXT_CHANGED', 'The original save changed before the copy was committed.')
+			}
+			assertCurrent()
+			if (!validRecord(preserve.record) || !preserve.record.state) fail('INVALID_SAVE', 'The original checkpoint is incomplete.')
+			const checkpoint = clone(preserve.record); checkpoint.isProtected = true
+			const entry = options.entries[0], name = normalName(entry?.name)
+			if (entry.nameConflict !== 'reject') fail('INVALID_ARGUMENT', 'Protected forks cannot overwrite names.')
+			const originalName = manualIndex < 0 ? normalName(preserve.name) : ''
+			const names = previous.filter(Boolean).map(slot => String(slot.name || '').trim())
+			if (names.includes(name) || (manualIndex < 0 && (names.includes(originalName) || originalName === name))) fail('NAME_CONFLICT', 'A requested save name already exists.')
+			const indices = checkCapacity(game, manualIndex < 0 ? 2 : 1)
+			const next = previous.slice(), at = Date.now()
+			const originalIndex = manualIndex < 0 ? indices[0] : manualIndex
+			if (sourceSlot) {
+				// This explicit fork never discards an old point, even at the history limit.
+				next[manualIndex] = { ...clone(sourceSlot), lastModified: at, stack: [clone(sourceSlot.stack[0]), checkpoint, ...clone(sourceSlot.stack.slice(1))] }
+			} else next[originalIndex] = { name: originalName, ownerHash: current.ownerHash, creationTimeStamp: at, lastModified: at, stack: [checkpoint] }
+			const copyIndex = indices[manualIndex < 0 ? 1 : 0]
+			const candidate = decodeInput(game, entry.data)
+			const copy = forkSlot(normalizeSlot(game, validRecord(candidate) ? { stack: [candidate] } : candidate))
+			if (copy.stack.length !== 1 || !copy.stack[0].state) fail('INVALID_SAVE', 'A current fork must contain one complete record.')
+			copy.name = name; copy.ownerHash = current.ownerHash; copy.creationTimeStamp = at; copy.lastModified = at
+			copy.stack[0].isProtected = false
+			next[copyIndex] = copy
+			const identity = normalizeSaveInstanceId(copy.stack[0].state.modloader.saveInstanceId)
+			const markerKey = activationKey(game), noticeKey = activationNoticeKey(game), preferencesKey = `abstractv03_preferences${owner}`
+			const oldValues = new Map([markerKey, noticeKey, preferencesKey].map(key => [key, localStorage.getItem(key)]))
+			const wasBlocked = game.preventSaving, oldNotice = ctx.activationNotice
+			const scope = { steamId: owner, localDatabase: game.localDatabase }
+			let localCommitted = false, publishedIndex = null
+			const hooks = {
+				assertCurrent,
+				async verify(collection) {
+					for (let index = 0; index < collection.length; index++) {
+						if (collection[index] === previous[index]) continue
+						assertCurrent()
+						const saved = await game.readFromSlot(index)
+						assertCurrent()
+						if (JSON.stringify(saved) !== JSON.stringify(collection[index])) fail('VERIFY_FAILED', 'A fork record could not be read back exactly.')
+					}
+				},
+				publish(collection, activeIndex) {
+					assertCurrent()
+					const marker = { schema: 2, steamId: String(owner || ''), index: activeIndex, saveInstanceId: identity,
+						fork: { copyIndex, sourceIndex: originalIndex, sourceId, timestamp: checkpoint.state.timestamp } }
+					const notice = { cloudSaved: false, saveInstanceId: identity }
+					for (const [key, value] of [[markerKey, marker], [noticeKey, notice]]) {
+						const raw = JSON.stringify(value); localStorage.setItem(key, raw)
+						if (localStorage.getItem(key) !== raw) fail('VERIFY_FAILED', 'The activation marker could not be verified.')
+					}
+					publishedIndex = activeIndex; game.currentSlotId = activeIndex; game.savePreferences()
+					if (JSON.parse(localStorage.getItem(preferencesKey) || 'null')?.currentSlotId !== activeIndex) fail('VERIFY_FAILED', 'The active slot preference could not be verified.')
+				},
+				restore() {
+					if (game.steamId !== owner || game.saveSlots !== previous ||
+						(game.currentSlotId !== previousIndex && game.currentSlotId !== publishedIndex)) fail('ROLLBACK_FAILED', 'The save context changed during recovery. Reload before continuing.')
+					game.currentSlotId = previousIndex
+					for (const [key, value] of oldValues) {
+						if (value === null) localStorage.removeItem(key); else localStorage.setItem(key, value)
+						if (localStorage.getItem(key) !== value) fail('ROLLBACK_FAILED', 'The previous activation state could not be restored.')
+					}
+				}
+			}
+			ctx.activating = true; game.preventSaving = true
+			try {
+				let result
+				if (activePolicy) result = await activePolicy.commitFork(next, copyIndex, hooks)
+				else {
+					let wrote = false
+					try {
+						assertCurrent(); await writeLocalCollection(scope, previous, next); wrote = true
+						await hooks.verify(next); hooks.publish(next, copyIndex)
+					} catch (error) {
+						try { if (wrote) await writeLocalCollection(scope, next, previous); hooks.restore() }
+						catch (_) { fail('ROLLBACK_FAILED', 'The fork could not be rolled back. Reload before continuing.') }
+						throw error
+					}
+					game.saveSlots = next
+					let cloudSaved = false
+					try { cloudSaved = await game.spaceport?.invoke?.('store', next) === true } catch (_) { /* Local copy is already verified. */ }
+					result = { activeIndex: copyIndex, cloudSaved }
+				}
+				localCommitted = true
+				ctx.persistedIdentity = identity; ctx.cloudSaved = result.cloudSaved
+				ctx.activationNotice = result.cloudSaved ? null : Object.freeze({ cloudSaved: false, saveInstanceId: identity })
+				if (result.cloudSaved) clearActivationNotice(game)
+				statusKey = result.cloudSaved ? 'saved' : 'localOnly'
+				setTimeout(() => globalThis.location.reload(), 100)
+				return Object.freeze({ activated: true, reloadScheduled: true, activeIndex: result.activeIndex, cloudSaved: result.cloudSaved,
+					sourceIndex: originalIndex, entries: Object.freeze([Object.freeze({ index: copyIndex, name, timestamp: recordTime(copy.stack[0], copy) })]) })
+			} catch (error) {
+				ctx.activating = false; ctx.activationNotice = oldNotice
+				if (error.code === 'ROLLBACK_FAILED' || localCommitted) {
+					ctx.error = new SaveSlotsServiceError('ROLLBACK_FAILED', 'The save result is uncertain. Reload before continuing.')
+					game.preventSaving = true; throw ctx.error
+				}
+				game.preventSaving = wasBlocked
+				throw error
+			}
+		}
 		async function activateCollection(game, next, index) {
+			if (policy(game)) {
+				context(game).activating = true
+				try {
+					const active = await policy(game).activateCollection(next, index)
+					const identity = normalizeSaveInstanceId(game.saveSlots[active]?.stack?.[0]?.state?.modloader?.saveInstanceId)
+					if (identity) localStorage.setItem(activationKey(game), JSON.stringify({schema:2,steamId:String(game.steamId||''),index:active,saveInstanceId:identity}))
+					setTimeout(() => globalThis.location.reload(), 100)
+				} catch (error) { context(game).activating = false; throw error }
+				return
+			}
 			const identity = normalizeSaveInstanceId(next[index]?.stack?.[0]?.state?.modloader?.saveInstanceId)
 			const oldMarker = localStorage.getItem(activationKey(game))
 			// Identity-bearing activations are verified against IndexedDB after reload.
@@ -365,6 +545,12 @@ ModLoader.register({
 			return mutate(game, async () => {
 				const index = game.saveSlots.indexOf(slot)
 				if (index < 0 || !slot.stack.includes(record)) fail('STALE_SAVE', text(game, 'changed'))
+				if (policy(game)) {
+					await policy(game).activate(index, record)
+					context(game).activating = true
+					setTimeout(() => globalThis.location.reload(), 100)
+					return
+				}
 				const selected = clone(record)
 				await saveCurrent(game)
 				const next = game.saveSlots.slice()
@@ -385,18 +571,24 @@ ModLoader.register({
 				if (targetSlot === null) checkCapacity(game, 1)
 				await saveCurrent(game)
 				const current = game.saveSlots[game.currentSlotId]
-				if (targetIndex === null) return appendSlots(game, [{ ...clone(current), name: '', stack: [clone(current.stack[0])], creationTimeStamp: Date.now() }])
+				if (targetIndex === null) {
+					const receipts = await appendSlots(game, [{ ...clone(current), name: '', stack: [clone(current.stack[0])], creationTimeStamp: Date.now() }])
+					if (policy(game)) await policy(game).setSource(receipts[0].index)
+					return receipts
+				}
 				if (targetIndex === game.currentSlotId) return
 				const target = game.saveSlots[targetIndex]
 				if (!target) fail('STALE_SAVE', text(game, 'changed'))
 				const next = game.saveSlots.slice()
 				const copy = clone(target)
 				copy.stack.unshift(forkSlot({ stack: [current.stack[0]] }).stack[0])
+				if (policy(game)) copy.tweaksSavePolicy = { ...copy.tweaksSavePolicy, headAt: Date.now() }
 				trimHistory(game, copy.stack)
 				copy.ownerHash = current.ownerHash
 				copy.lastModified = Date.now()
 				next[targetIndex] = copy
-				return persistCollection(game, next)
+				await persistCollection(game, next)
+				if (policy(game)) await policy(game).setSource(targetIndex)
 			})
 		}
 		function trimHistory(game, stack) {
@@ -413,7 +605,7 @@ ModLoader.register({
 					const suffix = ' — ' + text(game, 'copy')
 					return appendSlots(game, [{ ...clone(slot), name: slotTitle(game, slot, index).slice(0, maxNameLength - suffix.length) + suffix }])
 				}
-				if (action === 'delete' && index === game.currentSlotId) fail('ACTIVE_SLOT', text(game, 'activeDelete'))
+				if (action === 'delete' && (index === game.currentSlotId || index === policy(game)?.sourceIndex())) fail('ACTIVE_SLOT', text(game, 'activeDelete'))
 				await saveCurrent(game)
 				const next = game.saveSlots.slice()
 				let activeIndex = game.currentSlotId
@@ -456,7 +648,7 @@ ModLoader.register({
 				steamId: String(game.steamId || ''), slotCount: manualSlotCount, currentSlotId: game.currentSlotId, slots: clone(game.saveSlots) }
 		}
 		function safeTimestamp(value) { const n = Number(value); return Number.isFinite(n) && n > 0 ? n : null }
-		function recordTime(record, slot) { return safeTimestamp(record?.state?.timestamp) || (record === slot?.stack?.[0] ? safeTimestamp(slot?.lastModified) : null) }
+		function recordTime(record, slot) { return safeTimestamp(record?.state?.timestamp) || (record === slot?.stack?.[0] ? safeTimestamp(!isAuto(slot) && slot?.tweaksSavePolicy?.headAt || slot?.lastModified) : null) }
 		function slotsKey(game) { return `abstractv03_saveSlots${game.steamId}` }
 		function slotTitle(game, slot, index) { return slot?.name || text(game, 'defaultSlotName', { index: index + 1 }) }
 		function showError(error) {
@@ -485,7 +677,7 @@ ModLoader.register({
 			const rule = document.createElement('div')
 			rule.className = 'cattail-save-slots-rule-strong'
 			ctx.content.append(rule)
-			for (let index = 0; index < Math.max(manualSlotCount, slots.length); index++) ctx.content.append(renderNativeRow(game, slots[index], index))
+			for (let index = 0; index < Math.max(manualSlotCount, slots.length); index++) if (!policy(game) || !isAuto(slots[index])) ctx.content.append(renderNativeRow(game, slots[index], index))
 		}
 		function renderNativeRow(game, slot, index, isAuto = false) {
 			const row = document.createElement('div')
@@ -501,7 +693,7 @@ ModLoader.register({
 			name.textContent = title
 			const time = document.createElement('div')
 			time.className = 'cattail-save-slots-time'
-			time.textContent = (slot ? formatTime(recordTime(slot.stack?.[0], slot)) : '') + (!isAuto && slot && index === game.currentSlotId ? ' · ' + text(game, 'current') : '')
+			time.textContent = (slot ? formatTime(recordTime(slot.stack?.[0], slot)) : '') + (!isAuto && slot && index === (policy(game)?.sourceIndex() ?? game.currentSlotId) ? ' · ' + text(game, 'current') : '')
 			info.append(name, time)
 			const resources = document.createElement('div')
 			resources.className = 'cattail-save-slots-resources'
@@ -533,7 +725,7 @@ ModLoader.register({
 					add('overwrite', false, () => select('overwrite'))
 					add('copy', !availableIndices(game).length, () => changeSlot(game, slot, 'copy'))
 					add('rename', false, () => renderRenameSlot(game, row, slot))
-					add('delete', index === game.currentSlotId, () => select('delete'))
+					add('delete', index === game.currentSlotId || index === policy(game)?.sourceIndex(), () => select('delete'))
 				}
 			}
 			row.append(info, resourceArea, actions)
@@ -563,7 +755,7 @@ ModLoader.register({
 				button.style.setProperty('--position', entries.length === 1 ? .5 : position / (entries.length - 1))
 				for (const { capacity, positions } of labelSets) button.style.setProperty(`--label-${capacity}`, positions.has(position) ? 'visible' : 'hidden')
 				const timestamp = time ? formatTime(time) : text(game, 'noTime')
-				button.title = timestamp + (index === 0 ? ' · ' + text(game, 'latest') : '')
+				button.title = timestamp + (index === 0 ? ' · ' + text(game, policy(game) && !isAuto(slot) ? 'manualPoint' : 'latest') : '')
 				button.setAttribute('aria-label', text(game, 'load') + ': ' + button.title)
 				const dot = document.createElement('span')
 				dot.className = 'cattail-save-slots-timeline-dot'
@@ -823,9 +1015,9 @@ ModLoader.register({
 		}
 
 		const NATIVE_LABELS = {
-			en: { importClipboard: 'Import from clipboard', migrateLegacy: 'Migrate old slots', confirmImport: 'Add slots', importConfirm: 'Add {count} new slots without switching?', copy: 'Copy', current: 'Playing', latest: 'Latest save', history: 'Save history', saved: 'Saved', localOnly: 'Saved locally. Steam cloud saving did not succeed.', operationFailed: 'Operation failed:', full: 'Not enough empty slots (20 slots maximum). Existing slots were kept.', changed: 'This save changed. Refresh and select it again.', activeDelete: 'Switch to another slot before deleting this slot.', noLegacy: 'No unmigrated old slots were found.' },
-			sch: { importClipboard: '从剪贴板导入', migrateLegacy: '迁入旧槽位', confirmImport: '添加槽位', importConfirm: '新增 {count} 个槽位，不切换当前游戏？', copy: '复制', current: '正在游玩', latest: '最新保存', history: '存档历史', saved: '已保存', localOnly: '已保存在本地，Steam 云保存未成功。', operationFailed: '操作失败：', full: '空槽不足（最多 20 个普通槽）；已有存档全部保留。', changed: '存档已变化，请刷新后重新选择。', activeDelete: '请先切换到其他槽，再删除此槽。', noLegacy: '没有尚未迁入的旧槽位。' },
-			tch: { importClipboard: '從剪貼簿匯入', migrateLegacy: '遷入舊槽位', confirmImport: '新增槽位', importConfirm: '新增 {count} 個槽位，不切換目前遊戲？', copy: '複製', current: '正在遊玩', latest: '最新儲存', history: '存檔歷史', saved: '已儲存', localOnly: '已儲存在本機，Steam 雲端儲存未成功。', operationFailed: '操作失敗：', full: '空槽不足（最多 20 個普通槽）；現有存檔全部保留。', changed: '存檔已變更，請重新整理後再選擇。', activeDelete: '請先切換到其他槽，再刪除此槽。', noLegacy: '沒有尚未遷入的舊槽位。' }
+			en: { importClipboard: 'Import from clipboard', migrateLegacy: 'Migrate old slots', confirmImport: 'Add slots', importConfirm: 'Add {count} new slots without switching?', copy: 'Copy', current: 'Playing', manualPoint: 'Manual save point', latest: 'Latest save', history: 'Save history', saved: 'Saved', localOnly: 'Saved locally. Steam cloud saving did not succeed.', operationFailed: 'Operation failed:', full: 'Not enough empty slots (20 slots maximum). Existing slots were kept.', changed: 'This save changed. Refresh and select it again.', activeDelete: 'Switch to another slot before deleting this slot.', noLegacy: 'No unmigrated old slots were found.' },
+			sch: { importClipboard: '从剪贴板导入', migrateLegacy: '迁入旧槽位', confirmImport: '添加槽位', importConfirm: '新增 {count} 个槽位，不切换当前游戏？', copy: '复制', current: '正在游玩', manualPoint: '手动保存点', latest: '最新保存', history: '存档历史', saved: '已保存', localOnly: '已保存在本地，Steam 云保存未成功。', operationFailed: '操作失败：', full: '空槽不足（最多 20 个普通槽）；已有存档全部保留。', changed: '存档已变化，请刷新后重新选择。', activeDelete: '请先切换到其他槽，再删除此槽。', noLegacy: '没有尚未迁入的旧槽位。' },
+			tch: { importClipboard: '從剪貼簿匯入', migrateLegacy: '遷入舊槽位', confirmImport: '新增槽位', importConfirm: '新增 {count} 個槽位，不切換目前遊戲？', copy: '複製', current: '正在遊玩', manualPoint: '手動儲存點', latest: '最新儲存', history: '存檔歷史', saved: '已儲存', localOnly: '已儲存在本機，Steam 雲端儲存未成功。', operationFailed: '操作失敗：', full: '空槽不足（最多 20 個普通槽）；現有存檔全部保留。', changed: '存檔已變更，請重新整理後再選擇。', activeDelete: '請先切換到其他槽，再刪除此槽。', noLegacy: '沒有尚未遷入的舊槽位。' }
 		}
 		NATIVE_LABELS.modsch = NATIVE_LABELS.sch
 

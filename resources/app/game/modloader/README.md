@@ -621,6 +621,42 @@ Mods can declare whether they follow the game's language switching with:
 
 The catalog only changes display text at runtime. It is local user data and is
 excluded from release packages so updates do not overwrite a player's edits.
+### Derived language variants
+
+The optional second argument to `api.registerLanguage(id, options)` registers a
+derived language and returns `true` when supported. Existing one-argument calls
+keep their behavior. `options` contains `sourceLanguage`, `transformText(text)`
+and an optional `languageName` (the full `splash.language` label). For example:
+
+```js
+api.registerLanguage('modtch', {
+  sourceLanguage: 'modsch',
+  transformText: convertToTraditional,
+  languageName: '語言：繁體中文[優化]'
+})
+```
+
+The converter must be synchronous and return a string. It owns any memoization
+and protection of markup/placeholders. Variants must derive directly from a base
+language; chained or self-referencing variants are rejected.
+
+After all `afterWords` hooks, Loader copies and converts the source word tree.
+Object keys and source values are unchanged; arrays are copied as a whole and
+existing target-only namespaces survive the merge. Native language-list reads
+receive cached display names without invoking Mod hooks again.
+
+For Loader UI, locale lookup tries the variant, its source language, normal
+Chinese aliases (where applicable), then English. Display templates are converted
+before dynamic values are substituted. Config keys, option values, paths used for
+file access and persisted values are not converted. Explicit variant entries in
+the translation catalog are supported without writing generated entries to disk.
+This does not translate arbitrary DOM or a Mod-owned custom UI.
+
+Chinese Optimization ships the offline OpenCC converter and registers `modtch`;
+there is no network/CDN dependency or conversion in the game frame loop.
+Older Loaders without the optional descriptor still receive the Mod fallback
+game word tree; complete Loader menu conversion requires this updated Loader.
+
 ## Example Building
 
 Enable the entity example with:
@@ -1034,3 +1070,12 @@ ModLoader.register({
 
 If a save contains an entity whose mod is disabled, the loader keeps that
 entity in `save.modloader.orphanEntities` instead of crashing or deleting it.
+
+
+## Tweaks private save policy (desktop 1.3, 2026-10-20)
+
+The fixed enabled Tweaks auto-save-stutter-fix.js entry is loaded before native save preparation and registers only once. It installs the optional policy when enableAutoSaveStutterFix is enabled. Other entries retain the normal lifecycle; this is not a general early-entry or arbitrary main-process Mod API.
+
+The private tweaks-save-policy-v2 protocol uses the existing trusted main-window channel. Begin returns a token and record references, never requests a full renderer seed. Commits contain only changed slot descriptors and new current/history records. Tweaks owns snapshot isolation, local IDB completion, cloud retry, content checksums, the two-file auto ring and publish-last index. No enabled-policy error falls back to a full collection. The cloud reader reconstructs the legacy charpsMemory baseline plus the optional delta index even when the setting is off. Disabling/reloading restores native saves; an updated native baseline supersedes the older delta index. New delta data requires this reader.
+
+Better UIs service v1 keeps source.index/activeIndex tied to the verified physical working auto slot; its source name describes the played manual slot. Manual entry receipts keep manual indices. First installation requires a full Electron restart. See Codex-md/save_policy_20261020.md for validation and player/Steam limitations.

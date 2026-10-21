@@ -155,7 +155,7 @@ function createService(options) {
     }, milliseconds)
   }
   async function start(win, payload) {
-    if (active) throw new Error('已有探针采集正在运行。')
+    if (active || options.isOtherBusy?.()) throw new Error('已有探针采集正在运行。')
     if (traceStopUncertain) throw new Error('上次底层追踪未能正常停止，请完整重启游戏后再采集。')
     if (!['light', 'deep', 'ablation', 'grid-ablation', 'grid-threshold', 'origin'].includes(payload.mode)) throw new Error('未知采集方式。')
     if (payload.mode === 'deep' && (win.webContents.isDevToolsOpened?.() || win.webContents.debugger?.isAttached?.())) throw new Error('深入记录前请关闭开发者工具或调试连接，再重试。')
@@ -255,7 +255,7 @@ function createService(options) {
     } catch (error) { return reply(false, safeError(error)) }
   }
   ipcMain.handle(CHANNEL, handle)
-  return { attachWindow, handle }
+  return { attachWindow, handle, isBusy: () => !!active }
 }
 
 module.exports = { CHANNEL, TRACE_CATEGORIES, createService, summarize }

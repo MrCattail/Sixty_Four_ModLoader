@@ -2699,8 +2699,169 @@ ModLoader.register({
 				creativeOperationFailed: 'Operasjonen i kreativ modus mislyktes.'
 			}
 		}
+		// Native forks preserve an ordinary checkpoint; legacy forks keep their original contract.
+		const CREATIVE_COPY_TEXT = {
+		  "en": [
+		    "{required} empty manual slots are required. Available: {count}.",
+		    "A protected history point will preserve your ordinary progress. The creative copy uses {required} empty slot.",
+		    "An ordinary save named {name} and a creative copy will be created. Required empty slots: {required}.",
+		    "Enable compatible Better UIs save slots to create a creative copy.",
+		    "Creative copy saved locally. Cloud sync is incomplete."
+		  ],
+		  "sch": [
+		    "需要 {required} 个空手动存档格。当前可用：{count}。",
+		    "将在原存档增加受保护历史点，保留当前普通进度。创造副本占用 {required} 个空位。",
+		    "将新建普通存档“{name}”及创造副本，共需 {required} 个空位。",
+		    "请启用兼容的 Better UIs 存档管理以创建创造副本。",
+		    "创造副本已保存在本地，云同步未完成。"
+		  ],
+		  "tch": [
+		    "需要 {required} 個空手動存檔格。目前可用：{count}。",
+		    "將在原存檔新增受保護歷史點，保留目前普通進度。創造副本佔用 {required} 個空位。",
+		    "將新增普通存檔「{name}」及創造副本，共需 {required} 個空位。",
+		    "請啟用相容的 Better UIs 存檔管理以建立創造副本。",
+		    "創造副本已儲存在本機，雲端同步未完成。"
+		  ],
+		  "ru": [
+		    "Требуется свободных ячеек: {required}. Доступно: {count}.",
+		    "Обычный прогресс сохранится в защищённой точке истории. Для творческой копии нужно ячеек: {required}.",
+		    "Будут созданы обычное сохранение {name} и творческая копия. Нужно ячеек: {required}.",
+		    "Включите совместимое управление сохранениями Better UIs.",
+		    "Творческая копия сохранена локально. Синхронизация с облаком не завершена."
+		  ],
+		  "de": [
+		    "Benötigte freie Speicherplätze: {required}. Verfügbar: {count}.",
+		    "Ein geschützter Verlaufspunkt bewahrt den normalen Fortschritt. Die Kreativkopie benötigt {required} freien Platz.",
+		    "Der normale Spielstand {name} und eine Kreativkopie werden erstellt. Benötigte freie Plätze: {required}.",
+		    "Aktiviere eine kompatible Speicherplatzverwaltung von Better UIs.",
+		    "Kreativkopie lokal gespeichert. Die Cloud-Synchronisierung ist nicht abgeschlossen."
+		  ],
+		  "ptbr": [
+		    "Espaços manuais livres necessários: {required}. Disponíveis: {count}.",
+		    "Um ponto protegido do histórico preservará o progresso normal. A cópia criativa usa {required} espaço livre.",
+		    "Serão criados o salvamento normal {name} e uma cópia criativa. Espaços necessários: {required}.",
+		    "Ative o gerenciamento de salvamentos compatível do Better UIs.",
+		    "Cópia criativa salva localmente. A sincronização com a nuvem não foi concluída."
+		  ],
+		  "it": [
+		    "Slot manuali liberi richiesti: {required}. Disponibili: {count}.",
+		    "Un punto protetto nella cronologia conserverà i progressi normali. La copia creativa usa {required} slot libero.",
+		    "Verranno creati il salvataggio normale {name} e una copia creativa. Slot richiesti: {required}.",
+		    "Attiva la gestione dei salvataggi compatibile di Better UIs.",
+		    "Copia creativa salvata localmente. Sincronizzazione cloud incompleta."
+		  ],
+		  "es": [
+		    "Espacios manuales libres necesarios: {required}. Disponibles: {count}.",
+		    "Un punto protegido del historial conservará el progreso normal. La copia creativa ocupa {required} espacio libre.",
+		    "Se crearán la partida normal {name} y una copia creativa. Espacios necesarios: {required}.",
+		    "Activa la gestión de partidas compatible de Better UIs.",
+		    "Copia creativa guardada localmente. La sincronización con la nube está incompleta."
+		  ],
+		  "fr": [
+		    "Emplacements manuels libres nécessaires : {required}. Disponibles : {count}.",
+		    "Un point protégé de l’historique conservera la progression normale. La copie créative utilise {required} emplacement libre.",
+		    "La sauvegarde normale {name} et une copie créative seront créées. Emplacements nécessaires : {required}.",
+		    "Activez la gestion des sauvegardes compatible de Better UIs.",
+		    "Copie créative enregistrée localement. Synchronisation cloud incomplète."
+		  ],
+		  "nl": [
+		    "Benodigde lege handmatige opslagplaatsen: {required}. Beschikbaar: {count}.",
+		    "Een beschermd geschiedenispunt bewaart je normale voortgang. De creatieve kopie gebruikt {required} lege plaats.",
+		    "Er worden een normale opslag {name} en een creatieve kopie gemaakt. Benodigde plaatsen: {required}.",
+		    "Schakel compatibel opslagbeheer van Better UIs in.",
+		    "Creatieve kopie lokaal opgeslagen. Cloudsynchronisatie is niet voltooid."
+		  ],
+		  "cz": [
+		    "Potřebné volné pozice: {required}. Dostupné: {count}.",
+		    "Chráněný bod historie zachová běžný postup. Kreativní kopie zabere {required} volnou pozici.",
+		    "Vznikne běžná uložená hra {name} a kreativní kopie. Potřebné pozice: {required}.",
+		    "Zapněte kompatibilní správu uložených her Better UIs.",
+		    "Kreativní kopie byla uložena místně. Synchronizace s cloudem není dokončena."
+		  ],
+		  "pl": [
+		    "Wymagane wolne miejsca: {required}. Dostępne: {count}.",
+		    "Chroniony punkt historii zachowa zwykłe postępy. Kopia kreatywna zajmie {required} wolne miejsce.",
+		    "Powstanie zwykły zapis {name} i kopia kreatywna. Wymagane miejsca: {required}.",
+		    "Włącz zgodne zarządzanie zapisami Better UIs.",
+		    "Kopia kreatywna zapisana lokalnie. Synchronizacja z chmurą nie została ukończona."
+		  ],
+		  "jp": [
+		    "空き手動セーブ枠が {required} 個必要です。現在：{count} 個。",
+		    "通常モードの現在の進行を保護された履歴に保存します。クリエイティブコピーは空き枠を {required} 個使用します。",
+		    "通常セーブ「{name}」とクリエイティブコピーを作成します。空き枠が {required} 個必要です。",
+		    "対応する Better UIs のセーブ管理を有効にしてください。",
+		    "クリエイティブコピーをローカルに保存しました。クラウド同期は未完了です。"
+		  ],
+		  "kr": [
+		    "빈 수동 저장 슬롯 {required}개가 필요합니다. 사용 가능: {count}개.",
+		    "일반 모드 진행 상황을 보호된 기록에 보존합니다. 크리에이티브 사본은 빈 슬롯 {required}개를 사용합니다.",
+		    "일반 저장 {name} 및 크리에이티브 사본을 생성합니다. 필요한 빈 슬롯: {required}개.",
+		    "호환되는 Better UIs 저장 관리를 활성화하세요.",
+		    "크리에이티브 사본이 로컬에 저장되었습니다. 클라우드 동기화가 완료되지 않았습니다."
+		  ],
+		  "thai": [
+		    "ต้องการช่องบันทึกว่าง {required} ช่อง มีอยู่: {count} ช่อง",
+		    "จะเก็บความคืบหน้าโหมดปกติในประวัติที่ป้องกันไว้ สำเนาโหมดสร้างใช้ช่องว่าง {required} ช่อง",
+		    "จะสร้างบันทึกปกติชื่อ {name} และสำเนาโหมดสร้าง ต้องการช่องว่าง {required} ช่อง",
+		    "เปิดใช้งานการจัดการบันทึก Better UIs รุ่นที่รองรับ",
+		    "บันทึกสำเนาโหมดสร้างในเครื่องแล้ว การซิงค์คลาวด์ยังไม่เสร็จ"
+		  ],
+		  "hu": [
+		    "Szükséges üres mentési helyek: {required}. Elérhető: {count}.",
+		    "Egy védett előzménypont megőrzi a normál haladást. A kreatív másolat {required} üres helyet használ.",
+		    "Létrejön a(z) {name} normál mentés és egy kreatív másolat. Szükséges helyek: {required}.",
+		    "Kapcsold be a Better UIs kompatibilis mentéskezelését.",
+		    "A kreatív másolat helyben mentve. A felhőszinkronizálás nem fejeződött be."
+		  ],
+		  "lv": [
+		    "Vajadzīgas {required} brīvas manuālās saglabāšanas vietas. Pieejamas: {count}.",
+		    "Aizsargāts vēstures punkts saglabās parasto progresu. Radošā kopija izmantos {required} brīvu vietu.",
+		    "Tiks izveidots parastais saglabājums {name} un radošā kopija. Vajadzīgas vietas: {required}.",
+		    "Ieslēdziet saderīgu Better UIs saglabājumu pārvaldību.",
+		    "Radošā kopija saglabāta lokāli. Mākoņa sinhronizācija nav pabeigta."
+		  ],
+		  "ro": [
+		    "Sunt necesare {required} sloturi manuale libere. Disponibile: {count}.",
+		    "Un punct protejat din istoric va păstra progresul normal. Copia creativă folosește {required} slot liber.",
+		    "Vor fi create salvarea normală {name} și o copie creativă. Sloturi necesare: {required}.",
+		    "Activează gestionarea compatibilă a salvărilor Better UIs.",
+		    "Copia creativă a fost salvată local. Sincronizarea în cloud este incompletă."
+		  ],
+		  "no": [
+		    "Ledige manuelle lagringsplasser som kreves: {required}. Tilgjengelig: {count}.",
+		    "Et beskyttet historikkpunkt bevarer vanlig fremdrift. Den kreative kopien bruker {required} ledig plass.",
+		    "En vanlig lagring kalt {name} og en kreativ kopi opprettes. Plasser som kreves: {required}.",
+		    "Aktiver kompatibel lagringsadministrasjon i Better UIs.",
+		    "Kreativ kopi lagret lokalt. Skysynkronisering er ikke fullført."
+		  ],
+		  "modsch": [
+		    "需要 {required} 个空手动存档格。当前可用：{count}。",
+		    "将在原存档增加受保护历史点，保留当前普通进度。创造副本占用 {required} 个空位。",
+		    "将新建普通存档“{name}”及创造副本，共需 {required} 个空位。",
+		    "请启用兼容的 Better UIs 存档管理以创建创造副本。",
+		    "创造副本已保存在本地，云同步未完成。"
+		  ]
+		}
+		// Like the native-tool/ending messages, new dialog variants stay private
+		// and do not change the versioned public UI-key catalog.
+		const CREATIVE_COPY_PRIVATE_TEXT = {}
+		for (const [language, values] of Object.entries(CREATIVE_COPY_TEXT)) {
+			const table = CREATIVE_TEXT[language]
+			CREATIVE_COPY_PRIVATE_TEXT[language] = Object.freeze({
+				creativeCopyReadyLegacy: table.creativeCopyReady,
+				creativeCopyReadyNew: values[2],
+				creativeCopyLocalOnly: values[4]
+			})
+			table.creativeCopyNeedsSlots = values[0]
+			table.creativeCopyReady = values[1]
+			table.creativeCopyUnavailable = values[3]
+		}
+		Object.freeze(CREATIVE_COPY_PRIVATE_TEXT)
 		const NATIVE_CREATIVE_TEXT = {
 			en: {
+				creativePinholeCheckpointing: 'Saving and checking the pre-ending save…',
+				creativePinholeCheckpointFailed: 'The pre-ending save or target could not be verified. Pinhole was not placed.',
+				creativePinholeExecutionFailed: 'Pinhole failed during execution. Reload the pre-ending save before editing again.',
 				nativeEraseHint: "Creative demolition: no resource refund. Protected objects are excluded.",
 				nativeRelocation: "Creative relocation",
 				nativeToolProtected: "This building or location is protected, or cannot be edited safely.",
@@ -2710,11 +2871,13 @@ ModLoader.register({
 				nativeToolSwap: "Occupied-position swaps require two movable single-cell buildings.",
 				nativeToolNoMove: "The destination is the same as the starting position.",
 				creativeNativeEnableMessage: 'Enable creative mode in this save. Single building purchases and upgrades will be free; existing placement restrictions remain.',
-				creativeNativeCopyDeferred: 'Creative copies are awaiting 1.3 support. Only the current-save option is available.',
-				creativeNativeDeferred: "The Pinhole ending and legacy bulk-copy action remain unavailable in creative mode. Use World Editor blueprints to copy buildings.",
+				creativeNativeDeferred: "The legacy bulk-copy action remains unavailable in creative mode. Use World Editor blueprints to copy buildings.",
 				creativeNativeReloadRequired: 'Creative writes are blocked. Reload the game before continuing; any created safety snapshot has been kept.'
 			},
 			sch: {
+				creativePinholeCheckpointing: '正在保存并核实结局前存档……',
+				creativePinholeCheckpointFailed: '结局前存档或目标核实失败，未放置 Pinhole。',
+				creativePinholeExecutionFailed: 'Pinhole 执行异常，请重新加载结局前存档后再编辑。',
 				nativeEraseHint: "创造拆除：不返还资源。受保护对象不会被选中。",
 				nativeRelocation: "创造搬迁",
 				nativeToolProtected: "该建筑或位置受到保护，或暂不支持安全编辑。",
@@ -2724,11 +2887,13 @@ ModLoader.register({
 				nativeToolSwap: "占用位置交换仅支持两座可搬迁的单格建筑。",
 				nativeToolNoMove: "目标位置与原位置相同。",
 				creativeNativeEnableMessage: '在当前存档开启创造模式。单体建筑购买和升级免材料，原有放置限制继续生效。',
-				creativeNativeCopyDeferred: '创造副本尚待适配 1.3，目前仅支持切换当前存档。',
-				creativeNativeDeferred: "Pinhole 结局购买与旧批量复制入口仍未开放创造模式；复制建筑请使用 World Editor 蓝图。",
+				creativeNativeDeferred: "旧批量复制入口仍未开放创造模式；复制建筑请使用 World Editor 蓝图。",
 				creativeNativeReloadRequired: '创造写入已停止，请重新加载游戏后再继续；已创建的安全快照会保留。'
 			},
 			tch: {
+				creativePinholeCheckpointing: '正在儲存並核實結局前存檔……',
+				creativePinholeCheckpointFailed: '結局前存檔或目標核實失敗，未放置 Pinhole。',
+				creativePinholeExecutionFailed: 'Pinhole 執行異常，請重新載入結局前存檔後再編輯。',
 				nativeEraseHint: "創造拆除：不返還資源。受保護物件不會被選中。",
 				nativeRelocation: "創造搬遷",
 				nativeToolProtected: "此建築或位置受到保護，或暫不支援安全編輯。",
@@ -2738,8 +2903,7 @@ ModLoader.register({
 				nativeToolSwap: "占用位置交換僅支援兩座可搬遷的單格建築。",
 				nativeToolNoMove: "目標位置與原位置相同。",
 				creativeNativeEnableMessage: '在目前存檔開啟創造模式。單體建築購買和升級免材料，原有放置限制繼續生效。',
-				creativeNativeCopyDeferred: '創造副本尚待適配 1.3，目前僅支援切換目前存檔。',
-				creativeNativeDeferred: "Pinhole 結局購買與舊批次複製入口仍未開放創造模式；複製建築請使用 World Editor 藍圖。",
+				creativeNativeDeferred: "舊批次複製入口仍未開放創造模式；複製建築請使用 World Editor 藍圖。",
 				creativeNativeReloadRequired: '創造寫入已停止，請重新載入遊戲後再繼續；已建立的安全快照會保留。'
 			}
 		}
@@ -4729,6 +4893,8 @@ ModLoader.register({
 			paintPaletteKeys: PAINT_PALETTE_KEYS,
 			t(languageOrGame, key) {
 				const language = typeof languageOrGame === 'string' ? languageOrGame : languageOrGame?.language
+				const copyTable = CREATIVE_COPY_PRIVATE_TEXT[language] || CREATIVE_COPY_PRIVATE_TEXT.en
+				if (Object.prototype.hasOwnProperty.call(copyTable, key)) return copyTable === CREATIVE_COPY_PRIVATE_TEXT.en ? titleCaseEnglish(copyTable[key]) : copyTable[key]
 				const nativeTable = NATIVE_CREATIVE_TEXT[language] || NATIVE_CREATIVE_TEXT.en
 				if (Object.prototype.hasOwnProperty.call(nativeTable, key)) return nativeTable[key]
 				const economyTable = CREATIVE_ECONOMY_TEXT[language] || CREATIVE_ECONOMY_TEXT.en

@@ -136,7 +136,7 @@ function prepare() {
 			entityAtCoordinates(cell) { return this.stuff.find(e => Math.abs(e.position[0] - cell[0]) <= (e.entitySpan || 0) && Math.abs(e.position[1] - cell[1]) <= (e.entitySpan || 0)) || null }
 		})
 		game.codex = { entityTypes: { default: {}, dark: {} }, entities: {} }
-		for (const [name, settings] of Object.entries({ gradient: {}, pump: {}, pump2: { isUpgradeTo: 'pump' }, pinhole: { isUpgradeTo: 'pump' }, wide: { span: 1 }, locked: {}, unique: { onlyone: true }, dark: { type: 'dark', isDark: true }, base: { canPurchase: false }, upgrade: { isUpgradeTo: 'base' } })) {
+		for (const [name, settings] of Object.entries({ gradient: {}, pump: {}, pump2: { isUpgradeTo: 'pump' }, chasm: { onlyone: true }, pinhole: { isUpgradeTo: 'chasm', onlyone: true }, wide: { span: 1 }, locked: {}, unique: { onlyone: true }, dark: { type: 'dark', isDark: true }, base: { canPurchase: false }, upgrade: { isUpgradeTo: 'base' } })) {
 			game.codex.entities[name] = { canPurchase: true, price: [50e6, 40e6, 30e6, 0, 0, 0, 0, 0, 2e4, 1e4], priceExponent: 1.2, ...settings,
 				class: class { constructor(master) { this.master = master; this.name = name; this.position = [0, 0]; this.entitySpan = settings.span || 0 } init() {} }
 			}
@@ -173,6 +173,7 @@ async function exercise() {
 	await runHook('afterVanillaScripts')
 	let game = await newWorld()
 	check(!localStorage.getItem('abstractv03isolated-player'), 'legacy slot must be absent')
+	await rejection(mode().createFork({ originalName: 'fixture' }), 'SAVE_SLOTS_UNAVAILABLE')
 	mode().setDialogOpen(true)
 	await mode().enableInPlace()
 	check(mode().snapshot().creativeMode, 'enable with an open confirmation dialog')
@@ -183,7 +184,7 @@ async function exercise() {
 	const encoded = adapter().encodeSnapshot(game, adapter().capture(game))
 	check(game.decodeSave(encoded).state.modloader.otherMod.note === '保留其他模组', 'Unicode snapshot metadata')
 	check(game.decodeSave(encoded).permanents.completions === 2, 'snapshot includes permanent progress')
-	await rejection(mode().createFork({ originalName: 'fixture' }), 'NATIVE_CREATIVE_DEFERRED')
+	await rejection(mode().createFork({ originalName: 'fixture' }), 'INVALID_STATE')
 	results.push('native mode save, metadata and full record encoding')
 
 	check(!game.store.html.items.gradient.classList.contains('disabled'), 'zero-resource Store qualification')
@@ -255,7 +256,7 @@ async function exercise() {
 	delete game.interactionMode
 	game.store.html.relocator.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }))
 	check(game.interactionMode !== 'relocate', 'direct native relocation control blocked')
-	game.pickupItem('pinhole'); check(game.itemInHand?.name !== 'pinhole', 'Pinhole purchase blocked')
+	game.pickupItem('pinhole'); check(game.itemInHand?.name === 'pinhole', 'Pinhole preview available; ending tested separately')
 	game.interactionMode = 'relocate'; game.processMove(); check(!game.interactionMode, 'stale relocation cancelled safely')
 	results.push('deferred native controls and direct method guards')
 
@@ -398,7 +399,7 @@ async function exercise() {
 	game.store.visibilityUpdate()
 	check(mode().snapshot().creativeMode && !game.store.html.items.locked.classList.contains('hidden'), 'saved creative mode restores temporary unlock availability')
 	same(game.unlockedEntities, { pump: true }, 'reload preserves only real unlocks')
-	for (const name of ['pinhole', 'memory', 'orbifold', 'whitehole', 'eraser']) {
+	for (const name of ['memory', 'orbifold', 'whitehole', 'eraser']) {
 		game.codex.entities[name] ||= { canPurchase: true }
 		check(!mode().canBypassUnlock(name), 'special unlock remains protected: ' + name)
 	}
@@ -498,6 +499,7 @@ app.on('window-all-closed',()=>app.quit());`)
 function run(options) {
 	if (options) {
 		suite = options
+		for (const file of options.otherEntries || []) { otherEntries.push(file); allowed.add(file) }
 		for (const entry of options.entries || []) { const file = `mods/${MOD}/scripts/${entry}.js`; entries.push(file); allowed.add(file) }
 	}
 	return main()

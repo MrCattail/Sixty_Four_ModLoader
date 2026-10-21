@@ -10,12 +10,49 @@ ModLoader.register({
 		const CREATIVE_SUFFIX = '创造模式'
 		const ORIGINAL_NAME_MAX_LENGTH = 60
 		const loadedStates = new WeakMap()
+		const loadedSlots = new WeakMap()
+		let permanentsPatched = false
 		let activeController = null
+
+		// A fresh native run has state:null, and Loader saves its new identity
+		// before afterGameInit. Seed here so that first save retains the mode.
+		api.on('afterVanillaScripts', function (payload, game) {
+			if (game?.saveSlots) rememberState(game, stateFromRecord(game))
+			if (permanentsPatched || typeof Game === 'undefined' || !Game.prototype.assemblePermanents) return
+			permanentsPatched = true
+			api.patch(Game.prototype, 'assemblePermanents', function (original) {
+				return function () {
+					const value = original.apply(this, arguments)
+					if (!Array.isArray(this.saveSlots) || !value || typeof value !== 'object') return value
+					return { ...value, modloader: { ...value.modloader, worldEditor: serializePersistedState(stateForSave(this)) } }
+				}
+			})
+		})
+
+		function stateFromRecord(game) {
+			const record = game?.saveSlots?.[game.currentSlotId]?.stack?.[0]
+			// Only a blank new run may use the carrier. A full world is authoritative,
+			// including old ordinary worlds whose canonical marker is absent.
+			return normalizePersistedState(record?.state === null
+				? record.permanents?.modloader?.worldEditor : record?.state?.modloader?.worldEditor)
+		}
+
+		function rememberState(game, state) {
+			loadedStates.set(game, state)
+			loadedSlots.set(game, { id: game.currentSlotId, slot: game.saveSlots?.[game.currentSlotId] })
+		}
+
+		function stateForSave(game) {
+			const origin = loadedSlots.get(game)
+			const current = !origin || (origin.id === game?.currentSlotId && origin.slot === game?.saveSlots?.[game.currentSlotId])
+			if (current && activeController?.game === game) return activeController.persistedState()
+			return current && loadedStates.get(game) || stateFromRecord(game)
+		}
 
 		api.on('beforeSaveLoad', function (save, game) {
 			if (game && (typeof game === 'object' || typeof game === 'function')) {
 				if (activeController?.game === game) activeController.dispose('save-loading')
-				loadedStates.set(game, normalizePersistedState(save?.modloader?.worldEditor))
+				rememberState(game, normalizePersistedState(save?.modloader?.worldEditor))
 			}
 			return save
 		})
@@ -23,9 +60,7 @@ ModLoader.register({
 		api.on('beforeSaveWrite', function (save, game) {
 			if (!save || typeof save !== 'object' || Array.isArray(save)) return save
 			if (!save.modloader || typeof save.modloader !== 'object' || Array.isArray(save.modloader)) save.modloader = {}
-			const state = activeController?.game === game
-				? activeController.persistedState()
-				: loadedStates.get(game) || defaultPersistedState()
+			const state = stateForSave(game)
 			save.modloader.worldEditor = serializePersistedState(state)
 			return save
 		})
@@ -42,7 +77,9 @@ ModLoader.register({
 					finalizationError = normalizeError(error, 'FORK_FINALIZATION_FAILED')
 				}
 			}
-			const controller = createController(game, loadedStates.get(game) || defaultPersistedState(), finalizationError)
+			const initialState = stateForSave(game)
+			rememberState(game, initialState)
+			const controller = createController(game, initialState, finalizationError)
 			activeController = controller
 			Object.defineProperty(globalThis, CREATIVE_KEY, {
 				value: controller,
@@ -147,7 +184,7 @@ ModLoader.register({
 						throw createError('VERIFY_FAILED', 'The creative-mode state could not be verified.')
 					}
 					persisted = target
-					loadedStates.set(game, target)
+					rememberState(game, target)
 					pendingPersisted = null
 					busy = false
 					dialogOpen = false
@@ -217,7 +254,7 @@ ModLoader.register({
 							throw saveError
 						}
 						persisted = target
-						loadedStates.set(game, target)
+						rememberState(game, target)
 						pendingPersisted = null
 					})
 					assertLive()
@@ -237,14 +274,12 @@ ModLoader.register({
 			}
 
 			async function createFork(options) {
-				if (globalThis[SAVE_ADAPTER_KEY]?.isNative(game)) {
-					throw createError('NATIVE_CREATIVE_DEFERRED', 'Creative copies are awaiting 1.3 support. Use the current save instead.')
-				}
 				if (disposed || !ready) throw error || createError('NOT_READY', 'Creative mode is not ready.')
 				if (busy) throw createError('BUSY', 'A creative-mode operation is already active.')
 				if (isEconomyBusy(game)) throw createError('BUSY', 'A creative shop operation is already active.')
 				if (persisted.creativeMode) throw createError('INVALID_STATE', 'Creative mode is already enabled.')
 				if (game.preventSaving || game.preventCloud) throw createError('SAVING_BLOCKED', 'Saving is currently blocked.')
+				if (globalThis[SAVE_ADAPTER_KEY]?.isNative(game)) return createNativeFork(options)
 				const originalName = normalizeOriginalName(options?.originalName)
 				const creativeName = originalName + CREATIVE_SUFFIX
 				const saveSlots = globalThis[SAVE_SLOTS_KEY]
@@ -324,6 +359,51 @@ ModLoader.register({
 				}
 			}
 
+			async function createNativeFork(options) {
+				const originalName = normalizeOriginalName(options?.originalName)
+				const saveSlots = globalThis[SAVE_SLOTS_KEY], adapter = globalThis[SAVE_ADAPTER_KEY]
+				if (saveSlots?.version !== 1 || typeof saveSlots.createAndActivate !== 'function' || !saveSlots.capabilities?.().protectedCurrentFork || !saveSlots.snapshot?.().ready) {
+					throw createError('SAVE_SLOTS_UNAVAILABLE', 'Enable compatible Better UIs save slots to create a protected creative copy.')
+				}
+				const context = adapter.capture(game)
+				busy = true; error = null; notify('fork-preparing')
+				function assertLive() {
+					if (disposed || activeController !== controller || isEconomyBusy(game)) throw createError('SAVE_CONTEXT_CHANGED', 'The active save changed or another editor operation is active.')
+					adapter.assertCurrent(game, context)
+				}
+				try {
+					const result = await adapter.withSaveLock(game, context, async function () {
+						await adapter.readVerified(game, context)
+						assertLive()
+						if (game.preventSaving || game.preventCloud || adapter.isSavingBlocked(game)) throw createError('SAVING_BLOCKED', 'Saving is currently blocked.')
+						const slotsState = saveSlots.snapshot()
+						if (!slotsState.ready) throw createError('SAVE_SLOTS_UNAVAILABLE', 'Save slots are busy or unavailable.')
+						if (slotsState.emptyCount < slotsState.fork.requiredSlots) throw createError('INSUFFICIENT_EMPTY_SLOTS', 'Not enough empty slots for the original checkpoint and creative copy.')
+						// Both branches come from this one frozen, complete native record.
+						const record = decodeSave(game, adapter.encodeSnapshot(game, context))
+						if (!record?.state || !record.permanents || normalizeSaveId(record.state.modloader?.saveInstanceId) !== context.saveId || normalizePersistedState(record.state.modloader?.worldEditor).creativeMode) {
+							throw createError('VERIFY_FAILED', 'The original ordinary save could not be verified.')
+						}
+						const copy = JSON.parse(JSON.stringify(record))
+						const marker = { schema: 1, creativeMode: true, entryMode: 'forked', createdAt: Date.now() }
+						copy.state.modloader.worldEditor = { ...marker }
+						delete copy.state.modloader.saveInstanceId
+						copy.permanents.modloader = { ...copy.permanents.modloader, worldEditor: { ...marker } }
+						return saveSlots.createAndActivate({ entries: [{ name: originalName + CREATIVE_SUFFIX, data: copy, nameConflict: 'reject' }], activateEntry: 0,
+							preserveSource: { record, name: originalName, sourceIndex: slotsState.fork.sourceIndex, saveInstanceId: context.saveId, assertCurrent: assertLive } })
+					})
+					if (!result?.activated || !result.reloadScheduled) throw createError('ACTIVATE_FAILED', 'The creative copy was not activated.')
+					lastReason = 'fork-reload-scheduled'; revision += 1
+					return result
+				} catch (operationError) {
+					busy = false; error = normalizeError(operationError, 'FORK_FAILED')
+					if (error.code === 'ROLLBACK_FAILED' || error.code === 'SAVE_CONTEXT_CHANGED') ready = false
+					if (error.code === 'ROLLBACK_FAILED') adapter.blockSaving(game, context)
+					if (!disposed) notify('fork-failed')
+					throw error
+				}
+			}
+
 			const controller = Object.freeze({
 				version: '1.0.0',
 				game,
@@ -332,7 +412,7 @@ ModLoader.register({
 					if (disposed || !ready || !persisted.creativeMode || !Array.isArray(game?.saveSlots)) return false
 					const definition = game.codex?.entities?.[name]
 					return definition?.canPurchase === true && definition.type !== 'complete' &&
-						!['pinhole', 'orbifold', 'memory', 'whitehole'].includes(String(name).toLowerCase()) &&
+						!['orbifold', 'memory', 'whitehole'].includes(String(name).toLowerCase()) &&
 						!/^eraser/i.test(String(name))
 				},
 				persistedState() {

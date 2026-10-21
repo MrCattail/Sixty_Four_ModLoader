@@ -135,6 +135,70 @@ async function main() {
 		const button = (page, name) => page.getByRole('button', { name, exact: true })
 		const preview = async (page, value) => { await page.evaluate(text => { clipboardValue = text }, value); await press(button(page, 'Import from clipboard')); await button(page, 'Add slots').waitFor() }
 		const confirm = page => press(button(page, 'Add slots'))
+		const protectedFork = page => page.evaluate(async () => {
+			const record = { state: game.assembleSave(), permanents: game.assemblePermanents(), isProtected: false }
+			try { return await service.createAndActivate({ entries: [{ name: 'protected copy', data: record, nameConflict: 'reject' }], activateEntry: 0,
+				preserveSource: { record, name: 'original', sourceIndex: 0, saveInstanceId: record.state.modloader.saveInstanceId, assertCurrent() {} } }) }
+			catch (error) { return { code: error.code } }
+		})
+		await test('protected fork writes original checkpoint and copy, then verifies both after reload', async () => {
+			const page = await setup(), before = await page.evaluate(() => clone(game.saveSlots[0]))
+			const result = await protectedFork(page); assert.equal(result.activated, true); assert.equal(result.entries[0].index, 1)
+			const original = await page.evaluate(() => game.readFromSlot(0))
+			assert.deepEqual([original.stack[0], ...original.stack.slice(2)], before.stack)
+			assert.equal(original.stack[1].isProtected, true)
+			const restored = await setup({ restore: true }, page.context())
+			assert.equal(await restored.evaluate(() => service.snapshot().ready), true)
+			assert.equal(await restored.evaluate(() => game.saveSlots[1].stack.length), 1)
+		})
+		for (const fault of ['write', 'read', 'preferences']) await test('protected fork ' + fault + ' failure restores database and selection', async () => {
+			const page = await setup(), before = await page.evaluate(() => clone(game.saveSlots))
+			await page.evaluate(fault => {
+				if (fault === 'write') abortIndex = 1
+				if (fault === 'preferences') failPreferences = 1
+				if (fault === 'read') { const read = game.readFromSlot.bind(game); game.readFromSlot = async i => { const s = await read(i); if (i === 1 && s) return { ...s, name: 'incorrect' }; return s } }
+			}, fault)
+			assert.ok((await protectedFork(page)).code)
+			assert.deepEqual(await page.evaluate(() => game.saveSlots), before)
+			assert.deepEqual(await page.evaluate(() => game.getSlotList()), [0])
+			assert.deepEqual(await page.evaluate(() => game.readFromSlot(0)), before[0])
+			assert.equal(await page.evaluate(() => game.currentSlotId === 0 && !game.preventSaving && reloads.length === 0), true)
+		})
+		await test('protected fork cloud warning persists in the rendered save page after reload', async () => {
+			const page = await setup(); await page.evaluate(() => { cloudMode = 'false' })
+			assert.equal((await protectedFork(page)).cloudSaved, false)
+			const restored = await setup({ restore: true }, page.context())
+			assert.equal(await restored.evaluate(() => service.snapshot().activationNotice.cloudSaved), false)
+			assert.match(await restored.locator('[role=status]').innerText(), /Saved locally/)
+		})
+		await test('cloud recovery emits one game-scoped status event; repeated failures retain the notice', async () => {
+			const page = await setup(); await page.evaluate(() => { cloudMode = 'false' })
+			assert.equal((await protectedFork(page)).cloudSaved, false)
+			const restored = await setup({ restore: true }, page.context())
+			await restored.evaluate(() => {
+				window.notices = []
+				window.addEventListener('cattail:better-uis-save-status', e => notices.push({ ownGame: e.detail.game === game, notice: service.snapshot().activationNotice }))
+				cloudMode = 'false'
+			})
+			await restored.evaluate(() => game.saveGame())
+			assert.equal(await restored.evaluate(() => notices.length), 0)
+			assert.equal(await restored.evaluate(() => service.snapshot().activationNotice.cloudSaved), false)
+			await restored.evaluate(() => { cloudMode = 'success' }); await restored.evaluate(() => game.saveGame())
+			assert.deepEqual(await restored.evaluate(() => notices), [{ ownGame: true, notice: null }])
+			assert.equal(await restored.evaluate(() => localStorage.getItem('abstractv03_saveSlotsForkNoticesynthetic-player')), null)
+			await restored.evaluate(() => game.saveGame())
+			assert.equal(await restored.evaluate(() => notices.length), 1)
+		})
+		await test('missing original protection point prevents activation settlement and later saves', async () => {
+			const page = await setup(); assert.equal((await protectedFork(page)).activated, true)
+			await page.evaluate(async () => { game.saveSlots[0].stack.splice(1, 1); await game.writeToSlot(game.saveSlots[0], 0) })
+			const restored = await setup({ restore: true }, page.context())
+			assert.equal(await restored.evaluate(() => service.snapshot().error.code), 'VERIFY_FAILED')
+			const before = await restored.evaluate(() => JSON.stringify(game.saveSlots))
+			await restored.evaluate(() => game.saveGame())
+			assert.equal(await restored.evaluate(() => JSON.stringify(game.saveSlots)), before)
+			assert.ok(await restored.evaluate(() => localStorage.getItem('abstractv03_saveSlotsNativeActivationsynthetic-player')))
+		})
 		await test('v1 service, 20 ordinary slots and current-slot alias', async () => {
 			const page = await setup(); const state = await page.evaluate(() => service.snapshot())
 			assert.equal(state.version, 1); assert.equal(state.ready, true); assert.equal(state.emptyCount, 19)

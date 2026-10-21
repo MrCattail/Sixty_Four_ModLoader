@@ -1858,14 +1858,21 @@ ModLoader.register({
 			const counts = Object.assign({}, game.entitiesInGame || {})
 			const resources = numericArray(game.resources)
 			const steps = []
-			const eraserName = Number(game.eraserType) === 2
-				? 'eraser3'
-				: Number(game.eraserType) === 1
-					? 'eraser2'
-					: 'eraser'
+			// Native 1.3 demolition refunds buildings without an eraser commodity
+			// fee. Use the same native-save boundary as priceFor; only the legacy
+			// economy still quotes those products. eraserType still affects refunds.
+			const eraserName = Array.isArray(game?.saveSlots)
+				? null
+				: Number(game.eraserType) === 2
+					? 'eraser3'
+					: Number(game.eraserType) === 1
+						? 'eraser2'
+						: 'eraser'
 			for (const removal of removals) {
-				const eraserCost = priceFor(game, counts, eraserName, false)
-				pushEconomyStep(resources, steps, 'eraser-cost', eraserName, negateArray(eraserCost))
+				if (eraserName) {
+					const eraserCost = priceFor(game, counts, eraserName, false)
+					pushEconomyStep(resources, steps, 'eraser-cost', eraserName, negateArray(eraserCost))
+				}
 				const refund = priceFor(game, counts, removal.name, true)
 				pushEconomyStep(resources, steps, 'refund', removal.name, refund)
 				counts[removal.name] = Math.max(0, finiteOr(counts[removal.name], 0) - 1)

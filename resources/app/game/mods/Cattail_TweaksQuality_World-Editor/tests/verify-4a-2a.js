@@ -289,7 +289,7 @@ function verifyIntegrationSources() {
 	assert.match(shell, /createFork\(/)
 	assert.match(shell, /createDialogButton\(dialog, 'creativeEnableCurrent', true, 'elmerine'\)/)
 	assert.match(shell, /createDialogButton\(dialog, 'creativeCreateCopy', true\)/)
-	assert.match(shell, /Number\(slotsState\.emptyCount\) < 1/)
+	assert.match(shell, /Number\(slotsState\.emptyCount\) < required/)
 	assert.match(shell, /\['input', 'change', 'keyup', 'compositionend'\]/)
 	assert.match(shell, /\['keydown', 'paste', 'cut'\]/)
 	assert.match(shell, /creativeDialog === dialog && !dialog\.busy/)

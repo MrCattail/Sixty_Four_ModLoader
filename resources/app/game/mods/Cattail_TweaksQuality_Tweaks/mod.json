@@ -36,10 +36,12 @@
   "entries": [
     "scripts/remember-language.js",
     "scripts/clear-view-grid-fix.js",
+    "scripts/auto-save-stutter-fix.js",
     "scripts/shift-ctrl-zoom-disable.js",
     "scripts/view-distance.js",
     "scripts/window-size-presets.js",
     "scripts/mouse-anchored-camera.js",
+    "scripts/right-drag-hover-fix.js",
     "scripts/origin-arrow-tip-anchor.js",
     "scripts/void-return-fade-skip.js",
     "scripts/waypoint-teleport-fade-skip.js",
@@ -57,6 +59,7 @@
     "scripts/chasm-transfer-path-index.js",
     "scripts/resource-explosion-bezier-fast-path.js",
     "scripts/floor-grid-lines.js",
+    "scripts/clear-view-options.js",
     "scripts/play-time-counter.js",
     "scripts/dynamic-camera.js",
     "scripts/cube-resource-cache.js",
@@ -78,6 +81,82 @@
     "Cattail_TweaksQuality_Dynamic-Camera"
   ],
   "config": {
+    "disableClearViewGrid": {
+      "type": "boolean",
+      "label": {
+        "en": "Hide native clear-view grid",
+        "sch": "关闭原版清晰视图网格",
+        "modsch": "关闭原版清晰视图网格",
+        "tch": "關閉原版清晰視圖網格"
+      },
+      "default": false,
+      "description": {
+        "en": "Hide native grid lines in desktop 1.3 clear view (Alt, erase, relocate and building placement). Keep occupied-cell shading and action hints. Takes priority over the style option; the persistent Tweaks floor grid is independent.",
+        "sch": "关闭桌面1.3清晰视图中的原版网格线，涵盖Alt、拆除、搬迁和拿起建筑。保留占位阴影与操作提示；优先于样式替换。Tweaks常驻地板网格独立控制。",
+        "modsch": "关闭桌面1.3清晰视图中的原版网格线，涵盖Alt、拆除、搬迁和拿起建筑。保留占位阴影与操作提示；优先于样式替换。Tweaks常驻地板网格独立控制。",
+        "tch": "關閉桌面1.3清晰視圖中的原版網格線，涵蓋Alt、拆除、搬遷和拿起建築。保留占位陰影與操作提示；優先於樣式替換。Tweaks常駐地板網格獨立控制。"
+      },
+      "reloadPolicy": "hot",
+      "section": "clearViewOptions",
+      "sectionLabel": {
+        "en": "Clear view (1.3)",
+        "sch": "清晰视图（1.3）",
+        "modsch": "清晰视图（1.3）",
+        "tch": "清晰視圖（1.3）"
+      }
+    },
+    "disableClearViewBuildingClipping": {
+      "type": "boolean",
+      "label": {
+        "en": "Disable clear-view building clipping",
+        "sch": "关闭原版建筑菱形裁剪",
+        "modsch": "关闭原版建筑菱形裁剪",
+        "tch": "關閉原版建築菱形裁剪"
+      },
+      "default": false,
+      "description": {
+        "en": "Show full building sprites in desktop 1.3 clear view, including Alt, erase, relocate and building placement. Remove only the outer diamond crop; keep internal building masks, highlights and action hints.",
+        "sch": "桌面1.3清晰视图中显示完整建筑贴图，涵盖Alt、拆除、搬迁和拿起建筑。仅移除外层菱形裁剪，保留建筑内部遮罩、高亮与操作提示。",
+        "modsch": "桌面1.3清晰视图中显示完整建筑贴图，涵盖Alt、拆除、搬迁和拿起建筑。仅移除外层菱形裁剪，保留建筑内部遮罩、高亮与操作提示。",
+        "tch": "桌面1.3清晰視圖中顯示完整建築貼圖，涵蓋Alt、拆除、搬遷和拿起建築。僅移除外層菱形裁剪，保留建築內部遮罩、高亮與操作提示。"
+      },
+      "reloadPolicy": "hot",
+      "section": "clearViewOptions"
+    },
+    "useTweaksClearViewGridStyle": {
+      "type": "boolean",
+      "label": {
+        "en": "Use Tweaks clear-view grid style",
+        "sch": "清晰视图网格使用Tweaks样式",
+        "modsch": "清晰视图网格使用Tweaks样式",
+        "tch": "清晰視圖網格使用Tweaks樣式"
+      },
+      "default": false,
+      "description": {
+        "en": "Use Tweaks floor-grid colors, thin lines and density limit for the desktop 1.3 clear-view grid. Works with the persistent grid off; avoids duplicate lines with it on. Hide native clear-view grid takes priority.",
+        "sch": "桌面1.3清晰视图网格沿用Tweaks地板网格的颜色、细线和密度限制。常驻网格关闭时仍可显示，开启时避免重复绘线；“关闭原版清晰视图网格”优先。",
+        "modsch": "桌面1.3清晰视图网格沿用Tweaks地板网格的颜色、细线和密度限制。常驻网格关闭时仍可显示，开启时避免重复绘线；“关闭原版清晰视图网格”优先。",
+        "tch": "桌面1.3清晰視圖網格沿用Tweaks地板網格的顏色、細線和密度限制。常駐網格關閉時仍可顯示，開啟時避免重複繪線；「關閉原版清晰視圖網格」優先。"
+      },
+      "reloadPolicy": "hot",
+      "section": "clearViewOptions"
+    },
+    "enableAutoSaveStutterFix": {
+      "type": "boolean",
+      "label": {
+        "en": "Autosave stutter fix",
+        "sch": "自动保存卡顿修复",
+        "modsch": "自动保存卡顿修复",
+        "tch": "自動儲存卡頓修復"
+      },
+      "default": true,
+      "description": {
+        "en": "Every 10 seconds, update one global autosave. About every 4 minutes, add history to the played manual slot without overwriting its manual save point. Transfer only changed records, including Steam Cloud. New cloud records need this Loader to read. Save and reload to switch; restart after installing.",
+        "sch": "每10秒只更新一个全局自动存档，约每4分钟向正在游玩的普通槽追加历史，不覆盖其手动保存点。进程间及Steam云端只传变化记录。新增云记录需本Loader读取。保存并重新加载后切换；安装后完整重启。",
+        "modsch": "每10秒只更新一个全局自动存档，约每4分钟向正在游玩的普通槽追加历史，不覆盖其手动保存点。进程间及Steam云端只传变化记录。新增云记录需本Loader读取。保存并重新加载后切换；安装后完整重启。",
+        "tch": "每10秒只更新一個全域自動存檔，約每4分鐘向正在遊玩的普通槽追加歷史，不覆蓋其手動儲存點。處理程序間及Steam雲端只傳變更記錄。新增雲端記錄需本Loader讀取。儲存並重新載入後切換；安裝後完整重啟。"
+      }
+    },
     "enableClearViewGridFix": {
       "type": "boolean",
       "label": {
@@ -282,26 +361,26 @@
     "enableShopScrollAnchorFix": {
       "type": "boolean",
       "label": {
-        "en": "Shop scroll anchor fix",
-        "sch": "商店滚动定位修复",
-        "modsch": "商店滚动定位修复",
-        "tch": "商店滾動定位修復",
-        "ru": "Исправление прокрутки магазина",
-        "de": "Shop-Scrollanker-Fix",
-        "ptbr": "Correcao da rolagem da loja",
-        "it": "Correzione scorrimento negozio",
-        "es": "Correccion del desplazamiento de la tienda",
-        "fr": "Correctif ancrage boutique",
-        "nl": "Winkel-scrollanker fix",
-        "cz": "Oprava ukotveni rolovani obchodu",
-        "pl": "Naprawa przewijania sklepu",
-        "jp": "ショップスクロール固定修正",
-        "kr": "상점 스크롤 고정 수정",
-        "thai": "แก้การยึดตำแหน่งเลื่อนร้านค้า",
-        "hu": "Bolt gorgetesi horgony javitas",
-        "lv": "Veikala ritinasanas enkurvietas labojums",
-        "ro": "Corectie ancorare derulare magazin",
-        "no": "Fiks for butikkrulling"
+        "en": "Shop scroll anchor fix [1.2.1]",
+        "sch": "商店滚动定位修复 [1.2.1]",
+        "modsch": "商店滚动定位修复 [1.2.1]",
+        "tch": "商店滾動定位修復 [1.2.1]",
+        "ru": "Исправление прокрутки магазина [1.2.1]",
+        "de": "Shop-Scrollanker-Fix [1.2.1]",
+        "ptbr": "Correcao da rolagem da loja [1.2.1]",
+        "it": "Correzione scorrimento negozio [1.2.1]",
+        "es": "Correccion del desplazamiento de la tienda [1.2.1]",
+        "fr": "Correctif ancrage boutique [1.2.1]",
+        "nl": "Winkel-scrollanker fix [1.2.1]",
+        "cz": "Oprava ukotveni rolovani obchodu [1.2.1]",
+        "pl": "Naprawa przewijania sklepu [1.2.1]",
+        "jp": "ショップスクロール固定修正 [1.2.1]",
+        "kr": "상점 스크롤 고정 수정 [1.2.1]",
+        "thai": "แก้การยึดตำแหน่งเลื่อนร้านค้า [1.2.1]",
+        "hu": "Bolt gorgetesi horgony javitas [1.2.1]",
+        "lv": "Veikala ritinasanas enkurvietas labojums [1.2.1]",
+        "ro": "Corectie ancorare derulare magazin [1.2.1]",
+        "no": "Fiks for butikkrulling [1.2.1]"
       },
       "default": true,
       "description": {
@@ -1819,6 +1898,30 @@
           "label": "1280 x 720"
         }
       ]
+    },
+    "enableRightDragHoverFix": {
+      "type": "boolean",
+      "label": {
+        "en": "Fix right-drag building hint flicker",
+        "sch": "右键拖动信息卡闪烁修复",
+        "modsch": "右键拖动信息卡闪烁修复",
+        "tch": "右鍵拖曳資訊卡閃爍修復"
+      },
+      "default": true,
+      "description": {
+        "en": "Refresh the hovered building after right-drag camera movement in desktop 1.3. Keep building hints visible normally. Turn off to restore native behavior. Changes preview immediately.",
+        "sch": "修正桌面1.3快速按住右键移动视角时建筑信息卡闪烁。移动镜头后刷新悬停命中，保留正常信息卡显示；关闭恢复原版行为，支持即时预览。",
+        "modsch": "修正桌面1.3快速按住右键移动视角时建筑信息卡闪烁。移动镜头后刷新悬停命中，保留正常信息卡显示；关闭恢复原版行为，支持即时预览。",
+        "tch": "修正桌面1.3按住右鍵快速移動視角時建築資訊卡閃爍。移動鏡頭後更新懸停命中，保留正常資訊卡顯示；關閉恢復原版行為，支援即時預覽。"
+      },
+      "reloadPolicy": "hot",
+      "section": "rightDragHover",
+      "sectionLabel": {
+        "en": "Mouse hover (1.3)",
+        "sch": "鼠标悬停（1.3）",
+        "modsch": "鼠标悬停（1.3）",
+        "tch": "滑鼠懸停（1.3）"
+      }
     },
     "enableMouseAnchoredZoom": {
       "type": "boolean",

@@ -228,8 +228,8 @@ function testManifestAndLocalization() {
 		i18n.t('en', 'creativeEnableMessage'),
 		'Choose Whether to Change This Save Directly or Create One Separate Creative Copy. The Current Save Remains Unchanged When Creating a Copy.'
 	)
-	assert.equal(i18n.t('en', 'creativeCopyNeedsSlots'), 'One Empty Manual Slot Is Required. Available: {count}.')
-	assert.equal(i18n.t('sch', 'creativeCopyReady'), '创造副本将占用一个空手动存档格，当前存档保持不变。')
+	assert.equal(i18n.t('en', 'creativeCopyNeedsSlots'), '{required} Empty Manual Slots Are Required. Available: {count}.')
+	assert.equal(i18n.t('sch', 'creativeCopyReady'), '将在原存档增加受保护历史点，保留当前普通进度。创造副本占用 {required} 个空位。')
 	assert.doesNotMatch(i18nSource, /'Delete Contents'|'Delete Selection Contents'|'Delete Selection'|'Cut Contents'/)
 }
 

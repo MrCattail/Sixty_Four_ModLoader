@@ -554,7 +554,7 @@ ModLoader.register({
 		}
 
 		function showCoordinateTeleportPanel(game) {
-			if (!game || !Array.isArray(game.hoveredCell)) return
+			if (!game || !Array.isArray(game.hoveredCell) || !getCoordinateTeleportPointer(game)) return
 			const panel = getCoordinateTeleportPanel()
 			panel.u.value = String(game.hoveredCell[0])
 			panel.v.value = String(game.hoveredCell[1])
@@ -614,11 +614,17 @@ ModLoader.register({
 			return coordinateTeleportPanel
 		}
 
+		function getCoordinateTeleportPointer(game) {
+			const pointer = game?.mouse?.sxy
+			return Array.isArray(pointer) && Number.isFinite(pointer[0]) && Number.isFinite(pointer[1]) ? pointer : null
+		}
+
 		function positionCoordinateTeleportPanel(game, panel = coordinateTeleportPanel) {
-			if (!game || !panel?.element) return
+			const mouse = getCoordinateTeleportPointer(game)
+			if (!mouse || !panel?.element) return
 			const canvasRect = game.canvas?.getBoundingClientRect?.()
-			const baseX = (canvasRect?.left || 0) + (game.mouse?.offsetxy?.[0] || 0)
-			const baseY = (canvasRect?.top || 0) + (game.mouse?.offsetxy?.[1] || 0)
+			const baseX = (canvasRect?.left || 0) + mouse[0]
+			const baseY = (canvasRect?.top || 0) + mouse[1]
 			panel.element.style.left = baseX + 'px'
 			panel.element.style.top = baseY + 'px'
 			const rect = panel.element.getBoundingClientRect?.()
@@ -636,8 +642,7 @@ ModLoader.register({
 			const u = parseCoordinateTeleportValue(panel.u.value)
 			const v = parseCoordinateTeleportValue(panel.v.value)
 			if (!Number.isFinite(u) || !Number.isFinite(v)) return
-			teleportToCoordinate(game, [u, v])
-			hideCoordinateTeleportPanel()
+			if (teleportToCoordinate(game, [u, v])) hideCoordinateTeleportPanel()
 		}
 
 		function parseCoordinateTeleportValue(value) {
@@ -646,19 +651,29 @@ ModLoader.register({
 		}
 
 		function teleportToCoordinate(game, position) {
-			if (!game || !Array.isArray(position) || !Array.isArray(game.translation) || typeof game.uvToXY !== 'function') return
+			const mouse = getCoordinateTeleportPointer(game)
+			if (!mouse || !Array.isArray(position) || !Number.isFinite(position[0]) || !Number.isFinite(position[1]) ||
+				!Array.isArray(game.translation) || typeof game.uvToXY !== 'function' ||
+				typeof game.updatePointerState !== 'function' || typeof game.updateGlobalPositioning !== 'function') return false
 			const projected = game.uvToXY(position)
-			const zoom = Number(game.zoom) || 1
-			if (!Array.isArray(projected)) return
-			const ratio = Number(game.pixelRatio) || 1
-			const mouse = Array.isArray(game.mouse?.offsetxy) ? game.mouse.offsetxy : [0, 0]
+			const zoom = Number(game.zoom)
+			const ratio = Number(game.pixelRatio)
+			if (!Array.isArray(projected) || !Number.isFinite(projected[0]) || !Number.isFinite(projected[1]) ||
+				!Number.isFinite(zoom) || zoom <= 0 || !Number.isFinite(ratio) || ratio <= 0) return false
 			const desired = [
-				(Number(mouse[0]) || 0) * ratio - (Number(game.w2) || (Number(game.w) || 0) / 2),
-				(Number(mouse[1]) || 0) * ratio - (Number(game.h2) || (Number(game.h) || 0) / 2)
+				mouse[0] * ratio - (Number(game.w2) || (Number(game.w) || 0) / 2),
+				mouse[1] * ratio - (Number(game.h2) || (Number(game.h) || 0) / 2)
 			]
-			game.translation[0] += (projected[0] - desired[0]) / zoom
-			game.translation[1] += (projected[1] - desired[1]) / zoom
-			game.updateMouseData?.()
+			const translation = [
+				game.translation[0] + (projected[0] - desired[0]) / zoom,
+				game.translation[1] + (projected[1] - desired[1]) / zoom
+			]
+			if (!translation.every(Number.isFinite)) return false
+			game.translation[0] = translation[0]
+			game.translation[1] = translation[1]
+			game.updatePointerState()
+			game.updateGlobalPositioning()
+			return true
 		}
 		function installDirectionPointerToggle() {
 			if (window._cattailDynamicDirectionPointerToggleInstalled) return
@@ -2400,7 +2415,7 @@ ModLoader.register({
 
 		function createOriginalConversionFlow(game, input, output) {
 			if (typeof Cloud === 'undefined' || typeof Cloud.prototype.addConvertersOutput !== 'function') return null
-			const cloud = new Cloud(game)
+			const cloud = new Cloud({ master: game })
 			cloud.addConvertersOutput(input, function () { return output })
 			cloud.update?.()
 			const vessel = cloud.element.querySelector('.converterOutputVessel')

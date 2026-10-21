@@ -32,7 +32,13 @@ ModLoader.register({
 				api.patch(Game.prototype, method, original => function (entity) {
 					if (!original.apply(this, arguments)) return false
 					const service = get(this, 'native-tools')
-					return !service?.active() || service.safe(entity, operation)
+					if (!service?.active()) return true
+					// Entity.initHint asks for the native E hint inside constructors,
+					// before pickupItem/addEntity has assigned a world position. This
+					// type-only query must not assess a preview as a placed building.
+					if (operation === 'relocate' && entity.position === undefined &&
+						Array.isArray(this.stuff) && !this.stuff.includes(entity)) return true
+					return service.safe(entity, operation)
 				})
 			}
 			api.patch(Game.prototype, 'processMove', original => function () {
@@ -78,6 +84,7 @@ ModLoader.register({
 				return identities.get(entity)
 			}
 			function safe(entity, operation) {
+				if (!validPosition(entity?.position)) return false
 				return allowedPlane() && placement.assessEntity(entity, { blueprintMode: 'full', operation }).safe
 			}
 			function cells(entity, position) {
@@ -325,7 +332,7 @@ ModLoader.register({
 				handle(name, args, original) {
 					if (name === 'pickupEraser') return start('erase')
 					if (name === 'pickupEntitiesForRelocation') {
-						game.relocationCandidatesList = Array.from(new Set(game.relocationCandidatesList || [])).filter(e => game.canRelocate(e))
+						game.relocationCandidatesList = Array.from(new Set(game.relocationCandidatesList || [])).filter(e => game.stuff.includes(e) && game.canRelocate(e))
 						if (!game.relocationCandidatesList.length) { cancel(); reject(failure('PROTECTED_TARGET')); return }
 						const result = original.apply(game, args)
 						held = game.relocationList.map(entity => ({ entity, position: entity.position.slice() }))
