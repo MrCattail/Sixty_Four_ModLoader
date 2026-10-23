@@ -1079,3 +1079,29 @@ The fixed enabled Tweaks auto-save-stutter-fix.js entry is loaded before native 
 The private tweaks-save-policy-v2 protocol uses the existing trusted main-window channel. Begin returns a token and record references, never requests a full renderer seed. Commits contain only changed slot descriptors and new current/history records. Tweaks owns snapshot isolation, local IDB completion, cloud retry, content checksums, the two-file auto ring and publish-last index. No enabled-policy error falls back to a full collection. The cloud reader reconstructs the legacy charpsMemory baseline plus the optional delta index even when the setting is off. Disabling/reloading restores native saves; an updated native baseline supersedes the older delta index. New delta data requires this reader.
 
 Better UIs service v1 keeps source.index/activeIndex tied to the verified physical working auto slot; its source name describes the played manual slot. Manual entry receipts keep manual indices. First installation requires a full Electron restart. See Codex-md/save_policy_20261020.md for validation and player/Steam limitations.
+
+## 一次性启动分层探针（默认关闭）
+
+遇到白屏、启动无响应或界面未显示时，可使用 tools/Start Startup Probe.cmd 启动一次诊断。不依赖 F12，也无需预先导出真实配置。
+
+1. 保存当前游戏并完整退出，确认没有 Sixty Four 进程。启动器发现已有进程时会提示退出，不会结束进程或另开第二份。
+2. 在本目录的 tools 文件夹中双击 Start Startup Probe.cmd。它只给这一次游戏进程添加 --modloader-startup-probe，不修改 Steam 启动项或持久化设置。
+3. 保持游戏窗口打开约 65 秒。探针采样 60 秒后自动停止，窗口截图最多再等待 5 秒；游戏继续运行，不自动退出、重启或修复。即使仍然白屏也可留下窗口等待收尾。
+4. 查看 state/startup-probes/latest.json 指向的本次目录：summary.txt 是摘要，summary.json 是最终/进行中状态，timeline.jsonl 是按时间排列的事件；window.png 最多一张，仅截取游戏窗口。采集中摘要每秒更新，主进程阻塞或异常退出时仍可检查已落盘的部分时间线。
+5. 后续正常从 Steam 或原游戏启动方式进入，即不启用探针。已有诊断文件不会自动上传或清空。
+
+### 记录内容与读取方法
+
+- 从主进程桥、页面前 preload、SDK require/initialize，到 Loader boot、各 entry、Mod init、同步/异步生命周期钩子，记录进入/完成/异常位置。
+- 对 Game 实例观察原生数据准备、脚本/样式/图片、资源/世界载入以及首三帧的实体/网格/资源绘制；后续保留帧与心跳计数。同步函数不会被改成 async，Promise 本身、参数、this、结果和异常的业务传播保持；探针不改变原型函数源码签名，实例观察继续委托当前的 Mod 原型补丁。
+- 同时覆盖 Render API 开/关。记录画布及祖先的尺寸、display、visibility、opacity、z-index、transform，以及可见原生/Loader图层的小块像素统计。隐藏或辅助图标 canvas 不计作场景显示，原生 Store 父容器零宽也不能单独判错。
+- summary 中 pending 是尚未返回的调用，不自动等于死锁。对照 timeline 的 begin/end：例如 stage:afterVanillaScripts 下 hook:某Mod:afterVanillaScripts 有 begin 无 end，可缩小到该回调；game:renderResources 的 error 可给出异常类型和脚本行列。正常加载与帧均推进但窗口仍白时，再比较图层样式、像素和截图。
+- 主进程心跳独立于渲染线程；若主进程本身同步堵死，它的定时器同样无法运行，只能依靠最后已写入的进入点和心跳。主桥导入之前的失败可能没有会话目录。像素读回有同步开销；若停点为probe:canvas-readback，应先视为诊断采样未返回。GPU故障、隐藏窗口截图过早或特殊 Mod 组合，仍需结合现场继续判断；探针不是性能基准或自动归因器。
+
+### 输出上限与数据边界
+
+一次最多 4000 条事件，时间线/摘要合计不超过 2 MiB，另有最多一张 8 MiB PNG；截图超时或过大只记录状态，不阻塞游戏。渲染端图像/事件观察也有独立上限。停止时只移除探针自己的监听器、计时器和包装，不恢复成过期的 Mod 方法，不覆盖已有 preload。
+
+不记录配置值、存档/IndexedDB内容、原始 IPC 参数、SDK token 或完整异常 message；异常保留类型及经过处理的脚本位置。探针不增加、跳过或取消保存/Steam Cloud操作。玩家通过启动器运行正式游戏时，游戏正常的配置与存档读写仍照常发生。窗口截图可能包含当时可见的游戏画面。
+
+这是 Loader 的私有可选诊断，不是新增 Mod 公共接口或正式白屏修复。源码/合同验证可运行 node tools/startup-probe-contract.test.js；游戏内采集、修复、诊断移除和发布分别处理。

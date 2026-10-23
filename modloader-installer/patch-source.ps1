@@ -184,10 +184,52 @@ function Patch-GameJs {
         this.words = words[this.language]
         this.words_en = words.en
 '@
-		if (-not [regex]::IsMatch($Text, $oldDataPattern)) {
+		# The October 2026 build awaits images before selecting the language.
+		# Patch its two separate consumers without moving or repeating preload.
+		$splitDataPattern = '(?m)^\t\tthis\.codex = abstract_getCodex\(\)\n\t\tthis\.images = await this\.preloadImages\(\)\n'
+		$splitWordsPattern = '(?m)^\t\tconst words = abstract_getWords\(\)\n\t\tthis\.words = words\[this\.language\]\n\t\tthis\.words_en = words\.en\n'
+		$splitLanguagePattern = '(?m)^\t\tthis\.language = this\.languages\[this\.languageId \?\? 0\]\n'
+		if ([regex]::Matches($Text, $oldDataPattern).Count -eq 1) {
+			$Text = [regex]::Replace($Text, $oldDataPattern, { param($match) $newData + "`n" }, 1)
+		} elseif ([regex]::Matches($Text, $splitDataPattern).Count -eq 1 -and
+			[regex]::Matches($Text, $splitWordsPattern).Count -eq 1 -and
+			[regex]::Matches($Text, $splitLanguagePattern).Count -eq 1) {
+			$splitData = @'
+        const vanillaCodex = abstract_getCodex()
+        this.codex = window.ModLoader?.applyData(vanillaCodex, this) || vanillaCodex
+        this.images = await this.preloadImages()
+'@
+			$splitLanguage = @'
+        this.languages = window.ModLoader?.applyLanguages(this.languages) || this.languages
+        if (!this.languages[this.languageId]) this.languageId = 0
+        this.language = this.languages[this.languageId]
+'@
+			$splitWords = @'
+        const vanillaWords = abstract_getWords()
+        const words = window.ModLoader?.applyWords(vanillaWords, this) || vanillaWords
+        if (!words[this.language]) {
+            this.languageId = 0
+            this.language = this.languages[this.languageId] || `en`
+        }
+        this.words = words[this.language]
+        this.words_en = words.en
+'@
+			$Text = [regex]::Replace($Text, $splitDataPattern, { param($match) $splitData + "`n" }, 1)
+			$Text = [regex]::Replace($Text, $splitLanguagePattern, { param($match) $splitLanguage + "`n" }, 1)
+			$Text = [regex]::Replace($Text, $splitWordsPattern, { param($match) $splitWords + "`n" }, 1)
+		} else {
 			throw 'Could not patch game data and language hooks. The game file may have changed or was edited by another tool.'
 		}
-		$Text = [regex]::Replace($Text, $oldDataPattern, { param($match) $newData + "`n" })
+	}
+	$initMatches = [regex]::Matches($Text, '(?ms)^\tasync init\(preload\)\{\n.*?^\t\}')
+	if ($initMatches.Count -ne 1) { throw 'Expected one active desktop init method.' }
+	foreach ($hook in @('applyData', 'applyLanguages', 'applyWords')) {
+		if ([regex]::Matches($initMatches[0].Value, "ModLoader\?\.$hook\(").Count -ne 1) {
+			throw "Incomplete game initialization hook: $hook"
+		}
+	}
+	if ($Text.Contains('async preloadImages()') -and -not $initMatches[0].Value.Contains('this.images = await this.preloadImages()')) {
+		throw 'Async image preload must remain awaited.'
 	}
 
 	if (-not $Text.Contains('afterGameInit')) {
@@ -327,10 +369,77 @@ function Patch-UiJs {
 	return Apply-Required $Text $old $new 'active Store image hook'
 }
 
+function Patch-MainSaveBridge {
+	param([string]$Text)
+	$Text = [regex]::Replace($Text, '(?m)^[ \t]+(?=if \(client\.cloud\?\.fileExists\(`charpsMemory`\) \|\| ModLoaderMainProcess\.hasSaveOverlay\(client\.cloud\))', '  ')
+	$sendBlock = @'
+ipcMain.on(`store`, (e,slots)=>{
+  return ModLoaderMainProcess.dispatchSaveStore(e, slots, value => {
+    try {
+      return client.cloud?.writeFile(`charpsMemory`, JSON.stringify(value))
+    } catch (_) {
+      win.webContents.send(`console`, `Error! Error! Error! Can't serialize and write slots to the cloud.`)
+      return false
+    }
+  })
+})
+'@
+	$invokeBlock = @'
+ipcMain.handle(`store`, async (e, slots) => {
+  return ModLoaderMainProcess.dispatchSaveStore(e, slots, value => {
+    try {
+      console.log(`Saving to Steam...`)
+      return client.cloud?.writeFile('charpsMemory', JSON.stringify(value)) === true
+    } catch (_) {
+      console.error('Steam save failed.')
+      return false
+    }
+  })
+})
+'@
+	$marker = '// ModLoader save bridge v2'
+	$sendPattern = '(?ms)^ipcMain\.on\(`store`, \(e,slots\)=>\{\n.*?^\}\)'
+	$invokePattern = '(?ms)^ipcMain\.handle\(`store`, async \(e, slots\) => \{\n.*?^\}\)'
+	$sendMatches = [regex]::Matches($Text, $sendPattern)
+	$invokeMatches = [regex]::Matches($Text, $invokePattern)
+	if ($sendMatches.Count -ne 1 -or $invokeMatches.Count -ne 1) { throw 'Save bridge needs exactly one store send and invoke handler.' }
+	if ($Text.Contains($marker)) {
+		if ($sendMatches[0].Value -cne $sendBlock -or $invokeMatches[0].Value -cne $invokeBlock) { throw 'Incomplete or edited save dispatch bridge.' }
+		foreach ($required in @('ModLoaderMainProcess.configureSaveCloud(client.cloud)', 'return ModLoaderMainProcess.readSaveOverlay(client.cloud, JSON.parse(save))', 'savePolicyLayout: slots?.policyLayout,', 'ModLoaderMainProcess.hasSaveOverlay(client.cloud)', "if (e?.code === 'SAVE_COLLECTION_INVALID' || e?.code === 'SAVE_BASELINE_MISSING')")) {
+			if ([regex]::Matches($Text, [regex]::Escape($required)).Count -ne 1) { throw "Incomplete or duplicate save bridge: $required" }
+		}
+		return $Text
+	}
+	if ($Text -match 'ModLoaderMainProcess\.(configureSaveCloud|readSaveOverlay|dispatchSaveStore)') { throw 'Partial save bridge without its complete version marker.' }
+	$Text = Apply-Required $Text $sendMatches[0].Value $sendBlock 'save send dispatch'
+	$Text = Apply-Required $Text $invokeMatches[0].Value $invokeBlock 'save invoke dispatch'
+	$configure = "$marker`nModLoaderMainProcess.configureSaveCloud(client.cloud)`n`n"
+	$Text = Insert-BeforeStandaloneLine $Text '// LANGUAGE CODES' $configure 'save cloud configuration'
+	$Text = Apply-Required $Text 'if (client.cloud?.fileExists(`charpsMemory`)){' 'if (client.cloud?.fileExists(`charpsMemory`) || ModLoaderMainProcess.hasSaveOverlay(client.cloud)){' 'save overlay presence'
+	$Text = Apply-Required $Text '      slots: slots,' "      slots: slots,`n      savePolicyLayout: slots?.policyLayout," 'save layout forwarding'
+	$Text = Apply-Required $Text 'const save = client.cloud.readFile(`charpsMemory`)' "const save = client.cloud?.fileExists(``charpsMemory``) ? client.cloud.readFile(``charpsMemory``) : '[]'" 'save baseline read'
+	$Text = Apply-Required $Text 'return JSON.parse(save)' 'return ModLoaderMainProcess.readSaveOverlay(client.cloud, JSON.parse(save))' 'save overlay reconstruction'
+	$readFailure = @'
+    } catch(e){
+      if (e?.code === 'SAVE_COLLECTION_INVALID' || e?.code === 'SAVE_BASELINE_MISSING') {
+        console.error('Invalid cloud save collection; loading stopped.')
+        return false
+      }
+      console.warn(`Cloud read failed, attempt ${i + 1}`)
+'@
+	$oldReadFailure = @'
+    } catch(e){
+      console.warn(`Cloud read failed, attempt ${i + 1}`)
+'@
+	$Text = Apply-Required $Text $oldReadFailure $readFailure 'invalid cloud input rejection'
+	return Patch-MainSaveBridge $Text
+}
+
 function Patch-MainJs {
 	param([string]$Text)
 	# The 1.3 main process uses tabs in bodies formerly indented with two spaces.
 	$Text = [regex]::Replace($Text, '(?m)^\t+', { param($m) '  ' * $m.Length })
+	$Text = Patch-MainSaveBridge $Text
 	if (-not $Text.Contains('clearSnapshotContext(e.sender) // reload')) {
 		$Text = Apply-Required $Text 'ipcMain.on(`getMyStuff`, async (e,d)=>{' "ipcMain.on(``getMyStuff``, async (e,d)=>{`n  ModLoaderMainProcess.clearSnapshotContext(e.sender) // reload" 'reload snapshot context'
 	}
@@ -488,22 +597,11 @@ ipcMain.on(`modloader:toggle-devtools`, ()=>{
 		$Text = Insert-BeforeStandaloneLine $Text '//1111111111111111' $devToolsIpcBlock 'DevTools renderer IPC'
 	}
 
-	if (-not $Text.Contains('toggleDevTools')) {
+	# The native menu and our IPC already mention toggleDevTools. Neither proves
+	# that shortcuts or renderer diagnostics have been installed.
+	$Text = $Text.Replace("// {role: 'toggleDevTools'}", "{role: 'toggleDevTools'}")
+	if (-not $Text.Contains("ModLoaderMainProcess.runtimeLog('console'")) {
 		$devToolsBlock = @'
-  const isMac = process.platform === 'darwin'
-  const temp = [
-    {
-      label: 'View',
-      submenu: [
-        {role: 'reload'},
-        {role: 'forceReload'},
-        {role: 'toggleDevTools'}
-      ]
-    }
-  ]
-  const menu = Menu.buildFromTemplate(temp)
-  Menu.setApplicationMenu(menu)
-
   globalShortcut.register('CommandOrControl+Shift+I', _=>{
     win.webContents.toggleDevTools()
   })
@@ -512,7 +610,11 @@ ipcMain.on(`modloader:toggle-devtools`, ()=>{
   })
 
   win.webContents.on('console-message', (event, level, message, line, sourceId)=>{
-    ModLoaderMainProcess.runtimeLog('console', level, message, `${sourceId}:${line}`)
+    if (level && typeof level === 'object') {
+      ModLoaderMainProcess.runtimeLog('console', level.level, level.message, `${level.sourceId}:${level.lineNumber}`)
+    } else {
+      ModLoaderMainProcess.runtimeLog('console', level, message, `${sourceId}:${line}`)
+    }
   })
   win.webContents.on('render-process-gone', (event, details)=>{
     ModLoaderMainProcess.runtimeLog('render-process-gone', details)

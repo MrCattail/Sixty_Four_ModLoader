@@ -215,7 +215,7 @@ app.on('window-all-closed',()=>app.quit());`)
 			await page.evaluate(() => ModLoader.togglePanel())
 			await page.locator('.modloader-mod-title').click()
 			const field = page.locator('[data-modloader-config-key="enableClearViewGridFix"]')
-			assert.equal(await field.getAttribute('aria-label'), '清晰视图网格卡顿修复')
+			assert.equal(await field.getAttribute('aria-label'), '[已修复] 清晰视图网格卡顿修复')
 			await page.waitForTimeout(350) // Let the existing settings expansion finish.
 			await field.scrollIntoViewIfNeeded(); await page.screenshot({ path: path.join(output, 'setting.png') })
 			await field.uncheck()

@@ -2,6 +2,16 @@
 const { PROTOCOL, clone, hash, info, isAuto, describe, mergeSlot } = require('./save-policy-core.js')
 const KEY = Symbol.for('cattail.tweaks.save-policy')
 const CONTROL = 'modloader:tweaks-slot-store'
+function assertSlotInput(slots, game) {
+  const invalid = () => { game.preventSaving = true; const error = new Error('Invalid saved slot collection. Loading stopped without replacing save data.'); error.code = 'TWEAKS_SAVE_INPUT_INVALID'; throw error }
+  if (!slots || typeof slots !== 'object') invalid()
+  for (const [index, slot] of Object.entries(slots)) {
+    if (!/^(0|[1-9]\d*)$/.test(index) || Number(index) > 10000) invalid()
+    if (slot === null || slot === undefined || slot === false) continue
+    if (typeof slot !== 'object' || Array.isArray(slot) || !Array.isArray(slot.stack) || !slot.stack.length) invalid()
+    for (const record of slot.stack) if (!record || typeof record !== 'object' || Array.isArray(record) || !(record.state === null || (record.state && typeof record.state === 'object' && !Array.isArray(record.state))) || !record.permanents || typeof record.permanents !== 'object' || Array.isArray(record.permanents)) invalid()
+  }
+}
 function createPolicy(game) {
   let loading = false, localQueue = Promise.resolve(), cloudQueue = Promise.resolve(), session = null
   let cloudSlots = {}, lastError = '', autoIndex = -1, layoutAt = 0, dirty = {}, lastTiming = null
@@ -125,6 +135,8 @@ function createPolicy(game) {
     const read = game.readFromSlot, list = game.getSlotList, preferences = game.getPreferences
     let localIds = [], combined = null
     try {
+      if (preload?.noSave) { game.preventSaving = true; const error = new Error('Cloud save loading failed. Initialization stopped without replacing save data.'); error.code = 'TWEAKS_SAVE_LOAD_FAILED'; throw error }
+      if (preload?.slots !== undefined && preload?.slots !== null) assertSlotInput(preload.slots, game)
       if (!preload?.slots) {
         game.steamId = preload?.steamId || ''
         game.localDatabase = await game.getDatabase()
@@ -142,6 +154,7 @@ function createPolicy(game) {
         layoutAt = Math.max(localLayout?.at || 0, remoteLayout?.at || 0)
         for (const index of localIds) locals[index] = await read.call(game, index)
         game.localDatabase.close()
+        assertSlotInput(locals, game)
         for (const slots of [locals, remotes]) for (const [index, slot] of Object.entries(slots)) if (slot) {
           if (!info(slot).id) slot.tweaksSavePolicy = { id: idFor(slot, Number(index)), headAt: slot.lastModified }
           const id = info(slot).id; byId.set(id, mergeSlot(byId.get(id), slot))

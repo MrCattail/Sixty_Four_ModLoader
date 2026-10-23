@@ -3,6 +3,13 @@ const crypto = require('crypto')
 const fs = require('fs')
 const path = require('path')
 const { spawn } = require('child_process')
+// One-run diagnostics are inactive unless the explicit launch switch is present.
+let startupProbeService = null
+if (app.commandLine?.hasSwitch?.('modloader-startup-probe')) {
+  try { startupProbeService = require('./diagnostics/startup-main.js').createService({
+    enabled: true, electron: require('electron'), outputRoot: path.join(__dirname, 'state', 'startup-probes')
+  }) } catch (_) { /* Optional probe failure must not block normal startup. */ }
+}
 const { SnapshotStore, SnapshotStoreError, safeMessageForCode } = require('./snapshot-store.js')
 const { encodeSnapshotContainer } = require('./snapshot-container.js')
 const { LibraryStore, LibraryStoreError, normalizeManifestLibraries, safeMessageForCode: safeLibraryMessageForCode } = require('./library-store.js')
@@ -521,7 +528,7 @@ function getInitialAppWindowBounds(){
 }
 
 function getMainWindowOptions(baseOptions){
-  const options = Object.assign({}, baseOptions || {})
+  const options = startupProbeService?.prepareWindowOptions(Object.assign({}, baseOptions || {})) || Object.assign({}, baseOptions || {})
   if (!hasAppWindowCreationState()) {
     pendingMainWindowFrameless = options.frame === false
     return options
@@ -1558,6 +1565,7 @@ ipcMain.on(`modloader:window:close`, (event, payload)=>{
 })
 function attachWindow(parentWindow, options){
   win = parentWindow
+  startupProbeService?.attachWindow(win)
   // Temporary probe: optional module; no recording until explicitly requested.
   if (fs.existsSync(path.join(__dirname, 'diagnostics', 'clear-view-main.js'))) {
     try {
@@ -1637,7 +1645,23 @@ let savePolicyCloud = null
 function configureSaveCloud(cloud) { savePolicyCloud = cloud }
 function savePolicyBackend() { return require('../mods/Cattail_TweaksQuality_Tweaks/scripts/main/auto-save-policy-store.js') }
 function hasSaveOverlay(cloud) { return cloud?.fileExists?.('cattail-save-policy-v2.json') === true }
-function readSaveOverlay(cloud, base) { return hasSaveOverlay(cloud) ? savePolicyBackend().readOverlay(cloud, base) : base }
+function assertSaveCollection(value) {
+  const invalid = () => { const error = new Error('Invalid saved slot collection. Loading stopped without replacing save data.'); error.code = 'SAVE_COLLECTION_INVALID'; throw error }
+  if (!value || typeof value !== 'object') invalid()
+  for (const [index, slot] of Object.entries(value)) {
+    if (!/^(0|[1-9]\d*)$/.test(index) || Number(index) > 10000) invalid()
+    if (slot === null || slot === undefined || slot === false) continue
+    if (typeof slot !== 'object' || Array.isArray(slot) || !Array.isArray(slot.stack) || !slot.stack.length) invalid()
+    for (const record of slot.stack) if (!record || typeof record !== 'object' || Array.isArray(record) || !(record.state === null || (record.state && typeof record.state === 'object' && !Array.isArray(record.state))) || !record.permanents || typeof record.permanents !== 'object' || Array.isArray(record.permanents)) invalid()
+  }
+  return value
+}
+function readSaveOverlay(cloud, base) {
+  assertSaveCollection(base)
+  if (!hasSaveOverlay(cloud)) return base
+  if (cloud?.fileExists?.('charpsMemory') !== true) { const error = new Error('The save baseline is missing. Loading stopped.'); error.code = 'SAVE_BASELINE_MISSING'; throw error }
+  return assertSaveCollection(savePolicyBackend().readOverlay(cloud, base))
+}
 function clearTweaksSlotStore(sender) { tweaksSlotStore?.clear(sender) }
 function isMainSaveSender(event) {
   return !!win && !win.isDestroyed() && event.sender === win.webContents &&
@@ -1649,6 +1673,7 @@ ipcMain.handle('modloader:tweaks-slot-store', (event, request) => {
   const unavailable = { protocol: tweaksSlotStoreProtocol, ok: false }
   if (!isMainSaveSender(event) || request?.protocol !== tweaksSlotStoreProtocol) return unavailable
   if (request.action === 'begin') {
+    if (!savePolicyCloud) return unavailable
     if (request.gameVersion !== '1.3') return unavailable
     const id = 'Cattail_TweaksQuality_Tweaks', modsDir = path.resolve(__dirname, '..', 'mods')
     const enabled = normalizeEnabledEntries(readJsonFile(path.join(modsDir, 'enabled.json'), { mods: [] }))
@@ -1663,9 +1688,13 @@ ipcMain.handle('modloader:tweaks-slot-store', (event, request) => {
   return unavailable
 })
 function dispatchSaveStore(event, slots, write) {
+  if (!isMainSaveSender(event)) return { ok: false, reason: 'sender' }
   if (typeof slots?.protocol === 'string' && slots.protocol.startsWith('tweaks-') && slots.protocol !== tweaksSlotStoreProtocol) return { ok: false, reason: 'protocol' }
   if (slots?.protocol === tweaksSlotStoreProtocol && (!isMainSaveSender(event) || !tweaksSlotStore)) {
     return { protocol: tweaksSlotStoreProtocol, ok: false, reason: 'resync' }
+  }
+  if (slots?.protocol !== tweaksSlotStoreProtocol) {
+    try { assertSaveCollection(slots) } catch (_) { return { ok: false, reason: 'collection' } }
   }
   return tweaksSlotStore ? tweaksSlotStore.store(event.sender, slots, write, savePolicyCloud) : write(slots)
 }

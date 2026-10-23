@@ -210,9 +210,54 @@ ModLoader.register({
 
 		namespace.installShopBuildCountdown = function () {
 			if (namespace.shopBuildCountdownInstalled) return
-			if (typeof Shop === 'undefined') return
+			if (typeof Store === 'undefined' || typeof DesktopStoreVersion === 'undefined') return
 			namespace.shopBuildCountdownInstalled = true
 			installBuildCountdown()
+		}
+
+		// Private read-only adapter for this Mod's display-only Shortcut API consumer.
+		const shortcutStateListeners = new Set()
+		let shortcutStateSignature = ''
+		namespace.getShortcutState = function (game = lastGame) {
+			const building = !!namespace.buildingDetailsInstalled && isBuildingDetailsFeatureEnabled()
+			const resources = !!namespace.resourceSourcesInstalled && isResourceSourceFeatureEnabled()
+			const coordinates = !!namespace.coordinateOverlayInstalled && isCoordinateOverlayFeatureEnabled()
+			const directions = !!namespace.directionPointersInstalled && isDirectionPointersFeatureEnabled()
+			const hoveredResource = resources && Number.isInteger(game?.hoveredResource)
+			const buildingContext = !!(building && game && isBuildingDetailContext(game))
+			const pinnedResource = resources && !!game?.[resourceSourceToggleKey]
+			const lineLocked = resources && !!game?.[resourceSourceLineLockKey]
+			const activeElement = document.activeElement
+			const editing = !!(activeElement?.isContentEditable || activeElement?.closest?.('input,textarea,select,[contenteditable="true"]'))
+			const panelFocused = !!(coordinateTeleportPanel?.visible && activeElement && coordinateTeleportPanel.element.contains(activeElement))
+			const playing = !!(game && !game.isMobile && !game.splash?.isShown && !game.credits && !game.pinhole && !game.entitiesInGame?.pinhole && !api.ui?.hud?.isHidden?.())
+			return Object.freeze({
+				building, resources, coordinates, directions,
+				opacity: !!window._cattailDynamicDetailsOpacityInstalled && (building || resources),
+				chart: resources && isResourceSourceLineChartEnabled(),
+				playing, ready: playing && !editing, panelFocused,
+				buildingContext, hoveredResource,
+				resourceView: hoveredResource && !game?.plane,
+				linePreview: !!(resources && !game?.plane && (lineLocked ? hoveredResource : (game?.altActive || pinnedResource) && (hoveredResource || (pinnedResource && Number.isInteger(game?.[resourceSourceLastResourceKey]))))),
+				chartContext: !!(hoveredResource && game?.entitiesInGame?.mega1b),
+				cell: !!(Array.isArray(game?.hoveredCell) && game?.mouse?.cursorVisible !== false),
+				emptyCell: !!(game && isCoordinateEmptyCellContext(game)),
+				opacityContext: !!(game && (game.altActive || game[detailToggleKey]) && !(hoveredResource || (pinnedResource && !buildingContext)))
+			})
+		}
+		namespace.subscribeShortcutState = function (listener) {
+			shortcutStateListeners.add(listener)
+			return () => shortcutStateListeners.delete(listener)
+		}
+		function notifyShortcutState(game = lastGame) {
+			if (!shortcutStateListeners.size) return
+			const state = namespace.getShortcutState(game)
+			const signature = JSON.stringify(state)
+			if (signature === shortcutStateSignature) return
+			shortcutStateSignature = signature
+			for (const listener of shortcutStateListeners) {
+				try { listener(state) } catch (error) { console.warn('[Cattail Dynamic Details] Shortcut refresh failed', error) }
+			}
 		}
 
 		namespace.isReady = true
@@ -1083,6 +1128,7 @@ ModLoader.register({
 						}
 					}
 					if (!shouldUseCoordinateRenderApiOverlay()) renderCoordinateOverlay(this)
+					notifyShortcutState(this)
 					return result
 				}
 			})
@@ -2878,15 +2924,16 @@ ModLoader.register({
 					}
 					const previousHoveredResource = this.hoveredResource
 					if (Number.isInteger(previousHoveredResource)) rememberResourceSourceResource(this, previousHoveredResource)
+					// Select links before the pinned panel installs its virtual hover.
+					profileResourceSource(
+						'resource.links.total',
+						() => { if (!shouldUseResourceSourceRenderApiLinks(this)) renderResourceSourceLinks(this, this.ctx, { compositeGpuToCanvas: true }) },
+						() => getResourceSourceProfileDetail(this, getResourceSourceFocusResourceId(this))
+					)
 					const virtualHoveredResource = getResourceSourceVirtualHoveredResourceId(this)
 					const useVirtualHover = Number.isInteger(virtualHoveredResource) && !Number.isInteger(previousHoveredResource)
 					if (useVirtualHover) this.hoveredResource = virtualHoveredResource
 					try {
-						profileResourceSource(
-							'resource.links.total',
-							() => { if (!shouldUseResourceSourceRenderApiLinks(this)) renderResourceSourceLinks(this, this.ctx, { compositeGpuToCanvas: true }) },
-							() => getResourceSourceProfileDetail(this, getResourceSourceFocusResourceId(this))
-						)
 						const result = profileResourceSource(
 							'resource.vanilla.renderResources',
 							() => original.apply(this, args),
@@ -3816,13 +3863,18 @@ ModLoader.register({
 		}
 
 		function isResourceSourceLinkActive(game) {
-			if (!game) return false
-			if (isResourceSourceLineLockActive(game)) return Number.isInteger(getResourceSourceLineResourceId(game))
-			return !!(
-				game.shiftPressed &&
-				(game.altActive || isResourceSourceToggleActive(game)) &&
-				Number.isInteger(getResourceSourceFocusResourceId(game))
-			)
+			return Number.isInteger(getResourceSourceActiveLineResourceId(game))
+		}
+
+		function getResourceSourceActiveLineResourceId(game) {
+			if (!game) return null
+			if (isResourceSourceLineLockActive(game)) {
+				// Shift previews only the real hovered resource; it never changes the lock.
+				if (game.shiftPressed && Number.isInteger(game.hoveredResource)) return game.hoveredResource
+				return getResourceSourceLineResourceId(game)
+			}
+			if (game.shiftPressed && (game.altActive || isResourceSourceToggleActive(game))) return getResourceSourceFocusResourceId(game)
+			return null
 		}
 
 		function rememberResourceSourceResource(game, resourceId) {
@@ -3907,7 +3959,7 @@ ModLoader.register({
 				clearResourceSourceGpuLines(game)
 				return
 			}
-			const resourceId = isResourceSourceLineLockActive(game) ? getResourceSourceLineResourceId(game) : getResourceSourceFocusResourceId(game)
+			const resourceId = getResourceSourceActiveLineResourceId(game)
 			if (!Number.isInteger(resourceId)) {
 				clearResourceSourceGpuLines(game)
 				return
@@ -5640,37 +5692,59 @@ ModLoader.register({
 			return Math.max(min, Math.min(max, value))
 		}
 		function installBuildCountdown() {
-			if (typeof Shop === 'undefined') return
+			if (typeof Store === 'undefined' || typeof DesktopStoreVersion === 'undefined') return
 
 			installBuildCountdownStyles()
 			installBuildCountdownResourceEvents()
-			api.patch(Shop.prototype, 'updatePrice', function (original) {
-			  return function (item) {
-			    const result = original.call(this, item)
-			    ensureCountdownElement(item)
-			    updateCountdown(this, item, true)
-			    return result
-			  }
-			})
-
-			api.patch(Shop.prototype, 'updateElements', function (original) {
-			  return function () {
-			    const result = original.apply(this, arguments)
-			    sampleResourceSnapshot(this.master)
-			    updateShopCountdowns(this, true)
-			    return result
-			  }
-			})
-
-			api.patch(Shop.prototype, 'check', function (original) {
-			  return function () {
-			    prepareCompressedCountdownSignature(this)
-			    const result = original.apply(this, arguments)
-			    sampleResourceSnapshot(this.master)
-			    updateShopCountdowns(this, false)
-			    return result
-			  }
-			})
+			const adapters = new WeakMap()
+			const activeStores = new WeakMap()
+			const clearItem = item => {
+				item[buildCountdownElementKey]?.remove()
+				item.priceHtml?.classList.remove(buildCountdownActivePriceClass)
+			}
+			function refresh(store, force, initializing = false) {
+				const game = store.master
+				if (!game || game.isMobile || !store.html?.items) return
+				if (initializing) {
+					const previous = activeStores.get(game)
+					if (previous && previous !== store) {
+						for (const item of adapters.get(previous)?.items || []) clearItem(item)
+						adapters.delete(previous)
+					}
+					activeStores.set(game, store)
+				}
+				if (activeStores.has(game) && activeStores.get(game) !== store) return
+				let shop = adapters.get(store)
+				if (!shop) {
+					shop = { master: game, items: [] }
+					adapters.set(store, shop)
+				}
+				const previous = new Map(shop.items.map(item => [item.name, item]))
+				shop.items = Object.entries(store.html.items).map(([name, html]) => {
+					const priceHtml = store.html.priceContainers[name]
+					const old = previous.get(name)
+					previous.delete(name)
+					if (old?.html === html && old.priceHtml === priceHtml) return old
+					if (old) clearItem(old)
+					return { name, html, priceHtml }
+				})
+				for (const item of previous.values()) clearItem(item)
+				// Classic views move the real cards; the Store maps remain authoritative.
+				shop.vessel = shop.items[0]?.html?.closest('.cattail-classic-shop') || store.vessel
+				sampleResourceSnapshot(game)
+				updateShopCountdowns(shop, force)
+			}
+			for (const [prototype, method, force, initializing] of [
+				[DesktopStoreVersion.prototype, 'init', true, true],
+				[Store.prototype, 'compositionUpdate', true, false],
+				[DesktopStoreVersion.prototype, 'visibilityUpdate', false, false]
+			]) {
+				api.patch(prototype, method, original => function (...args) {
+					const result = original.apply(this, args)
+					refresh(this, force, initializing)
+					return result
+				})
+			}
 		}
 
 		function installBuildCountdownResourceEvents() {
@@ -5700,7 +5774,9 @@ ModLoader.register({
 		  const style = document.createElement('style')
 		  style.id = buildCountdownStyleId
 		  style.textContent = `
-		    .shop .shopItem .itemPrice .${buildCountdownClass} {
+		    .shop .shopItem .itemPrice .${buildCountdownClass},
+		    .store .item .itemPrice .${buildCountdownClass},
+		    .cattail-shop-category-item-meta .itemPrice .${buildCountdownClass} {
 		      display: none;
 		      clear: both;
 		      width: 100%;
@@ -5712,13 +5788,17 @@ ModLoader.register({
 		      line-height: 1.25;
 		      white-space: nowrap;
 		    }
-		    .shop .shopItem .itemPrice .${buildCountdownClass}.active {
+		    .shop .shopItem .itemPrice .${buildCountdownClass}.active,
+		    .store .item .itemPrice .${buildCountdownClass}.active,
+		    .cattail-shop-category-item-meta .itemPrice .${buildCountdownClass}.active {
 		      display: block;
 		    }
-		    .shop.darkShop .shopItem .itemPrice .${buildCountdownClass} {
+		    .shop.darkShop .shopItem .itemPrice .${buildCountdownClass},
+		    .store .item.dark .itemPrice .${buildCountdownClass} {
 		      color: rgba(205, 205, 214, 0.9);
 		    }
-		    .shop .shopItem.disabled .itemPrice .${buildCountdownClass} {
+		    .shop .shopItem.disabled .itemPrice .${buildCountdownClass},
+		    .store .item.disabled .itemPrice .${buildCountdownClass} {
 		      opacity: 0.95;
 		    }
 		    .shop.minimized .shopItem .itemPrice .${buildCountdownClass} {
@@ -5760,6 +5840,12 @@ ModLoader.register({
 		  const element = ensureCountdownElement(item)
 		  if (!element) return
 
+		  const entity = shop.master.codex?.entities?.[item.name]
+		  if (item.html?.classList.contains('hidden') || shop.master.onlyones?.[item.name] || (entity && (entity.type === 'dark') !== Boolean(shop.master.plane))) {
+		    setCountdownText(shop, item, element, '')
+		    item[buildCountdownNextRefreshKey] = 0
+		    return
+		  }
 		  const now = performance.now()
 		  const affordable = isAffordable(shop.master, item)
 		  if (!force && item[buildCountdownNextRefreshKey] && now < item[buildCountdownNextRefreshKey] && item[buildCountdownLastAffordableKey] === affordable) {
@@ -5807,33 +5893,12 @@ ModLoader.register({
 
 		function syncCountdownText(shop, item, element, text) {
 		  const nextText = text || ''
-		  if (isShopCategoriesCompressed(shop)) {
-		    clearOriginalCountdownElement(item, element)
-		    syncCategoryCountdownText(shop, item, nextText)
-		    return
-		  }
-
 		  if (element.textContent !== nextText) element.textContent = nextText
 		  element.classList.toggle('active', Boolean(nextText))
 		  if (item.priceHtml) {
 		    item.priceHtml.classList.toggle(buildCountdownActivePriceClass, Boolean(nextText))
 		  }
-		}
-
-		function prepareCompressedCountdownSignature(shop) {
-		  if (!isShopCategoriesCompressed(shop) || !Array.isArray(shop.items)) return
-		  for (const item of shop.items) {
-		    const element = item?.priceHtml?.querySelector?.('.' + buildCountdownClass)
-		    clearOriginalCountdownElement(item, element)
-		  }
-		}
-
-		function clearOriginalCountdownElement(item, element) {
-		  if (element) {
-		    if (element.textContent) element.textContent = ''
-		    element.classList.remove('active')
-		  }
-		  item?.priceHtml?.classList?.remove(buildCountdownActivePriceClass)
+		  if (isShopCategoriesCompressed(shop)) syncCategoryCountdownText(shop, item, nextText)
 		}
 
 		function syncCategoryCountdownText(shop, item, text) {

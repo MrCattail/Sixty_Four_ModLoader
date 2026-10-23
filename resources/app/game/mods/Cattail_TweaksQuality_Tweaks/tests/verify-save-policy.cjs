@@ -53,4 +53,38 @@ files.set(currentFile, '{}'); assert.throws(()=>readOverlay(cloud)); files.set(c
 check('Checksum corruption blocks loading instead of returning stale progress', true)
 const changedBase = [clone(manual)]; changedBase[0].lastModified=999; files.set('charpsMemory',JSON.stringify(changedBase))
 check('A later native full save supersedes the old overlay', JSON.stringify(readOverlay(cloud)) === JSON.stringify(changedBase))
-console.log(JSON.stringify({status:'passed',checks},null,2))
+verifyPrepareInputs().then(() => console.log(JSON.stringify({status:'passed',checks},null,2))).catch(error => { console.error(error); process.exitCode = 1 })
+
+async function verifyPrepareInputs() {
+  const { createPolicy } = require('../scripts/save-policy.js')
+  const good = { name: 'Synthetic local', creationTimeStamp: 1, ownerHash: 1, lastModified: 1, stack: [{ state: null, permanents: {} }] }
+  for (const [name, slots] of [
+    ['protocol packet', { protocol: PROTOCOL, changes: {}, records: {} }], ['string', 'bad'],
+    ['primitive slot', { 0: 'bad' }], ['empty stack', { 0: { stack: [] } }],
+    ['non-numeric key', { named: good }], ['array state', { 0: { stack: [{ state: [], permanents: {} }] } }],
+    ['missing permanents', { 0: { stack: [{ state: null }] } }]
+  ]) {
+    let opens = 0, originals = 0
+    const game = { getDatabase() { opens++; throw Error('No database access expected') }, readFromSlot() {}, getSlotList() {}, getPreferences() {} }
+    await assert.rejects(createPolicy(game).prepare(() => { originals++ }, { slots }), { code: 'TWEAKS_SAVE_INPUT_INVALID' })
+    check('Preparation rejects ' + name + ' before database/native writes', opens === 0 && originals === 0 && game.preventSaving === true)
+  }
+  let opens = 0, originals = 0
+  const unavailable = { getDatabase() { opens++; throw Error('No database access expected') }, readFromSlot() {}, getSlotList() {}, getPreferences() {} }
+  await assert.rejects(createPolicy(unavailable).prepare(() => { originals++ }, { noSave: true, slots: false }), { code: 'TWEAKS_SAVE_LOAD_FAILED' })
+  check('Failed cloud read blocks initialization rather than inventing a fresh save', opens === 0 && originals === 0 && unavailable.preventSaving === true)
+  let closed = 0, writes = 0
+  const game = { async getDatabase() { return { close() { closed++ }, transaction() { writes++; throw Error('No write expected') } } }, async getSlotList() { return [0] }, async readFromSlot(index) { return index === 0 ? 'synthetic-invalid-local-slot' : undefined }, getPreferences() { return {} } }
+  const methods = { read: game.readFromSlot, list: game.getSlotList, preferences: game.getPreferences }
+  await assert.rejects(createPolicy(game).prepare(() => { originals++ }, { slots: [] }), { code: 'TWEAKS_SAVE_INPUT_INVALID' })
+  check('Invalid local slot also blocks before original/native writes', writes === 0 && originals === 0 && closed === 1 && game.preventSaving)
+  check('Input rejection restores the original read/list/preferences methods', game.readFromSlot === methods.read && game.getSlotList === methods.list && game.getPreferences === methods.preferences)
+  for (const slots of [[], {}, { 0: good }, [null, false, good]]) {
+    const stop = new Error('SYNTHETIC_STOP_BEFORE_NATIVE_WRITES')
+    const valid = { async getDatabase() { return { close() {} } }, async getSlotList() { return [] }, async readFromSlot() { return undefined }, getPreferences() { return {} } }
+    let reached = false
+    await assert.rejects(createPolicy(valid).prepare(() => { reached = true; throw stop }, { slots }), error => error === stop)
+    assert(reached)
+  }
+  check('Valid empty/sparse/native slot collections reach original preparation unchanged', true)
+}

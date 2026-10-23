@@ -12,9 +12,9 @@ let playwright
 try { playwright = require('playwright') } catch (_) {
 	playwright = createRequire(path.join(process.env.CODEX_NODE_MODULES || path.join(os.homedir(), '.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules'), '_resolve.cjs'))('playwright')
 }
-const ROOT = path.resolve(__dirname, '../../..')
+const ROOT = process.env.BETTER_UI_GAME_ROOT || path.resolve(__dirname, '../../..')
 const MOD = 'Cattail_TweaksQuality_Better-UIs'
-const MOD_ROOT = path.resolve(__dirname, '..')
+const MOD_ROOT = process.env.BETTER_UI_MOD_ROOT || path.resolve(__dirname, '..')
 const manifest = JSON.parse(fs.readFileSync(path.join(MOD_ROOT, 'mod.json'), 'utf8'))
 const source = fs.readFileSync(path.join(ROOT, 'scripts/ui.js'), 'utf8')
 const storeSource = source.slice(source.indexOf('class Store {'), source.indexOf('class Shop {'))
@@ -60,14 +60,14 @@ const server = http.createServer((req, res) => {
 	} else if (url.pathname === '/mods/enabled.json') {
 		type = 'application/json'; body = JSON.stringify({ mods: [MOD] })
 	} else if (url.pathname === '/mods/' + MOD + '/mod.json') {
-		type = 'application/json'; body = JSON.stringify({ ...manifest, entries: ['scripts/classic-shop.js', 'scripts/shop-categories.js'] })
+		type = 'application/json'; body = JSON.stringify({ ...manifest, entries: manifest.entries.filter(entry => ['scripts/classic-shop.js', 'scripts/shop-categories.js', 'scripts/native-accordion-shop.js'].includes(entry)) })
 	} else if (url.pathname === '/store.js') body = storeSource
 	else if (url.pathname === '/codex.js') body = classes.map(name => 'const ' + name + ' = class {};').join('\n') + '\n' + codexSource
 	else {
 		const relative = decodeURIComponent(url.pathname.slice(1))
-		const target = path.resolve(ROOT, relative)
-		const permitted = ['cascade.css', 'modloader/loader.js', `mods/${MOD}/scripts/classic-shop.js`, `mods/${MOD}/scripts/shop-categories.js`].includes(relative) || /^(img|font)\/[\w./-]+$/.test(relative)
-		if (permitted && target.startsWith(ROOT + path.sep) && fs.existsSync(target) && fs.statSync(target).isFile()) {
+		const target = relative.startsWith('mods/' + MOD + '/') ? path.resolve(MOD_ROOT, relative.slice(('mods/' + MOD + '/').length)) : path.resolve(ROOT, relative)
+		const permitted = ['cascade.css', 'modloader/loader.js', `mods/${MOD}/scripts/classic-shop.js`, `mods/${MOD}/scripts/shop-categories.js`, `mods/${MOD}/scripts/native-accordion-shop.js`].includes(relative) || /^(img|font)\/[\w./-]+$/.test(relative)
+		if (permitted && (target.startsWith(ROOT + path.sep) || target.startsWith(MOD_ROOT + path.sep)) && fs.existsSync(target) && fs.statSync(target).isFile()) {
 			body = fs.readFileSync(target)
 			type = ({ '.css': 'text/css', '.jpg': 'image/jpeg', '.png': 'image/png', '.svg': 'image/svg+xml', '.woff2': 'font/woff2' })[path.extname(target)] || type
 		}
@@ -106,12 +106,14 @@ async function main() {
 		const native = await setup()
 		await check('default 1.3 leaves native Store and category controls untouched', async () => {
 			assert.deepEqual(await state(native), { classic: 0, size: 0, compact: 0, alias: false })
+			assert.equal(await native.locator('.cattail-native-shop-toggle').count(), 2)
 			assert.ok(await native.locator('.store > .element:not(.hidden):not(.eraser):not(.relocator)').count())
 			assert.equal(await native.locator('#cattail-classic-shop-style, #cattail-shop-categories-style').count(), 0)
 		})
 		const page = await setup('?version=1.2.1')
 		await check('classic uses real Store cards and native price/counter references', async () => {
 			assert.deepEqual(await state(page), { classic: 1, size: 1, compact: 1, alias: false })
+			assert.equal(await page.locator('.cattail-native-shop-toggle').count(), 0)
 			assert.equal(await page.evaluate(() => Object.entries(game.store.html.items).every(([id, el]) => el === document.querySelector('[data-classic-item="' + id + '"]'))), true)
 			await page.evaluate(() => { game.prices.pump = [27, 13]; game.entitiesInGame.pump = 4; game.store.compositionUpdate(); game.store.visibilityUpdate() })
 			assert.equal(await page.locator('[data-classic-item="pump"] .itemCounter').textContent(), '4')

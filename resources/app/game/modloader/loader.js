@@ -1,6 +1,11 @@
 (function () {
 	'use strict'
 
+	// Private opt-in preload; no collector or timers are created by the Loader.
+	const startupProbe = typeof window === 'undefined' ? null : window.__modloaderStartupProbe
+	const observeStartup = (name, run, detail) => startupProbe ? startupProbe.observe(name, run, detail) : run()
+	startupProbe?.mark('loader-enter')
+
 	const state = {
 		version: '0.5.0',
 		booted: false,
@@ -11344,7 +11349,7 @@
 	}
 
 	const loadScript = function (url) {
-		return new Promise(function (resolve, reject) {
+		return observeStartup('entry:' + String(url).split(/[?#]/)[0], () => new Promise(function (resolve, reject) {
 			const script = document.createElement('script')
 			script.type = 'text/javascript'
 			script.src = url
@@ -11353,7 +11358,7 @@
 				reject(new Error(`Failed to load script: ${url}`))
 			}
 			document.head.appendChild(script)
-		})
+		}))
 	}
 
 	const normalizeEnabled = function (enabled) {
@@ -11543,7 +11548,7 @@
 		let current = payload
 		for (const hook of hooks) {
 			try {
-				const result = hook.fn(current, context)
+				const result = observeStartup('hook:' + hook.modId + ':' + name, () => hook.fn(current, context))
 				if (result !== undefined) current = result
 			} catch (error) {
 				warn(`Hook ${name} from ${hook.modId} failed`, error)
@@ -12032,6 +12037,7 @@
 
 		async boot() {
 			if (state.booted) return state
+			const bootSpan = startupProbe?.begin('loader:boot')
 			state.booted = true
 
 			readTranslationCatalogFromDisk({ silent: true })
@@ -12064,6 +12070,7 @@
 			info(`Loaded ${state.mods.length} enabled mod manifest(s).`)
 			showStatus()
 			requestAnimationFrame(restorePanelAfterLoad)
+			startupProbe?.end(bootSpan)
 			return state
 		},
 
@@ -12085,6 +12092,8 @@
 		},
 
 		async stage(name, context, payload) {
+			const stageSpan = startupProbe?.begin('stage:' + name)
+			if (name === 'beforeGamePrepare') startupProbe?.attachGame(context)
 			if (context?.language) state.game = context
 			if (name === 'beforeGamePrepare') {
 				if (context?.version !== '1.3' || context?.isMobile) throw new Error('ModLoader requires the desktop game 1.3.')
@@ -12105,7 +12114,7 @@
 			if (name === 'afterGameInit') {
 				installGameHud(context)
 				installVanillaGameHudSync(context)
-				await activateSnapshotContext(context)
+				await observeStartup('loader:snapshot-context', () => activateSnapshotContext(context))
 				requestAnimationFrame(refreshOpenPanel)
 				requestAnimationFrame(restorePanelAfterLoad)
 				requestAnimationFrame(syncUiDocks)
@@ -12118,15 +12127,16 @@
 			let current = payload
 			for (const hook of hooks) {
 				try {
-					const result = await hook.fn(current, context)
+					const result = await observeStartup('hook:' + hook.modId + ':' + name, () => hook.fn(current, context))
 					if (result !== undefined) current = result
 				} catch (error) {
 					warn(`Hook ${name} from ${hook.modId} failed`, error)
 				}
 			}
-			if (name === 'afterVanillaScripts' || name === 'afterGameInit') installRenderApi(context)
+			if (name === 'afterVanillaScripts' || name === 'afterGameInit') observeStartup('loader:render-install', () => installRenderApi(context))
 			if (name === 'afterVanillaScripts') await startClearViewOriginIfArmed(context)
 			if (name === 'afterGameInit') clearViewProbe?.gameReady(context)
+			startupProbe?.end(stageSpan)
 			return current
 		},
 
@@ -12143,7 +12153,7 @@
 			if (mod.hooks) {
 				for (const name in mod.hooks) api.on(name, mod.hooks[name], mod.id)
 			}
-			if (typeof mod.init === 'function') mod.init(api.forMod(mod.id))
+			if (typeof mod.init === 'function') observeStartup('mod-init:' + mod.id, () => mod.init(api.forMod(mod.id)))
 		},
 
 		forMod(modId) {
@@ -12334,5 +12344,6 @@
 		}
 	}
 
+	startupProbe?.mark('loader-ready')
 	window.ModLoader = api
 })()

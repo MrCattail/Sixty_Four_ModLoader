@@ -514,8 +514,8 @@ class CompleteTransaction extends VFX {
 		grad.addColorStop(0, `#112f`)
 		grad.addColorStop(1, `#f000`)
 
+		ctx.lineCap = `butt`
 		ctx.fillStyle = grad
-
 		ctx.globalAlpha = ff > .2 ? 1 : ff ** .2 * 5
 
 		//Base
@@ -1058,7 +1058,7 @@ class Game {
 		this.ctx = this.canvas.getContext(`2d`)
 
 		// Colored sprites back canvas
-		this.bcanvas = document.createElement(`canvas`)
+		this.bcanvas = new OffscreenCanvas(100,100)//document.createElement(`canvas`)
 		this.bctx = this.bcanvas.getContext(`2d`)
 
 		this.pixelRatio = devicePixelRatio
@@ -1121,6 +1121,7 @@ class Game {
 		this.renderLimitOfAKind = 96
 		this.clickPower = 1
 		this.extractionSpeed = 1
+		this.conversionSpeed = 1
 		this.currentHint = {
 			entity: undefined,
 			element: undefined
@@ -1351,30 +1352,28 @@ class Game {
 	}
 	async writeToSlot(data, slot){
 
-		//WIP
-		const cloudPromise = this.spaceport?.invoke ? this.spaceport.invoke('store', this.saveSlots) : Promise.resolve(false)
-		const localPromise = new Promise((resolve, reject) => {
+		return new Promise((resolve, reject) => {
 			const tx = this.localDatabase.transaction(`charps_memory_slots`, `readwrite`)
 			tx.objectStore(`charps_memory_slots`).put(data, [this.steamId, slot])
 			tx.oncomplete = resolve
 			tx.onerror = _=> reject(tx.error)
 		})
 
-		const [saved] = await Promise.all([
-	        cloudPromise,
-	        localPromise
-	    ])
-
-	    return saved
-
-		// if (this.spaceport?.send) this.spaceport.send(`store`, this.saveSlots)
-
-		// return new Promise((resolve, reject) => {
+		// const cloudPromise = this.spaceport?.invoke ? this.spaceport.invoke('store', this.saveSlots) : Promise.resolve(false)
+		// const localPromise = new Promise((resolve, reject) => {
 		// 	const tx = this.localDatabase.transaction(`charps_memory_slots`, `readwrite`)
 		// 	tx.objectStore(`charps_memory_slots`).put(data, [this.steamId, slot])
 		// 	tx.oncomplete = resolve
 		// 	tx.onerror = _=> reject(tx.error)
 		// })
+
+		// const [saved] = await Promise.all([
+	    //     cloudPromise,
+	    //     localPromise
+	    // ])
+
+	    // return saved
+
 	}
 	readFromSlot(slot) {
 		return new Promise((resolve, reject) => {
@@ -1459,17 +1458,27 @@ class Game {
 			await window.ModLoader?.stage(`afterVanillaScripts`, this)
 			await this.loadStyle(`cascade.css`)
 		}
+
+        const vanillaCodex = abstract_getCodex()
+        this.codex = window.ModLoader?.applyData(vanillaCodex, this) || vanillaCodex
+        this.images = await this.preloadImages()
+		console.log(`Assets loaded...`)
 		
 		const slot = this.saveSlots[this.currentSlotId]
 		const permanents = slot.stack[0].permanents
+
+		// WIP: ABSOLUTES
+		this.absolutes = this.getAbsolutes()
 
 		this.resourceNoise = new OpenSimplex2S(64)
 		this.hasSteam = this.steamId ? true : false
 
 		this.languageId = this.preferences.languageId
-		// if (this.languageId === null) this.languageId = (preload && preload.languageId !== null) ? preload.languageId : 0
-		if (preload && preload.languageId !== null) this.languageId = preload.languageId
-		this.language = this.languages[this.languageId ?? 0]
+		if (this.languageId === null) this.languageId = (preload && preload.languageId !== null) ? preload.languageId : 0
+		// if (preload && preload.languageId !== null) this.languageId = preload.languageId
+        this.languages = window.ModLoader?.applyLanguages(this.languages) || this.languages
+        if (!this.languages[this.languageId]) this.languageId = 0
+        this.language = this.languages[this.languageId]
 
 		this.isMute = this.preferences.mute
 		this.memorycomplex = permanents.memorycomplex
@@ -1491,14 +1500,7 @@ class Game {
 			this.spaceport = {send:_=>false, isPlaceholder: true}
 		}
 		this.initAlfa()
-
-        this.languages = window.ModLoader?.applyLanguages(this.languages) || this.languages
-        if (!this.languages[this.languageId]) this.languageId = 0
-        this.language = this.languages[this.languageId]
-
-        const vanillaCodex = abstract_getCodex()
-        this.codex = window.ModLoader?.applyData(vanillaCodex, this) || vanillaCodex
-        this.images = this.preloadImages()
+	
         const vanillaWords = abstract_getWords()
         const words = window.ModLoader?.applyWords(vanillaWords, this) || vanillaWords
         if (!words[this.language]) {
@@ -1589,6 +1591,7 @@ class Game {
 		//Pinhole test
 
 		if (this.onlyones.pinhole){
+			// console.log(this.onlyones)
 			this.quickFinish()
 		}
 	}
@@ -1982,27 +1985,85 @@ class Game {
 
 	}
 
+	//Mobile absolutes
+
+	getAbsolutes(){
+
+		//WIP: move to backend
+		const json = localStorage.getItem(`sixtyfourabsoluteslocal`)
+		return json ? JSON.parse(json) : {
+			enabled: false,
+			alfa: 0,
+			bought: 0,
+			found: 0,
+			spent: 0
+		}
+
+	}
+
+	saveAbsolutes(){
+
+		//WIP: move to backend
+		localStorage.setItem(`sixtyfourabsoluteslocal`, JSON.stringify(this.absolutes))
+
+	}
+
+	spendAlfa(v){
+		if (this.absolutes.alfa < v) return false
+		this.absolutes.alfa -= v
+		this.absolutes.spent += v
+		this.saveAbsolutes()
+		return true
+	}
+
+	buyAlfa(v){
+		this.absolutes.alfa += v
+		this.absolutes.bought += v
+		this.saveAbsolutes()
+	}
+
+	findAlfa(v){
+		this.absolutes.enabled = true
+		this.absolutes.alfa += v
+		this.absolutes.found += v
+		this.saveAbsolutes()
+	}
+
 	initAlfa(){
 
 		this.alfa = {
-			resource: 100,
 			currentEvents: [],
+			currentNodes: [],
+			spawnIntervalRange: [300000, 2400000],
+			nodeProperties: {
+				radius: 1,
+				duration: 16000,
+				spiralCount: 64,
+				spiralAngle: 0.7638888889 * Math.PI,
+				spiralStep: .04
+			},
 			prices: {
 				haste: 6,
 				insta: 6,
-				oiled: 6
+				oiled: 6,
+				fill: 10,
+				convert: 6
 			}
 		}
+		this.alfa.spawnTimer = this.alfa.spawnIntervalRange[0] + (this.alfa.spawnIntervalRange[1] - this.alfa.spawnIntervalRange[0]) * Math.random()
+
 		this.alfa.startEvent = label => {
 
 			const events = {
 				haste: {
+					id: `haste`,
 					onstart: _=>{console.log(`Haste event started`)},
 					onupdate: _=>{this.time.dt *= 2},
 					onfinish: _=>{console.log(`Haste event finished`)},
-					remains: 120000
+					remains: 600000
 				},
 				insta: {
+					id: `insta`,
 					onstart: _=>{
 						console.log(`Insta event started`)
 						this.clickPower = 1e3
@@ -2011,47 +2072,76 @@ class Game {
 						this.clickPower = 1
 						console.log(`Insta event finished`)
 					},
-					remains: 120000
+					remains: 300000
 				},
 				oiled: {
+					id: `oiled`,
 					onstart: _=>{
 						console.log(`Oiled event started`)
-						this.extractionSpeed = 4
+						this.extractionSpeed = 10
 					},
 					onfinish: _=>{
 						this.extractionSpeed = 1
 						console.log(`Oiled event finished`)
 					},
-					remains: 120000
+					remains: 300000
+				},
+				fill: {
+					id: `fill`,
+					onupdate: _=>{
+						if (this.unfilledEntities.length){
+							const i = Math.floor(Math.random() * this.unfilledEntities.length)
+							const e = this.unfilledEntities[i]
+							if (e.refill) e.refill()
+						}
+					},
+					remains: 3600000
+				},
+				convert: {
+					id: `convert`,
+					onstart: _=>{
+						this.conversionSpeed = 8
+					},
+					onfinish: _=>{
+						this.conversionSpeed = 1
+					},
+					remains: 1200000
 				}
 			}
 
 			const event = events[label]
+			const instance = {...event}
 			
-			event.onstart()
-			this.alfa.currentEvents.push(event)
+			if (instance.onstart) instance.onstart()
+			this.alfa.currentEvents.push(instance)
+			this.store.pushAlfaEvent(instance)
+
+			return instance
 		}
 		this.alfa.activate = label => {
-			const price = this.alfa.prices[label]
-			if (this.alfa.resource < price){
-				console.log(`You broke`)
-				return
+			//Check for current
+			for (let i = 0; i < this.alfa.currentEvents.length; i++){
+				if (this.alfa.currentEvents[i].id === label) return null
 			}
-			this.alfa.resource -= price
-			this.alfa.startEvent(label)
+
+			const price = this.alfa.prices[label]
+			const good = this.spendAlfa(price)
+			let e = null
+			if (good) e = this.alfa.startEvent(label); else console.log(`you broke`)
+			return e
 		}
 	}
 
 	updateAlfa(dt){
 
-		if (!this.alfa) return
+		if (!this.alfa || this.pinhole) return
 		for (let i = 0; i < this.alfa.currentEvents.length; i++){
 			const e = this.alfa.currentEvents[i]
 			if (e.onupdate) e.onupdate(dt)
 
 			e.remains -= dt
 			if (e.remains <= 0){
-				e.onfinish()
+				if (e.onfinish) e.onfinish()
 				this.alfa.currentEvents.splice(i,1)
 				i--
 			}
@@ -2173,17 +2263,41 @@ class Game {
 
 	}
 
-	preloadImages(){
+	async preloadImages(){
+
 		const list = window.ModLoader?.applyPreloadList(this.codex.preload) || this.codex.preload
 		const images = {}
+		const promises = []
+
 		for (let i = 0; i < list.length; i++){
 
+			const src = list[i]
 			const img = new Image()
-			img.src = list[i]
-			images[list[i]] = img
 
+			images[src] = img
+
+			promises.push(new Promise((resolve, reject) => {
+				img.onload = resolve
+				img.onerror = reject
+			}))
+
+			img.src = src
 		}
+
+		await Promise.all(promises)
+
 		return images
+
+		// const list = this.codex.preload
+		// const images = {}
+		// for (let i = 0; i < list.length; i++){
+
+		// 	const img = new Image()
+		// 	img.src = list[i]
+		// 	images[list[i]] = img
+
+		// }
+		// return images
 
 	}
 
@@ -2320,6 +2434,15 @@ class Game {
 		this.playSound(`lightning`)
 		this.createHollowEvent(`#000`, 50000)
 		this.stats.gameIsFinished = true
+
+		//Finish alfa
+		if (this.alfa?.currentEvents.length){
+			for (let i = 0; i < this.alfa.currentEvents.length; i++){
+				const e = this.alfa.currentEvents[i]
+				if (e.onfinish) e.onfinish()
+			}
+			this.alfa.currentEvents = []
+		}
 
 		if (this.voidsculpture) this.clearCell(this.voidsculpture.position)
 		if (this.orbifoldUI) this.closeOrbifolds()
@@ -2607,6 +2730,8 @@ class Game {
 
 		if (this.isMobile){
 
+			// this.store.compositionUpdate()
+
 			//WIP Mobile button handling
 
 			// this.shop.switchPlane(p)
@@ -2813,9 +2938,12 @@ class Game {
 		// 	const save = this.assembleSave()
 		// 	await navigator.clipboard.writeText(save)
 		// }
+		console.log(`Preparing export. Saving game...`)
 
 		if (this.preventSaving) return null
 		await this.saveGame()
+
+		console.log(`Game saved. Exporting...`)
 
 		const raw = this.saveSlots[this.currentSlotId]
 		const serialized = JSON.stringify({
@@ -2827,6 +2955,7 @@ class Game {
 		const base = this.encodeSave(serialized)
 
 		await navigator.clipboard.writeText(base)
+		console.log(`Exported`)
 
 	}
 
@@ -2839,7 +2968,22 @@ class Game {
 		// const hope = this.encodeSave(JSON.stringify(state))
 		// this.importSave(hope)
 
-		const encoded = await navigator.clipboard.readText()
+		let encoded
+		try {
+			encoded = await navigator.clipboard.readText()
+		} catch (e) {
+			console.log(`No paste`)
+			encoded = prompt(`Paste save`)
+			console.log(encoded)
+			// return
+			// console.warn('Clipboard read failed:', e)
+			// return 'clipboard-unavailable'
+
+		}
+
+		if (!encoded) return
+
+		// const encoded = await navigator.clipboard.readText()
 		let decoded = this.decodeSave(encoded)
 		if (decoded === 0){
 			return
@@ -3003,6 +3147,14 @@ class Game {
 			if (manual.timestamp){
 				const timeSinceLastSave = (Date.now() - manual.timestamp)
 				this.simulateIdleTime(timeSinceLastSave)
+			}
+
+			if (manual.currentAlfaEvents){
+				for (let i = 0; i < manual.currentAlfaEvents.length; i++){
+					const e = this.alfa.startEvent(manual.currentAlfaEvents[i].id)
+					e.remains = manual.currentAlfaEvents[i].remains
+				}
+				if (this.store.updateAlfa) this.store.updateAlfa()
 			}
 
 			return true
@@ -3362,6 +3514,14 @@ class Game {
 
 	// }
 
+	assembleCurrentAlfaEvents(){
+		const events = []
+		for (let i = 0; i < this.alfa.currentEvents.length; i++){
+			events.push({id: this.alfa.currentEvents[i].id, remains: this.alfa.currentEvents[i].remains})
+		}
+		return events
+	}
+
 	assembleSave(){
 
 		const stuff = []
@@ -3389,7 +3549,8 @@ class Game {
 			glory: this.achiever.fired,
 			stats: this.stats,
 			timestamp: Date.now(),
-			memory: this.memoryBuffer
+			memory: this.memoryBuffer,
+			currentAlfaEvents: this.alfa.currentEvents.length ? this.assembleCurrentAlfaEvents() : null
 		}
 
 		return window.ModLoader?.applySave(saveState, this) || saveState
@@ -3664,10 +3825,11 @@ class Game {
 
 	//WIP new eraser 2
 	pickupEraser(){
+		this.cleanupInteractionMode()
 		if (!this.unlockedEntities.pump) return null //Never had a resource 3 (insecure)
 		this.interactionMode = `erase`
-		delete this.transportedEntity
-		delete this.itemInHand
+		// delete this.transportedEntity
+		// delete this.itemInHand
 		return true
 	}
 
@@ -3719,6 +3881,7 @@ class Game {
 	}
 
 	updateGlobalPositioning(){
+		
 		for (const s of this.soundSources){
 			this.updateSoundSource(s)
 		}
@@ -3759,14 +3922,12 @@ class Game {
 		if (!s.audibility[this.plane] && !s.filterOn){
 			//Engage
 			s.filterOn = true
-			console.log(`engaged`)
 			s.volume.disconnect(this.sfx.master)
 			s.volume.connect(s.filter)
 			s.filter.connect(this.sfx.master)
 		} else if (s.audibility[this.plane] && s.filterOn){
 			//Disengage
 			s.filterOn = false
-			console.log(`disengaged`)
 			s.volume.disconnect(s.filter)
 			s.filter.disconnect(this.sfx.master)
 			s.volume.connect(this.sfx.master)
@@ -3835,7 +3996,8 @@ class Game {
 			{src: `sfx/impact.mp3`, name: `impact`, volume: .8, detune: 80},
 			{src: `sfx/collapsing.mp3`, name: `collapsing_drone`, volume: .5},
 			{src: `sfx/drone_exp.mp3`, name: `expanding`, volume: 1},
-			{src: `sfx/complete.mp3`, name: `complete`, volume: .8}
+			{src: `sfx/complete.mp3`, name: `complete`, volume: .8},
+			{src: `sfx/alfanode.mp3`, name: `alfanode`, volume: .5}
 		]
 
 		samples = window.ModLoader?.applySoundList(samples) || samples
@@ -4203,8 +4365,8 @@ class Game {
 				
 		} else if (this.interactionMode === `relocate` && click){
 
-			if (!this.relocationTarget || this.hoveredCell[0] !== this.relocationTarget[0] || this.hoveredCell[1] !== this.relocationTarget[1]){
-				this.relocationTarget = this.hoveredCell
+			if (!this.selectionTarget || this.hoveredCell[0] !== this.selectionTarget[0] || this.hoveredCell[1] !== this.selectionTarget[1]){
+				this.selectionTarget = this.hoveredCell
 				this.updateRelocationArea()
 			}
 
@@ -4452,11 +4614,7 @@ class Game {
 		} else if (!this.itemInHand && this.store.isOpen && !this.hoveredEntity) {
 			this.store.closeTypes()
 		} else if (this.itemInHand || this.interactionMode){ //Like esc, don't close the store
-			delete this.itemInHand
-			delete this.transportedEntity
-			delete this.interactionMode
-			this.cleanupErase()
-			this.cleanupRelocation()
+			this.cleanupInteractionMode()
 		} else if (this.hoveredEntity && !this.plane){ // Copy
 			this.store.centerItem(this.hoveredEntity.name)
 			if (this.canAfford(this.hoveredEntity.name) && !this.onlyones[this.hoveredEntity.name] && this.codex.entities[this.hoveredEntity.name].canPurchase){
@@ -4475,10 +4633,7 @@ class Game {
 		if (!ok) return
 
 		if (this.interactionMode === `relocate`) {
-			delete this.interactionMode
-			delete this.itemInHand
-			delete this.transportedEntity
-			this.cleanupRelocation()
+			this.cleanupInteractionMode()
 			return
 		}
 
@@ -4487,7 +4642,7 @@ class Game {
 		if (this.hoveredEntity){
 
 			if (this.canRelocate(this.hoveredEntity)){
-				this.relocationCandidatesList = [this.hoveredEntity]
+				this.selectionCandidateSet = new Set([this.hoveredEntity])
 				this.pickupEntitiesForRelocation()
 			} else {
 				delete this.interactionMode
@@ -4513,6 +4668,11 @@ class Game {
 		return (this.codex.entities[e.name].canPurchase || e.name === `stabilizer3`) && !(e.name === `flower` || e.name === `fruit` || e.name === `strange1` || e.name === `strange2` || e.name === `strange3` || e.name === `pump` || e.name === `pump2` || e.name === `cube` || e.name === `gradient_rem` || e.name === `puncture`)
 	}
 
+	canClone(e){
+		if (!e || !e.name) return false
+		return this.codex.entities[e.name].canPurchase && !this.onlyones[e.name] && !(e.name === `flower` || e.name === `fruit`)
+	}
+
 	massRelocate(entities,positions){
 
 		//WIP
@@ -4525,6 +4685,7 @@ class Game {
 		const swapList = []
 		const swapPositionList = []
 		for (let i = 0; i < entities.length; i++){
+			if(!this.canRelocate(entities[i])) return
 			const se = this.entityAtCoordinates(positions[i])
 			if (!se || relocationSet.has(se)) continue
 			if (!this.canRelocate(se)) return
@@ -4598,6 +4759,58 @@ class Game {
 		//SFX
 		this.playSound(`place`)
 		this.punchScreen()
+
+	}
+
+	massClone(entities, positions){
+
+		//WIP: make upgrades
+		//WIP: SUPER IMPORTANT: ONLYONES: I can relocate first and then just clone
+
+		for (let i = 0; i < entities.length; i++){
+
+			const e = entities[i]
+			const p = positions[i]
+			const ee = this.entityAtCoordinates(p)
+			const up = this.codex.entities[e.name].isUpgradeTo
+
+			const isLegitUpgrade = ee && up && up === ee.name
+			const isLegitBuild = !ee && !(up && this.codex.entities[up].onlyone) && !(up && (e.name === `flower` || e.name === `fruit` || e.name === `gradient_rem`))
+
+			if (isLegitUpgrade){
+
+				this.clearCell(p)
+				const price = this.getRealPrice(e.name)
+				const refund = this.getRealPrice(ee.name)
+				const xy = this.uvToXYUntranslated(p)
+				this.createResourceTransfer(refund, xy, undefined, undefined, undefined, true)
+				this.requestResources(price, p, _=>{}, true)
+				this.addEntity(e.name, p)
+
+				this.stats.machinesBuild++
+				if (this.codex.entities[e.name].onlyone) this.onlyones[e.name] = true
+
+			} else if (isLegitBuild){
+
+				const price = this.getRealPrice(e.name)
+				this.requestResources(price, p, false, true)
+				const ne = this.addEntity(e.name, p)
+				if (e.name === `gradient`){
+					ne.penalty = .5
+					ne.init()
+				}
+
+				this.stats.machinesBuild++
+				if (this.codex.entities[e.name].onlyone) this.onlyones[e.name] = true
+
+			}
+
+		}
+
+		//SFX
+		this.playSound(`place`)
+		this.punchScreen()
+		// this.shop.check()
 
 	}
 
@@ -4884,7 +5097,6 @@ class Game {
 
 		if (this.interactionMode === `erase`){
 			this.finalizeErase()
-			delete this.interactionMode
 			return
 		}
 
@@ -4902,7 +5114,9 @@ class Game {
 	}
 
 	zoomInOut(delta){
-		this.zoom = Math.min(this.zoomRange[1], Math.max(this.zoomRange[0], this.zoom + delta * this.time.realDt * .0002))
+		this.zoom *= Math.exp(delta * 0.001)
+		this.zoom = Math.min(this.zoomRange[1], Math.max(this.zoomRange[0], this.zoom))
+		// this.zoom = Math.min(this.zoomRange[1], Math.max(this.zoomRange[0], this.zoom + delta * this.time.realDt * .0002))
 	}
 
 	doOnBlur(){
@@ -5317,6 +5531,7 @@ class Game {
 		})
 
 		this.canvas.addEventListener(`touchmove`, e=>{
+
 			if (e.target === this.canvas) e.preventDefault()
 
 			if (e.touches[1]){
@@ -5325,13 +5540,16 @@ class Game {
 				const zoom = fingerDelta - this.mouse.fingerDelta
 				this.mouse.fingerDelta = fingerDelta
 
-			// 	this.zoom = Math.min(this.zoomRange[1], Math.max(this.zoomRange[0], this.zoom + zoom * .004))
+				this.zoom = Math.min(this.zoomRange[1], Math.max(this.zoomRange[0], this.zoom + zoom * .004))
+				if (this.interactionMode === `relocate`) this.updateRelocationPositioning()
+				this.mouse.positionChanged = true
 
 			} else {
 
 				if (this.mouse.fingerChanged) return
 				this.updatePointerState({sxy: [e.touches[0].clientX, e.touches[0].clientY], button: 1, isTap: true})
 				this.processMove()
+				this.updateGlobalPositioning()
 
 			}
 
@@ -5386,9 +5604,8 @@ class Game {
 
 		const xy = this.uvToXYUntranslated(this.hoveredCell)
 
-		for (let i = 0; i < this.eraseList.length; i++){
+		for (let e of this.selectionCandidateSet){
 
-			const e = this.eraseList[i]
 			let chainElement = this.codex.entities[e.name]
 			while (chainElement.isUpgradeTo){
 				delete this.onlyones[chainElement.isUpgradeTo]
@@ -5424,57 +5641,84 @@ class Game {
 		const pan = this.getPanValueFromX(xy[0])
 		this.playSound(`recycle`, pan)
 		
-		this.cleanupErase()
+		this.cleanupInteractionMode()
 
 	}
 
 	pickupEntitiesForRelocation(){
 
-		this.relocationList = []
+		this.selectionList = []
 
 		// const xy = this.uvToXYUntranslated(this.hoveredCell)
 
-		for (let i = 0; i < this.relocationCandidatesList.length; i++){
+		for (let e of this.selectionCandidateSet){
 
-			const e = this.relocationCandidatesList[i]
-			if (this.canRelocate(e)) this.relocationList.push(e)
+			if (this.canRelocate(e)) this.selectionList.push(e)
 
 		}
 
-		this.relocationOffsets = []
+		this.selectionOffsets = []
 		const center = [0,0]
 
-		for (let i = 0; i < this.relocationList.length; i++){
+		for (let i = 0; i < this.selectionList.length; i++){
 
-			center[0] += this.relocationList[i].position[0]
-			center[1] += this.relocationList[i].position[1]
+			center[0] += this.selectionList[i].position[0]
+			center[1] += this.selectionList[i].position[1]
 
 		}
 
-		center[0] = Math.floor(center[0] / this.relocationList.length)
-		center[1] = Math.floor(center[1] / this.relocationList.length)
+		center[0] = Math.floor(center[0] / this.selectionList.length)
+		center[1] = Math.floor(center[1] / this.selectionList.length)
 
-		for (let i = 0; i < this.relocationList.length; i++){
+		for (let i = 0; i < this.selectionList.length; i++){
 
-			this.relocationOffsets.push([
-				this.relocationList[i].position[0] - center[0],
-				this.relocationList[i].position[1] - center[1]
+			this.selectionOffsets.push([
+				this.selectionList[i].position[0] - center[0],
+				this.selectionList[i].position[1] - center[1]
 			])
 
 		}
 
-		// this.stats.timeSinceLastDelete = 0
-		// this.shop.check()
-		// this.hoveredEntity = undefined
-		// this.updateMouseData()
-		// if (this.isMobile) this.shop.toggleMobileEraser()
+		delete this.selectionOrigin
+		delete this.selectionTarget
+		delete this.selectionCandidateSet
+	}
 
-		//SFX
-		// const pan = this.getPanValueFromX(xy[0])
-		// this.playSound(`recycle`, pan)
-		
-		// this.cleanupErase()
-		this.cleanupRelocationArea()
+	pickupEntitiesForCloning(){
+
+		//WIP: make in a single function with relocation
+
+		this.selectionList = []
+
+		for (let e of this.selectionCandidateSet){
+			this.selectionList.push(e)
+		}
+
+		this.selectionOffsets = []
+		const center = [0,0]
+
+		for (let i = 0; i < this.selectionList.length; i++){
+
+			center[0] += this.selectionList[i].position[0]
+			center[1] += this.selectionList[i].position[1]
+
+		}
+
+		center[0] = Math.floor(center[0] / this.selectionList.length)
+		center[1] = Math.floor(center[1] / this.selectionList.length)
+
+		for (let i = 0; i < this.selectionList.length; i++){
+
+			this.selectionOffsets.push([
+				this.selectionList[i].position[0] - center[0],
+				this.selectionList[i].position[1] - center[1]
+			])
+
+		}
+
+		delete this.selectionOrigin
+		delete this.selectionTarget
+		delete this.selectionCandidateSet
 	}
 
 	confirmMassRelocation(){
@@ -5538,87 +5782,105 @@ class Game {
 
 	}
 
-	updateEraseArea(){
-		
-		this.eraseList = [] //renderInColor
-		this.totalRefund = new Array(10).fill(0)
-		const extra = {}
-		if (!this.eraseOrigin || !this.eraseTarget) return
-		
-		const umin = Math.min(this.eraseTarget[0], this.eraseOrigin[0])
-		const umax = Math.max(this.eraseTarget[0], this.eraseOrigin[0])
-		const vmin = Math.min(this.eraseTarget[1], this.eraseOrigin[1])
-		const vmax = Math.max(this.eraseTarget[1], this.eraseOrigin[1])
-		const singleCell = this.eraseTarget[0] === this.eraseOrigin[0] && this.eraseTarget[1] === this.eraseOrigin[1]
+	updateSelectionArea(){
 
-		const eraseSet = new Set()
+		this.selectionCandidateSet = new Set()
+		if (!this.selectionOrigin || !this.selectionTarget) return
+		
+		const umin = Math.min(this.selectionTarget[0], this.selectionOrigin[0])
+		const umax = Math.max(this.selectionTarget[0], this.selectionOrigin[0])
+		const vmin = Math.min(this.selectionTarget[1], this.selectionOrigin[1])
+		const vmax = Math.max(this.selectionTarget[1], this.selectionOrigin[1])
+		// this.selectionIsSingleCell = this.selectionTarget[0] === this.selectionOrigin[0] && this.selectionTarget[1] === this.selectionOrigin[1]
+
 		for (let u = umin; u <= umax; u++){
 			for (let v = vmin; v <= vmax; v++){
 				const entity = this.entityAtCoordinates([u,v])
-				if (entity && this.canEraseEntity(entity) && !(!singleCell && (entity instanceof Pump || entity instanceof Gradient))) {
-					if (extra[entity.name]===undefined) extra[entity.name] = -1
-					extra[entity.name]++
-					const refund = this.getRealPrice(entity.name, true, -extra[entity.name])
-					for (let i = 0; i < refund.length; i++){
-						if (refund[i]) this.totalRefund[i] += refund[i]
-					}
-					eraseSet.add(entity)
-				}
+				if (entity) this.selectionCandidateSet.add(entity)
 			}
 		}
-		this.eraseList = Array.from(eraseSet)
+
+	}
+
+	updateEraseArea(){
+
+		this.updateSelectionArea()
+
+		const singleCell = this.selectionTarget[0] === this.selectionOrigin[0] && this.selectionTarget[1] === this.selectionOrigin[1]
+		const extra = {}
+		this.totalRefund = new Array(10).fill(0)
+
+		for (let e of this.selectionCandidateSet){
+
+			const validForErase = this.canEraseEntity(e) && !(!singleCell && (e instanceof Pump || e instanceof Gradient))
+
+			if (validForErase) {
+				if (extra[e.name]===undefined) extra[e.name] = -1
+				extra[e.name]++
+				const refund = this.getRealPrice(e.name, true, -extra[e.name])
+				for (let i = 0; i < refund.length; i++){
+					if (refund[i]) this.totalRefund[i] += refund[i]
+				}
+			} else {
+				this.selectionCandidateSet.delete(e)
+			}
+		}
 
 		const hint = new Cloud({master:this})
 		hint.addRefundListFromArray(this.totalRefund)
-		this.eraseHint = hint
-
-		// if (hint.element !== this.currentHint.element){
-
-		// 	if (this.currentHint.element) document.body.removeChild(this.currentHint.element)
-		// 	this.currentHint.element = hint.element
-		// 	document.body.appendChild(this.currentHint.element)
-
-		// }
+		this.areaHint = hint
 
 	}
 
 	updateRelocationArea(){
-		
-		this.relocationCandidatesList = []
-		if (!this.relocationOrigin || !this.relocationTarget) return
-		
-		const umin = Math.min(this.relocationTarget[0], this.relocationOrigin[0])
-		const umax = Math.max(this.relocationTarget[0], this.relocationOrigin[0])
-		const vmin = Math.min(this.relocationTarget[1], this.relocationOrigin[1])
-		const vmax = Math.max(this.relocationTarget[1], this.relocationOrigin[1])
-		const singleCell = this.relocationTarget[0] === this.relocationOrigin[0] && this.relocationTarget[1] === this.relocationOrigin[1]
 
-		const relocationSet = new Set()
-		for (let u = umin; u <= umax; u++){
-			for (let v = vmin; v <= vmax; v++){
-				const entity = this.entityAtCoordinates([u,v])
-				if (entity && this.canRelocate(entity)) {
-					relocationSet.add(entity)
-				}
-			}
+		this.updateSelectionArea()
+
+		for (let e of this.selectionCandidateSet){
+			if (!this.canRelocate(e)) this.selectionCandidateSet.delete(e)
 		}
-		this.relocationCandidatesList = Array.from(relocationSet)
-
-		// const hint = new Cloud({master:this})
-		// hint.addRefundListFromArray(this.totalRefund)
-		// this.eraseHint = hint
-
-		// if (hint.element !== this.currentHint.element){
-
-		// 	if (this.currentHint.element) document.body.removeChild(this.currentHint.element)
-		// 	this.currentHint.element = hint.element
-		// 	document.body.appendChild(this.currentHint.element)
-
-		// }
 
 	}
 
 	updateCloneArea(){
+
+		this.updateSelectionArea()
+
+		const extra = {}
+		this.totalPrice = new Array(10).fill(0) // WIP: WHY THIS.TOTAL not const and for erase as well?
+
+		//Calculate price
+		for (let e of this.selectionCandidateSet){
+
+			if (this.canClone(e)) {
+				if (extra[e.name]===undefined) extra[e.name] = -1
+				extra[e.name]++
+
+				const price = this.getRealPrice(e.name, false, extra[e.name])
+				for (let i = 0; i < price.length; i++){
+					if (price[i]) this.totalPrice[i] += price[i]
+				}
+			} else {
+				this.selectionCandidateSet.delete(e)
+			}
+
+		}
+
+		this.canPlace = true //WIP: rename to interactionIsOkay or smth
+		for (let i = 0; i < this.totalPrice.length; i++){
+			if (this.resources[i] < this.totalPrice[i]){
+				this.canPlace = false
+				break
+			}
+		}
+
+		const hint = new Cloud({master:this})
+		hint.addResourceList(this.totalPrice)
+		this.areaHint = hint
+
+	}
+
+	REM_updateCloneArea(){
 
 		this.cloneList = []
 		this.totalCloneCost = new Array(10).fill(0)
@@ -5667,25 +5929,22 @@ class Game {
 
 	}
 
-	cleanupErase(){
-		delete this.eraseOrigin
-		delete this.eraseTarget
-		delete this.eraseList
+	cleanupInteractionMode(){
+		delete this.interactionMode
+		delete this.itemInHand
+		delete this.transportedEntity
+		delete this.selectionOrigin
+		delete this.selectionTarget
+		delete this.selectionCandidateSet
+		delete this.selectionList
+		delete this.selectionOffsets
 		delete this.totalRefund
-		delete this.eraseHint
+		delete this.areaHint
+		delete this.forcedMobileAnchor
+		if (this.store.html.mobileConfirmButton) this.store.html.mobileConfirmButton.classList.add(`hidden`)
+		if (this.store.html.mobileRelocatorSwitch) this.store.html.mobileRelocatorSwitch.remove()
+		if (this.isMobile) this.store.pushMenu(true)
 		this.removeHint()
-	}
-
-	cleanupRelocationArea(){
-		delete this.relocationOrigin
-		delete this.relocationTarget
-		delete this.relocationCandidatesList
-	}
-
-	cleanupRelocation(){
-		this.cleanupRelocationArea()
-		delete this.relocationList
-		delete this.relocationOffsets
 	}
 
 	cleanupClone(){
@@ -5767,14 +6026,9 @@ class Game {
 
 			if (e.code === `Escape`){
 
-				delete this.interactionMode
-				this.cleanupErase()
-				this.cleanupRelocation()
+				this.cleanupInteractionMode()
 
-				if (this.itemInHand) {
-					delete this.itemInHand
-					delete this.transportedEntity
-				} else if (this.orbifoldUI) {
+				if (this.orbifoldUI) {
 					this.closeOrbifolds()
 				} else {
 					this.toggleSplash()
@@ -5797,6 +6051,16 @@ class Game {
 			} else if (e.code === `KeyA` || e.code === `ArrowLeft`){
 				this.translationMap[3] = 1
 			} else if (e.key === `Shift` || e.key === `Control`){
+
+				if (this.interactionMode === `relocate`){
+					// console.log(`clone`)
+					this.interactionMode = `clone`
+					this.processMove()
+
+					return
+
+				}
+
 				if (!this.zoomWhenShiftPressed) {
 					this.zoomWhenShiftPressed = this.zoom
 					delete this.thereWasZoomAction
@@ -5822,6 +6086,14 @@ class Game {
 				this.altActive = false
 				document.body.classList.remove(`altHolded`)
 			} else if (e.key === `Shift` || e.key === `Control`){
+
+				if (this.interactionMode === `clone`){
+					// console.log(`relocate`)
+					this.interactionMode = `relocate`
+					this.processMove()
+					return
+				}
+
 				this.shiftPressed = false
 				if (!this.thereWasZoomAction){
 					this.zoom = 1
@@ -5832,38 +6104,49 @@ class Game {
 
 		//Wheel events
 		this.canvas.addEventListener('wheel', e=>{
+
 			e.preventDefault()
 
-			if (this.shiftPressed){
+			const scale = e.deltaMode === WheelEvent.DOM_DELTA_LINE ? 16 : e.deltaMode === WheelEvent.DOM_DELTA_PAGE ? window.innerHeight : 1
+			const dx = e.deltaX * scale
+			const dy = e.deltaY * scale
+
+			if (this.shiftPressed || e.ctrlKey){
 
 				if (!this.thereWasZoomAction) this.thereWasZoomAction = true
+				const boost = this.shiftPressed ? 1 : 6
+				const delta = e.ctrlKey ? -dy : -(Math.abs(dy) > Math.abs(dx) ? dy : dx)
+				this.zoomInOut(delta * boost)
 
-				const delta = [
-					e.wheelDeltaX * (this.isWindows ? .2 : .5),
-					e.wheelDeltaY * (this.isWindows ? .2 : .5)
-				]
+				//e.ctrlKey here
 
-				this.zoomInOut(Math.abs(delta[1]) > Math.abs(delta[0]) ? delta[1] : delta[0])
+				// const delta = [
+				// 	e.wheelDeltaX * (this.isWindows ? .2 : .5),
+				// 	e.wheelDeltaY * (this.isWindows ? .2 : .5)
+				// ]
+
+				// this.zoomInOut(Math.abs(delta[1]) > Math.abs(delta[0]) ? delta[1] : delta[0])
 
 			} else {
 
-				const delta = [
-					e.wheelDeltaX * (this.isWindows ? .2 : .5) / this.zoom,
-					e.wheelDeltaY * (this.isWindows ? .2 : .5) / this.zoom
-				]
+				this.translation[0] += dx / this.zoom
+				this.translation[1] += dy / this.zoom
 
-				this.translation[0] -= delta[0]
-				this.translation[1] -= delta[1]
-
-				// this.processMousemove(e, delta)
-				// this.processMousemove2(
-				// 	[e.offsetX, e.offsetY],
-				// 	[delta[0], delta[1]],
-				// 	2
-				// )
 				this.updateMouseData()
 				this.processMove()
 				this.updateGlobalPositioning()
+
+				// const delta = [
+				// 	e.wheelDeltaX * (this.isWindows ? .2 : .5) / this.zoom,
+				// 	e.wheelDeltaY * (this.isWindows ? .2 : .5) / this.zoom
+				// ]
+
+				// this.translation[0] -= delta[0]
+				// this.translation[1] -= delta[1]
+
+				// this.updateMouseData()
+				// this.processMove()
+				// this.updateGlobalPositioning()
 
 
 			}
@@ -5919,6 +6202,13 @@ class Game {
 		const uv = this.xyToUV(this.mouse.sxy)
 		const targetCell = [Math.floor(uv[0]), Math.floor(uv[1])]
 
+		//Detect alfa nodes
+		for (let i = 0; i < this.alfa.currentNodes.length; i++){
+			const n = this.alfa.currentNodes[i]
+			const dst = ((n.position[0] - uv[0]) ** 2 + (n.position[1] - uv[1]) ** 2) ** .5
+			n.hit = dst < this.alfa.nodeProperties.radius
+		}
+
 		//Update hover
 		if (p.adjustTap){
 			const C = this.entityAtCoordinates(targetCell)
@@ -5971,23 +6261,23 @@ class Game {
 		this.mouse.positionChanged = false
 		this.mouse.originalPosition = [...this.mouse.xy]
 
-		if (this.interactionMode === `erase`){
-			this.eraseOrigin = this.hoveredCell
-			this.eraseTarget = this.hoveredCell
-			this.updateEraseArea()
-			return
-		}
+		const validForAreaSelection = this.interactionMode === `erase` || this.interactionMode === `relocate` || this.interactionMode === `clone`
+		if (validForAreaSelection){
+			this.selectionOrigin = this.hoveredCell
+			this.selectionTarget = this.hoveredCell
 
-		if (this.interactionMode === `relocate` && !this.relocationList){
-			this.relocationOrigin = this.hoveredCell
-			this.relocationTarget = this.hoveredCell
-			this.updateRelocationArea()
-			return
+			if (this.interactionMode === `erase`){
+				this.updateEraseArea()
+			} else if (this.interactionMode === `relocate` && !this.selectionList){
+				this.updateRelocationArea()
+			} else if (this.interactionMode === `clone` && !this.selectionList){
+				this.updateCloneArea()
+			}
 		}
 
 		if (this.isMobile && this.plane === 1 && this.hoveredEntity?.ondarkhover){
 			this.hoveredEntity.ondarkhover()
-		}//qqqqqqqqqqqq
+		}
 
 		//Default
 		if (this.mouse.state !== 2){
@@ -6021,6 +6311,7 @@ class Game {
 
 					this.selectedEntity = this.hoveredEntity
 					if (!this.plane){
+						//WIP: Keep refill for mobile?
 						this.selectedEntity.onmousedown()
 					} else if (this.plane === 1 && this.selectedEntity.ondarkmousedown){
 						this.selectedEntity.ondarkmousedown()
@@ -6034,69 +6325,105 @@ class Game {
 
 	}
 
-	processUp(){
+	finalizeRelocation(){
+		if (this.canPlace && this.selectionOffsets){
 
-		const click = !this.mouse.positionChanged
+			const anchor = this.getSelectionAnchor()
+			const positions = []
+			for (let i = 0; i < this.selectionList.length; i++){
+				const p = [anchor[0] + this.selectionOffsets[i][0], anchor[1] + this.selectionOffsets[i][1]]
+				positions.push(p)
+			}
+			this.massRelocate(this.selectionList, positions)
+			this.cleanupInteractionMode()
+
+		} else {
+			this.cleanupInteractionMode()
+		}
+	}
+
+	finalizeCloning(){
+		if (this.canPlace && this.selectionOffsets){
+
+			const anchor = this.getSelectionAnchor()
+			const positions = []
+			for (let i = 0; i < this.selectionList.length; i++){
+				const p = [anchor[0] + this.selectionOffsets[i][0], anchor[1] + this.selectionOffsets[i][1]]
+				positions.push(p)
+			}
+			this.massClone(this.selectionList, positions)
+			this.cleanupInteractionMode()
+
+		} else {
+			this.cleanupInteractionMode()
+		}
+	}
+
+	processUp(){
 
 		if (this.mouse.state === 2 || this.mouse.state === 3){
 			//RBM or LMB + RMB: esc
-			delete this.interactionMode
-			delete this.itemInHand
-			delete this.transportedEntity
-			this.cleanupErase()
-			this.cleanupRelocation()
+			this.cleanupInteractionMode()
 		}
 
 		if (this.interactionMode === `erase`){
+
 			this.finalizeErase()
-			delete this.interactionMode
 			return
+
 		} else if (this.interactionMode === `relocate`) {
-			if (this.relocationList){
 
-				if (this.canPlace && this.relocationOffsets){
+			if (this.selectionList){
 
-					const positions = []
-					for (let i = 0; i < this.relocationList.length; i++){
-						const p = [this.hoveredCell[0] + this.relocationOffsets[i][0], this.hoveredCell[1] + this.relocationOffsets[i][1]]
-						positions.push(p)
-					}
-					this.massRelocate(this.relocationList, positions)
-					delete this.interactionMode
-					this.cleanupRelocation()
-
+				if (this.isMobile && this.mouse.positionChanged) return
+				if (this.isMobile){
+					this.forcedMobileAnchor = true
+					this.updateRelocationPositioning()
 				} else {
-					delete this.interactionMode
-					this.cleanupRelocation()
+					this.finalizeRelocation()
 				}
 
 			} else {
-				if (!this.relocationCandidatesList.length){
-					this.cleanupRelocation()
-					delete this.interactionMode
+				if (!this.selectionCandidateSet.size){
+					this.cleanupInteractionMode()
 				} else {
 					this.pickupEntitiesForRelocation()
+					this.updateRelocationPositioning()
 				}
 			}
-			// if (!this.canRelocateEntityHere(this.transportedEntity, this.hoveredCell)) return
-			// this.relocate(this.transportedEntity, this.hoveredCell)
-			// if (this.itemInHand.name === `gradient`){
-			// 	this.transportedEntity.penalty = .5
-			// 	this.transportedEntity.init()
-			// }
-			// delete this.transportedEntity
-			// delete this.itemInHand
-			// delete this.interactionMode
 			return
-		} else if (this.interactionMode === `build` && click){
+
+		} else if (this.interactionMode === `clone`) {
+
+			if (this.selectionList){
+
+				if (this.isMobile && this.mouse.positionChanged) return
+
+				if (this.isMobile && this.selectionOffsets){
+					this.forcedMobileAnchor = true
+					this.updateClonePositioning()
+				} else {
+					this.finalizeCloning()
+				}
+
+			} else {
+				if (!this.selectionCandidateSet.size || !this.canPlace){
+					this.cleanupInteractionMode()
+				} else {
+					this.pickupEntitiesForCloning()
+				}
+			}
+			return
+
+		} else if (this.interactionMode === `build` && !this.mouse.positionChanged){
 			
-			//WIP: Deal with span
 			const ok = this.canPlaceEntityHere(this.itemInHand, this.hoveredCell)
 			if (!ok) return
 
 			const isUpgrade = this.hoveredEntity && this.codex.entities[this.itemInHand.name]?.isUpgradeTo === this.hoveredEntity?.name
 
 			if (isUpgrade){
+
 				if (this.itemInHand.name === `pinhole`){
 					this.saveGame()
 					this.preventSaving = true
@@ -6129,11 +6456,13 @@ class Game {
 			this.punchScreen()
 
 			this.stats.machinesBuild++
-			if (this.store.html.store) { // MOB DONE
+			if (this.store.html.store) {
+				if (this.codex.entities[this.itemInHand.name].onlyone){
+					this.onlyones[this.itemInHand.name] = true
+				}
 				delete this.interactionMode
 				delete this.itemInHand
 				this.store.html.store.classList.remove(`active`)
-				// this.shop.toggleAllButShop()
 			} else {
 				if (this.codex.entities[this.itemInHand.name].onlyone){
 					this.onlyones[this.itemInHand.name] = true
@@ -6163,14 +6492,23 @@ class Game {
 
 		//Always
 		this.mouse.positionChanged = this.mouse.originalPosition ? Math.abs(this.mouse.xy[0] - this.mouse.originalPosition[0]) + Math.abs(this.mouse.xy[1] - this.mouse.originalPosition[1]) > 1 : false
+		if (this.mouse.positionChanged) delete this.forcedMobileAnchor
 
 		if (this.plane === 1 && this.hoveredEntity?.ondarkhover){
 			this.hoveredEntity.ondarkhover()
 		}
 
+		//Camera Movement
+		const mobileTranslateCondition = this.isMobile && this.mouse.state === 1 && (this.interactionMode !== `relocate` || this?.selectionList) && (this.interactionMode !== `clone` || this?.selectionList) && this.interactionMode !== `erase`
+
+		if ((this.mouse.delta[0] || this.mouse.delta[1]) && (this.mouse.state === 2 || mobileTranslateCondition)){
+			this.translation[0] -= this.mouse.delta[0] * this.pixelRatio / this.zoom
+			this.translation[1] -= this.mouse.delta[1] * this.pixelRatio / this.zoom
+		}
+
 		if (this.interactionMode === `erase` && this.mouse.state === 1){
-			if (!this.eraseTarget || this.hoveredCell[0] !== this.eraseTarget[0] || this.hoveredCell[1] !== this.eraseTarget[1]){
-				this.eraseTarget = this.hoveredCell
+			if (!this.selectionTarget || this.hoveredCell[0] !== this.selectionTarget[0] || this.hoveredCell[1] !== this.selectionTarget[1]){
+				this.selectionTarget = this.hoveredCell
 				this.updateEraseArea()
 			}	
 		} else if (this.interactionMode === `build`){
@@ -6178,94 +6516,12 @@ class Game {
 			
 		} else if (this.interactionMode === `relocate`){
 
-			if (this.relocationList && this.relocationOffsets && this.hoveredCell){
-				
-				//WIP: CHECK SWAPS OR SELF-INTERSECTIONS
-				const relocationSet = new Set(this.relocationList)
-				this.canPlace = true
-				for (let i = 0; i < this.relocationList.length; i++){
+			this.updateRelocationPositioning()
 
-					const position = [this.hoveredCell[0] + this.relocationOffsets[i][0], this.hoveredCell[1] + this.relocationOffsets[i][1]]
-					if (this.isWithinMemoryComplex(position)){
-						this.canPlace = false
-						break
-					}
-					const entityHere = this.entityAtCoordinates(position)
+		} else if (this.interactionMode === `clone`){
 
-					if (!entityHere) continue
+			this.updateClonePositioning()
 
-					let isInList = relocationSet.has(entityHere)//false
-					// for (let j = 0; j < this.relocationList.length; j++){
-					// 	if (this.relocationList[j] === entityHere){
-					// 		isInList = true
-					// 		break
-					// 	}
-					// }
-					if (!isInList){
-						if (!this.canRelocate(entityHere)){
-							this.canPlace = false
-							break
-						}
-
-						const swapTarget = this.relocationList[i].position
-
-						for (let j = 0; j < this.relocationList.length; j++){
-							if (i === j) continue
-							const alreadyBooked = [this.hoveredCell[0] + this.relocationOffsets[j][0], this.hoveredCell[1] + this.relocationOffsets[j][1]]
-							if (swapTarget[0] === alreadyBooked[0] && swapTarget[1] === alreadyBooked[1]){
-								this.canPlace = false
-								break
-							}
-						}
-					}
-					
-					if (!this.canPlace) break
-
-				}
-
-			} else if (!this.relocationTarget || this.hoveredCell[0] !== this.relocationTarget[0] || this.hoveredCell[1] !== this.relocationTarget[1]){
-				this.relocationTarget = this.hoveredCell
-				this.updateRelocationArea()
-			}
-			// this.canPlace = this.canRelocateEntityHere(this.transportedEntity, this.hoveredCell)
-		}
-
-
-		//  else if (this.itemInHand){
-
-		// 	//REM Replace with interaction mode
-		// 	//REM Replace with unified condition function
-		// 	this.canPlace = false
-		// 	const up = this.codex.entities[this.itemInHand.name].isUpgradeTo
-		// 	const base = this.hoveredCell && this.canAfford(this.itemInHand.name)
-		// 	const eraserOk = this.itemInHand.eraser && this.hoveredEntity && !this.hoveredEntity.indestructible && !(this.hoveredEntity instanceof Cube) && !((this.hoveredEntity instanceof Pump || this.hoveredEntity instanceof Gradient) && ((this.entitiesInGame[`pump`] || 0) + (this.entitiesInGame[`pump2`] || 0) + (this.entitiesInGame[`gradient`] || 0) < 2))
-		// 	const newOk = !this.itemInHand.eraser && !this.hoveredEntity && !(up && this.codex.entities[up].onlyone) && !(up && (this.itemInHand.name === `flower` || this.itemInHand.name === `fruit` || this.itemInHand.name === `gradient_rem`))
-		// 	const upgradeOk = this.hoveredEntity && !this.itemInHand.eraser && this.codex.entities[this.itemInHand.name]?.isUpgradeTo === this.hoveredEntity.name
-		// 	// this.canPlace = this.transportedEntity ? (!this.hoveredEntity || this.canRelocate(this.hoveredEntity)) : (base && (eraserOk || newOk || upgradeOk))
-		// 	///WIP HANDLE SPAN
-		// 	let relocationOk = true
-		// 	if (this.transportedEntity){
-		// 		const span = this.transportedEntity.entitySpan
-		// 		for (let x = -span; x <= span; x++){
-		// 			for (let y = -span; y <= span; y++){
-		// 				const xy = [this.hoveredCell[0] + x, this.hoveredCell[1] + y]
-		// 				const e = this.entityAtCoordinates(xy)
-		// 				if (!e || e === this.transportedEntity || (x === 0 && y === 0 && e.entitySpan === this.transportedEntity.entitySpan && this.canRelocate(e))) continue
-		// 				relocationOk = false
-		// 				break
-		// 			}
-		// 		}
-		// 	}
-		// 	this.canPlace = this.transportedEntity ? relocationOk : (base && (eraserOk || newOk || upgradeOk))
-
-		// }
-
-		//Camera Movement
-		const mobileTranslateCondition = this.isMobile && this.mouse.state === 1 && (this.interactionMode !== `relocate` || this?.relocationList) && this.interactionMode !== `erase`
-
-		if ((this.mouse.delta[0] || this.mouse.delta[1]) && (this.mouse.state === 2 || mobileTranslateCondition)){
-			this.translation[0] -= this.mouse.delta[0] * this.pixelRatio / this.zoom
-			this.translation[1] -= this.mouse.delta[1] * this.pixelRatio / this.zoom
 		}
 
 		//Brush refill
@@ -6278,6 +6534,142 @@ class Game {
 
 		//
 
+	}
+
+	updateRelocationPositioning(){
+
+		const anchor = this.getSelectionAnchor()
+
+		if (this.selectionList && this.selectionOffsets && anchor){
+			
+			const relocationSet = new Set(this.selectionList)
+			this.canPlace = true
+			for (let i = 0; i < this.selectionList.length; i++){
+
+				if (!this.canRelocate(this.selectionList[i])){
+					this.canPlace = false
+					break
+				}
+
+				const position = [anchor[0] + this.selectionOffsets[i][0], anchor[1] + this.selectionOffsets[i][1]]
+				if (this.isWithinMemoryComplex(position)){
+					this.canPlace = false
+					break
+				}
+				const entityHere = this.entityAtCoordinates(position)
+
+				if (!entityHere) continue
+
+				let isInList = relocationSet.has(entityHere)
+				if (!isInList){
+					if (!this.canRelocate(entityHere)){
+						this.canPlace = false
+						break
+					}
+
+					const swapTarget = this.selectionList[i].position
+
+					for (let j = 0; j < this.selectionList.length; j++){
+						if (i === j) continue
+						const alreadyBooked = [anchor[0] + this.selectionOffsets[j][0], anchor[1] + this.selectionOffsets[j][1]]
+						if (swapTarget[0] === alreadyBooked[0] && swapTarget[1] === alreadyBooked[1]){
+							this.canPlace = false
+							break
+						}
+					}
+				}
+				
+				if (!this.canPlace) break
+
+			}
+
+		} else if (!this.selectionTarget || anchor[0] !== this.selectionTarget[0] || anchor[1] !== this.selectionTarget[1]){
+			this.selectionTarget = anchor
+			this.updateRelocationArea()
+		}
+
+		const shouldConfirm = this.isMobile && this.canPlace && this.selectionList && this.selectionOffsets
+		if (shouldConfirm && this.store.html.mobileConfirmButton.classList.contains(`hidden`)){
+			this.store.html.mobileConfirmButton.classList.remove(`hidden`)
+		} else if (!shouldConfirm && !this.store.html.mobileConfirmButton.classList.contains(`hidden`)){
+			this.store.html.mobileConfirmButton.classList.add(`hidden`)
+		}
+	}
+
+	updateClonePositioning(){
+
+		const anchor = this.getSelectionAnchor()
+
+		if (this.selectionList && this.selectionOffsets && anchor){
+
+			this.canPlace = true
+
+			this.totalPrice = new Array(10).fill(0)
+			const extra = {}
+
+			for (let i = 0; i < this.selectionList.length; i++){
+
+				const e = this.selectionList[i]
+
+				if (!this.canClone(e)){
+					this.canPlace = false
+					break
+				}
+
+				const position = [anchor[0] + this.selectionOffsets[i][0], anchor[1] + this.selectionOffsets[i][1]]
+
+				if (this.isWithinMemoryComplex(position)){
+					this.canPlace = false
+					break
+				}
+				const entityHere = this.entityAtCoordinates(position)
+
+				if (entityHere && !(this.codex.entities[e.name].isUpgradeTo === entityHere.name)) {
+					this.canPlace = false
+					break
+				}
+
+				if (extra[e.name]===undefined) extra[e.name] = -1
+				extra[e.name]++
+				const price = this.getRealPrice(e.name, false, extra[e.name])
+				for (let i = 0; i < price.length; i++){
+					if (price[i]) this.totalPrice[i] += price[i]
+				}
+
+			}
+
+			if (!this.areaHint){
+				const hint = new Cloud({master:this})
+				hint.addResourceList(this.totalPrice)
+				this.areaHint = hint
+			}
+
+			for (let i = 0; i < this.totalPrice.length; i++){
+				if (this.resources[i] < this.totalPrice[i]){
+					this.canPlace = false
+					break
+				}
+			}
+
+		} else if (!this.selectionTarget || anchor[0] !== this.selectionTarget[0] || anchor[1] !== this.selectionTarget[1]){
+			this.selectionTarget = anchor
+			this.updateCloneArea()
+		}
+
+		const shouldConfirm = this.isMobile && this.canPlace && this.selectionList && this.selectionOffsets
+		if (shouldConfirm && this.store.html.mobileConfirmButton.classList.contains(`hidden`)){
+			this.store.html.mobileConfirmButton.classList.remove(`hidden`)
+		} else if (!shouldConfirm && !this.store.html.mobileConfirmButton.classList.contains(`hidden`)){
+			this.store.html.mobileConfirmButton.classList.add(`hidden`)
+		}
+	}
+
+	getSelectionAnchor(){
+		if (!this.forcedMobileAnchor && this.isMobile && this.selectionList && this.selectionOffsets){
+			const uv = this.xyToUVUntranslated([0, 0])
+			return [Math.floor(uv[0]), Math.floor(uv[1])]
+		}
+		return this.hoveredCell
 	}
 
 	//==============================
@@ -6331,9 +6723,7 @@ class Game {
 					delete this.itemInHand
 					delete this.transportedEntity
 				} else if (this.interactionMode){
-					delete this.interactionMode
-					this.cleanupErase()
-					this.cleanupRelocation()
+					this.cleanupInteractionMode()
 				} else {
 					this.toggleSplash()
 				}
@@ -6465,10 +6855,7 @@ class Game {
 		this.canvas.addEventListener(`mouseup`, e=>{
 
 			if (!this.mouse.positionChanged && e.button === 2 && this.itemInHand){
-				delete this.itemInHand
-				delete this.transportedEntity
-				delete this.interactionMode
-				this.cleanupErase()
+				this.cleanupInteractionMode()
 			}
 
 			this.processMouseup()
@@ -6641,7 +7028,7 @@ class Game {
 		//Ingame updates
 		this.currentlyExtracting = false
 		this.updateSlowdownEvent()
-		if (this.alfa) this.updateAlfa(this.time.dt)
+		if (this.alfa) this.updateAlfa(realDt)
 		this.updatePunch(this.time.dt)
 		this.updateUnfilled(this.time.dt)
 		this.updateMemories(this.time.dt)
@@ -6654,6 +7041,7 @@ class Game {
 		this.updateAnalytics(this.time.dt)
 
 		if (!silent){
+			this.updateAlfaNodes(realDt)
 			this.updateTranslation(realDt)
 			this.updateAutoClicker(this.time.dt)
 			this.updateMusic(realDt)
@@ -6664,6 +7052,48 @@ class Game {
 		}
 
 		return true
+	}
+
+	updateAlfaNodes(dt){
+
+		//Spawning loop
+		this.alfa.spawnTimer -= dt
+		if (this.alfa.spawnTimer <= 0){
+			this.alfa.spawnTimer = this.alfa.spawnIntervalRange[0] + (this.alfa.spawnIntervalRange[1] - this.alfa.spawnIntervalRange[0]) * Math.random()
+			
+			//WIP is it enough?
+			const condition = this.resources[3] > 0
+			if (condition) this.spawnAlfa()
+		}
+
+
+		if (!this.alfa?.currentNodes?.length) return
+
+		for (let i = 0; i < this.alfa.currentNodes.length; i++){
+
+			const n = this.alfa.currentNodes[i]
+			if (n.hit && !n.tainted){
+				n.tainted = true
+				n.timer = 0
+				this.createHollowEvent(`#FF1769`, 1000)
+				this.playSound(`impact`)
+				this.findAlfa(1)
+				this.store.updateAlfa()
+				if (this.store.html.store){
+					this.store.html.store.classList.add(`alfaFlash`)
+					setTimeout(_=>{this.store.html.store.classList.remove(`alfaFlash`)}, 100)
+				}
+			}
+
+			n.timer -= dt
+			if (n.timer <= 0){
+				this.deleteSoundSource(n.sfx)
+				this.alfa.currentNodes.splice(i,1)
+				i--
+				continue
+			}
+
+		}
 	}
 
 	updateMemories(dt){
@@ -6768,26 +7198,27 @@ class Game {
 					continue
 				}
 
+				//Early exit without building a pinhole
+				if (affordableTarget === `pinhole`){
+					this.saveGame()
+					this.preventSaving = true
+
+					this.completions++
+					this.orbUpgrades++
+					m.terminate = true
+					this.reset(true)
+					return
+				}
+
+
 				//ALL GOOD, PROCEED
 				const sxy = this.uvToXYUntranslated(p)
 				const price = this.getRealPrice(affordableTarget)
 
 				if (entityHere){
 
-					//WIP SAVE PINHOLE
-
-					// if (affordableTarget === `pinhole`){
-					// 	this.saveGame()
-					// 	this.completions++
-					// 	this.orbUpgrades++
-					// 	this.savePermanents(true)
-					// 	this.spaceport.send(`reset`, ``)
-					// 	localStorage.removeItem(`abstractv03${this.steamId}`) //Wipe current save
-					// 	setTimeout(_=>{location.reload()},400)
-					// }
-
 					this.clearCell(p)
-					if (affordableTarget !== `pinhole`) this.stats.timeSinceLastDelete = 0
+					this.stats.timeSinceLastDelete = 0
 
 					const refund = this.getRealPrice(entityHere.name)
 					this.createResourceTransfer(refund, sxy, undefined, undefined, undefined, true)
@@ -6819,13 +7250,13 @@ class Game {
 					}
 				}
 
-				////////////
-				if (affordableTarget === `pinhole`){
-					this.completions++
-					this.orbUpgrades++
-					this.reset(true)
-				}
-				/////////////
+				// ////////////
+				// if (affordableTarget === `pinhole`){
+				// 	this.completions++
+				// 	this.orbUpgrades++
+				// 	this.reset(true)
+				// }
+				// /////////////
 
 				if (affordableTarget === en){
 					m.terminate = true
@@ -6872,7 +7303,7 @@ class Game {
 
 	updateGamepad(dt){
 
-		//WIP UPDATE
+		//WIP: UPDATE
 
 		if (!this.gamepadIsConnected) return
 		const gamepad = navigator.getGamepads()[0]
@@ -7317,6 +7748,7 @@ class Game {
 
 		requestAnimationFrame(_=>{this.renderloop()})
 
+
 		this.unit = this.solidUnit * this.zoom
 
 		if (this.halt) return
@@ -7349,7 +7781,7 @@ class Game {
 
 			const showItemInHand = this.itemInHand && this.hoveredCell
 			const ifNotMobileOrWhileTap = !this.isMobile || this.mouse.state === 1
-			const clearView = showItemInHand || this.touchMode || this.altActive || this.interactionMode === `erase` || this.interactionMode === `relocate`
+			const clearView = showItemInHand || this.touchMode || this.altActive || this.interactionMode === `erase` || this.interactionMode === `relocate` || this.interactionMode === `clone`
 
 			if (clearView) {
 				this.renderEntitiesAbstract(this.renderTime.dt)
@@ -7373,6 +7805,59 @@ class Game {
 				this.ctx.fill()
 			}
 
+			//Alfa nodes
+			if (this.alfa.currentNodes?.length){
+				for (let i = 0; i < this.alfa.currentNodes.length; i++){
+					const np = this.alfa.nodeProperties
+					const n = this.alfa.currentNodes[i]
+					const r = np.radius * this.unit * 1
+					const xy = this.uvToXY([n.position[0] - .5, n.position[1] - .5])
+
+					const s = this.unit * .25
+					const t = performance.now() / 20
+					const phase = t/50 % 1
+
+					const age = n.timer / np.duration
+					let alfaMult = age < .1 ? age * 10 : age > .8 ? 1 - (age-.8) * 5 : 1
+					alfaMult *= .8
+
+					for (let j = 0; j < np.spiralCount; j++){
+
+						const index = (j + t) % np.spiralCount
+
+					    const a = j * np.spiralAngle
+
+					    const f = index / np.spiralCount
+					    const shift = r * f ** .5
+
+					    const fadeOut = Math.min(1, (1 - f) * 2)
+					    const alpha = Math.max(0, Math.min(1, fadeOut))
+					    const ss = s * (0.5 + f * 1.5) * alpha
+
+					    this.ctx.save()
+					    this.ctx.globalAlpha = alfaMult * alpha * ((Math.sin(t/10 + j * 7.12) * .5 + .5) * .9 + .1)
+					    this.ctx.translate(xy[0], xy[1])
+					    this.ctx.scale(1,.68)
+					    this.ctx.rotate(a)
+					    this.ctx.translate(0, shift)
+
+					    // this.ctx.fillRect(-ss / 2, -ss / 2, ss, ss)
+					    this.ctx.drawImage(this.images[`img/shard.jxl`], -ss/2, -ss/2, ss, ss * (1 + f * 64 * age))
+					    this.ctx.restore()
+
+					}
+
+					this.ctx.globalAlpha = alfaMult
+					let si = this.unit * .6
+					si *= (1 + .1 * Math.random())
+					this.ctx.drawImage(this.images[`img/shard.jxl`], xy[0]-si/2, xy[1]-si/2, si, si)
+					this.ctx.globalAlpha = 1
+					
+
+
+				}
+			}
+
 			//Alt mode
 			if (this.altActive && !this.plane) {
 				// this.ctx.fillStyle = `#FFFC`
@@ -7389,7 +7874,7 @@ class Game {
 			if (this.interactionMode === `build` && this.hoveredCell && ifNotMobileOrWhileTap){
 				this.renderAvailability()
 				this.renderSOI(this.hoveredCell)
-			} else if (this.interactionMode === `erase` && this.hoveredCell && !this.eraseList?.length){
+			} else if (this.interactionMode === `erase` && this.hoveredCell && !this.selectionCandidateSet?.size){
 				if (this.hoveredEntity && this.canEraseEntity(this.hoveredEntity)){
 					this.renderEntityInColor(`bad`, this.hoveredEntity)
 				}
@@ -7397,18 +7882,21 @@ class Game {
 
 			if (this.hoveredCell && ifNotMobileOrWhileTap) this.renderHoveredCell()
 
-			//TST NEW ERASE
-			if (this.eraseList){
-				for (let i = 0; i < this.eraseList.length; i++){
-					this.renderEntityInColor(`bad`, this.eraseList[i])
+			//ERASE RELOCATE CLONE
+			if (this.selectionCandidateSet){
+				const scheme = this.interactionMode === `erase` || (this.interactionMode === `clone` && !this.canPlace) ? `bad` : `good`
+				for (let c of this.selectionCandidateSet){
+					this.renderEntityInColor(scheme, c)
 				}
 
-				if (this.eraseOrigin && this.eraseTarget){
+				if (this.selectionOrigin && this.selectionTarget){
 
-					const umin = Math.min(this.eraseTarget[0], this.eraseOrigin[0])
-					const umax = Math.max(this.eraseTarget[0], this.eraseOrigin[0])
-					const vmin = Math.min(this.eraseTarget[1], this.eraseOrigin[1])
-					const vmax = Math.max(this.eraseTarget[1], this.eraseOrigin[1])
+					const color = this.interactionMode === `erase` ? `#FF241C` : `#24AA1C`
+
+					const umin = Math.min(this.selectionTarget[0], this.selectionOrigin[0])
+					const umax = Math.max(this.selectionTarget[0], this.selectionOrigin[0])
+					const vmin = Math.min(this.selectionTarget[1], this.selectionOrigin[1])
+					const vmax = Math.max(this.selectionTarget[1], this.selectionOrigin[1])
 
 					const dx = .866 * this.unit
 					const dy = .5 * this.unit
@@ -7422,8 +7910,7 @@ class Game {
 
 					this.ctx.setLineDash([this.pixelRatio * 8, this.pixelRatio * 10])
 					this.ctx.lineWidth = this.pixelRatio * 3
-					this.ctx.strokeStyle = `#FF241C`
-					//this.unit * .03
+					this.ctx.strokeStyle = color
 
 					this.ctx.beginPath()
 					this.ctx.moveTo(xyA[0], xyA[1] - dy)
@@ -7434,57 +7921,24 @@ class Game {
 					this.ctx.stroke()
 
 					this.ctx.restore()
-
-				}
-			} else if (this.relocationCandidatesList){
-				for (let i = 0; i < this.relocationCandidatesList.length; i++){
-					this.renderEntityInColor(`good`, this.relocationCandidatesList[i])
-				}
-				if (this.relocationOrigin && this.relocationTarget){
-
-					const umin = Math.min(this.relocationTarget[0], this.relocationOrigin[0])
-					const umax = Math.max(this.relocationTarget[0], this.relocationOrigin[0])
-					const vmin = Math.min(this.relocationTarget[1], this.relocationOrigin[1])
-					const vmax = Math.max(this.relocationTarget[1], this.relocationOrigin[1])
-
-					const dx = .866 * this.unit
-					const dy = .5 * this.unit
-
-					const xyA = this.uvToXY([umin, vmin])
-					const xyB = this.uvToXY([umax, vmin])
-					const xyC = this.uvToXY([umax, vmax])
-					const xyD = this.uvToXY([umin, vmax])
-
-					this.ctx.save()
-
-					this.ctx.setLineDash([this.pixelRatio * 8, this.pixelRatio * 10])
-					this.ctx.lineWidth = this.pixelRatio * 3
-					this.ctx.strokeStyle = `#24AA1C`
-
-					this.ctx.beginPath()
-					this.ctx.moveTo(xyA[0], xyA[1] - dy)
-					this.ctx.lineTo(xyB[0] + dx, xyB[1])
-					this.ctx.lineTo(xyC[0], xyC[1] + dy)
-					this.ctx.lineTo(xyD[0] - dx, xyD[1])
-					this.ctx.closePath()
-					this.ctx.stroke()
-
-					this.ctx.restore()
-
-				}
-			} else if (this.relocationList && this.relocationOffsets){
-
-				// this.canPlace = true //WIP set in mouse move after check
-				const c = this.canPlace ? `#09D35055` : this.getColorWave([236,20,1,.5],[220,220,220,.9])
-				for (let i = 0; i < this.relocationList.length; i++){
-
-					// this.renderEntityInColor(`good`, this.relocationList[i])
-					
-					this.relocationList[i].renderColored(0, [this.hoveredCell[0] + this.relocationOffsets[i][0], this.hoveredCell[1] + this.relocationOffsets[i][1]], c)
 
 				}
 
 			}
+
+			if (this.selectionList && this.selectionOffsets){
+
+				const anchor = this.getSelectionAnchor()
+
+				const c = this.canPlace ? `#09D35055` : this.getColorWave([236,20,1,.5],[220,220,220,.9])
+				for (let i = 0; i < this.selectionList.length; i++){
+
+					this.selectionList[i].renderColored(0, [anchor[0] + this.selectionOffsets[i][0], anchor[1] + this.selectionOffsets[i][1]], c)
+
+				}
+
+			}
+
 			if (this.cloneList && !this.cloneAreaSelected){
 
 				let canAfford = true
@@ -7655,16 +8109,73 @@ class Game {
 			} else if (this.isMobile && this.interactionMode === `relocate`){
 
 				const fill = this.ctx.createLinearGradient(0, 0, 0, this.h)
-				fill.addColorStop(0, this.massRelocation ? `#30F1FFFF` : `#C7FF7EFF`)
-				fill.addColorStop(1, this.massRelocation ? `#CEFFB400` : `#FFF5B400`)
+				fill.addColorStop(0, `#30F1FFFF`)
+				fill.addColorStop(1, `#CEFFB400`)
 				this.ctx.save()
 				this.ctx.globalCompositeOperation = `multiply`
 				this.ctx.fillStyle = fill
 				this.ctx.fillRect(0, 0, this.w, this.h)
 
+				this.ctx.globalCompositeOperation = `difference`
+				this.ctx.font = `600 ` + this.screenUnit * .5 + `px Montserrat, sans-serif`
+				this.ctx.textAlign = `center`
+				this.ctx.fillStyle = `#FFF`
+				this.ctx.fillText(this.pronounce('random', 'relocate'), this.w2, this.h * .25)
+
+				this.ctx.restore()
+
+			} else if (this.isMobile && this.interactionMode === `clone`){
+
+				const fill = this.ctx.createLinearGradient(0, 0, 0, this.h)
+				fill.addColorStop(0, `#C7FF7EFF`)
+				fill.addColorStop(1, `#FFF5B400`)
+				this.ctx.save()
+				this.ctx.globalCompositeOperation = `multiply`
+				this.ctx.fillStyle = fill
+				this.ctx.fillRect(0, 0, this.w, this.h)
+
+				this.ctx.globalCompositeOperation = `difference`
+				this.ctx.font = `600 ` + this.screenUnit * .5 + `px Montserrat, sans-serif`
+				this.ctx.textAlign = `center`
+				this.ctx.fillStyle = `#FFF`
+				this.ctx.fillText(this.pronounce('random', 'clone'), this.w2, this.h * .25)
+
 				this.ctx.restore()
 
 			}
+
+			//Desktop modes
+			// if (this.interactionMode === `erase` || this.interactionMode === `relocate` || this.interactionMode === `clone`){
+
+			// 	this.ctx.font = this.smallFont
+
+			// 	const sh = this.pixelRatio * 4
+			// 	const h = this.pixelRatio * 30
+			// 	const db = h
+			// 	const txt = this.interactionMode === `erase` ? `Click / Click + Drag` : this.interactionMode === `relocate` ? `Click on a machine or select an area to move machines. SHIFT to clone.` : `Click on a machine or select an area to copy machines`//this.pronounce(`entities`, `eraser3`, `name`)
+			// 	const tw = this.ctx.measureText(txt).width
+
+			// 	const x1 = this.w2 - tw/2
+			// 	const x2 = this.w2 + tw/2
+
+			// 	this.ctx.fillStyle = this.interactionMode === `erase` ? `#AA4F43` : this.interactionMode === `relocate` ? `#477868` : `#645EB7`
+
+			// 	this.ctx.beginPath()
+			// 	this.ctx.moveTo(0, this.h - sh)
+			// 	this.ctx.lineTo(x1 - db - db, this.h - sh)
+			// 	this.ctx.bezierCurveTo(x1 - db, this.h - sh, x1 - db , this.h - h, x1, this.h - h)
+			// 	this.ctx.lineTo(x2, this.h - h)
+			// 	this.ctx.bezierCurveTo(x2 + db, this.h - h, x2 + db , this.h - sh, x2 + db + db , this.h - sh)
+			// 	this.ctx.lineTo(this.w, this.h - sh)
+			// 	this.ctx.lineTo(this.w, this.h)
+			// 	this.ctx.lineTo(0, this.h)
+			// 	this.ctx.closePath()
+			// 	this.ctx.fill()
+
+			// 	this.ctx.fillStyle = `#FFF`
+			// 	this.ctx.fillText(txt,this.w2, this.h - h*.48)
+
+			// }
 			
 
 			if (!this.plane){
@@ -8052,7 +8563,7 @@ class Game {
 
 
 		if (!this.plane){
-			const hint = this.eraseList?.length ? this.eraseHint : this.cloneList?.length ? this.cloneHint : (this.interactionMode === `erase` && !this.eraseList?.length ? this.hoveredEntity?.getSellHint() : (this.itemInHand && this.hoveredEntity && this.hoveredEntity.name === this.codex.entities[this.itemInHand.name].isUpgradeTo) ? this.itemInHandPriceAndRefundTag : this.itemInHand ? this.itemInHandPriceTag : this.hoveredEntity?.getHint())
+			const hint = ((this.selectionCandidateSet?.size && this.interactionMode === `erase`) || (this.interactionMode === `clone` && (this.selectionCandidateSet?.size || this.selectionList?.length))) ? this.areaHint : this.cloneList?.length ? this.cloneHint : (this.interactionMode === `erase` && !this.selectionCandidateSet?.size ? this.hoveredEntity?.getSellHint() : (this.itemInHand && this.hoveredEntity && this.hoveredEntity.name === this.codex.entities[this.itemInHand.name].isUpgradeTo) ? this.itemInHandPriceAndRefundTag : this.itemInHand ? this.itemInHandPriceTag : this.hoveredEntity?.getHint())
 			const canHit = this.hoveredEntity && this.hoveredEntity.canHit()
 
 			if (!this.touchMode){
@@ -8096,6 +8607,22 @@ class Game {
 					this.ctx.stroke()
 					this.ctx.beginPath()
 					this.ctx.arc(0,0,slength * .6,0,Math.PI * 2)
+					this.ctx.closePath()
+					this.ctx.fill()
+
+
+				} else if (this.interactionMode === `clone`){
+
+					const big = this.canClone(this.hoveredEntity)
+					const length = this.pixelRatio * (big ? 20 : 12)
+					const slength = length * .3
+					this.ctx.fillStyle = `#000`
+					this.ctx.beginPath()
+					this.ctx.arc(-slength,0,slength * .8,0,Math.PI * 2)
+					this.ctx.closePath()
+					this.ctx.fill()
+					this.ctx.beginPath()
+					this.ctx.arc(slength,0,slength * .8,0,Math.PI * 2)
 					this.ctx.closePath()
 					this.ctx.fill()
 
@@ -8528,17 +9055,19 @@ class Game {
 				this.ctx.restore()
 
 				let text = this.isMobile ? this.makeReadableFloor(this.resources[i]) : this.makeReadable(this.resources[i])
-				if (this.entitiesInGame.pinhole > 0){
+				if (this.pinhole){
 
 					const t = performance.now()
 					if (Math.sin(t/834) * .6 + Math.sin(t/27) * .4 > 0){
-						text = Math.random().toString(36).slice(2, 5)
+						// text = Math.random().toString(36).slice(2, 5)
+						text = this.pinhole.labels[Math.floor(this.pinhole.labels.length * Math.random())]
 					} else {
 						const dict = [`U/D`,`C/S`,`T/B`,`E/νE`,`μ/νμ`,`τ/ντ`,`G/γ`,`Z/W`,`H`,`Δ/νΔ`]
 						text = dict[i]
 					}
 
 				}
+				// let text = `TST`
 
 				const pad = this.screenUnit * .04
 				const x = this.resourceHomes[i][0]
@@ -8900,29 +9429,34 @@ class Game {
 
 	renderEntitiesAbstract(dt){
 
-		const dx = .9 * .866 * this.unit
-		const dy = .9 * .5 * this.unit
+		const dx = .866 * this.unit 	//*.9
+		const dy = .5 * this.unit 		//*.9
+		const nx = dx * .06
+		const ny = dy * .06
 
 		if (!this.plane){
 
-			for (let i = 0; i < this.stuff.length; i++){
+			for (let i = this.stuff.length - 1; i >= 0; i--){
 
-				if (this.stuff[i].name !== `conductor` && this.isVisible(this.stuff[i])) {
+				if (this.isVisible(this.stuff[i])) { //this.stuff[i].name !== `conductor`
+
+					this.stuff[i].render(dt)
 
 					const xy = this.uvToXY(this.stuff[i].position)
 					const mult = (this.stuff[i].entitySpan ?? 0) * 2 + 1
-
-					this.ctx.save()
+					this.ctx.fillStyle = `#FFF`
 					this.ctx.beginPath()
-					this.ctx.moveTo(xy[0], xy[1] - dy * mult)
-					this.ctx.lineTo(xy[0] + dx * mult, xy[1])
-					this.ctx.lineTo(xy[0], xy[1] + dy * mult)
-					this.ctx.lineTo(xy[0] - dx * mult, xy[1])
-					// this.ctx.arc(0,0,300,0,Math.PI*2)
+
+					this.ctx.lineTo(xy[0] + dx * mult + dx, -this.h2)
+					this.ctx.lineTo(xy[0] + dx * mult + dx, xy[1] - dy)
+					this.ctx.lineTo(xy[0] + dx * mult -nx, xy[1] + dy - dy + ny)
+					this.ctx.lineTo(xy[0], xy[1] - dy * mult + ny * 2)
+					this.ctx.lineTo(xy[0] - dx * mult + nx, xy[1] + ny)
+					this.ctx.lineTo(xy[0] - dx * mult - dx, xy[1] - dy)
+					this.ctx.lineTo(xy[0] - dx * mult - dx, -this.h2)
+
 					this.ctx.closePath()
-					this.ctx.clip()
-					this.stuff[i].render(dt)
-					this.ctx.restore()
+					this.ctx.fill()
 					
 				}
 				
@@ -8937,6 +9471,46 @@ class Game {
 			}
 
 		}
+
+		//// CLIP METHOD
+
+		// const dx = .9 * .866 * this.unit
+		// const dy = .9 * .5 * this.unit
+
+		// if (!this.plane){
+
+		// 	for (let i = 0; i < this.stuff.length; i++){
+
+		// 		if (this.stuff[i].name !== `conductor` && this.isVisible(this.stuff[i])) {
+
+		// 			const xy = this.uvToXY(this.stuff[i].position)
+		// 			const mult = (this.stuff[i].entitySpan ?? 0) * 2 + 1
+
+		// 			this.ctx.save()
+		// 			this.ctx.beginPath()
+		// 			this.ctx.moveTo(xy[0], xy[1] - dy * mult)
+		// 			this.ctx.lineTo(xy[0] + dx * mult, xy[1])
+		// 			this.ctx.lineTo(xy[0], xy[1] + dy * mult)
+		// 			this.ctx.lineTo(xy[0] - dx * mult, xy[1])
+		// 			// this.ctx.arc(0,0,300,0,Math.PI*2)
+		// 			this.ctx.closePath()
+		// 			this.ctx.clip()
+		// 			this.stuff[i].render(dt)
+		// 			this.ctx.restore()
+					
+		// 		}
+				
+		// 	}
+
+		// } else if (this.plane === 1){
+
+		// 	for (let i = 0; i < this.stuff.length; i++){
+
+		// 		if (this.isVisible(this.stuff[i])) this.stuff[i].darkrender(dt)
+
+		// 	}
+
+		// }
 
 	}
 
@@ -9028,7 +9602,8 @@ class Game {
 		lb[1] = Math.floor(lb[1])// + .5
 
 		this.ctx.save()
-		this.ctx.strokeStyle = `#1129`
+		this.ctx.strokeStyle = this.plane ? `#334` : `#BBBBC5`
+		this.ctx.lineCap = `butt`
 		// this.ctx.setLineDash([8,8])
 		this.ctx.lineWidth = this.pixelRatio
 
@@ -9549,6 +10124,23 @@ class Game {
 			if (placed) break
 
 		}
+
+	}
+
+	spawnAlfa(){
+
+		//WIP Mobile (there nothing to see here, move along)
+
+		// const origin = this.xyToUV(this.mouse.sxy)
+		// const radius = 6
+		// const u = Math.floor((Math.random() * 2 - 1) * radius + origin[0])
+		// const v = Math.floor((Math.random() * 2 - 1) * radius + origin[1])
+
+		// this.alfa.currentNodes.push({
+		// 	position: [u,v],
+		// 	timer: this.alfa.nodeProperties.duration,
+		// 	sfx: this.addSoundSource(`alfanode`, [u, v])
+		// })
 
 	}
 

@@ -9,17 +9,21 @@ const crypto = require('node:crypto')
 const cp = require('node:child_process')
 const vm = require('node:vm')
 const root = path.resolve(process.argv[2] || path.join(__dirname, '../../../../..'))
+// Optional pristine fixture root allows repeating the contract after publishing
+// hooks to the workspace, without stripping or rewriting official game files.
+const fixtureRoot = path.resolve(process.argv[3] || root)
 const suite = fs.mkdtempSync(path.join(os.tmpdir(), 'sixtyfour-loader-13-'))
 const core = ['resources/app/main.js', 'resources/app/game/index.html', 'resources/app/game/scripts/game.js', 'resources/app/game/scripts/ui.js', 'resources/app/game/scripts/sprites.js']
 const digest = file => crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex')
 const hashes = dir => core.map(p => digest(path.join(dir, p)))
-const baseline = hashes(root)
+const officialBaseline = hashes(root)
+const baseline = hashes(fixtureRoot)
 const patcher = path.join(root, 'modloader-installer/patch-source.ps1')
 function fixture(name) {
     const dir = path.join(suite, name)
     for (const p of core) {
         fs.mkdirSync(path.dirname(path.join(dir, p)), { recursive: true })
-        fs.copyFileSync(path.join(root, p), path.join(dir, p))
+        fs.copyFileSync(path.join(fixtureRoot, p), path.join(dir, p))
     }
     fs.mkdirSync(path.join(dir, 'resources/app/game/mods'), { recursive: true })
     fs.writeFileSync(path.join(dir, 'resources/app/game/mods/enabled.json'), '{"mods":[]}')
@@ -49,10 +53,80 @@ const gameText = fs.readFileSync(path.join(clean, core[2]), 'utf8')
 assert.ok(gameText.indexOf('stage(`beforeGamePrepare`') < gameText.indexOf('await this.prepareSavedGameData(preload)'), 'early lifecycle precedes native migration')
 assert.match(gameText, /return window\.ModLoader\?\.applySave\(saveState, this\) \|\| saveState/)
 assert.doesNotMatch(gameText, /this\.getLanguageId\(/)
+const initText = gameText.match(/^\tasync init\(preload\)\{\n[\s\S]*?^\t\}/m)[0]
+for (const hook of ['applyData', 'applyLanguages', 'applyWords']) {
+    assert.equal(initText.split('ModLoader?.' + hook + '(').length - 1, 1, 'one active ' + hook)
+}
+if (gameText.includes('async preloadImages()')) {
+    assert.match(initText, /this\.images = await this\.preloadImages\(\)/)
+    assert.ok(initText.indexOf('applyData(') < initText.indexOf('await this.preloadImages()'))
+    assert.ok(initText.indexOf('await this.preloadImages()') < initText.indexOf('applyLanguages('))
+    assert.ok(initText.indexOf('applyLanguages(') < initText.indexOf('applyWords('))
+}
+const mainText = fs.readFileSync(path.join(clean, core[0]), 'utf8')
+for (const name of ['configureSaveCloud(client.cloud)', 'readSaveOverlay(client.cloud, JSON.parse(save))', 'savePolicyLayout: slots?.policyLayout,', 'hasSaveOverlay(client.cloud)']) assert.equal(mainText.split(name).length - 1, 1, name)
+assert.equal(mainText.split('ModLoaderMainProcess.dispatchSaveStore(e, slots, value =>').length - 1, 2, 'both IPC modes must dispatch')
+const brokenSaveBridges = [
+ ['missing save configure', text => text.replace('ModLoaderMainProcess.configureSaveCloud(client.cloud)', '')],
+ ['missing overlay reconstruction', text => text.replace('ModLoaderMainProcess.readSaveOverlay(client.cloud, JSON.parse(save))', 'JSON.parse(save)')],
+ ['missing layout forwarding', text => text.replace('savePolicyLayout: slots?.policyLayout,', '')],
+ ['missing invoke dispatch', text => { const at = text.indexOf('ipcMain.handle('); return text.slice(0, at) + text.slice(at).replace('ModLoaderMainProcess.dispatchSaveStore(e, slots, value =>', 'rawDispatch(e, slots, value =>') }],
+ ['duplicate store handler', text => text + '\nipcMain.on(' + String.fromCharCode(96) + 'store' + String.fromCharCode(96) + ', (e,slots)=>{\n})\n'],
+ ['duplicate save configure', text => text + '\nModLoaderMainProcess.configureSaveCloud(client.cloud)\n'],
+ ['partial save marker', text => text.replace('// ModLoader save bridge v2', '')],
+ ['missing read guard', text => text.replace("if (e?.code === 'SAVE_COLLECTION_INVALID' || e?.code === 'SAVE_BASELINE_MISSING')", 'if (false)')]
+]
+for (const [label, alter] of brokenSaveBridges) {
+ const dir = fixture(label.replaceAll(' ', '-'))
+ for (const name of core) fs.copyFileSync(path.join(clean, name), path.join(dir, name))
+ fs.writeFileSync(path.join(dir, core[0]), alter(mainText))
+ const before = hashes(dir)
+ ps(['-File', patcher, '-GameRoot', dir], false)
+ assert.deepEqual(hashes(dir), before, label + ' rejects before any source write')
+}
+
+assert.match(mainText, /ModLoaderMainProcess\.runtimeLog\('console'/, 'commented native DevTools menu cannot skip diagnostics')
+assert.match(mainText, /ModLoaderMainProcess\.runtimeLog\('render-process-gone'/)
+assert.match(mainText, /ModLoaderMainProcess\.runtimeLog\('did-fail-load'/)
+assert.match(mainText, /globalShortcut\.register\('F12'/)
+assert.match(mainText, /\s+\{role: 'toggleDevTools'\}/)
+assert.equal((mainText.match(/const menu = Menu\.buildFromTemplate/g) || []).length, 1, 'preserve native menu without duplicate declarations')
+// Exercise the actual generated console listener for both Electron signatures.
+const consoleHook = mainText.match(/win\.webContents\.on\('console-message', ([\s\S]*?)\n  \}\)/)[1]
+const logged = []
+const logConsole = vm.runInNewContext('(' + consoleHook + '\n  })', { ModLoaderMainProcess: { runtimeLog(...args) { logged.push(args) } } })
+logConsole({}, { level: 'error', message: 'new signature', sourceId: 'game.js', lineNumber: 42 })
+logConsole({}, 3, 'old signature', 21, 'old.js')
+assert.deepEqual(logged, [['console', 'error', 'new signature', 'game.js:42'], ['console', 3, 'old signature', 'old.js:21']])
+for (const kind of ['missing-words', 'duplicate-data', 'partial-hook']) {
+    const bad = fixture(kind), file = path.join(bad, core[2])
+    let text = fs.readFileSync(file, 'utf8')
+    if (kind === 'missing-words') text = text.replace('const words = abstract_getWords()', 'const words = changed_getWords()')
+    if (kind === 'duplicate-data') text = text.replace('this.codex = abstract_getCodex()', 'this.codex = abstract_getCodex()\n\t\tthis.images = await this.preloadImages()\n\t\tthis.codex = abstract_getCodex()')
+    if (kind === 'partial-hook') text = text.replace('this.codex = abstract_getCodex()', 'this.codex = window.ModLoader?.applyData(abstract_getCodex(), this)')
+    fs.writeFileSync(file, text)
+    const before = hashes(bad)
+    ps(['-File', patcher, '-GameRoot', bad], false)
+    assert.deepEqual(hashes(bad), before, kind + ' fails before any file is written')
+}
+// Also retain support for the earlier synchronous, contiguous 1.3 layout.
+if (gameText.includes('async preloadImages()')) {
+    const earlier = fixture('earlier-contiguous-layout'), file = path.join(earlier, core[2])
+    let text = fs.readFileSync(file, 'utf8')
+    const words = '\t\tconst words = abstract_getWords()\n\t\tthis.words = words[this.language]\n\t\tthis.words_en = words.en\n'
+    assert.ok(text.includes(words))
+    text = text.replace(words, '').replace('this.images = await this.preloadImages()\n', 'this.images = this.preloadImages()\n' + words).replace('async preloadImages(){', 'preloadImages(){').replace('await Promise.all(', 'Promise.all(')
+    fs.writeFileSync(file, text)
+    ps(['-File', patcher, '-GameRoot', earlier])
+    const first = hashes(earlier)
+    ps(['-File', patcher, '-GameRoot', earlier])
+    assert.deepEqual(hashes(earlier), first, 'earlier layout stays idempotent')
+    assert.match(fs.readFileSync(file, 'utf8'), /this\.images = this\.preloadImages\(\)/)
+}
 const assembleMatch = gameText.match(/^\tassembleSave\(\)\{\n[\s\S]*?^\t\}/m)
 assert.ok(assembleMatch)
 const assemble = vm.runInNewContext('({' + assembleMatch[0] + '}).assembleSave', { window: { ModLoader: { applySave(save) { save.testMetadata = 'kept'; return save } } } })
-const assembled = assemble.call({ stuff: [], store: { existed: {} }, messenger: {}, achiever: { fired: [] } })
+const assembled = assemble.call({ stuff: [], store: { existed: {} }, messenger: {}, achiever: { fired: [] }, alfa: { currentEvents: [] } })
 assert.equal(typeof assembled, 'object', 'patched native assembly remains an object')
 assert.equal(assembled.testMetadata, 'kept')
 const drift = fixture('late-anchor-drift')
@@ -101,6 +175,6 @@ assert.deepEqual(hashes(rollback), baseline, 'verification failure rolls back al
 assert.equal(digest(oldLoader), oldRuntimeHash, 'verification failure restores overwritten runtime')
 assert.equal(fs.readFileSync(path.join(rollback, 'resources/app/game/mods/old-test-mod/keep.txt'), 'utf8'), 'original mod')
 assert.equal(fs.existsSync(path.join(rollback, 'resources/app/game/mods/new-test-mod/payload.txt')), false, 'failed install removes new payload')
-assert.deepEqual(hashes(root), baseline, 'official game source untouched')
-fs.writeFileSync(path.join(suite, 'result.json'), JSON.stringify({ status: 'passed', officialRoot: root, fixtureRoot: suite, cases: ['preflight', 'patch syntax', 'object assembly', 'idempotence', 'late anchor failure', 'unsupported version', 'write rollback', 'installer', 'loader verification', 'repeat install', 'uninstall', 'verification failure rollback'] }, null, 2))
+assert.deepEqual(hashes(root), officialBaseline, 'official game source untouched')
+fs.writeFileSync(path.join(suite, 'result.json'), JSON.stringify({ status: 'passed', officialRoot: root, fixtureRoot: suite, cases: [...brokenSaveBridges.map(([name]) => name), 'preflight', 'patch syntax', 'split awaited initialization', 'earlier contiguous initialization', 'partial/duplicate/missing anchors', 'Electron console signatures', 'object assembly', 'idempotence', 'late anchor failure', 'unsupported version', 'write rollback', 'installer', 'loader verification', 'repeat install', 'uninstall', 'verification failure rollback'] }, null, 2))
 console.log('Game 1.3 installer contract passed. Fixtures: ' + suite)

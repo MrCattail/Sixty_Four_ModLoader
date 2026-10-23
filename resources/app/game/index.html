@@ -30,8 +30,26 @@
 <canvas class="canvas"></canvas>
 <!-- <div class="shop"></div> -->
 <div class="store"></div>
-<script>var DEBUG</script>
+<script>
+	var DEBUG
+	var Playsaurus
+</script>
 <script type="module">
+
+try {
+	Playsaurus = require('@playsaurus-inc/sdk')
+	Playsaurus.initialize({
+		gameSlug: `sixty-four`,
+		endpoint: `https://staging.playsaurus.com/api`,
+		gameVersion: `1.0.0`,
+		gamePlatform: Playsaurus.GamePlatform.Web,
+		gameStorefront: Playsaurus.GameStorefront.PlaysaurusWeb,
+		gameFlavor: `default`,
+		locale: 'en-US',
+	})
+} catch(e){
+	console.log(e)
+}
 
 let game
 window.onload = _=>{
@@ -52,6 +70,7 @@ window.onload = _=>{
 			spaceport.send(`getMyStuff`, `please`)
 		}
 	} catch (e){
+		console.log(`hey`)
 		stopSpinning()
 		game = new Game(document.querySelector(`.canvas`))
 		DEBUG = game

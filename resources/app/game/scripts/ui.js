@@ -484,7 +484,6 @@ class Splash {
 
 		this.playElement = document.createElement(`div`)
 		this.playElement.classList.add(`menuItem`, `main`)
-		// this.playElement.innerHTML = localStorage.getItem(`abstractv03${this.master.steamId}`) ? this.texts.continue : this.texts.start
 		this.playElement.innerHTML = this.master.saveSlots[this.master.currentSlotId].stack[0].state ? this.say('continue') : this.say('start')
 		menu.append(this.playElement)
 
@@ -492,6 +491,11 @@ class Splash {
 		this.muteElement.classList.add(`menuItem`, `muteButton`)
 		this.muteElement.innerHTML = this.gameIsMute ? this.say('soundoff') : this.say('soundon')
 		menu.append(this.muteElement)
+
+		const saveload = document.createElement(`div`)
+		saveload.classList.add(`menuItem`)//, `nohover`)
+		saveload.innerHTML = `${this.say('save')}/${this.say('load')}`
+		menu.append(saveload)
 
 		const language = document.createElement(`div`)
 		language.classList.add(`menuItem`)
@@ -520,18 +524,17 @@ class Splash {
 			this.deGloryButton.style.display = `none`
 		}
 
-		const reset = document.createElement(`div`)
-		// reset.style.position = `relative`
-		this.resetProgressbar = document.createElement(`div`)
-		this.resetProgressbar.classList.add(`resetProgressbar`)
-		const resetText = document.createElement(`div`)
-		resetText.style.position = `relative`
-		resetText.style.display = `inline-block`
-		resetText.innerText = this.texts.reset
-		reset.classList.add(`menuItem`)
-		reset.append(this.resetProgressbar)
-		reset.append(resetText)
-		menu.append(reset)
+		// const reset = document.createElement(`div`)
+		// this.resetProgressbar = document.createElement(`div`)
+		// this.resetProgressbar.classList.add(`resetProgressbar`)
+		// const resetText = document.createElement(`div`)
+		// resetText.style.position = `relative`
+		// resetText.style.display = `inline-block`
+		// resetText.innerText = this.texts.reset
+		// reset.classList.add(`menuItem`)
+		// reset.append(this.resetProgressbar)
+		// reset.append(resetText)
+		// menu.append(reset)
 
 		// const exp = document.createElement(`span`)
 		// exp.classList.add(`hoverable`)
@@ -576,30 +579,35 @@ class Splash {
 			this.updateMute(!this.gameIsMute)
 		}
 
-		reset.ontouchstart = _=>{
-			// this.fireNotification(this.texts.warning, resetText)
-			this.fireResetNotification()
-			this.resetProgressbar.classList.add(`active`)
-			this.resetProgressbar.onanimationend = _=>{
-				this.master.preventSaving = true
-				this.master.reset()
-				// this.master.spaceport.send(`reset`, ``)
-				// localStorage.removeItem(`abstractv03${this.master.steamId}`)
-				// localStorage.removeItem(`abstractv03_helpIsNeeded${this.master.steamId}`)
-				// if (this.master.explainer?.lskey) localStorage.removeItem(this.master.explainer.lskey)
+		saveload.ontouchstart = _=>{
+			this.updateWarehouse()
+			this.warehouse.style.bottom = 0
+		}
 
-				// setTimeout(_=>{location.reload()},400)
-			}
-		}
-		reset.ontouchend = _=>{
-			this.dismissResetNotification()
-			this.resetProgressbar.onanimationend = null
-			this.resetProgressbar.classList.remove(`active`)
-		}
-		reset.onmouseout = _=>{
-			this.resetProgressbar.onanimationend = null
-			this.resetProgressbar.classList.remove(`active`)
-		}
+		// reset.ontouchstart = _=>{
+		// 	// this.fireNotification(this.texts.warning, resetText)
+		// 	this.fireResetNotification()
+		// 	this.resetProgressbar.classList.add(`active`)
+		// 	this.resetProgressbar.onanimationend = _=>{
+		// 		this.master.preventSaving = true
+		// 		this.master.reset()
+		// 		// this.master.spaceport.send(`reset`, ``)
+		// 		// localStorage.removeItem(`abstractv03${this.master.steamId}`)
+		// 		// localStorage.removeItem(`abstractv03_helpIsNeeded${this.master.steamId}`)
+		// 		// if (this.master.explainer?.lskey) localStorage.removeItem(this.master.explainer.lskey)
+
+		// 		// setTimeout(_=>{location.reload()},400)
+		// 	}
+		// }
+		// reset.ontouchend = _=>{
+		// 	this.dismissResetNotification()
+		// 	this.resetProgressbar.onanimationend = null
+		// 	this.resetProgressbar.classList.remove(`active`)
+		// }
+		// reset.onmouseout = _=>{
+		// 	this.resetProgressbar.onanimationend = null
+		// 	this.resetProgressbar.classList.remove(`active`)
+		// }
 
 		// exp.ontouchstart = _=>{
 		// 	this.master.exportSave()
@@ -675,8 +683,8 @@ class Splash {
 		for (let i = 0; i < this.master.codex.achievements.length; i++){
 
 			const cell = document.createElement(`div`)
-			cell.classList.add(`ablock`)
-			cell.style.opacity = .3
+			cell.classList.add(`ablock`, `unfired`)
+			// cell.style.opacity = .3
 			this.glory.append(cell)
 
 			const img = document.createElement(`div`)
@@ -691,7 +699,8 @@ class Splash {
 
 			const desc = document.createElement(`div`)
 			desc.classList.add(`description`)
-			desc.innerHTML = ``
+			desc.innerHTML = this.master.pronounce('achievements', i, 'description')//``
+			if (this.master.codex.achievements[i].noorbs) desc.innerHTML += ` (${this.master.pronounce('random', 'noorbs')})`
 			cell.append(desc)
 
 			this.achievements.push({
@@ -703,13 +712,44 @@ class Splash {
 
 		}
 
+		// for (let i = 0; i < this.master.codex.achievements.length; i++){
+
+		// 	const cell = document.createElement(`div`)
+		// 	cell.classList.add(`ablock`)
+		// 	cell.style.opacity = .3
+		// 	this.glory.append(cell)
+
+		// 	const img = document.createElement(`div`)
+		// 	img.classList.add(`image`)
+		// 	img.style.backgroundImage = `url('img/glory/blank.png')`
+		// 	cell.append(img)
+
+		// 	const name = document.createElement(`div`)
+		// 	name.classList.add(`name`)
+		// 	name.innerHTML = ``
+		// 	cell.append(name)
+
+		// 	const desc = document.createElement(`div`)
+		// 	desc.classList.add(`description`)
+		// 	desc.innerHTML = ``
+		// 	cell.append(desc)
+
+		// 	this.achievements.push({
+		// 		cell: cell,
+		// 		img: img,
+		// 		name: name,
+		// 		desc: desc
+		// 	})
+
+		// }
+
 		this.updateGlory()
 
 		this.items = [
 			this.playElement,
 			this.muteElement,
 			language,
-			reset
+			// reset
 		]
 
 	}
@@ -744,19 +784,19 @@ class Splash {
 		this.muteElement.innerHTML = this.gameIsMute ? this.say('soundoff') : this.say('soundon')
 		menu.append(this.muteElement)
 
-		if (!this.master.isMobile){
-			this.soundBar = document.createElement(`div`)
-			this.soundBar.classList.add(`soundBar`)
-			if (!this.gameIsMute) this.muteElement.append(this.soundBar)
-			this.soundSlider = document.createElement(`div`)
-			this.soundSlider.classList.add(`soundSlider`)
-			this.soundBar.append(this.soundSlider)
-		}
+		// if (!this.master.isMobile){
+		this.soundBar = document.createElement(`div`)
+		this.soundBar.classList.add(`soundBar`)
+		if (!this.gameIsMute) this.muteElement.append(this.soundBar)
+		this.soundSlider = document.createElement(`div`)
+		this.soundSlider.classList.add(`soundSlider`)
+		this.soundBar.append(this.soundSlider)
+		// }
 
 		const saveload = document.createElement(`div`)
-		// saveload.style.position = `relative`
 		saveload.classList.add(`menuItem`)//, `nohover`)
 		saveload.innerHTML = `${this.say('save')}/${this.say('load')}`
+		// saveload.style.position = `relative`
 		// const save = document.createElement(`span`)
 		// save.classList.add(`subMenuItem`)
 		// save.innerHTML = this.texts.save
@@ -790,12 +830,12 @@ class Splash {
 		// menu.append(reset)
 
 		let quit
-		if (!this.master.isMobile){
-			quit = document.createElement(`div`)
-			quit.classList.add(`menuItem`)
-			quit.innerHTML = this.say('quit')
-			menu.append(quit)
-		}
+		// if (!this.master.isMobile){
+		quit = document.createElement(`div`)
+		quit.classList.add(`menuItem`)
+		quit.innerHTML = this.say('quit')
+		menu.append(quit)
+		// }
 
 		//EXIMP
 		// const exp = document.createElement(`span`)
@@ -933,6 +973,7 @@ class Splash {
 			quit.onclick = async _=>{
 				console.log(`Peace out!`)
 				await this.master.saveGame()
+				if (this.master.spaceport?.invoke) await this.master.spaceport.invoke('store', this.master.saveSlots)
 				this.master.spaceport.send(`quit`, ``)
 			}
 		}
@@ -1969,9 +2010,27 @@ class Store {
 			priceElements: {},
 			counters: {},
 			existeds: {},
+			alfa: {}
 		}
 		this.existed = {}
 
+	}
+
+	reinit() {
+		this.vessel.replaceChildren()
+
+		this.html = {
+			types: {},
+			items: {},
+			priceContainers: {},
+			priceElements: {},
+			counters: {},
+			existeds: {},
+		}
+
+		this.init()
+		this.compositionUpdate()
+		this.visibilityUpdate()
 	}
 
 	setEraserType(t){
@@ -2084,6 +2143,105 @@ class Store {
 
 	}
 
+	createAlfaCard(id){
+		// const e = this.master.codex.entities[id]
+		// if (!e.canPurchase) return null
+
+		// const type = e.type ?? `default`
+		const item = document.createElement(`div`)
+
+		item.classList.add(`item`, `alfaCard`)
+
+		const imageVessel = document.createElement(`div`)
+		imageVessel.classList.add(`imageVessel`, `alfaImage`)
+		item.append(imageVessel)
+		const image = document.createElement(`img`)
+		image.src = `img/shop/haste.svg`//`img/shop/${e.isDark ? id + '_dark' : id}.jpg`
+		imageVessel.append(image)
+
+		// const upgrade = this.master.codex.entities[id]?.isUpgradeTo
+		// if (upgrade && !(upgrade === `chasm` || upgrade === `hollow`)){
+		// 	const upBox = document.createElement(`div`)
+		// 	upBox.classList.add(`upgradeFrom`)
+		// 	upBox.style.backgroundImage = `url("img/shop/${upgrade}.jpg")`
+		// 	imageVessel.append(upBox)
+		// }
+
+		const header = document.createElement(`div`)
+		header.classList.add(`itemHeader`)
+		header.innerText = this.master.pronounce('alfa', id, 'name')
+		item.append(header)
+
+		const description = document.createElement(`div`)
+		description.classList.add(`itemDescription`)
+		description.innerText = this.master.pronounce('alfa', id, 'description')
+		item.append(description)
+
+		const price = document.createElement(`div`)
+		price.classList.add(`alfaPrice`)
+		price.innerHTML = this.master.alfa.prices[id]
+		item.append(price)
+
+		const timer = document.createElement(`div`)
+		timer.classList.add(`timer`)
+		item.append(timer)
+
+		// const counter = document.createElement(`div`)
+		// counter.classList.add(`itemCounter`)
+		// item.append(counter)
+
+		// const existed = document.createElement(`div`)
+		// existed.classList.add(`existed`)
+		// existed.innerText = this.master.pronounce('random', 'existed')
+		// item.append(existed)
+
+		return {
+			id: id,
+			card: item,
+			timer: timer
+			// price: price,
+			// counter: counter,
+			// existed: existed,
+			// type: type
+		}
+	}
+
+	createIapCard(p){
+		// const e = this.master.codex.entities[id]
+		// if (!e.canPurchase) return null
+
+		// const type = e.type ?? `default`
+		const item = document.createElement(`div`)
+
+		item.classList.add(`item`, `iapCard`)
+
+		const imageVessel = document.createElement(`div`)
+		imageVessel.classList.add(`imageVessel`, `alfaImage`)
+		item.append(imageVessel)
+		const image = document.createElement(`img`)
+		image.src = `img/alfa.png`//`img/shop/${e.isDark ? id + '_dark' : id}.jpg`
+		imageVessel.append(image)
+
+		const header = document.createElement(`div`)
+		header.classList.add(`itemHeader`)
+		header.innerText = p.header || ``
+		item.append(header)
+
+		const description = document.createElement(`div`)
+		description.classList.add(`itemDescription`)
+		description.innerText = p.description || ``
+		item.append(description)
+
+		const price = document.createElement(`div`)
+		price.classList.add(`iapPrice`)
+		price.innerHTML = p.sum
+		item.append(price)
+
+		return {
+			card: item
+		}
+	}
+
 }
 
 class DesktopStoreVersion extends Store{
@@ -2140,23 +2298,6 @@ class DesktopStoreVersion extends Store{
 
 	}
 
-	reinit() {
-		this.vessel.replaceChildren()
-
-		this.html = {
-			types: {},
-			items: {},
-			priceContainers: {},
-			priceElements: {},
-			counters: {},
-			existeds: {},
-		}
-
-		this.init()
-		this.compositionUpdate()
-		this.visibilityUpdate()
-	}
-
 	init() {
 
 		//Create categories
@@ -2204,6 +2345,18 @@ class DesktopStoreVersion extends Store{
 			e.style.backgroundImage = `url(img/shop/delete.svg)`
 			this.vessel.append(e)
 			this.html.eraser = e
+
+			//Hint
+			const h = document.createElement(`div`)
+			h.classList.add(`storeButtonHint`, `whileInactive`)
+			h.innerHTML = `<nobr><div class="key">Q</div></nobr>`
+			e.append(h)
+
+			const ha = document.createElement(`div`)
+			ha.classList.add(`storeButtonHint`, `whileActive`)
+			ha.innerHTML = `<nobr>${this.master.pronounce(`random`, `eraserHint`)}</nobr>`
+			e.append(ha)
+
 			e.addEventListener(`mousedown`, _=>{
 				if (e.classList.contains(`closed`)){
 					e.classList.remove(`closed`)
@@ -2211,8 +2364,7 @@ class DesktopStoreVersion extends Store{
 					this.closeTypes()
 				} else {
 					if (this.master.interactionMode === `erase`) {
-						delete this.master.interactionMode
-						this.master.cleanupErase()
+						this.master.cleanupInteractionMode()
 					}
 					e.classList.add(`closed`)
 				}
@@ -2227,6 +2379,18 @@ class DesktopStoreVersion extends Store{
 			e.style.backgroundImage = `url(img/m_relocate.png)`
 			this.vessel.append(e)
 			this.html.relocator = e
+
+			//Hint
+			const h = document.createElement(`div`)
+			h.classList.add(`storeButtonHint`, `whileInactive`)
+			h.innerHTML = `<nobr><div class="key">E</div></nobr>`
+			e.append(h)
+
+			const ha = document.createElement(`div`)
+			ha.classList.add(`storeButtonHint`, `whileActive`)
+			ha.innerHTML = `<nobr>${this.master.pronounce(`random`, `relocatorHint`)}</nobr>`
+			e.append(ha)
+
 			e.addEventListener(`mousedown`, _=>{
 				if (e.classList.contains(`closed`)){
 					e.classList.remove(`closed`)
@@ -2237,10 +2401,7 @@ class DesktopStoreVersion extends Store{
 					}
 				} else {
 					if (this.master.interactionMode === `relocate`) {
-						delete this.master.interactionMode
-						delete this.master.itemInHand
-						delete this.master.transportedEntity
-						this.master.cleanupRelocation()
+						this.master.cleanupInteractionMode()
 					}
 					e.classList.add(`closed`)
 				}
@@ -2268,6 +2429,30 @@ class DesktopStoreVersion extends Store{
 			this.html.existeds[i] = pack.existed
 
 		}
+
+	}
+
+	updateAlfa(){
+		// this.html.alfaStorage.innerHTML = `Alpha-pylene: ${this.master.absolutes.alfa}`
+	}
+
+	pushAlfaEvent(e){
+
+		// const element = document.createElement(`div`)
+		// element.classList.add(`alfaEvent`)
+
+		// const timer = document.createElement(`span`)
+		// // timer.innerHTML = `${Math.round(e.remains / 1000)}s`
+
+		// element.innerHTML = `<span>${this.master.pronounce(`alfa`, e.id, `name`)} </span>`
+		// element.append(timer)
+		// this.html.currentContainer.append(element)
+
+		// this.html.currentEvents.push({
+		// 	event: e,
+		// 	element: element,
+		// 	timer: timer
+		// })
 
 	}
 
@@ -2416,6 +2601,7 @@ class MobileStoreVersion extends Store{
 
 		super(container, master)
 		this.isOpen = false
+		this.lastMassMode = `clone`
 
 		this.init()
 		this.visibilityLoop()
@@ -2424,13 +2610,7 @@ class MobileStoreVersion extends Store{
 
 	init() {
 
-		//WIP DUMMIES
-		// this.html.eraser = document.createElement(`div`)
-		// this.html.relocator = document.createElement(`div`)
-		// this.html.chat = document.createElement(`div`)
-		// this.html.menu = document.createElement(`div`)
-
-		const firstRow = document.createElement(`div`)
+		const firstRow = this.html.firstRow = document.createElement(`div`)
 		firstRow.classList.add(`firstRow`)
 		document.body.append(firstRow)
 
@@ -2439,8 +2619,7 @@ class MobileStoreVersion extends Store{
 		this.html.menu.classList.add(`mobileMenu`)
 		firstRow.appendChild(this.html.menu)
 		this.html.menu.ontouchstart = _=>{
-			this.master.cleanupErase()
-			// this.master.cleanupClone() // WIP
+			this.master.cleanupInteractionMode()
 			this.master.toggleSplash()
 		}
 
@@ -2451,8 +2630,7 @@ class MobileStoreVersion extends Store{
 
 		this.html.chat.ontouchstart = _=>{
 			this.master.removeHint()
-			this.master.cleanupErase()
-			// this.master.cleanupClone() //WIP
+			this.master.cleanupInteractionMode()
 			if (this.master.messenger.messagesShown === 1){
 				this.master.messenger.hideMessages()
 			} else {
@@ -2466,19 +2644,19 @@ class MobileStoreVersion extends Store{
 		this.html.store.classList.add(`mobileToggle`)
 		firstRow.appendChild(this.html.store)
 		this.html.store.ontouchstart = _=>{
-			delete this.master.interactionMode
-			this.master.cleanupErase()
-			// this.master.cleanupClone() //WIP
+			
 			this.master.messenger.hideMessages()
 			if (this.master.itemInHand){
-				delete this.master.itemInHand
-				delete this.master.transportedEntity
+				// delete this.master.itemInHand
+				// delete this.master.transportedEntity
 				this.html.store.classList.remove(`active`)
 			} else {
 				this.vessel.classList.toggle(`visible`)
+				this.html.alfaButton.classList.toggle(`visible`)
 				this.html.store.classList.toggle(`active`)
 			}
-			this.toggleAllButStore()
+			this.master.cleanupInteractionMode()
+			// this.toggleAllButStore()
 		}
 
 		// Counter
@@ -2493,17 +2671,22 @@ class MobileStoreVersion extends Store{
 		this.html.eraser.classList.add(`mobileEraser`)
 		firstRow.append(this.html.eraser)
 		this.html.eraser.ontouchstart = _=>{
+
+			if (this.master.interactionMode === `erase`) {
+				this.master.cleanupInteractionMode()
+				return
+			}
+			// this.master.cleanupInteractionMode()
 			this.master.pressedMobileDisassemble = true
 			this.master.messenger.hideMessages()
 			this.html.store.classList.remove(`active`)
 			this.vessel.classList.remove(`visible`)
+			this.html.alfaButton.classList.remove(`visible`)
+			this.html.mobileRelocatorSwitch.remove()
 
-			if (this.master.interactionMode === `erase`){
-				delete this.master.interactionMode
-				this.master.cleanupErase()
-			} else {
-				this.master.pickupEraser()
-			}
+			
+			this.master.pickupEraser()
+			
 			
 
 			// this.toggleMobileEraser()
@@ -2517,25 +2700,72 @@ class MobileStoreVersion extends Store{
 		this.html.relocator.classList.add(`mobileRelocator`)
 		firstRow.appendChild(this.html.relocator)
 		this.html.relocator.ontouchstart = _=>{
-			// this.master.messenger.hideMessages()
-			// this.mobileToggle.classList.remove(`active`)
-			// this.vessel.classList.remove(`visible`)
-			// this.toggleMobileRelocator()
-			// this.master.cleanupErase()
-			// this.master.cleanupClone()
+
+			this.master.messenger.hideMessages()
+			this.html.store.classList.remove(`active`)
+			this.vessel.classList.remove(`visible`)
+			this.html.alfaButton.classList.remove(`visible`)
 
 			const ok = this.master.entitiesInGame.mega3 > 0 && !this.master.entitiesInGame.pinhole && !this.master.plane
 			if (!ok) return
 
-			if (this.master.interactionMode === `relocate`) {
-				delete this.master.interactionMode
-				delete this.master.itemInHand
-				delete this.master.transportedEntity
-				this.master.cleanupRelocation()
+			if (this.master.interactionMode === `relocate` || this.master.interactionMode === `clone`) {
+				this.master.cleanupInteractionMode()
 				return
 			}
 
+			this.master.interactionMode = this.lastMassMode
+			this.html.firstRow.append(this.html.mobileRelocatorSwitch)
+			this.pushMenu()
+
+		}
+
+		//Switch
+		this.html.mobileRelocatorSwitch = document.createElement(`div`)
+		this.html.mobileRelocatorSwitch.classList.add(`mobileRelocatorSwitch`)
+		this.html.mobileRelocatorSwitchClone = document.createElement(`div`)
+		this.html.mobileRelocatorSwitchClone.classList.add(`clone`, `active`)
+		this.html.mobileRelocatorSwitch.append(this.html.mobileRelocatorSwitchClone)
+		this.html.mobileRelocatorSwitchMove = document.createElement(`div`)
+		this.html.mobileRelocatorSwitchMove.classList.add(`move`)
+		this.html.mobileRelocatorSwitch.append(this.html.mobileRelocatorSwitchMove)
+
+		this.html.mobileRelocatorSwitchClone.ontouchstart = _=>{
+			this.master.interactionMode = `clone`
+			this.lastMassMode = `clone`
+			this.html.mobileRelocatorSwitchMove.classList.remove(`active`)
+			this.html.mobileRelocatorSwitchClone.classList.add(`active`)
+			this.master.processMove()	
+		}
+
+		this.html.mobileRelocatorSwitchMove.ontouchstart = _=>{
 			this.master.interactionMode = `relocate`
+			this.lastMassMode = `relocate`
+			this.html.mobileRelocatorSwitchMove.classList.add(`active`)
+			this.html.mobileRelocatorSwitchClone.classList.remove(`active`)
+			this.master.processMove()
+		}
+
+		//Confirm button
+		this.html.mobileConfirmButton = document.createElement(`div`)
+		this.html.mobileConfirmButton.classList.add(`mobileConfirmButton`, `hidden`)
+		document.body.append(this.html.mobileConfirmButton)
+		this.html.mobileConfirmButton.ontouchstart = _=>{
+
+			this.html.mobileConfirmButton.classList.add(`hidden`)
+			if (this.master.interactionMode === `relocate`) {
+				this.master.finalizeRelocation()
+			} else if (this.master.interactionMode === `clone`) {
+				this.master.finalizeCloning()
+			}
+			// if (this.master.massRelocation){
+			// 	this.master.confirmMassRelocation()
+			// } else {
+			// 	this.master.confirmMassClone()
+			// }
+
+			// this.toggleMobileRelocator()
+			// this.master.cleanupClone()
 
 		}
 
@@ -2555,6 +2785,7 @@ class MobileStoreVersion extends Store{
 				this.master.pickupItem(i)
 				this.master.updatePointerState()
 				this.vessel.classList.toggle(`visible`)
+				this.html.alfaButton.classList.toggle(`visible`)
 				e.stopPropagation()
 			}
 
@@ -2568,6 +2799,147 @@ class MobileStoreVersion extends Store{
 			
 		}
 
+		//Alfa
+		this.html.wholeAlfa = document.createElement(`div`)
+		this.html.wholeAlfa.style.display = `none`
+		this.vessel.append(this.html.wholeAlfa)
+
+		const alfaHeader = document.createElement(`div`)
+		alfaHeader.classList.add(`alfaHeader`)
+		this.html.wholeAlfa.append(alfaHeader)
+
+		const alfaWrap = document.createElement(`div`)
+		alfaWrap.classList.add(`alfaWrap`)
+		this.html.wholeAlfa.append(alfaWrap)
+
+		this.html.alfaButton = document.createElement(`div`)
+		this.html.alfaButton.classList.add(`alfaButton`, `invisible`)
+		document.body.append(this.html.alfaButton)
+		this.html.alfaButton.onmousedown = _=>{
+			alfaHeader.scrollIntoView({behavior: `smooth`, block: `center`})
+		}
+
+		this.html.alfaStorage = document.createElement(`div`)
+		this.html.alfaStorage.classList.add(`alfaStorage`)
+		this.html.alfaStorage.innerHTML = `Alpha-pylene: ${this.master.absolutes.alfa}`
+		alfaHeader.append(this.html.alfaStorage)
+
+		this.vessel.addEventListener(`scroll`, _=>{
+			const bounds = alfaHeader.getBoundingClientRect()
+			const notch = 80
+			// const icon = this.html.alfaButton.getBoundingClientRect()
+			if (bounds.top > innerHeight - notch && this.html.alfaButton.parentElement === alfaHeader){
+				document.body.append(this.html.alfaButton)
+				this.html.alfaButton.classList.remove(`landed`)
+				this.html.alfaButton.classList.remove(`upper`)
+				if (this.vessel.classList.contains(`darker`)) this.vessel.classList.remove(`darker`)
+			} else if (bounds.top < innerHeight - notch && bounds.top > notch && this.html.alfaButton.parentElement !== alfaHeader){
+				alfaHeader.append(this.html.alfaButton)
+				this.html.alfaButton.classList.remove(`upper`)
+				this.html.alfaButton.classList.add(`landed`)
+				if (!this.vessel.classList.contains(`darker`)) this.vessel.classList.add(`darker`)
+			} 
+			// else if (bounds.top < notch && this.html.alfaButton.parentElement === alfaHeader){
+			// 	document.body.append(this.html.alfaButton)
+			// 	this.html.alfaButton.classList.remove(`landed`)
+			// 	this.html.alfaButton.classList.add(`upper`)
+			// }
+		})
+
+		this.html.currentEvents = []
+		this.html.alfaCards = {}
+		this.html.currentContainer = document.createElement(`div`)
+		this.html.currentContainer.classList.add(`currentContainer`)
+		document.body.append(this.html.currentContainer)
+
+		for (let i in this.master.alfa.prices){
+			const pack = this.createAlfaCard(i)
+			this.html.alfaCards[i] = pack
+			let timeout
+			let origin = [0,0]
+			pack.card.onpointerdown = e=>{
+				
+				console.log(e)
+				origin = [e.screenX, e.screenY]
+				if (pack.card.classList.contains(`disabled`)) return
+				pack.card.classList.add(`alfaShake`)
+				timeout = setTimeout(_=>{
+					pack.card.classList.remove(`alfaShake`)
+					this.master.alfa.activate(i)
+					this.updateAlfa()
+
+					this.vessel.classList.toggle(`visible`)
+					this.html.alfaButton.classList.toggle(`visible`)
+
+					this.html.store.classList.remove(`active`)
+					e.stopPropagation()
+				},1000)
+				
+				// this.master.pickupItem(i)
+				// this.master.updatePointerState()
+				
+			}
+			const abort = _=>{
+				if (timeout) clearTimeout(timeout)
+				pack.card.classList.remove(`alfaShake`)
+			}
+			pack.card.onpointerup = abort
+			pack.card.onpointermove = e=>{
+				const v = [e.screenX - origin[0], e.screenY - origin[1]]
+				if (v[0] ** 2 + v[1] ** 2 > 100) abort()
+			}
+			this.html.alfa[i] = pack.card
+			alfaWrap.append(pack.card)
+		}
+
+		const iap_sf = this.createIapCard({header: `[TEST ONLY] 64 Alpha-Pylene`, description: ``, sum: `$2.99`}).card
+		alfaWrap.append(iap_sf)
+		iap_sf.onclick = _=>{
+			this.master.buyAlfa(64)
+			this.updateAlfa()
+		}
+
+	}
+
+	pushMenu(back){
+
+		if (back){
+			this.html.menu.classList.remove(`pushed`)
+			this.html.chat.classList.remove(`pushed`)
+			this.html.store.classList.remove(`pushed`)
+			this.html.eraser.classList.remove(`pushed`)
+		} else {
+			this.html.menu.classList.add(`pushed`)
+			this.html.chat.classList.add(`pushed`)
+			this.html.store.classList.add(`pushed`)
+			this.html.eraser.classList.add(`pushed`)
+		}
+		
+
+	}
+
+	updateAlfa(){
+		this.html.alfaStorage.innerHTML = `Alpha-pylene: ${this.master.absolutes.alfa}`
+	}
+
+	pushAlfaEvent(e){
+
+		const element = document.createElement(`div`)
+		element.classList.add(`alfaEvent`)
+
+		const timer = document.createElement(`span`)
+		// timer.innerHTML = `${Math.round(e.remains / 1000)}s`
+
+		element.innerHTML = `<span>${this.master.pronounce(`alfa`, e.id, `name`)} </span>`
+		element.append(timer)
+		this.html.currentContainer.append(element)
+
+		this.html.currentEvents.push({
+			event: e,
+			element: element,
+			timer: timer
+		})
+
 	}
 
 	closeTypes(){
@@ -2575,7 +2947,7 @@ class MobileStoreVersion extends Store{
 		this.isOpen = false
 	}
 
-	toggleAllButStore(){
+	// toggleAllButStore(){
 
 		// const on = this.html.store.classList.contains(`active`)
 		// if (on) {
@@ -2591,7 +2963,7 @@ class MobileStoreVersion extends Store{
 		// 		this.html.eraser.removeAttribute(`style`)
 		// 	}
 		// }
-	}
+	// }
 
 	visibilityUpdate(){
 
@@ -2633,11 +3005,12 @@ class MobileStoreVersion extends Store{
 		if (this.html.eraser.classList.contains(`hidden`) && bv[3]) this.html.eraser.classList.remove(`hidden`); else if (!this.html.eraser.classList.contains(`hidden`) && !bv[3]) this.html.eraser.classList.add(`hidden`)
 		if (this.html.relocator.classList.contains(`hidden`) && bv[4]) this.html.relocator.classList.remove(`hidden`); else if (!this.html.relocator.classList.contains(`hidden`) && !bv[4]) this.html.relocator.classList.add(`hidden`)
 
+
 		// Handling button press states
 		if (this.master.interactionMode === `erase`){
 			this.html.eraser.classList.add(`pressed`)
 			this.html.relocator.classList.remove(`pressed`)
-		} else if (this.master.interactionMode === `relocate`){
+		} else if (this.master.interactionMode === `relocate` || this.master.interactionMode === `clone`){
 			this.html.eraser.classList.remove(`pressed`)
 			this.html.relocator.classList.add(`pressed`)
 		} else {
@@ -2649,6 +3022,51 @@ class MobileStoreVersion extends Store{
 			this.html.chat.classList.add(`pressed`)
 		} else if (this.master.messenger.messagesShown !== 1 && this.html.chat.classList.contains(`pressed`)){
 			this.html.chat.classList.remove(`pressed`)
+		}
+
+		//Alfa
+		if (this.html.wholeAlfa.style.display === `none` && this.master.absolutes.enabled){
+			this.html.wholeAlfa.style.display = `block`
+			this.html.alfaButton.classList.remove(`invisible`)
+
+		}
+
+		if (this.master.absolutes.enabled){
+
+			if (this.html.store.classList.contains(`active`) && this.html.alfaButton.classList.contains(`hidden`)) this.html.alfaButton.classList.remove(`hidden`); else if (!this.html.store.classList.contains(`active`) && !this.html.alfaButton.classList.contains(`hidden`)) this.html.alfaButton.classList.add(`hidden`)
+
+			//Counters
+			for (let i = 0; i < this.html.currentEvents.length; i++){
+
+				const e = this.html.currentEvents[i]
+				const remains = e.event.remains
+				if (remains <= 0) {
+					e.element.remove()
+					this.html.currentEvents.splice(i,1)
+					i--
+					continue
+				}
+				const minutes = Math.floor(remains / 1000 / 60)
+				const seconds = Math.floor(remains / 1000 % 60)
+				e.timer.innerHTML = minutes + `:` + seconds.toString().padStart(2, '0')
+
+			}
+
+			//Cards
+			for (let id in this.html.alfaCards){
+				this.html.alfaCards[id].card.classList.remove('beingUsed')
+			}
+			for (let i = 0; i < this.master.alfa.currentEvents.length; i++){
+				const e = this.master.alfa.currentEvents[i]
+				const id = e.id
+				this.html.alfaCards[id].card.classList.add('beingUsed')
+
+				const remains = e.remains
+				const minutes = Math.floor(remains / 1000 / 60)
+				const seconds = Math.floor(remains / 1000 % 60)
+				this.html.alfaCards[id].timer.innerText = minutes + `:` + seconds.toString().padStart(2, '0')
+			}
+
 		}
 
 		//Fast update
@@ -2706,8 +3124,14 @@ class MobileStoreVersion extends Store{
 				unlocked = (this.master.codex.entities[i].shouldUnlock && this.master.codex.entities[i].shouldUnlock(this.master)) ? true : false
 				if (unlocked) this.master.unlockedEntities[i] = true
 			}
-
 			if (!unlocked) continue
+
+			//Plane
+			const planeFits = (!this.master.plane && !this.master.codex.entities[i].isDark) || (this.master.plane && this.master.codex.entities[i].isDark)
+			if (!planeFits){
+				if (!wasHidden) item.classList.add(`hidden`)
+				continue
+			}
 
 			const type = this.master.codex.entities[i].type ?? `default`
 			item.classList.remove(`hidden`)
@@ -2773,6 +3197,23 @@ class MobileStoreVersion extends Store{
 
 		}
 
+		for (let i in this.html.alfa){
+
+			const item = this.html.alfa[i]
+			const price = this.master.alfa.prices[i]
+
+			//pack.card.classList.contains(`disabled`)
+			
+			const afford = price <= this.master.absolutes.alfa
+			
+			if (afford && item.classList.contains(`disabled`)){
+				item.classList.remove(`disabled`)
+			} else if (!afford && !item.classList.contains(`disabled`)) {
+				item.classList.add(`disabled`)
+			}
+
+		}
+
 		//Store counter update
 		if (this.html.availableMachines) {
 			this.html.availableMachines.innerText = itemCount
@@ -2828,8 +3269,7 @@ class Shop {
 			firstRow.appendChild(this.mobileToggle)
 			this.mobileToggle.ontouchstart = _=>{
 				this.master.touchMode = 0
-				this.master.cleanupErase()
-				this.master.cleanupClone()
+				this.master.cleanupInteractionMode()
 				this.master.messenger.hideMessages()
 				this.updateMobileMenuState()
 				if (this.master.itemInHand){
@@ -2901,14 +3341,14 @@ class Shop {
 			document.body.append(this.mobileConfirmButton)
 			this.mobileConfirmButton.ontouchstart = _=>{
 
-				if (this.master.massRelocation){
-					this.master.confirmMassRelocation()
-				} else {
-					this.master.confirmMassClone()
-				}
+				// if (this.master.massRelocation){
+				// 	this.master.confirmMassRelocation()
+				// } else {
+				// 	this.master.confirmMassClone()
+				// }
 
-				this.toggleMobileRelocator()
-				this.master.cleanupClone()
+				// this.toggleMobileRelocator()
+				// this.master.cleanupClone()
 
 			}
 
@@ -3573,7 +4013,7 @@ class MobileExplainer {
 			},
 			{	//Didn't relocate anything
 				showIf: (m,t)=>m.entitiesInGame.mega3 > 0,
-				hideIf: (m,t)=>m.transportedEntity,
+				hideIf: (m,t)=>m.selectionCandidateSet?.size,
 				getAttractor: _=> document.querySelector(`.mobileRelocator`)
 				// url: `url("img/mex/005.png")`
 			}
@@ -3712,19 +4152,22 @@ class OrbifoldMenu {
 
 		}
 
+		const d = [[-21, 13], [0, 20], [21, 13], [21, -16], [-21, -16], [0, -20]]
+		const m = this.master.isMobile ? .75 : 1
+
 		requestAnimationFrame(_=>{
-			collapse.style.left = `-21em`
-			collapse.style.top = `13em`
-			expand.style.left = `0em`
-			expand.style.top = `20em`
-			malform.style.left = `21em`
-			malform.style.top = `13em`
-			morph.style.left = `21em`
-			morph.style.top = `-16em`
-			oversat.style.left = `-21em`
-			oversat.style.top = `-16em`
-			intercal.style.left = `0em`
-			intercal.style.top = `-20em`
+			collapse.style.left = `${Math.round(d[0][0] * m)}em`
+			collapse.style.top = `${Math.round(d[0][1] * m)}em`
+			expand.style.left = `${Math.round(d[1][0] * m)}em`
+			expand.style.top = `${Math.round(d[1][1] * m)}em`
+			malform.style.left = `${Math.round(d[2][0] * m)}em`
+			malform.style.top = `${Math.round(d[2][1] * m)}em`
+			morph.style.left = `${Math.round(d[3][0] * m)}em`
+			morph.style.top = `${Math.round(d[3][1] * m)}em`
+			oversat.style.left = `${Math.round(d[4][0] * m)}em`
+			oversat.style.top = `${Math.round(d[4][1] * m)}em`
+			intercal.style.left = `${Math.round(d[5][0] * m)}em`
+			intercal.style.top = `${Math.round(d[5][1] * m)}em`
 		})
 
 	}

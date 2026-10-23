@@ -1,6 +1,3 @@
-//WIP STUFF TO DO
-
-
 //HID
 // const HID = require('node-hid')
 // const device = new HID.HID("/dev/hidraw3")
@@ -15,7 +12,19 @@ TrackJS.install({
 
 // ELECTRON TOOLS
 const { app, BrowserWindow, Tray, ipcMain, Menu, shell, globalShortcut } = require('electron')
-app.allowRendererProcessReuse = false
+// app.allowRendererProcessReuse = false
+
+//PSDK
+// const Playsaurus = require('@playsaurus-inc/sdk')
+// Playsaurus.initialize({
+//     gameSlug: `sixty-four`,
+//     endpoint: `https://staging.playsaurus.com/api`,
+//     gameVersion: `1.0.0`,
+//     gamePlatform: Playsaurus.GamePlatform.Web,
+//     gameStorefront: Playsaurus.GameStorefront.PlaysaurusWeb,
+//     gameFlavor: `default`,
+//     locale: 'en-US',
+// })
 
 //App options
 const fs = require('fs')
@@ -59,6 +68,7 @@ try {
   console.log(`No Steam today: ${e}`)
 }
 
+// ModLoader save bridge v2
 ModLoaderMainProcess.configureSaveCloud(client.cloud)
 
 // LANGUAGE CODES
@@ -88,7 +98,6 @@ const languages = {
 // RENDERER COMMUNICATION
 // Load save
 ipcMain.on(`getMyStuff`, async (e,d)=>{
-  ModLoaderMainProcess.clearTweaksSlotStore(e.sender)
   ModLoaderMainProcess.clearSnapshotContext(e.sender) // reload
  	if (d !== `please`) {
     win.webContents.send(`hereYouGoSir`, null)
@@ -98,7 +107,7 @@ ipcMain.on(`getMyStuff`, async (e,d)=>{
  	//Legacy stuff
  	win.webContents.send(`console`, `Spaceport operational. Is there a new save file? ${client.cloud?.fileExists(`charpsMemory`) ? 'Yes' : 'No'}!`)
  	let stuff = false
-	if (client.cloud?.fileExists(`charpsMemory`) || ModLoaderMainProcess.hasSaveOverlay(client.cloud)){
+  if (client.cloud?.fileExists(`charpsMemory`) || ModLoaderMainProcess.hasSaveOverlay(client.cloud)){
 
  		const slots = await getCloudSlots()
 
@@ -136,28 +145,26 @@ ipcMain.on(`save`, (e,d)=>{
 })
 
 ipcMain.on(`store`, (e,slots)=>{
-  try {
-    const cloud = client.cloud
-    if (cloud == null) return
-    ModLoaderMainProcess.dispatchSaveStore(e, slots, allSlots => {
-      const data = ModLoaderMainProcess.measureDiagnostic('cloud.serializeSlots', () => JSON.stringify(allSlots))
-      return ModLoaderMainProcess.measureDiagnostic('cloud.writeFile', () => cloud.writeFile(`charpsMemory`, data))
-    })
-  } catch(e){
-    win.webContents.send(`console`, `Error! Error! Error! Can't serialize and write slots to the cloud.`)
-  }
+  return ModLoaderMainProcess.dispatchSaveStore(e, slots, value => {
+    try {
+      return client.cloud?.writeFile(`charpsMemory`, JSON.stringify(value))
+    } catch (_) {
+      win.webContents.send(`console`, `Error! Error! Error! Can't serialize and write slots to the cloud.`)
+      return false
+    }
+  })
 })
 //WIP
 ipcMain.handle(`store`, async (e, slots) => {
+  return ModLoaderMainProcess.dispatchSaveStore(e, slots, value => {
     try {
-        return ModLoaderMainProcess.dispatchSaveStore(e, slots, allSlots => {
-          const data = ModLoaderMainProcess.measureDiagnostic('cloud.serializeSlots', () => JSON.stringify(allSlots))
-          return ModLoaderMainProcess.measureDiagnostic('cloud.writeFile', () => client.cloud.writeFile('charpsMemory', data))
-        })
-    } catch (e) {
-        console.error('Steam save failed:', e)
-        return false
+      console.log(`Saving to Steam...`)
+      return client.cloud?.writeFile('charpsMemory', JSON.stringify(value)) === true
+    } catch (_) {
+      console.error('Steam save failed.')
+      return false
     }
+  })
 })
 
 ipcMain.on(`updateAccumulatedPlaytime`, (e,d)=>{
@@ -173,11 +180,9 @@ ipcMain.on(`quit`, (e,d)=>{
 })
 
 ipcMain.on(`updateStat`, (e,d)=>{
-  ModLoaderMainProcess.measureDiagnostic('steam.updateStat', () => {
-    for (let i = 0; i < d.length; i++){
-      client.stats?.setInt(d[i].id, d[i].value)
-    }
-  })
+  for (let i = 0; i < d.length; i++){
+    client.stats?.setInt(d[i].id, d[i].value)
+  }
 })
 ipcMain.on(`gameError`, (e,d)=>{
   TrackJS?.track(d)
@@ -224,10 +229,14 @@ async function getCloudSlots(){
     if (delays[i]) await sleep(delays[i])
 
     try {
-      const save = client.cloud?.fileExists(`charpsMemory`) ? client.cloud.readFile(`charpsMemory`) : `[]`
+      const save = client.cloud?.fileExists(`charpsMemory`) ? client.cloud.readFile(`charpsMemory`) : '[]'
       console.log(`Cloud save read success on attempt ${i+1}`)
       return ModLoaderMainProcess.readSaveOverlay(client.cloud, JSON.parse(save))
     } catch(e){
+      if (e?.code === 'SAVE_COLLECTION_INVALID' || e?.code === 'SAVE_BASELINE_MISSING') {
+        console.error('Invalid cloud save collection; loading stopped.')
+        return false
+      }
       console.warn(`Cloud read failed, attempt ${i + 1}`)
     }
 
@@ -307,13 +316,33 @@ const createWindow = _=> {
     label: 'View',
     submenu: [
     {role: 'togglefullscreen'},
-    // {role: 'toggleDevTools'}
+    {role: 'toggleDevTools'}
     ]
   }
   ]
   const menu = Menu.buildFromTemplate(temp)
   Menu.setApplicationMenu(menu)
 
+  globalShortcut.register('CommandOrControl+Shift+I', _=>{
+    win.webContents.toggleDevTools()
+  })
+  globalShortcut.register('F12', _=>{
+    win.webContents.toggleDevTools()
+  })
+
+  win.webContents.on('console-message', (event, level, message, line, sourceId)=>{
+    if (level && typeof level === 'object') {
+      ModLoaderMainProcess.runtimeLog('console', level.level, level.message, `${level.sourceId}:${level.lineNumber}`)
+    } else {
+      ModLoaderMainProcess.runtimeLog('console', level, message, `${sourceId}:${line}`)
+    }
+  })
+  win.webContents.on('render-process-gone', (event, details)=>{
+    ModLoaderMainProcess.runtimeLog('render-process-gone', details)
+  })
+  win.webContents.on('did-fail-load', (event, errorCode, errorDescription, validatedURL)=>{
+    ModLoaderMainProcess.runtimeLog('did-fail-load', errorCode, errorDescription, validatedURL)
+  })
   //LOAD
   win.loadFile('./game/index.html')
 

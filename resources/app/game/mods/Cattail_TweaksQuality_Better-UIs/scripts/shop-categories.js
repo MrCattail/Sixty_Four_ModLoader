@@ -416,7 +416,13 @@ ModLoader.register({
 			return 'language:' + (shop?.master?.language || 'en') + '|' + visibleCategories.map((category) => {
 				const items = category.items.map((item) => {
 					const disabled = item.html.classList.contains('disabled') ? 'd' : 'a'
-					const price = item.priceHtml?.innerHTML || ''
+					// Countdown changes update the price in place, without replacing rows/tooltips.
+					let price = item.priceHtml?.innerHTML || ''
+					if (item.priceHtml?.querySelector('.cattail-build-countdown')) {
+						const cleanPrice = item.priceHtml.cloneNode(true)
+						for (const countdown of cleanPrice.querySelectorAll('.cattail-build-countdown')) countdown.remove()
+						price = cleanPrice.innerHTML
+					}
 					const count = item.counter?.textContent || ''
 					const isNew = item.html.classList.contains('newItem') ? 'n' : 'o'
 					return item.name + ':' + disabled + ':' + isNew + ':' + price + ':' + count

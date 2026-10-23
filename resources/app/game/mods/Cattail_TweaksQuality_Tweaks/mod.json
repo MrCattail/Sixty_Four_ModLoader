@@ -35,6 +35,8 @@
   ],
   "entries": [
     "scripts/remember-language.js",
+    "scripts/eraser-tier-icon-fix.js",
+    "scripts/escape-action-fix.js",
     "scripts/clear-view-grid-fix.js",
     "scripts/auto-save-stutter-fix.js",
     "scripts/shift-ctrl-zoom-disable.js",
@@ -81,6 +83,30 @@
     "Cattail_TweaksQuality_Dynamic-Camera"
   ],
   "config": {
+    "enableEscapeActionFix": {
+      "type": "boolean",
+      "label": {
+        "en": "Fix layered Esc cancellation",
+        "sch": "Esc 分层取消修复",
+        "modsch": "Esc 分层取消修复",
+        "tch": "Esc 分層取消修復"
+      },
+      "default": true,
+      "description": {
+        "en": "On desktop 1.3, each Esc press exits dismantle/relocate first, then collapses expanded native/classic categories, then opens the menu. Holding Esc does not skip layers. Hot changes affect subsequent keys only; turn off to use native behavior.",
+        "sch": "桌面1.3按Esc依次退出拆除/搬迁、收起已展开的原版/经典分类卡片，最后打开菜单；每次按下只处理一层，长按不连续穿层。开关即时影响后续按键，关闭恢复原版行为。",
+        "modsch": "桌面1.3按Esc依次退出拆除/搬迁、收起已展开的原版/经典分类卡片，最后打开菜单；每次按下只处理一层，长按不连续穿层。开关即时影响后续按键，关闭恢复原版行为。",
+        "tch": "桌面1.3按Esc依次退出拆除/搬遷、收起已展開的原版/經典分類卡片，最後開啟選單；每次按下只處理一層，長按不連續穿層。開關即時影響後續按鍵，關閉恢復原版行為。"
+      },
+      "reloadPolicy": "hot",
+      "section": "escapeBehavior",
+      "sectionLabel": {
+        "en": "Esc behavior (1.3)",
+        "sch": "Esc 行为（1.3）",
+        "modsch": "Esc 行为（1.3）",
+        "tch": "Esc 行為（1.3）"
+      }
+    },
     "disableClearViewGrid": {
       "type": "boolean",
       "label": {
@@ -160,20 +186,44 @@
     "enableClearViewGridFix": {
       "type": "boolean",
       "label": {
-        "en": "Clear-view grid stutter fix",
-        "sch": "清晰视图网格卡顿修复",
-        "modsch": "清晰视图网格卡顿修复",
-        "tch": "清晰視圖網格卡頓修復"
+        "en": "[Fixed] Clear-view grid stutter fix",
+        "sch": "[已修复] 清晰视图网格卡顿修复",
+        "modsch": "[已修复] 清晰视图网格卡顿修复",
+        "tch": "[已修復] 清晰視圖網格卡頓修復"
       },
       "default": true,
       "description": {
-        "en": "Reduce grid stutter when holding Alt, selecting a building or moving one in game 1.3. Keeps the grid's width and color. Independent of Floor grid lines. Save and reload to apply changes.",
-        "sch": "修复 1.3 中按住 Alt、选中建筑或移动建筑时的网格卡顿，保留网格粗细和颜色。独立于“地板网格线”开关，保存并重新加载后生效。",
-        "modsch": "修复 1.3 中按住 Alt、选中建筑或移动建筑时的网格卡顿，保留网格粗细和颜色。独立于“地板网格线”开关，保存并重新加载后生效。",
-        "tch": "修復 1.3 中按住 Alt、選取建築或移動建築時的網格卡頓，保留網格粗細和顏色。獨立於「地板網格線」開關，儲存並重新載入後生效。"
+        "en": "Fixed in the base game as of 1.3.0.1. Temporarily retained for older 1.3 builds: reduces grid stutter when holding Alt, selecting a building or moving one. Keeps the grid's width and color. Independent of Floor grid lines. Save and reload to apply changes.",
+        "sch": "原版 1.3.0.1 已修复，此项暂时保留供旧版 1.3 使用：修复按住 Alt、选中建筑或移动建筑时的网格卡顿，保留网格粗细和颜色。独立于“地板网格线”开关，保存并重新加载后生效。",
+        "modsch": "原版 1.3.0.1 已修复，此项暂时保留供旧版 1.3 使用：修复按住 Alt、选中建筑或移动建筑时的网格卡顿，保留网格粗细和颜色。独立于“地板网格线”开关，保存并重新加载后生效。",
+        "tch": "原版 1.3.0.1 已修復，此項暫時保留供舊版 1.3 使用：修復按住 Alt、選取建築或移動建築時的網格卡頓，保留網格粗細和顏色。獨立於「地板網格線」開關，儲存並重新載入後生效。"
       },
       "reloadPolicy": "reload",
       "section": "renderPerformance"
+    },
+    "enableEraserTierIconFix": {
+      "type": "boolean",
+      "label": {
+        "en": "Fix dismantle button tier icon",
+        "sch": "拆解按钮等级图案修复",
+        "modsch": "拆解按钮等级图案修复",
+        "tch": "拆解按鈕等級圖案修復"
+      },
+      "default": true,
+      "description": {
+        "en": "Keep the desktop 1.3 dismantle button icon aligned with the current tier after changing language or rebuilding the native/classic shop. Only correct the display; tier, resources and refunds stay unchanged. Enabling also corrects the current icon; disabling stops future corrections.",
+        "sch": "切换语言或重建原版/经典商店后，让桌面1.3拆解按钮图案匹配当前等级。仅修正显示，不改等级、资源和退款。开启时同时补正当前图案，关闭停止后续补正，支持即时预览。",
+        "modsch": "切换语言或重建原版/经典商店后，让桌面1.3拆解按钮图案匹配当前等级。仅修正显示，不改等级、资源和退款。开启时同时补正当前图案，关闭停止后续补正，支持即时预览。",
+        "tch": "切換語言或重建原版/經典商店後，讓桌面1.3拆解按鈕圖案符合目前等級。僅修正顯示，不改等級、資源和退款。開啟時也補正目前圖案，關閉停止後續補正，支援即時預覽。"
+      },
+      "reloadPolicy": "hot",
+      "section": "eraserTierIcon",
+      "sectionLabel": {
+        "en": "Dismantle button (1.3)",
+        "sch": "拆解按钮（1.3）",
+        "modsch": "拆解按钮（1.3）",
+        "tch": "拆解按鈕（1.3）"
+      }
     },
     "enableRememberLanguage": {
       "type": "boolean",

@@ -372,6 +372,7 @@
     "scripts/resource-source.js",
     "scripts/coordinate-overlay.js",
     "scripts/direction-pointers.js",
-    "scripts/build-countdown.js"
+    "scripts/build-countdown.js",
+    "scripts/shortcut-hints.js"
   ]
 }

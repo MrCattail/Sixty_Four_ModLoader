@@ -29,8 +29,25 @@ class Sprite {
 			this.origins = args.origins
 		}
 
+		// this.tstLOD()
+
 		this.switchSequence(0)
 
+	}
+
+	tstLOD(){
+
+		const w = Math.round(this.img.naturalWidth / 4)
+		const h = Math.round(this.img.naturalHeight / 4)
+
+		console.log(this.frames[0][2], this.img.src)
+
+		const c4 = new OffscreenCanvas(w, h)
+		const ctx = c4.getContext(`2d`)
+		ctx.drawImage(this.img, 0, 0, c4.width, c4.height)
+		// ctx.fillStyle = `#F0F`
+		// ctx.fillRect(0,0,c.width, c.height)
+		this.lod = c4
 	}
 
 	switchSequence(n){
@@ -52,6 +69,27 @@ class Sprite {
 
 	render(uv,dt,back = false, scaleMult = 1){
 
+		// this.update(dt)
+
+		// const p = this.master.uvToXY(uv)
+		// const mask = back ? this.backframes[this.sequences[this.currentSequence][this.currentFrame]] : this.frames[this.sequences[this.currentSequence][this.currentFrame]]
+		// const origin = this.origins[this.sequences[this.currentSequence][this.currentFrame]]
+		// const scale = this.master.unit * 1.737 / mask[2] * this.scale * scaleMult
+
+		// this.master.ctx.drawImage(
+		// 	this.lod,
+		// 	mask[0]/4, 
+		// 	mask[1]/4, 
+		// 	mask[2]/4, 
+		// 	mask[3]/4, 
+		// 	p[0] - origin[0]*scale, 
+		// 	p[1] - origin[1]*scale, 
+		// 	mask[2]*scale, 
+		// 	mask[3]*scale
+		// )
+
+		// return
+
 		this.update(dt)
 
 		const p = this.master.uvToXY(uv)
@@ -70,6 +108,7 @@ class Sprite {
 			mask[2]*scale, 
 			mask[3]*scale
 		)
+
 	}
 
 	renderWithOverlay(uv,dt,back = false, scaleMult = 1, c){
@@ -138,6 +177,7 @@ class Sprite {
 			mask[2]*scale, 
 			mask[3]*scale
 		)
+
 	}
 
 	renderStateWithOverlay(uv,f,back,scaleMult = 1, c){
