@@ -35,9 +35,10 @@
 				// Capture-phase UI/editor owners have already had their turn. This
 				// listener is installed before the native window bubble listener.
 				if (handledPress) { consume(event); return }
-				if (game.itemInHand) return // Keep native building cancellation.
+				const building = game.interactionMode === 'build' && !!game.itemInHand && !game.itemInHand.eraser
+				if (game.itemInHand && !building) return // Other held objects stay native.
 				const unifiedCleanup = typeof game.cleanupInteractionMode === 'function'
-				const tool = game.interactionMode === 'erase' || game.interactionMode === 'relocate' || (unifiedCleanup && game.interactionMode === 'clone')
+				const tool = building || game.interactionMode === 'erase' || game.interactionMode === 'relocate' || (unifiedCleanup && game.interactionMode === 'clone')
 				const cards = game.store?.isOpen === true && typeof game.store.closeTypes === 'function'
 				if (!tool && !cards) return
 				if (tool && !unifiedCleanup && (typeof game.cleanupErase !== 'function' || typeof game.cleanupRelocation !== 'function')) return
@@ -54,6 +55,7 @@
 					if (unifiedCleanup) game.cleanupInteractionMode()
 					else {
 						delete game.interactionMode
+						if (building) delete game.itemInHand
 						game.cleanupErase()
 						game.cleanupRelocation()
 					}

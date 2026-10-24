@@ -2338,6 +2338,7 @@
 	const installRenderApi = function (game) {
 		if (game) state.game = game
 		if (typeof Game === 'undefined' || !Game.prototype) return
+		preparePlacementProbe()
 		if (!state.renderInstalled) {
 			state.renderInstalled = true
 			state.renderTouchModeOverlayStyle = detectTouchModeOverlayStyle(Game.prototype.renderloop)
@@ -5105,6 +5106,38 @@
 	// Temporary diagnostics are lazy-loaded and never alter Render API routing.
 	let clearViewProbe = null
 	let clearViewNativeGrid = null
+	let placementProbeController = null
+	let placementRenderHooks = null
+	const preparePlacementProbe = function () {
+		if (placementProbeController || typeof Game === 'undefined') return
+		const tools = getModFileTools()
+		if (!tools?.ipcRenderer) return
+		if (!placementRenderHooks) {
+			const hooksPath = tools.path.join(tools.gameRoot, 'modloader', 'placement-render-hooks.js')
+			if (tools.fs.existsSync(hooksPath)) {
+				try {
+					placementRenderHooks = require(hooksPath).install(Game.prototype)
+					window.__cattailPlacementRenderHooksV1 = placementRenderHooks
+				} catch (error) { warn('Placement rendering adapter skipped.', error) }
+			}
+		}
+		const modulePath = tools.path.join(tools.gameRoot, 'modloader', 'diagnostics', 'placement-probe.js')
+		if (!tools.fs.existsSync(modulePath)) return
+		try { placementProbeController = require(modulePath).installNativeHooks(Game.prototype, placementRenderHooks) }
+		catch (error) { warn('Optional placement probe skipped.', error) }
+	}
+	const placementProbeConfiguration = function () {
+		const values = {}
+		for (const key of ['enablePlacementShadowTraversalReuse', 'enableClearViewGridFix', 'disableClearViewGrid', 'disableClearViewBuildingClipping', 'useTweaksClearViewGridStyle',
+			'enableFloorGridLines', 'enableDynamicCamera', 'cameraPitch', 'cameraYaw', 'enableViewDistance', 'farthestZoom',
+			'enableEntitySpriteRenderCache', 'enableEntitySliceRenderCache', 'enableExperimentalEntityWebGLRecorder']) {
+			values[key] = getConfigValue('Cattail_TweaksQuality_Tweaks', key, null)
+		}
+		values.renderApiEnabled = isRenderApiEnabled()
+		values.renderTimingEnabled = !!state.renderTimingEnabled
+		values.resourceProfilerEnabled = !!window.cattailResourceSourceProfiler?.isEnabled?.()
+		return values
+	}
 	const getClearViewProbe = function () {
 		if (clearViewProbe) return clearViewProbe
 		const tools = getModFileTools()
@@ -5113,6 +5146,7 @@
 		clearViewProbe = require(modulePath).createClient({
 			window, document, ipc: tools.ipcRenderer, getGame: () => state.game,
 			getNativeGrid: () => clearViewNativeGrid,
+			getPlacementController: () => placementProbeController, placementConfiguration: placementProbeConfiguration,
 			isMenuOpen: () => !!document.getElementById('modloader-panel') && !state.panelHidden,
 			closeMenu() { if (document.getElementById('modloader-panel')) togglePanel() },
 			metadata() { return { loaderVersion: state.version, mods: state.mods.map(mod => ({ id: mod.id, version: mod.manifest.version })), clearViewGridFix: { modLoaded: state.mods.some(mod => mod.id === 'Cattail_TweaksQuality_Tweaks'), configured: getConfigValue('Cattail_TweaksQuality_Tweaks', 'enableClearViewGridFix', true) }, renderApiEnabled: isRenderApiEnabled(), existingRenderTimingEnabled: !!state.renderTimingEnabled, resourceProfilerEnabled: !!window.cattailResourceSourceProfiler?.isEnabled?.() } },
@@ -5146,7 +5180,7 @@
 		for (const button of root.querySelectorAll('button')) {
 			button.disabled = button.dataset.probeAction === 'start' ? phase !== 'idle' : button.dataset.probeAction === 'stop' ? !['arming', 'starting', 'recording', 'export-failed'].includes(phase) : false
 		}
-		root.querySelector('[data-probe-status]').textContent = transformLocalizedText(state.clearViewProbeMessage || '默认关闭。启动来源记录需先预备再完整重启，读档后自动记录 30 秒。旧对照需持续按住 Alt，普通记录 20 秒。')
+		root.querySelector('[data-probe-status]').textContent = transformLocalizedText(state.clearViewProbeMessage || '默认关闭。新版放置细分记录20秒，分项对照60秒需保持手持建筑和镜头不动；旧对照仅供旧版Alt诊断。')
 	}
 	const renderClearViewProbeControls = function (parent) {
 		const tools = getModFileTools()
@@ -5158,6 +5192,11 @@
 		const actions = element('div', 'modloader-panel-settings-actions')
 		actions.style.flexWrap = 'wrap'
 		for (const item of [
+			...(tools.fs.existsSync(tools.path.join(tools.gameRoot, 'modloader', 'diagnostics', 'placement-probe.js')) ? [
+				['放置细分记录（20秒）', 'start', () => getClearViewProbe().start('placement-light')],
+				['放置深入记录（20秒）', 'start', () => getClearViewProbe().start('placement-deep')],
+				['放置分项对照（60秒）', 'start', () => getClearViewProbe().start('placement-ablation')]
+			] : []),
 			...(tools.fs.existsSync(tools.path.join(tools.gameRoot, 'modloader', 'diagnostics', 'clear-view-origin.js')) ? [
 				['预备下次启动来源记录', 'start', () => getClearViewProbe().armOrigin()],
 				['取消下次启动记录', 'cancel-origin', () => getClearViewProbe().cancelOrigin()]
@@ -9237,6 +9276,19 @@
 		syncPanelSettingsPageState(panel)
 	}
 
+	const getPanelEscapeAction = function (options) {
+		if (!options || options.hidden || options.blocked) return null
+		if (options.configExpanded) return 'config'
+		if (options.settingsOpen) return 'settings'
+		return 'hide'
+	}
+
+	const consumePanelEscapeEvent = function (event) {
+		event.preventDefault()
+		event.stopPropagation()
+		event.stopImmediatePropagation?.()
+	}
+
 	const formatPanelTooltipLayoutNumber = function (value) {
 		return String(Math.round((Number(value) || 0) * 100) / 100)
 	}
@@ -10280,6 +10332,7 @@
 		let expandedRow = null
 		let configAnimating = false
 		let configAnimationTimer = null
+		let pendingEscapeConfigCollapse = false
 		let importMode = false
 		let listOrderDirty = !sameStringList(getOrderedSelectedPaths(mods, selected, true), originalSelected)
 
@@ -10363,6 +10416,10 @@
 			}, function () {
 				rowModel.container.classList.add('modloader-mod-row-expanded')
 				configAnimating = false
+				if (pendingEscapeConfigCollapse && expandedRow === rowModel) {
+					pendingEscapeConfigCollapse = false
+					collapseConfigRow(rowModel, true)
+				}
 			})
 		}
 
@@ -10405,6 +10462,7 @@
 				clearTimeout(configAnimationTimer)
 				configAnimationTimer = null
 			}
+			pendingEscapeConfigCollapse = false
 			configAnimating = false
 			if (expandedRow) collapseConfigRow(expandedRow, false)
 			if (importMode) setImportMode(false)
@@ -11199,16 +11257,52 @@
 			if (!importMode || !document.getElementById('modloader-panel')) return
 			importClipboardZip(event)
 		}
+		let panelEscapeHandledUntilKeyup = false
+		const isPanelEscapeEvent = function (event) {
+			return event.key === 'Escape' || event.code === 'Escape' || event.keyCode === 27
+		}
 		const documentKeyHandler = function (event) {
+			if (isPanelEscapeEvent(event) && document.getElementById('modloader-panel') === panel) {
+				if (event.repeat && panelEscapeHandledUntilKeyup) {
+					consumePanelEscapeEvent(event)
+					return
+				}
+				if (!event.repeat) panelEscapeHandledUntilKeyup = false
+				const escapeAction = getPanelEscapeAction({
+					hidden: state.panelHidden,
+					blocked: panel.classList.contains('modloader-panel-modal-open') || !!document.querySelector('.modloader-select-menu'),
+					configExpanded: !!expandedRow,
+					settingsOpen: state.panelSettingsOpen
+				})
+				if (escapeAction) {
+					panelEscapeHandledUntilKeyup = true
+					consumePanelEscapeEvent(event)
+					if (escapeAction === 'config') {
+						if (configAnimating) pendingEscapeConfigCollapse = true
+						else collapseConfigRow(expandedRow, true)
+					} else if (escapeAction === 'settings') {
+						closePanelSettingsPage(panel)
+						savePanelState()
+					} else {
+						hidePanelToEdge(panel, true)
+					}
+					return
+				}
+			}
 			if (!importMode || !document.getElementById('modloader-panel')) return
 			if (!(event.ctrlKey || event.metaKey) || event.key.toLowerCase() !== 'v') return
 			importClipboardZip(event)
 		}
+		const documentKeyupHandler = function (event) {
+			if (isPanelEscapeEvent(event)) panelEscapeHandledUntilKeyup = false
+		}
 		document.addEventListener('paste', documentPasteHandler, true)
 		document.addEventListener('keydown', documentKeyHandler, true)
+		document.addEventListener('keyup', documentKeyupHandler, true)
 		addCleanup(function () {
 			document.removeEventListener('paste', documentPasteHandler, true)
 			document.removeEventListener('keydown', documentKeyHandler, true)
+			document.removeEventListener('keyup', documentKeyupHandler, true)
 		})
 
 		save.onclick = function () {
@@ -12105,6 +12199,8 @@
 			}
 			if (name === 'beforeVanillaScripts') await api.boot()
 			if (name === 'afterVanillaScripts') {
+				// Capture whitelisted native leaves before Mod entries/hooks wrap them.
+				preparePlacementProbe()
 				await api.loadEntries()
 				if (uiPages.length) ensureUiPagesInstalled()
 				installLanguageBridge()

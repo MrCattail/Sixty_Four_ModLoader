@@ -66,7 +66,7 @@ function createRecorder(options) {
           row.calls++; row.totalMs += elapsed; row.selfMs += Math.max(0, elapsed - node.children); row.samples.push(elapsed)
           if (frame) frame.methods[name] = (frame.methods[name] || 0) + elapsed
           if (!parent) roots.push({ method: name, startMs: began - startedAt, durationMs: elapsed, selfMs: Math.max(0, elapsed - node.children) })
-          if (ownFrame) { frame.durationMs = elapsed; frames.push(frame) }
+          if (ownFrame) { frame.durationMs = elapsed; options.afterFrame?.(frame); frames.push(frame) }
         } catch (_) { warn('A timing sample could not be stored') }
         finally { if (ownFrame) frame = null }
       }
@@ -104,11 +104,11 @@ function createRecorder(options) {
         const prev = index > 0 ? captured[index - 1] : null
         const controls = scene => { const { entities, ...rest } = scene; return rest }
         const stable = prev && JSON.stringify(controls(prev.scene)) === JSON.stringify(controls(s)) && prev.observedView === f.observedView
-        const interrupted = scene => scene.hidden || scene.focused === false || scene.menuOpen || scene.halt || scene.resizing || scene.settling || scene.ablationSettling || scene.ablationActive === false
+        const interrupted = scene => scene.hidden || scene.focused === false || scene.menuOpen || scene.halt || scene.resizing || scene.settling || scene.ablationSettling || scene.ablationActive === false || scene.placementDetailed || scene.placementSettling || scene.placementActive === false
         const invalid = interrupted(s) || !prev || interrupted(prev.scene) || !stable
         f.comparable = !invalid
         f.strictlyComparable = f.comparable && JSON.stringify(prev.scene) === JSON.stringify(s)
-        const key = [f.observedView, s.alt ? 'alt' : '', s.item ? 'item=' + s.itemType : '', s.relocate ? 'relocate' : '', s.erase ? 'erase' : '', s.touch ? 'touch' : '', s.width + 'x' + s.height, 'dpr=' + s.dpr, 'zoom=' + s.zoom, 'plane=' + s.plane, 'camera=' + s.cameraX + ',' + s.cameraY, 'ablation=' + (s.ablationPhase || 'off')].join('|')
+        const key = [f.observedView, s.alt ? 'alt' : '', s.item ? 'item=' + s.itemType : '', s.relocate ? 'relocate' : '', s.erase ? 'erase' : '', s.touch ? 'touch' : '', s.width + 'x' + s.height, 'dpr=' + s.dpr, 'zoom=' + s.zoom, 'plane=' + s.plane, 'camera=' + s.cameraX + ',' + s.cameraY, 'ablation=' + (s.ablationPhase || 'off'), ...(s.placementPhase ? ['placement=' + s.placementPhase, 'sample=' + (s.placementDetailed ? 'detail' : s.placementRaw ? 'raw' : 'timed')] : [])].join('|')
         const g = groups[key] || (groups[key] = { key, frames: 0, excluded: 0, strictFrames: 0, entitiesMin: Infinity, entitiesMax: -Infinity, gaps: [], cpu: [] })
         g.frames++
         if (f.strictlyComparable) g.strictFrames++
@@ -213,10 +213,11 @@ function createClient(options) {
   const { window: win, document: doc, ipc, getGame } = options
   let phase = 'idle', mode = '', recorder = null, session = null, timer = null, countdown = null
   let observer = null, resizedAt = -Infinity, captureAt = 0, lastResult = null, pendingReport = null, stopPromise = null
-  let ablation = null, startCancelled = false, originCapture = null
+  let ablation = null, placement = null, startCancelled = false, originCapture = null
   const originBusy = () => originCapture && originCapture.status().phase !== 'idle'
   const isGrid = () => mode === 'grid-ablation' || mode === 'grid-threshold'
-  const isComparison = () => mode === 'ablation' || isGrid()
+  const isPlacement = () => mode.startsWith('placement-')
+  const isComparison = () => mode === 'ablation' || isGrid() || mode === 'placement-ablation'
   const notify = message => options.notify?.(message)
   const invoke = async (action, payload = {}) => {
     const response = await ipc.invoke(CHANNEL, { action, ...payload })
@@ -226,12 +227,17 @@ function createClient(options) {
   const change = () => options.onChange?.()
   const resize = () => { resizedAt = win.performance.now() }
   const marker = label => {
-    if (mode !== 'deep') return
+    if (mode !== 'deep' && mode !== 'placement-deep') return
     const name = 'SFProbe:' + label
     try { win.performance.mark(name); win.performance.clearMarks(name) } catch (_) {}
   }
   const scheduleFinish = reason => { void Promise.resolve().then(() => finish(reason)).catch(() => {}) }
   const interrupted = event => {
+    if (isPlacement()) {
+      if (event.type === 'keyup') return
+      if (event.type === 'visibilitychange' && !doc.hidden) return
+      placement?.abort(event.type); return
+    }
     if (!isComparison()) return
     if (event.type === 'keyup' && event.key !== 'Alt') return
     if (event.type === 'visibilitychange' && !doc.hidden) return
@@ -245,9 +251,11 @@ function createClient(options) {
     win.removeEventListener('resize', resize)
     for (const event of ['blur', 'keyup', 'resize']) win.removeEventListener(event, interrupted)
     doc.removeEventListener('visibilitychange', interrupted)
-    recorder?.stop()
-    // Unwrap the outer recorder first, then the inner drawing intervention.
-    ablation?.stop(reason)
+    win.removeEventListener('modloader:config-preview', interrupted)
+    win.removeEventListener('modloader:config-changed', interrupted)
+    // Deactivate interventions even if a changed descriptor prevents unwrapping.
+    try { recorder?.stop() }
+    finally { ablation?.stop(reason); placement?.stop(reason) }
   }
   function baseScene() {
     const g = getGame()
@@ -255,14 +263,57 @@ function createClient(options) {
       width: g.canvas?.width, height: g.canvas?.height, windowWidth: win.innerWidth, windowHeight: win.innerHeight,
       dpr: win.devicePixelRatio, gamePixelRatio: g.pixelRatio, zoom: g.zoom, unit: g.unit, plane: g.plane,
       cameraX: g.translation?.[0], cameraY: g.translation?.[1], itemType: String(g.itemInHand?.name || '').slice(0, 64),
-      ...(isGrid() ? { projectionPitch: g.__cattailDynamicCameraState?.pitch ?? null, projectionYaw: g.__cattailDynamicCameraState?.yaw ?? null } : {}),
+      ...(isGrid() || isPlacement() ? { projectionPitch: g.__cattailDynamicCameraState?.pitch ?? null, projectionYaw: g.__cattailDynamicCameraState?.yaw ?? null } : {}),
+      ...(isPlacement() ? { hoveredX: g.hoveredCell?.[0] ?? null, hoveredY: g.hoveredCell?.[1] ?? null, interactionMode: g.interactionMode || null,
+        configSignature: JSON.stringify(options.placementConfiguration?.() || {}) } : {}),
       entities: g.stuff?.length || 0, alt: !!g.altActive, item: !!g.itemInHand, transported: !!g.transportedEntity, hovered: !!g.hoveredCell,
       relocate: g.interactionMode === 'relocate', erase: g.interactionMode === 'erase', touch: !!g.touchMode,
       halt: !!g.halt, hidden: doc.hidden, focused: doc.hasFocus(), menuOpen: !!options.isMenuOpen?.(),
       resizing: win.performance.now() - resizedAt < 500, settling: win.performance.now() - captureAt < 2500
     }
   }
-  function scene() { return { ...baseScene(), ...(ablation?.state() || {}) } }
+  function scene() { return { ...baseScene(), ...(ablation?.state() || {}), ...(placement?.state() || {}) } }
+  function diagnosticText(value, limit = 500) {
+    try { return String(value || '').replace(/[\u0000-\u001f\u007f]/g, ' ').slice(0, limit) } catch (_) { return 'Unavailable' }
+  }
+  function startupError(value) {
+    try { return { name: diagnosticText(value?.name || 'Error', 64), message: diagnosticText(value?.message || value) } }
+    catch (_) { return { name: 'Error', message: '错误信息不可读' } }
+  }
+  function startupDiagnostic(stage, error) {
+    const result = { schemaVersion: 1, stage, cancelled: startCancelled, error: startupError(error) }
+    // Read only a fixed diagnostic allowlist, never the full scene/config/save.
+    try {
+      const g = getGame(), number = value => Number.isFinite(value) ? value : null
+      result.scene = {
+        zoom: number(g?.zoom), unit: number(g?.unit), plane: number(g?.plane),
+        width: number(g?.canvas?.width), height: number(g?.canvas?.height),
+        projectionPitch: number(g?.__cattailDynamicCameraState?.pitch), projectionYaw: number(g?.__cattailDynamicCameraState?.yaw),
+        item: !!g?.itemInHand, itemType: diagnosticText(g?.itemInHand?.name, 64),
+        hovered: !!g?.hoveredCell, hoveredX: number(g?.hoveredCell?.[0]), hoveredY: number(g?.hoveredCell?.[1]),
+        transported: !!g?.transportedEntity, interactionMode: diagnosticText(g?.interactionMode, 32),
+        touch: !!g?.touchMode, mobile: !!g?.isMobile, halt: !!g?.halt,
+        hidden: !!doc.hidden, focused: !!doc.hasFocus(), menuOpen: !!options.isMenuOpen?.()
+      }
+    } catch (_) { result.sceneUnavailable = true }
+    if (isPlacement()) {
+      try {
+        const config = options.placementConfiguration?.() || {}
+        result.configuration = Object.fromEntries(['enablePlacementShadowTraversalReuse', 'disableClearViewGrid', 'useTweaksClearViewGridStyle', 'disableClearViewBuildingClipping'].map(key => [key, typeof config[key] === 'boolean' ? config[key] : null]))
+        // The existing main-process schema keeps three structured booleans.
+        // Preserve this new state in its already bounded error-text field too.
+        if (typeof config.enablePlacementShadowTraversalReuse === 'boolean') result.error.message = diagnosticText('[enablePlacementShadowTraversalReuse=' + config.enablePlacementShadowTraversalReuse + '] ' + result.error.message)
+      } catch (_) { result.configurationUnavailable = true }
+      try {
+        const capabilities = options.getPlacementController?.()?.describe() || {}
+        result.capabilities = Object.fromEntries(['renderGrid', 'renderEntitiesAbstract'].map(name => [name, {
+          supported: capabilities[name]?.supported === true,
+          sha256: /^[a-f0-9]{64}$/.test(capabilities[name]?.sha256) ? capabilities[name].sha256 : null
+        }]))
+      } catch (_) { result.capabilitiesUnavailable = true }
+    }
+    return result
+  }
   async function finish(reason = 'manual') {
     if (originBusy()) return originCapture.finish(reason)
     if (stopPromise) return stopPromise
@@ -271,13 +322,13 @@ function createClient(options) {
     if (!session) return
     phase = 'exporting'; clean(reason); change()
     pendingReport ||= { ...recorder.report(), metadata: options.metadata?.() || {}, stopReason: reason, rendererTimeOrigin: win.performance.timeOrigin,
-      ...(ablation ? { ablation: ablation.report() } : {}) }
+      ...(ablation ? { ablation: ablation.report() } : {}), ...(placement ? { placement: placement.report() } : {}) }
     stopPromise = (async () => {
       try {
         lastResult = await invoke('finish', { id: session.id, report: pendingReport })
-        const endedEarly = pendingReport.ablation && !pendingReport.ablation.completed
+        const endedEarly = pendingReport.ablation && !pendingReport.ablation.completed || pendingReport.placement && !pendingReport.placement.completed
         phase = 'idle'; session = null; pendingReport = null
-        notify((endedEarly ? '对照提前结束，已恢复原样并保存已有记录：' : isComparison() ? '对照结束，已恢复原样；可以松开 Alt。记录：' : lastResult.traceStatus === 'failed' ? '计时已保存，但底层追踪失败，请查看报告并重启游戏：' : '探针记录已保存：') + lastResult.directory)
+        notify((endedEarly ? '采集提前结束，已恢复原样并保存已有记录：' : isComparison() ? '对照结束，已恢复原样。记录：' : lastResult.traceStatus === 'failed' ? '计时已保存，但底层追踪失败，请查看报告并重启游戏：' : '探针记录已保存：') + lastResult.directory)
         return lastResult
       } catch (error) {
         phase = 'export-failed'; notify('导出失败，可点“停止并导出”重试：' + error.message); throw error
@@ -310,22 +361,37 @@ function createClient(options) {
     start(nextMode) {
       if (phase !== 'idle' || originBusy()) throw new Error('已有采集或待导出的记录，请先停止并导出。')
       if (!getGame()?.canvas) throw new Error('请先进入需要测试的游戏场景。')
-      mode = ['grid-threshold', 'grid-ablation', 'ablation', 'deep'].includes(nextMode) ? nextMode : 'light'
-      recorder = null; ablation = null; pendingReport = null; startCancelled = false
+      mode = ['grid-threshold', 'grid-ablation', 'ablation', 'deep', 'placement-light', 'placement-deep', 'placement-ablation'].includes(nextMode) ? nextMode : 'light'
+      recorder = null; ablation = null; placement = null; pendingReport = null; startCancelled = false; lastResult = null
       phase = 'arming'; change()
       options.closeMenu?.()
-      const seconds = mode === 'grid-threshold' ? 96 : mode === 'grid-ablation' ? 72 : mode === 'ablation' ? 60 : 20
-      notify(isComparison() ? `3 秒后开始自动对照：现在按住 Alt，保持窗口和镜头不动，约 ${seconds} 秒后自动恢复。松开 Alt 可提前结束。` : '3 秒后采集 20 秒：普通 5 秒 → Alt 5 秒 → 松开恢复。')
+      const seconds = mode === 'grid-threshold' ? 96 : mode === 'grid-ablation' ? 72 : mode === 'ablation' || mode === 'placement-ablation' ? 60 : 20
+      notify(isPlacement() ? isComparison() ? '3秒后开始放置分项对照：保持手持建筑、目标格和镜头不动，不点击放置；60秒后恢复。' : '3秒后观察20秒：可比较普通、Alt与手持建筑；不点击放置，保持游戏前台。' : isComparison() ? `3 秒后开始自动对照：现在按住 Alt，保持窗口和镜头不动，约 ${seconds} 秒后自动恢复。松开 Alt 可提前结束。` : '3 秒后采集 20 秒：普通 5 秒 → Alt 5 秒 → 松开恢复。')
       countdown = win.setTimeout(async () => {
         countdown = null; phase = 'starting'; change()
+        let startupStage = 'main-start'
         try {
           session = await invoke('start', { mode, seconds })
           if (startCancelled) throw new Error('已取消启动。')
+          startupStage = 'protocol-check'
           if (isComparison() && session.seconds !== seconds) throw new Error(`主进程尚未支持 ${seconds} 秒对照，请完整退出并重启游戏。`)
           const game = getGame()
           resizedAt = -Infinity
           captureAt = win.performance.now()
-          if (isComparison()) {
+          if (isPlacement()) {
+            startupStage = 'placement-module'
+            const module = require('./placement-probe')
+            startupStage = 'placement-setup'
+            placement = module.createPlacementCapture({ game, controller: options.getPlacementController?.(), comparison: isComparison(),
+              now: () => win.performance.now(), snapshot: baseScene, isCurrent: () => getGame() === game,
+              onAbort: why => scheduleFinish('placement-' + why), onComplete: () => scheduleFinish('duration'),
+              onPhase: (entry, index) => notify(`采集中，第${index + 1}/5组：${entry.label}。保持手持建筑、目标格和镜头不动。`) })
+            startupStage = 'placement-start'
+            placement.start()
+            for (const event of ['blur', 'resize', 'modloader:config-preview', 'modloader:config-changed']) win.addEventListener(event, interrupted)
+            doc.addEventListener('visibilitychange', interrupted)
+          } else if (isComparison()) {
+            startupStage = 'comparison-start'
             const module = require(isGrid() ? './clear-view-grid' : './clear-view-ablation')
             const create = mode === 'grid-threshold' ? module.createGridThreshold : module.createGridAblation || module.createAblation
             const phases = mode === 'grid-threshold' ? module.THRESHOLD_PHASES : module.PHASES
@@ -336,21 +402,34 @@ function createClient(options) {
             for (const event of ['blur', 'keyup', 'resize']) win.addEventListener(event, interrupted)
             doc.addEventListener('visibilitychange', interrupted)
           }
+          startupStage = 'recorder-start'
           recorder = createRecorder({ game, now: () => win.performance.now(), snapshot: scene, marker, ablation: isComparison(),
-            beforeFrame: () => ablation?.beforeFrame(), onFrameError: () => ablation?.abort('frame-exception') })
+            beforeFrame: () => { ablation?.beforeFrame(); placement?.beforeFrame() },
+            afterFrame: frame => { if (placement) frame.placement = placement.afterFrame(frame) },
+            onFrameError: () => { ablation?.abort('frame-exception'); placement?.abort('frame-exception') } })
           win.addEventListener('resize', resize)
           recorder.start()
+          startupStage = 'observer-start'
           if (win.PerformanceObserver?.supportedEntryTypes?.includes('longtask')) {
             observer = new win.PerformanceObserver(list => { for (const e of list.getEntries()) recorder?.addEvent('longtask', e.startTime, e.duration) })
             observer.observe({ type: 'longtask' })
           }
           phase = 'recording'; change()
-          if (!isComparison()) notify('正在采集；20 秒后自动停止并导出。')
+          if (mode === 'placement-ablation') notify('已开始采集，第1/5组：原样。保持手持建筑、目标格和镜头不动；60秒后恢复并导出。')
+          else if (!isComparison()) notify('已开始采集；20 秒后自动停止并导出。')
           timer = win.setTimeout(() => { void finish('duration').catch(() => {}) }, seconds * 1000)
         } catch (error) {
-          clean()
-          if (session) { try { await invoke('abort', { id: session.id }) } catch (_) {} }
-          session = null; phase = 'idle'; notify('无法开始采集：' + error.message); change()
+          const diagnostic = startupDiagnostic(startupStage, error)
+          try { clean('startup-failed') } catch (cleanupError) { diagnostic.cleanupError = startupError(cleanupError) }
+          let exportError = null
+          if (session) {
+            try { lastResult = await invoke('abort', { id: session.id, startup: diagnostic }) }
+            catch (failure) { exportError = startupError(failure).message }
+          }
+          session = null; phase = 'idle'
+          notify((diagnostic.cancelled ? '未开始采集：启动期间已取消。' : '未开始采集：' + diagnostic.error.message + '。') +
+            (lastResult?.directory ? '诊断已保存：' + lastResult.directory : '启动诊断未保存' + (exportError ? '：' + exportError : '（主进程未返回采集会话）') + '。'))
+          change()
         }
       }, 3000)
     },

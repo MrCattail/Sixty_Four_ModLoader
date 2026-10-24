@@ -358,6 +358,9 @@ const createWindow = _=> {
 
 }
 
+//Direct composition disable fix
+if (!(process.platform === 'darwin')) app.commandLine.appendSwitch('disable-direct-composition')
+
 app.whenReady().then(() => {
 
   createWindow()

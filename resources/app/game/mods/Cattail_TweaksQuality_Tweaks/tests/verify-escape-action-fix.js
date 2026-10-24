@@ -31,26 +31,35 @@ function fixture() {
 	if (q.get('shop') === '1.2.1') localStorage.setItem('cattailShopCategoriesCompressed', q.has('long') ? '0' : '1')
 	if (q.has('off') && !localStorage.getItem('fixture-initialized')) localStorage.setItem(ownKey, 'false')
 	localStorage.setItem('fixture-initialized', 'true')
-	window.nativeCalls = { splash: 0, erase: 0, relocate: 0, clone: 0, orb: 0, unifiedCleanup: 0, eraseCleanup: 0, relocateCleanup: 0, release: 0 }
+	window.nativeCalls = { splash: 0, erase: 0, relocate: 0, clone: 0, build: 0, upgrade: 0, spend: 0, refund: 0, save: 0, orb: 0, unifiedCleanup: 0, eraseCleanup: 0, relocateCleanup: 0, release: 0 }
 	window.weState = { active: false, pending: false, preview: false, count: 0, busy: false, steps: [] }
 	window.cleanupCallbacks = []
 	window.nativeCreative = false
 	window.game = Object.assign(Object.create(Game.prototype), {
 		version: q.has('old') ? '1.2.1' : '1.3', isMobile: q.has('mobile'), language: 'en', plane: 0,
-		eraserType: 2, resources: [10000, 20000], onlyones: {}, unlockedEntities: { pump: true, mega3: true },
-		entitiesInGame: { pump: 3, mega3: 1 }, prices: {}, stuff: [{ name: 'pump', position: [1, 2] }],
+		eraserType: 2, resources: [10000, 20000], onlyones: {}, unlockedEntities: { pump: true, mega3: true, waypoint2: true },
+		entitiesInGame: { pump: 3, mega3: 1, waypoint: 1 }, prices: {}, stuff: [{ name: 'pump', position: [1, 2] }, { name: 'waypoint', position: [3, 4] }],
 		stats: { totalPlayTime: 10 }, alfa: { currentNodes: [] }, currentHint: {}, translation: [0, 0], translationMap: [0, 0, 0, 0],
 		zoom: 1, pixelRatio: 1, screenUnit: 10, resourceHomes: [], hoveredCell: [0, 0], soundSources: new Set(), selectedEntity: false, saveSlots: [],
 		mouse: { sxy: [10, 10], xy: [10, 10], delta: [0, 0], state: 0, maxTimer: 600, positionChanged: false },
 		codex: { entityTypes: { default: {}, tools: {} }, entities: {
-			pump: { type: 'default', canPurchase: true, price: [100], priceExponent: 2 },
+			pump: { type: 'default', canPurchase: true, price: [100], priceExponent: 2,
+				class: class { constructor(master) { this.master = master; this.name = 'pump' } } },
+			waypoint: { price: [20], priceExponent: 1 },
+			waypoint2: { type: 'default', canPurchase: true, price: [200], priceExponent: 2, isUpgradeTo: 'waypoint',
+				class: class { constructor(master) { this.master = master; this.name = 'waypoint2' } } },
 			mega3: { type: 'tools', canPurchase: true, price: [20], priceExponent: 1.5 }
 		} },
 		pronounce: (a, id, part) => part === 'description' ? 'Fixture description' : String(id),
 		makeReadable: v => String(v), xyToUV: xy => [xy[0] / 64, xy[1] / 64], entityAtCoordinates: () => undefined,
 		processMove() {}, canRelocate: () => true, finalizeErase() { nativeCalls.erase++ }, massRelocate() { nativeCalls.relocate++ }, massClone() { nativeCalls.clone++ },
+		canPlaceEntityHere: () => true,
+		addEntity() { nativeCalls.build++; throw new Error('unexpected building commit') },
+		clearCell() { nativeCalls.upgrade++; throw new Error('unexpected upgrade commit') },
+		requestResources() { nativeCalls.spend++; throw new Error('unexpected building cost') },
+		createResourceTransfer() { nativeCalls.refund++; throw new Error('unexpected building refund') },
 		closeOrbifolds() { nativeCalls.orb++; delete this.orbifoldUI },
-		savePreferences() {}, saveGame() { throw new Error('unexpected game save') }
+		savePreferences() {}, saveGame() { nativeCalls.save++; throw new Error('unexpected game save') }
 	})
 	window.unified = typeof game.cleanupInteractionMode === 'function'
 	for (const method of ['processQ', 'processE']) {
@@ -115,6 +124,7 @@ function fixture() {
 		if (unified) game.cleanupInteractionMode()
 		else { game.cleanupErase(); game.cleanupRelocation() }
 		delete game.hoveredEntity
+		game.entityAtCoordinates = () => undefined
 		game.mouse.state = 0; game.mouse.positionChanged = false
 		game.store.closeTypes()
 		if (cards) openCards()
@@ -138,9 +148,25 @@ function fixture() {
 		game.store.visibilityUpdate()
 		for (const key of Object.keys(nativeCalls)) nativeCalls[key] = 0
 	}
+	// Native Store card handlers / Q / pickupItem / Cloud are exercised below;
+	// entity constructors, world, and commit endpoints remain isolated fixtures.
+	window.beginPlacement = (source, cards = true) => {
+		prepare(null, cards)
+		if (source === 'q') game.hoveredEntity = game.stuff[0]
+		else game.store.html.items[source === 'upgrade' ? 'waypoint2' : 'pump'].dispatchEvent(new MouseEvent('mousedown', { bubbles: true }))
+	}
+	window.showPlacementHint = source => {
+		if (!game.itemInHand || game.interactionMode !== 'build') throw new Error('native placement not active')
+		game.canPlace = true
+		const hint = source === 'upgrade' ? game.itemInHandPriceAndRefundTag : game.itemInHandPriceTag
+		if (!hint?.element || hint.master !== game) throw new Error('native price hint missing')
+		document.body.append(hint.element); game.currentHint = { element: hint.element, entity: game.itemInHand }
+		if (source === 'upgrade') game.entityAtCoordinates = () => game.stuff.find(entity => entity.name === 'waypoint')
+	}
 	window.sample = () => ({
 		mode: game.interactionMode || null, cards: game.store.isOpen, splash: game.splash.isShown,
 		calls: { ...nativeCalls }, resources: game.resources.slice(), positions: game.stuff.map(e => e.position.slice()),
+		names: game.stuff.map(e => e.name), entityCounts: { ...game.entitiesInGame }, stats: { ...game.stats },
 		refund: game.getRealPrice('pump', true).slice(), canPlace: game.canPlace,
 		unified, selectionPreview: !!(game.selectionOrigin || game.selectionTarget || game.selectionCandidateSet || game.selectionList || game.selectionOffsets || game.totalRefund || game.areaHint || game.forcedMobileAnchor),
 		erasePreview: !!(game.eraseOrigin || game.eraseTarget || game.eraseList || game.totalRefund || game.eraseHint),
@@ -148,7 +174,7 @@ function fixture() {
 		transported: !!game.transportedEntity, eraserClosed: game.store.html.eraser.classList.contains('closed'),
 		relocatorClosed: game.store.html.relocator.classList.contains('closed'),
 		expanded: document.querySelectorAll('.cattail-shop-category.expanded').length,
-		item: game.itemInHand?.name || null
+		item: game.itemInHand?.name || null, hintVisible: !!game.currentHint.element?.isConnected
 	})
 	window.boot = async () => {
 		await ModLoader.boot()
@@ -209,7 +235,11 @@ async function main() {
 	const check = async (name, fn) => { await fn(); assert.deepEqual(errors, []); results.push(name); console.log('PASS ' + name) }
 	const sample = page => page.evaluate(() => sample())
 	const press = page => page.keyboard.press('Escape')
-	const unchanged = (before, after) => { assert.deepEqual(after.resources, before.resources); assert.deepEqual(after.positions, before.positions); assert.deepEqual(after.refund, before.refund); assert.equal(after.calls.erase, 0); assert.equal(after.calls.relocate, 0); assert.equal(after.calls.clone, 0) }
+	const unchanged = (before, after) => {
+		assert.deepEqual(after.resources, before.resources); assert.deepEqual(after.positions, before.positions); assert.deepEqual(after.refund, before.refund)
+		assert.deepEqual(after.names, before.names); assert.deepEqual(after.entityCounts, before.entityCounts); assert.deepEqual(after.stats, before.stats)
+		for (const key of ['erase', 'relocate', 'clone', 'build', 'upgrade', 'spend', 'refund', 'save']) assert.equal(after.calls[key], 0, key + ' must not commit')
+	}
 	const cleaned = (state, before) => {
 		assert.equal(state.mode, null); assert.equal(state.selectionPreview, false); assert.equal(state.erasePreview, false); assert.equal(state.relocatePreview, false)
 		assert.equal(state.calls.unifiedCleanup - (before?.calls.unifiedCleanup || 0), state.unified ? 1 : 0)
@@ -254,6 +284,25 @@ async function main() {
 					await press(page); const after = await sample(page); cleaned(after, before); unchanged(before, after); assert.equal(after.splash, false)
 				}
 			})
+			for (const source of ['shop', 'q', 'upgrade']) {
+				await check('native ' + source + ' placement cancels before cards/menu and mouse release ' + (query || 'native'), async () => {
+					for (const cards of [false, true]) {
+						await page.evaluate(({ source, cards }) => beginPlacement(source, cards), { source, cards })
+						if (source === 'q') await page.keyboard.press('q')
+						await page.evaluate(source => showPlacementHint(source), source)
+						await page.locator('canvas').dispatchEvent('mousedown', { button: 0, buttons: 1, clientX: 90, clientY: 90 })
+						const before = await sample(page); assert.equal(before.mode, 'build'); assert.equal(before.hintVisible, true)
+						assert.equal(before.item, source === 'upgrade' ? 'waypoint2' : 'pump')
+						await press(page); const cancelled = await sample(page)
+						assert.equal(cancelled.splash, false); assert.equal(cancelled.cards, before.cards); assert.equal(cancelled.item, null); assert.equal(cancelled.hintVisible, false)
+						cleaned(cancelled, before); unchanged(before, cancelled)
+						await page.locator('canvas').dispatchEvent('mouseup', { button: 0, buttons: 0, clientX: 90, clientY: 90 })
+						const released = await sample(page); unchanged(before, released); assert.equal(released.calls.release, 1); assert.equal(released.item, null); assert.equal(released.mode, null)
+						if (before.cards) { await press(page); assert.equal((await sample(page)).cards, false); assert.equal((await sample(page)).splash, false) }
+						await press(page); assert.equal((await sample(page)).splash, true)
+					}
+				})
+			}
 		}
 		const page = await setup()
 		await check('single/area erase and relocation cancellation prevents actual mouseup commit', async () => {
@@ -322,13 +371,52 @@ async function main() {
 			await page.evaluate(() => { prepare(null, true); dispatchEvent(new KeyboardEvent('keydown', { code: 'Escape', key: 'Escape', cancelable: true })); dispatchEvent(new Event('blur')); openCards() })
 			await press(page); assert.equal((await sample(page)).cards, false)
 		})
-		await check('normal building cancellation, Orbifold and native menu still own Esc', async () => {
+		await check('building cancellation is layered; Orbifold and idle menu stay native', async () => {
 			await page.evaluate(() => { prepare(null, true); game.interactionMode = 'build'; game.itemInHand = { name: 'pump' }; game.transportedEntity = {} })
-			await press(page); let s = await sample(page); assert.equal(s.item, null); assert.equal(s.cards, true); assert.equal(s.splash, s.unified) // Preserve this build's native building/menu branch.
+			await press(page); let s = await sample(page); cleaned(s); assert.equal(s.item, null); assert.equal(s.cards, true); assert.equal(s.splash, false)
 			await page.evaluate(() => { prepare(null, true); game.orbifoldUI = {} })
 			await press(page); s = await sample(page); assert.equal(s.calls.orb, 1); assert.equal(s.cards, true); assert.equal(s.splash, false)
 			await page.evaluate(() => prepare(null)); await press(page); assert.equal((await sample(page)).splash, true)
 			await press(page); assert.equal((await sample(page)).splash, false)
+		})
+		for (const source of ['shop', 'q', 'upgrade']) {
+			await check('held Esc does not cross a cancelled ' + source + ' placement layer; blur permits the next layer', async () => {
+				await page.evaluate(source => beginPlacement(source), source)
+				if (source === 'q') await page.keyboard.press('q')
+				await page.evaluate(source => showPlacementHint(source), source)
+				const before = await sample(page)
+				await page.keyboard.down('Escape'); await page.keyboard.down('Escape'); await page.keyboard.down('Escape')
+				const after = await sample(page); cleaned(after, before); unchanged(before, after); assert.equal(after.item, null); assert.equal(after.hintVisible, false); assert.equal(after.cards, true); assert.equal(after.splash, false)
+				await page.keyboard.up('Escape'); await page.evaluate(() => dispatchEvent(new Event('blur')))
+				await press(page); assert.equal((await sample(page)).cards, false); assert.equal((await sample(page)).splash, false)
+			})
+		}
+		await check('building hot toggle preserves the preview until a key and disabled mode matches native', async () => {
+			await page.evaluate(() => { beginPlacement('shop'); showPlacementHint('shop'); setFix(false) })
+			assert.equal((await sample(page)).item, 'pump'); await press(page)
+			let s = await sample(page); assert.equal(s.item, null); assert.equal(s.splash, s.unified)
+			await page.evaluate(() => { beginPlacement('upgrade'); showPlacementHint('upgrade'); setFix(true) })
+			assert.equal((await sample(page)).item, 'waypoint2'); const before = await sample(page); await press(page)
+			s = await sample(page); cleaned(s, before); unchanged(before, s); assert.equal(s.splash, false); assert.equal(s.hintVisible, false)
+		})
+		await check('building preview yields to editable focus, Loader page, WE capture and WE dialog', async () => {
+			await page.evaluate(() => { beginPlacement('shop'); showPlacementHint('shop') })
+			await page.locator('#fixture-input').focus(); await press(page)
+			assert.equal((await sample(page)).splash, (await sample(page)).unified) // Guard delegates this build's native branch.
+			await page.evaluate(() => { beginPlacement('shop'); showPlacementHint('shop'); window.buildPage = ModLoader.forMod('Cattail_TweaksQuality_Tweaks').ui.pages.register({ id: 'build-fixture', title: 'Build fixture' }); buildPage.open(game.splash) })
+			await press(page); assert.equal(await page.evaluate(() => buildPage.isActive()), false); assert.equal((await sample(page)).item, 'pump'); assert.equal((await sample(page)).splash, false)
+			await page.evaluate(() => { Object.assign(weState, { active: true, pending: true, preview: true, count: 1, steps: [] }) })
+			for (let i = 0; i < 4; i++) { await press(page); assert.equal((await sample(page)).item, 'pump'); assert.equal((await sample(page)).splash, false) }
+			assert.deepEqual(await page.evaluate(() => weState.steps), ['pending', 'preview', 'selection', 'hotkey-escape'])
+			await page.evaluate(() => { window.buildDialog = window[Symbol.for('cattail.world-editor.dialogs')].create({ id: 'build-dialog', title: 'Build dialog' }); buildDialog.mount() })
+			await press(page); assert.equal(await page.evaluate(() => buildDialog.closed), true); assert.equal((await sample(page)).item, 'pump')
+			const before = await sample(page); await press(page); const after = await sample(page); cleaned(after, before); unchanged(before, after); assert.equal(after.splash, false)
+		})
+		await check('unknown held objects and legacy eraser placeholders retain native behavior', async () => {
+			for (const eraser of [false, true]) {
+				await page.evaluate(eraser => { prepare(null, true); if (eraser) game.interactionMode = 'build'; game.itemInHand = { name: eraser ? 'eraser' : 'pump', eraser } }, eraser)
+				await press(page); const s = await sample(page); assert.equal(s.item, null); assert.equal(s.cards, true); assert.equal(s.splash, s.unified)
+			}
 		})
 		await check('non-Esc keys and original keyup movement stay native', async () => {
 			await page.evaluate(() => prepare('erase'))
@@ -429,7 +517,7 @@ async function main() {
 		})
 		assert.deepEqual(errors, []); passed = true; console.log('ESC_ACTION_OK=' + results.length)
 	} finally {
-		fs.writeFileSync(path.join(output, 'report.json'), JSON.stringify({ passed, results, errors, browser: browser.version(), nativeRoot: NATIVE_ROOT, fixSource: FIX_SOURCE, boundary: 'actual desktop Game Q/E/listeners/cleanup/pickup/processUp, Store/current CSS, Loader/menu/UI page, Better UIs native/accordion/classic/categories, Tweaks Shift-Ctrl guard and WE native-tools/input-controller/shared-dialog source; synthetic world/runtime/preview/shared guards/native-tool eligibility/transactions/storage/splash/preferences/projection/scene movement/commit sentinels; unified preview uses native pickup without the unadapted WE legacy held-list hook; unsupported/mobile markers use desktop fixture only; no player game/profile/config/save/Steam' }, null, 2))
+		fs.writeFileSync(path.join(output, 'report.json'), JSON.stringify({ passed, results, errors, browser: browser.version(), nativeRoot: NATIVE_ROOT, fixSource: FIX_SOURCE, boundary: 'actual desktop Game Q/E/Store purchase/pickupItem/Cloud/keyboard/pointer/processDown/processUp/cleanup and clone pickup, Store/current CSS, Loader/menu/UI page, Better UIs native/accordion/classic/categories, Tweaks Shift-Ctrl guard and WE native-tools/input-controller/shared-dialog source; synthetic entity constructors/world/runtime/shared guards/native-tool eligibility/transactions/storage/splash/preferences/projection/scene movement, with throwing build/upgrade/cost/refund/save commit sentinels; unified preview uses native pickup without the unadapted WE legacy held-list hook; unsupported/mobile markers use desktop fixture only; old Game/UI use current CSS and consumers; no player game/profile/config/save/Steam' }, null, 2))
 		console.log('Report: ' + output)
 		for (const ctx of contexts) await ctx.close()
 		await browser.close(); await new Promise(resolve => server.close(resolve))

@@ -61,6 +61,7 @@
     "scripts/chasm-transfer-path-index.js",
     "scripts/resource-explosion-bezier-fast-path.js",
     "scripts/floor-grid-lines.js",
+    "scripts/placement-shadow.js",
     "scripts/clear-view-options.js",
     "scripts/play-time-counter.js",
     "scripts/dynamic-camera.js",
@@ -93,10 +94,10 @@
       },
       "default": true,
       "description": {
-        "en": "On desktop 1.3, each Esc press exits dismantle/relocate first, then collapses expanded native/classic categories, then opens the menu. Holding Esc does not skip layers. Hot changes affect subsequent keys only; turn off to use native behavior.",
-        "sch": "桌面1.3按Esc依次退出拆除/搬迁、收起已展开的原版/经典分类卡片，最后打开菜单；每次按下只处理一层，长按不连续穿层。开关即时影响后续按键，关闭恢复原版行为。",
-        "modsch": "桌面1.3按Esc依次退出拆除/搬迁、收起已展开的原版/经典分类卡片，最后打开菜单；每次按下只处理一层，长按不连续穿层。开关即时影响后续按键，关闭恢复原版行为。",
-        "tch": "桌面1.3按Esc依次退出拆除/搬遷、收起已展開的原版/經典分類卡片，最後開啟選單；每次按下只處理一層，長按不連續穿層。開關即時影響後續按鍵，關閉恢復原版行為。"
+        "en": "On desktop 1.3, each Esc press cancels building placement, dismantling, relocation or native cloning first, then collapses expanded native/capsule/classic categories, then opens the menu. Holding Esc does not skip layers. Hot changes affect subsequent keys only; turn off to use native behavior.",
+        "sch": "桌面1.3按Esc先取消建筑放置、拆除、搬迁或原生克隆，再收起已展开的原版/胶囊/经典分类卡片，最后打开菜单；每次按下只处理一层，长按不连续穿层。开关即时影响后续按键，关闭恢复原版行为。",
+        "modsch": "桌面1.3按Esc先取消建筑放置、拆除、搬迁或原生克隆，再收起已展开的原版/胶囊/经典分类卡片，最后打开菜单；每次按下只处理一层，长按不连续穿层。开关即时影响后续按键，关闭恢复原版行为。",
+        "tch": "桌面1.3按Esc先取消建築放置、拆除、搬遷或原生複製，再收起已展開的原版/膠囊/經典分類卡片，最後開啟選單；每次按下只處理一層，長按不連續穿層。開關即時影響後續按鍵，關閉恢復原版行為。"
       },
       "reloadPolicy": "hot",
       "section": "escapeBehavior",
@@ -105,6 +106,30 @@
         "sch": "Esc 行为（1.3）",
         "modsch": "Esc 行为（1.3）",
         "tch": "Esc 行為（1.3）"
+      }
+    },
+    "enablePlacementShadowTraversalReuse": {
+      "type": "boolean",
+      "label": {
+        "en": "Reuse building traversal for occupied-cell shading",
+        "sch": "复用建筑遍历绘制占位阴影",
+        "modsch": "复用建筑遍历绘制占位阴影",
+        "tch": "重用建築遍歷繪製佔位陰影"
+      },
+      "description": {
+        "en": "Preserve placement shading while reusing the current building-render pass instead of scanning empty map cells. Unsupported or incomplete frames use the original path. Turn off to compare instantly.",
+        "sch": "保留放置占位阴影，复用当前帧建筑渲染遍历，避免逐格扫描空地图。入口不支持或收集不完整时走原路径；关闭可即时对照。",
+        "modsch": "保留放置占位阴影，复用当前帧建筑渲染遍历，避免逐格扫描空地图。入口不支持或收集不完整时走原路径；关闭可即时对照。",
+        "tch": "保留放置佔位陰影，重用目前影格的建築繪製遍歷，避免逐格掃描空地圖。入口不支援或收集不完整時使用原路徑；關閉可即時比較。"
+      },
+      "default": true,
+      "reloadPolicy": "hot",
+      "section": "clearViewOptions",
+      "sectionLabel": {
+        "en": "Clear view (1.3)",
+        "sch": "清晰视图（1.3）",
+        "modsch": "清晰视图（1.3）",
+        "tch": "清晰視圖（1.3）"
       }
     },
     "disableClearViewGrid": {

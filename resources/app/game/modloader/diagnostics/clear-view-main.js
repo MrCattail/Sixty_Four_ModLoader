@@ -6,6 +6,30 @@ const crypto = require('crypto')
 const CHANNEL = 'modloader:clear-view-probe'
 const TRACE_CATEGORIES = ['toplevel', 'devtools.timeline', 'disabled-by-default-devtools.timeline',
   'disabled-by-default-devtools.timeline.frame', 'blink.user_timing', 'v8', 'v8.execute', 'cc', 'gpu', 'viz', 'benchmark']
+const PLACEMENT_TRACE_CATEGORIES = ['toplevel', 'devtools.timeline', 'blink.user_timing', 'cc', 'gpu', 'viz']
+
+function sanitizeStartupDiagnostic(value) {
+  const stages = ['main-start', 'protocol-check', 'placement-module', 'placement-setup', 'placement-start', 'comparison-start', 'recorder-start', 'observer-start']
+  if (!value || value.schemaVersion !== 1 || !stages.includes(value.stage) || typeof value.cancelled !== 'boolean') throw new Error('无效的探针启动诊断。')
+  const text = (v, limit) => typeof v === 'string' ? v.replace(/[\u0000-\u001f\u007f]/g, ' ').slice(0, limit) : ''
+  const error = v => ({ name: text(v?.name, 64), message: text(v?.message, 500) })
+  const result = { schemaVersion: 1, stage: value.stage, cancelled: value.cancelled, error: error(value.error) }
+  if (value.cleanupError) result.cleanupError = error(value.cleanupError)
+  if (value.scene && typeof value.scene === 'object') {
+    result.scene = {}
+    for (const key of ['zoom', 'unit', 'plane', 'width', 'height', 'projectionPitch', 'projectionYaw', 'hoveredX', 'hoveredY']) result.scene[key] = Number.isFinite(value.scene[key]) ? value.scene[key] : null
+    for (const key of ['item', 'hovered', 'transported', 'touch', 'mobile', 'halt', 'hidden', 'focused', 'menuOpen']) result.scene[key] = typeof value.scene[key] === 'boolean' ? value.scene[key] : null
+    result.scene.itemType = text(value.scene.itemType, 64)
+    result.scene.interactionMode = text(value.scene.interactionMode, 32)
+  }
+  if (value.configuration && typeof value.configuration === 'object') result.configuration = Object.fromEntries(
+    ['disableClearViewGrid', 'useTweaksClearViewGridStyle', 'disableClearViewBuildingClipping'].map(key => [key, typeof value.configuration[key] === 'boolean' ? value.configuration[key] : null]))
+  if (value.capabilities && typeof value.capabilities === 'object') result.capabilities = Object.fromEntries(
+    ['renderGrid', 'renderEntitiesAbstract'].map(name => [name, { supported: value.capabilities[name]?.supported === true,
+      sha256: typeof value.capabilities[name]?.sha256 === 'string' && /^[a-f0-9]{64}$/.test(value.capabilities[name].sha256) ? value.capabilities[name].sha256 : null }]))
+  for (const key of ['sceneUnavailable', 'configurationUnavailable', 'capabilitiesUnavailable']) if (value[key] === true) result[key] = true
+  return result
+}
 
 function summarize(report, record) {
   const number = n => Number.isFinite(n) ? n.toFixed(2) : '未测得'
@@ -13,8 +37,48 @@ function summarize(report, record) {
     `- 记录目录：${record.directory}`, `- 浏览器时间线：${record.trace.status}`,
     '- 方法数值为同步调用墙钟耗时，包含当前模组包装及原生调用等待；不等于 GPU 硬件耗时。',
     '- 方法 inclusive 会重叠，禁止直接相加；self 只扣除已测量子方法。',
-    '- 底层轨道是否足够定位 GPU／栅格化／合成，必须查看 trace.json；缺失不能推算。', '']
+    '- 底层轨道是否足够定位 GPU／栅格化／合成，必须查看底层时间线文件；缺失不能推算。', '']
+  if (record.trace.fileName) lines.push(`- 底层文件：${record.trace.fileName}；格式：${record.trace.format}。Perfetto原生流不伪装成JSON；覆盖和丢失仍需离线核对。`, '')
+  if (record.trace.categoryDiscoveryIncomplete) lines.push('- 当前类别枚举不完整，已请求固定白名单；请求分类不等于实际轨道存在，须核对原始时间线。', '')
+  if (record.rendererStartup) {
+    const d = record.rendererStartup
+    lines.push('## 采集未开始', '', `- 启动结果：${d.cancelled ? '启动期间取消' : '渲染进程启动失败'}；阶段：${d.stage}。`,
+      `- 错误：${d.error.name}：${d.error.message}`,
+      '- 本记录没有完成有效采样，不能用于性能归因。白名单场景、三项冲突设置与原生方法能力见 session.json 的 rendererStartup。')
+    if (d.cleanupError) lines.push(`- 清理错误：${d.cleanupError.name}：${d.cleanupError.message}`)
+    lines.push('')
+  }
+  if (record.startError) lines.push('- 主进程启动错误：' + record.startError, '')
   if (report) {
+    if (report.placement) {
+      const p = report.placement, groups = new Map()
+      const median = values => { const a = values.filter(Number.isFinite).sort((x, y) => x - y); return a.length ? a[Math.ceil(a.length / 2) - 1] : null }
+      for (const frame of report.frames) {
+        const d = frame?.placement
+        if (!d) continue
+        const key = [d.phase, 'zoom=' + frame.scene?.zoom, frame.observedView, frame.scene?.item ? frame.scene.itemType : '无手持', d.kind].join(' / ')
+        const row = groups.get(key) || { key, count: 0, stable: 0, setup: [], lines: [], scan: [], cells: [], entities: [], masks: [], call: [], overhead: [] }
+        row.count++; if (frame.comparable) row.stable++
+        // Block timings retain raw samples; comparable frame intervals are in the general table.
+        if (d.grid) { row.setup.push(d.grid.setupMs); row.lines.push(d.grid.linesMs); row.scan.push(d.grid.placementMs); row.cells.push(d.grid.executedCells) }
+        if (d.detail) { row.entities.push(d.detail.entityMs); row.masks.push(d.detail.maskMs) }
+        row.call.push(frame.durationMs); row.overhead.push(d.callbackOverheadMs)
+        groups.set(key, row)
+      }
+      lines.push('## 新版放置细分', '', `- 完整协议：${p.completed ? '是' : '否'}；停止原因：${p.stopReason}；详细采样每${p.detailEvery}帧一次。`,
+        '- 原样/raw直接调用捕获的原方法；timed含分块计时；detail含稀疏逐实体/遮罩计时。原样、普通计时和详细采样开销必须分别判断。',
+        '- 下表是各类原始同步耗时中位数（不是GPU时间）；detail及相邻间隔已从稳定帧统计排除。空白代表未测得，不代表零成本。',
+        '- 扫描格数从实际原生循环边界计算；描边次数是原生层尝试/发出的调用，外层已有Mod可能再抑制；不等于实际像素。', '',
+        '| 组/缩放/视图/手持/采样 | 样本/稳定帧 | 网格准备 ms | 网格线 ms | 放置扫描+阴影 ms | 执行格数 | 建筑render ms | 白色mask ms | 外层帧调用 ms | 已计入几何记录开销 ms |',
+        '| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |')
+      for (const row of groups.values()) lines.push(`| ${row.key} | ${row.count}/${row.stable} | ${number(median(row.setup))} | ${number(median(row.lines))} | ${number(median(row.scan))} | ${number(median(row.cells))} | ${number(median(row.entities))} | ${number(median(row.masks))} | ${number(median(row.call))} | ${number(median(row.overhead))} |`)
+      if (p.comparison) {
+        lines.push('', '| 对照组 | 开始/结束 ms | 帧数 | 原生网格/抽象入口次数 |', '| --- | --- | ---: | ---: |')
+        for (const phase of p.phases) lines.push(`| ${phase.label} | ${number(phase.startMs)}/${number(phase.endMs)} | ${phase.frames} | ${phase.gridCalls}/${phase.abstractCalls} |`)
+        lines.push('', '- 仅对照期间按组省略指定绘制；结束恢复。首尾漂移、有效帧和实体数范围另见通用统计，不把合成检查当成现场因果证明。')
+      }
+      lines.push('', ...p.warnings.map(w => '- ' + w), ...p.limitations.map(w => '- ' + w), '')
+    }
     if (report.origin) {
       const o = report.origin
       lines.push('## 启动来源观测', '', `- 游戏完成初始化：${o.ready ? '是' : '否'}；loadSave 调用数：${o.loads}；停止原因：${report.stopReason}`,
@@ -94,7 +158,7 @@ function createService(options) {
   function save(record, report = null) {
     if (report) record.savedReport = report
     record.savePromise = (record.savePromise || Promise.resolve()).catch(() => {}).then(async () => {
-      const metadata = Object.fromEntries(['id', 'mode', 'seconds', 'directory', 'status', 'startedAtUtc', 'originReadyAtUtc', 'finishedAtUtc', 'versions', 'trace', 'window', 'gpuFeatures', 'gpuDevices', 'gpuInfoError'].map(key => [key, record[key]]))
+      const metadata = Object.fromEntries(['id', 'mode', 'seconds', 'directory', 'status', 'startedAtUtc', 'originReadyAtUtc', 'finishedAtUtc', 'startError', 'rendererStartup', 'versions', 'trace', 'window', 'gpuFeatures', 'gpuDevices', 'gpuInfoError'].map(key => [key, record[key]]))
       await fs.promises.writeFile(path.join(record.directory, 'session.json'), JSON.stringify(metadata, null, 2))
       if (record.savedReport) await fs.promises.writeFile(path.join(record.directory, 'frames.json'), JSON.stringify(record.savedReport))
       await fs.promises.writeFile(path.join(record.directory, 'summary.md'), summarize(record.savedReport, record))
@@ -110,6 +174,17 @@ function createService(options) {
       record.trace.bufferUsage = 'not-queried: Electron 28 native HandleScope crash'
       try {
         await contentTracing.stopRecording(path.join(record.directory, 'trace.json'))
+        // New shipped runtimes export Perfetto protobuf, even with a .json path.
+        // Inspect a bounded header; preserve the native stream without conversion.
+        const file = path.join(record.directory, 'trace.json'), header = Buffer.alloc(64)
+        const handle = await fs.promises.open(file, 'r')
+        let bytesRead
+        try { ({ bytesRead } = await handle.read(header, 0, header.length, 0)) } finally { await handle.close() }
+        if (!bytesRead) throw new Error('底层追踪文件为空。')
+        const json = /^\s*\{\s*"/.test(header.subarray(0, bytesRead).toString('utf8'))
+        record.trace.format = json ? 'chrome-json' : 'perfetto-protobuf'
+        record.trace.fileName = json ? 'trace.json' : 'trace.pftrace'
+        if (!json) await fs.promises.rename(file, path.join(record.directory, record.trace.fileName))
         record.trace.status = 'saved'
       } catch (error) { record.trace.status = 'failed'; record.trace.error = safeError(error); traceStopUncertain = true }
       record.trace.stoppedAtUtc = new Date().toISOString()
@@ -157,13 +232,14 @@ function createService(options) {
   async function start(win, payload) {
     if (active || options.isOtherBusy?.()) throw new Error('已有探针采集正在运行。')
     if (traceStopUncertain) throw new Error('上次底层追踪未能正常停止，请完整重启游戏后再采集。')
-    if (!['light', 'deep', 'ablation', 'grid-ablation', 'grid-threshold', 'origin'].includes(payload.mode)) throw new Error('未知采集方式。')
-    if (payload.mode === 'deep' && (win.webContents.isDevToolsOpened?.() || win.webContents.debugger?.isAttached?.())) throw new Error('深入记录前请关闭开发者工具或调试连接，再重试。')
-    const seconds = payload.mode === 'origin' ? 30 : payload.mode === 'grid-threshold' ? 96 : payload.mode === 'grid-ablation' ? 72 : payload.mode === 'ablation' ? 60 : Math.min(30, Math.max(5, Number(payload.seconds) || 20))
+    if (!['light', 'deep', 'ablation', 'grid-ablation', 'grid-threshold', 'origin', 'placement-light', 'placement-deep', 'placement-ablation'].includes(payload.mode)) throw new Error('未知采集方式。')
+    const deep = payload.mode === 'deep' || payload.mode === 'placement-deep'
+    if (deep && (win.webContents.isDevToolsOpened?.() || win.webContents.debugger?.isAttached?.())) throw new Error('深入记录前请关闭开发者工具或调试连接，再重试。')
+    const seconds = payload.mode === 'origin' ? 30 : payload.mode === 'grid-threshold' ? 96 : payload.mode === 'grid-ablation' ? 72 : payload.mode === 'ablation' || payload.mode === 'placement-ablation' ? 60 : payload.mode.startsWith('placement-') ? 20 : Math.min(30, Math.max(5, Number(payload.seconds) || 20))
     const id = new Date().toISOString().replace(/[:.]/g, '-') + '-' + crypto.randomBytes(4).toString('hex')
     const record = { id, mode: payload.mode, seconds, directory: path.join(outputRoot, id), sender: win.webContents,
       status: 'starting', startedAtUtc: new Date().toISOString(), versions: options.versions || process.versions,
-      trace: { status: payload.mode === 'deep' ? 'pending' : 'not-requested', hardwareGpuTime: 'not-measured' } }
+      trace: { status: deep ? 'pending' : 'not-requested', hardwareGpuTime: 'not-measured' } }
     let setupComplete
     record.setupDone = new Promise(resolve => { setupComplete = resolve })
     active = record
@@ -178,13 +254,19 @@ function createService(options) {
         record.gpuDevices = gpu.gpuDevice?.map(d => ({ vendorId: d.vendorId, deviceId: d.deviceId, active: d.active })) || []
       } catch (error) { record.gpuInfoError = safeError(error) }
       if (record.cancelled) throw new Error('窗口已关闭或重新加载。')
-      if (payload.mode === 'deep') {
+      if (deep) {
         const available = await contentTracing.getCategories()
         if (record.cancelled) throw new Error('窗口已关闭或重新加载。')
-        const selected = TRACE_CATEGORIES.filter(c => available.includes(c))
-        if (!selected.includes('devtools.timeline')) throw new Error('当前运行时没有所需的时间线分类。')
+        const requested = payload.mode === 'placement-deep' ? PLACEMENT_TRACE_CATEGORIES : TRACE_CATEGORIES
+        let selected = requested.filter(c => available.includes(c))
+        if (!selected.includes('devtools.timeline')) {
+          if (payload.mode !== 'placement-deep') throw new Error('当前运行时没有所需的时间线分类。')
+          // Discovery can be incomplete until a code path runs. Request only our
+          // fixed allowlist and let marker/event coverage establish availability.
+          selected = [...requested]; record.trace.categoryDiscoveryIncomplete = true
+        }
         record.trace.categories = selected
-        record.trace.missingCategories = TRACE_CATEGORIES.filter(c => !selected.includes(c))
+        record.trace.missingCategories = requested.filter(c => !available.includes(c))
         record.trace.bufferLimitKB = 32768
         // The argument-filter flag also crashes this shipped Electron 28 at flush.
         // Verified with a minimal isolated A/B. Keep the category allowlist instead.
@@ -198,9 +280,13 @@ function createService(options) {
       record.status = 'recording'
       await save(record)
       setupComplete()
-      setDeadline(record, (payload.mode === 'origin' ? 120 : seconds) * 1000)
+      // Give the placement renderer time to emit capture-stop before the safety
+      // watchdog flushes tracing. Hung renderers still have a bounded deadline.
+      if (payload.mode === 'placement-deep') record.trace.watchdogGraceMs = 1000
+      setDeadline(record, (payload.mode === 'origin' ? 120 : seconds) * 1000 + (payload.mode === 'placement-deep' ? 1000 : 0))
       return { id, seconds }
     } catch (error) {
+      record.startError = safeError(error)
       setupComplete()
       await abandon(record, 'start-failed').catch(() => {})
       throw error
@@ -208,15 +294,17 @@ function createService(options) {
   }
   async function finish(record, report) {
     if (record.finishPromise) return record.finishPromise
-    const comparison = record.mode === 'ablation' || record.mode === 'grid-ablation' || record.mode === 'grid-threshold'
+    const comparison = record.mode === 'ablation' || record.mode === 'grid-ablation' || record.mode === 'grid-threshold' || record.mode === 'placement-ablation'
     const frameLimit = comparison ? 24000 : 12000
     if (!report || report.schemaVersion !== 1 || !Array.isArray(report.frames) || report.frames.length > frameLimit || !Array.isArray(report.methods) || report.methods.length > 64 || !Array.isArray(report.groups) || report.groups.length > frameLimit) throw new Error('无效或过大的探针报告。')
     if (record.mode === 'origin' && (report.origin?.protocol !== 'clear-view-origin-v1' || !Array.isArray(report.origin.events) || report.origin.events.length > 2048 || !Array.isArray(report.origin.stacks) || report.origin.stacks.length > 24 || !Array.isArray(report.origin.contexts) || report.origin.contexts.length > 8)) throw new Error('无效或过大的启动来源报告。')
+    if (record.mode.startsWith('placement-') && (report.placement?.protocol !== 'placement-v1' || !Array.isArray(report.placement.phases) || report.placement.phases.length > 5 || !Array.isArray(report.placement.warnings) || report.placement.warnings.length > 24 || !Array.isArray(report.placement.limitations) || report.placement.limitations.length > 16)) throw new Error('无效或过大的放置细分报告。')
+    if (report.placement?.completed && (!report.frames.length || report.placement.phases.length !== (comparison ? 5 : 1))) throw new Error('放置细分缺少完整采样组或有效帧，不能标记完成。')
     if (Buffer.byteLength(JSON.stringify(report)) > (comparison ? 64 : 24) * 1024 * 1024) throw new Error('探针报告超过大小上限。')
     timers.clearTimeout(record.timer); timers.clearTimeout(record.grace)
     record.finishPromise = (async () => {
       await stopTrace(record)
-      record.status = 'complete'; record.finishedAtUtc = new Date().toISOString()
+      record.status = report.placement && !report.placement.completed ? 'incomplete' : 'complete'; record.finishedAtUtc = new Date().toISOString()
       await save(record, report)
       last = record
       if (active === record) active = null
@@ -250,7 +338,17 @@ function createService(options) {
         return reply(true, { seconds: 30 })
       }
       if (payload.action === 'finish') return reply(true, await finish(record, payload.report))
-      if (payload.action === 'abort') { await abandon(record, 'cancelled'); return reply(true, { status: 'cancelled' }) }
+      if (payload.action === 'abort') {
+        let status = 'cancelled'
+        if (payload.startup !== undefined) {
+          if (record !== active || record.cancelled || record.finishPromise || record.status !== 'recording') throw new Error('当前会话不能接收启动失败诊断。')
+          record.rendererStartup = sanitizeStartupDiagnostic(payload.startup)
+          status = record.rendererStartup.cancelled ? 'startup-cancelled' : 'renderer-start-failed'
+          record.finishedAtUtc = new Date().toISOString()
+        }
+        await abandon(record, status)
+        return reply(true, { status: record.status, directory: record.directory, traceStatus: record.trace.status })
+      }
       throw new Error('未知探针操作。')
     } catch (error) { return reply(false, safeError(error)) }
   }

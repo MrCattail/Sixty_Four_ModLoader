@@ -23,6 +23,12 @@ For most players:
 2. Open `modloader-installer` and double-click `Install ModLoader.cmd`.
 3. Start the game and press `Ctrl+M`.
 
+The installer prints `Installation may take a minute. Do not close this window.`
+before it starts. After the five source checks, silent file-list, backup and copy
+work uses a single-line `| / - \` spinner with the current phase and file count.
+When output is redirected to a log or automated test, it prints one normal line
+per phase instead of carriage-return animation.
+
 If Windows extracts the zip into a new `SixtyFour-ModLoader` folder inside
 `win-unpacked`, open `SixtyFour-ModLoader\modloader-installer` and double-click
 `Install ModLoader.cmd` there. The installer will detect the nested package and

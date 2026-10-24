@@ -104,6 +104,14 @@ Both shortcuts update the existing `modloader:panelState` immediately and stay
 in sync with Menu Settings. Manual mode stops the auto-hide timer but still
 allows **Hide to edge** to be used explicitly.
 
+While the visible main panel is open, `Esc` closes one ModLoader layer per key
+press: an expanded Mod configuration first, then Menu Settings, then the panel
+itself to its remembered edge. A handled press is consumed before the game's
+native pause/menu shortcut, and holding the key cannot cascade through multiple
+layers. Unsaved configuration edits remain in memory when their row collapses.
+Once the panel is already edge-hidden, `Esc` belongs to the game again. Existing
+ModLoader select menus and modal prompts keep their own keyboard behavior.
+
 The lower-left status line also shows the loader version, enabled mod count,
 and `Ctrl+M` reminder.
 

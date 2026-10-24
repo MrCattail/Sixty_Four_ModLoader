@@ -65,12 +65,19 @@
 								// Mirror only the desktop 1.3 abstract entity loop, omitting
 								// its outer diamond. Do not switch to renderEntities/caches,
 								// or intercept clip() used inside an entity's own renderer.
-								for (let i = 0; i < this.stuff.length; i++) {
-									const entity = this.stuff[i]
-									if (entity.name === 'conductor' || !this.isVisible(entity)) continue
-									this.ctx.save()
-									try { entity.render(args[0]) } finally { this.ctx.restore() }
-								}
+								const placement = window.__cattailPlacementRenderHooksV1
+								const pass = placement?.beginPass(this)
+								let complete = false
+								try {
+									for (let i = 0; i < this.stuff.length; i++) {
+										const entity = this.stuff[i]
+										if (pass) placement.visit(this, entity, pass)
+										if (entity.name === 'conductor' || !this.isVisible(entity)) continue
+										this.ctx.save()
+										try { entity.render(args[0]) } finally { this.ctx.restore() }
+									}
+									complete = true
+								} finally { if (pass) placement.endPass(this, pass, complete) }
 							})
 						}
 					})

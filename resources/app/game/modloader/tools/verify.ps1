@@ -137,6 +137,7 @@ $snapshotContractTests = @(
 	[ordered]@{ file = 'ui-page-menu-scroll-contract.test.js'; description = 'UI page menu scroll contract'; pattern = 'automatic max-height, inertial wheel, ModLoader scrollbar styling' },
 	[ordered]@{ file = 'panel-description-display-mode-contract.test.js'; description = 'Panel description display mode contract'; pattern = 'hover default, inline descriptions, translated settings' },
 	[ordered]@{ file = 'panel-header-quick-toggles-contract.test.js'; description = 'Panel header quick toggles contract'; pattern = 'button order, sun/moon, pin states, persistence, manual edge hiding, themes, translations' },
+	[ordered]@{ file = 'panel-escape-contract.test.js'; description = 'Panel Escape hierarchy contract'; pattern = 'config collapse, settings collapse, edge hiding, event interception, repeat suppression, cleanup' },
 	[ordered]@{ file = 'settings-api-v1-contract.test.js'; description = 'Settings API v1 contract'; pattern = 'registration, actions, shared renderer, typed values, validation, persistence, themes, scrolling, tooltips, cleanup' },
 	[ordered]@{ file = 'shortcut-api-v1-contract.test.js'; description = 'Shortcut API v1 contract'; pattern = 'ownership, normalization, generation-safe handles, diagnostics, UI structure, documentation, and 20 languages' },
 	[ordered]@{ file = 'tooltip-lifecycle-contract.test.js'; description = 'Tooltip lifecycle contract'; pattern = 'persistent pointer/focus ownership, shared portal isolation, delays, and cleanup' },
