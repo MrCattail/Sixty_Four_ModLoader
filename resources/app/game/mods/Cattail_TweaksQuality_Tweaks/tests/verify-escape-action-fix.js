@@ -117,6 +117,22 @@ function fixture() {
 		if (q.get('shop') === '1.2.1') document.querySelector('.cattail-shop-category-head').click()
 		else game.store.html.types.default.button.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }))
 	}
+	// Dispatch the actual category/header/proxy handlers, retaining native state
+	// changes so the Esc regression cannot be hidden by fixture cleanup.
+	window.clickCategory = (target, entrance = 'header') => {
+		if (q.get('shop') === '1.2.1') {
+			const categories = [...document.querySelectorAll('.cattail-shop-category')]
+			const category = categories.find(node => node.classList.contains('expanded') === (target === 'same'))
+			if (!category) throw new Error('fixture category missing')
+			category.querySelector('.cattail-shop-category-head').click()
+		} else {
+			const id = target === 'same' ? 'default' : 'tools'
+			const button = entrance === 'proxy' ? document.querySelector('[data-native-proxy="' + id + '"]') : game.store.html.types[id].button
+			if (!button) throw new Error('fixture category entrance missing')
+			button.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true, button: 0 }))
+		}
+	}
+
 	window.prepare = (mode, cards = false, area = false) => {
 		document.activeElement?.blur?.()
 		delete game.itemInHand; delete game.orbifoldUI; delete game.interactionMode; delete game.transportedEntity
@@ -303,6 +319,38 @@ async function main() {
 					}
 				})
 			}
+
+			for (const entrance of query.includes('accordion') ? ['header', 'proxy'] : ['header']) for (const target of ['same', 'other']) {
+				await check('category ' + entrance + '/' + target + ' keeps placement, cards and menu on separate Esc presses ' + (query || 'native'), async () => {
+					for (const source of ['shop', 'q', 'upgrade']) {
+						await page.evaluate(source => beginPlacement(source), source)
+						if (source === 'q') await page.keyboard.press('q')
+						await page.evaluate(source => showPlacementHint(source), source)
+						await page.locator('canvas').dispatchEvent('mousedown', { button: 0, buttons: 1, clientX: 90, clientY: 90 })
+						await page.evaluate(({ target, entrance }) => clickCategory(target, entrance), { target, entrance })
+						const before = await sample(page)
+						assert.equal(before.mode, query.includes('shop=1.2.1') ? 'build' : null) // Category behavior stays native.
+						assert.equal(before.item, source === 'upgrade' ? 'waypoint2' : 'pump'); assert.equal(before.hintVisible, true)
+						assert.equal(before.cards, target === 'other')
+						await page.keyboard.down('Escape'); await page.keyboard.down('Escape'); await page.keyboard.down('Escape')
+						const cancelled = await sample(page)
+						assert.equal(cancelled.splash, false); assert.equal(cancelled.cards, before.cards); assert.equal(cancelled.item, null); assert.equal(cancelled.hintVisible, false)
+						cleaned(cancelled, before); unchanged(before, cancelled)
+						await page.keyboard.up('Escape')
+						await page.locator('canvas').dispatchEvent('mouseup', { button: 0, buttons: 0, clientX: 90, clientY: 90 })
+						const released = await sample(page); unchanged(before, released); assert.equal(released.calls.release, 1); assert.equal(released.item, null)
+						if (before.cards) { await press(page); assert.equal((await sample(page)).cards, false); assert.equal((await sample(page)).splash, false) }
+						await press(page); assert.equal((await sample(page)).splash, true)
+					}
+				})
+			}
+			await check('switching categories with no held object collapses cards immediately ' + (query || 'native'), async () => {
+				await page.evaluate(() => { prepare(null, true); clickCategory('other') })
+				const before = await sample(page); assert.equal(before.cards, true); assert.equal(before.item, null)
+				await press(page); const after = await sample(page); unchanged(before, after); assert.equal(after.cards, false); assert.equal(after.splash, false)
+				await press(page); assert.equal((await sample(page)).splash, true)
+			})
+
 		}
 		const page = await setup()
 		await check('single/area erase and relocation cancellation prevents actual mouseup commit', async () => {
@@ -418,6 +466,63 @@ async function main() {
 				await press(page); const s = await sample(page); assert.equal(s.item, null); assert.equal(s.cards, true); assert.equal(s.splash, s.unified)
 			}
 		})
+		await check('orphaned preview rejects foreign, world, transported and unknown held objects', async () => {
+			for (const kind of ['plain', 'foreign', 'world', 'transported', 'eraser', 'unpurchasable', 'unknown-mode', 'unknown-class']) {
+				await page.evaluate(kind => {
+					beginPlacement('shop'); showPlacementHint('shop'); clickCategory('other')
+					if (kind === 'plain') game.itemInHand = { name: 'pump', master: game }
+					if (kind === 'foreign') game.itemInHand.master = {}
+					if (kind === 'world') { game.itemInHand.position = [8, 9]; game.stuff.push(game.itemInHand) }
+					if (kind === 'transported') game.transportedEntity = {}
+					if (kind === 'eraser') game.itemInHand.eraser = true
+					if (kind === 'unpurchasable') game.codex.entities.pump.canPurchase = false
+					if (kind === 'unknown-mode') game.interactionMode = 'third-party'
+					if (kind === 'unknown-class') { window.savedPumpClass = game.codex.entities.pump.class; game.codex.entities.pump.class = () => {} }
+				}, kind)
+				const before = await sample(page); await press(page); const after = await sample(page)
+				unchanged(before, after); assert.equal(after.cards, true); assert.equal(after.splash, after.unified)
+				await page.evaluate(kind => {
+					if (kind === 'world') game.stuff.pop()
+					if (kind === 'unpurchasable') game.codex.entities.pump.canPurchase = true
+					if (kind === 'unknown-class') { game.codex.entities.pump.class = savedPumpClass; delete window.savedPumpClass }
+				}, kind)
+			}
+		})
+		await check('orphaned preview consumes inherited repeat only and blur unlocks the next layer', async () => {
+			await page.evaluate(() => {
+				beginPlacement('shop'); showPlacementHint('shop'); clickCategory('other')
+				dispatchEvent(new KeyboardEvent('keydown', { code: 'Escape', key: 'Escape', repeat: true, cancelable: true }))
+			})
+			assert.equal((await sample(page)).item, 'pump'); assert.equal((await sample(page)).calls.splash, 0)
+			await page.evaluate(() => dispatchEvent(new Event('blur')))
+			await page.keyboard.down('Escape'); assert.equal((await sample(page)).item, null); assert.equal((await sample(page)).cards, true)
+			// Simulate a fresh nonrepeat key after focus loss without delivering the old keyup.
+			await page.evaluate(() => { dispatchEvent(new Event('blur')); dispatchEvent(new KeyboardEvent('keydown', { code: 'Escape', key: 'Escape', cancelable: true })) })
+			assert.equal((await sample(page)).cards, false); assert.equal((await sample(page)).splash, false)
+			await page.keyboard.up('Escape')
+		})
+		await check('orphaned preview hot disable delegates native and re-enable waits for Esc', async () => {
+			await page.evaluate(() => { beginPlacement('shop'); showPlacementHint('shop'); clickCategory('other'); setFix(false) })
+			assert.equal((await sample(page)).item, 'pump'); await press(page)
+			assert.equal((await sample(page)).cards, true); assert.equal((await sample(page)).splash, (await sample(page)).unified)
+			await page.evaluate(() => { beginPlacement('upgrade'); showPlacementHint('upgrade'); clickCategory('other'); setFix(true) })
+			assert.equal((await sample(page)).item, 'waypoint2'); const before = await sample(page); await press(page)
+			const after = await sample(page); cleaned(after, before); unchanged(before, after); assert.equal(after.item, null); assert.equal(after.cards, true); assert.equal(after.splash, false)
+		})
+		await check('orphaned preview still yields to editable, Loader page, WE capture and dialog owners', async () => {
+			await page.evaluate(() => { beginPlacement('shop'); showPlacementHint('shop'); clickCategory('other') })
+			await page.locator('#fixture-input').focus(); await press(page)
+			assert.equal((await sample(page)).splash, (await sample(page)).unified); assert.equal((await sample(page)).cards, true)
+			await page.evaluate(() => { beginPlacement('shop'); showPlacementHint('shop'); clickCategory('other'); buildPage.open(game.splash) })
+			await press(page); assert.equal(await page.evaluate(() => buildPage.isActive()), false); assert.equal((await sample(page)).item, 'pump')
+			await page.evaluate(() => Object.assign(weState, { active: true, pending: true, preview: true, count: 1, steps: [] }))
+			for (let i = 0; i < 4; i++) { await press(page); assert.equal((await sample(page)).item, 'pump'); assert.equal((await sample(page)).splash, false) }
+			assert.deepEqual(await page.evaluate(() => weState.steps), ['pending', 'preview', 'selection', 'hotkey-escape'])
+			await page.evaluate(() => { window.orphanDialog = window[Symbol.for('cattail.world-editor.dialogs')].create({ id: 'orphan-dialog', title: 'Orphan dialog' }); orphanDialog.mount() })
+			await press(page); assert.equal(await page.evaluate(() => orphanDialog.closed), true); assert.equal((await sample(page)).item, 'pump')
+			await press(page); assert.equal((await sample(page)).item, null); assert.equal((await sample(page)).cards, true); assert.equal((await sample(page)).splash, false)
+		})
+
 		await check('non-Esc keys and original keyup movement stay native', async () => {
 			await page.evaluate(() => prepare('erase'))
 			await page.keyboard.down('w'); assert.equal(await page.evaluate(() => game.translationMap[0]), 1)
@@ -517,7 +622,7 @@ async function main() {
 		})
 		assert.deepEqual(errors, []); passed = true; console.log('ESC_ACTION_OK=' + results.length)
 	} finally {
-		fs.writeFileSync(path.join(output, 'report.json'), JSON.stringify({ passed, results, errors, browser: browser.version(), nativeRoot: NATIVE_ROOT, fixSource: FIX_SOURCE, boundary: 'actual desktop Game Q/E/Store purchase/pickupItem/Cloud/keyboard/pointer/processDown/processUp/cleanup and clone pickup, Store/current CSS, Loader/menu/UI page, Better UIs native/accordion/classic/categories, Tweaks Shift-Ctrl guard and WE native-tools/input-controller/shared-dialog source; synthetic entity constructors/world/runtime/shared guards/native-tool eligibility/transactions/storage/splash/preferences/projection/scene movement, with throwing build/upgrade/cost/refund/save commit sentinels; unified preview uses native pickup without the unadapted WE legacy held-list hook; unsupported/mobile markers use desktop fixture only; old Game/UI use current CSS and consumers; no player game/profile/config/save/Steam' }, null, 2))
+		fs.writeFileSync(path.join(output, 'report.json'), JSON.stringify({ passed, results, errors, browser: browser.version(), nativeRoot: NATIVE_ROOT, fixSource: FIX_SOURCE, boundary: 'actual desktop Game Q/E/Store purchase/pickupItem/Cloud/keyboard/pointer/processDown/processUp/cleanup and clone pickup, Store category header/proxy changes and current CSS, Loader/menu/UI page, Better UIs native/accordion/classic/categories, Tweaks Shift-Ctrl guard and WE native-tools/input-controller/shared-dialog source; synthetic entity constructors/world/runtime/shared guards/native-tool eligibility/transactions/storage/splash/preferences/projection/scene movement, with throwing build/upgrade/cost/refund/save commit sentinels; unified preview uses native pickup without the unadapted WE legacy held-list hook; unsupported/mobile markers use desktop fixture only; old Game/UI use current CSS and consumers; no player game/profile/config/save/Steam' }, null, 2))
 		console.log('Report: ' + output)
 		for (const ctx of contexts) await ctx.close()
 		await browser.close(); await new Promise(resolve => server.close(resolve))

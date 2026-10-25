@@ -8,6 +8,12 @@
         const fetchImpl = options.fetch || root.fetch?.bind(root)
         const WebSocketImpl = options.WebSocket || root.WebSocket
         const AbortControllerImpl = options.AbortController || root.AbortController
+        const localOnly = config.localOnly === true
+        const context = options.context
+        if (localOnly) {
+            if (!config.desktop13 || !context?.validate(config)) throw new Error('Valid early P2P session required.')
+            if (config.signalingUrl !== 'http://127.0.0.1:8787') throw new Error('Fixed loopback signaling required.')
+        }
         const listeners = new Set()
         const signalListeners = new Set()
         let socket = null
@@ -29,8 +35,8 @@
             signalingUrl: normalizeBaseUrl(config.signalingUrl || 'http://127.0.0.1:8787', !!config.safeTest),
             socketOpen: false,
             reconnectAttempt: 0,
-            iceMode: 'stun-only',
-            iceServers: [{ urls: ['stun:stun.cloudflare.com:3478', 'stun:stun.cloudflare.com:53'] }],
+            iceMode: localOnly ? 'local-host-only' : 'stun-only',
+            iceServers: localOnly ? [] : [{ urls: ['stun:stun.cloudflare.com:3478', 'stun:stun.cloudflare.com:53'] }],
             turnExpiresAt: null,
             lastEvent: null,
             error: null
@@ -72,6 +78,7 @@
         }
 
         function assertLocalScope() {
+            if (localOnly) { context.assertReady(); options.assertReady?.() }
             if (!config.safeTest) throw new Error('Phase 2 local implementation requires SAFE TEST MODE.')
             if (typeof fetchImpl !== 'function') throw new Error('Fetch is unavailable in this runtime.')
             if (typeof WebSocketImpl !== 'function') throw new Error('WebSocket is unavailable in this runtime.')
@@ -91,6 +98,7 @@
                     method: 'POST',
                     headers,
                     body: JSON.stringify(body || {}),
+                    ...(localOnly ? { redirect: 'error' } : {}),
                     signal: controller?.signal
                 })
                 let value = {}
@@ -113,7 +121,7 @@
                 peerId: String(value.peerId || ''),
                 slot: Number.isFinite(value.slot) ? value.slot : value.role === 'host' ? 0 : null,
                 peers: [],
-                iceServers: Array.isArray(value.iceServers) ? value.iceServers : state.iceServers,
+                iceServers: localOnly ? [] : Array.isArray(value.iceServers) ? value.iceServers : state.iceServers,
                 error: null
             })
         }
@@ -247,12 +255,13 @@
         }
 
         async function refreshIceServers() {
+            if (localOnly) context.assertReady()
             if (!state.roomCode || !participantToken || !resumeToken) throw new Error('A room session is required before requesting ICE servers.')
             const result = await request(`/v2/rooms/${encodeURIComponent(state.roomCode)}/turn`, {}, true)
             const refreshAfterMs = Math.max(5 * 60 * 1000, Number(result.refreshAfterMs || 90 * 60 * 1000))
             update({
-                iceMode: result.mode === 'stun-turn' ? 'stun-turn' : 'stun-only',
-                iceServers: Array.isArray(result.iceServers) ? result.iceServers : state.iceServers,
+                iceMode: localOnly ? 'local-host-only' : result.mode === 'stun-turn' ? 'stun-turn' : 'stun-only',
+                iceServers: localOnly ? [] : Array.isArray(result.iceServers) ? result.iceServers : state.iceServers,
                 turnExpiresAt: Date.now() + Math.max(10 * 60 * 1000, Number(result.ttlSeconds || 7200) * 1000)
             })
             clearTimeout(refreshTimer)

@@ -8,10 +8,13 @@
         const audit = options.audit || { record: function () {} }
         const getHandshake = options.getHandshake
         const PeerConnection = options.RTCPeerConnection || root.RTCPeerConnection
+        const localOnly = config.localOnly === true
+        const context = options.context
+        if (localOnly && (!config.desktop13 || !context?.validate(config))) throw new Error('Valid early P2P session required.')
         const listeners = new Set()
         const peers = new Map()
         let destroyed = false
-        let iceServers = [{ urls: ['stun:stun.cloudflare.com:3478', 'stun:stun.cloudflare.com:53'] }]
+        let iceServers = localOnly ? [] : [{ urls: ['stun:stun.cloudflare.com:3478', 'stun:stun.cloudflare.com:53'] }]
         let lastLoopback = null
         let lastError = null
 
@@ -21,6 +24,7 @@
                 role: record.role,
                 status: record.status,
                 channelOpen: !!record.channel && record.channel.readyState === 'open',
+                sameMachine: record.sameMachine === true,
                 connectionPath: record.connectionPath,
                 localCandidateType: record.localCandidateType,
                 remoteCandidateType: record.remoteCandidateType,
@@ -38,6 +42,8 @@
         function snapshot() {
             const list = Array.from(peers.values()).map(publicPeer).sort(function (left, right) { return left.peerId.localeCompare(right.peerId) })
             return {
+                iceServerCount: iceServers.length,
+                localOnly,
                 status: destroyed ? 'closed' : list.some(function (peer) { return peer.channelOpen }) ? 'connected' : list.length ? 'connecting' : 'idle',
                 role: config.role || 'none',
                 peers: list,
@@ -67,6 +73,7 @@
         }
 
         function assertAvailable() {
+            if (localOnly) context.assertReady()
             if (destroyed) throw new Error('Transport has been closed.')
             if (typeof PeerConnection !== 'function') throw new Error('RTCPeerConnection is unavailable in this runtime.')
         }
@@ -96,6 +103,7 @@
 
         function closeRecord(record, reason) {
             clearTimeout(record.connectTimer)
+            clearTimeout(record.pathTimer)
             if (record.channel) {
                 try { record.channel.close() } catch (error) {}
             }
@@ -135,6 +143,7 @@
                     localRole: config.role,
                     peerId: record.peerId
                 })
+                if (localOnly && record.remoteHandshake.gameVersion !== getHandshake().gameVersion) throw new Error('Remote game version mismatch.')
                 sendEnvelope(record, protocol.MESSAGE_TYPES.HANDSHAKE_ACK, { accepted: true, protocolVersion: protocol.PROTOCOL_VERSION })
                 audit.record('remote-handshake-accepted', { peerId: record.peerId, role: record.remoteHandshake.role })
             } else if (envelope.type === protocol.MESSAGE_TYPES.HANDSHAKE_ACK) {
@@ -201,11 +210,25 @@
                 const reports = await record.pc.getStats()
                 let pair = null
                 reports.forEach(function (report) {
+                    if (report.type === 'transport' && report.selectedCandidatePairId) pair = reports.get(report.selectedCandidatePairId)
+                })
+                reports.forEach(function (report) {
                     if (report.type === 'candidate-pair' && report.state === 'succeeded' && (report.nominated || report.selected)) pair = report
                 })
-                if (!pair) return
+                if (!pair) {
+                    record.pathAttempts = (record.pathAttempts || 0) + 1
+                    if (record.pc && record.pathAttempts < 20) {
+                        clearTimeout(record.pathTimer)
+                        record.pathTimer = setTimeout(function () { inspectConnectionPath(record) }, 250)
+                    }
+                    return
+                }
                 const local = reports.get(pair.localCandidateId)
                 const remote = reports.get(pair.remoteCandidateId)
+                if (localOnly) {
+                    for (const candidate of [local, remote]) context.candidateAllowed({ candidate: 'candidate:stats 1 udp 1 ' + candidate?.address + ' ' + candidate?.port + ' typ ' + candidate?.candidateType })
+                    record.sameMachine = true
+                }
                 record.localCandidateType = String(local?.candidateType || 'unknown')
                 record.remoteCandidateType = String(remote?.candidateType || 'unknown')
                 record.connectionPath = record.localCandidateType === 'relay' || record.remoteCandidateType === 'relay' ? 'relay' : 'direct'
@@ -229,6 +252,7 @@
             pc.onicecandidate = function (event) {
                 if (!event.candidate) return
                 try {
+                    if (localOnly) context.candidateAllowed(event.candidate)
                     signaling.send(protocol.SIGNAL_TYPES.ICE, { targetPeerId: record.peerId, candidate: event.candidate.toJSON ? event.candidate.toJSON() : event.candidate })
                 } catch (error) { fail(error, 'ice-signal-send-error', record) }
             }
@@ -284,6 +308,7 @@
             peers.set(peerId, record)
             try {
                 const pc = createPeerConnection(record, false)
+                if (localOnly) context.descriptionAllowed(message.payload.description)
                 await pc.setRemoteDescription(message.payload.description)
                 await flushCandidates(record)
                 await pc.setLocalDescription(await pc.createAnswer())
@@ -301,6 +326,7 @@
             const record = peers.get(peerId)
             if (config.role !== 'host' || !record?.pc) throw new Error('Host received an answer without an active offer.')
             try {
+                if (localOnly) context.descriptionAllowed(message.payload.description)
                 await record.pc.setRemoteDescription(message.payload.description)
                 await flushCandidates(record)
                 record.status = 'ice-dtls'
@@ -316,6 +342,7 @@
             const record = peers.get(peerId)
             if (!record?.pc) return
             try {
+                if (localOnly) context.candidateAllowed(message.payload.candidate)
                 if (record.pc.remoteDescription) await record.pc.addIceCandidate(message.payload.candidate)
                 else record.pendingCandidates.push(message.payload.candidate)
             } catch (error) {
@@ -365,8 +392,8 @@
         }
 
         function setIceServers(nextServers) {
-            if (!Array.isArray(nextServers) || !nextServers.length) return
-            iceServers = nextServers.slice()
+            if (!Array.isArray(nextServers)) return
+            iceServers = localOnly ? [] : nextServers.slice()
             for (const record of peers.values()) {
                 try { record.pc?.setConfiguration({ iceServers: iceServers.slice() }) } catch (error) {
                     audit.record('ice-server-refresh-apply-error', { peerId: record.peerId, message: error.message })

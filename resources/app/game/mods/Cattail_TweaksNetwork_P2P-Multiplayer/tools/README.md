@@ -1,4 +1,44 @@
-# Phase 2 tools
+# Desktop 1.3 tools
+
+## Current desktop 1.3 local acceptance (2026-10-24)
+
+The tools/desktop-1.3 harness runs the actual copied game, assets, clock, world,
+shop and ModLoader with only P2P enabled in the clone. An early preload guard
+redirects progress to session memory; native autosave still runs. Reset,
+import/export and destructive slot actions resolve false. Only isolated
+preference fields persist. Steam/Cloud/SDK use synthetic substitutes.
+
+This path requires a validated early context, game readiness, fixed
+127.0.0.1:8787 signaling, empty ICE servers and same-machine host candidates.
+Creation, joining and refresh never adopt the Worker's STUN/TURN servers.
+The real enabled list remains unchanged.
+
+Approved output root: C:\tmp\sixtyfour-p2p-desktop13-20261024. The baseline and
+before/ backups were created before this batch. Do not overwrite a running
+runtime or an existing report attempt. From the repository root, after reviewing
+the handoff and authorization:
+
+~~~powershell
+node resources/app/game/mods/Cattail_TweaksNetwork_P2P-Multiplayer/tools/desktop-1.3/prepare.cjs
+node resources/app/game/mods/Cattail_TweaksNetwork_P2P-Multiplayer/tools/desktop-1.3/verify.cjs "D:\Steam\steamapps\common\Sixty Four\win-unpacked" 010
+~~~
+
+Attempt 008 passed 43 full-game checks; three startup rejections, 31 client
+unit/regression checks and 18 service regressions also passed. Screenshots were
+visually reviewed. This is automated local P1-equivalent evidence. Player,
+four-instance 1.3, public network and world synchronization acceptance remain open.
+
+Miniflare must use cf:false and caches inside the approved root. Early attempts
+001–004 omitted that setting and refreshed the existing project
+.wrangler/cache/cf.json through public metadata fetch. The incident and missing
+old backup are recorded in scope-incident.json; do not describe those attempts
+as zero-public-network evidence. No account API or deployment was performed.
+
+
+## Archived pre-1.3 Phase 2 tools
+
+Historical workflow below is not the current 1.3 launcher; it uses older runtime/profile assumptions.
+
 
 Phase 2 local workflow (no Cloudflare deployment):
 
@@ -18,7 +58,7 @@ PowerShell history.
 
 ## Archived Phase 1 tools
 
-Canonical tools for the current Phase 1 acceptance:
+Historical tools for the old Phase 1 acceptance:
 
 1. `prepare-phase1.ps1` creates a new disposable clone. It refuses to overwrite an existing root.
 2. If preparation stopped because the original game was open, close the original game and run `finalize-phase1-preparation-v2.ps1`.

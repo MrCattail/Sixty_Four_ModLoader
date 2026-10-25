@@ -35,7 +35,7 @@
 				// Capture-phase UI/editor owners have already had their turn. This
 				// listener is installed before the native window bubble listener.
 				if (handledPress) { consume(event); return }
-				const building = game.interactionMode === 'build' && !!game.itemInHand && !game.itemInHand.eraser
+				const building = (game.interactionMode === 'build' && !!game.itemInHand && !game.itemInHand.eraser) || orphanedBuildingPreview(game)
 				if (game.itemInHand && !building) return // Other held objects stay native.
 				const unifiedCleanup = typeof game.cleanupInteractionMode === 'function'
 				const tool = building || game.interactionMode === 'erase' || game.interactionMode === 'relocate' || (unifiedCleanup && game.interactionMode === 'clone')
@@ -83,5 +83,14 @@
 			api.on('afterGameInit', function (_payload, game) { activeGame = game })
 		}
 	})
+	function orphanedBuildingPreview(game) {
+		// Native category clicks delete the mode without clearing the preview.
+		// Recognize only a detached purchase instance owned by this game.
+		const item = game.itemInHand
+		if (game.interactionMode != null || !item || item.eraser || game.transportedEntity || item.master !== game) return false
+		const definition = game.codex?.entities?.[item.name]
+		return definition?.canPurchase === true && typeof definition.class === 'function' && !!definition.class.prototype &&
+			item instanceof definition.class && Array.isArray(game.stuff) && !game.stuff.includes(item)
+	}
 	function supported(game) { return game?.version === '1.3' && !game.isMobile }
 })()
