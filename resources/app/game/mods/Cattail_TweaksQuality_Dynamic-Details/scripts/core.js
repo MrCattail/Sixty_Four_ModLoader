@@ -417,6 +417,7 @@ ModLoader.register({
 			const current = hint[detailKey]
 			if (current?.entity === entity && current.widthKey === widthKey) return
 
+			if (current) namespace.pumpDistributionChart?.dispose(current)
 			if (current?.topFlow) current.topFlow.remove()
 			if (current?.line) current.line.remove()
 			if (current?.body) current.body.remove()
@@ -457,6 +458,7 @@ ModLoader.register({
 			panel.line.classList.toggle('active', active)
 			panel.body.classList.toggle('active', active)
 			if (!active) {
+				namespace.pumpDistributionChart?.update(panel, entity, false)
 				renderTopFlow(panel, game, null)
 				clearStableWidths(panel)
 				return
@@ -465,13 +467,17 @@ ModLoader.register({
 			const details = describeEntity(entity)
 			const now = performance.now()
 			const signature = details.signature + '|lang:' + (game.language || 'en')
-			if (signature === panel.lastSignature && now < panel.nextRefresh) return
+			if (signature === panel.lastSignature && now < panel.nextRefresh) {
+				namespace.pumpDistributionChart?.update(panel, entity, true)
+				return
+			}
 
 			panel.lastSignature = signature
 			panel.nextRefresh = now + (details.refreshMs || 500)
 			renderTopFlow(panel, game, details.topFlow)
 			renderDetails(panel.body, entity, details.rows)
 			stabilizeDetailWidths(panel)
+			namespace.pumpDistributionChart?.update(panel, entity, true)
 		}
 
 		function isDetailActive(game) {

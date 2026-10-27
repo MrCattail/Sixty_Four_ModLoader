@@ -30,6 +30,282 @@
       },
       "section": "buildingDetails"
     },
+    "enableMineDistributionChart": {
+      "type": "boolean",
+      "label": {
+        "en": "Mineral depth distribution chart",
+        "sch": "矿物深度分布图",
+        "modsch": "矿物深度分布图",
+        "tch": "礦物深度分布圖",
+        "ru": "График распределения минералов по глубине",
+        "de": "Diagramm der Mineralverteilung nach Tiefe",
+        "ptbr": "Gráfico de distribuição de minerais por profundidade",
+        "it": "Grafico della distribuzione dei minerali per profondità",
+        "es": "Gráfico de distribución de minerales por profundidad",
+        "fr": "Graphique de répartition des minéraux selon la profondeur",
+        "nl": "Grafiek van mineraalverdeling per diepte",
+        "cz": "Graf rozložení minerálů podle hloubky",
+        "pl": "Wykres rozkładu minerałów według głębokości",
+        "jp": "鉱物の深度分布図",
+        "kr": "광물 깊이별 분포도",
+        "thai": "แผนภูมิการกระจายแร่ตามความลึก",
+        "hu": "Ásványok mélység szerinti eloszlásdiagramja",
+        "lv": "Minerālu sadalījuma diagramma pēc dziļuma",
+        "ro": "Graficul distribuției mineralelor după adâncime",
+        "no": "Diagram over mineralfordeling etter dybde"
+      },
+      "default": true,
+      "description": {
+        "en": "Show mineral depth distribution charts on extended mine detail cards.",
+        "sch": "在矿井的扩展建筑信息卡片中显示矿物深度分布图。",
+        "modsch": "在矿井的扩展建筑信息卡片中显示矿物深度分布图。",
+        "tch": "在礦井的擴充建築資訊卡片中顯示礦物深度分布圖。",
+        "ru": "Показывать распределение минералов по глубине в расширенных карточках шахт.",
+        "de": "Mineralverteilung nach Tiefe in erweiterten Mineninfokarten anzeigen.",
+        "ptbr": "Mostrar a distribuição de minerais por profundidade nos cartões ampliados das minas.",
+        "it": "Mostra la distribuzione dei minerali per profondità nelle schede dettagliate delle miniere.",
+        "es": "Muestra la distribución de minerales por profundidad en las tarjetas ampliadas de las minas.",
+        "fr": "Affiche la répartition des minéraux selon la profondeur dans les fiches détaillées des mines.",
+        "nl": "Toon de mineraalverdeling per diepte op uitgebreide mijninformatiekaarten.",
+        "cz": "Zobrazovat rozložení minerálů podle hloubky v rozšířených informačních kartách dolů.",
+        "pl": "Pokazuj rozkład minerałów według głębokości na rozszerzonych kartach informacji o kopalniach.",
+        "jp": "鉱山の拡張情報カードに鉱物の深度分布図を表示します。",
+        "kr": "확장된 광산 정보 카드에 광물 깊이별 분포도를 표시합니다.",
+        "thai": "แสดงแผนภูมิการกระจายแร่ตามความลึกในการ์ดข้อมูลเหมืองแบบขยาย",
+        "hu": "Az ásványok mélység szerinti eloszlását mutatja a bővített bányainformációs kártyákon.",
+        "lv": "Rādīt minerālu sadalījumu pēc dziļuma paplašinātajās raktuvju informācijas kartītēs.",
+        "ro": "Afișează distribuția mineralelor după adâncime în cardurile extinse de informații ale minelor.",
+        "no": "Vis mineralfordeling etter dybde på utvidede informasjonskort for gruver."
+      },
+      "reloadPolicy": "hot",
+      "persist": "change",
+      "section": "buildingDetails"
+    },
+    "mineDistributionChartView": {
+      "type": "select",
+      "label": {
+        "en": "Mineral distribution chart style",
+        "sch": "矿物分布图样式",
+        "modsch": "矿物分布图样式",
+        "tch": "礦物分布圖樣式",
+        "ru": "Вид графика распределения минералов",
+        "de": "Darstellung der Mineralverteilung",
+        "ptbr": "Estilo do gráfico de distribuição de minerais",
+        "it": "Stile del grafico di distribuzione dei minerali",
+        "es": "Estilo del gráfico de distribución de minerales",
+        "fr": "Style du graphique de répartition des minéraux",
+        "nl": "Stijl van de mineraalverdelingsgrafiek",
+        "cz": "Styl grafu rozložení minerálů",
+        "pl": "Styl wykresu rozkładu minerałów",
+        "jp": "鉱物分布図の表示形式",
+        "kr": "광물 분포도 스타일",
+        "thai": "รูปแบบแผนภูมิการกระจายแร่",
+        "hu": "Az ásványeloszlás-diagram stílusa",
+        "lv": "Minerālu sadalījuma diagrammas stils",
+        "ro": "Stilul graficului de distribuție a mineralelor",
+        "no": "Stil for mineralfordelingsdiagram"
+      },
+      "default": "stacked",
+      "options": [
+        "stacked",
+        "bands"
+      ],
+      "valueLabels": {
+        "stacked": {
+          "en": "Stacked probability chart",
+          "sch": "堆叠概率图",
+          "modsch": "堆叠概率图",
+          "tch": "堆疊機率圖",
+          "ru": "График вероятностей с накоплением",
+          "de": "Gestapeltes Wahrscheinlichkeitsdiagramm",
+          "ptbr": "Gráfico de probabilidade empilhado",
+          "it": "Grafico di probabilità sovrapposte",
+          "es": "Gráfico de probabilidad apilado",
+          "fr": "Graphique de probabilités empilées",
+          "nl": "Gestapelde kansgrafiek",
+          "cz": "Skládaný graf pravděpodobnosti",
+          "pl": "Skumulowany wykres prawdopodobieństwa",
+          "jp": "積み上げ確率グラフ",
+          "kr": "누적 확률 그래프",
+          "thai": "กราฟความน่าจะเป็นแบบซ้อน",
+          "hu": "Halmozott valószínűségi diagram",
+          "lv": "Uzkrāto varbūtību diagramma",
+          "ro": "Grafic de probabilitate suprapus",
+          "no": "Stablet sannsynlighetsdiagram"
+        },
+        "bands": {
+          "en": "Separate mineral bands",
+          "sch": "独立分布带",
+          "modsch": "独立分布带",
+          "tch": "獨立分布帶",
+          "ru": "Отдельные полосы минералов",
+          "de": "Getrennte Mineralbänder",
+          "ptbr": "Faixas separadas de minerais",
+          "it": "Bande separate per i minerali",
+          "es": "Bandas de minerales separadas",
+          "fr": "Bandes minérales distinctes",
+          "nl": "Aparte mineraalbanden",
+          "cz": "Samostatná pásma minerálů",
+          "pl": "Osobne pasma minerałów",
+          "jp": "鉱物別の分布帯",
+          "kr": "광물별 분포 띠",
+          "thai": "แถบแร่แยกกัน",
+          "hu": "Külön ásványsávok",
+          "lv": "Atsevišķas minerālu joslas",
+          "ro": "Benzi separate pentru minerale",
+          "no": "Separate mineralbånd"
+        }
+      },
+      "description": {
+        "en": "Choose a stacked probability chart or separate mineral bands.",
+        "sch": "选择堆叠概率图或独立矿物分布带。",
+        "modsch": "选择堆叠概率图或独立矿物分布带。",
+        "tch": "選擇堆疊機率圖或獨立礦物分布帶。",
+        "ru": "Выберите график вероятностей с накоплением или отдельные полосы минералов.",
+        "de": "Gestapeltes Wahrscheinlichkeitsdiagramm oder getrennte Mineralbänder wählen.",
+        "ptbr": "Escolha um gráfico de probabilidade empilhado ou faixas separadas de minerais.",
+        "it": "Scegli un grafico di probabilità sovrapposte o bande separate per i minerali.",
+        "es": "Elige un gráfico de probabilidad apilado o bandas de minerales separadas.",
+        "fr": "Choisir un graphique de probabilités empilées ou des bandes minérales distinctes.",
+        "nl": "Kies een gestapelde kansgrafiek of aparte mineraalbanden.",
+        "cz": "Vyberte skládaný graf pravděpodobnosti nebo samostatná pásma minerálů.",
+        "pl": "Wybierz skumulowany wykres prawdopodobieństwa lub osobne pasma minerałów.",
+        "jp": "積み上げ確率グラフまたは鉱物別の分布帯を選択します。",
+        "kr": "누적 확률 그래프 또는 광물별 분포 띠를 선택합니다.",
+        "thai": "เลือกกราฟความน่าจะเป็นแบบซ้อนหรือแถบแร่แยกกัน",
+        "hu": "Halmozott valószínűségi diagram vagy külön ásványsávok választhatók.",
+        "lv": "Izvēlieties uzkrāto varbūtību diagrammu vai atsevišķas minerālu joslas.",
+        "ro": "Alege un grafic de probabilitate suprapus sau benzi separate pentru minerale.",
+        "no": "Velg et stablet sannsynlighetsdiagram eller separate mineralbånd."
+      },
+      "reloadPolicy": "hot",
+      "persist": "change",
+      "section": "buildingDetails"
+    },
+    "mineDistributionVisibility": {
+      "type": "select",
+      "label": {
+        "en": "Mineral visibility",
+        "sch": "矿物显示范围",
+        "modsch": "矿物显示范围",
+        "tch": "礦物顯示範圍",
+        "ru": "Видимость минералов",
+        "de": "Sichtbarkeit der Minerale",
+        "ptbr": "Visibilidade dos minerais",
+        "it": "Visibilità dei minerali",
+        "es": "Visibilidad de minerales",
+        "fr": "Visibilité des minéraux",
+        "nl": "Zichtbaarheid van mineralen",
+        "cz": "Viditelnost minerálů",
+        "pl": "Widoczność minerałów",
+        "jp": "鉱物の表示範囲",
+        "kr": "광물 표시 범위",
+        "thai": "ขอบเขตการแสดงแร่",
+        "hu": "Ásványok láthatósága",
+        "lv": "Minerālu redzamība",
+        "ro": "Vizibilitatea mineralelor",
+        "no": "Synlighet for mineraler"
+      },
+      "default": "discovered",
+      "options": [
+        "all",
+        "anonymous",
+        "discovered"
+      ],
+      "valueLabels": {
+        "all": {
+          "en": "Show all minerals",
+          "sch": "全部公开",
+          "modsch": "全部公开",
+          "tch": "全部公開",
+          "ru": "Показывать все минералы",
+          "de": "Alle Minerale anzeigen",
+          "ptbr": "Mostrar todos os minerais",
+          "it": "Mostra tutti i minerali",
+          "es": "Mostrar todos los minerales",
+          "fr": "Afficher tous les minéraux",
+          "nl": "Alle mineralen tonen",
+          "cz": "Zobrazit všechny minerály",
+          "pl": "Pokaż wszystkie minerały",
+          "jp": "すべての鉱物を公開",
+          "kr": "모든 광물 공개",
+          "thai": "เปิดเผยแร่ทั้งหมด",
+          "hu": "Összes ásvány megjelenítése",
+          "lv": "Rādīt visus minerālus",
+          "ro": "Afișează toate mineralele",
+          "no": "Vis alle mineraler"
+        },
+        "anonymous": {
+          "en": "Anonymize undiscovered minerals",
+          "sch": "未发现矿物匿名",
+          "modsch": "未发现矿物匿名",
+          "tch": "未發現礦物匿名",
+          "ru": "Скрывать названия неоткрытых минералов",
+          "de": "Unentdeckte Minerale anonymisieren",
+          "ptbr": "Anonimizar minerais não descobertos",
+          "it": "Anonimizza i minerali non scoperti",
+          "es": "Anonimizar minerales sin descubrir",
+          "fr": "Anonymiser les minéraux non découverts",
+          "nl": "Niet-ontdekte mineralen anonimiseren",
+          "cz": "Anonymizovat neobjevené minerály",
+          "pl": "Anonimizuj nieodkryte minerały",
+          "jp": "未発見の鉱物を匿名で表示",
+          "kr": "미발견 광물 익명 표시",
+          "thai": "ไม่ระบุชื่อแร่ที่ยังไม่ค้นพบ",
+          "hu": "Fel nem fedezett ásványok név nélkül",
+          "lv": "Anonimizēt neatklātos minerālus",
+          "ro": "Anonimizează mineralele nedescoperite",
+          "no": "Anonymiser uoppdagede mineraler"
+        },
+        "discovered": {
+          "en": "Discovered minerals only",
+          "sch": "仅已发现矿物",
+          "modsch": "仅已发现矿物",
+          "tch": "僅已發現礦物",
+          "ru": "Только открытые минералы",
+          "de": "Nur entdeckte Minerale",
+          "ptbr": "Somente minerais descobertos",
+          "it": "Solo minerali scoperti",
+          "es": "Solo minerales descubiertos",
+          "fr": "Minéraux découverts uniquement",
+          "nl": "Alleen ontdekte mineralen",
+          "cz": "Pouze objevené minerály",
+          "pl": "Tylko odkryte minerały",
+          "jp": "発見済みの鉱物のみ",
+          "kr": "발견한 광물만 표시",
+          "thai": "เฉพาะแร่ที่ค้นพบแล้ว",
+          "hu": "Csak felfedezett ásványok",
+          "lv": "Tikai atklātie minerāli",
+          "ro": "Doar minerale descoperite",
+          "no": "Bare oppdagede mineraler"
+        }
+      },
+      "description": {
+        "en": "Choose how undiscovered minerals appear in the distribution chart.",
+        "sch": "选择分布图如何显示尚未发现的矿物。",
+        "modsch": "选择分布图如何显示尚未发现的矿物。",
+        "tch": "選擇分布圖如何顯示尚未發現的礦物。",
+        "ru": "Выберите, как показывать неоткрытые минералы на графике распределения.",
+        "de": "Wählen, wie unentdeckte Minerale im Verteilungsdiagramm angezeigt werden.",
+        "ptbr": "Escolha como os minerais não descobertos aparecem no gráfico de distribuição.",
+        "it": "Scegli come mostrare i minerali non scoperti nel grafico di distribuzione.",
+        "es": "Elige cómo aparecen los minerales sin descubrir en el gráfico de distribución.",
+        "fr": "Choisir comment afficher les minéraux non découverts dans le graphique de répartition.",
+        "nl": "Kies hoe niet-ontdekte mineralen in de verdelingsgrafiek verschijnen.",
+        "cz": "Vyberte způsob zobrazení neobjevených minerálů v grafu rozložení.",
+        "pl": "Wybierz sposób wyświetlania nieodkrytych minerałów na wykresie rozkładu.",
+        "jp": "分布図で未発見の鉱物をどのように表示するか選択します。",
+        "kr": "분포도에서 미발견 광물을 표시하는 방식을 선택합니다.",
+        "thai": "เลือกวิธีแสดงแร่ที่ยังไม่ค้นพบในแผนภูมิการกระจาย",
+        "hu": "Válassza ki, hogyan jelenjenek meg a fel nem fedezett ásványok az eloszlásdiagramon.",
+        "lv": "Izvēlieties, kā sadalījuma diagrammā attēlot neatklātos minerālus.",
+        "ro": "Alege cum apar mineralele nedescoperite în graficul de distribuție.",
+        "no": "Velg hvordan uoppdagede mineraler vises i fordelingsdiagrammet."
+      },
+      "reloadPolicy": "hot",
+      "persist": "change",
+      "section": "buildingDetails"
+    },
     "enableResourceSourceDetails": {
       "type": "boolean",
       "label": {
@@ -170,6 +446,27 @@
         "resourceSourceLineRenderer": {
           "label": "资源来源连线渲染",
           "description": "选择资源来源连线的渲染方式。游戏中按 O 也会切换这个值。"
+        },
+        "enableMineDistributionChart": {
+          "label": "矿物深度分布图",
+          "description": "在矿井的扩展建筑信息卡片中显示矿物深度分布图。"
+        },
+        "mineDistributionChartView": {
+          "label": "矿物分布图样式",
+          "description": "选择堆叠概率图或独立矿物分布带。",
+          "valueLabels": {
+            "stacked": "堆叠概率图",
+            "bands": "独立分布带"
+          }
+        },
+        "mineDistributionVisibility": {
+          "label": "矿物显示范围",
+          "description": "选择分布图如何显示尚未发现的矿物。",
+          "valueLabels": {
+            "all": "全部公开",
+            "anonymous": "未发现矿物匿名",
+            "discovered": "仅已发现矿物"
+          }
         }
       }
     },
@@ -203,6 +500,27 @@
         "resourceSourceLineRenderer": {
           "label": "资源来源连线渲染",
           "description": "选择资源来源连线的渲染方式。游戏中按 O 也会切换这个值。"
+        },
+        "enableMineDistributionChart": {
+          "label": "矿物深度分布图",
+          "description": "在矿井的扩展建筑信息卡片中显示矿物深度分布图。"
+        },
+        "mineDistributionChartView": {
+          "label": "矿物分布图样式",
+          "description": "选择堆叠概率图或独立矿物分布带。",
+          "valueLabels": {
+            "stacked": "堆叠概率图",
+            "bands": "独立分布带"
+          }
+        },
+        "mineDistributionVisibility": {
+          "label": "矿物显示范围",
+          "description": "选择分布图如何显示尚未发现的矿物。",
+          "valueLabels": {
+            "all": "全部公开",
+            "anonymous": "未发现矿物匿名",
+            "discovered": "仅已发现矿物"
+          }
         }
       }
     },
@@ -224,6 +542,27 @@
             "Canvas 2D",
             "WebGL"
           ]
+        },
+        "enableMineDistributionChart": {
+          "label": "Mineral depth distribution chart",
+          "description": "Show mineral depth distribution charts on extended mine detail cards."
+        },
+        "mineDistributionChartView": {
+          "label": "Mineral distribution chart style",
+          "description": "Choose a stacked probability chart or separate mineral bands.",
+          "valueLabels": {
+            "stacked": "Stacked probability chart",
+            "bands": "Separate mineral bands"
+          }
+        },
+        "mineDistributionVisibility": {
+          "label": "Mineral visibility",
+          "description": "Choose how undiscovered minerals appear in the distribution chart.",
+          "valueLabels": {
+            "all": "Show all minerals",
+            "anonymous": "Anonymize undiscovered minerals",
+            "discovered": "Discovered minerals only"
+          }
         }
       },
       "description": "Adds Alt+Shift dynamic building detail panels and shop build-availability countdowns without modifying vanilla scripts."
@@ -233,6 +572,27 @@
       "config": {
         "cookieDirectionPassword": {
           "label": "Пароль направления печенья"
+        },
+        "enableMineDistributionChart": {
+          "label": "График распределения минералов по глубине",
+          "description": "Показывать распределение минералов по глубине в расширенных карточках шахт."
+        },
+        "mineDistributionChartView": {
+          "label": "Вид графика распределения минералов",
+          "description": "Выберите график вероятностей с накоплением или отдельные полосы минералов.",
+          "valueLabels": {
+            "stacked": "График вероятностей с накоплением",
+            "bands": "Отдельные полосы минералов"
+          }
+        },
+        "mineDistributionVisibility": {
+          "label": "Видимость минералов",
+          "description": "Выберите, как показывать неоткрытые минералы на графике распределения.",
+          "valueLabels": {
+            "all": "Показывать все минералы",
+            "anonymous": "Скрывать названия неоткрытых минералов",
+            "discovered": "Только открытые минералы"
+          }
         }
       }
     },
@@ -241,6 +601,27 @@
       "config": {
         "cookieDirectionPassword": {
           "label": "Cookie-Richtungspasswort"
+        },
+        "enableMineDistributionChart": {
+          "label": "Diagramm der Mineralverteilung nach Tiefe",
+          "description": "Mineralverteilung nach Tiefe in erweiterten Mineninfokarten anzeigen."
+        },
+        "mineDistributionChartView": {
+          "label": "Darstellung der Mineralverteilung",
+          "description": "Gestapeltes Wahrscheinlichkeitsdiagramm oder getrennte Mineralbänder wählen.",
+          "valueLabels": {
+            "stacked": "Gestapeltes Wahrscheinlichkeitsdiagramm",
+            "bands": "Getrennte Mineralbänder"
+          }
+        },
+        "mineDistributionVisibility": {
+          "label": "Sichtbarkeit der Minerale",
+          "description": "Wählen, wie unentdeckte Minerale im Verteilungsdiagramm angezeigt werden.",
+          "valueLabels": {
+            "all": "Alle Minerale anzeigen",
+            "anonymous": "Unentdeckte Minerale anonymisieren",
+            "discovered": "Nur entdeckte Minerale"
+          }
         }
       }
     },
@@ -249,6 +630,27 @@
       "config": {
         "cookieDirectionPassword": {
           "label": "Senha da direção do cookie"
+        },
+        "enableMineDistributionChart": {
+          "label": "Gráfico de distribuição de minerais por profundidade",
+          "description": "Mostrar a distribuição de minerais por profundidade nos cartões ampliados das minas."
+        },
+        "mineDistributionChartView": {
+          "label": "Estilo do gráfico de distribuição de minerais",
+          "description": "Escolha um gráfico de probabilidade empilhado ou faixas separadas de minerais.",
+          "valueLabels": {
+            "stacked": "Gráfico de probabilidade empilhado",
+            "bands": "Faixas separadas de minerais"
+          }
+        },
+        "mineDistributionVisibility": {
+          "label": "Visibilidade dos minerais",
+          "description": "Escolha como os minerais não descobertos aparecem no gráfico de distribuição.",
+          "valueLabels": {
+            "all": "Mostrar todos os minerais",
+            "anonymous": "Anonimizar minerais não descobertos",
+            "discovered": "Somente minerais descobertos"
+          }
         }
       }
     },
@@ -257,6 +659,27 @@
       "config": {
         "cookieDirectionPassword": {
           "label": "Password direzione cookie"
+        },
+        "enableMineDistributionChart": {
+          "label": "Grafico della distribuzione dei minerali per profondità",
+          "description": "Mostra la distribuzione dei minerali per profondità nelle schede dettagliate delle miniere."
+        },
+        "mineDistributionChartView": {
+          "label": "Stile del grafico di distribuzione dei minerali",
+          "description": "Scegli un grafico di probabilità sovrapposte o bande separate per i minerali.",
+          "valueLabels": {
+            "stacked": "Grafico di probabilità sovrapposte",
+            "bands": "Bande separate per i minerali"
+          }
+        },
+        "mineDistributionVisibility": {
+          "label": "Visibilità dei minerali",
+          "description": "Scegli come mostrare i minerali non scoperti nel grafico di distribuzione.",
+          "valueLabels": {
+            "all": "Mostra tutti i minerali",
+            "anonymous": "Anonimizza i minerali non scoperti",
+            "discovered": "Solo minerali scoperti"
+          }
         }
       }
     },
@@ -265,6 +688,27 @@
       "config": {
         "cookieDirectionPassword": {
           "label": "Contraseña de dirección de cookie"
+        },
+        "enableMineDistributionChart": {
+          "label": "Gráfico de distribución de minerales por profundidad",
+          "description": "Muestra la distribución de minerales por profundidad en las tarjetas ampliadas de las minas."
+        },
+        "mineDistributionChartView": {
+          "label": "Estilo del gráfico de distribución de minerales",
+          "description": "Elige un gráfico de probabilidad apilado o bandas de minerales separadas.",
+          "valueLabels": {
+            "stacked": "Gráfico de probabilidad apilado",
+            "bands": "Bandas de minerales separadas"
+          }
+        },
+        "mineDistributionVisibility": {
+          "label": "Visibilidad de minerales",
+          "description": "Elige cómo aparecen los minerales sin descubrir en el gráfico de distribución.",
+          "valueLabels": {
+            "all": "Mostrar todos los minerales",
+            "anonymous": "Anonimizar minerales sin descubrir",
+            "discovered": "Solo minerales descubiertos"
+          }
         }
       }
     },
@@ -273,6 +717,27 @@
       "config": {
         "cookieDirectionPassword": {
           "label": "Mot de passe de direction du cookie"
+        },
+        "enableMineDistributionChart": {
+          "label": "Graphique de répartition des minéraux selon la profondeur",
+          "description": "Affiche la répartition des minéraux selon la profondeur dans les fiches détaillées des mines."
+        },
+        "mineDistributionChartView": {
+          "label": "Style du graphique de répartition des minéraux",
+          "description": "Choisir un graphique de probabilités empilées ou des bandes minérales distinctes.",
+          "valueLabels": {
+            "stacked": "Graphique de probabilités empilées",
+            "bands": "Bandes minérales distinctes"
+          }
+        },
+        "mineDistributionVisibility": {
+          "label": "Visibilité des minéraux",
+          "description": "Choisir comment afficher les minéraux non découverts dans le graphique de répartition.",
+          "valueLabels": {
+            "all": "Afficher tous les minéraux",
+            "anonymous": "Anonymiser les minéraux non découverts",
+            "discovered": "Minéraux découverts uniquement"
+          }
         }
       }
     },
@@ -281,6 +746,27 @@
       "config": {
         "cookieDirectionPassword": {
           "label": "Cookie-richtingswachtwoord"
+        },
+        "enableMineDistributionChart": {
+          "label": "Grafiek van mineraalverdeling per diepte",
+          "description": "Toon de mineraalverdeling per diepte op uitgebreide mijninformatiekaarten."
+        },
+        "mineDistributionChartView": {
+          "label": "Stijl van de mineraalverdelingsgrafiek",
+          "description": "Kies een gestapelde kansgrafiek of aparte mineraalbanden.",
+          "valueLabels": {
+            "stacked": "Gestapelde kansgrafiek",
+            "bands": "Aparte mineraalbanden"
+          }
+        },
+        "mineDistributionVisibility": {
+          "label": "Zichtbaarheid van mineralen",
+          "description": "Kies hoe niet-ontdekte mineralen in de verdelingsgrafiek verschijnen.",
+          "valueLabels": {
+            "all": "Alle mineralen tonen",
+            "anonymous": "Niet-ontdekte mineralen anonimiseren",
+            "discovered": "Alleen ontdekte mineralen"
+          }
         }
       }
     },
@@ -289,6 +775,27 @@
       "config": {
         "cookieDirectionPassword": {
           "label": "Heslo směru sušenky"
+        },
+        "enableMineDistributionChart": {
+          "label": "Graf rozložení minerálů podle hloubky",
+          "description": "Zobrazovat rozložení minerálů podle hloubky v rozšířených informačních kartách dolů."
+        },
+        "mineDistributionChartView": {
+          "label": "Styl grafu rozložení minerálů",
+          "description": "Vyberte skládaný graf pravděpodobnosti nebo samostatná pásma minerálů.",
+          "valueLabels": {
+            "stacked": "Skládaný graf pravděpodobnosti",
+            "bands": "Samostatná pásma minerálů"
+          }
+        },
+        "mineDistributionVisibility": {
+          "label": "Viditelnost minerálů",
+          "description": "Vyberte způsob zobrazení neobjevených minerálů v grafu rozložení.",
+          "valueLabels": {
+            "all": "Zobrazit všechny minerály",
+            "anonymous": "Anonymizovat neobjevené minerály",
+            "discovered": "Pouze objevené minerály"
+          }
         }
       }
     },
@@ -297,6 +804,27 @@
       "config": {
         "cookieDirectionPassword": {
           "label": "Hasło kierunku ciasteczka"
+        },
+        "enableMineDistributionChart": {
+          "label": "Wykres rozkładu minerałów według głębokości",
+          "description": "Pokazuj rozkład minerałów według głębokości na rozszerzonych kartach informacji o kopalniach."
+        },
+        "mineDistributionChartView": {
+          "label": "Styl wykresu rozkładu minerałów",
+          "description": "Wybierz skumulowany wykres prawdopodobieństwa lub osobne pasma minerałów.",
+          "valueLabels": {
+            "stacked": "Skumulowany wykres prawdopodobieństwa",
+            "bands": "Osobne pasma minerałów"
+          }
+        },
+        "mineDistributionVisibility": {
+          "label": "Widoczność minerałów",
+          "description": "Wybierz sposób wyświetlania nieodkrytych minerałów na wykresie rozkładu.",
+          "valueLabels": {
+            "all": "Pokaż wszystkie minerały",
+            "anonymous": "Anonimizuj nieodkryte minerały",
+            "discovered": "Tylko odkryte minerały"
+          }
         }
       }
     },
@@ -305,6 +833,27 @@
       "config": {
         "cookieDirectionPassword": {
           "label": "クッキー方向パスワード"
+        },
+        "enableMineDistributionChart": {
+          "label": "鉱物の深度分布図",
+          "description": "鉱山の拡張情報カードに鉱物の深度分布図を表示します。"
+        },
+        "mineDistributionChartView": {
+          "label": "鉱物分布図の表示形式",
+          "description": "積み上げ確率グラフまたは鉱物別の分布帯を選択します。",
+          "valueLabels": {
+            "stacked": "積み上げ確率グラフ",
+            "bands": "鉱物別の分布帯"
+          }
+        },
+        "mineDistributionVisibility": {
+          "label": "鉱物の表示範囲",
+          "description": "分布図で未発見の鉱物をどのように表示するか選択します。",
+          "valueLabels": {
+            "all": "すべての鉱物を公開",
+            "anonymous": "未発見の鉱物を匿名で表示",
+            "discovered": "発見済みの鉱物のみ"
+          }
         }
       }
     },
@@ -313,6 +862,27 @@
       "config": {
         "cookieDirectionPassword": {
           "label": "쿠키 방향 암호"
+        },
+        "enableMineDistributionChart": {
+          "label": "광물 깊이별 분포도",
+          "description": "확장된 광산 정보 카드에 광물 깊이별 분포도를 표시합니다."
+        },
+        "mineDistributionChartView": {
+          "label": "광물 분포도 스타일",
+          "description": "누적 확률 그래프 또는 광물별 분포 띠를 선택합니다.",
+          "valueLabels": {
+            "stacked": "누적 확률 그래프",
+            "bands": "광물별 분포 띠"
+          }
+        },
+        "mineDistributionVisibility": {
+          "label": "광물 표시 범위",
+          "description": "분포도에서 미발견 광물을 표시하는 방식을 선택합니다.",
+          "valueLabels": {
+            "all": "모든 광물 공개",
+            "anonymous": "미발견 광물 익명 표시",
+            "discovered": "발견한 광물만 표시"
+          }
         }
       }
     },
@@ -321,6 +891,27 @@
       "config": {
         "cookieDirectionPassword": {
           "label": "餅乾方向密碼"
+        },
+        "enableMineDistributionChart": {
+          "label": "礦物深度分布圖",
+          "description": "在礦井的擴充建築資訊卡片中顯示礦物深度分布圖。"
+        },
+        "mineDistributionChartView": {
+          "label": "礦物分布圖樣式",
+          "description": "選擇堆疊機率圖或獨立礦物分布帶。",
+          "valueLabels": {
+            "stacked": "堆疊機率圖",
+            "bands": "獨立分布帶"
+          }
+        },
+        "mineDistributionVisibility": {
+          "label": "礦物顯示範圍",
+          "description": "選擇分布圖如何顯示尚未發現的礦物。",
+          "valueLabels": {
+            "all": "全部公開",
+            "anonymous": "未發現礦物匿名",
+            "discovered": "僅已發現礦物"
+          }
         }
       }
     },
@@ -329,6 +920,27 @@
       "config": {
         "cookieDirectionPassword": {
           "label": "รหัสทิศทางคุกกี้"
+        },
+        "enableMineDistributionChart": {
+          "label": "แผนภูมิการกระจายแร่ตามความลึก",
+          "description": "แสดงแผนภูมิการกระจายแร่ตามความลึกในการ์ดข้อมูลเหมืองแบบขยาย"
+        },
+        "mineDistributionChartView": {
+          "label": "รูปแบบแผนภูมิการกระจายแร่",
+          "description": "เลือกกราฟความน่าจะเป็นแบบซ้อนหรือแถบแร่แยกกัน",
+          "valueLabels": {
+            "stacked": "กราฟความน่าจะเป็นแบบซ้อน",
+            "bands": "แถบแร่แยกกัน"
+          }
+        },
+        "mineDistributionVisibility": {
+          "label": "ขอบเขตการแสดงแร่",
+          "description": "เลือกวิธีแสดงแร่ที่ยังไม่ค้นพบในแผนภูมิการกระจาย",
+          "valueLabels": {
+            "all": "เปิดเผยแร่ทั้งหมด",
+            "anonymous": "ไม่ระบุชื่อแร่ที่ยังไม่ค้นพบ",
+            "discovered": "เฉพาะแร่ที่ค้นพบแล้ว"
+          }
         }
       }
     },
@@ -337,6 +949,27 @@
       "config": {
         "cookieDirectionPassword": {
           "label": "Sütiirány jelszó"
+        },
+        "enableMineDistributionChart": {
+          "label": "Ásványok mélység szerinti eloszlásdiagramja",
+          "description": "Az ásványok mélység szerinti eloszlását mutatja a bővített bányainformációs kártyákon."
+        },
+        "mineDistributionChartView": {
+          "label": "Az ásványeloszlás-diagram stílusa",
+          "description": "Halmozott valószínűségi diagram vagy külön ásványsávok választhatók.",
+          "valueLabels": {
+            "stacked": "Halmozott valószínűségi diagram",
+            "bands": "Külön ásványsávok"
+          }
+        },
+        "mineDistributionVisibility": {
+          "label": "Ásványok láthatósága",
+          "description": "Válassza ki, hogyan jelenjenek meg a fel nem fedezett ásványok az eloszlásdiagramon.",
+          "valueLabels": {
+            "all": "Összes ásvány megjelenítése",
+            "anonymous": "Fel nem fedezett ásványok név nélkül",
+            "discovered": "Csak felfedezett ásványok"
+          }
         }
       }
     },
@@ -345,6 +978,27 @@
       "config": {
         "cookieDirectionPassword": {
           "label": "Cepuma virziena parole"
+        },
+        "enableMineDistributionChart": {
+          "label": "Minerālu sadalījuma diagramma pēc dziļuma",
+          "description": "Rādīt minerālu sadalījumu pēc dziļuma paplašinātajās raktuvju informācijas kartītēs."
+        },
+        "mineDistributionChartView": {
+          "label": "Minerālu sadalījuma diagrammas stils",
+          "description": "Izvēlieties uzkrāto varbūtību diagrammu vai atsevišķas minerālu joslas.",
+          "valueLabels": {
+            "stacked": "Uzkrāto varbūtību diagramma",
+            "bands": "Atsevišķas minerālu joslas"
+          }
+        },
+        "mineDistributionVisibility": {
+          "label": "Minerālu redzamība",
+          "description": "Izvēlieties, kā sadalījuma diagrammā attēlot neatklātos minerālus.",
+          "valueLabels": {
+            "all": "Rādīt visus minerālus",
+            "anonymous": "Anonimizēt neatklātos minerālus",
+            "discovered": "Tikai atklātie minerāli"
+          }
         }
       }
     },
@@ -353,6 +1007,27 @@
       "config": {
         "cookieDirectionPassword": {
           "label": "Parolă direcție cookie"
+        },
+        "enableMineDistributionChart": {
+          "label": "Graficul distribuției mineralelor după adâncime",
+          "description": "Afișează distribuția mineralelor după adâncime în cardurile extinse de informații ale minelor."
+        },
+        "mineDistributionChartView": {
+          "label": "Stilul graficului de distribuție a mineralelor",
+          "description": "Alege un grafic de probabilitate suprapus sau benzi separate pentru minerale.",
+          "valueLabels": {
+            "stacked": "Grafic de probabilitate suprapus",
+            "bands": "Benzi separate pentru minerale"
+          }
+        },
+        "mineDistributionVisibility": {
+          "label": "Vizibilitatea mineralelor",
+          "description": "Alege cum apar mineralele nedescoperite în graficul de distribuție.",
+          "valueLabels": {
+            "all": "Afișează toate mineralele",
+            "anonymous": "Anonimizează mineralele nedescoperite",
+            "discovered": "Doar minerale descoperite"
+          }
         }
       }
     },
@@ -361,12 +1036,34 @@
       "config": {
         "cookieDirectionPassword": {
           "label": "Passord for kjeksretning"
+        },
+        "enableMineDistributionChart": {
+          "label": "Diagram over mineralfordeling etter dybde",
+          "description": "Vis mineralfordeling etter dybde på utvidede informasjonskort for gruver."
+        },
+        "mineDistributionChartView": {
+          "label": "Stil for mineralfordelingsdiagram",
+          "description": "Velg et stablet sannsynlighetsdiagram eller separate mineralbånd.",
+          "valueLabels": {
+            "stacked": "Stablet sannsynlighetsdiagram",
+            "bands": "Separate mineralbånd"
+          }
+        },
+        "mineDistributionVisibility": {
+          "label": "Synlighet for mineraler",
+          "description": "Velg hvordan uoppdagede mineraler vises i fordelingsdiagrammet.",
+          "valueLabels": {
+            "all": "Vis alle mineraler",
+            "anonymous": "Anonymiser uoppdagede mineraler",
+            "discovered": "Bare oppdagede mineraler"
+          }
         }
       }
     }
   },
   "entries": [
     "scripts/core.js",
+    "scripts/pump-distribution-chart.js",
     "scripts/production-telemetry.js",
     "scripts/building-details.js",
     "scripts/resource-source.js",
