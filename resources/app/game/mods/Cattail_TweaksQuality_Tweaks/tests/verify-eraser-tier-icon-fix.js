@@ -16,7 +16,7 @@ const ROOT = process.env.SIXTY_FOUR_GAME_ROOT || path.resolve(__dirname, '../../
 const MODROOT = path.resolve(__dirname, '..')
 const MOD = 'Cattail_TweaksQuality_Tweaks'
 const BETTER = 'Cattail_TweaksQuality_Better-UIs'
-const KEY = 'enableEraserTierIconFix', FIX = 'scripts/eraser-tier-icon-fix.js'
+const KEY = 'enableEraserIconFix', FIX = 'scripts/eraser-icon-fix.js'
 const manifest = JSON.parse(fs.readFileSync(path.join(MODROOT, 'mod.json'), 'utf8'))
 const betterManifest = JSON.parse(fs.readFileSync(path.join(ROOT, 'mods', BETTER, 'mod.json'), 'utf8'))
 const output = fs.mkdtempSync(path.join(process.env.ERASER_ICON_TEST_OUTPUT_ROOT || os.tmpdir(), 'tweaks-eraser-icon-'))
@@ -30,7 +30,7 @@ function fixture() {
 	const query = new URLSearchParams(location.search)
 	const ownKey = key => 'modloader:Cattail_TweaksQuality_Tweaks:config:' + key
 	localStorage.setItem('modloader:Cattail_TweaksQuality_Better-UIs:config:shopVersion', JSON.stringify(query.get('shop') || '1.3'))
-	if (query.has('off')) localStorage.setItem(ownKey('enableEraserTierIconFix'), 'false')
+	if (query.has('off')) localStorage.setItem(ownKey('enableEraserIconFix'), 'false')
 	window.writes = 0
 	window.abstract_getWords = () => ({
 		en: { marker: 'English' }, sch: { marker: 'Chinese' }, tch: { marker: 'Traditional' }
@@ -66,8 +66,8 @@ function fixture() {
 	game.splash.master = game
 	bindLanguage.call(game.splash, document.querySelector('#language'))
 	window.setFix = function (value) {
-		ModLoader.forMod('Cattail_TweaksQuality_Tweaks').config.set('enableEraserTierIconFix', value)
-		dispatchEvent(new CustomEvent('modloader:config-preview', { detail: { modId: 'Cattail_TweaksQuality_Tweaks', key: 'enableEraserTierIconFix', value } }))
+		ModLoader.forMod('Cattail_TweaksQuality_Tweaks').config.set('enableEraserIconFix', value)
+		dispatchEvent(new CustomEvent('modloader:config-preview', { detail: { modId: 'Cattail_TweaksQuality_Tweaks', key: 'enableEraserIconFix', value } }))
 	}
 	window.sample = function () {
 		const e = game.store.html.eraser
@@ -261,14 +261,14 @@ async function main() {
 			await check('unsupported or cold-disabled target stays native ' + query, async () => {
 				await guard.evaluate(() => { game.updateEraserType(2); game.store.reinit() })
 				const s = await state(guard); assert.equal(s.tier, 2); assert.equal(parseFloat(s.position), 0)
-				if (query !== '?off') assert.equal(await guard.evaluate(() => window.__cattailEraserTierIconFixInstalled), undefined)
+				if (query !== '?off') assert.equal(await guard.evaluate(() => window.__cattailTweaksEraserIconFixInstalled), undefined)
 			})
 		}
 		const disabled = await setup('?off')
 		await check('disabling Tweaks on reload removes its entry and visual correction', async () => {
 			await disabled.route('**/mods/enabled.json*', r => r.fulfill({ contentType: 'application/json', body: JSON.stringify({ mods: [BETTER] }) }))
 			await disabled.reload(); await ready(disabled)
-			assert.equal(await disabled.evaluate(() => window.__cattailEraserTierIconFixInstalled), undefined)
+			assert.equal(await disabled.evaluate(() => window.__cattailTweaksEraserIconFixInstalled), undefined)
 			await disabled.evaluate(() => { game.updateEraserType(2); game.store.reinit() })
 			assert.equal(parseFloat((await state(disabled)).position), 0)
 		})

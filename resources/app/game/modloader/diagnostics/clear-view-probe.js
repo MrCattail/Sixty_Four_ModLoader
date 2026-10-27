@@ -263,7 +263,7 @@ function createClient(options) {
       width: g.canvas?.width, height: g.canvas?.height, windowWidth: win.innerWidth, windowHeight: win.innerHeight,
       dpr: win.devicePixelRatio, gamePixelRatio: g.pixelRatio, zoom: g.zoom, unit: g.unit, plane: g.plane,
       cameraX: g.translation?.[0], cameraY: g.translation?.[1], itemType: String(g.itemInHand?.name || '').slice(0, 64),
-      ...(isGrid() || isPlacement() ? { projectionPitch: g.__cattailDynamicCameraState?.pitch ?? null, projectionYaw: g.__cattailDynamicCameraState?.yaw ?? null } : {}),
+      ...(isGrid() || isPlacement() ? { projectionPitch: g.__cattailTweaksCameraAngleState?.pitch ?? null, projectionYaw: g.__cattailTweaksCameraAngleState?.yaw ?? null } : {}),
       ...(isPlacement() ? { hoveredX: g.hoveredCell?.[0] ?? null, hoveredY: g.hoveredCell?.[1] ?? null, interactionMode: g.interactionMode || null,
         configSignature: JSON.stringify(options.placementConfiguration?.() || {}) } : {}),
       entities: g.stuff?.length || 0, alt: !!g.altActive, item: !!g.itemInHand, transported: !!g.transportedEntity, hovered: !!g.hoveredCell,
@@ -288,7 +288,7 @@ function createClient(options) {
       result.scene = {
         zoom: number(g?.zoom), unit: number(g?.unit), plane: number(g?.plane),
         width: number(g?.canvas?.width), height: number(g?.canvas?.height),
-        projectionPitch: number(g?.__cattailDynamicCameraState?.pitch), projectionYaw: number(g?.__cattailDynamicCameraState?.yaw),
+        projectionPitch: number(g?.__cattailTweaksCameraAngleState?.pitch), projectionYaw: number(g?.__cattailTweaksCameraAngleState?.yaw),
         item: !!g?.itemInHand, itemType: diagnosticText(g?.itemInHand?.name, 64),
         hovered: !!g?.hoveredCell, hoveredX: number(g?.hoveredCell?.[0]), hoveredY: number(g?.hoveredCell?.[1]),
         transported: !!g?.transportedEntity, interactionMode: diagnosticText(g?.interactionMode, 32),
@@ -299,10 +299,10 @@ function createClient(options) {
     if (isPlacement()) {
       try {
         const config = options.placementConfiguration?.() || {}
-        result.configuration = Object.fromEntries(['enablePlacementShadowTraversalReuse', 'disableClearViewGrid', 'useTweaksClearViewGridStyle', 'disableClearViewBuildingClipping'].map(key => [key, typeof config[key] === 'boolean' ? config[key] : null]))
+        result.configuration = Object.fromEntries(['enablePlacementShadowReuse', 'enableClearViewGridBlock', 'enableClearViewGridStyle', 'enableClearViewClipBlock'].map(key => [key, typeof config[key] === 'boolean' ? config[key] : null]))
         // The existing main-process schema keeps three structured booleans.
         // Preserve this new state in its already bounded error-text field too.
-        if (typeof config.enablePlacementShadowTraversalReuse === 'boolean') result.error.message = diagnosticText('[enablePlacementShadowTraversalReuse=' + config.enablePlacementShadowTraversalReuse + '] ' + result.error.message)
+        if (typeof config.enablePlacementShadowReuse === 'boolean') result.error.message = diagnosticText('[enablePlacementShadowReuse=' + config.enablePlacementShadowReuse + '] ' + result.error.message)
       } catch (_) { result.configurationUnavailable = true }
       try {
         const capabilities = options.getPlacementController?.()?.describe() || {}

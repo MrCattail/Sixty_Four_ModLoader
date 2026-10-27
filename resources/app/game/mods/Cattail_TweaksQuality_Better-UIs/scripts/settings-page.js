@@ -13,7 +13,7 @@ ModLoader.register({
 		let shiftCtrlZoomDisablePreview = null
 		const pressedByAction = {}
 		const tweaksModId = 'Cattail_TweaksQuality_Tweaks'
-		const shiftCtrlZoomDisableKey = 'disableShiftCtrlZoomShortcut'
+		const shiftCtrlZoomDisableKey = 'enableZoomResetBlock'
 
 		const tabs = ['game', 'video', 'sound', 'keyboard', 'controller', 'mod']
 		const storagePrefix = 'cattailBetterUisSettingsBindings'

@@ -17,15 +17,15 @@ const MODROOT = path.resolve(__dirname, '..')
 // Optional original 1.3 game.js/ui.js extracted outside the checkout. Other
 // consumers stay current; no legacy cleanup shims are installed in the page.
 const NATIVE_ROOT = process.env.ESC_ACTION_NATIVE_ROOT || ROOT
-const FIX_SOURCE = process.env.ESC_ACTION_FIX_SOURCE || path.join(MODROOT, 'scripts/escape-action-fix.js')
+const FIX_SOURCE = process.env.ESC_ACTION_FIX_SOURCE || path.join(MODROOT, 'scripts/better-escape.js')
 const MOD = 'Cattail_TweaksQuality_Tweaks', BETTER = 'Cattail_TweaksQuality_Better-UIs', WE = 'Cattail_TweaksQuality_World-Editor'
-const KEY = 'enableEscapeActionFix', FIX = 'scripts/escape-action-fix.js'
+const KEY = 'enableBetterEscape', FIX = 'scripts/better-escape.js'
 const manifest = JSON.parse(fs.readFileSync(path.join(MODROOT, 'mod.json'), 'utf8'))
 const manifests = Object.fromEntries([BETTER, WE].map(id => [id, JSON.parse(fs.readFileSync(path.join(ROOT, 'mods', id, 'mod.json'), 'utf8'))]))
 const output = fs.mkdtempSync(path.join(process.env.ESC_ACTION_TEST_OUTPUT_ROOT || os.tmpdir(), 'tweaks-escape-'))
 function fixture() {
 	const q = new URLSearchParams(location.search)
-	const ownKey = 'modloader:Cattail_TweaksQuality_Tweaks:config:enableEscapeActionFix'
+	const ownKey = 'modloader:Cattail_TweaksQuality_Tweaks:config:enableBetterEscape'
 	localStorage.setItem('modloader:Cattail_TweaksQuality_Better-UIs:config:shopVersion', JSON.stringify(q.get('shop') || '1.3'))
 	if (q.has('accordion')) localStorage.setItem('cattailNativeShopStyle', 'accordion')
 	if (q.get('shop') === '1.2.1') localStorage.setItem('cattailShopCategoriesCompressed', q.has('long') ? '0' : '1')
@@ -85,8 +85,8 @@ function fixture() {
 		close() { nativeCalls.splash++; this.isShown = false; splashElement.style.display = 'none' }
 	}
 	window.setFix = value => {
-		ModLoader.forMod('Cattail_TweaksQuality_Tweaks').config.set('enableEscapeActionFix', value)
-		dispatchEvent(new CustomEvent('modloader:config-preview', { detail: { modId: 'Cattail_TweaksQuality_Tweaks', key: 'enableEscapeActionFix', value } }))
+		ModLoader.forMod('Cattail_TweaksQuality_Tweaks').config.set('enableBetterEscape', value)
+		dispatchEvent(new CustomEvent('modloader:config-preview', { detail: { modId: 'Cattail_TweaksQuality_Tweaks', key: 'enableBetterEscape', value } }))
 	}
 	const editable = 'input,textarea,select,[contenteditable]:not([contenteditable="false"]),[role="textbox"]'
 	window[Symbol.for('cattail.world-editor.runtime')] = {
@@ -206,7 +206,7 @@ function fixture() {
 const allow = new Set(['scripts/game.js', 'scripts/ui.js', 'cascade.css', 'modloader/loader.js', 'modloader/translations.json',
 	'mods/' + BETTER + '/scripts/classic-shop.js', 'mods/' + BETTER + '/scripts/shop-categories.js', 'mods/' + BETTER + '/scripts/native-accordion-shop.js',
 	'mods/' + WE + '/scripts/core/input-controller.js', 'mods/' + WE + '/scripts/core/native-tools.js', 'mods/' + WE + '/scripts/ui/dialog.js',
-	'mods/' + MOD + '/scripts/eraser-tier-icon-fix.js', 'mods/' + MOD + '/scripts/shift-ctrl-zoom-disable.js'])
+	'mods/' + MOD + '/scripts/eraser-icon-fix.js', 'mods/' + MOD + '/scripts/zoom-reset-block.js'])
 const server = http.createServer((req, res) => {
 	const url = new URL(req.url, 'http://localhost'), file = decodeURIComponent(url.pathname.slice(1))
 	let body, type = 'text/javascript'
@@ -216,7 +216,7 @@ const server = http.createServer((req, res) => {
 	} else if (file === 'mods/enabled.json') {
 		type = 'application/json'; body = JSON.stringify({ mods: q.has('better-first') ? [BETTER, MOD, WE] : [MOD, BETTER, WE] })
 	} else if (file === 'mods/' + MOD + '/mod.json') {
-		type = 'application/json'; body = JSON.stringify({ ...manifest, entries: ['scripts/eraser-tier-icon-fix.js', FIX, 'scripts/shift-ctrl-zoom-disable.js'] })
+		type = 'application/json'; body = JSON.stringify({ ...manifest, entries: ['scripts/eraser-icon-fix.js', FIX, 'scripts/zoom-reset-block.js'] })
 	} else if (file === 'mods/' + BETTER + '/mod.json') {
 		type = 'application/json'; body = JSON.stringify({ ...manifests[BETTER], entries: ['scripts/classic-shop.js', 'scripts/shop-categories.js', ...(q.has('accordion') ? ['scripts/native-accordion-shop.js'] : [])] })
 	} else if (file === 'mods/' + WE + '/mod.json') {
@@ -610,14 +610,14 @@ async function main() {
 			await check('unsupported/cold-disabled target delegates native Esc ' + query, async () => {
 				await guard.evaluate(() => prepare('erase', true)); await press(guard)
 				const s = await sample(guard); assert.equal(s.mode, null); assert.equal(s.cards, true); assert.equal(s.splash, true)
-				if (query !== '?off') assert.equal(await guard.evaluate(() => window.__cattailEscapeActionFixInstalled), undefined)
+				if (query !== '?off') assert.equal(await guard.evaluate(() => window.__cattailTweaksBetterEscapeInstalled), undefined)
 			})
 		}
 		const disabled = await setup()
 		await check('disabling Tweaks on reload removes its listener', async () => {
 			await disabled.route('**/mods/enabled.json*', route => route.fulfill({ contentType: 'application/json', body: JSON.stringify({ mods: [BETTER, WE] }) }))
 			await disabled.reload(); await ready(disabled)
-			assert.equal(await disabled.evaluate(() => window.__cattailEscapeActionFixInstalled), undefined)
+			assert.equal(await disabled.evaluate(() => window.__cattailTweaksBetterEscapeInstalled), undefined)
 			await disabled.evaluate(() => prepare('erase', true)); await press(disabled); assert.equal((await sample(disabled)).splash, true)
 		})
 		assert.deepEqual(errors, []); passed = true; console.log('ESC_ACTION_OK=' + results.length)

@@ -14,7 +14,7 @@ for (const name of ['sixtyfour.exe', 'chrome_100_percent.pak', 'chrome_200_perce
   if (fs.existsSync(path.join(shipped, name))) fs.cpSync(path.join(shipped, name), path.join(runtime, name), { recursive: true })
 }
 fs.copyFileSync(path.join(gameRoot, 'scripts/game.js'), path.join(appDir, 'scripts/game.js'))
-fs.copyFileSync(path.join(gameRoot, 'mods/Cattail_TweaksQuality_Tweaks/scripts/resource-explosion-bezier-fast-path.js'), path.join(appDir, 'fast-path.js'))
+fs.copyFileSync(path.join(gameRoot, 'mods/Cattail_TweaksQuality_Tweaks/scripts/resource-explosion-path-reuse.js'), path.join(appDir, 'fast-path.js'))
 fs.copyFileSync(path.join(gameRoot, 'modloader/diagnostics/manual-native-explosion.cjs'), path.join(appDir, 'manual.cjs'))
 function fixture() {
   window.hooks = {}
@@ -35,7 +35,7 @@ function fixture() {
       canvas, ctx: canvas.getContext('2d'), w: 480, h: 270, unit: 24, pixelRatio: 1.5, zoom: .1, translation: [0, 0], plane: 0,
       altActive: true, halt: false, renderLimitOfAKind: 96, resourceHomes: Array.from({ length: 10 }, () => [0, 0]),
       codex: { resources: Array.from({ length: 10 }, () => ({ triplet: ['#ff0000', '#00ff00', '#0000ff'] })) } })
-    window.dispatchEvent(new CustomEvent('modloader:config-preview', { detail: { modId: 'Cattail_TweaksQuality_Tweaks', key: 'enableResourceExplosionBezierFastPath', value: true } }))
+    window.dispatchEvent(new CustomEvent('modloader:config-preview', { detail: { modId: 'Cattail_TweaksQuality_Tweaks', key: 'enableResourceExplosionPathReuse', value: true } }))
     return DEBUG
   }
 }
@@ -68,7 +68,7 @@ async function run() {
         const during = c.result(), beforeStop = g.ctx.lineCap
         c.stop(); return { during, beforeStop, after: c.result(), remaining: g.vfx.length, same: g.vfx[0] === sentinel,
           descriptorSame: Object.getOwnPropertyDescriptor(CanvasRenderingContext2D.prototype, 'lineCap').set === d.set,
-          noOwnRender: !Object.hasOwn(fx, 'render'), noFastCurve: !Object.hasOwn(fx, '__cattailResourceExplosionBezierFastPathPrepared') }
+          noOwnRender: !Object.hasOwn(fx, 'render'), noFastCurve: !Object.hasOwn(fx, '__cattailTweaksResourceExplosionPathReusePrepared') }
       })
       assert.equal(r.during.nativePathConfirmed, true); assert.equal(r.during.resourcesUnchangedByCreation, true)
       assert.equal(r.during.directRenderCallsDelta, 0); assert.equal(r.during.afterStats.enabled, false)
@@ -93,7 +93,7 @@ async function run() {
       assert.deepEqual(r, { failed: true, n: 1, active: false, cap: 'butt', reason: 'F9' })
     })
     await test('restore preserves previously disabled effective configuration', async () => {
-      const r = await page.evaluate(() => { resetWorld(); window.dispatchEvent(new CustomEvent('modloader:config-preview', { detail: { modId: 'Cattail_TweaksQuality_Tweaks', key: 'enableResourceExplosionBezierFastPath', value: false } })); const c = startTest(window); c.fire(); DEBUG.renderVFX(); c.stop(); return c.result() })
+      const r = await page.evaluate(() => { resetWorld(); window.dispatchEvent(new CustomEvent('modloader:config-preview', { detail: { modId: 'Cattail_TweaksQuality_Tweaks', key: 'enableResourceExplosionPathReuse', value: false } })); const c = startTest(window); c.fire(); DEBUG.renderVFX(); c.stop(); return c.result() })
       assert.equal(r.previousEnabled, false); assert.equal(r.restoredEnabled, false); assert.equal(r.nativePathConfirmed, true)
     })
     await test('pre-render competing round writer invalidates trial without clearing its state', async () => {
@@ -105,7 +105,7 @@ async function run() {
       assert(r.same && r.descriptorSame); assert.equal(r.cap, 'butt'); assert.equal(r.r.restoredEnabled, true); assert.equal(r.r.stopReason, 'render-error')
     })
     await test('newer user preview wins and removes only own effect', async () => {
-      const r = await page.evaluate(() => { resetWorld(); const c = startTest(window); c.fire(); window.dispatchEvent(new CustomEvent('modloader:config-preview', { detail: { modId: 'Cattail_TweaksQuality_Tweaks', key: 'enableResourceExplosionBezierFastPath', value: false } })); return { active: c.active, n: DEBUG.vfx.length, enabled: CattailTweaksResourceExplosionBezierFastPath.stats().enabled } })
+      const r = await page.evaluate(() => { resetWorld(); const c = startTest(window); c.fire(); window.dispatchEvent(new CustomEvent('modloader:config-preview', { detail: { modId: 'Cattail_TweaksQuality_Tweaks', key: 'enableResourceExplosionPathReuse', value: false } })); return { active: c.active, n: DEBUG.vfx.length, enabled: CattailTweaksResourceExplosionBezierFastPath.stats().enabled } })
       assert.deepEqual(r, { active: false, n: 0, enabled: false })
     })
     await test('20-second restore and 60-second idle deadline invoke cleanup', async () => {

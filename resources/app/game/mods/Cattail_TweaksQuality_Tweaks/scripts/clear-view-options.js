@@ -1,9 +1,9 @@
 (function () {
 	const MOD_ID = 'Cattail_TweaksQuality_Tweaks'
-	const gridOffKey = 'disableClearViewGrid'
-	const clippingOffKey = 'disableClearViewBuildingClipping'
-	const styleKey = 'useTweaksClearViewGridStyle'
-	const installedKey = '__cattailClearViewOptionsInstalled'
+	const gridOffKey = 'enableClearViewGridBlock'
+	const clippingOffKey = 'enableClearViewClipBlock'
+	const styleKey = 'enableClearViewGridStyle'
+	const installedKey = '__cattailTweaksClearViewOptionsInstalled'
 	const preview = Object.create(null)
 
 	ModLoader.register({
@@ -40,7 +40,7 @@
 							const replace = !hide && enabled(styleKey)
 							if ((!hide && !replace) || !this.ctx) return original.apply(this, args)
 							return inMethodLayer(this, 'renderGrid', () => {
-								if (replace && window.__cattailTweaksFloorGridV1?.renderClearView(this, this.ctx) !== true) return original.apply(this, args)
+								if (replace && (window.CattailTweaks?.gridV1 || window.__cattailTweaksFloorGridV1)?.renderClearView(this, this.ctx) !== true) return original.apply(this, args)
 								const ctx = this.ctx
 								const descriptor = Object.getOwnPropertyDescriptor(ctx, 'stroke')
 								// Run native renderGrid for its occupied-cell fills. Only its

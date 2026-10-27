@@ -207,24 +207,29 @@
         async function inspectConnectionPath(record) {
             try {
                 if (!record.pc || typeof record.pc.getStats !== 'function') return
-                const reports = await record.pc.getStats()
+                const pc = record.pc
+                const reports = await pc.getStats()
+                if (record.pc !== pc || pc.connectionState === 'closed') return
                 let pair = null
                 reports.forEach(function (report) {
                     if (report.type === 'transport' && report.selectedCandidatePairId) pair = reports.get(report.selectedCandidatePairId)
                 })
-                reports.forEach(function (report) {
+                if (!pair) reports.forEach(function (report) {
                     if (report.type === 'candidate-pair' && report.state === 'succeeded' && (report.nominated || report.selected)) pair = report
                 })
-                if (!pair) {
+                const local = pair && reports.get(pair.localCandidateId)
+                const remote = pair && reports.get(pair.remoteCandidateId)
+                if (!pair || [local, remote].some(function (candidate) { return !candidate || !candidate.address || !candidate.port || !candidate.candidateType })) {
                     record.pathAttempts = (record.pathAttempts || 0) + 1
                     if (record.pc && record.pathAttempts < 20) {
                         clearTimeout(record.pathTimer)
                         record.pathTimer = setTimeout(function () { inspectConnectionPath(record) }, 250)
+                    } else {
+                        audit.record('connection-path-unavailable', { peerId: record.peerId, message: 'Selected ICE candidate statistics remain incomplete after bounded retries.' })
                     }
                     return
                 }
-                const local = reports.get(pair.localCandidateId)
-                const remote = reports.get(pair.remoteCandidateId)
+                clearTimeout(record.pathTimer)
                 if (localOnly) {
                     for (const candidate of [local, remote]) context.candidateAllowed({ candidate: 'candidate:stats 1 udp 1 ' + candidate?.address + ' ' + candidate?.port + ' typ ' + candidate?.candidateType })
                     record.sameMachine = true

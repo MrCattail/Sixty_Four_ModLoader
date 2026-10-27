@@ -85,7 +85,7 @@ async function exercise() {
 	const clone = value => JSON.parse(JSON.stringify(value))
 	const target = (g, cell = [4, 4]) => { g.pickupItem('pinhole'); g.hoveredCell = cell; g.hoveredEntity = g.entityAtCoordinates(cell); g.mouse.state = 1; g.mouse.positionChanged = false }
 	const cleanup = () => {
-		window.game?.__cattailEndingSkipController?.dispose?.()
+		window.game?.__cattailTweaksEndingSkipController?.dispose?.()
 		for (const element of document.querySelectorAll('.credits,.orbVeil,.orbResetWrap')) element.remove()
 	}
 	const fresh = async (creative = true) => { cleanup(); const game = await newWorld(creative, true); game.addEntity('chasm', [4, 4]); await game.saveGame(); return game }
@@ -187,7 +187,7 @@ async function exercise() {
 	results.push('pending-save ordering, duplicate clicks, zero snapshot, real first ending, checkpoint and native pointer input')
 
 	// Actual Tweaks skip opens actual vanilla credits; reward uses actual reset.
-	const skip = game.__cattailEndingSkipController
+	const skip = game.__cattailTweaksEndingSkipController
 	check(skip, 'Tweaks ending controller loaded')
 	skip.button.click()
 	check(game.credits?.isConnected && !get('runtime').activate(), 'Tweaks skip reaches original credits while editor stays off')
@@ -221,7 +221,7 @@ async function exercise() {
 		const next = Object.assign(Object.create(Game.prototype), game, { stuff: [], stuffMap: {}, onlyones: {}, stats: {}, resources: Array(10).fill(0),
 			pinhole: null, credits: null, halt: false, preventSaving: false, testSaveId: crypto.randomUUID(),
 			saveSlots: [{ name: 'next', stack: [clone(record)] }], currentSlotId: 0 })
-		delete next.__cattailEndingSkipController
+		delete next.__cattailTweaksEndingSkipController
 		delete next.deployOrbElement; delete next.watchCredits; delete next.pronounce
 		next.pronounce = (...args) => args[args.length - 1]
 		await next.writeToSlot(next.saveSlots[0], 0)

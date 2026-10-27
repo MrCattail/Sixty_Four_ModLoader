@@ -2,14 +2,13 @@
 	const MOD_ID = 'Cattail_TweaksQuality_Tweaks'
 	const configKey = 'enableExplainerFix'
 	const legacyConfigKey = 'enableExplainerLanguageFix'
-	const installedKey = '__cattailExplainerFixInstalled'
+	const installedKey = '__cattailTweaksExplainerFixInstalled'
 	const styleId = 'cattail-explainer-fix-style'
 	const voidClass = 'cattail-explainer-void'
 
 	ModLoader.register({
 		id: MOD_ID,
 		init(api) {
-			migrateLegacyExplainerConfig(api)
 			api.on('afterVanillaScripts', function () {
 				installExplainerFix(api)
 			})

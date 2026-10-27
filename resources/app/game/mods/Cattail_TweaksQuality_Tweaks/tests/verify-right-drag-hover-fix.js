@@ -16,11 +16,11 @@ const ROOT = process.env.SIXTY_FOUR_GAME_ROOT || path.resolve(__dirname, '../../
 const RUNTIME = path.resolve(ROOT, '../../..')
 const MODROOT = path.resolve(__dirname, '..')
 const MOD = 'Cattail_TweaksQuality_Tweaks'
-const KEY = 'enableRightDragHoverFix'
-const FIX = 'scripts/right-drag-hover-fix.js'
+const KEY = 'enableCardHoverFix'
+const FIX = 'scripts/card-hover-fix.js'
 const manifest = JSON.parse(fs.readFileSync(path.join(MODROOT, 'mod.json'), 'utf8'))
 const output = fs.mkdtempSync(path.join(process.env.RIGHT_DRAG_TEST_OUTPUT_ROOT || os.tmpdir(), 'tweaks-right-drag-'))
-const entries = ['scripts/mouse-anchored-camera.js', FIX, 'scripts/dynamic-camera.js', 'scripts/gradient-puncture-relocation-fix.js', 'scripts/gradient-relocation-penalty-fix.js']
+const entries = ['scripts/camera-zoom-anchor.js', FIX, 'scripts/camera-angles.js', 'scripts/gradient-relocation-puncture-allow.js', 'scripts/gradient-relocation-no-penalty.js']
 const bubbleCss = fs.readFileSync(path.join(ROOT, 'cascade.css'), 'utf8').match(/\.hintBubble\{[\s\S]*?\n\s*\}/)[0]
 
 function fixture() {
@@ -71,9 +71,9 @@ function fixture() {
 			soundSources: new Set(), language: 'sch', languageId: 12, resources: new Array(10).fill(0)
 		})
 		canvas.width = game.w; canvas.height = game.h
-		setOption('enableDynamicCamera', !!options.camera)
-		if (options.camera) game.__cattailDynamicCameraState = { pitch: options.camera.pitch, yaw: options.camera.yaw }
-		if (options.enabled !== undefined) setOption('enableRightDragHoverFix', options.enabled)
+		setOption('enableCameraAngle', !!options.camera)
+		if (options.camera) game.__cattailTweaksCameraAngleState = { pitch: options.camera.pitch, yaw: options.camera.yaw }
+		if (options.enabled !== undefined) setOption('enableCardHoverFix', options.enabled)
 		window.addBuilding = function (position, name) {
 			const entity = { master: game, name, position, canHit: () => false, canDarkHit: () => false, onmousedown() {}, onmouseup() {} }
 			const hint = new Cloud(entity)
@@ -106,7 +106,7 @@ function fixture() {
 		// The current game object is passed through the actual Loader lifecycle.
 		Object.assign(game, { version: params.has('old') ? '1.2.1' : '1.3', isMobile: params.has('mobile'), canvas, language: 'sch', languageId: 12 })
 		await ModLoader.boot()
-		api().config.set('enableDynamicCamera', false)
+		api().config.set('enableCameraAngle', false)
 		await ModLoader.stage('afterVanillaScripts', game)
 		await configureScene()
 		game.setListenersDesktop()
@@ -140,7 +140,7 @@ async function main() {
 	assert.equal(manifest.config[KEY].default, true)
 	assert.equal(manifest.config[KEY].reloadPolicy, 'hot')
 	assert.equal(manifest.entries.filter(f => f === FIX).length, 1)
-	assert(manifest.entries.indexOf(FIX) < manifest.entries.indexOf('scripts/gradient-puncture-relocation-fix.js'))
+	assert(manifest.entries.indexOf(FIX) < manifest.entries.indexOf('scripts/gradient-relocation-puncture-allow.js'))
 	for (const lang of ['en', 'sch', 'modsch', 'tch']) assert(manifest.config[KEY].label[lang] && manifest.config[KEY].description[lang])
 	assert.equal(manifest.version, '0.1.0')
 	await new Promise(resolve => server.listen(0, '127.0.0.1', resolve))
@@ -192,7 +192,7 @@ async function main() {
 	try {
 		await ready()
 		await check('default enabled, real DOM remains attached through actual right-button events', async () => {
-			assert.equal(await page.evaluate(() => ModLoader.forMod('Cattail_TweaksQuality_Tweaks').config.get('enableRightDragHoverFix')), true)
+			assert.equal(await page.evaluate(() => ModLoader.forMod('Cattail_TweaksQuality_Tweaks').config.get('enableCardHoverFix')), true)
 			const rows = await drag()
 			assert(rows.every(r => r.actual === 'fixture-building' && r.hover === r.actual && r.hint === r.actual && r.visible))
 			assert(rows.every((r, i) => r.moves === i + 1 && r.deltaIdentity && r.deltaSame && r.buttonsSame && r.state === 2))
@@ -315,22 +315,22 @@ async function main() {
 			const field = page.locator('[data-modloader-config-key="' + KEY + '"]')
 			await field.scrollIntoViewIfNeeded(); await field.uncheck(); await page.locator('.modloader-save-button').click()
 			await page.reload(); await ready()
-			assert.equal(await page.evaluate(() => ModLoader.forMod('Cattail_TweaksQuality_Tweaks').config.get('enableRightDragHoverFix')), false)
+			assert.equal(await page.evaluate(() => ModLoader.forMod('Cattail_TweaksQuality_Tweaks').config.get('enableCardHoverFix')), false)
 			assert((await drag()).some(r => !r.visible))
-			await page.evaluate(() => setOption('enableRightDragHoverFix', true))
+			await page.evaluate(() => setOption('enableCardHoverFix', true))
 			assert((await drag()).every(r => r.visible))
 		})
 		for (const query of ['?old', '?mobile']) {
 			await reset(query)
 			await check('unsupported target delegates and has no installed fix ' + query, async () => {
-				assert.equal(await page.evaluate(() => window.__cattailRightDragHoverFixInstalled), undefined)
+				assert.equal(await page.evaluate(() => window.__cattailTweaksCardHoverFixInstalled), undefined)
 				assert((await drag({ enabled: true })).some(r => r.hover !== r.actual))
 			})
 		}
 		await check('disabled mod on reload has no fix and exposes the original defect', async () => {
 			await page.route('**/mods/enabled.json*', route => route.fulfill({ contentType: 'application/json', body: '{"mods":[]}' }))
 			await reset()
-			assert.equal(await page.evaluate(() => window.__cattailRightDragHoverFixInstalled), undefined)
+			assert.equal(await page.evaluate(() => window.__cattailTweaksCardHoverFixInstalled), undefined)
 			assert((await drag()).some(r => !r.visible))
 		})
 		assert.deepEqual(errors, [])

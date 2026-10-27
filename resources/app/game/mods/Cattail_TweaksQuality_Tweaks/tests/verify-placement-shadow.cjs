@@ -45,7 +45,7 @@ function fixture(options = {}) {
     game.stuffMap = {}
     for (const entity of game.stuff) for (let y = entity.position[1] - entity.entitySpan; y <= entity.position[1] + entity.entitySpan; y++) for (let x = entity.position[0] - entity.entitySpan; x <= entity.position[0] + entity.entitySpan; x++) game.stuffMap['u' + x + 'v' + y] = entity
   }
-  const config = { enablePlacementShadowTraversalReuse: true, ...options.config }, stages = []
+  const config = { enablePlacementShadowReuse: true, ...options.config }, stages = []
   const api = {
     config: { get(key, fallback) { return key in config ? config[key] : fallback } },
     on(name, fn) { if (name === 'afterVanillaScripts') stages.push(fn) },
@@ -54,11 +54,11 @@ function fixture(options = {}) {
   const win = { addEventListener: (name, fn) => events.on(name, fn), __cattailPlacementRenderHooksV1: bridge,
     __cattailTweaksFloorGridV1: { renderClearView(g) { log.push(['tweaks-floor', g === game]); return true } } }
   const context = vm.createContext({ window: win, Game, ModLoader: { register(entry) { entry.init(api) } } })
-  for (const file of ['placement-shadow.js', 'clear-view-options.js']) vm.runInContext(fs.readFileSync(path.join(modRoot, 'scripts', file), 'utf8'), context, { filename: file })
+  for (const file of ['building-shadow-reuse.js', 'clear-view-options.js']) vm.runInContext(fs.readFileSync(path.join(modRoot, 'scripts', file), 'utf8'), context, { filename: file })
   for (const run of stages) run({}, game)
   function set(key, value) { config[key] = value; events.emit('modloader:config-preview', { detail: { modId: 'Cattail_TweaksQuality_Tweaks', key, value } }) }
   function draw(on) {
-    if (on !== undefined) set('enablePlacementShadowTraversalReuse', on)
+    if (on !== undefined) set('enablePlacementShadowReuse', on)
     log.length = 0; game.renderloop()
     assert.equal(stack.length, 0)
     return { commands: JSON.stringify(log), state: JSON.stringify(state), path: bridge?.gridResult(game) }
@@ -78,7 +78,7 @@ async function main() {
   })
   check('all eight existing grid/clipping combinations preserve exactly the same commands, including current three true settings', () => {
     for (let bits = 0; bits < 8; bits++) {
-      const f = fixture({ config: { disableClearViewGrid: !!(bits & 1), useTweaksClearViewGridStyle: !!(bits & 2), disableClearViewBuildingClipping: !!(bits & 4) } })
+      const f = fixture({ config: { enableClearViewGridBlock: !!(bits & 1), enableClearViewGridStyle: !!(bits & 2), enableClearViewClipBlock: !!(bits & 4) } })
       f.add('A', 0, 0, 2); f.add('conductor', -4, 1); f.add('hidden', -2, -3, 1, true); assert.equal(equivalent(f).path.path, 'entity-traversal-reuse')
     }
   })
@@ -148,8 +148,8 @@ async function main() {
   })
   check('default true, hot off/on/cancel and original manifest entries/settings remain consistent', () => {
     const manifest = JSON.parse(fs.readFileSync(path.join(modRoot, 'mod.json'), 'utf8'))
-    assert.equal(manifest.entries.length, 41); assert.equal(Object.keys(manifest.config).length, 58)
-    assert.equal(manifest.config.enablePlacementShadowTraversalReuse.default, true); assert.equal(manifest.config.enablePlacementShadowTraversalReuse.reloadPolicy, 'hot')
+    assert.equal(manifest.entries.length, 39); assert.equal(Object.keys(manifest.config).length, 55)
+    assert.equal(manifest.config.enablePlacementShadowReuse.default, true); assert.equal(manifest.config.enablePlacementShadowReuse.reloadPolicy, 'hot')
     const f = fixture(); f.add('A', 0, 0); assert.equal(f.draw().path.path, 'entity-traversal-reuse')
     assert.equal(f.draw(false).path.path, 'native-area-scan'); assert.equal(f.draw(true).path.path, 'entity-traversal-reuse')
   })

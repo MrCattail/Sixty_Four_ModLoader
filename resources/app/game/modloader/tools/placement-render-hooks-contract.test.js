@@ -45,7 +45,7 @@ check('comparison rejects enabled optimization, while disabling restores the nat
   const snapshot = () => ({ focused: true, hidden: false, plane: 0, item: true, itemType: 'candidate', hovered: true, configSignature: '{}' })
   const capture = placement.createPlacementCapture({ game: f.game, controller, snapshot, comparison: true })
   assert.throws(() => capture.start(), /复用建筑遍历/)
-  f.set('enablePlacementShadowTraversalReuse', false)
+  f.set('enablePlacementShadowReuse', false)
   const baseline = placement.createPlacementCapture({ game: f.game, controller, snapshot, comparison: true }); baseline.start(); baseline.beforeFrame()
   assert.equal(f.draw(false).path.path, 'native-area-scan'); assert.ok(baseline.afterFrame({}).grid.executedCells > 0); baseline.stop()
 })

@@ -6,7 +6,7 @@ const vm = require('node:vm')
 const gameRoot = path.resolve(__dirname, '../../..')
 const scriptRoot = process.argv[2] ? path.resolve(process.argv[2]) : path.resolve(__dirname, '../scripts')
 const source = ['stuff', 'codex', 'bezier', 'game'].map(name => fs.readFileSync(path.join(gameRoot, 'scripts', name + '.js'), 'utf8')).join('\n')
-const punctureKey = 'enableGradientPunctureRelocationFix', penaltyKey = 'enableGradientRelocationPenaltyFix'
+const punctureKey = 'enableGradientRelocationPunctureAllow', penaltyKey = 'enableGradientRelocationNoPenalty'
 const results = [], failures = []
 function check(name, run) {
 	try { run(); results.push(name) } catch (error) { failures.push({ name, message: error.stack }); console.error('FAIL: ' + name) }
@@ -27,7 +27,7 @@ function fixture(puncture = true, penalty = true, reverse = false) {
 		patch(target, name, factory) { assert.equal(typeof target[name], 'function'); target[name] = factory(target[name]) }
 	}
 	context.ModLoader = { register: mod => mod.init(api) }
-	const files = ['gradient-puncture-relocation-fix.js', 'gradient-relocation-penalty-fix.js']
+	const files = ['gradient-relocation-puncture-allow.js', 'gradient-relocation-no-penalty.js']
 	if (reverse) files.reverse()
 	for (const name of files) vm.runInContext(fs.readFileSync(path.join(scriptRoot, name), 'utf8'), context, { filename: name })
 	handlers.forEach(fn => fn())
@@ -95,7 +95,7 @@ function state(h) {
 function unchanged(h, before) {
 	const after = state(h)
 	assert.deepEqual(after, before)
-	assert.equal(h.g.__cattailGradientPunctureRelocationActive, undefined)
+	assert.equal(h.g.__cattailTweaksGradientRelocationPunctureAllowActive, undefined)
 }
 
 for (const p of [false, true]) for (const keep of [false, true]) {

@@ -5,7 +5,7 @@
 // the Game constructor, player profile, saves and Steam are never used.
 const fs = require('node:fs'), path = require('node:path'), assert = require('node:assert/strict')
 const MOD = 'Cattail_TweaksQuality_Tweaks'
-const ENTRIES = ['scripts/floor-grid-lines.js', 'scripts/placement-shadow.js', 'scripts/clear-view-options.js', 'scripts/dynamic-camera.js']
+const ENTRIES = ['scripts/grid.js', 'scripts/building-shadow-reuse.js', 'scripts/clear-view-options.js', 'scripts/camera-angles.js']
 if (!process.versions.electron) {
   assert.ok(process.argv.includes('--run'), 'Supply --run and --lab ABSOLUTE_NEW_DIRECTORY.')
   const flag = process.argv.indexOf('--lab'); assert.ok(flag >= 0 && path.isAbsolute(process.argv[flag + 1] || ''))
@@ -100,7 +100,7 @@ if (!process.versions.electron) {
           for(const key of ['saveGame','build','upgrade','massRelocate'])g[key]=()=>{throw Error('Forbidden fixture world endpoint '+key)};
           await ModLoader.boot();ModLoader.state.game=g;
           const api=ModLoader.forMod('Cattail_TweaksQuality_Tweaks');
-          for(const key of ['enablePlacementShadowTraversalReuse','enableFloorGridLines','enableDynamicCamera','disableClearViewGrid','disableClearViewBuildingClipping','useTweaksClearViewGridStyle'])api.config.set(key,false);
+          for(const key of ['enablePlacementShadowReuse','enableGrid','enableCameraAngle','enableClearViewGridBlock','enableClearViewClipBlock','enableClearViewGridStyle'])api.config.set(key,false);
           if(localStorage.getItem('fixture-early-render'))ModLoader.render.install(g);
           await ModLoader.stage('afterVanillaScripts',g);
           for(const layer of ['background','interaction','buildings'])api.render.onLayer(layer,()=>{},{id:'placement-fixture-'+layer});
@@ -152,12 +152,12 @@ if (!process.versions.electron) {
           const matrix = await evaluate(`(() => {
             clearInterval(frameTimer); const results=[];
             for(const apiEnabled of [false,true])for(const dynamic of [false,true])for(const zoom of [2,.3,.03])for(let bits=0;bits<8;bits++){
-              ModLoader.render.setEnabled(apiEnabled);setOption('enableDynamicCamera',dynamic);setOption('cameraPitch',.87);setOption('cameraYaw',35);
-              setOption('disableClearViewGrid',!!(bits&1));setOption('useTweaksClearViewGridStyle',!!(bits&2));setOption('disableClearViewBuildingClipping',!!(bits&4));
+              ModLoader.render.setEnabled(apiEnabled);setOption('enableCameraAngle',dynamic);setOption('cameraPitch',.87);setOption('cameraYaw',35);
+              setOption('enableClearViewGridBlock',!!(bits&1));setOption('enableClearViewGridStyle',!!(bits&2));setOption('enableClearViewClipBlock',!!(bits&4));
               game.zoom=zoom;game.unit=game.solidUnit*zoom;
-              setOption('enablePlacementShadowTraversalReuse',false);game.renderloop();const before=JSON.stringify(hashPixels());
-              setOption('enablePlacementShadowTraversalReuse',true);game.renderloop();const after=JSON.stringify(hashPixels());
-              results.push({apiEnabled,dynamic,zoom,bits,equal:before===after,path:window.__cattailPlacementRenderHooksV1.gridResult(game),camera:game.__cattailDynamicCameraState});
+              setOption('enablePlacementShadowReuse',false);game.renderloop();const before=JSON.stringify(hashPixels());
+              setOption('enablePlacementShadowReuse',true);game.renderloop();const after=JSON.stringify(hashPixels());
+              results.push({apiEnabled,dynamic,zoom,bits,equal:before===after,path:window.__cattailPlacementRenderHooksV1.gridResult(game),camera:game.__cattailTweaksCameraAngleState});
             }return results;
           })()`)
           result.pixelMatrices.push({ early, cases: matrix })
@@ -165,7 +165,7 @@ if (!process.versions.electron) {
           check('optimized path reaches original grid leaf with complete multi-cell/conductor/hidden collection, order=' + early,
             matrix.some(row => row.path?.path === 'entity-traversal-reuse' && row.path.fills > 0) && matrix.filter(row => row.zoom === .03 && !row.dynamic).every(row => row.path?.path === 'entity-traversal-reuse'))
         }
-        await evaluate('setOption("enableDynamicCamera",false);setOption("disableClearViewGrid",true);setOption("useTweaksClearViewGridStyle",true);setOption("disableClearViewBuildingClipping",true);game.zoom=.03;game.unit=game.solidUnit*game.zoom;setOption("enablePlacementShadowTraversalReuse",true);frameTimer=setInterval(()=>game.renderloop(),16);true')
+        await evaluate('setOption("enableCameraAngle",false);setOption("enableClearViewGridBlock",true);setOption("enableClearViewGridStyle",true);setOption("enableClearViewClipBlock",true);game.zoom=.03;game.unit=game.solidUnit*game.zoom;setOption("enablePlacementShadowReuse",true);frameTimer=setInterval(()=>game.renderloop(),16);true')
         await click('放置细分记录'); await recording(); await delay(500); await evaluate('testProbeClient().finish()'); await idle()
         let record = lastReport(); result.optimizedDirectory = record.dir
         check('real short observation preserves optimization and exports truthful footprint counts for timed/detail/raw frames',
@@ -174,14 +174,14 @@ if (!process.versions.electron) {
           record.report.placement.warnings.some(text => text.includes('复用路径')))
         await click('放置分项对照'); await idle()
         const dirs = fs.readdirSync(path.join(lab, 'reports')).sort(), rejected = JSON.parse(fs.readFileSync(path.join(lab, 'reports', dirs.at(-1), 'session.json')))
-        check('original comparison rejects optimization without changing any setting and saves the reason', rejected.status === 'renderer-start-failed' && rejected.rendererStartup.error.message.includes('复用建筑遍历') && await evaluate('ModLoader.forMod("Cattail_TweaksQuality_Tweaks").config.get("enablePlacementShadowTraversalReuse") === true'))
+        check('original comparison rejects optimization without changing any setting and saves the reason', rejected.status === 'renderer-start-failed' && rejected.rendererStartup.error.message.includes('复用建筑遍历') && await evaluate('ModLoader.forMod("Cattail_TweaksQuality_Tweaks").config.get("enablePlacementShadowReuse") === true'))
         const toggle = await evaluate(`(() => {
-          clearInterval(frameTimer);setOption('enablePlacementShadowTraversalReuse',false);game.renderloop();const before=JSON.stringify(hashPixels()),off=__cattailPlacementRenderHooksV1.gridResult(game);
-          setOption('enablePlacementShadowTraversalReuse',true);game.renderloop();return {equal:before===JSON.stringify(hashPixels()),off,on:__cattailPlacementRenderHooksV1.gridResult(game)};
+          clearInterval(frameTimer);setOption('enablePlacementShadowReuse',false);game.renderloop();const before=JSON.stringify(hashPixels()),off=__cattailPlacementRenderHooksV1.gridResult(game);
+          setOption('enablePlacementShadowReuse',true);game.renderloop();return {equal:before===JSON.stringify(hashPixels()),off,on:__cattailPlacementRenderHooksV1.gridResult(game)};
         })()`)
         check('hot off restores native immediately; on restores reuse with identical actual pixels', toggle.equal && toggle.off.path === 'native-area-scan' && toggle.on.path === 'entity-traversal-reuse')
         const optional = path.join(__dirname, 'game/modloader/diagnostics/placement-probe.js')
-        fs.renameSync(optional, optional + '.disabled'); await load(); await evaluate('setOption("enablePlacementShadowTraversalReuse",true);game.renderloop()')
+        fs.renameSync(optional, optional + '.disabled'); await load(); await evaluate('setOption("enablePlacementShadowReuse",true);game.renderloop()')
         check('production optimization remains available when optional diagnostic module is absent', await evaluate('__cattailPlacementRenderHooksV1.gridResult(game).path === "entity-traversal-reuse"'))
         result.errors.push(...await evaluate('window.fixtureErrors'))
         check('shadow subset has no external requests or renderer exceptions', result.network.length === 0 && result.errors.length === 0)
@@ -194,19 +194,19 @@ if (!process.versions.electron) {
         }
         result.startupDirectories = []
         for (const kind of ['configuration', 'capabilities', 'handheld']) {
-          if (kind === 'configuration') await evaluate('setOption("disableClearViewGrid",true)')
+          if (kind === 'configuration') await evaluate('setOption("enableClearViewGridBlock",true)')
           if (kind === 'capabilities') await evaluate('window.fixtureDescribe=testPlacementController().describe;testPlacementController().describe=()=>({renderGrid:{supported:false},renderEntitiesAbstract:{supported:false}});true')
           if (kind === 'handheld') await evaluate('window.fixtureHand=game.itemInHand;delete game.itemInHand')
           await click('放置分项对照'); await idle()
           const record = lastAttempt(), d = record.session.rendererStartup, message = await evaluate('ModLoader.state.clearViewProbeMessage')
           check('real menu startup rejection saves exact reason and diagnostic directory: ' + kind,
             record.session.status === 'renderer-start-failed' && d.stage === 'placement-start' && d.cancelled === false &&
-            (kind === 'configuration' ? d.configuration.disableClearViewGrid === true && d.error.message.includes('设置') :
+            (kind === 'configuration' ? d.configuration.enableClearViewGridBlock === true && d.error.message.includes('设置') :
               kind === 'capabilities' ? d.capabilities.renderGrid.supported === false && d.error.message.includes('原生入口') : d.scene.item === false && d.error.message.includes('放置对照需要')) &&
             message.includes('未开始采集') && message.includes(record.dir) && record.summary.includes(d.error.message) && !fs.existsSync(path.join(record.dir, 'frames.json')))
           check('failed menu startup leaves placement intervention inactive: ' + kind, await evaluate('lastPlacement.state().placementActive === false'))
           result.startupDirectories.push(record.dir)
-          if (kind === 'configuration') await evaluate('setOption("disableClearViewGrid",false)')
+          if (kind === 'configuration') await evaluate('setOption("enableClearViewGridBlock",false)')
           if (kind === 'capabilities') await evaluate('testPlacementController().describe=window.fixtureDescribe;true')
           if (kind === 'handheld') await evaluate('game.itemInHand=window.fixtureHand')
         }
@@ -264,13 +264,13 @@ if (!process.versions.electron) {
       check('real shipped runtime deep tracing exports bounded categories and capture markers', record.session.trace.status === 'saved' && markers.includes('SFProbe:capture-start') && markers.includes('SFProbe:capture-stop'))
       result.traceBytes = fs.statSync(path.join(record.dir, record.session.trace.fileName || 'trace.json')).size
       for (const apiEnabled of [false, true]) for (const dynamic of [false, true]) {
-        await evaluate('ModLoader.render.setEnabled(' + apiEnabled + ');setOption("enableDynamicCamera",' + dynamic + ')'); await delay(100)
+        await evaluate('ModLoader.render.setEnabled(' + apiEnabled + ');setOption("enableCameraAngle",' + dynamic + ')'); await delay(100)
         const before = await evaluate('hashPixels()')
         await click('放置细分记录'); await recording(); await delay(100)
         check('Canvas equivalence API=' + apiEnabled + ' dynamic=' + dynamic, JSON.stringify(before) === JSON.stringify(await evaluate('hashPixels()')))
         await evaluate('testProbeClient().finish()'); await idle()
       }
-      for (const key of ['disableClearViewGrid', 'useTweaksClearViewGridStyle', 'disableClearViewBuildingClipping']) {
+      for (const key of ['enableClearViewGridBlock', 'enableClearViewGridStyle', 'enableClearViewClipBlock']) {
         await evaluate('setOption(' + JSON.stringify(key) + ',true)'); await click('放置分项对照'); await idle()
         check('conflicting setting rejects intervention without writeback: ' + key, await evaluate('ModLoader.state.clearViewProbeMessage.includes("设置")'))
         await evaluate('setOption(' + JSON.stringify(key) + ',false)')

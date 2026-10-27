@@ -5200,9 +5200,9 @@
 	}
 	const placementProbeConfiguration = function () {
 		const values = {}
-		for (const key of ['enablePlacementShadowTraversalReuse', 'disableClearViewGrid', 'disableClearViewBuildingClipping', 'useTweaksClearViewGridStyle',
-			'enableFloorGridLines', 'enableDynamicCamera', 'cameraPitch', 'cameraYaw', 'enableViewDistance', 'farthestZoom',
-			'enableEntitySpriteRenderCache', 'enableEntitySliceRenderCache', 'enableExperimentalEntityWebGLRecorder']) {
+		for (const key of ['enablePlacementShadowReuse', 'enableClearViewGridBlock', 'enableClearViewClipBlock', 'enableClearViewGridStyle',
+			'enableGrid', 'enableCameraAngle', 'cameraPitch', 'cameraYaw', 'enableCameraZoom', 'cameraZoomMin',
+			'enableBuildingSpriteCache', 'enableBuildingBatchCache', 'enableBuildingWebGLRecorder']) {
 			values[key] = getConfigValue('Cattail_TweaksQuality_Tweaks', key, null)
 		}
 		values.renderApiEnabled = isRenderApiEnabled()
@@ -6359,6 +6359,8 @@
 	}
 	const dispatchConfigPreview = function (model) {
 		if (!model || model.invalid) return
+		const alias = model.mod?.manifest?.configCompatibility?.keys?.[model.item?.key]
+		if (alias) model = { ...model, item: { ...model.item, key: alias } }
 		try {
 			window.dispatchEvent(new CustomEvent('modloader:config-preview', {
 				detail: {
@@ -6372,6 +6374,10 @@
 	}
 
 	const readConfigForPanel = function (mod) {
+		if (mod.manifest.configCompatibility) {
+			state.configCompatibilityMods ||= {}
+			state.configCompatibilityMods[mod.id] = mod
+		}
 		const liveConfig = state.configs[mod.id]
 		const schemaSource = liveConfig?.schema?.length ? liveConfig.schema : normalizeConfigSchema(mod.manifest.config)
 		const schema = schemaSource.map(function (item) {
@@ -6390,7 +6396,7 @@
 			if (isSettingsActionItem(item)) continue
 			const liveValue = liveConfig?.values ? liveConfig.values[item.key] : undefined
 			values[item.key] = liveValue === undefined
-				? parseStoredConfig(localStorage.getItem(storageKey(mod.id, item.key)), item.default)
+				? (mod.manifest.configCompatibility ? readCompatibleConfigValue(mod, item) : parseStoredConfig(localStorage.getItem(storageKey(mod.id, item.key)), item.default))
 				: cloneConfigValue(liveValue)
 		}
 		return { schema, values }
@@ -6402,6 +6408,99 @@
 		if (typeof raw === 'string' || typeof raw === 'number' || typeof raw === 'boolean') return String(raw)
 		if (isObject(raw)) return String(raw.id || raw.key || raw.name || raw.en || raw.sch || raw.modsch || '')
 		return ''
+	}
+
+	const mapCompatibleConfigSectionKey = function (mod, key) {
+		const sections = mod.manifest?.configCompatibility?.sections
+		if (!sections) return key
+		return String(key).replace(/^section:([^#]+)(#\d+)?$/, function (all, id, suffix) {
+			return 'section:' + (sections[id] || id) + (suffix || '')
+		})
+	}
+
+	const mapCompatiblePanelConfigLayout = function (mod, stored) {
+		const compatibility = mod.manifest?.configCompatibility
+		if (!compatibility || !stored?.blocks?.length) return stored
+		const keys = compatibility.keys || {}
+		const canonical = function (key) { return keys[key] || key }
+		const originalKeys = new Set()
+		const originalSections = new Set()
+		for (const block of stored.blocks) {
+			if (block.type === 'section') {
+				if (mapCompatibleConfigSectionKey(mod, block.key) === block.key) originalSections.add(block.key)
+				for (const key of block.items || []) if (canonical(key) === key) originalKeys.add(key)
+			} else if (block.type === 'item' && canonical(block.key) === block.key) originalKeys.add(block.key)
+		}
+		const mappedItems = function (items) {
+			return (items || []).filter(function (key) { return canonical(key) === key || !originalKeys.has(canonical(key)) }).map(canonical)
+		}
+		const blocks = [], sections = new Map(), deferred = new Map()
+		for (const source of stored.blocks) {
+			if (source.type === 'section') {
+				const key = mapCompatibleConfigSectionKey(mod, source.key)
+				const items = mappedItems(source.items)
+				if (source.key !== key && originalSections.has(key)) {
+					deferred.set(key, (deferred.get(key) || []).concat(items))
+					continue
+				}
+				if (sections.has(key)) { sections.get(key).items.push(...items); continue }
+				const block = { ...source, key, items }
+				sections.set(key, block); blocks.push(block)
+			} else if (source.type === 'item') {
+				if (source.key !== canonical(source.key) && originalKeys.has(canonical(source.key))) continue
+				blocks.push({ ...source, key: canonical(source.key) })
+			} else blocks.push({ ...source })
+		}
+		for (const [key, items] of deferred) if (sections.has(key)) sections.get(key).items.push(...items)
+		return { ...stored, blocks }
+	}
+
+	const mapCompatibleConfigSectionOrder = function (mod, order) {
+		if (!mod.manifest?.configCompatibility || !Array.isArray(order)) return order
+		const originals = new Set(order.filter(function (key) { return mapCompatibleConfigSectionKey(mod, key) === key }))
+		const result = []
+		for (const key of order) {
+			const mapped = mapCompatibleConfigSectionKey(mod, key)
+			if (mapped !== key && originals.has(mapped)) continue
+			if (!result.includes(mapped)) result.push(mapped)
+		}
+		return result
+	}
+
+	const prepareCompatiblePanelState = function (payload, previous) {
+		payload.configLayout = { ...payload.configLayout }
+		payload.configSectionOrder = { ...payload.configSectionOrder }
+		for (const mod of Object.values(state.configCompatibilityMods || {})) {
+			const compatibility = mod.manifest?.configCompatibility
+			if (!compatibility) continue
+			const key = getPanelConfigSectionOrderKey(mod)
+			const oldLayout = previous.configLayout?.[key]
+			const oldOrder = previous.configSectionOrder?.[key]
+			const mappedLayout = mapCompatiblePanelConfigLayout(mod, oldLayout)
+			const mappedOrder = mapCompatibleConfigSectionOrder(mod, oldOrder)
+			const hasOld = JSON.stringify(oldLayout) !== JSON.stringify(mappedLayout) || JSON.stringify(oldOrder) !== JSON.stringify(mappedOrder)
+			try {
+				if (hasOld) {
+					const backupKey = 'modloader:' + mod.id + ':' + (compatibility.layoutBackupKey || 'identifierMigrationBackupV1')
+					const existing = localStorage.getItem(backupKey)
+					if (existing === null) localStorage.setItem(backupKey, JSON.stringify({ version: 1, modId: mod.id, layout: oldLayout, sectionOrder: oldOrder }))
+					else {
+						const backup = JSON.parse(existing)
+						if (backup?.version !== 1 || backup.modId !== mod.id) throw new Error('Unrecognized layout backup')
+					}
+				}
+				if (payload.configLayout[key]) payload.configLayout[key] = mapCompatiblePanelConfigLayout(mod, payload.configLayout[key])
+				if (payload.configSectionOrder[key]) payload.configSectionOrder[key] = mapCompatibleConfigSectionOrder(mod, payload.configSectionOrder[key])
+			} catch (error) {
+				// Never replace an old layout if its recoverable snapshot could not be saved.
+				if (oldLayout === undefined) delete payload.configLayout[key]
+				else payload.configLayout[key] = oldLayout
+				if (oldOrder === undefined) delete payload.configSectionOrder[key]
+				else payload.configSectionOrder[key] = oldOrder
+				console.warn('[ModLoader] Identifier layout migration deferred for ' + mod.id, error)
+			}
+		}
+		return payload
 	}
 
 	const getConfigSectionLabel = function (mod, item) {
@@ -6422,7 +6521,7 @@
 
 	const applyPanelConfigSectionOrder = function (mod, groups) {
 		const key = getPanelConfigSectionOrderKey(mod)
-		const stored = state.panelConfigSectionOrder[key] || []
+		const stored = mapCompatibleConfigSectionOrder(mod, state.panelConfigSectionOrder[key] || [])
 		if (!stored.length) return groups
 		const order = new Map()
 		stored.forEach(function (sectionKey, index) {
@@ -6477,7 +6576,7 @@
 	const resolvePanelConfigLayout = function (mod, schema) {
 		const rawGroups = buildRawConfigSectionGroups(mod, schema)
 		const modKey = getPanelConfigSectionOrderKey(mod)
-		const stored = state.panelConfigLayout[modKey]
+		const stored = mapCompatiblePanelConfigLayout(mod, state.panelConfigLayout[modKey])
 		if (!stored?.blocks?.length) {
 			return applyPanelConfigSectionOrder(mod, rawGroups).map(function (group) {
 				const resolved = createResolvedConfigSection(group)
@@ -9299,7 +9398,8 @@
 			const restoreAsTab = hasRestoreOverride
 				? options.restoreAsTab === true
 				: state.panelHidden || (isPanelAutoHideEnabled() && !!document.getElementById('modloader-panel'))
-			localStorage.setItem(PANEL_STATE_STORAGE_KEY, JSON.stringify({
+			const previous = JSON.parse(localStorage.getItem(PANEL_STATE_STORAGE_KEY) || '{}')
+			let payload = { ...(isObject(previous) ? previous : {}),
 				position: state.panelPosition,
 				hidden: state.panelHidden,
 				restoreAsTab,
@@ -9312,7 +9412,9 @@
 				recentLogExpanded: state.panelRecentLogExpanded === true,
 				settings: state.panelSettings,
 				shortcuts: { enabled: state.shortcutSettings.enabled !== false, mods: state.shortcutSettings.mods }
-			}))
+			}
+			if (state.configCompatibilityMods) payload = prepareCompatiblePanelState(payload, isObject(previous) ? previous : {})
+			localStorage.setItem(PANEL_STATE_STORAGE_KEY, JSON.stringify(payload))
 		} catch (error) {}
 	}
 
@@ -12171,25 +12273,75 @@
 		}
 	}
 
+	// Manifest-declared identifier compatibility. Reads are side-effect free.
+	const readCompatibleConfigValue = function (mod, item) {
+		const own = localStorage.getItem(storageKey(mod.id, item.key))
+		if (own !== null) return parseStoredConfig(own, item.default)
+		const sources = mod.manifest.configCompatibility?.sources?.[item.key] || []
+		for (const source of sources) {
+			const sourceId = source.modId || mod.id
+			const raw = localStorage.getItem(storageKey(sourceId, source.key))
+			if (raw === null && !Object.prototype.hasOwnProperty.call(source, 'fallback')) continue
+			let value = raw === null ? source.fallback : parseStoredConfig(raw, item.default)
+			for (const operation of source.operations || []) {
+				if (operation.unless) {
+					const condition = operation.unless
+					const stored = localStorage.getItem(storageKey(condition.modId || mod.id, condition.key))
+					if (stored !== null && parseStoredConfig(stored, null) === condition.equals) continue
+				}
+				if (operation.kind === 'notFalse') value = value !== false
+				else if (operation.kind === 'map') {
+					const input = operation.normalizeText && typeof value === 'string' ? value.trim().toLowerCase() : value
+					const match = (operation.values || []).find(function (pair) { return pair[0] === input })
+					if (match) value = match[1]
+					else if (Object.prototype.hasOwnProperty.call(operation, 'fallback')) value = operation.fallback
+				} else if (operation.kind === 'and') {
+					// A blocked prerequisite read cannot accidentally enable a renderer.
+					try {
+						const other = operation.source || {}
+						const stored = localStorage.getItem(storageKey(other.modId || mod.id, other.key))
+						if (stored === null) continue
+						const parsed = parseStoredConfig(stored, null)
+						const number = Number(parsed)
+						const rejected = (operation.reject || []).includes(String(parsed ?? '').trim().toLowerCase())
+						value = value !== false && !rejected && !(operation.rejectNonPositive && Number.isFinite(number) && number <= 0)
+					} catch (error) { value = false }
+				}
+			}
+			return value
+		}
+		return item.default
+	}
+
 	const loadModConfig = function (mod) {
 		const schema = normalizeConfigSchema(mod.manifest.config)
 		const values = {}
 		for (const item of schema) {
 			const fallback = item.default
-			values[item.key] = parseStoredConfig(localStorage.getItem(storageKey(mod.id, item.key)), fallback)
+			values[item.key] = mod.manifest.configCompatibility
+				? readCompatibleConfigValue(mod, item)
+				: parseStoredConfig(localStorage.getItem(storageKey(mod.id, item.key)), fallback)
 			item.type = item.type || inferConfigType(fallback)
 		}
 		state.configs[mod.id] = { schema, values }
+		if (mod.manifest.configCompatibility) {
+			state.configs[mod.id].compatibility = mod.manifest.configCompatibility
+			state.configCompatibilityMods ||= {}
+			state.configCompatibilityMods[mod.id] = mod
+		}
 	}
 
 	const getConfigValue = function (modId, key, fallback) {
 		const config = state.configs[modId]
 		if (!config) return fallback
+		key = config.compatibility?.keys?.[key] || key
 		return config.values[key] === undefined ? fallback : config.values[key]
 	}
 
 	const setConfigValue = function (modId, key, value) {
 		if (!state.configs[modId]) state.configs[modId] = { schema: [], values: {} }
+		const compatibility = state.configs[modId].compatibility || state.configCompatibilityMods?.[modId]?.manifest?.configCompatibility
+		key = compatibility?.keys?.[key] || key
 		state.configs[modId].values[key] = value
 		localStorage.setItem(storageKey(modId, key), JSON.stringify(value))
 		showStatus()

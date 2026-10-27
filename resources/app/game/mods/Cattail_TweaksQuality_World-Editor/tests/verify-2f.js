@@ -499,7 +499,7 @@ function testCardI18nManifestAndCompatibilityBoundary() {
 	assert.match(controllerSource, /passive:\s*false/)
 
 	const dynamicCameraSource = fs.readFileSync(
-		path.join(GAME_ROOT, 'mods/Cattail_TweaksQuality_Tweaks/scripts/dynamic-camera.js'),
+		path.join(GAME_ROOT, 'mods/Cattail_TweaksQuality_Tweaks/scripts/camera-angles.js'),
 		'utf8'
 	)
 	assert.match(dynamicCameraSource, /window\.addEventListener\('wheel'/)

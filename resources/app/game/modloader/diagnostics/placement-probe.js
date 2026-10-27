@@ -156,8 +156,8 @@ function createPlacementCapture(options) {
       if (comparison && controller.optimizationEnabled?.(game)) throw new Error('复用建筑遍历绘制占位阴影已开启，不能作为原版五组对照；请使用观察记录，或自行关闭该开关后再对照。')
       if (comparison) {
         let config = {}; try { config = JSON.parse(baseline.configSignature || '{}') } catch (_) {}
-        if (config.enablePlacementShadowTraversalReuse === true) throw new Error('复用建筑遍历绘制占位阴影已开启，不能作为原版五组对照；可使用观察记录。')
-        if (config.disableClearViewGrid || config.useTweaksClearViewGridStyle || config.disableClearViewBuildingClipping) throw new Error('当前清晰视图关闭/替换设置会干扰分项对照；未代改设置，可先用观察记录。')
+        if (config.enablePlacementShadowReuse === true) throw new Error('复用建筑遍历绘制占位阴影已开启，不能作为原版五组对照；可使用观察记录。')
+        if (config.enableClearViewGridBlock || config.enableClearViewGridStyle || config.enableClearViewClipBlock) throw new Error('当前清晰视图关闭/替换设置会干扰分项对照；未代改设置，可先用观察记录。')
       }
       held = game.itemInHand; projections = Object.fromEntries(PROJECTIONS.map(name => [name, game[name]]))
       started = changedAt = now(); active = true

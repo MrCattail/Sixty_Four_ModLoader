@@ -114,7 +114,7 @@ async function main() {
     }
   })
   await test('client records all eight groups and excludes metadata frames plus following intervals', async () => {
-    const f = clientFixture(); f.game.__cattailDynamicCameraState = { pitch: .5, yaw: 0 }; f.client.start('grid-threshold'); await f.fire(3000)
+    const f = clientFixture(); f.game.__cattailTweaksCameraAngleState = { pitch: .5, yaw: 0 }; f.client.start('grid-threshold'); await f.fire(3000)
     for (let i = 0; i < 8; i++) for (const t of [0, 2900, 3100, 3200, 3300, 3400, 3500]) { f.setTime(i * 12000 + t); f.game.renderloop() }
     f.setTime(96000); await f.fire(96000); await flush()
     assert.equal(f.calls[0].mode, 'grid-threshold'); assert.equal(f.calls[0].seconds, 96); assert.equal(f.report.ablation.completed, true)

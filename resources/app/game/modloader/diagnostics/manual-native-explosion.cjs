@@ -4,7 +4,7 @@
 module.exports = function startNativeExplosionTest(win) {
   const game = win.DEBUG
   const api = win.CattailTweaksResourceExplosionBezierFastPath
-  const key = 'enableResourceExplosionBezierFastPath'
+  const key = 'enableResourceExplosionPathReuse'
   const modId = 'Cattail_TweaksQuality_Tweaks'
   if (win.SFNativeExplosionTest?.active) throw new Error('对照已启动；fireAfter() 倒计时触发，F9 恢复。')
   if (game?.version !== '1.3' || !game.ctx || !Array.isArray(game.vfx)) throw new Error('请先进入桌面版 1.3 的存档。')

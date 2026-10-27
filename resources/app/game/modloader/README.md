@@ -760,6 +760,34 @@ custom layout for later use. Newly registered keys append to their schema
 section, removed keys are ignored, and the older saved section-only order is
 used automatically until the player makes an item-level layout change.
 
+### Renamed config identifiers
+
+Tweaks declares `configCompatibility` version 1 in its manifest. `keys` maps old
+config names to canonical names; `sections` maps old section IDs. Ordered
+`sources` describe older storage keys and the existing value conversions. The
+Loader uses these declarations for both enabled Mods and disabled-Mod panels.
+An actually saved canonical key wins, including false, zero, empty strings and
+null. Inherited reads do not write or remove storage. Normal saves and config
+sets write only the canonical key; old get/set names remain aliases. Preview
+events carry the canonical key once, using the existing cancel/save lifecycle.
+Mods without this declaration retain their existing config path.
+
+Panel layout reads map section blocks, child keys, detached items and the older
+section-only order while preserving custom placement. Canonical entries win
+when both spellings exist. Before replacing a persisted legacy layout, the
+Loader saves its original Tweaks layout and section order once to
+`modloader:Cattail_TweaksQuality_Tweaks:identifierMigrationBackupV1`. If that
+backup fails, the old persisted layout remains and a later save can retry.
+Other Mods and unrelated panel-state fields are retained. This is independent
+of game saves and the Storage Snapshot API.
+
+Tweaks keeps the `CattailResourceGlowColors` palette share type and accepts the
+old `resourceGlowColors` import field. Its canonical runtime helpers live under
+`window.CattailTweaks`; legacy global helpers forward to the same objects.
+Methods, return fields and receiver semantics are unchanged. The old
+`game.__cattailDynamicCameraState` field forwards to
+`game.__cattailTweaksCameraAngleState` for existing consumers.
+
 ### Mod config search and recent log
 
 The **Mod Manager** heading keeps the normal "Toggle mods or edit config below"

@@ -23,7 +23,7 @@ function sanitizeStartupDiagnostic(value) {
     result.scene.interactionMode = text(value.scene.interactionMode, 32)
   }
   if (value.configuration && typeof value.configuration === 'object') result.configuration = Object.fromEntries(
-    ['disableClearViewGrid', 'useTweaksClearViewGridStyle', 'disableClearViewBuildingClipping'].map(key => [key, typeof value.configuration[key] === 'boolean' ? value.configuration[key] : null]))
+    ['enableClearViewGridBlock', 'enableClearViewGridStyle', 'enableClearViewClipBlock'].map(key => [key, typeof value.configuration[key] === 'boolean' ? value.configuration[key] : null]))
   if (value.capabilities && typeof value.capabilities === 'object') result.capabilities = Object.fromEntries(
     ['renderGrid', 'renderEntitiesAbstract'].map(name => [name, { supported: value.capabilities[name]?.supported === true,
       sha256: typeof value.capabilities[name]?.sha256 === 'string' && /^[a-f0-9]{64}$/.test(value.capabilities[name].sha256) ? value.capabilities[name].sha256 : null }]))

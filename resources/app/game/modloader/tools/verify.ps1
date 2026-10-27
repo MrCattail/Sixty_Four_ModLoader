@@ -133,6 +133,7 @@ if (Test-Path -LiteralPath $renderApiContractTestPath) {
 }
 
 $snapshotContractTests = @(
+	[ordered]@{ file = 'config-identifier-compatibility-contract.test.js'; description = 'Config identifier compatibility contract'; pattern = 'canonical priority, legacy reads, disabled panel, preview, layout backup and retry' },
 	[ordered]@{ file = 'game-1.3-runtime-contract.test.js'; description = 'Game 1.3 foundational runtime contract'; pattern = 'object save, asynchronous identity readback, early lifecycle, Store HUD' },
 	[ordered]@{ file = 'ui-page-menu-scroll-contract.test.js'; description = 'UI page menu scroll contract'; pattern = 'automatic max-height, inertial wheel, ModLoader scrollbar styling' },
 	[ordered]@{ file = 'panel-description-display-mode-contract.test.js'; description = 'Panel description display mode contract'; pattern = 'hover default, inline descriptions, translated settings' },

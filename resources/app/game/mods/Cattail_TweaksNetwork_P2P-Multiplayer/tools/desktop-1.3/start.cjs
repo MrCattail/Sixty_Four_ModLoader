@@ -1,40 +1,88 @@
 'use strict';
 const fs=require('fs'),path=require('path'),{spawn,execFileSync}=require('child_process');
 const {ROOT,config}=require('./fixtures.cjs');
-async function start(source,attempt='001'){
+function clientFor(child,role,timeoutDefault=15000){
+ const pending=new Map();let seq=0,fatal='',exited=false;
+ const lifecycle={closing:false,closed:false,loaded:false,timeout:false,exitCode:null,signal:null};
+ function settleAll(code){for(const p of pending.values()){clearTimeout(p.timer);p.reject(Error(code));}pending.clear();}
+ child.on('message',m=>{
+  if(m.fatal){fatal=m.fatal;settleAll('CLIENT_FATAL');}
+  if(m.event==='loaded')lifecycle.loaded=true;
+  if(m.event==='closing')lifecycle.closing=true;
+  if(m.event==='closed'){lifecycle.closed=true;settleAll('CLIENT_CLOSED');}
+  if(m.event==='manual-timeout')lifecycle.timeout=true;
+  const p=pending.get(m.id);
+  if(p){clearTimeout(p.timer);pending.delete(m.id);m.error?p.reject(Error(m.error)):p.resolve(m.result);}
+ });
+ child.on('error',()=>{fatal='CLIENT_PROCESS_ERROR';settleAll(fatal);});
+ child.on('exit',(code,signal)=>{exited=true;lifecycle.closed=true;lifecycle.exitCode=code;lifecycle.signal=signal;settleAll('CLIENT_EXITED');});
+ const client={role,child,lifecycle,get exited(){return exited||child.exitCode!==null||child.signalCode!==null;},
+  call(method,value,timeout=timeoutDefault){
+   if(client.exited||lifecycle.closed||lifecycle.closing&&method!=='shutdown')return Promise.reject(Error('CLIENT_CLOSED'));
+   if(fatal)return Promise.reject(Error('CLIENT_FATAL'));
+   if(!child.connected)return Promise.reject(Error('CLIENT_DISCONNECTED'));
+   return new Promise((resolve,reject)=>{
+    const id=++seq,timer=setTimeout(()=>{pending.delete(id);reject(Error('RPC_TIMEOUT'));},timeout);
+    pending.set(id,{resolve,reject,timer});
+    try{child.send({id,method,value},error=>{if(error&&pending.has(id)){clearTimeout(timer);pending.delete(id);reject(Error('CLIENT_SEND_FAILED'));}});}
+    catch(error){clearTimeout(timer);pending.delete(id);reject(Error('CLIENT_SEND_FAILED'));}
+   });
+  }
+ };
+ return client;
+}
+async function start(source,attempt='001',options={}){
+ const mode=options.mode||'automated';
+ config('host',attempt,mode);config('guest',attempt,mode);
  const dir=path.join(ROOT,'reports',attempt);
  if(fs.existsSync(dir))throw Error('ATTEMPT_EXISTS');
- fs.mkdirSync(dir,{recursive:true});
  const tmp=path.join(ROOT,'temp',attempt);fs.mkdirSync(tmp,{recursive:true});
- process.env.TEMP=tmp;process.env.TMP=tmp;process.env.XDG_CACHE_HOME=path.join(ROOT,'cache',attempt);process.env.MINIFLARE_CACHE_DIR=path.join(ROOT,'cache',attempt,'miniflare');process.env.CLOUDFLARE_CF_FETCH_ENABLED='false';
+ process.env.TEMP=tmp;process.env.TMP=tmp;
+ process.env.XDG_CACHE_HOME=path.join(ROOT,'cache',attempt);
+ process.env.MINIFLARE_CACHE_DIR=path.join(ROOT,'cache',attempt,'miniflare');
+ process.env.CLOUDFLARE_CF_FETCH_ENABLED='false';
+ await require('./signaling-local.cjs').portFree();
+ fs.mkdirSync(dir,{recursive:true});
  const service=await require('./signaling-local.cjs').start(source,attempt);
  const clients=[];
+ let stopPromise;
+ async function stop(){
+  if(stopPromise)return stopPromise;
+  stopPromise=(async()=>{
+   for(const c of clients)if(!c.exited&&!c.lifecycle.closed){try{await c.call('shutdown',null,3000);}catch(error){}}
+   const deadline=Date.now()+8000;
+   while(clients.some(c=>!c.exited)&&Date.now()<deadline)await new Promise(resolve=>setTimeout(resolve,100));
+   let forced=0;
+   if(mode==='automated')for(const c of clients)if(!c.exited){execFileSync('taskkill',['/PID',String(c.child.pid),'/T','/F'],{windowsHide:true,stdio:'ignore'});forced++;}
+   await new Promise(resolve=>setTimeout(resolve,100));
+   await service.stop();
+   const result={allExited:clients.every(c=>c.exited),forced,residual:clients.filter(c=>!c.exited).map(c=>({role:c.role,pid:c.child.pid}))};
+   result.processErrors=fs.readdirSync(dir).filter(name=>name.endsWith('main-failure.json'));
+   result.exitCodes=clients.map(client=>({role:client.role,code:client.lifecycle.exitCode,signal:client.lifecycle.signal}));
+   result.ok=result.allExited&&forced===0&&result.processErrors.length===0&&result.exitCodes.every(row=>row.code===0&&!row.signal);
+   fs.writeFileSync(path.join(dir,'cleanup.json'),JSON.stringify(result,null,2));
+   if(mode==='automated'&&!result.ok)throw Error('CLIENT_CLEANUP_FAILED');
+   return result;
+  })();
+  return stopPromise;
+ }
  try{
   for(const role of ['host','guest']){
-   const cfg=config(role,attempt),env={...process.env};
+   const cfg=config(role,attempt,mode),env={...process.env};
    for(const key of Object.keys(env))if(/CLOUDFLARE|CF_API|NODE_OPTIONS|NODE_PATH|ELECTRON_RUN_AS_NODE|^CATTAIL_P2P_/i.test(key))delete env[key];
    for(const name of ['roaming','local','temp'])fs.mkdirSync(path.join(cfg.profile,name),{recursive:true});
-   Object.assign(env,{APPDATA:path.join(cfg.profile,'roaming'),LOCALAPPDATA:path.join(cfg.profile,'local'),TEMP:path.join(cfg.profile,'temp'),TMP:path.join(cfg.profile,'temp'),CATTAIL_P2P_DESKTOP13:'1',CATTAIL_P2P_SAFE_TEST:'1',CATTAIL_P2P_ROLE:role,CATTAIL_P2P_TEST_ROOT:ROOT,CATTAIL_P2P_SESSION:'desktop13-'+attempt,CATTAIL_P2P_SIGNALING_URL:cfg.signalingUrl,CATTAIL_P2P_AUDIT_PATH:path.join(dir,role+'-audit.jsonl')});
-   const exe=path.join(ROOT,'runtime/sixtyfour.exe');
-   const child=spawn(exe,['--p2p-role='+role,'--attempt='+attempt],{cwd:path.dirname(exe),env,windowsHide:true,stdio:['ignore','pipe','pipe','ipc']});
+   Object.assign(env,{APPDATA:path.join(cfg.profile,'roaming'),LOCALAPPDATA:path.join(cfg.profile,'local'),TEMP:path.join(cfg.profile,'temp'),TMP:path.join(cfg.profile,'temp'),CATTAIL_P2P_TOOL_ROOT:ROOT,CATTAIL_P2P_DESKTOP13:'1',CATTAIL_P2P_SAFE_TEST:'1',CATTAIL_P2P_ROLE:role,CATTAIL_P2P_TEST_ROOT:ROOT,CATTAIL_P2P_SESSION:'desktop13-'+attempt,CATTAIL_P2P_SIGNALING_URL:cfg.signalingUrl,CATTAIL_P2P_AUDIT_PATH:path.join(dir,role+'-audit.jsonl')});
+   const exe=path.join(ROOT,'runtime/sixtyfour.exe'),args=['--p2p-role='+role,'--attempt='+attempt,'--p2p-mode='+mode];
+   if(options.uiCheck)args.push('--p2p-ui-check=1');
+   const child=spawn(exe,args,{cwd:path.dirname(exe),env,windowsHide:true,stdio:['ignore','pipe','pipe','ipc']});
    const stream=fs.createWriteStream(path.join(dir,role+'-process.log'));
    child.stdout.pipe(stream,{end:false});child.stderr.pipe(stream,{end:false});
-   const pending=new Map();let seq=0,fatal='';
-   child.on('message',m=>{if(m.fatal)fatal=m.fatal;const p=pending.get(m.id);if(p){clearTimeout(p.timer);pending.delete(m.id);m.error?p.reject(Error(m.error)):p.resolve(m.result);}});
-   child.on('exit',(code)=>{stream.end();for(const p of pending.values()){clearTimeout(p.timer);p.reject(Error('CHILD_EXIT_'+code));}pending.clear();});
-   clients.push({role,child,call(method,value,timeout=15000){if(fatal)return Promise.reject(Error(fatal));return new Promise((resolve,reject)=>{const id=++seq,timer=setTimeout(()=>{pending.delete(id);reject(Error('RPC_TIMEOUT_'+role+'_'+method));},timeout);pending.set(id,{resolve,reject,timer});child.send({id,method,value},err=>{if(err){clearTimeout(timer);pending.delete(id);reject(err);}});});}});
+   child.on('exit',()=>stream.end());
+   clients.push(clientFor(child,role));
   }
-  fs.writeFileSync(path.join(dir,'owned-processes.json'),JSON.stringify(clients.map(x=>({role:x.role,pid:x.child.pid})),null,2));
-  return {clients,dir,async stop(){
-   for(const client of clients){try{await client.call('shutdown');}catch(e){}}
-   const exited=c=>c.child.exitCode!==null||c.child.signalCode!==null;
-   const end=Date.now()+8000;
-   while(clients.some(c=>!exited(c))&&Date.now()<end)await new Promise(r=>setTimeout(r,100));
-   for(const client of clients)if(!exited(client)){execFileSync('taskkill',['/PID',String(client.child.pid),'/T','/F'],{windowsHide:true,stdio:'ignore'});}
-   await new Promise(r=>setTimeout(r,200));
-   await service.stop();
-  }};
- }catch(e){for(const c of clients)c.child.kill();await service.stop();throw e;}
+  fs.writeFileSync(path.join(dir,'owned-processes.json'),JSON.stringify(clients.map(c=>({role:c.role,pid:c.child.pid})),null,2));
+  return {clients,dir,stop};
+ }catch(error){await stop();throw error;}
 }
-module.exports={start};
-if(require.main===module)require('./verify.cjs').verify(process.argv[2]||process.cwd(),process.argv[3]||'001').catch(e=>{console.error(e.message);process.exitCode=1;});
+module.exports={start,clientFor};
+if(require.main===module)require('./verify.cjs').verify(process.argv[2]||process.cwd(),process.argv[3]||'001').catch(error=>{console.error(error.message);process.exitCode=1;});

@@ -3,12 +3,12 @@ ModLoader.register({
 	init(api) {
 		if (api.config.get('enableEndingSkip', true) === false) return
 
-		const controllerKey = '__cattailEndingSkipController'
+		const controllerKey = '__cattailTweaksEndingSkipController'
 		const styleId = 'cattail-ending-skip-style'
 		const buttonClass = 'cattail-ending-skip-button'
 		const hiddenClass = 'cattail-ending-skip-hidden'
-		const movieSkippedKey = '__cattailEndingSkipMovieSkipped'
-		const creditOffsetKey = '__cattailEndingSkipCreditOffset'
+		const movieSkippedKey = '__cattailTweaksEndingSkipMovieSkipped'
+		const creditOffsetKey = '__cattailTweaksEndingSkipCreditOffset'
 		const creditScrollSpeed = .02
 		const creditFastMultiplier = 10
 		const fallbackMovieOffset = 1000

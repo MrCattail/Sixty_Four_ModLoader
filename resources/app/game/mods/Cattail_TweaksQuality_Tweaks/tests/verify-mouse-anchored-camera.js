@@ -11,8 +11,8 @@ const stuffSource = fs.readFileSync(path.join(gameRoot, 'scripts/stuff.js'), 'ut
 const waypointStart = stuffSource.indexOf('class Waypoint extends Entity')
 const waypointEnd = stuffSource.indexOf('\nclass ', stuffSource.indexOf('class Waypoint2 extends Waypoint') + 1)
 assert(waypointStart >= 0 && waypointEnd > waypointStart, 'native waypoint classes must be found')
-const zoomKey = 'enableMouseAnchoredZoom'
-const waypointKey = 'enableMouseAnchoredWaypointTeleport'
+const zoomKey = 'enableCameraZoomAnchor'
+const waypointKey = 'enableCameraWaypointAnchor'
 const results = []
 
 function pointNear(actual, expected, message) {
@@ -26,7 +26,7 @@ function classList() {
 function createHarness(camera = null, extraConfig = {}) {
 	const handlers = {}
 	const storage = new Map()
-	const config = { [zoomKey]: true, [waypointKey]: true, enableDynamicCamera: !!camera, ...extraConfig }
+	const config = { [zoomKey]: true, [waypointKey]: true, enableCameraAngle: !!camera, ...extraConfig }
 	const api = {
 		id: 'Cattail_TweaksQuality_Tweaks',
 		config: { get: (key, fallback) => Object.hasOwn(config, key) ? config[key] : fallback, set: (key, value) => { config[key] = value } },
@@ -46,7 +46,7 @@ function createHarness(camera = null, extraConfig = {}) {
 	vm.runInContext(stuffSource.slice(waypointStart, waypointEnd) + '\nglobalThis.WaypointTypes = [Waypoint, Waypoint2]', context)
 	context.GameType.prototype.createHollowEvent = function (...args) { this.hollowEvents.push(args) }
 	// Match the manifest order; include the existing zoom-range and fade consumers.
-	for (const file of ['view-distance.js', 'mouse-anchored-camera.js', 'waypoint-teleport-fade-skip.js', ...(camera ? ['dynamic-camera.js'] : [])]) {
+	for (const file of ['camera-zoom.js', 'camera-zoom-anchor.js', 'waypoint-fade-skip.js', ...(camera ? ['camera-angles.js'] : [])]) {
 		vm.runInContext(fs.readFileSync(path.join(scripts, file), 'utf8'), context, { filename: file })
 	}
 	for (const handler of handlers.afterVanillaScripts || []) handler()
@@ -63,7 +63,7 @@ function createHarness(camera = null, extraConfig = {}) {
 			playSound(...args) { this.sounds.push(args) },
 			requestResources() { this.resourceRequests++; return this.canPay !== false }
 		})
-		if (camera) game.__cattailDynamicCameraState = { pitch: camera.pitch, yaw: camera.yaw * Math.PI / 180 }
+		if (camera) game.__cattailTweaksCameraAngleState = { pitch: camera.pitch, yaw: camera.yaw * Math.PI / 180 }
 		game.globalPositions = []
 		game.pointerRefreshes = 0
 		const nativeGlobal = game.updateGlobalPositioning
@@ -109,7 +109,7 @@ function check(name, fn) { fn(); results.push(name) }
 const cameras = [null, { pitch: .87, yaw: 45 }, { pitch: .25, yaw: -30 }]
 for (const camera of cameras) for (const ratio of [1, 2]) for (const zoom of [.03, 1, 4]) for (const type of [0, 1]) for (const enabled of [false, true]) {
 	check(`waypoint ${JSON.stringify({camera, ratio, zoom, type, enabled})}`, () => {
-		const h = createHarness(camera, { [waypointKey]: enabled, enableWaypointTeleportFadeSkip: type === 0 })
+		const h = createHarness(camera, { [waypointKey]: enabled, enableWaypointFadeSkip: type === 0 })
 		const g = h.makeGame(ratio, zoom)
 		const points = [h.addWaypoint(g, type, [0, 0]), h.addWaypoint(g, type, [-1024, -1024]), h.addWaypoint(g, type, [30, 10])]
 		g.soundSources.add({ position: points[1].position, pan: { pan: { value: 0 } }, volume: { gain: { value: 0 } }, baseVolume: .5, audibility: [1, 1] })

@@ -15,8 +15,8 @@ try { playwright = require('playwright') } catch (_) {
 const ROOT = path.resolve(__dirname, '../../..')
 const RUNTIME = path.resolve(ROOT, '../../..')
 const MOD = 'Cattail_TweaksQuality_Tweaks'
-const KEYS = ['disableClearViewGrid', 'disableClearViewBuildingClipping', 'useTweaksClearViewGridStyle']
-const entries = ['scripts/floor-grid-lines.js', 'scripts/clear-view-options.js', 'scripts/dynamic-camera.js']
+const KEYS = ['enableClearViewGridBlock', 'enableClearViewClipBlock', 'enableClearViewGridStyle']
+const entries = ['scripts/grid.js', 'scripts/clear-view-options.js', 'scripts/camera-angles.js']
 const manifest = JSON.parse(fs.readFileSync(path.join(ROOT, 'mods', MOD, 'mod.json'), 'utf8'))
 const output = fs.mkdtempSync(path.join(os.tmpdir(), 'tweaks-clear-view-options-'))
 
@@ -82,8 +82,8 @@ function fixture() {
 		window.dispatchEvent(new CustomEvent('modloader:config-preview', { detail: { modId: 'Cattail_TweaksQuality_Tweaks', key, value } }))
 	}
 	window.clearOptions = function () {
-		for (const key of ['disableClearViewGrid', 'disableClearViewBuildingClipping', 'useTweaksClearViewGridStyle']) setOption(key, false)
-		setOption('enableFloorGridLines', false); setOption('enableDynamicCamera', false)
+		for (const key of ['enableClearViewGridBlock', 'enableClearViewClipBlock', 'enableClearViewGridStyle']) setOption(key, false)
+		setOption('enableGrid', false); setOption('enableCameraAngle', false)
 		Object.assign(game, { altActive: true, interactionMode: null, itemInHand: null, hoveredCell: null, transportedEntity: null, plane: 0, touchMode: 0 })
 	}
 	window.gridSample = function () {
@@ -96,9 +96,9 @@ function fixture() {
 	window.boot = async function () {
 		await ModLoader.boot()
 		const api = ModLoader.forMod('Cattail_TweaksQuality_Tweaks'), query = new URLSearchParams(location.search)
-		api.config.set('enableFloorGridLines', false); api.config.set('enableDynamicCamera', false)
+		api.config.set('enableGrid', false); api.config.set('enableCameraAngle', false)
 
-		if (query.has('startup')) for (const key of ['disableClearViewGrid', 'disableClearViewBuildingClipping', 'useTweaksClearViewGridStyle']) api.config.set(key, true)
+		if (query.has('startup')) for (const key of ['enableClearViewGridBlock', 'enableClearViewClipBlock', 'enableClearViewGridStyle']) api.config.set(key, true)
 		if (query.has('old')) game.version = '1.2.1'
 		if (query.has('mobile')) game.isMobile = true
 		if (query.has('earlyLayer')) ModLoader.render.install(game)
@@ -170,7 +170,7 @@ app.on('window-all-closed',()=>app.quit());`)
 			const rows = await page.evaluate(() => {
 				clearOptions(); game.itemInHand = { name: 'candidate' }; const rows = [], nativeColor = gridSample().strokes[0].color
 				for (const hide of [false, true]) for (const crop of [false, true]) for (const style of [false, true]) {
-					setOption('disableClearViewGrid', hide); setOption('disableClearViewBuildingClipping', crop); setOption('useTweaksClearViewGridStyle', style)
+					setOption('enableClearViewGridBlock', hide); setOption('enableClearViewClipBlock', crop); setOption('enableClearViewGridStyle', style)
 					rows.push({ hide, crop, style, nativeColor, ...gridSample() })
 				}
 				return rows
@@ -185,7 +185,7 @@ app.on('window-all-closed',()=>app.quit());`)
 			const rows = await page.evaluate(() => {
 				clearOptions(); ModLoader.render.setEnabled(false); const rows = []
 				for (const off of [false, true]) {
-					setOption('disableClearViewBuildingClipping', off)
+					setOption('enableClearViewClipBlock', off)
 					const sample = draw => {
 						logs.length = 0; renderCalls.length = 0
 						mainContext.clearRect(0, 0, 480, 270); mainContext.save(); mainContext.translate(game.w2, game.h2)
@@ -211,7 +211,7 @@ app.on('window-all-closed',()=>app.quit());`)
 		})
 		await check('native trigger expression covers Alt, erase, relocate, Q/store placement and ordinary view', async () => {
 			const rows = await page.evaluate(() => {
-				clearOptions(); ModLoader.render.setEnabled(false); setOption('useTweaksClearViewGridStyle', true)
+				clearOptions(); ModLoader.render.setEnabled(false); setOption('enableClearViewGridStyle', true)
 				const rows = []
 				for (const mode of ['ordinary', 'alt', 'erase', 'relocate', 'placement', 'touch']) {
 					game.altActive = mode === 'alt'; game.interactionMode = ['erase', 'relocate'].includes(mode) ? mode : null
@@ -226,7 +226,7 @@ app.on('window-all-closed',()=>app.quit());`)
 			const rows = await page.evaluate(() => {
 				clearOptions(); const rows = []
 				for (const layers of [false, true]) for (const floor of [false, true]) for (const hide of [false, true]) for (const style of [false, true]) {
-					ModLoader.render.setEnabled(layers); setOption('enableFloorGridLines', floor); setOption('disableClearViewGrid', hide); setOption('useTweaksClearViewGridStyle', style)
+					ModLoader.render.setEnabled(layers); setOption('enableGrid', floor); setOption('enableClearViewGridBlock', hide); setOption('enableClearViewGridStyle', style)
 					logs.length = 0; game.renderloop()
 					rows.push({ layers, floor, hide, style, strokes: logs.filter(v => v.method === 'stroke') })
 				}
@@ -246,7 +246,7 @@ app.on('window-all-closed',()=>app.quit());`)
 				const api = ModLoader.forMod('Cattail_TweaksQuality_Tweaks'), dispose = api.render.routeMethod('renderEntitiesAbstract', 'buildings')
 				const layer = api.render.context('buildings', game)
 				for (const off of [true, false]) {
-					setOption('disableClearViewBuildingClipping', off); logs.length = 0; renderCalls.length = 0
+					setOption('enableClearViewClipBlock', off); logs.length = 0; renderCalls.length = 0
 					game.renderloop()
 					rows.push({ off, clips: logs.filter(v => v.method === 'clip').length, calls: [...renderCalls],
 						top: Array.from(layer.getImageData(game.w2, game.h2 - 40, 1, 1).data), sameContext: game.ctx === mainContext })
@@ -261,11 +261,11 @@ app.on('window-all-closed',()=>app.quit());`)
 		})
 		await check('shared color previews, void fallback, density limit and dynamic camera combinations', async () => {
 			const rows = await page.evaluate(() => {
-				clearOptions(); setOption('useTweaksClearViewGridStyle', true); const rows = []
-				setOption('floorGridLineRealityColor', '#123abc'); setOption('floorGridLineVoidColor', '#654321')
+				clearOptions(); setOption('enableClearViewGridStyle', true); const rows = []
+				setOption('floorGridRealityColor', '#123abc'); setOption('floorGridVoidColor', '#654321')
 				for (const layers of [false, true]) for (const dynamic of [false, true]) for (const plane of [0, 1]) for (const dpr of [1, 1.5, 2]) for (const yaw of [-Math.PI / 2, 0, Math.PI / 6, Math.PI / 2, Math.PI]) {
-					ModLoader.render.setEnabled(layers); setOption('enableDynamicCamera', dynamic); game.plane = plane; game.pixelRatio = dpr
-					game.__cattailDynamicCameraState = { pitch: 0.7, yaw }
+					ModLoader.render.setEnabled(layers); setOption('enableCameraAngle', dynamic); game.plane = plane; game.pixelRatio = dpr
+					game.__cattailTweaksCameraAngleState = { pitch: 0.7, yaw }
 					logs.length = 0; game.renderloop(); rows.push({ plane, count: logs.filter(v => v.method === 'stroke').length, strokes: logs.filter(v => v.method === 'stroke') })
 				}
 				ModLoader.render.setEnabled(false); game.plane = 0; game.unit = 0.02; game.zoom = 0.001
@@ -277,7 +277,7 @@ app.on('window-all-closed',()=>app.quit());`)
 		await reset()
 		await check('actual menu cancel reverses unsaved hot options', async () => {
 			await page.evaluate(() => ModLoader.togglePanel()); await page.locator('.modloader-mod-title').click()
-			const field = page.locator('[data-modloader-config-key="disableClearViewGrid"]')
+			const field = page.locator('[data-modloader-config-key="enableClearViewGridBlock"]')
 			await field.scrollIntoViewIfNeeded(); await field.check()
 			assert.equal((await page.evaluate(() => gridSample())).strokes.length, 0)
 			await page.locator('.modloader-cancel-button').click()
@@ -305,19 +305,19 @@ app.on('window-all-closed',()=>app.quit());`)
 		await check('all-off cold startup keeps exact native diagnostic baseline; native and Tweaks style use butt', async () => {
 			assert.equal(await page.evaluate(() => testNativeGrid() === nativeGrid), true)
 			assert.ok((await page.evaluate(() => gridSample())).strokes.every(v => v.cap === 'butt'))
-			assert.ok((await page.evaluate(() => { setOption('useTweaksClearViewGridStyle', true); return gridSample() })).strokes.every(v => v.cap === 'butt'))
+			assert.ok((await page.evaluate(() => { setOption('enableClearViewGridStyle', true); return gridSample() })).strokes.every(v => v.cap === 'butt'))
 		})
 		await check('exceptions retain error identity and restore stroke property and entity Canvas state', async () => {
 			const result = await page.evaluate(() => {
 				clearOptions(); ModLoader.render.setEnabled(false)
 				const sentinel = new Error('expected')
-				setOption('disableClearViewGrid', true)
+				setOption('enableClearViewGridBlock', true)
 				const stroke = mainContext.stroke, xyToUV = game.xyToUV
 				game.xyToUV = () => { throw sentinel }; let gridSame = false
 				try { game.renderGrid() } catch (error) { gridSame = error === sentinel }
 				game.xyToUV = xyToUV
 				const render = game.stuff[0].render, matrix = mainContext.getTransform()
-				setOption('disableClearViewBuildingClipping', true); game.stuff[0].render = () => { mainContext.translate(99, 99); throw sentinel }; let entitySame = false
+				setOption('enableClearViewClipBlock', true); game.stuff[0].render = () => { mainContext.translate(99, 99); throw sentinel }; let entitySame = false
 				try { game.renderEntitiesAbstract(8) } catch (error) { entitySame = error === sentinel }
 				game.stuff[0].render = render
 				return { gridSame, entitySame, stroke: mainContext.stroke === stroke, matrix: mainContext.getTransform().toString() === matrix.toString() }

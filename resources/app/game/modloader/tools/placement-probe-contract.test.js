@@ -144,7 +144,7 @@ async function main() {
     f.setTime(12001); const data = f.frame(capture).data; assert.equal(data.kind, 'timed'); assert.equal(data.grid.executedCells, 0); capture.stop()
   })
   await check('configuration conflicts, unknown hooks, handheld/plane/tools and bypassed leaves fail closed', () => {
-    for (const key of ['disableClearViewGrid', 'useTweaksClearViewGridStyle', 'disableClearViewBuildingClipping']) {
+    for (const key of ['enableClearViewGridBlock', 'enableClearViewGridStyle', 'enableClearViewClipBlock']) {
       const f = fixture(); f.scene.configSignature = JSON.stringify({ [key]: true }); assert.throws(() => f.make({ comparison: true }).start(), /设置/)
     }
     assert.throws(() => fixture({ noHooks: true }).make().start(), /原生入口/)
@@ -246,7 +246,7 @@ async function main() {
     for (const kind of ['configuration', 'controller', 'handheld']) {
       const s = serviceFixture(), f = clientFixture({
         ipc: { on() {}, invoke: (_channel, payload) => s.call(payload) },
-        ...(kind === 'configuration' ? { placementConfiguration: () => ({ disableClearViewGrid: true, unrelated: 'DO-NOT-EXPORT' }) } : {}),
+        ...(kind === 'configuration' ? { placementConfiguration: () => ({ enableClearViewGridBlock: true, unrelated: 'DO-NOT-EXPORT' }) } : {}),
         ...(kind === 'controller' ? { getPlacementController: () => null } : {})
       })
       if (kind === 'handheld') delete f.game.itemInHand
@@ -305,7 +305,7 @@ async function main() {
       schemaVersion: 1, stage: 'placement-start', cancelled: false,
       error: { name: 'X'.repeat(100), message: 'bad\n' + 'X'.repeat(2000), stack: 'DO-NOT-EXPORT' },
       scene: { zoom: Infinity, focused: true, itemType: 'X'.repeat(100), save: 'DO-NOT-EXPORT' },
-      configuration: { disableClearViewGrid: true, save: 'DO-NOT-EXPORT' },
+      configuration: { enableClearViewGridBlock: true, save: 'DO-NOT-EXPORT' },
       capabilities: { renderGrid: { supported: true, sha256: 'wrong' }, unknown: 'DO-NOT-EXPORT' },
       save: 'DO-NOT-EXPORT'
     } }
@@ -381,16 +381,16 @@ async function main() {
     assert.doesNotThrow(() => f.game.renderloop())
   })
   await check('new optimization rejects original comparison; renderer sends its flag and existing main schema saves the explicit bounded reason', async () => {
-    const f = clientFixture({ placementConfiguration: () => ({ enablePlacementShadowTraversalReuse: true }) })
+    const f = clientFixture({ placementConfiguration: () => ({ enablePlacementShadowReuse: true }) })
     f.client.start('placement-ablation'); await f.fire(3000)
     const abort = f.calls.find(call => call.action === 'abort')
-    assert.equal(abort.startup.configuration.enablePlacementShadowTraversalReuse, true)
+    assert.equal(abort.startup.configuration.enablePlacementShadowReuse, true)
     assert.match(abort.startup.error.message, /复用建筑遍历/)
     assert.ok(f.messages.at(-1).includes('未开始采集'))
-    const s = serviceFixture(), real = clientFixture({ placementConfiguration: () => ({ enablePlacementShadowTraversalReuse: true }), ipc: { on() {}, invoke: (_channel, payload) => s.call(payload) } })
+    const s = serviceFixture(), real = clientFixture({ placementConfiguration: () => ({ enablePlacementShadowReuse: true }), ipc: { on() {}, invoke: (_channel, payload) => s.call(payload) } })
     real.client.start('placement-ablation'); await real.fire(3000)
     const session = JSON.parse(fs.readFileSync(path.join(real.client.status().lastResult.directory, 'session.json')))
-    assert.ok(session.rendererStartup.error.message.includes('[enablePlacementShadowTraversalReuse=true]'))
+    assert.ok(session.rendererStartup.error.message.includes('[enablePlacementShadowReuse=true]'))
     assert.match(session.rendererStartup.error.message, /复用建筑遍历/)
   })
   await check('real shared native adapter retains optimized drawing in raw/timed/detail observations', () => {
