@@ -1643,7 +1643,7 @@ let tweaksSlotStore = null
 const tweaksSlotStoreProtocol = 'tweaks-save-policy-v2'
 let savePolicyCloud = null
 function configureSaveCloud(cloud) { savePolicyCloud = cloud }
-function savePolicyBackend() { return require('../mods/Cattail_TweaksQuality_Tweaks/scripts/main/auto-save-policy-store.js') }
+function savePolicyBackend() { return require('../mods/Cattail_TweaksQuality_Better-UIs/scripts/main/auto-save-policy-store.js') }
 function hasSaveOverlay(cloud) { return cloud?.fileExists?.('cattail-save-policy-v2.json') === true }
 function assertSaveCollection(value) {
   const invalid = () => { const error = new Error('Invalid saved slot collection. Loading stopped without replacing save data.'); error.code = 'SAVE_COLLECTION_INVALID'; throw error }
@@ -1667,7 +1667,7 @@ function isMainSaveSender(event) {
   return !!win && !win.isDestroyed() && event.sender === win.webContents &&
     (!event.senderFrame || event.senderFrame === event.sender.mainFrame)
 }
-// No arbitrary main-process Mod entries: this private bridge loads only Tweaks'
+// No arbitrary main-process Mod entries: this private bridge loads only Better UIs'
 // fixed save backend, and only after its enabled renderer asks to start a session.
 ipcMain.handle('modloader:tweaks-slot-store', (event, request) => {
   const unavailable = { protocol: tweaksSlotStoreProtocol, ok: false }
@@ -1675,11 +1675,11 @@ ipcMain.handle('modloader:tweaks-slot-store', (event, request) => {
   if (request.action === 'begin') {
     if (!savePolicyCloud) return unavailable
     if (request.gameVersion !== '1.3') return unavailable
-    const id = 'Cattail_TweaksQuality_Tweaks', modsDir = path.resolve(__dirname, '..', 'mods')
+    const id = 'Cattail_TweaksQuality_Better-UIs', modsDir = path.resolve(__dirname, '..', 'mods')
     const enabled = normalizeEnabledEntries(readJsonFile(path.join(modsDir, 'enabled.json'), { mods: [] }))
     if (!enabled.some(entry => entry.path === id)) return unavailable
     const manifest = readJsonFile(path.join(modsDir, id, 'mod.json'), null)
-    if (manifest?.id !== id || !manifest.entries?.includes('scripts/auto-save-stutter-fix.js')) return unavailable
+    if (manifest?.id !== id || !manifest.entries?.includes('scripts/independent-auto-save.js')) return unavailable
     try {
       if (!tweaksSlotStore) tweaksSlotStore = savePolicyBackend().createStore({ measure: measureDiagnostic })
       return tweaksSlotStore.begin(event.sender, request.owner, savePolicyCloud)

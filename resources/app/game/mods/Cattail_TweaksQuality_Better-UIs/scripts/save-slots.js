@@ -6,6 +6,7 @@ ModLoader.register({
 			if (globalThis[SERVICE_KEY]?.owner === api.id) delete globalThis[SERVICE_KEY]
 			return
 		}
+		// Better UIs owns the policy; its legacy v2 identifier stays compatible.
 		const policy = game => game?.[Symbol.for('cattail.tweaks.save-policy')]
 		const isAuto = slot => slot?.tweaksSavePolicy?.role === 'auto'
 		const serviceVersion = 1
@@ -49,9 +50,23 @@ ModLoader.register({
 				throw error instanceof SaveSlotsServiceError ? error : new SaveSlotsServiceError('WRITE_FAILED', String(error?.message || error))
 			})
 		}
-		async function saveCurrent(game) {
+		function updatePolicyStatus(game, result) {
+			const active = policy(game)
+			if (!active) {
+				if (result === true) { context(game).cloudSaved = true; statusKey = 'saved'; clearActivationNotice(game) }
+				else if (result === false) { context(game).cloudSaved = false; statusKey = 'localOnly' }
+				return
+			}
+			context(game).cloudSaved = result === true && !active.pendingCloud
+			if (result === true) clearActivationNotice(game)
+			statusKey = active.lastError || context(game).activationNotice?.cloudSaved === false ? 'localOnly' : active.pendingCloud ? 'localPending' : result === true ? 'saved' : statusKey
+		}
+		async function saveCurrent(game, submit = false) {
 			requireWritable(game)
-			await (baseSave || game.saveGame).call(game)
+			let result = await (baseSave || game.saveGame).call(game)
+			if (submit) result = policy(game) ? await policy(game).submitCloud() : await game.spaceport?.invoke?.('store', game.saveSlots) === true
+			updatePolicyStatus(game, result)
+			return result
 		}
 		function nativeSlots(game) { return Array.isArray(game?.saveSlots) ? game.saveSlots : [] }
 		function forkSourceIndex(game) {
@@ -122,7 +137,8 @@ ModLoader.register({
 					return enqueue(this, async () => {
 						if (context(this).activating || context(this).error) return
 						const result = await original.apply(this, args)
-						if (result === true) clearActivationNotice(this)
+						if (policy(this)) updatePolicyStatus(this, result)
+						else if (result === true) clearActivationNotice(this)
 						return result
 					}).catch(error => { showError(error); throw error })
 				}
@@ -134,8 +150,9 @@ ModLoader.register({
 					context(this).persistedIdentity = normalizeSaveInstanceId(args[0]?.stack?.[0]?.state?.modloader?.saveInstanceId)
 					if (result === true) clearActivationNotice(this)
 				}
-				if (result !== true) statusKey = 'localOnly'
-				else if (statusKey === 'localOnly') statusKey = 'saved'
+				if (policy(this)) updatePolicyStatus(this, result)
+				else if (result !== true) statusKey = result === false || context(this).activationNotice?.cloudSaved === false ? 'localOnly' : 'localPending'
+				else if (statusKey === 'localOnly' || statusKey === 'localPending') statusKey = 'saved'
 				return result
 			})
 		})
@@ -206,6 +223,7 @@ ModLoader.register({
 				const saved = await policy(game).persistCollection(next, activeIndex)
 				context(game).persistedIdentity = normalizeSaveInstanceId(game.saveSlots[game.currentSlotId]?.stack?.[0]?.state?.modloader?.saveInstanceId)
 				context(game).cloudSaved = saved; statusKey = saved ? 'saved' : 'localOnly'; statusDetail = ''
+				if (saved) clearActivationNotice(game)
 				return saved
 			}
 			const previous = game.saveSlots
@@ -233,6 +251,7 @@ ModLoader.register({
 			try { cloudSaved = await game.spaceport?.invoke?.('store', game.saveSlots) === true }
 			catch (error) { console.warn('[Save Slots] Cloud write failed; local records are retained.', error) }
 			context(game).cloudSaved = cloudSaved
+			if (cloudSaved) clearActivationNotice(game)
 			statusKey = cloudSaved ? 'saved' : 'localOnly'
 			statusDetail = ''
 			return cloudSaved
@@ -719,7 +738,7 @@ ModLoader.register({
 			} else {
 				const add = (key, disabled, work) => { if (actions.childNodes.length) actions.append(actionSeparator()); actions.append(actionButton(text(game, key), disabled, work)) }
 				if (!slot) add('newSlot', !availableIndices(game).length, () => copyCurrent(game))
-				else if (isAuto) { add('save', false, () => mutate(game, () => saveCurrent(game))); add('load', false, () => select('load')) }
+				else if (isAuto) { add('save', false, () => mutate(game, () => saveCurrent(game, true))); add('load', false, () => select('load')) }
 				else {
 					add('load', false, () => select('load'))
 					add('overwrite', false, () => select('overwrite'))
@@ -1021,10 +1040,33 @@ ModLoader.register({
 		}
 		NATIVE_LABELS.modsch = NATIVE_LABELS.sch
 
+		const LOCAL_PENDING_LABELS = {
+		  "en": "Saved locally. Waiting for cloud submission.",
+		  "sch": "已保存在本地，等待云提交。",
+		  "modsch": "已保存在本地，等待云提交。",
+		  "tch": "已儲存在本機，等待雲端提交。",
+		  "ru": "Сохранено локально. Ожидание отправки в облако.",
+		  "de": "Lokal gespeichert. Cloud-Übertragung steht aus.",
+		  "ptbr": "Salvo localmente. Aguardando envio para a nuvem.",
+		  "it": "Salvato in locale. In attesa dell’invio al cloud.",
+		  "es": "Guardado localmente. Pendiente de envío a la nube.",
+		  "fr": "Enregistré localement. En attente d’envoi dans le cloud.",
+		  "nl": "Lokaal opgeslagen. Wacht op verzending naar de cloud.",
+		  "cz": "Uloženo místně. Čeká na odeslání do cloudu.",
+		  "pl": "Zapisano lokalnie. Oczekiwanie na wysłanie do chmury.",
+		  "jp": "ローカルに保存しました。クラウドへの送信待ちです。",
+		  "kr": "로컬에 저장되었습니다. 클라우드 전송 대기 중입니다.",
+		  "thai": "บันทึกในเครื่องแล้ว รอส่งไปยังคลาวด์",
+		  "hu": "Helyileg mentve. Felhőbe küldésre vár.",
+		  "lv": "Saglabāts lokāli. Gaida nosūtīšanu uz mākoni.",
+		  "ro": "Salvat local. În așteptarea trimiterii în cloud.",
+		  "no": "Lagret lokalt. Venter på overføring til skyen."
+		}
 		function text(game, key, values) {
 			const language = game?.language || 'en'
 			const labels = LABELS[language] || LABELS.en
 			const extras = EXTRA_LABELS[language] || EXTRA_LABELS.en
+			if (key === 'localPending') return LOCAL_PENDING_LABELS[language] || LOCAL_PENDING_LABELS.en
 			let template = NATIVE_LABELS[language]?.[key] || NATIVE_LABELS.en[key] || labels[key] || extras[key]
 			if (!template && key === 'autoSlotName') template = (labels.autoSlot || LABELS.en.autoSlot).replace(/\s*\{time\}/, '').replace(/[：:]\s*$/, '').trim()
 			if (!template && key === 'back') template = labels.cancel || LABELS.en.cancel

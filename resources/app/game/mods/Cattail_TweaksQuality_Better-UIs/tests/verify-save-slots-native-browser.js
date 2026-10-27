@@ -184,6 +184,8 @@ async function main() {
 			assert.equal(await restored.evaluate(() => notices.length), 0)
 			assert.equal(await restored.evaluate(() => service.snapshot().activationNotice.cloudSaved), false)
 			await restored.evaluate(() => { cloudMode = 'success' }); await restored.evaluate(() => game.saveGame())
+			assert.equal(await restored.evaluate(() => notices.length), 0, 'A local save must keep the failed-cloud notice')
+			await press(restored.locator('.cattail-save-slots-auto').getByRole('button', { name: 'Save', exact: true }))
 			assert.deepEqual(await restored.evaluate(() => notices), [{ ownGame: true, notice: null }])
 			assert.equal(await restored.evaluate(() => localStorage.getItem('abstractv03_saveSlotsForkNoticesynthetic-player')), null)
 			await restored.evaluate(() => game.saveGame())
@@ -337,6 +339,14 @@ async function main() {
 			const page = await setup(); await preview(page, encode(world())); await page.evaluate(() => { cloudDelay = 40; window.backgroundSave = game.saveGame() })
 			await confirm(page); await page.evaluate(() => backgroundSave); assert.equal(await page.evaluate(() => maxSaving), 1)
 		})
+		await test('opening the native 1.3.0.1 page reports a local pending save without cloud IPC', async () => {
+			const page = await setup()
+			const count = await page.evaluate(() => cloud.length)
+			await page.evaluate(() => pageDefinition.onOpen({ game, splash }))
+			await page.getByText('Saved locally. Waiting for cloud submission.', { exact: true }).waitFor()
+			assert.equal(await page.evaluate(() => cloud.length), count)
+			assert.equal(await page.evaluate(() => service.snapshot().ready), true)
+		})
 		await test('disabled service remains unavailable', async () => { const page = await setup({ enabled: false }); assert.equal(await page.evaluate(() => !!service), false) })
 		await test('new/copy/overwrite preserve NG+ and create independent identities', async () => {
 			const page = await setup({ slots: [slot('x'.repeat(64))] })
@@ -424,6 +434,29 @@ async function main() {
 			await press(hiddenLabelNode)
 			assert.equal(await page.evaluate(() => game.saveSlots[0].stack[0].state.timestamp), times.at(-2))
 			assert.equal(await page.evaluate(() => reloads.length), 1)
+		})
+		await test('the early Save entry migrates legacy preferences in real browser storage', async () => {
+			const ctx = await browser.newContext(); contexts.push(ctx)
+			const page = await ctx.newPage(); await page.goto(address)
+			await page.evaluate(() => {
+				localStorage.setItem('modloader:Cattail_TweaksQuality_Tweaks:config:enableAutoSaveStutterFix', 'false')
+				window.policyInstalls = 0; window.earlyHooks = []
+				window.Game = function () {}; window.__dirname = 'fixture'
+				window.require = name => name === 'path' ? { join: (...parts) => parts.join('/') } : { install: () => policyInstalls++ }
+				window.ModLoader = { register: definition => definition.init({
+					config: {
+						get: (key, fallback) => { const value = localStorage.getItem('modloader:Cattail_TweaksQuality_Better-UIs:config:' + key); return value === null ? fallback : JSON.parse(value) },
+						set: (key, value) => localStorage.setItem('modloader:Cattail_TweaksQuality_Better-UIs:config:' + key, JSON.stringify(value))
+					}, on: (_name, callback) => earlyHooks.push(callback)
+				}) }
+			})
+			const entry = fs.readFileSync(path.resolve(__dirname, '../scripts/independent-auto-save.js'), 'utf8')
+			await page.addScriptTag({ content: entry }); await page.evaluate(() => earlyHooks.forEach(fn => fn()))
+			assert.deepEqual(await page.evaluate(() => ({ value: localStorage.getItem('modloader:Cattail_TweaksQuality_Better-UIs:config:enableIndependentAutoSave'), legacy: localStorage.getItem('modloader:Cattail_TweaksQuality_Tweaks:config:enableAutoSaveStutterFix'), installs: policyInstalls })), { value: 'false', legacy: 'false', installs: 0 })
+			await page.evaluate(() => { localStorage.setItem('modloader:Cattail_TweaksQuality_Tweaks:config:enableAutoSaveStutterFix', 'true'); delete globalThis[Symbol.for('cattail.better-uis.independent-auto-save.registered')]; earlyHooks = [] })
+			await page.addScriptTag({ content: entry }); await page.evaluate(() => earlyHooks.forEach(fn => fn()))
+			assert.equal(await page.evaluate(() => localStorage.getItem('modloader:Cattail_TweaksQuality_Better-UIs:config:enableIndependentAutoSave')), 'false')
+			await page.close()
 		})
 		console.log(`${passed} checks passed. Artifacts: ${OUTPUT}`)
 	} finally {

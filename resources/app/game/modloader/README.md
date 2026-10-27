@@ -743,6 +743,50 @@ ordinary number values. Config-only saves do not reload the game automatically;
 mods that read config during startup still need a manual reload to apply those
 values.
 
+Config definitions can use a stable `section` id and a localized
+`sectionLabel` to form consecutive groups. With **Config layout sorting**
+enabled in Menu Settings, players can still drag whole section blocks and can
+also press a config row for 300 ms to start item sorting. A categorized item can
+be reordered inside its current section or dropped outside it as an independent
+unclassified row. An independent row can later be dropped into any section.
+Input, button, slider, select, and text-editing surfaces remain interactive and
+do not start the row drag.
+
+The custom block order, item order, and displayed section membership are stored
+only in `modloader:panelState`. They never rewrite a mod's `mod.json`, never
+change config values, and never change script execution order. Turning Config
+layout sorting off temporarily shows the schema order while retaining the
+custom layout for later use. Newly registered keys append to their schema
+section, removed keys are ignored, and the older saved section-only order is
+used automatically until the player makes an item-level layout change.
+
+### Mod config search and recent log
+
+The **Mod Manager** heading keeps the normal "Toggle mods or edit config below"
+helper. The Mod config search beside **all** keeps its field-specific placeholder
+and uses the current game language to search localized Mod names, section labels,
+config labels, and config descriptions. It also accepts stable Mod folder names,
+Mod ids, and config keys, but does not search translated text from inactive
+languages or current config values. Exact matches rank before prefixes and
+substrings, with the current Mod and config layout breaking ties.
+
+The dropdown shows at most five read-only jump results across Mods, sections,
+and config items. Each result keeps its title on the first line and shows
+`type | path` on the second line without a type badge. Selecting one expands the
+Mod when needed, scrolls to the target, and highlights it briefly. Search results
+never toggle a Mod or edit a config value. Disabled Mods remain searchable; a Mod
+with a manifest load error offers only its Mod-level jump. Focusing or clicking a
+non-empty search field restores its results. The themed clear control clears the
+query and keeps focus; the query is also cleared when the panel closes and is not
+written to panel state. The search action does not wrap, and only the search field
+uses a white background in the light theme.
+
+**Recent Log starts collapsed** for a new panel state. Its whole heading and
+chevron toggle the latest twelve log lines, and the expanded state is remembered
+in `modloader:panelState`. When search results are open, Escape closes them and
+leaves the existing config, Menu Settings, and hide-to-edge Escape layers for
+subsequent presses.
+
 Color map config can use the built-in `resourceColors` control. It renders an
 optional Export colors / Import colors toolbar, then rows in this order:
 optional resource icon, color picker, hex color input, reset button. Other mods
@@ -1080,13 +1124,13 @@ If a save contains an entity whose mod is disabled, the loader keeps that
 entity in `save.modloader.orphanEntities` instead of crashing or deleting it.
 
 
-## Tweaks private save policy (desktop 1.3, 2026-10-20)
+## Better UIs independent autosave (desktop 1.3.0.1, 2026-10-26)
 
-The fixed enabled Tweaks auto-save-stutter-fix.js entry is loaded before native save preparation and registers only once. It installs the optional policy when enableAutoSaveStutterFix is enabled. Other entries retain the normal lifecycle; this is not a general early-entry or arbitrary main-process Mod API.
+The fixed enabled Better UIs independent-auto-save.js entry is loaded before native save preparation and registers only once. It installs the optional independent autosave policy when enableSaveSlots and enableIndependentAutoSave are enabled. The new boolean keeps an explicit new choice and otherwise inherits a saved legacy Tweaks boolean on first load; no saved legacy choice defaults to enabled. The backend is owned and authorized by Better UIs. Existing v2 protocol, index filenames and saved metadata remain compatible, including overlay reads when the option is disabled. Other entries retain the normal lifecycle; this is not a general early-entry or arbitrary main-process Mod API.
 
-The private tweaks-save-policy-v2 protocol uses the existing trusted main-window channel. Begin returns a token and record references, never requests a full renderer seed. Commits contain only changed slot descriptors and new current/history records. Tweaks owns snapshot isolation, local IDB completion, cloud retry, content checksums, the two-file auto ring and publish-last index. No enabled-policy error falls back to a full collection. The cloud reader reconstructs the legacy charpsMemory baseline plus the optional delta index even when the setting is off. Disabling/reloading restores native saves; an updated native baseline supersedes the older delta index. New delta data requires this reader.
+The private tweaks-save-policy-v2 protocol uses the existing trusted main-window channel. Begin returns a token and record references, never requests a full renderer seed. Commits contain only changed slot descriptors and new current/history records. Better UIs owns snapshot isolation, local IDB completion, explicit cloud checkpoints and retries, content checksums, the two-file auto ring and publish-last index. Ten-second autosaves, four-minute source histories and opening Save Slots stay local; explicit save/collection actions and menu Quit submit the pending changes. No enabled-policy error falls back to a full collection. The cloud reader reconstructs the legacy charpsMemory baseline plus the optional delta index even when the setting is off. Disabling/reloading restores native saves; an updated native baseline supersedes the older delta index. New delta data requires this reader.
 
-Better UIs service v1 keeps source.index/activeIndex tied to the verified physical working auto slot; its source name describes the played manual slot. Manual entry receipts keep manual indices. First installation requires a full Electron restart. See Codex-md/save_policy_20261020.md for validation and player/Steam limitations.
+Better UIs service v1 keeps source.index/activeIndex tied to the verified physical working auto slot; its source name describes the played manual slot. Manual entry receipts keep manual indices. This ownership migration requires a full Electron restart; later setting changes require save and reload. Current validation and player/Steam limitations are recorded in Codex-md/progress_BetterUI.md; Codex-md/save_policy_20261020.md retains the original implementation history.
 
 ## 一次性启动分层探针（默认关闭）
 
@@ -1113,3 +1157,5 @@ Better UIs service v1 keeps source.index/activeIndex tied to the verified physic
 不记录配置值、存档/IndexedDB内容、原始 IPC 参数、SDK token 或完整异常 message；异常保留类型及经过处理的脚本位置。探针不增加、跳过或取消保存/Steam Cloud操作。玩家通过启动器运行正式游戏时，游戏正常的配置与存档读写仍照常发生。窗口截图可能包含当时可见的游戏画面。
 
 这是 Loader 的私有可选诊断，不是新增 Mod 公共接口或正式白屏修复。源码/合同验证可运行 node tools/startup-probe-contract.test.js；游戏内采集、修复、诊断移除和发布分别处理。
+
+The optional periodic-stall diagnostic captures live webContents when binding a window. Its closed callback compares the captured identity without reading a destroyed BrowserWindow. The contract covers idle/active captures, pending trace setup, foreign windows and repeated binding. Isolated save launchers record uncaught main exceptions/rejections and attempted error dialogs without modal UI; any such error, nonzero exit or forced teardown fails acceptance.

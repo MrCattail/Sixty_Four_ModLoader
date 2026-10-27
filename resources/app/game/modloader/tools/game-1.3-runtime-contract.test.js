@@ -14,16 +14,16 @@ async function verifyMainSaveBridge() {
     const beforeRead = main.indexOf('const sleep = ms =>'), afterRead = main.indexOf('function getAccumulatedPlayTime()')
     assert(beforeStore >= 0 && afterStore > beforeStore && beforeRead >= 0 && afterRead > beforeRead)
     const slice = bridge.slice(bridge.indexOf('let tweaksSlotStore = null'), bridge.indexOf('// The optional temporary collector owns all timing'))
-    const mod = 'Cattail_TweaksQuality_Tweaks'
+    const mod = 'Cattail_TweaksQuality_Better-UIs'
     assert.equal(main.split('ModLoaderMainProcess.dispatchSaveStore(e, slots, value =>').length - 1, 2)
     assert(main.includes('ModLoaderMainProcess.readSaveOverlay(client.cloud, JSON.parse(save))'))
     assert(main.includes('savePolicyLayout: slots?.policyLayout,'))
     const backendPath = path.join(sourceRoot, 'resources/app/game/mods', mod, 'scripts/save-policy-core.js')
-    if (!fs.existsSync(backendPath)) { console.log('Main save bridge source checks passed; optional Tweaks backend absent (SkipMods), backend behavior not exercised.'); return }
+    if (!fs.existsSync(backendPath)) { console.log('Main save bridge source checks passed; optional Better UIs backend absent (SkipMods), backend behavior not exercised.'); return }
     const backend = require(backendPath)
     const record = n => ({ state: { stuff: [], resources: [n], timestamp: n }, permanents: {}, isProtected: false })
     const manual = { name: 'Synthetic manual', ownerHash: 1, creationTimeStamp: 1, lastModified: 1, stack: [record(1)] }
-    function fixture(initial = [manual]) {
+    function fixture(initial = [manual], options = {}) {
         const files = new Map([['charpsMemory', JSON.stringify(initial)]]), writes = [], on = new Map(), handles = new Map(), messages = []
         const cloud = { fileExists: f => files.has(f), readFile: f => { if (!files.has(f)) throw Error('Synthetic missing file'); return files.get(f) }, writeFile(f, data) { writes.push(f); files.set(f, data); return true } }
         const frame = {}, contents = { mainFrame: frame, send: (channel, value) => messages.push({ channel, value }) }
@@ -33,7 +33,7 @@ async function verifyMainSaveBridge() {
             require: require('module').createRequire(bridgeFile), __dirname: path.dirname(bridgeFile), path,
             win, ipcMain: { on: (name, fn) => on.set(name, fn), handle: (name, fn) => handles.set(name, fn) },
             measureDiagnostic: (_name, run) => run(), runtimeLog() {},
-            normalizeEnabledEntries: () => [{ path: mod }], readJsonFile: () => ({ id: mod, entries: ['scripts/auto-save-stutter-fix.js'] }),
+            normalizeEnabledEntries: () => [{ path: options.mod || mod }], readJsonFile: () => ({ id: options.mod || mod, entries: [options.entry || 'scripts/independent-auto-save.js'] }),
             client: { cloud }, STEAMID: 'synthetic-owner', STEAMLANGUAGE: 'english', languages: { english: 0 }, DEBUG: '',
             console: { log() {}, warn() {}, error() {} }, setTimeout: fn => { fn(); return 0 }
         }
@@ -46,6 +46,8 @@ async function verifyMainSaveBridge() {
         const begin = () => handles.get('modloader:tweaks-slot-store')(event, { action: 'begin', protocol: backend.PROTOCOL, gameVersion: '1.3', owner: 'synthetic-owner' })
         return { files, writes, on, handles, event, messages, api: context.api, cloud, begin }
     }
+    check('Tweaks alone cannot authorize the Better UIs private backend', fixture(undefined, { mod: 'Cattail_TweaksQuality_Tweaks', entry: 'scripts/auto-save-stutter-fix.js' }).begin().ok === false)
+    check('Better UIs without the fixed early entry cannot authorize the backend', fixture(undefined, { entry: 'scripts/save-slots.js' }).begin().ok === false)
     const f = fixture(), baseline = f.files.get('charpsMemory')
     const packet = { protocol: backend.PROTOCOL, action: 'commit', owner: 'synthetic-owner', token: 'not-a-session', revision: 0, changes: {}, records: {} }
     check('protocol before begin cannot fall back to native full write', (await f.handles.get('store')(f.event, packet)).reason === 'resync' && f.writes.length === 0)

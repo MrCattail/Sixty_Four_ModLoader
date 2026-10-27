@@ -28,7 +28,9 @@ function mainFixture() {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'sf-periodic-probe-'))
   const jobs = new Set(), sender = new EventEmitter(), win = new EventEmitter(), mainFrame = {}
   sender.mainFrame = mainFrame; sender.isDevToolsOpened = () => f.devtools; sender.send = (...args) => f.messages.push(args)
-  win.webContents = sender; win.isDestroyed = () => false
+  let destroyed = false
+  Object.defineProperty(win, 'webContents', { get() { if (destroyed) throw new TypeError('Object has been destroyed'); return sender } })
+  win.isDestroyed = () => destroyed
   const f = { directory, jobs, win, sender, mainFrame, messages: [], devtools: false, otherBusy: false, starts: 0, stops: 0, traceGate: null }
   const timers = { setTimeout(fn, ms) { const job = { fn, ms }; jobs.add(job); return job }, clearTimeout(job) { jobs.delete(job) },
     setInterval(fn, ms) { const job = { fn, ms, interval: true }; jobs.add(job); return job }, clearInterval(job) { jobs.delete(job) } }
@@ -38,6 +40,7 @@ function mainFixture() {
         async stopRecording(file) { f.stops++; await fs.promises.writeFile(file, '{"traceEvents":[]}') }, getTraceBufferUsage() { throw Error('unsafe API called') } } } })
   service.attachWindow(win)
   Object.assign(f, { service, call: (action, args = {}) => service.handle({ sender, senderFrame: mainFrame }, { action, ...args }), advance: ms => { clock += ms } })
+  f.destroy = () => { destroyed = true; win.emit('closed') }
   return f
 }
 const emptyReport = () => { const f = fixture(); f.recorder.start(); f.game.renderloop(); f.recorder.stop(); return f.recorder.report() }
@@ -142,7 +145,7 @@ async function until(run) { for (let i = 0; i < 100; i++) { if (run()) return; a
     const stat = source.slice(source.indexOf('ipcMain.on(`updateStat`'), source.indexOf('ipcMain.on(`gameError`'))
     const client = { cloud: { writeFile(name, data) { f.advance(13); calls.push({ name, data }); return true } }, stats: { setInt(id, value) { calls.push({ id, value }) } } }
     vm.runInNewContext(store + stat, { ipcMain: { on(name, fn) { handlers[name + ':on'] = fn }, handle(name, fn) { handlers[name + ':handle'] = fn } },
-      client, ModLoaderMainProcess: { measureDiagnostic: f.service.measure }, console: { error() {} } })
+      client, win: f.win, ModLoaderMainProcess: { measureDiagnostic: f.service.measure, dispatchSaveStore(_event, slots, write) { return write(slots) } }, console: { error() {}, log() {} } })
     const slots = [{ stack: [{ state: { fixtureOnly: true } }] }]
     assert.equal(await handlers['store:handle']({}, slots), true); handlers['store:on']({}, slots); handlers['updateStat:on']({}, [{ id: 'X', value: 5 }])
     assert.equal(calls[0].data, JSON.stringify(slots)); assert.equal(calls[1].data, JSON.stringify(slots)); assert.equal(calls[2].value, 5)
@@ -170,6 +173,33 @@ async function until(run) { for (let i = 0; i < 100; i++) { if (run()) return; a
     await client.start(); const beginning = [...jobs][0].fn(); assert.equal(client.status().phase, 'starting')
     await client.finish(); release(); await beginning
     assert.equal(client.status().phase, 'idle'); assert.deepEqual(requests, ['start', 'abort']); assert.equal(Object.hasOwn(f.game, 'saveGame'), false)
+  })
+  await test('idle window close never rereads destroyed webContents and binding remains unique', () => {
+    const f = mainFixture(); f.service.attachWindow(f.win)
+    assert.equal(f.win.listenerCount('closed'), 1)
+    assert.doesNotThrow(() => f.destroy()); assert.equal(f.service.isBusy(), false)
+    assert.equal(f.jobs.size, 0); assert.equal(fs.readdirSync(f.directory).length, 0)
+  })
+  for (const deep of [false, true]) await test('active '+(deep?'deep':'light')+' capture closes safely after contents destruction', async () => {
+    const f = mainFixture(), start = await f.call('start', { deep }); assert.equal(start.ok, true)
+    assert.doesNotThrow(() => f.destroy()); await until(() => !f.service.isBusy())
+    const session = JSON.parse(fs.readFileSync(path.join(f.directory, start.result.id, 'session.json')))
+    assert.equal(session.status, 'incomplete'); assert.equal(session.reason, 'window-closed')
+    assert.equal(f.jobs.size, 0); assert.equal(f.stops, Number(deep))
+  })
+  await test('closing a foreign window cannot abandon another window capture', async () => {
+    const f = mainFixture(), start = await f.call('start'); assert.equal(start.ok, true)
+    const foreign = new EventEmitter(), contents = new EventEmitter(); let destroyed = false
+    Object.defineProperty(foreign, 'webContents', { get() { if (destroyed) throw Error('Object has been destroyed'); return contents } })
+    f.service.attachWindow(foreign); destroyed = true
+    assert.doesNotThrow(() => foreign.emit('closed')); assert.equal(f.service.isBusy(), true)
+    f.destroy(); await until(() => !f.service.isBusy())
+  })
+  await test('window close while tracing starts cancels and cleans up the pending capture', async () => {
+    const f = mainFixture(); let release; f.traceGate = new Promise(resolve => { release = resolve })
+    const start = f.call('start', { deep: true }); await until(() => f.starts === 1)
+    assert.doesNotThrow(() => f.destroy()); release(); assert.equal((await start).ok, false)
+    await until(() => !f.service.isBusy()); assert.equal(f.stops, 1); assert.equal(f.jobs.size, 0)
   })
   console.log('Periodic stall probe: ' + checks.length + ' checks passed.')
 })().catch(error => { console.error(error.stack); process.exitCode = 1 })

@@ -247,7 +247,7 @@ app.whenReady().then(()=>{session.defaultSession.webRequest.onBeforeRequest((d,c
       const explosion = e.find(x => x.type === 'explosion-create'), cap = e.find(x => x.type === 'lineCap-change' && x.cap === 'round'), grid = e.find(x => x.type === 'grid-entry' && x.cap === 'round')
       assert.ok(explosion && cap && grid, JSON.stringify(e)); assert.ok(explosion.sequence < cap.sequence && cap.sequence < grid.sequence)
       assert.equal(cap.contextId, grid.contextId); assert.ok(r.origin.stacks.some(x => x.stack.includes('ResourceExplosion.render')))
-      assert.equal(r.origin.ready, true); assert.equal(r.metadata.clearViewGridFix.modLoaded, false)
+      assert.equal(r.origin.ready, true); assert.equal(Object.hasOwn(r.metadata, 'clearViewGridFix'), false)
       assert.equal(await page.evaluate(() => Object.getOwnPropertyDescriptor(CanvasRenderingContext2D.prototype,'lineCap').set === originalCapDescriptor.set), true)
     })
     await test('Electron: Render API interaction layer attribution differs from the main effect canvas', async () => {

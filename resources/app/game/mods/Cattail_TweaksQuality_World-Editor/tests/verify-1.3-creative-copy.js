@@ -6,7 +6,7 @@ const fs = require('node:fs'), path = require('node:path'), assert = require('no
 if (!process.versions.electron) {
   const root = path.resolve(__dirname, '../../../../../..')
   if (!process.argv.includes('--lab')) process.argv.push('--lab', path.join(path.dirname(root), 'Mod-Development-Backups', 'WE31-Copy-Test-' + Date.now()))
-  require('../../Cattail_TweaksQuality_Tweaks/tests/save-policy-electron.cjs').launch(root, root, { scenario: __filename })
+  require('../../Cattail_TweaksQuality_Better-UIs/tests/save-policy-electron.cjs').launch(root, root, { scenario: __filename })
 } else module.exports = async function ({ check, evaluate, load, files, baseline, appDir, setCloudFailure }) {
   const MOD = 'Cattail_TweaksQuality_Tweaks', BETTER = 'Cattail_TweaksQuality_Better-UIs', WE = 'Cattail_TweaksQuality_World-Editor'
   const clone = value => JSON.parse(JSON.stringify(value))
@@ -17,7 +17,7 @@ if (!process.versions.electron) {
     const count = options.count ?? 3
     const slots = Array.from({ length: count }, (_, i) => { const s = clone(baseline[i % baseline.length]); s.name = '槽 ' + i; s.creationTimeStamp = i + 1; return s })
     files.clear(); files.set('charpsMemory', JSON.stringify(slots))
-    fs.writeFileSync(path.join(appDir, 'case.json'), JSON.stringify({ config: [[MOD, 'enableAutoSaveStutterFix', options.policy !== false], [BETTER, 'enableSaveSlots', options.better !== false]] }))
+    fs.writeFileSync(path.join(appDir, 'case.json'), JSON.stringify({ config: [[BETTER, 'enableIndependentAutoSave', options.policy !== false], [BETTER, 'enableSaveSlots', options.better !== false]] }))
     fs.writeFileSync(path.join(appDir, 'game/mods/enabled.json'), JSON.stringify({ mods: options.reverse ? [WE, BETTER, MOD] : [MOD, BETTER, WE] }))
     await load(); await init()
     const actualSlots = await evaluate('game.saveSlots.filter(s=>s&&s.tweaksSavePolicy?.role!=="auto").map(s=>s.name)')
@@ -124,7 +124,9 @@ if (!process.versions.electron) {
     await load(); await init()
     check('Policy ' + policyEnabled + ': local-only notice survives actual reload with verified Creative mode', await evaluate('mode().snapshot().creativeMode&&service.snapshot().ready&&service.snapshot().activationNotice?.cloudSaved===false'))
     setCloudFailure(''); await evaluate('game.saveGame()')
-    check('Policy ' + policyEnabled + ': successful later cloud save clears the warning', await evaluate('service.snapshot().activationNotice===null&&!localStorage.getItem("abstractv03_saveSlotsForkNoticesynthetic-owner")'))
+    check('Policy ' + policyEnabled + ': local autosave retains the cloud warning', await evaluate('service.snapshot().activationNotice?.cloudSaved===false'))
+    await evaluate('tap(game.currentSlotId,"保存")')
+    check('Policy ' + policyEnabled + ': explicit Save clears the warning', await evaluate('service.snapshot().activationNotice===null&&!localStorage.getItem("abstractv03_saveSlotsForkNoticesynthetic-owner")'))
   }
 
   await reset(); const corrupt = await fork('损坏标记'); assert.equal(corrupt.activated, true)
@@ -194,10 +196,14 @@ if (!process.versions.electron) {
     await evaluate('window.copyNotice=(new Function(' + JSON.stringify(statusUI) + '))();void 0')
     check('Policy ' + policyEnabled + ': editor displays the persisted local-only notice after reload', await evaluate('copyNotice.element.dataset.active==="true"&&copyNotice.element.textContent.includes("云同步未完成")&&copyNotice.element.getAttribute("role")==="status"'))
     await evaluate('game.saveGame()')
-    check('Policy ' + policyEnabled + ': another failed cloud save retains the visible notice', await evaluate('service.snapshot().activationNotice?.cloudSaved===false&&copyNotice.element.textContent.includes("云同步未完成")'))
+    check('Policy ' + policyEnabled + ': local autosave retains the visible cloud notice', await evaluate('service.snapshot().activationNotice?.cloudSaved===false&&copyNotice.element.textContent.includes("云同步未完成")'))
+    await evaluate('tap(game.currentSlotId,"保存")')
+    check('Policy ' + policyEnabled + ': another explicit failed Save retains the visible notice', await evaluate('service.snapshot().activationNotice?.cloudSaved===false&&copyNotice.element.textContent.includes("云同步未完成")'))
     setCloudFailure(''); await evaluate('game.saveGame()')
-    // No manual refresh: use the real service event and actual shell listener.
-    check('Policy ' + policyEnabled + ': successful saving automatically clears the idle banner', await evaluate('service.snapshot().activationNotice===null&&copyNotice.element.dataset.active==="false"&&copyNotice.element.textContent===""'))
+    check('Policy ' + policyEnabled + ': later local saves do not claim cloud recovery', await evaluate('service.snapshot().activationNotice?.cloudSaved===false'))
+    await evaluate('tap(game.currentSlotId,"保存")')
+    // No manual refresh: use the real explicit Save event and actual shell listener.
+    check('Policy ' + policyEnabled + ': explicit successful Save clears the idle banner', await evaluate('service.snapshot().activationNotice===null&&copyNotice.element.dataset.active==="false"&&copyNotice.element.textContent===""'))
     await evaluate('copyNotice.element.textContent="sentinel";window.dispatchEvent(new CustomEvent("cattail:better-uis-save-status",{detail:{game:{}}}));void 0')
     check('Policy ' + policyEnabled + ': unrelated game notifications cannot update this banner', await evaluate('copyNotice.element.textContent==="sentinel"'))
     await evaluate('copyNotice.fail();window.beforeFailureText=copyNotice.element.textContent;window.dispatchEvent(new CustomEvent("cattail:better-uis-save-status",{detail:{game}}));void 0')

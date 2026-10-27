@@ -47,6 +47,8 @@
 		panelPreferredHideEdge: null,
 		panelModOrder: [],
 		panelConfigSectionOrder: {},
+		panelConfigLayout: {},
+		panelRecentLogExpanded: false,
 		panelSettings: { theme: 'dark', hideMode: 'auto', autoHideSeconds: 3, hideMenuDetails: false, hideModFileDetails: false, descriptionDisplayMode: 'hover', sortConfigSections: true, renderApiEnabled: true },
 		panelSettingsOpen: false,
 		panelStateLoaded: false,
@@ -3665,7 +3667,18 @@
 			close: '\u5173\u95ed', hideToEdge: '\u9690\u85cf\u5230\u8fb9\u7f18', showFromEdge: '\u663e\u793a ModLoader \u83dc\u5355', menuSettings: 'Mod \u83dc\u5355\u8bbe\u7f6e', themeMode: '\u4eae\u8272 / \u6697\u8272\u6a21\u5f0f', darkMode: '\u6697\u8272', lightMode: '\u4eae\u8272', hideMode: '\u81ea\u52a8\u9690\u85cf\u6a21\u5f0f', autoHide: '\u81ea\u52a8\u9690\u85cf', manualHide: '\u624b\u52a8\u9690\u85cf', sortMod: '\u6392\u5e8f mod', sortConfigSection: '\u6392\u5e8f\u5b50\u529f\u80fd', configSectionSorting: '\u5b50\u529f\u80fd\u624b\u52a8\u6392\u5e8f', configSectionSortingOn: '\u5f00\u542f', configSectionSortingOff: '\u5173\u95ed', renderApi: '\u6e32\u67d3 API', renderApiOn: '\u5f00\u542f', renderApiOff: '\u5173\u95ed', renderApiLayerDemands: '\u5df2\u9700\u6c42\u56fe\u5c42', renderApiCreatedLayers: '\u5df2\u521b\u5efa\u56fe\u5c42', renderApiCallbacks: '\u56de\u8c03 \u6d3b\u8dc3/\u603b\u6570', renderApiLayerDemanders: '\u9700\u6c42\u5668 \u6d3b\u8dc3/\u603b\u6570', renderApiMethodRoutes: '\u5df2\u8def\u7531\u65b9\u6cd5', renderApiTiming: '\u8017\u65f6', autoHideDelay: '\u81ea\u52a8\u9690\u85cf\u79d2\u6570', secondsSuffix: '\u79d2', hideMenuDetails: '\u9690\u85cf\u83dc\u5355\u8be6\u60c5', hideModFileDetails: '\u9690\u85cf mod \u6587\u4ef6\u8be6\u60c5', show: '\u663e\u793a', hide: '\u9690\u85cf', installedMods: '\u5df2\u5b89\u88c5 mod', enabledEntries: '\u542f\u7528\u6761\u76ee', loadedMods: '\u5df2\u52a0\u8f7d mod', issues: '\u95ee\u9898', dataPatches: '\u6570\u636e\u8865\u4e01', wordPatches: '\u6587\u672c\u8865\u4e01', registeredLanguages: '\u5df2\u6ce8\u518c\u8bed\u8a00', orphanEntities: '\u5b64\u7acb\u5b9e\u4f53', modManager: 'Mod \u7ba1\u7406', selectAll: '\u5168\u9009', toggleNote: '\u5728\u4e0b\u65b9\u5f00\u5173 mod \u6216\u7f16\u8f91\u914d\u7f6e\u3002', changesRequireReload: '\u6539\u52a8\u9700\u8981 reload\u3002', configSaveNote: '\u914d\u7f6e\u5df2\u4fdd\u5b58\u5230 localStorage\uff1b\u90e8\u5206 mod \u9700\u8981 reload \u751f\u6548\u3002', saveReload: '\u4fdd\u5b58\u5e76 Reload', saveConfig: '\u4fdd\u5b58\u914d\u7f6e', insert: '\u5bfc\u5165', folder: '\u6587\u4ef6\u5939', deleteMod: '\u5220\u9664 mod', config: '\u914d\u7f6e', recentLog: '\u6700\u8fd1\u65e5\u5fd7', noLogEntries: '\u6682\u65e0\u65e5\u5fd7\u3002', noModsFound: '\u6ca1\u6709\u627e\u5230\u5e26 mod.json \u7684 mod\u3002', fileAccessUnavailable: '\u6587\u4ef6\u8bbf\u95ee\u4e0d\u53ef\u7528\u3002', fileAccessLoadedOnly: '\u6587\u4ef6\u8bbf\u95ee\u4e0d\u53ef\u7528\uff0c\u6240\u4ee5\u53ea\u80fd\u663e\u793a\u5df2\u52a0\u8f7d\u7684 mod\u3002', reloadHot: '\u652f\u6301\u70ed\u5f00\u5173\uff0c\u5f53\u524d\u4ecd\u5efa\u8bae reload', reloadRestart: '\u9700\u8981\u91cd\u542f', reloadRequired: '\u9700\u8981 reload', idPrefix: 'id\uff1a{value}', uniquePrefix: '\u552f\u4e00\u7801\uff1a{value}', depsPrefix: '\u4f9d\u8d56\uff1a{value}', conflictsPrefix: '\u51b2\u7a81\uff1a{value}', missingDependencies: '\u7f3a\u5c11\u4f9d\u8d56\uff1a{value}', conflictsEnabled: '\u5df2\u542f\u7528\u51b2\u7a81\uff1a{value}', savedReloading: '\u5df2\u4fdd\u5b58\uff0c\u6b63\u5728 reload...', saveFailed: '\u4fdd\u5b58\u5931\u8d25\uff1a{value}', configSaved: '\u914d\u7f6e\u5df2\u4fdd\u5b58\u3002', noChanges: '\u6ca1\u6709\u9700\u8981\u4fdd\u5b58\u7684\u6539\u52a8\u3002', changesCanceled: '\u5df2\u53d6\u6d88\u672a\u4fdd\u5b58\u7684\u6539\u52a8\u3002', openFolderFailed: '\u65e0\u6cd5\u6253\u5f00\u6587\u4ef6\u5939\uff1a{value}', deleteTitle: '\u5220\u9664 Mod\uff1f', deleteMessage: '\u4ece mods \u6587\u4ef6\u5939\u5220\u9664 {name}\uff1f\u8fd9\u4e2a\u64cd\u4f5c\u4e0d\u80fd\u64a4\u9500\u3002', deleteConfirm: '\u5220\u9664', cancel: '\u53d6\u6d88', replaceTitle: '\u66ff\u6362 Mod\uff1f', replaceMessage: 'mods \u91cc\u5df2\u7ecf\u6709 {name}\u3002\u662f\u5426\u7528\u5bfc\u5165\u7684 mod \u66ff\u6362\u5b83\uff1f', replaceConfirm: '\u66ff\u6362', deletedMod: '\u5df2\u5220\u9664 {name}\u3002\u5df2\u7ecf\u8fd0\u884c\u7684\u4ee3\u7801\u9700\u8981 reload \u624d\u4f1a\u5378\u8f7d\u3002', deleteFailed: '\u5220\u9664\u5931\u8d25\uff1a{value}', importHint: '\u628a\u6587\u4ef6\u62d6\u5230\u8fd9\u91cc\u6216\u590d\u5236', importDetail: '\u53ef\u4ee5\u628a mod zip \u5305\u76f4\u63a5\u62d6\u5165\uff0c\u6216\u8005\u590d\u5236 zip \u5305\u540e\u5728\u8fd9\u91cc\u6309\u7c98\u8d34\u5feb\u6377\u952e\uff0cModLoader \u4f1a\u81ea\u52a8\u89e3\u5305\u5230 mods \u6587\u4ef6\u5939\u3002', importWaiting: '\u7b49\u5f85 zip \u6587\u4ef6...', importNoZip: '\u8bf7\u62d6\u5165\u6216\u7c98\u8d34 .zip \u6587\u4ef6\u3002', importNoPath: '\u65e0\u6cd5\u8bfb\u53d6\u8be5\u6587\u4ef6\u8def\u5f84\u3002', importing: '\u6b63\u5728\u5bfc\u5165 {name}...', importedMod: '\u5df2\u5bfc\u5165 {name}\u3002\u9700\u8981\u65f6\u52fe\u9009\u5b83\u5e76\u4fdd\u5b58 reload\u3002', importFailed: '\u5bfc\u5165\u5931\u8d25\uff1a{value}', importModeOff: '\u8fd4\u56de mod \u5217\u8868', invalidZip: '\u53ea\u80fd\u5bfc\u5165 .zip mod \u5305\u3002', zipNoMod: '\u8fd9\u4e2a zip \u5185\u6ca1\u6709 mod.json\u3002', zipMultipleMods: '\u8fd9\u4e2a zip \u5305\u542b\u591a\u4e2a mod \u6587\u4ef6\u5939\uff1b\u8bf7\u4e00\u6b21\u5bfc\u5165\u4e00\u4e2a mod\u3002', zipExtractFailed: '\u65e0\u6cd5\u89e3\u538b zip\uff1a{value}', folderOpened: '\u5df2\u6253\u5f00 mods \u6587\u4ef6\u5939\u3002', replaceRenamedUniqueTitle: '\u53d1\u73b0\u540c\u552f\u4e00\u7801 Mod', replaceRenamedUniqueMessage: '\u65b0\u6587\u4ef6\u8ddf\u5df2\u6709\u6587\u4ef6\u6709\u76f8\u540c\u7684 mod \u552f\u4e00\u7801\uff0c\u5b83\u5f88\u53ef\u80fd\u662f\u65e7\u6587\u4ef6\u7684\u66f4\u65b0\u548c\u6539\u540d\u3002\n{oldName} \u2192 {newName}\n\u662f\u5426\u8986\u76d6\u65e7\u6587\u4ef6\uff1f', replaceRenamedPreviousTitle: '\u53d1\u73b0 Mod \u6539\u540d', replaceRenamedPreviousMessage: '\u8fd9\u4e2a\u65b0\u6587\u4ef6\u662f\u5df2\u6709\u6587\u4ef6\u7684\u6539\u540d\u3002\n{oldName} \u2192 {newName}\n\u662f\u5426\u8986\u76d6\u65e7\u6587\u4ef6\uff1f', replaceOld: '\u8986\u76d6', keepImported: '\u4e0d\u8986\u76d6\uff08\u52a0\u5165\u65b0\u6587\u4ef6\uff09', uniqueCodeEditTitle: '\u63a8\u8350\u4fee\u6539 mod \u552f\u4e00\u7801', uniqueCodeEditMessage: '\u8fd9\u4e24\u4e2a mod \u4f1a\u5171\u7528\u540c\u4e00\u4e2a mod \u552f\u4e00\u7801\u3002\u662f\u5426\u5728\u52a0\u5165\u65b0\u6587\u4ef6\u524d\u4fee\u6539\u5bfc\u5165 mod \u7684\u552f\u4e00\u7801\uff1f', uniqueCodeLabel: 'mod \u552f\u4e00\u7801', uniqueCodeConfirm: '\u786e\u8ba4\u4fee\u6539', uniqueCodeSkip: '\u5426\uff08\u4e0d\u4fee\u6539\uff09', manifestReadFailed: '\u65e0\u6cd5\u8bfb\u53d6 mod.json\uff1a{value}', translationFile: '\u7ffb\u8bd1', translationFileTitle: '\u6253\u5f00\u7ffb\u8bd1\u6587\u4ef6', translationFileSynced: '\u7ffb\u8bd1\u6587\u4ef6\u5df2\u540c\u6b65\uff1a{path}', translationFileFailed: '\u7ffb\u8bd1\u6587\u4ef6\u5931\u8d25\uff1a{value}'
 		}
 	}
+	PANEL_TEXT.en.configSectionSorting = 'Config layout sorting'
+	PANEL_TEXT.sch.configSectionSorting = '\u914d\u7f6e\u5e03\u5c40\u624b\u52a8\u6392\u5e8f'
 	Object.assign(PANEL_TEXT.en, {
+		searchHint: 'Search helps you find the config you want faster.',
+		searchPlaceholder: 'Search Mods, sections, or config...',
+		search: 'Search',
+		searchResultMod: 'Mod',
+		searchResultSection: 'Section',
+		searchResultConfig: 'Config',
+		searchNoResults: 'No matching items.',
+		recentLogExpand: 'Expand recent log',
+		recentLogCollapse: 'Collapse recent log',
 		devTools: 'DevTools',
 		devToolsTitle: 'Open DevTools',
 		devToolsOpened: 'DevTools opened.',
@@ -3721,6 +3734,15 @@
 		shortcutContextInactive: 'Not available in the current context'
 	})
 	Object.assign(PANEL_TEXT.sch, {
+		searchHint: '\u641c\u7d22\u53ef\u66f4\u5feb\u627e\u5230\u60f3\u8981\u7684\u914d\u7f6e\u3002',
+		searchPlaceholder: '\u641c\u7d22 Mod\u3001\u5206\u7c7b\u6216\u914d\u7f6e\u2026\u2026',
+		search: '\u641c\u7d22',
+		searchResultMod: 'Mod',
+		searchResultSection: '\u5206\u7c7b',
+		searchResultConfig: '\u914d\u7f6e',
+		searchNoResults: '\u672a\u627e\u5230\u5339\u914d\u9879\u3002',
+		recentLogExpand: '\u5c55\u5f00\u6700\u8fd1\u65e5\u5fd7',
+		recentLogCollapse: '\u6536\u8d77\u6700\u8fd1\u65e5\u5fd7',
 		devTools: 'DevTools',
 		devToolsTitle: '\u6253\u5f00 DevTools',
 		devToolsOpened: 'DevTools \u5df2\u6253\u5f00\u3002',
@@ -4710,6 +4732,9 @@
 			#modloader-panel.modloader-panel-modal-open > :not(.modloader-modal) { filter: blur(4px); opacity: .52; pointer-events: none; user-select: none; }
 			#modloader-panel h2 { flex: 1 1 auto; min-width: 0; margin: 0; font-size: 16px; }
 			#modloader-panel h3 { margin: 14px 0 6px; font-size: 13px; color: var(--modloader-text); }
+			#modloader-panel .modloader-mod-heading { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; margin: 14px 0 6px; }
+			#modloader-panel .modloader-mod-heading h3 { margin: 0; }
+			#modloader-panel .modloader-mod-heading-note { color: var(--modloader-text-muted); font-size: 11px; }
 			#modloader-panel button, #modloader-panel input, #modloader-panel textarea, #modloader-panel select { font: inherit; }
 			#modloader-panel .modloader-panel-header { display: flex; align-items: center; gap: 10px; margin: -3px -3px 8px; padding: 3px; cursor: grab; user-select: none; touch-action: none; }
 			#modloader-panel .modloader-panel-header:active { cursor: grabbing; }
@@ -4768,6 +4793,7 @@
 			#modloader-panel.modloader-panel-theme-light .modloader-panel-settings-option.active { background: var(--modloader-primary-bg); color: var(--modloader-primary-text); }
 			#modloader-panel.modloader-panel-theme-light .modloader-panel-settings-number-wrap { color: var(--modloader-text-muted); }
 			#modloader-panel.modloader-panel-theme-light .modloader-mod-toolbar { background: var(--modloader-panel-bg); }
+			#modloader-panel.modloader-panel-theme-light .modloader-search-input { background: #fff; }
 			#modloader-panel.modloader-panel-theme-light .modloader-mod-row, #modloader-panel.modloader-panel-theme-light .modloader-panel-log, #modloader-panel.modloader-panel-theme-light .modloader-import-zone { border-color: var(--modloader-border); background: var(--modloader-surface); }
 			#modloader-panel.modloader-panel-theme-light .modloader-import-zone.dragging { border-color: var(--modloader-focus-border); background: var(--modloader-surface-active); }
 			#modloader-panel.modloader-panel-theme-light .modloader-import-copy { color: var(--modloader-text); }
@@ -4795,10 +4821,34 @@
 			#modloader-panel .modloader-panel-issues { margin: 8px 0 0; padding: 8px 8px 8px 24px; border-radius: 6px; background: rgba(255, 196, 87, .12); color: rgba(255,255,255,.92); }
 			#modloader-panel .modloader-panel-issue-error { color: var(--modloader-error-text); }
 			#modloader-panel .modloader-panel-issue-warn { color: var(--modloader-warning-text); }
-			#modloader-panel .modloader-mod-toolbar { position: sticky; top: -14px; z-index: 2; display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 8px -2px 10px; padding: 8px 2px; background: var(--modloader-panel-bg); }
-			#modloader-panel .modloader-toolbar-left { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; min-width: 0; }
+			#modloader-panel .modloader-mod-toolbar { position: sticky; top: -14px; z-index: 4; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 12px; margin: 8px -2px 10px; padding: 8px 2px; background: var(--modloader-panel-bg); }
+			#modloader-panel .modloader-toolbar-left { display: inline-flex; flex: 1 1 330px; align-items: center; gap: 4px 8px; min-width: 0; }
 			#modloader-panel .modloader-select-all-control { display: inline-flex; align-items: center; gap: 7px; flex: 0 0 auto; color: var(--modloader-control-text); font-size: 12px; cursor: pointer; user-select: none; }
 			#modloader-panel .modloader-select-all-text { transform: translateY(.5px); }
+			#modloader-panel .modloader-search-control { position: relative; display: inline-flex; flex: 1 1 220px; align-items: center; gap: 6px; min-width: 150px; max-width: 460px; }
+			#modloader-panel .modloader-search-field { position: relative; display: flex; flex: 1 1 auto; min-width: 0; }
+			#modloader-panel .modloader-search-input { box-sizing: border-box; width: 100%; min-width: 0; height: 31px; border: 1px solid var(--modloader-input-border); border-radius: 6px; padding: 6px 31px 6px 9px; background: var(--modloader-input-bg); color: var(--modloader-input-text); outline: none; appearance: none; -webkit-appearance: none; }
+			#modloader-panel .modloader-search-input:focus { border-color: var(--modloader-focus-border); box-shadow: 0 0 0 2px color-mix(in srgb, var(--modloader-focus-border) 35%, transparent); }
+			#modloader-panel .modloader-search-input::-webkit-search-cancel-button { display: none; -webkit-appearance: none; }
+			#modloader-panel .modloader-search-clear { position: absolute; right: 4px; top: 50%; width: 23px; height: 23px; border: 0; border-radius: 5px; padding: 0; background: transparent; color: var(--modloader-control-text); cursor: pointer; transform: translateY(-50%); }
+			#modloader-panel .modloader-search-clear:before, #modloader-panel .modloader-search-clear:after { content: ''; position: absolute; left: 50%; top: 50%; width: 13px; height: 1.8px; border-radius: 999px; background: currentColor; transform-origin: center; }
+			#modloader-panel .modloader-search-clear:before { transform: translate(-50%, -50%) rotate(45deg); }
+			#modloader-panel .modloader-search-clear:after { transform: translate(-50%, -50%) rotate(-45deg); }
+			#modloader-panel .modloader-search-clear:hover, #modloader-panel .modloader-search-clear:focus-visible { outline: none; background: var(--modloader-surface-hover); color: var(--modloader-control-text-hover); }
+			#modloader-panel .modloader-search-button { flex: 0 0 auto; min-width: 96px; justify-content: center; white-space: nowrap; }
+			#modloader-panel .modloader-search-button > span:last-child { white-space: nowrap; }
+			#modloader-panel .modloader-search-results { position: absolute; left: 0; right: 0; top: calc(100% + 5px); z-index: 8; display: none; max-height: min(44vh, 330px); overflow-x: hidden; overflow-y: auto; border: 1px solid var(--modloader-border-strong); border-radius: 7px; padding: 4px; background: var(--modloader-panel-bg); box-shadow: 0 12px 28px rgba(0,0,0,.38); }
+			#modloader-panel .modloader-search-results.active { display: grid; gap: 3px; }
+			#modloader-panel .modloader-search-result { display: grid; grid-template-columns: minmax(0, 1fr); gap: 2px; width: 100%; border: 0; border-radius: 5px; padding: 7px 8px; background: transparent; color: var(--modloader-control-text); text-align: left; cursor: pointer; }
+			#modloader-panel .modloader-search-result:hover, #modloader-panel .modloader-search-result:focus-visible { outline: none; background: var(--modloader-surface-hover); color: var(--modloader-control-text-hover); }
+			#modloader-panel .modloader-search-result-type { flex: 0 0 auto; color: var(--modloader-text-muted); font-size: 11px; font-weight: 600; }
+			#modloader-panel .modloader-search-result-label { min-width: 0; overflow: hidden; color: var(--modloader-text-strong); font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+			#modloader-panel .modloader-search-result-context { display: flex; align-items: baseline; gap: 5px; min-width: 0; overflow: hidden; color: var(--modloader-text-subtle); font-size: 11px; white-space: nowrap; }
+			#modloader-panel .modloader-search-result-separator { flex: 0 0 auto; color: var(--modloader-text-subtle); }
+			#modloader-panel .modloader-search-result-path { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+			#modloader-panel .modloader-search-empty { padding: 8px; color: var(--modloader-text-muted); text-align: center; }
+			#modloader-panel .modloader-search-target-highlight { animation: modloader-search-target-highlight 1.5s ease-out; }
+			@keyframes modloader-search-target-highlight { 0%, 38% { border-color: var(--modloader-focus-border); box-shadow: 0 0 0 3px color-mix(in srgb, var(--modloader-focus-border) 40%, transparent); background: var(--modloader-surface-active); } 100% { box-shadow: none; } }
 			#modloader-panel .modloader-panel-note { color: var(--modloader-text); }
 			#modloader-panel .modloader-panel-reload-note { display: none; color: var(--modloader-warning-text); }
 			#modloader-panel .modloader-panel-reload-note.active { display: inline; }
@@ -4826,6 +4876,8 @@
 			#modloader-panel .modloader-action-icon-snapshots:before, #modloader-panel .modloader-action-icon-snapshots:after { content: ''; position: absolute; box-sizing: border-box; width: 12px; height: 9px; border: 1.5px solid currentColor; border-radius: 2px; }
 			#modloader-panel .modloader-action-icon-snapshots:before { left: 1px; top: 1px; opacity: .56; }
 			#modloader-panel .modloader-action-icon-snapshots:after { left: 3px; top: 5px; background: var(--modloader-control-bg); }
+			#modloader-panel .modloader-action-icon-search:before { content: ''; position: absolute; left: 1px; top: 1px; width: 8px; height: 8px; border: 1.8px solid currentColor; border-radius: 50%; box-sizing: border-box; }
+			#modloader-panel .modloader-action-icon-search:after { content: ''; position: absolute; left: 9px; top: 9px; width: 6px; height: 1.8px; border-radius: 999px; background: currentColor; transform: rotate(45deg); transform-origin: left center; }
 			#modloader-panel .modloader-action-icon-translation:before { content: 'Aa'; position: absolute; left: 50%; top: 50%; transform: translate(-50%, -52%); font: 700 10px/1 Montserrat, Arial, sans-serif; letter-spacing: -.5px; }
 			#modloader-panel .modloader-action-icon-export:before, #modloader-panel .modloader-action-icon-import:before { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -55%); font: 700 13px/1 Montserrat, Arial, sans-serif; }
 			#modloader-panel .modloader-action-icon-export:before { content: '\\2191'; }
@@ -4927,14 +4979,25 @@
 			#modloader-panel .modloader-config-section-moving { z-index: 3; will-change: transform; }
 			#modloader-panel .modloader-config-section-dragging { z-index: 7; opacity: 1; margin-top: 0; border: 1px solid rgba(207,233,255,.34); border-radius: 7px; padding: 8px; background: rgba(16,22,28,.82); box-shadow: 0 18px 38px rgba(0,0,0,.46), 0 0 0 1px rgba(207,233,255,.12), inset 0 1px 0 rgba(255,255,255,.08); backdrop-filter: blur(14px) saturate(1.18); -webkit-backdrop-filter: blur(14px) saturate(1.18); pointer-events: none; will-change: left, top; }
 			#modloader-panel .modloader-config-section-placeholder { min-height: 20px; border: 1px solid transparent; border-radius: 6px; background: transparent; box-sizing: border-box; transition: height .16s ease, min-height .16s ease; }
+			#modloader-panel .modloader-config-section-body:empty { min-height: 24px; border: 1px dashed var(--modloader-border); border-radius: 6px; }
 			#modloader-panel .modloader-mod-config-scroll > .modloader-config-field:first-child, #modloader-panel .modloader-config-section-body .modloader-config-field:first-child { margin-top: 0; }
 			#modloader-panel .modloader-config-field { display: grid; grid-template-columns: minmax(130px, .8fr) minmax(170px, 1fr); gap: 4px 10px; align-items: center; margin-top: 6px; }
+			#modloader-panel .modloader-config-field-sortable { border-radius: 6px; cursor: grab; transition: background .14s ease, box-shadow .14s ease, opacity .14s ease; }
+			#modloader-panel .modloader-config-field-sortable .modloader-config-text { user-select: none; -webkit-user-select: none; }
+			#modloader-panel .modloader-config-field-sortable input, #modloader-panel .modloader-config-field-sortable button, #modloader-panel .modloader-config-field-sortable select, #modloader-panel .modloader-config-field-sortable textarea, #modloader-panel .modloader-config-field-sortable a, #modloader-panel .modloader-config-field-sortable [contenteditable="true"] { cursor: auto; }
+			#modloader-panel .modloader-config-item-pressing { background: var(--modloader-surface-hover); box-shadow: inset 0 0 0 1px var(--modloader-border); }
+			#modloader-panel .modloader-config-item-moving { will-change: transform; }
+			#modloader-panel .modloader-config-item-dragging { z-index: 8; box-sizing: border-box; margin-top: 0; border: 1px solid rgba(207,233,255,.34); border-radius: 7px; padding: 6px; background: rgba(16,22,28,.88); box-shadow: 0 16px 34px rgba(0,0,0,.42), 0 0 0 1px rgba(207,233,255,.12), inset 0 1px 0 rgba(255,255,255,.08); backdrop-filter: blur(14px) saturate(1.18); -webkit-backdrop-filter: blur(14px) saturate(1.18); cursor: grabbing; pointer-events: none; will-change: left, top; }
+			#modloader-panel .modloader-config-item-placeholder { min-height: 28px; margin-top: 6px; border: 1px solid transparent; border-radius: 6px; background: transparent; box-sizing: border-box; }
+			#modloader-panel .modloader-config-section-body > .modloader-config-item-placeholder:first-child, #modloader-panel .modloader-mod-config-scroll > .modloader-config-item-placeholder:first-child { margin-top: 0; }
+			#modloader-panel .modloader-config-item-standalone { margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--modloader-border); }
 			#modloader-panel .modloader-config-section-start { margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--modloader-border); }
 			#modloader-panel.modloader-panel-theme-light .modloader-config-section, #modloader-panel.modloader-panel-theme-light .modloader-config-section-start { border-top-color: var(--modloader-border); }
 			#modloader-panel.modloader-panel-theme-light .modloader-config-section-title { color: var(--modloader-text); }
 			#modloader-panel.modloader-panel-theme-light .modloader-config-section-sort { color: var(--modloader-text-subtle); }
 			#modloader-panel.modloader-panel-theme-light .modloader-config-section-sort:hover { color: var(--modloader-control-text-hover); background: var(--modloader-surface-hover); }
 			#modloader-panel.modloader-panel-theme-light .modloader-config-section-dragging { border-color: rgba(18,20,22,.16); background: rgba(250,250,247,.86); box-shadow: 0 16px 34px rgba(0,0,0,.2), 0 0 0 1px rgba(18,20,22,.08), inset 0 1px 0 rgba(255,255,255,.7); }
+			#modloader-panel.modloader-panel-theme-light .modloader-config-item-dragging { border-color: rgba(18,20,22,.16); background: rgba(250,250,247,.9); box-shadow: 0 14px 30px rgba(0,0,0,.18), 0 0 0 1px rgba(18,20,22,.08), inset 0 1px 0 rgba(255,255,255,.72); }
 			#modloader-panel .modloader-config-field-disabled { opacity: .52; }
 			#modloader-panel .modloader-config-text { min-width: 0; }
 			#modloader-panel .modloader-config-label { display: block; color: var(--modloader-text-strong); overflow-wrap: anywhere; }
@@ -4967,6 +5030,11 @@
 			#modloader-panel .modloader-config-number-reset, #modloader-panel .modloader-config-slider-reset { border: 1px solid var(--modloader-control-border); border-radius: 5px; padding: 5px 7px; background: var(--modloader-control-bg); color: var(--modloader-control-text); cursor: pointer; }
 			#modloader-panel .modloader-config-number-reset:hover:not(:disabled), #modloader-panel .modloader-config-slider-reset:hover:not(:disabled) { background: var(--modloader-control-bg-hover); border-color: var(--modloader-control-border-hover); color: var(--modloader-control-text-hover); }
 			#modloader-panel .modloader-config-number-reset:disabled, #modloader-panel .modloader-config-slider-reset:disabled { cursor: default; opacity: .45; }
+			#modloader-panel .modloader-recent-log-heading { margin: 14px 0 6px; }
+			#modloader-panel .modloader-recent-log-toggle { display: flex; align-items: center; justify-content: space-between; gap: 10px; width: 100%; border: 0; border-radius: 5px; padding: 4px 5px; background: transparent; color: var(--modloader-text); text-align: left; font-weight: 600; cursor: pointer; }
+			#modloader-panel .modloader-recent-log-toggle:hover, #modloader-panel .modloader-recent-log-toggle:focus-visible { outline: none; background: var(--modloader-surface-hover); color: var(--modloader-text-strong); }
+			#modloader-panel .modloader-recent-log-chevron { width: 7px; height: 7px; border-right: 1.8px solid currentColor; border-bottom: 1.8px solid currentColor; transform: rotate(45deg) translate(-1px, -1px); transition: transform .16s ease; }
+			#modloader-panel .modloader-recent-log-toggle[aria-expanded="true"] .modloader-recent-log-chevron { transform: rotate(225deg) translate(-1px, -1px); }
 			#modloader-panel .modloader-config-slider { display: grid; grid-template-columns: minmax(0, 1fr) 66px auto; gap: 4px 8px; align-items: center; width: 100%; min-width: 0; --modloader-slider-thumb-half: 14px; }
 			#modloader-panel .modloader-config-slider-labeled { grid-template-columns: minmax(0, 1fr) auto; }
 			#modloader-panel .modloader-config-slider-range { appearance: none; -webkit-appearance: none; width: 100%; min-width: 0; height: 32px; margin: 0; background: transparent; cursor: grab; outline: none; }
@@ -5049,6 +5117,10 @@
 			#modloader-panel .modloader-modal-button-danger { background: var(--modloader-danger-bg); color: var(--modloader-danger-text); border-color: var(--modloader-danger-border); }
 			@media (max-width: 640px) {
 				#modloader-panel .modloader-panel-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+				#modloader-panel .modloader-toolbar-left, #modloader-panel .modloader-toolbar-actions { flex: 1 1 100%; }
+				#modloader-panel .modloader-toolbar-actions { justify-content: flex-end; }
+				#modloader-panel .modloader-search-control { max-width: none; }
+				#modloader-panel .modloader-search-button { font-size: 11px; }
 				#modloader-panel .modloader-snapshot-meta { grid-template-columns: 1fr; }
 				#modloader-panel .modloader-config-field { grid-template-columns: 1fr; }
 				#modloader-panel .modloader-config-error { grid-column: auto; }
@@ -5128,7 +5200,7 @@
 	}
 	const placementProbeConfiguration = function () {
 		const values = {}
-		for (const key of ['enablePlacementShadowTraversalReuse', 'enableClearViewGridFix', 'disableClearViewGrid', 'disableClearViewBuildingClipping', 'useTweaksClearViewGridStyle',
+		for (const key of ['enablePlacementShadowTraversalReuse', 'disableClearViewGrid', 'disableClearViewBuildingClipping', 'useTweaksClearViewGridStyle',
 			'enableFloorGridLines', 'enableDynamicCamera', 'cameraPitch', 'cameraYaw', 'enableViewDistance', 'farthestZoom',
 			'enableEntitySpriteRenderCache', 'enableEntitySliceRenderCache', 'enableExperimentalEntityWebGLRecorder']) {
 			values[key] = getConfigValue('Cattail_TweaksQuality_Tweaks', key, null)
@@ -5149,7 +5221,7 @@
 			getPlacementController: () => placementProbeController, placementConfiguration: placementProbeConfiguration,
 			isMenuOpen: () => !!document.getElementById('modloader-panel') && !state.panelHidden,
 			closeMenu() { if (document.getElementById('modloader-panel')) togglePanel() },
-			metadata() { return { loaderVersion: state.version, mods: state.mods.map(mod => ({ id: mod.id, version: mod.manifest.version })), clearViewGridFix: { modLoaded: state.mods.some(mod => mod.id === 'Cattail_TweaksQuality_Tweaks'), configured: getConfigValue('Cattail_TweaksQuality_Tweaks', 'enableClearViewGridFix', true) }, renderApiEnabled: isRenderApiEnabled(), existingRenderTimingEnabled: !!state.renderTimingEnabled, resourceProfilerEnabled: !!window.cattailResourceSourceProfiler?.isEnabled?.() } },
+			metadata() { return { loaderVersion: state.version, mods: state.mods.map(mod => ({ id: mod.id, version: mod.manifest.version })), renderApiEnabled: isRenderApiEnabled(), existingRenderTimingEnabled: !!state.renderTimingEnabled, resourceProfilerEnabled: !!window.cattailResourceSourceProfiler?.isEnabled?.() } },
 			notify(message) {
 				state.clearViewProbeMessage = message
 				updateClearViewProbeControls()
@@ -6363,7 +6435,7 @@
 		})
 	}
 
-	const buildConfigSectionGroups = function (mod, schema) {
+	const buildRawConfigSectionGroups = function (mod, schema) {
 		const groups = []
 		const usedKeys = {}
 		let current = null
@@ -6375,15 +6447,91 @@
 				current = {
 					key: makeUniqueConfigSectionKey(baseKey, usedKeys),
 					sectionId,
-					label: getConfigSectionLabel(mod, item),
+					label: '',
 					items: [],
 					originalIndex: groups.length
 				}
 				groups.push(current)
 			}
+			if (!current.label) current.label = getConfigSectionLabel(mod, item)
 			current.items.push(item)
 		}
-		return applyPanelConfigSectionOrder(mod, groups)
+		return groups
+	}
+
+	const buildConfigSectionGroups = function (mod, schema) {
+		return applyPanelConfigSectionOrder(mod, buildRawConfigSectionGroups(mod, schema))
+	}
+
+	const createResolvedConfigSection = function (group) {
+		return {
+			type: 'section',
+			key: group.key,
+			sectionId: group.sectionId,
+			label: group.label,
+			items: [],
+			originalIndex: group.originalIndex
+		}
+	}
+
+	const resolvePanelConfigLayout = function (mod, schema) {
+		const rawGroups = buildRawConfigSectionGroups(mod, schema)
+		const modKey = getPanelConfigSectionOrderKey(mod)
+		const stored = state.panelConfigLayout[modKey]
+		if (!stored?.blocks?.length) {
+			return applyPanelConfigSectionOrder(mod, rawGroups).map(function (group) {
+				const resolved = createResolvedConfigSection(group)
+				resolved.items = group.items.slice()
+				return resolved
+			})
+		}
+
+		const groupByKey = new Map(rawGroups.map(function (group) { return [ group.key, group ] }))
+		const itemByKey = new Map()
+		for (const item of schema) {
+			const key = String(item?.key || '')
+			if (key && !itemByKey.has(key)) itemByKey.set(key, item)
+		}
+		const blocks = []
+		const sectionBlocks = new Map()
+		const usedItems = new Set()
+		for (const storedBlock of stored.blocks) {
+			if (storedBlock.type === 'section') {
+				const group = groupByKey.get(storedBlock.key)
+				if (!group || sectionBlocks.has(group.key)) continue
+				const block = createResolvedConfigSection(group)
+				for (const itemKey of storedBlock.items || []) {
+					const item = itemByKey.get(itemKey)
+					if (!item || usedItems.has(itemKey)) continue
+					usedItems.add(itemKey)
+					block.items.push(item)
+				}
+				sectionBlocks.set(group.key, block)
+				blocks.push(block)
+				continue
+			}
+			if (storedBlock.type !== 'item') continue
+			const itemKey = String(storedBlock.key || '')
+			const item = itemByKey.get(itemKey)
+			if (!item || usedItems.has(itemKey)) continue
+			usedItems.add(itemKey)
+			blocks.push({ type: 'item', key: itemKey, item })
+		}
+		for (const group of rawGroups) {
+			let block = sectionBlocks.get(group.key)
+			for (const item of group.items) {
+				const itemKey = String(item?.key || '')
+				if (!itemKey || usedItems.has(itemKey)) continue
+				if (!block) {
+					block = createResolvedConfigSection(group)
+					sectionBlocks.set(group.key, block)
+					blocks.push(block)
+				}
+				usedItems.add(itemKey)
+				block.items.push(item)
+			}
+		}
+		return blocks
 	}
 
 	const syncPanelConfigSectionOrderForMod = function (mod, sectionModels) {
@@ -6391,6 +6539,32 @@
 		if (!key) return
 		const order = sectionModels.map(function (section) { return section.key }).filter(Boolean)
 		if (order.length > 1) state.panelConfigSectionOrder[key] = order
+		else delete state.panelConfigSectionOrder[key]
+	}
+
+	const syncPanelConfigLayoutForMod = function (rowModel) {
+		const key = getPanelConfigSectionOrderKey(rowModel?.mod)
+		if (!key || !rowModel?.configScroll) return
+		const blocks = []
+		const sectionKeys = []
+		for (const child of Array.from(rowModel.configScroll.children)) {
+			const sectionModel = child.__modloaderConfigSectionModel
+			if (sectionModel) {
+				const items = []
+				for (const field of Array.from(sectionModel.body?.children || [])) {
+					const itemKey = String(field.__modloaderConfigItemModel?.item?.key || '')
+					if (itemKey) items.push(itemKey)
+				}
+				blocks.push({ type: 'section', key: sectionModel.key, items })
+				sectionKeys.push(sectionModel.key)
+				continue
+			}
+			const itemKey = String(child.__modloaderConfigItemModel?.item?.key || '')
+			if (itemKey) blocks.push({ type: 'item', key: itemKey })
+		}
+		if (blocks.length) state.panelConfigLayout[key] = { blocks }
+		else delete state.panelConfigLayout[key]
+		if (sectionKeys.length > 1) state.panelConfigSectionOrder[key] = sectionKeys
 		else delete state.panelConfigSectionOrder[key]
 	}
 	const formatConfigInputValue = function (value, type) {
@@ -8526,6 +8700,40 @@
 		return button
 	}
 
+	const normalizePanelSearchText = function (value) {
+		let text = String(value ?? '')
+		try { text = text.normalize('NFKC') } catch (error) {}
+		return text.trim().replace(/\s+/g, ' ').toLowerCase()
+	}
+
+	const getPanelSearchMatchRank = function (query, fields) {
+		const needle = normalizePanelSearchText(query)
+		if (!needle) return -1
+		let best = Number.MAX_SAFE_INTEGER
+		for (const field of fields || []) {
+			const haystack = normalizePanelSearchText(field)
+			if (!haystack) continue
+			if (haystack === needle) return 0
+			if (haystack.startsWith(needle)) best = Math.min(best, 1)
+			else if (haystack.includes(needle)) best = Math.min(best, 2)
+		}
+		return best === Number.MAX_SAFE_INTEGER ? -1 : best
+	}
+
+	const rankPanelSearchResults = function (query, entries, limit) {
+		const max = Math.max(0, Number(limit) || 0)
+		if (!normalizePanelSearchText(query) || !max) return []
+		return (entries || []).map(function (entry, index) {
+			return { entry, index, rank: getPanelSearchMatchRank(query, entry.fields) }
+		}).filter(function (item) {
+			return item.rank >= 0
+		}).sort(function (a, b) {
+			const aOrder = Number(typeof a.entry.order === 'function' ? a.entry.order() : a.entry.order || 0)
+			const bOrder = Number(typeof b.entry.order === 'function' ? b.entry.order() : b.entry.order || 0)
+			return a.rank - b.rank || aOrder - bOrder || a.index - b.index
+		}).slice(0, max).map(function (item) { return item.entry })
+	}
+
 	const showPanelChoice = function (panel, options) {
 		return new Promise(function (resolve) {
 			const modal = element('div', 'modloader-modal')
@@ -8992,6 +9200,49 @@
 		return true
 	}
 
+	const readPanelConfigLayout = function (source) {
+		const result = {}
+		if (!source || typeof source !== 'object' || Array.isArray(source)) return result
+		for (const modKey in source) {
+			const sourceBlocks = source[modKey]?.blocks
+			if (!Array.isArray(sourceBlocks)) continue
+			const blocks = []
+			for (const sourceBlock of sourceBlocks) {
+				if (!sourceBlock || typeof sourceBlock !== 'object') continue
+				if (sourceBlock.type === 'section') {
+					const key = String(sourceBlock.key || '')
+					if (!key) continue
+					const items = Array.isArray(sourceBlock.items)
+						? sourceBlock.items.map(function (itemKey) { return String(itemKey || '') }).filter(Boolean)
+						: []
+					blocks.push({ type: 'section', key, items })
+					continue
+				}
+				if (sourceBlock.type !== 'item') continue
+				const key = String(sourceBlock.key || '')
+				if (key) blocks.push({ type: 'item', key })
+			}
+			if (blocks.length) result[String(modKey)] = { blocks }
+		}
+		return result
+	}
+
+	const clonePanelConfigLayout = function (source) {
+		return readPanelConfigLayout(source)
+	}
+
+	const samePanelConfigLayout = function (a, b) {
+		const left = readPanelConfigLayout(a)
+		const right = readPanelConfigLayout(b)
+		const leftKeys = Object.keys(left).sort()
+		const rightKeys = Object.keys(right).sort()
+		if (!sameStringList(leftKeys, rightKeys)) return false
+		for (const key of leftKeys) {
+			if (JSON.stringify(left[key]) !== JSON.stringify(right[key])) return false
+		}
+		return true
+	}
+
 	const getPanelConfigSectionOrderKey = function (mod) {
 		return String(mod?.path || mod?.id || '')
 	}
@@ -9016,6 +9267,8 @@
 				state.panelModOrder = stored.modOrder.map(function (path) { return String(path || '') }).filter(Boolean)
 			}
 			state.panelConfigSectionOrder = readPanelConfigSectionOrder(stored.configSectionOrder)
+			state.panelConfigLayout = readPanelConfigLayout(stored.configLayout)
+			state.panelRecentLogExpanded = stored.recentLogExpanded === true
 			if (isObject(stored.settings)) {
 				if (isValidPanelTheme(stored.settings.theme)) state.panelSettings.theme = stored.settings.theme
 				if (isValidPanelHideMode(stored.settings.hideMode)) state.panelSettings.hideMode = stored.settings.hideMode
@@ -9055,6 +9308,8 @@
 				tabPositions: state.panelTabPositions,
 				modOrder: state.panelModOrder,
 				configSectionOrder: state.panelConfigSectionOrder,
+				configLayout: state.panelConfigLayout,
+				recentLogExpanded: state.panelRecentLogExpanded === true,
 				settings: state.panelSettings,
 				shortcuts: { enabled: state.shortcutSettings.enabled !== false, mods: state.shortcutSettings.mods }
 			}))
@@ -9922,8 +10177,10 @@
 		const selected = new Set(originalSelected)
 		const originalPanelModOrder = state.panelModOrder.slice()
 		const originalPanelConfigSectionOrder = clonePanelConfigSectionOrder(state.panelConfigSectionOrder)
+		const originalPanelConfigLayout = clonePanelConfigLayout(state.panelConfigLayout)
 		const rowModels = []
 		const configModels = []
+		const searchEntries = []
 
 		let panel = document.getElementById('modloader-panel')
 		if (!panel) {
@@ -10276,11 +10533,12 @@
 			panel.appendChild(summary)
 		}
 
-		panel.appendChild(element('h3', '', t('modManager')))
+		const modHeading = element('div', 'modloader-mod-heading')
+		modHeading.append(element('h3', '', t('modManager')), element('span', 'modloader-mod-heading-note', t('toggleNote')))
+		panel.appendChild(modHeading)
 		if (available.errorMessage) panel.appendChild(element('div', 'modloader-panel-error', available.errorMessage))
 
 		const toolbar = element('div', 'modloader-mod-toolbar')
-		const note = element('span', 'modloader-panel-note', t('toggleNote'))
 		const reloadNote = element('span', 'modloader-panel-reload-note', t('changesRequireReload'))
 		const configNote = element('span', 'modloader-panel-config-note', t('configSaveNote'))
 		const message = element('span', 'modloader-panel-note', '')
@@ -10292,6 +10550,8 @@
 		const insert = createPanelActionButton('plus', t('insert'), t('insert'))
 		const folder = createPanelActionButton('folder', t('folder'), t('folder'))
 		const snapshots = createPanelActionButton('snapshots', t('snapshots'), t('snapshotsOpenTitle'))
+		const searchButton = createPanelActionButton('search', t('search'), t('search'))
+		searchButton.classList.add('modloader-search-button')
 		save.disabled = true
 		cancelChanges.disabled = true
 		insert.disabled = !getModFileTools()
@@ -10304,7 +10564,25 @@
 		selectAll.setAttribute('role', 'switch')
 		selectAll.setAttribute('aria-label', t('selectAll'))
 		selectAllWrap.append(selectAll, element('span', 'modloader-select-all-text', t('selectAll')))
-		left.append(selectAllWrap, note, document.createTextNode(' '), reloadNote, document.createTextNode(' '), configNote, document.createTextNode(' '), message)
+		const searchControl = element('span', 'modloader-search-control')
+		const searchField = element('span', 'modloader-search-field')
+		const searchInput = element('input', 'modloader-search-input')
+		searchInput.type = 'search'
+		searchInput.placeholder = t('searchPlaceholder')
+		searchInput.autocomplete = 'off'
+		searchInput.spellcheck = false
+		const searchClear = element('button', 'modloader-search-clear')
+		searchClear.type = 'button'
+		searchClear.hidden = true
+		searchClear.setAttribute('aria-label', `${t('cancel')} ${t('search')}`)
+		const searchResults = element('div', 'modloader-search-results')
+		searchResults.id = 'modloader-panel-search-results'
+		searchInput.setAttribute('aria-label', t('searchPlaceholder'))
+		searchInput.setAttribute('aria-controls', searchResults.id)
+		searchInput.setAttribute('aria-expanded', 'false')
+		searchField.append(searchInput, searchClear)
+		searchControl.append(searchField, searchButton, searchResults)
+		left.append(selectAllWrap, searchControl, reloadNote, configNote, message)
 		actions.append(cancelChanges, snapshots, insert, folder, save)
 		toolbar.append(left, actions)
 		panel.appendChild(toolbar)
@@ -10429,6 +10707,107 @@
 			else expandConfigRow(rowModel)
 		}
 
+		let searchHighlightTimer = null
+		const closeSearchResults = function () {
+			searchResults.classList.remove('active')
+			searchInput.setAttribute('aria-expanded', 'false')
+		}
+		const highlightPanelSearchTarget = function (target) {
+			if (!target) return
+			for (const highlighted of panel.querySelectorAll('.modloader-search-target-highlight')) highlighted.classList.remove('modloader-search-target-highlight')
+			if (searchHighlightTimer) clearTimeout(searchHighlightTimer)
+			target.classList.remove('modloader-search-target-highlight')
+			target.getBoundingClientRect()
+			target.classList.add('modloader-search-target-highlight')
+			searchHighlightTimer = setTimeout(function () {
+				target.classList.remove('modloader-search-target-highlight')
+				searchHighlightTimer = null
+			}, 1500)
+		}
+		addCleanup(function () {
+			if (searchHighlightTimer) clearTimeout(searchHighlightTimer)
+		})
+		const jumpToPanelSearchEntry = function (entry) {
+			if (!entry?.rowModel?.container) return
+			closeSearchResults()
+			searchInput.blur()
+			const rowModel = entry.rowModel
+			const needsExpansion = rowModel.configModels.length && expandedRow !== rowModel
+			if (needsExpansion && configAnimating) {
+				setTimeout(function () { jumpToPanelSearchEntry(entry) }, 380)
+				return
+			}
+			if (needsExpansion) expandConfigRow(rowModel)
+			setTimeout(function () {
+				if (!document.body.contains(rowModel.container)) return
+				rowModel.container.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
+				const target = entry.target || rowModel.container
+				if (target !== rowModel.container) target.scrollIntoView({ block: 'center', behavior: 'smooth' })
+				highlightPanelSearchTarget(target)
+			}, needsExpansion ? 380 : 0)
+		}
+		const renderPanelSearchResults = function () {
+			const query = normalizePanelSearchText(searchInput.value)
+			searchClear.hidden = !query
+			searchResults.replaceChildren()
+			if (!query) {
+				closeSearchResults()
+				return []
+			}
+			const results = rankPanelSearchResults(query, searchEntries, 5)
+			if (!results.length) {
+				searchResults.appendChild(element('div', 'modloader-search-empty', t('searchNoResults')))
+			} else {
+				for (const entry of results) {
+					const result = element('button', 'modloader-search-result')
+					result.type = 'button'
+					const resultContext = element('span', 'modloader-search-result-context')
+					resultContext.appendChild(element('span', 'modloader-search-result-type', t(entry.type === 'mod' ? 'searchResultMod' : entry.type === 'section' ? 'searchResultSection' : 'searchResultConfig')))
+					if (entry.context) {
+						resultContext.append(element('span', 'modloader-search-result-separator', '|'), element('span', 'modloader-search-result-path', entry.context))
+					}
+					result.append(element('span', 'modloader-search-result-label', entry.label), resultContext)
+					result.onclick = function (event) {
+						event.preventDefault()
+						event.stopPropagation()
+						jumpToPanelSearchEntry(entry)
+					}
+					searchResults.appendChild(result)
+				}
+			}
+			searchResults.classList.add('active')
+			searchInput.setAttribute('aria-expanded', 'true')
+			return results
+		}
+		searchInput.addEventListener('input', renderPanelSearchResults)
+		const restorePanelSearchResults = function () {
+			if (normalizePanelSearchText(searchInput.value)) renderPanelSearchResults()
+		}
+		searchInput.addEventListener('focus', restorePanelSearchResults)
+		searchInput.addEventListener('click', restorePanelSearchResults)
+		searchInput.addEventListener('keydown', function (event) {
+			if (event.key !== 'Enter') return
+			event.preventDefault()
+			renderPanelSearchResults()
+		})
+		searchButton.onclick = function (event) {
+			event.preventDefault()
+			renderPanelSearchResults()
+			searchInput.focus()
+		}
+		searchClear.onclick = function (event) {
+			event.preventDefault()
+			event.stopPropagation()
+			searchInput.value = ''
+			renderPanelSearchResults()
+			searchInput.focus()
+		}
+		const closeSearchOnOutsidePointer = function (event) {
+			if (!searchControl.contains(event.target)) closeSearchResults()
+		}
+		document.addEventListener('pointerdown', closeSearchOnOutsidePointer, true)
+		addCleanup(function () { document.removeEventListener('pointerdown', closeSearchOnOutsidePointer, true) })
+
 		const getCurrentSelectedPaths = function () {
 			return getOrderedSelectedPaths(mods, selected, listOrderDirty)
 		}
@@ -10471,6 +10850,7 @@
 			resetConfigModels()
 			state.panelModOrder = originalPanelModOrder.slice()
 			state.panelConfigSectionOrder = clonePanelConfigSectionOrder(originalPanelConfigSectionOrder)
+			state.panelConfigLayout = clonePanelConfigLayout(originalPanelConfigLayout)
 			listOrderDirty = !sameStringList(getOrderedSelectedPaths(mods, selected, true), originalSelected)
 			state.panelMessage = t('changesCanceled')
 			savePanelState()
@@ -10682,17 +11062,15 @@
 
 		const captureConfigSectionRects = function (rowModel, draggedSection) {
 			const rects = new Map()
-			for (const sectionModel of rowModel.sectionModels || []) {
-				const section = sectionModel.container
-				if (section === draggedSection || section.parentNode !== rowModel.configScroll) continue
-				rects.set(section, section.getBoundingClientRect())
+			for (const child of Array.from(rowModel.configScroll?.children || [])) {
+				if (child === draggedSection || child.classList.contains('modloader-config-section-placeholder')) continue
+				rects.set(child, child.getBoundingClientRect())
 			}
 			return rects
 		}
 
 		const animateConfigSectionsFromRects = function (rowModel, firstRects) {
-			for (const sectionModel of rowModel.sectionModels || []) {
-				const section = sectionModel.container
+			for (const section of Array.from(rowModel.configScroll?.children || [])) {
 				const first = firstRects.get(section)
 				if (!first || section.parentNode !== rowModel.configScroll) continue
 				const last = section.getBoundingClientRect()
@@ -10714,8 +11092,8 @@
 		}
 
 		const getConfigSectionBeforeNode = function (rowModel, clientY, draggedSection, placeholder) {
-			const sections = (rowModel.sectionModels || []).map(function (sectionModel) { return sectionModel.container }).filter(function (section) {
-				return section.parentNode === rowModel.configScroll && section !== draggedSection && section !== placeholder
+			const sections = Array.from(rowModel.configScroll?.children || []).filter(function (section) {
+				return section !== draggedSection && section !== placeholder
 			})
 			for (const section of sections) {
 				const rect = section.getBoundingClientRect()
@@ -10749,13 +11127,11 @@
 			for (const child of Array.from(rowModel.configScroll.children)) {
 				if (child.__modloaderConfigSectionModel) ordered.push(child.__modloaderConfigSectionModel)
 			}
-			if (ordered.length === rowModel.sectionModels.length) {
-				rowModel.sectionModels.length = 0
-				rowModel.sectionModels.push(...ordered)
-				syncPanelConfigSectionOrderForMod(rowModel.mod, rowModel.sectionModels)
-				savePanelState()
-				refreshRows(true)
-			}
+			rowModel.sectionModels.length = 0
+			rowModel.sectionModels.push(...ordered)
+			syncPanelConfigLayoutForMod(rowModel)
+			savePanelState()
+			refreshRows(true)
 		}
 
 		const installConfigSectionSortDrag = function (rowModel, sectionModel, handle) {
@@ -10818,6 +11194,201 @@
 			}, true)
 			addCleanup(function () {
 				if (placeholder?.parentNode) finishConfigSectionSortDrag(rowModel, sectionModel, placeholder, false)
+				clearDrag()
+			})
+		}
+
+		const captureConfigItemRects = function (parent, draggedField, placeholder) {
+			const rects = new Map()
+			for (const child of Array.from(parent?.children || [])) {
+				if (child === draggedField || child === placeholder || !child.__modloaderConfigItemModel) continue
+				rects.set(child, child.getBoundingClientRect())
+			}
+			return rects
+		}
+
+		const animateConfigItemsFromRects = function (parent, firstRects) {
+			for (const child of Array.from(parent?.children || [])) {
+				const first = firstRects.get(child)
+				if (!first) continue
+				const last = child.getBoundingClientRect()
+				const dx = first.left - last.left
+				const dy = first.top - last.top
+				if (!dx && !dy) continue
+				child.classList.add('modloader-config-item-moving')
+				child.style.transition = 'none'
+				child.style.transform = `translate(${dx}px, ${dy}px)`
+				child.getBoundingClientRect()
+				child.style.transition = 'transform .18s cubic-bezier(.2, .8, .2, 1)'
+				child.style.transform = ''
+				setTimeout(function () {
+					child.classList.remove('modloader-config-item-moving')
+					child.style.transition = ''
+					child.style.transform = ''
+				}, 220)
+			}
+		}
+
+		const getConfigItemBeforeNode = function (parent, clientY, draggedField, placeholder) {
+			for (const child of Array.from(parent?.children || [])) {
+				if (child === draggedField || child === placeholder || !child.__modloaderConfigItemModel) continue
+				const rect = child.getBoundingClientRect()
+				if (clientY < rect.top + rect.height / 2) return child
+			}
+			return null
+		}
+
+		const findConfigItemDropSection = function (rowModel, clientX, clientY, originSectionModel, startedStandalone) {
+			for (const sectionModel of rowModel.sectionModels || []) {
+				if (!startedStandalone && sectionModel !== originSectionModel) continue
+				const section = sectionModel.container
+				if (section.parentNode !== rowModel.configScroll) continue
+				const rect = sectionModel.body.getBoundingClientRect()
+				if (clientX >= rect.left && clientX <= rect.right && clientY >= rect.top - 5 && clientY <= rect.bottom + 5) return sectionModel
+			}
+			return null
+		}
+
+		const updateConfigItemPlaceholder = function (parent, placeholder, beforeNode, draggedField) {
+			if (!parent || (placeholder.parentNode === parent && beforeNode === placeholder.nextSibling)) return
+			const oldParent = placeholder.parentNode
+			const oldRects = captureConfigItemRects(oldParent, draggedField, placeholder)
+			const newRects = oldParent === parent ? oldRects : captureConfigItemRects(parent, draggedField, placeholder)
+			parent.insertBefore(placeholder, beforeNode)
+			if (oldParent) animateConfigItemsFromRects(oldParent, oldRects)
+			if (parent !== oldParent) animateConfigItemsFromRects(parent, newRects)
+		}
+
+		const installConfigItemSortDrag = function (rowModel, itemModel) {
+			const field = itemModel?.container
+			if (!field) return
+			field.classList.add('modloader-config-field-sortable')
+			let holdTimer = null
+			let moveHandler = null
+			let upHandler = null
+			let cancelHandler = null
+			let placeholder = null
+			let active = false
+			let moved = false
+			let startX = 0
+			let startY = 0
+			let offsetY = 0
+			let originSectionModel = null
+			let startedStandalone = false
+			let suppressClick = false
+			const clearHold = function () {
+				if (holdTimer) clearTimeout(holdTimer)
+				holdTimer = null
+				field.classList.remove('modloader-config-item-pressing')
+			}
+			const clearDrag = function () {
+				clearHold()
+				if (moveHandler) document.removeEventListener('pointermove', moveHandler, true)
+				if (upHandler) document.removeEventListener('pointerup', upHandler, true)
+				if (cancelHandler) document.removeEventListener('pointercancel', cancelHandler, true)
+				moveHandler = null
+				upHandler = null
+				cancelHandler = null
+			}
+			const finishDrag = function (commit) {
+				if (!active) return
+				const parent = placeholder?.parentNode
+				if (parent) parent.insertBefore(field, placeholder)
+				if (placeholder?.parentNode) placeholder.remove()
+				placeholder = null
+				field.classList.remove('modloader-config-item-dragging')
+				field.classList.toggle('modloader-config-item-standalone', field.parentNode === rowModel.configScroll)
+				field.style.position = ''
+				field.style.left = ''
+				field.style.top = ''
+				field.style.width = ''
+				field.style.height = ''
+				field.style.transform = ''
+				field.style.transition = ''
+				field.removeAttribute('aria-grabbed')
+				active = false
+				suppressClick = true
+				setTimeout(function () { suppressClick = false }, 0)
+				if (!commit || !moved) return
+				syncPanelConfigLayoutForMod(rowModel)
+				savePanelState()
+				refreshRows(true)
+			}
+			field.addEventListener('click', function (event) {
+				if (!suppressClick) return
+				event.preventDefault()
+				event.stopImmediatePropagation()
+			}, true)
+			field.addEventListener('pointerdown', function (event) {
+				if (event.button !== undefined && event.button !== 0) return
+				if (configAnimating || importMode) return
+				const textTarget = event.target === field || event.target?.closest?.('.modloader-config-text')
+				if (!textTarget || !field.contains(event.target)) return
+				startX = event.clientX
+				startY = event.clientY
+				moved = false
+				active = false
+				field.classList.add('modloader-config-item-pressing')
+				const beginDrag = function () {
+					holdTimer = null
+					if (!field.isConnected || configAnimating || importMode) return
+					const rect = field.getBoundingClientRect()
+					const parent = field.parentNode
+					originSectionModel = parent?.parentNode?.__modloaderConfigSectionModel || null
+					startedStandalone = parent === rowModel.configScroll
+					offsetY = startY - rect.top
+					placeholder = element('div', 'modloader-config-item-placeholder')
+					placeholder.style.height = Math.max(28, Math.round(rect.height)) + 'px'
+					parent.insertBefore(placeholder, field)
+					field.classList.remove('modloader-config-item-pressing', 'modloader-config-item-standalone')
+					field.classList.add('modloader-config-item-dragging')
+					field.setAttribute('aria-grabbed', 'true')
+					field.style.position = 'fixed'
+					const style = window.getComputedStyle(field)
+					const frame = parseFloat(style.paddingLeft) + parseFloat(style.paddingRight) + parseFloat(style.borderLeftWidth) + parseFloat(style.borderRightWidth)
+					field.style.left = Math.round(rect.left) + 'px'
+					field.style.top = Math.round(rect.top) + 'px'
+					field.style.width = Math.max(0, Math.round(rect.width - frame)) + 'px'
+					panel.appendChild(field)
+					active = true
+				}
+				holdTimer = setTimeout(beginDrag, 300)
+				moveHandler = function (moveEvent) {
+					const dx = moveEvent.clientX - startX
+					const dy = moveEvent.clientY - startY
+					if (!active) {
+						if (Math.abs(dx) + Math.abs(dy) > 5) clearHold()
+						return
+					}
+					moveEvent.preventDefault()
+					if (Math.abs(dx) + Math.abs(dy) > 3) moved = true
+					field.style.top = Math.round(moveEvent.clientY - offsetY) + 'px'
+					const scrollRect = rowModel.configScroll.getBoundingClientRect()
+					if (moveEvent.clientY < scrollRect.top + 24) rowModel.configScroll.scrollTop -= 10
+					else if (moveEvent.clientY > scrollRect.bottom - 24) rowModel.configScroll.scrollTop += 10
+					const dropSection = findConfigItemDropSection(rowModel, moveEvent.clientX, moveEvent.clientY, originSectionModel, startedStandalone)
+					if (dropSection) {
+						updateConfigItemPlaceholder(dropSection.body, placeholder, getConfigItemBeforeNode(dropSection.body, moveEvent.clientY, field, placeholder), field)
+						return
+					}
+					updateConfigItemPlaceholder(rowModel.configScroll, placeholder, getConfigSectionBeforeNode(rowModel, moveEvent.clientY, field, placeholder), field)
+				}
+				upHandler = function () {
+					clearHold()
+					if (active) finishDrag(true)
+					clearDrag()
+				}
+				cancelHandler = function () {
+					clearHold()
+					if (active) finishDrag(false)
+					clearDrag()
+				}
+				document.addEventListener('pointermove', moveHandler, true)
+				document.addEventListener('pointerup', upHandler, true)
+				document.addEventListener('pointercancel', cancelHandler, true)
+			}, true)
+			addCleanup(function () {
+				if (active) finishDrag(false)
 				clearDrag()
 			})
 		}
@@ -10984,7 +11555,8 @@
 			const enabledDirty = !sameStringList(orderedSelected, originalSelected)
 			const modOrderDirty = !sameStringList(state.panelModOrder, originalPanelModOrder)
 			const sectionOrderDirty = state.panelSettings.sortConfigSections !== false && !samePanelConfigSectionOrder(state.panelConfigSectionOrder, originalPanelConfigSectionOrder)
-			const orderDirty = modOrderDirty || sectionOrderDirty
+			const configLayoutDirty = state.panelSettings.sortConfigSections !== false && !samePanelConfigLayout(state.panelConfigLayout, originalPanelConfigLayout)
+			const orderDirty = modOrderDirty || sectionOrderDirty || configLayoutDirty
 			const reloadDirty = enabledDirty || configReloadDirty
 			reloadNote.classList.toggle('active', reloadDirty)
 			configNote.classList.toggle('active', configDirty && !configReloadDirty)
@@ -11093,6 +11665,8 @@
 					model = {
 						mod,
 						item,
+						label: localizedConfigLabel || item.key,
+						description: localizedConfigDescription,
 						input: fieldHandle.input,
 						fieldHandle,
 						container: field,
@@ -11110,6 +11684,7 @@
 						rowConfigModels.push(model)
 						configModels.push(model)
 					}
+					field.__modloaderConfigItemModel = model
 					return field
 				}
 				if (state.panelSettings.sortConfigSections === false) {
@@ -11121,11 +11696,16 @@
 						previousConfigSection = configSection || ''
 					}
 				} else {
-					const configGroups = buildConfigSectionGroups(mod, modConfig.schema)
-					const canSortConfigSections = configGroups.length > 1
-					for (const group of configGroups) {
+					const configLayout = resolvePanelConfigLayout(mod, modConfig.schema)
+					const canSortConfigSections = configLayout.length > 1
+					for (const group of configLayout) {
+						if (group.type === 'item') {
+							const field = createConfigField(group.item, configScroll)
+							field.classList.add('modloader-config-item-standalone')
+							continue
+						}
 						const section = element('div', 'modloader-config-section')
-						const sectionModel = { mod, key: group.key, container: section, handle: null }
+						const sectionModel = { mod, key: group.key, label: group.label || '', container: section, body: null, handle: null }
 						section.__modloaderConfigSectionModel = sectionModel
 						if (group.label) {
 							const sectionHeader = element('div', 'modloader-config-section-header')
@@ -11148,6 +11728,7 @@
 							section.appendChild(sectionSort)
 						}
 						const sectionBody = element('div', 'modloader-config-section-body')
+						sectionModel.body = sectionBody
 						for (const item of group.items) createConfigField(item, sectionBody)
 						section.appendChild(sectionBody)
 						configScroll.appendChild(section)
@@ -11188,11 +11769,14 @@
 			const index = element('span', 'modloader-mod-index', String(modOrdinal))
 			const rowActions = element('div', 'modloader-mod-actions')
 			rowActions.append(deleteButton, sortButton, index)
-			const rowModel = { mod, checkbox, container: row, warning, configModels: rowConfigModels, sectionModels: rowSectionModels, configScroll, index }
+			const rowModel = { mod, localizedName: localizedModName, checkbox, container: row, warning, configModels: rowConfigModels, sectionModels: rowSectionModels, configScroll, index }
 			row.__modloaderRowModel = rowModel
 			for (const sectionModel of rowSectionModels) {
 				sectionModel.rowModel = rowModel
 				installConfigSectionSortDrag(rowModel, sectionModel, sectionModel.handle)
+			}
+			if (state.panelSettings.sortConfigSections !== false) {
+				for (const itemModel of rowConfigModels) installConfigItemSortDrag(rowModel, itemModel)
 			}
 			installSortDrag(rowModel, sortButton)
 			row.onclick = function (event) {
@@ -11202,6 +11786,65 @@
 			row.append(checkbox, main, rowActions)
 			list.appendChild(row)
 			rowModels.push(rowModel)
+			const getLiveSearchOrder = function (target) {
+				return function () {
+					const rowIndex = Math.max(0, rowModels.indexOf(rowModel))
+					if (!target || target === row) return rowIndex * 10000
+					const targets = Array.from(row.querySelectorAll('.modloader-config-section, .modloader-config-field'))
+					return rowIndex * 10000 + Math.max(1, targets.indexOf(target) + 1)
+				}
+			}
+
+			const modContext = localizedModName !== mod.path ? mod.path : (mod.id && mod.id !== localizedModName ? mod.id : '')
+			searchEntries.push({
+				type: 'mod',
+				label: localizedModName,
+				context: modContext,
+				fields: [ localizedModName, mod.path, mod.id ],
+				order: getLiveSearchOrder(row),
+				rowModel,
+				target: row
+			})
+			const sectionTargets = new Map()
+			for (const sectionModel of rowSectionModels) {
+				if (!sectionModel.label || sectionTargets.has(sectionModel.key)) continue
+				sectionTargets.set(sectionModel.key, { label: sectionModel.label, target: sectionModel.container })
+			}
+			if (!rowSectionModels.length) {
+				for (const model of rowConfigModels) {
+					const sectionLabel = getConfigSectionLabel(mod, model.item)
+					const sectionKey = getConfigSectionId(model.item) || sectionLabel
+					if (!sectionLabel || sectionTargets.has(sectionKey)) continue
+					sectionTargets.set(sectionKey, { label: sectionLabel, target: model.container })
+				}
+			}
+			for (const sectionTarget of sectionTargets.values()) {
+				const sectionLabel = sectionTarget.label
+				const target = sectionTarget.target
+				searchEntries.push({
+					type: 'section',
+					label: sectionLabel,
+					context: localizedModName,
+					fields: [ sectionLabel ],
+					order: getLiveSearchOrder(target),
+					rowModel,
+					target
+				})
+			}
+			for (const model of rowConfigModels) {
+				const displayedSection = state.panelSettings.sortConfigSections === false
+					? getConfigSectionLabel(mod, model.item)
+					: model.container.closest('.modloader-config-section')?.querySelector('.modloader-config-section-title')?.textContent || ''
+				searchEntries.push({
+					type: 'config',
+					label: model.label,
+					context: [ localizedModName, displayedSection ].filter(Boolean).join(' \u2192 '),
+					fields: [ model.label, model.description, model.item.key ],
+					order: getLiveSearchOrder(model.container),
+					rowModel,
+					target: model.container
+				})
+			}
 		}
 
 		if (!mods.length) list.appendChild(element('div', 'modloader-panel-note', t('noModsFound')))
@@ -11268,6 +11911,13 @@
 					return
 				}
 				if (!event.repeat) panelEscapeHandledUntilKeyup = false
+				if (!state.panelHidden && searchResults.classList.contains('active')) {
+					panelEscapeHandledUntilKeyup = true
+					consumePanelEscapeEvent(event)
+					closeSearchResults()
+					searchInput.blur()
+					return
+				}
 				const escapeAction = getPanelEscapeAction({
 					hidden: state.panelHidden,
 					blocked: panel.classList.contains('modloader-panel-modal-open') || !!document.querySelector('.modloader-select-menu'),
@@ -11326,11 +11976,31 @@
 			}
 		}
 
-		panel.appendChild(element('h3', '', t('recentLog')))
 		const lines = state.log.slice(-12).map(function (entry) {
 			return `${entry.level}: ${entry.args.map(function (arg) { return arg instanceof Error ? arg.message : String(arg) }).join(' ')}`
 		})
-		panel.appendChild(element('pre', 'modloader-panel-log', lines.join('\n') || t('noLogEntries')))
+		const recentLogHeading = element('h3', 'modloader-recent-log-heading')
+		const recentLogToggle = element('button', 'modloader-recent-log-toggle')
+		recentLogToggle.type = 'button'
+		const recentLog = element('pre', 'modloader-panel-log', lines.join('\n') || t('noLogEntries'))
+		recentLog.id = 'modloader-panel-recent-log'
+		const syncRecentLogState = function () {
+			const expanded = state.panelRecentLogExpanded === true
+			recentLog.hidden = !expanded
+			recentLogToggle.setAttribute('aria-expanded', expanded ? 'true' : 'false')
+			recentLogToggle.setAttribute('aria-label', t(expanded ? 'recentLogCollapse' : 'recentLogExpand'))
+			setPanelTooltipText(recentLogToggle, t(expanded ? 'recentLogCollapse' : 'recentLogExpand'))
+		}
+		recentLogToggle.setAttribute('aria-controls', recentLog.id)
+		recentLogToggle.append(element('span', '', t('recentLog')), element('span', 'modloader-recent-log-chevron'))
+		recentLogToggle.onclick = function () {
+			state.panelRecentLogExpanded = !state.panelRecentLogExpanded
+			syncRecentLogState()
+			savePanelState()
+		}
+		recentLogHeading.appendChild(recentLogToggle)
+		panel.append(recentLogHeading, recentLog)
+		syncRecentLogState()
 
 		refreshRows()
 		if (state.panelMessage) {
@@ -12193,9 +12863,9 @@
 				if (context?.version !== '1.3' || context?.isMobile) throw new Error('ModLoader requires the desktop game 1.3.')
 				state.game = context
 				await api.boot()
-				// This fixed Tweaks entry must detach the working save before native loading.
-				const tweaks = state.modById['Cattail_TweaksQuality_Tweaks']
-				if (tweaks?.path === 'Cattail_TweaksQuality_Tweaks' && getModEntryFiles(tweaks.manifest).includes('scripts/auto-save-stutter-fix.js')) await loadScript(tweaks.basePath + 'scripts/auto-save-stutter-fix.js')
+				// This fixed Better UIs entry selects the save policy before native loading.
+				const better = state.modById['Cattail_TweaksQuality_Better-UIs']
+				if (better?.path === 'Cattail_TweaksQuality_Better-UIs' && getModEntryFiles(better.manifest).includes('scripts/independent-auto-save.js')) await loadScript(better.basePath + 'scripts/independent-auto-save.js')
 			}
 			if (name === 'beforeVanillaScripts') await api.boot()
 			if (name === 'afterVanillaScripts') {

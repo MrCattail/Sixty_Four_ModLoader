@@ -5,7 +5,7 @@
 // the Game constructor, player profile, saves and Steam are never used.
 const fs = require('node:fs'), path = require('node:path'), assert = require('node:assert/strict')
 const MOD = 'Cattail_TweaksQuality_Tweaks'
-const ENTRIES = ['scripts/clear-view-grid-fix.js', 'scripts/floor-grid-lines.js', 'scripts/placement-shadow.js', 'scripts/clear-view-options.js', 'scripts/dynamic-camera.js']
+const ENTRIES = ['scripts/floor-grid-lines.js', 'scripts/placement-shadow.js', 'scripts/clear-view-options.js', 'scripts/dynamic-camera.js']
 if (!process.versions.electron) {
   assert.ok(process.argv.includes('--run'), 'Supply --run and --lab ABSOLUTE_NEW_DIRECTORY.')
   const flag = process.argv.indexOf('--lab'); assert.ok(flag >= 0 && path.isAbsolute(process.argv[flag + 1] || ''))

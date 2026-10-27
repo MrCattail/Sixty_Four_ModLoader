@@ -16,7 +16,7 @@ const ROOT = path.resolve(__dirname, '../../..')
 const RUNTIME = path.resolve(ROOT, '../../..')
 const MOD = 'Cattail_TweaksQuality_Tweaks'
 const KEYS = ['disableClearViewGrid', 'disableClearViewBuildingClipping', 'useTweaksClearViewGridStyle']
-const entries = ['scripts/clear-view-grid-fix.js', 'scripts/floor-grid-lines.js', 'scripts/clear-view-options.js', 'scripts/dynamic-camera.js']
+const entries = ['scripts/floor-grid-lines.js', 'scripts/clear-view-options.js', 'scripts/dynamic-camera.js']
 const manifest = JSON.parse(fs.readFileSync(path.join(ROOT, 'mods', MOD, 'mod.json'), 'utf8'))
 const output = fs.mkdtempSync(path.join(os.tmpdir(), 'tweaks-clear-view-options-'))
 
@@ -97,7 +97,7 @@ function fixture() {
 		await ModLoader.boot()
 		const api = ModLoader.forMod('Cattail_TweaksQuality_Tweaks'), query = new URLSearchParams(location.search)
 		api.config.set('enableFloorGridLines', false); api.config.set('enableDynamicCamera', false)
-		if (query.has('nofix')) api.config.set('enableClearViewGridFix', false)
+
 		if (query.has('startup')) for (const key of ['disableClearViewGrid', 'disableClearViewBuildingClipping', 'useTweaksClearViewGridStyle']) api.config.set(key, true)
 		if (query.has('old')) game.version = '1.2.1'
 		if (query.has('mobile')) game.isMobile = true
@@ -158,7 +158,7 @@ app.on('window-all-closed',()=>app.quit());`)
 	const check = async (name, fn) => { await fn(); results.push(name); console.log('PASS ' + name) }
 	try {
 		await ready()
-		await check('all-off preserves native strokes and fills; existing butt fix stays active', async () => {
+		await check('all-off preserves current native strokes and fills without the retired grid fix', async () => {
 			const result = await page.evaluate(() => {
 				clearOptions(); game.itemInHand = { name: 'candidate' }
 				return gridSample()
@@ -181,24 +181,32 @@ app.on('window-all-closed',()=>app.quit());`)
 				else { assert.ok(row.strokes.length > 0); assert.ok(row.strokes.every(v => v.color === (row.style ? '#cbc3e5' : row.nativeColor)), JSON.stringify(row)) }
 			}
 		})
-		await check('remove only outer diamond; real Canvas pixels retain internal masks and dt/order', async () => {
+		await check('off delegates to the current native renderer; enabled path retains internal masks and dt/order', async () => {
 			const rows = await page.evaluate(() => {
 				clearOptions(); ModLoader.render.setEnabled(false); const rows = []
 				for (const off of [false, true]) {
-					setOption('disableClearViewBuildingClipping', off); logs.length = 0; renderCalls.length = 0
-					mainContext.clearRect(0, 0, 480, 270); mainContext.save(); mainContext.translate(game.w2, game.h2)
-					try { game.renderEntitiesAbstract(37) } finally { mainContext.restore() }
-					const xy = game.uvToXYUntranslated([2, 0])
-					const pixel = (x, y) => Array.from(mainContext.getImageData(Math.round(x), Math.round(y), 1, 1).data)
-					rows.push({ off, calls: [...renderCalls], clips: logs.filter(v => v.method === 'clip').length,
-						top: pixel(game.w2, game.h2 - 40), masked: pixel(xy[0], xy[1] - 40), outsideMask: pixel(xy[0] + 20, xy[1] - 40) })
+					setOption('disableClearViewBuildingClipping', off)
+					const sample = draw => {
+						logs.length = 0; renderCalls.length = 0
+						mainContext.clearRect(0, 0, 480, 270); mainContext.save(); mainContext.translate(game.w2, game.h2)
+						try { draw() } finally { mainContext.restore() }
+						const xy = game.uvToXYUntranslated([2, 0])
+						const pixel = (x, y) => Array.from(mainContext.getImageData(Math.round(x), Math.round(y), 1, 1).data)
+						return { calls: [...renderCalls], clips: logs.filter(v => v.method === 'clip').length, image: game.canvas.toDataURL(),
+							top: pixel(game.w2, game.h2 - 40), masked: pixel(xy[0], xy[1] - 40), outsideMask: pixel(xy[0] + 20, xy[1] - 40) }
+					}
+					rows.push({ off, native: sample(() => nativeAbstract.call(game, 37)), current: sample(() => game.renderEntitiesAbstract(37)) })
 				}
 				return rows
 			})
-			assert.equal(rows[0].clips, 3); assert.equal(rows[1].clips, 1)
-			for (const row of rows) assert.deepEqual(row.calls, [['building', 37], ['masked', 37]])
-			assert.equal(rows[0].top[3], 0); assert.deepEqual(rows[1].top, [255, 0, 0, 255])
-			assert.deepEqual(rows[1].masked, [0, 255, 0, 255]); assert.equal(rows[1].outsideMask[3], 0)
+			// Current native 1.3.0.1 uses reverse drawing and a white fill instead
+			// of the old diamond clip. Keep its all-off output as the baseline.
+			assert.deepEqual(rows[0].current, rows[0].native)
+			assert.deepEqual(rows[0].native.calls, [['conductor', 37], ['masked', 37], ['building', 37]])
+			const enabled = rows[1].current
+			assert.equal(enabled.clips, 1); assert.deepEqual(enabled.calls, [['building', 37], ['masked', 37]])
+			assert.deepEqual(enabled.top, [255, 0, 0, 255])
+			assert.deepEqual(enabled.masked, [0, 255, 0, 255]); assert.equal(enabled.outsideMask[3], 0)
 			fs.writeFileSync(path.join(output, 'unclipped-canvas.png'), Buffer.from(await page.evaluate(() => game.canvas.toDataURL().split(',')[1]), 'base64'))
 		})
 		await check('native trigger expression covers Alt, erase, relocate, Q/store placement and ordinary view', async () => {
@@ -232,7 +240,7 @@ app.on('window-all-closed',()=>app.quit());`)
 				if (row.layers && row.floor) assert.ok(strokes.every(v => v.name === 'background'))
 			}
 		})
-		await check('custom abstract-method routing is respected; hot off restores clipping', async () => {
+		await check('custom abstract-method routing is respected; hot off restores current native rendering', async () => {
 			const rows = await page.evaluate(() => {
 				clearOptions(); ModLoader.render.setEnabled(true); const rows = []
 				const api = ModLoader.forMod('Cattail_TweaksQuality_Tweaks'), dispose = api.render.routeMethod('renderEntitiesAbstract', 'buildings')
@@ -246,8 +254,10 @@ app.on('window-all-closed',()=>app.quit());`)
 				dispose(); return rows
 			})
 			assert.equal(rows[0].clips, 1); assert.deepEqual(rows[0].top, [255, 0, 0, 255])
-			assert.equal(rows[1].clips, 3); assert.equal(rows[1].top[3], 0)
-			for (const row of rows) { assert.ok(row.sameContext); assert.deepEqual(row.calls, [['building', 16], ['masked', 16]]) }
+			assert.equal(rows[1].clips, 1); assert.deepEqual(rows[1].top, [255, 255, 255, 255])
+			assert.deepEqual(rows[0].calls, [['building', 16], ['masked', 16]])
+			assert.deepEqual(rows[1].calls, [['conductor', 16], ['masked', 16], ['building', 16]])
+			for (const row of rows) assert.ok(row.sameContext)
 		})
 		await check('shared color previews, void fallback, density limit and dynamic camera combinations', async () => {
 			const rows = await page.evaluate(() => {
@@ -291,10 +301,10 @@ app.on('window-all-closed',()=>app.quit());`)
 			assert.equal(await page.evaluate(async () => { const before = Game.prototype.renderGrid; await ModLoader.stage('afterVanillaScripts', game); return before === Game.prototype.renderGrid }), true)
 			assert.ok((await page.evaluate(() => { clearOptions(); return gridSample() })).strokes.length > 0)
 		})
-		await reset('?nofix')
-		await check('all-off cold startup keeps exact native diagnostic baseline; no-fix style still uses butt', async () => {
+		await reset()
+		await check('all-off cold startup keeps exact native diagnostic baseline; native and Tweaks style use butt', async () => {
 			assert.equal(await page.evaluate(() => testNativeGrid() === nativeGrid), true)
-			assert.ok((await page.evaluate(() => gridSample())).strokes.every(v => v.cap === 'round'))
+			assert.ok((await page.evaluate(() => gridSample())).strokes.every(v => v.cap === 'butt'))
 			assert.ok((await page.evaluate(() => { setOption('useTweaksClearViewGridStyle', true); return gridSample() })).strokes.every(v => v.cap === 'butt'))
 		})
 		await check('exceptions retain error identity and restore stroke property and entity Canvas state', async () => {
@@ -327,7 +337,7 @@ app.on('window-all-closed',()=>app.quit());`)
 			await reset(query)
 			await check('unsupported target delegates without clipping/grid overrides ' + query, async () => {
 				assert.ok((await page.evaluate(() => gridSample())).strokes.length > 0)
-				assert.equal(await page.evaluate(() => { ModLoader.render.setEnabled(false); logs.length = 0; game.renderEntitiesAbstract(6); return logs.filter(v => v.method === 'clip').length }), 3)
+				assert.equal(await page.evaluate(() => { ModLoader.render.setEnabled(false); logs.length = 0; game.renderEntitiesAbstract(6); return logs.filter(v => v.method === 'clip').length }), 1)
 			})
 		}
 		await check('disabling Tweaks removes all consumers and patches', async () => {

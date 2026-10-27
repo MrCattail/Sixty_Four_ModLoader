@@ -1,7 +1,7 @@
 'use strict'
 // Actual candidate main/index/SDK/IndexedDB; explicit isolated runtime only.
 const fs=require('fs'),path=require('path'),assert=require('assert/strict'),cp=require('child_process'),crypto=require('crypto')
-const MOD='Cattail_TweaksQuality_Tweaks',OWNER='startup-synthetic-owner'
+const MOD='Cattail_TweaksQuality_Better-UIs',OWNER='startup-synthetic-owner'
 const sha=x=>crypto.createHash('sha256').update(typeof x==='string'?x:JSON.stringify(x)).digest('hex')
 async function run(){
  const arg=n=>{const i=process.argv.indexOf(n);assert(i>=0&&process.argv[i+1],'Explicit '+n+' required');return path.resolve(process.argv[i+1])}
@@ -28,7 +28,7 @@ async function run(){
  fs.writeFileSync(path.join(appDir,'game/fixture-startup.js'),seed)
  const index=path.join(appDir,'game/index.html');fs.writeFileSync(index,fs.readFileSync(index,'utf8').replace('</head>','<script src="fixture-startup.js"></script></head>'))
  const pw=require('module').createRequire(path.join(process.env.USERPROFILE,'.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/_test.cjs'))('playwright')
- const report={status:'running',checks:[],cases:[],lab,source:root,runtime,network:'blocked; fake Steam/TrackJS; synthetic data only'}
+ const report={status:'running',checks:[],cases:[],lifecycle:[],lab,source:root,runtime,network:'blocked; fake Steam/TrackJS; synthetic data only'}
  let electron,page,stage='',profile,cloudFile,writeFile
  const check=(name,ok)=>{assert(ok,name);report.checks.push({name,ok:true})}
  const cloud=()=>JSON.parse(fs.readFileSync(cloudFile))
@@ -42,23 +42,32 @@ async function run(){
  })
  async function close(){
   if(!electron)return
-  const instance=electron;electron=null;const pid=await instance.evaluate(()=>process.pid).catch(()=>instance.process().pid)
+  const instance=electron,child=instance.process();electron=null;const pid=await instance.evaluate(()=>process.pid).catch(()=>child.pid)
   await instance.evaluate(({app,session})=>{session.defaultSession.flushStorageData();setTimeout(()=>app.quit(),200)}).catch(()=>{})
   await Promise.race([instance.waitForEvent('close',{timeout:3500}).catch(()=>{}),new Promise(r=>setTimeout(r,3500))])
   const command="@(Get-CimInstance Win32_Process -Filter \"ProcessId="+pid+"\" | Where-Object { $_.ExecutablePath -eq '"+exe.replace(/'/g,"''")+"' }).Count"
   const found=cp.spawnSync('powershell.exe',['-NoProfile','-Command',command],{encoding:'utf8',windowsHide:true})
-  if(Number(found.stdout.trim())===1)cp.spawnSync('taskkill.exe',['/PID',String(pid),'/T','/F'],{windowsHide:true})
+  const forced=Number(found.stdout.trim())===1
+  if(forced)cp.spawnSync('taskkill.exe',['/PID',String(pid),'/T','/F'],{windowsHide:true})
   await Promise.race([instance.close().catch(()=>{}),new Promise(r=>setTimeout(r,1000))])
+  const errorFile=path.join(lab,stage+'-main-errors.json'),mainErrors=fs.existsSync(errorFile)?JSON.parse(fs.readFileSync(errorFile)):[]
+  const exitCode=child.exitCode
+  report.lifecycle.push({stage,forced,exitCode,mainErrors})
+  if(forced||exitCode!==0||mainErrors.length){
+   report.status='failed';report.error={stage,message:'Runtime close failed: '+JSON.stringify(report.lifecycle.at(-1))}
+   fs.writeFileSync(path.join(lab,'result.json'),JSON.stringify(report,null,2));throw new Error(report.error.message)
+  }
+
  }
  async function launch(name,api,errorCode){
   await close();stage=name
   const env={...process.env}
   for(const k of Object.keys(env))if(['appdata','localappdata','temp','tmp','electron_run_as_node','node_options','psmodulepath'].includes(k.toLowerCase()))delete env[k]
   for(const [k,v]of[['APPDATA','appData'],['LOCALAPPDATA','localAppData'],['TEMP','temp'],['TMP','temp']]){env[k]=path.join(profile,v);fs.mkdirSync(env[k],{recursive:true})}
-  Object.assign(env,{SF41_PROFILE:profile,SF41_CLOUD:cloudFile,SF41_WRITES:writeFile,SF41_STAGE:name,SF41_API:String(+api)})
+  Object.assign(env,{SF41_PROFILE:profile,SF41_CLOUD:cloudFile,SF41_WRITES:writeFile,SF41_STAGE:name,SF41_API:String(+api),SF41_MAIN_FAULT:String(+process.argv.includes('--main-fault'))})
   electron=await pw._electron.launch({executablePath:exe,cwd:appDir,env,timeout:20000});page=await electron.firstWindow({timeout:15000})
   await page.waitForFunction(()=>window.fixtureStartup?.ready||window.fixtureStartup?.error,{},{timeout:20000})
-  const state=await page.evaluate(()=>fixtureStartup);report.cases.push({name,state,pid:electron.process().pid,runtime:await page.evaluate(()=>({policy:!!DEBUG?.[Symbol.for('cattail.tweaks.save-policy')],slot:DEBUG?.currentSlotId,resource:DEBUG?.resources?.[0],config:ModLoader.forMod('Cattail_TweaksQuality_Tweaks').config.get('enableAutoSaveStutterFix')}))})
+  const state=await page.evaluate(()=>fixtureStartup);report.cases.push({name,state,pid:electron.process().pid,runtime:await page.evaluate(()=>({policy:!!DEBUG?.[Symbol.for('cattail.tweaks.save-policy')],slot:DEBUG?.currentSlotId,resource:DEBUG?.resources?.[0],config:ModLoader.forMod('Cattail_TweaksQuality_Better-UIs').config.get('enableIndependentAutoSave')}))})
   check(name+' actual local SDK initialized',await page.evaluate(()=>require('@playsaurus-inc/sdk').isInitialized===true))
   if(errorCode)check(name+' controlled rejection',state.error?.code===errorCode&&!state.ready&&state.frames===0)
   else{
@@ -80,15 +89,17 @@ async function run(){
    check(group+' manual protected history survives',await page.evaluate(x=>JSON.stringify(DEBUG.saveSlots[0].stack)===x,JSON.stringify(manual.stack)))
    check(group+' independent auto and early preserved prefs',await page.evaluate(()=>DEBUG.currentSlotId===20&&DEBUG[Symbol.for('cattail.tweaks.save-policy')].sourceIndex()===0&&fixtureStartup.earlyPrefs.fixtureSentinel.keep))
    await page.evaluate(async()=>{DEBUG.resources[0]=777;await DEBUG.saveGame();await DEBUG[Symbol.for('cattail.tweaks.save-policy')].flush()})
-   check(group+' delta save preserves original baseline',cloud().charpsMemory===JSON.stringify([manual])&&!!cloud()['cattail-save-policy-v2.json'])
+   check(group+' periodic save stays local without a cloud overlay',cloud().charpsMemory===JSON.stringify([manual])&&!cloud()['cattail-save-policy-v2.json'])
    await launch(group+'-cold-resume',api)
    check(group+' full restart resumes latest auto',await page.evaluate(()=>DEBUG.resources[0]===777&&DEBUG.currentSlotId===20&&DEBUG[Symbol.for('cattail.tweaks.save-policy')].sourceIndex()===0))
-   await page.evaluate(id=>ModLoader.forMod(id).config.set('enableAutoSaveStutterFix',false),MOD)
+   await page.evaluate(()=>DEBUG[Symbol.for('cattail.tweaks.save-policy')].submitCloud())
+   check(group+' explicit checkpoint preserves native baseline and publishes the overlay',cloud().charpsMemory===JSON.stringify([manual])&&!!cloud()['cattail-save-policy-v2.json'])
+   await page.evaluate(id=>ModLoader.forMod(id).config.set('enableIndependentAutoSave',false),MOD)
    await launch(group+'-disabled',api)
    check(group+' disabled policy still reads overlay',await page.evaluate(()=>!DEBUG[Symbol.for('cattail.tweaks.save-policy')]&&DEBUG.resources[0]===777))
    check(group+' native invoke full save succeeds',await page.evaluate(()=>DEBUG.spaceport.invoke('store',DEBUG.saveSlots))===true)
    check(group+' native baseline is a slot array',Array.isArray(JSON.parse(cloud().charpsMemory)))
-   await page.evaluate(id=>ModLoader.forMod(id).config.set('enableAutoSaveStutterFix',true),MOD)
+   await page.evaluate(id=>ModLoader.forMod(id).config.set('enableIndependentAutoSave',true),MOD)
    await launch(group+'-reenabled',api)
    check(group+' reenable supersedes stale overlay safely',await page.evaluate(()=>!!DEBUG[Symbol.for('cattail.tweaks.save-policy')]&&DEBUG.resources[0]===777))
    if(api){
@@ -111,6 +122,16 @@ async function run(){
 }
 function bootstrap(){
  const electron=require('electron'),{app,BrowserWindow:Original}=electron,Module=require('module'),{lab}=JSON.parse(fs.readFileSync(path.join(__dirname,'fixture-config.json')))
+ const mainErrors=[];let fatalScheduled=false
+ const failMain=(kind,error)=>{
+  mainErrors.push({kind,message:String(error?.message||error),stack:error?.stack||''})
+  fs.writeFileSync(path.join(lab,process.env.SF41_STAGE+'-main-errors.json'),JSON.stringify(mainErrors,null,2))
+  if(!fatalScheduled){fatalScheduled=true;setImmediate(()=>app.exit(1))}
+ }
+ process.on('uncaughtException',error=>failMain('uncaughtException',error))
+ process.on('unhandledRejection',error=>failMain('unhandledRejection',error))
+ electron.dialog.showErrorBox=(title,message)=>failMain('error-dialog',new Error(title+': '+message))
+ if(process.env.SF41_MAIN_FAULT==='1'){setImmediate(()=>{throw new Error('Synthetic main-process failure')});return}
  const profile=path.resolve(process.env.SF41_PROFILE),cloudFile=path.resolve(process.env.SF41_CLOUD),writeFile=path.resolve(process.env.SF41_WRITES)
  assert(profile.toLowerCase().startsWith(path.resolve(lab).toLowerCase()+path.sep))
  for(const n of ['appData','userData','sessionData','temp','logs','crashDumps']){const d=path.join(profile,n);fs.mkdirSync(d,{recursive:true});app.setPath(n,d)}

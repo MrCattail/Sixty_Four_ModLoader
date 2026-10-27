@@ -4,7 +4,7 @@
 	const rendererKey = '__cattailChasmLineRenderer'
 	const rendererFailedKey = '__cattailChasmLineRendererFailed'
 	const enableConfigKey = 'enableChasmLineRenderer'
-	const modeConfigKey = 'chasmLineRendererMode'
+	const legacyModeConfigKey = 'chasmLineRendererMode'
 	const ignoreDistanceConfigKey = 'enableChasmLineDistanceOverride'
 	const modeCanvas = 0
 	const modeWebgl = 1
@@ -13,10 +13,12 @@
 	const uiDemandCallbackId = 'chasm-line-renderer-ui-demand'
 	const curveSegments = 64
 	let renderApiRegistered = false
+	let migrationFallback = null
 
 	ModLoader.register({
 		id: MOD_ID,
 		init(api) {
+			migrateLegacyChasmLineMode(api)
 			api.on('afterVanillaScripts', function () {
 				installChasmLineRenderer(api)
 			})
@@ -31,12 +33,11 @@
 			return function (...args) {
 				const ignoreDistance = shouldIgnoreChasmLineDistance(this, api)
 				const rendererEnabled = isChasmLineRendererEnabled(api)
-				const mode = normalizeChasmLineMode(api.config.get(modeConfigKey, modeWebgl))
 				if (!rendererEnabled && !ignoreDistance) return original.apply(this, args)
 				const segments = collectChasmLineSegments(this, { ignoreDistance })
 				if (!segments) return original.apply(this, args)
-				if (shouldUseChasmLineRenderApi(api, this) && shouldReplaceChasmLines(rendererEnabled, ignoreDistance, mode)) return
-				if (rendererEnabled && mode === modeWebgl && renderChasmLineSegmentsWebgl(this, segments)) return
+				if (shouldUseChasmLineRenderApi(api, this) && shouldReplaceChasmLines(rendererEnabled, ignoreDistance)) return
+				if (rendererEnabled && renderChasmLineSegmentsWebgl(this, segments)) return
 				if (ignoreDistance) {
 					drawChasmLineSegmentsCanvas(this, segments)
 					return
@@ -89,32 +90,68 @@
 		if (!shouldUseChasmLineRenderApi(api, game) || game.plane || !game.chasm) return false
 		const ignoreDistance = shouldIgnoreChasmLineDistance(game, api)
 		const rendererEnabled = isChasmLineRendererEnabled(api)
-		const mode = normalizeChasmLineMode(api.config.get(modeConfigKey, modeWebgl))
-		return shouldReplaceChasmLines(rendererEnabled, ignoreDistance, mode)
+		return shouldReplaceChasmLines(rendererEnabled, ignoreDistance)
 	}
 
 	function renderChasmLinesForRenderApi(api, game, ctx) {
 		if (!game || !ctx || game.plane) return
 		const ignoreDistance = shouldIgnoreChasmLineDistance(game, api)
 		const rendererEnabled = isChasmLineRendererEnabled(api)
-		const mode = normalizeChasmLineMode(api.config.get(modeConfigKey, modeWebgl))
-		if (!shouldReplaceChasmLines(rendererEnabled, ignoreDistance, mode)) return
+		if (!shouldReplaceChasmLines(rendererEnabled, ignoreDistance)) return
 		const segments = collectChasmLineSegments(game, { ignoreDistance })
 		if (!segments) return
-		if (rendererEnabled && mode === modeWebgl && renderChasmLineSegmentsWebgl(game, segments, ctx)) return
+		if (rendererEnabled && renderChasmLineSegmentsWebgl(game, segments, ctx)) return
 		if (ignoreDistance || rendererEnabled) drawChasmLineSegmentsCanvas(game, segments, ctx)
 	}
 
-	function shouldReplaceChasmLines(rendererEnabled, ignoreDistance, mode) {
-		return !!(ignoreDistance || (rendererEnabled && mode === modeWebgl))
+	function shouldReplaceChasmLines(rendererEnabled, ignoreDistance) {
+		return !!(ignoreDistance || rendererEnabled)
 	}
 
 	function isChasmLineRendererEnabled(api) {
-		return api.config.get(enableConfigKey, true) !== false
+		return migrationFallback === null ? api.config.get(enableConfigKey, true) !== false : migrationFallback
 	}
 
 	function shouldIgnoreChasmLineDistance(game, api) {
 		return !!game && api.config.get(ignoreDistanceConfigKey, false) === true
+	}
+
+	// Keep the boolean key stable for saved settings and custom panel layouts.
+	// The removed mode is no longer in the Loader schema, so read its old storage key.
+	function migrateLegacyChasmLineMode(api) {
+		const key = 'modloader:' + MOD_ID + ':config:' + legacyModeConfigKey
+		let raw
+		try { raw = localStorage.getItem(key) }
+		catch (error) {
+			migrationFallback = false
+			warnMigration('read', error)
+			return
+		}
+		if (raw === null) return
+		let legacy = raw
+		try { legacy = JSON.parse(raw) } catch (error) {}
+		const enabled = api.config.get(enableConfigKey, true) !== false && normalizeChasmLineMode(legacy) === modeWebgl
+		migrationFallback = enabled
+		try {
+			// Persist the effective choice before retiring the old selector.
+			api.config.set(enableConfigKey, enabled)
+			try { localStorage.removeItem(key) }
+			catch (error) {
+				// If deletion alone fails, neutralize the old selector so it cannot
+				// undo a later choice made with the surviving boolean switch.
+				localStorage.setItem(key, JSON.stringify(modeWebgl))
+				warnMigration('cleanup deferred', error)
+			}
+			migrationFallback = null
+		} catch (error) {
+			// A failed migration keeps the old effective choice for this session.
+			// Retain the legacy key and retry on the next normal startup.
+			warnMigration('save', error)
+		}
+	}
+
+	function warnMigration(stage, error) {
+		try { console.warn('[Tweaks] Chasm line settings migration ' + stage + ': ' + String(error?.message || error)) } catch (ignored) {}
 	}
 
 	function normalizeChasmLineMode(value) {

@@ -17,17 +17,18 @@
 	})
 
 	function installExplainerFix(api) {
-		if (window[installedKey] || typeof Game === 'undefined' || typeof Explainer === 'undefined') return
+		const ExplainerType = typeof DesktopExplainer !== 'undefined' ? DesktopExplainer : typeof Explainer !== 'undefined' ? Explainer : null
+		if (window[installedKey] || typeof Game === 'undefined' || !ExplainerType) return
 		window[installedKey] = true
 		ensureExplainerFixStyle()
 
-		Explainer.prototype.refreshLanguage = function () {
+		ExplainerType.prototype.refreshLanguage = function () {
 			if (!isExplainerFixEnabled(api) || !this.state || this.finished || !this.stuff?.[this.next]) return
 			this.element.innerHTML = this.master.pronounce('explainer', this.next)
 			updateExplainerTheme(this, api)
 		}
 
-		api.patch(Explainer.prototype, 'update', function (original) {
+		api.patch(ExplainerType.prototype, 'update', function (original) {
 			return function (...args) {
 				const result = original.apply(this, args)
 				updateExplainerTheme(this, api)

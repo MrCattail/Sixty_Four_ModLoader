@@ -190,9 +190,11 @@ function createService(options) {
     attachWindow(win) {
       if (bound.has(win)) return
       bound.add(win)
-      const abandonCurrent = reason => { if (active?.sender === win.webContents) void abandon(active, reason).catch(() => {}) }
-      win.webContents.on('did-start-navigation', (_event, _url, inPlace, mainFrame) => { if (mainFrame && !inPlace) abandonCurrent('navigation') })
-      win.webContents.on('render-process-gone', () => abandonCurrent('renderer-gone'))
+      // closed can fire after the window's webContents getter becomes invalid.
+      const contents = win.webContents
+      const abandonCurrent = reason => { const record = active; if (record?.sender === contents) void abandon(record, reason).catch(() => {}) }
+      contents.on('did-start-navigation', (_event, _url, inPlace, mainFrame) => { if (mainFrame && !inPlace) abandonCurrent('navigation') })
+      contents.on('render-process-gone', () => abandonCurrent('renderer-gone'))
       win.on('closed', () => abandonCurrent('window-closed'))
     }
   }

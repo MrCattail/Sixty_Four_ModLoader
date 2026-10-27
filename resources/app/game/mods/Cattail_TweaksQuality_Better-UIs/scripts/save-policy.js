@@ -15,6 +15,7 @@ function assertSlotInput(slots, game) {
 function createPolicy(game) {
   let loading = false, localQueue = Promise.resolve(), cloudQueue = Promise.resolve(), session = null
   let cloudSlots = {}, lastError = '', autoIndex = -1, layoutAt = 0, dirty = {}, lastTiming = null
+  let pendingCloud = false, localRevision = 0
   const now = () => performance.now()
   const captures = new WeakSet()
   const recordHash = hash
@@ -31,7 +32,10 @@ function createPolicy(game) {
     const started = now()
     return new Promise((resolve, reject) => {
       const tx = game.localDatabase.transaction('charps_memory_slots', 'readwrite'), store = tx.objectStore('charps_memory_slots')
-      tx.oncomplete = resolve
+      tx.oncomplete = () => {
+        if (layout || Object.keys(changes).length) { localRevision++; pendingCloud = true }
+        resolve()
+      }
       tx.onerror = tx.onabort = () => reject(tx.error || new Error('Local save transaction failed'))
       try {
         for (const [index, slot] of Object.entries(changes)) {
@@ -83,6 +87,20 @@ function createPolicy(game) {
     cloudQueue = task
     return task
   }
+  // Explicit checkpoints compare the complete current layout with the cloud catalog.
+  // Periodic saves never hash/describe old cloud records or start a cloud session.
+  function collectionChanges(slots = game.saveSlots) {
+    const changes = {}, indices = new Set([...Object.keys(slots), ...Object.keys(cloudSlots), ...Object.keys(dirty)])
+    for (const index of indices) if (/^\d+$/.test(index)) changes[index] = slots[index] || null
+    return changes
+  }
+  async function commitCloud(slots = game.saveSlots, timing = null) {
+    const revision = localRevision, current = slots === game.saveSlots
+    const saved = await cloudWrite(collectionChanges(slots), timing)
+    if (saved && current && revision === localRevision) pendingCloud = false
+    return saved
+  }
+  function submitCloud() { return serial(() => commitCloud()) }
   function capture() {
     if (game.preventSaving || game.preventCloud || loading) return null
     const started = now()
@@ -127,7 +145,8 @@ function createPolicy(game) {
       if (value.history) game.saveStackUpdateNeeded = false
       game.savePreferences()
       timing.acceptMs = now() - acceptStart
-      return cloudWrite(changes, timing)
+      // A completed local transaction is not a successful cloud submission.
+      return false
     })
   }
   async function prepare(original, preload) {
@@ -219,36 +238,45 @@ function createPolicy(game) {
     const copy = clone(data)
     if (isAuto(copy)) copy.stack = copy.stack.slice(0, 1)
     return serial(async () => {
-      await localWrite({ [index]: copy })
-      if (isAuto(game.saveSlots[index])) Object.assign(game.saveSlots[index], copy)
-      return cloudWrite({ [index]: copy })
+      // Native import/new/reset use writeToSlot explicitly; periodic saves use save().
+      const previousLayoutAt = layoutAt, added = !isAuto(copy) && !info(copy).id
+      if (added) copy.tweaksSavePolicy = { id: idFor(copy, index), headAt: copy.lastModified }
+      const next = game.saveSlots.slice(); next[index] = copy
+      if (added) layoutAt = Date.now()
+      try { await localWrite({ [index]: copy }, added ? makeLayout(next) : null) }
+      catch (error) { layoutAt = previousLayoutAt; throw error }
+      if (game.saveSlots[index]) Object.assign(game.saveSlots[index], copy)
+      else game.saveSlots[index] = copy
+      return commitCloud()
     })
   }
-  async function persistCollection(next, activeIndex = game.currentSlotId) {
-    const misplaced = next.findIndex(isAuto)
-    if (misplaced >= 0 && misplaced < 20) {
-      let target = 20; while (next[target]) target++
-      next[target] = next[misplaced]; delete next[misplaced]
-      if (activeIndex === misplaced) activeIndex = target
-    }
-    const previous = game.saveSlots, previousIndex = game.currentSlotId, previousLayoutAt = layoutAt, changes = {}
-    next.forEach((slot, index) => { if (slot && !isAuto(slot) && !info(slot).id) slot.tweaksSavePolicy = { id: idFor(slot, index), headAt: slot.lastModified } })
-    for (let index = 0; index < Math.max(previous.length, next.length); index++) if (previous[index] !== next[index]) changes[index] = next[index] || null
-    layoutAt = Date.now()
-    await localWrite(changes, makeLayout(next))
-    try { game.currentSlotId = activeIndex; game.savePreferences() }
-    catch (error) {
-      game.currentSlotId = previousIndex; layoutAt = previousLayoutAt
-      try {
-        await localWrite(Object.fromEntries(Object.keys(changes).map(i => [i, previous[i] || null])), makeLayout(previous))
-        game.savePreferences()
-      } catch (_) { game.preventSaving = true; throw new Error('Save selection rollback failed. Restart before continuing.') }
-      throw error
-    }
-    const oldAuto = previous[game.currentSlotId], newAuto = next[activeIndex]
-    if (isAuto(oldAuto) && isAuto(newAuto) && oldAuto !== newAuto && oldAuto.stack === newAuto.stack) { Object.assign(oldAuto, newAuto); next[activeIndex] = oldAuto }
-    game.saveSlots = next; autoIndex = next.findIndex(isAuto)
-    return cloudWrite(changes)
+  function persistCollection(next, activeIndex = game.currentSlotId) {
+    return serial(async () => {
+      const misplaced = next.findIndex(isAuto)
+      if (misplaced >= 0 && misplaced < 20) {
+        let target = 20; while (next[target]) target++
+        next[target] = next[misplaced]; delete next[misplaced]
+        if (activeIndex === misplaced) activeIndex = target
+      }
+      const previous = game.saveSlots, previousIndex = game.currentSlotId, previousLayoutAt = layoutAt, changes = {}
+      next.forEach((slot, index) => { if (slot && !isAuto(slot) && !info(slot).id) slot.tweaksSavePolicy = { id: idFor(slot, index), headAt: slot.lastModified } })
+      for (let index = 0; index < Math.max(previous.length, next.length); index++) if (previous[index] !== next[index]) changes[index] = next[index] || null
+      layoutAt = Date.now()
+      await localWrite(changes, makeLayout(next))
+      try { game.currentSlotId = activeIndex; game.savePreferences() }
+      catch (error) {
+        game.currentSlotId = previousIndex; layoutAt = previousLayoutAt
+        try {
+          await localWrite(Object.fromEntries(Object.keys(changes).map(i => [i, previous[i] || null])), makeLayout(previous))
+          game.savePreferences()
+        } catch (_) { game.preventSaving = true; throw new Error('Save selection rollback failed. Restart before continuing.') }
+        throw error
+      }
+      const oldAuto = previous[game.currentSlotId], newAuto = next[activeIndex]
+      if (isAuto(oldAuto) && isAuto(newAuto) && oldAuto !== newAuto && oldAuto.stack === newAuto.stack) { Object.assign(oldAuto, newAuto); next[activeIndex] = oldAuto }
+      game.saveSlots = next; autoIndex = next.findIndex(isAuto)
+      return commitCloud()
+    })
   }
   function makeLayout(slots) { return { at: layoutAt, slots: Object.fromEntries(slots.flatMap((slot, index) => slot ? [[index, info(slot).id || idFor(slot, index)]] : [])) } }
   async function activate(index, record) {
@@ -308,16 +336,31 @@ function createPolicy(game) {
         throw error
       }
       game.saveSlots = next; autoIndex = activeIndex
-      return { activeIndex, cloudSaved: await cloudWrite(changes) }
+      return { activeIndex, cloudSaved: await commitCloud() }
     })
   }
-  return { enabled: true, capture, save, prepare, writeSlot, persistCollection, activate, activateCollection, commitFork, setSource, sourceIndex, isAuto,
+  return { enabled: true, capture, save, submitCloud, prepare, writeSlot, persistCollection, activate, activateCollection, commitFork, setSource, sourceIndex, isAuto,
     get autoIndex() { return game.saveSlots.findIndex(isAuto) }, get lastError() { return lastError },
+    get pendingCloud() { return pendingCloud },
     get timing() { return lastTiming && { ...lastTiming } },
     async flush() { await localQueue; await cloudQueue },
     async wipe(index) { if (!game.saveSlots[index] || isAuto(game.saveSlots[index]) || index === sourceIndex()) return false; const next = game.saveSlots.slice(); next.splice(index, 1); const active = game.currentSlotId > index ? game.currentSlotId - 1 : game.currentSlotId; await persistCollection(next, active); return true },
-    async storeCollection(slots) { const changes = {}; const length = Math.max(slots.length, ...Object.keys(cloudSlots).map(i => Number(i) + 1)); for (let i = 0; i < length; i++) changes[i] = slots[i] || null; layoutAt = Date.now(); await localWrite({}, makeLayout(slots)); return cloudWrite(changes) },
-    async beforeReset() { const changes = {}; const record = clone(game.saveSlots[game.currentSlotId]?.stack?.[0]); if (record?.state) { addHistory(changes, record); if (Object.keys(changes).length) { await localWrite(changes); for (const [i, slot] of Object.entries(changes)) game.saveSlots[i] = slot; await cloudWrite(changes) } } },
+    storeCollection(slots) {
+      const current = slots === game.saveSlots
+      return serial(async () => {
+        const collection = current ? game.saveSlots : slots
+        layoutAt = Date.now(); await localWrite({}, makeLayout(collection))
+        return commitCloud(collection)
+      })
+    },
+    beforeReset() { return serial(async () => {
+      const changes = {}, record = clone(game.saveSlots[game.currentSlotId]?.stack?.[0])
+      if (record?.state) {
+        addHistory(changes, record)
+        if (Object.keys(changes).length) { await localWrite(changes); for (const [i, slot] of Object.entries(changes)) game.saveSlots[i] = slot }
+      }
+      return commitCloud()
+    }) },
     installFacade() {
       const port = game.spaceport
       if (!port?.invoke || port.__tweaksSavePolicy) return
