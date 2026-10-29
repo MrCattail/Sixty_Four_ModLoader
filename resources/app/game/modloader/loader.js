@@ -4097,6 +4097,7 @@
 			context: options.context,
 			visible: options.visible === undefined ? true : options.visible,
 			active: options.active === undefined ? true : options.active,
+			allowSharedCombination: options.allowSharedCombination === true,
 			order: normalizeShortcutOrder(options.order, 100),
 			category: normalizeShortcutCategory(options.category),
 			generation,
@@ -4114,21 +4115,57 @@
 		return !!a && !!b && a.id === b.id && a.order === b.order && shortcutTextSignature(a.label) === shortcutTextSignature(b.label)
 	}
 
-	const shortcutKeysSignature = function (keys) {
-		return keys.map(function (chord) { return chord.join('+') }).join(' / ')
+	const shortcutConflictTokenOrder = function (token) {
+		const modifierOrder = { Ctrl: 0, Alt: 1, Shift: 2, Meta: 3 }
+		if (Object.prototype.hasOwnProperty.call(modifierOrder, token)) return modifierOrder[token]
+		if (/^(?:Mouse|Wheel)/.test(token)) return 20
+		return 10
 	}
 
-	const recordShortcutConflicts = function (entry) {
+	const shortcutChordConflictSignature = function (chord) {
+		return Array.from(new Set(chord)).sort(function (a, b) {
+			return (shortcutConflictTokenOrder(a) - shortcutConflictTokenOrder(b)) || a.localeCompare(b)
+		}).join('+')
+	}
+
+	const shortcutConflictCombinations = function (entry) {
+		return new Set(entry.keys.map(shortcutChordConflictSignature))
+	}
+
+	const recordShortcutCategoryConflicts = function (entry) {
 		for (const key in state.shortcutEntries) {
 			const other = state.shortcutEntries[key]
 			if (!other || other.key === entry.key) continue
-			if (shortcutKeysSignature(other.keys) === shortcutKeysSignature(entry.keys)) {
-				const pair = [ other.key, entry.key ].sort().join('|')
-				pushShortcutDiagnostic('duplicate-combination', 'Shortcut combination is registered more than once: ' + shortcutKeysSignature(entry.keys), { entries: pair }, 'duplicate-combination:' + pair + ':' + shortcutKeysSignature(entry.keys))
-			}
 			if (other.modId !== entry.modId && other.source === 'mod' && entry.source === 'mod' && other.category.id === entry.category.id && !shortcutCategoryMatches(other.category, entry.category)) {
 				const pair = [ other.modId, entry.modId ].sort().join('|')
 				pushShortcutDiagnostic('category-conflict', 'Shortcut category metadata conflicts for ' + entry.category.id + '; the conflicting Mod will be isolated.', { mods: pair }, 'category-conflict:' + entry.category.id + ':' + pair)
+			}
+		}
+	}
+
+	const recordShortcutCombinationConflicts = function (entryStates) {
+		for (let index = 0; index < entryStates.length; index++) {
+			const firstState = entryStates[index]
+			if (!firstState.visible || !firstState.active) continue
+			const first = firstState.entry
+			const firstCombinations = shortcutConflictCombinations(first)
+			for (let otherIndex = index + 1; otherIndex < entryStates.length; otherIndex++) {
+				const secondState = entryStates[otherIndex]
+				if (!secondState.visible || !secondState.active) continue
+				const second = secondState.entry
+				if (first.allowSharedCombination && second.allowSharedCombination) continue
+				const secondCombinations = shortcutConflictCombinations(second)
+				const pairEntries = [ first.key, second.key ].sort()
+				const pair = pairEntries.join('|')
+				for (const combination of firstCombinations) {
+					if (!secondCombinations.has(combination)) continue
+					pushShortcutDiagnostic(
+						'duplicate-combination',
+						'Potential shortcut overlap for ' + combination + ': ' + pairEntries[0] + ' and ' + pairEntries[1] + ' are both visible and active.',
+						{ entries: pairEntries, combination },
+						'duplicate-combination:' + pair + ':' + combination
+					)
+				}
 			}
 		}
 	}
@@ -4161,7 +4198,7 @@
 			entry.category = sibling.category
 		}
 		state.shortcutEntries[entry.key] = entry
-		recordShortcutConflicts(entry)
+		recordShortcutCategoryConflicts(entry)
 		requestShortcutRefresh()
 		requestAnimationFrame(refreshOpenPanel)
 		return createShortcutHandle(entry.modId, entry.id, generation)
@@ -4191,7 +4228,7 @@
 				sibling.raw = Object.assign({}, sibling.raw, { category: patch.category })
 			}
 		}
-		recordShortcutConflicts(next)
+		recordShortcutCategoryConflicts(next)
 		requestShortcutRefresh()
 		return true
 	}
@@ -4254,11 +4291,18 @@
 		}
 	}
 
-	const getVisibleShortcutEntries = function () {
-		loadPanelState()
-		return Object.values(state.shortcutEntries).filter(function (entry) {
-			return state.shortcutSettings.mods[entry.modId] !== false && evaluateShortcutPredicate(entry.visible, entry, true, 'visible')
+	const resolveShortcutEntryStates = function () {
+		return Object.values(state.shortcutEntries).map(function (entry) {
+			const visible = evaluateShortcutPredicate(entry.visible, entry, true, 'visible')
+			return { entry, visible, active: visible && evaluateShortcutPredicate(entry.active, entry, true, 'active') }
 		})
+	}
+
+	const getVisibleShortcutEntries = function (entryStates) {
+		loadPanelState()
+		return entryStates.filter(function (entryState) {
+			return entryState.visible && state.shortcutSettings.mods[entryState.entry.modId] !== false
+		}).map(function (entryState) { return entryState.entry })
 	}
 
 	const getShortcutSourceLabel = function (source) {
@@ -4401,7 +4445,7 @@
 		return wrap
 	}
 
-	const renderShortcutPanel = function (panel, entries) {
+	const renderShortcutPanel = function (panel, entries, activeByKey) {
 		panel.innerHTML = ''
 		for (const section of buildShortcutViewModel(entries)) {
 			const source = element('section', 'modloader-shortcut-source')
@@ -4411,7 +4455,7 @@
 				for (const mod of category.mods) {
 					if (section.source === 'mod') source.appendChild(element('div', 'modloader-shortcut-mod-title', mod.name))
 					for (const entry of mod.entries) {
-						const active = evaluateShortcutPredicate(entry.active, entry, true, 'active')
+						const active = activeByKey.has(entry.key) ? activeByKey.get(entry.key) : evaluateShortcutPredicate(entry.active, entry, true, 'active')
 						const row = element('div', 'modloader-shortcut-row' + (active ? '' : ' modloader-shortcut-row-inactive'))
 						row.appendChild(renderShortcutKeys(entry.keys))
 						const description = element('span', 'modloader-shortcut-description', resolveShortcutText(entry.description, entry, entry.id))
@@ -4554,7 +4598,10 @@
 	const refreshShortcutUi = function () {
 		loadPanelState()
 		const allEntries = Object.values(state.shortcutEntries)
-		const entries = state.shortcutSettings.enabled !== false ? getVisibleShortcutEntries() : []
+		const entryStates = resolveShortcutEntryStates()
+		recordShortcutCombinationConflicts(entryStates)
+		const activeByKey = new Map(entryStates.map(function (entryState) { return [ entryState.entry.key, entryState.active ] }))
+		const entries = state.shortcutSettings.enabled !== false ? getVisibleShortcutEntries(entryStates) : []
 		if (!allEntries.length && !state.shortcutButton) {
 			syncShortcutStatusPosition()
 			return
@@ -4575,7 +4622,7 @@
 		ui.panel.setAttribute('aria-label', t('shortcutTips'))
 		ui.panel.setAttribute('aria-hidden', show && state.shortcutOpen ? 'false' : 'true')
 		if (show && state.shortcutOpen) {
-			renderShortcutPanel(ui.panel, entries)
+			renderShortcutPanel(ui.panel, entries, activeByKey)
 			refreshShortcutLayout()
 		}
 		syncShortcutStatusPosition()
@@ -5215,6 +5262,7 @@
 		const tools = getModFileTools()
 		if (!tools?.ipcRenderer) throw new Error('探针需要桌面游戏环境。')
 		const modulePath = tools.path.join(tools.gameRoot, 'modloader', 'diagnostics', 'clear-view-probe.js')
+		if (!tools.fs.existsSync(modulePath)) throw new Error('当前安装未包含可选诊断组件。')
 		clearViewProbe = require(modulePath).createClient({
 			window, document, ipc: tools.ipcRenderer, getGame: () => state.game,
 			getNativeGrid: () => clearViewNativeGrid,
@@ -5317,7 +5365,9 @@
 		if (periodicStallProbe) return periodicStallProbe
 		const tools = getModFileTools()
 		if (!tools?.ipcRenderer) throw new Error('探针需要桌面游戏环境。')
-		periodicStallProbe = require(tools.path.join(tools.gameRoot, 'modloader', 'diagnostics', 'periodic-stall-probe.js')).createClient({
+		const modulePath = tools.path.join(tools.gameRoot, 'modloader', 'diagnostics', 'periodic-stall-probe.js')
+		if (!tools.fs.existsSync(modulePath)) throw new Error('当前安装未包含可选诊断组件。')
+		periodicStallProbe = require(modulePath).createClient({
 			window, document, ipc: tools.ipcRenderer, getGame: () => state.game,
 			isOtherBusy: () => !!clearViewProbe && clearViewProbe.status().phase !== 'idle',
 			isMenuOpen: () => !!document.getElementById('modloader-panel') && !state.panelHidden,

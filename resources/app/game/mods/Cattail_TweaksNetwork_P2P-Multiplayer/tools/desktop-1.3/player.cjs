@@ -62,7 +62,7 @@ function assertPrepared(){
  }
  return true;
 }
-function launchInputs(){return ['fixtures.cjs','main.cjs','start.cjs','player.cjs'].map(name=>path.join(__dirname,name)).concat([path.join(MOD,'tests/verify-player-1.3.cjs'),path.join(MOD,'tests/verify-connection-path.cjs'),path.join(MOD,'scripts/transport.js'),path.join(ROOT,'preparation.json')]);}
+function launchInputs(){return ['fixtures.cjs','main.cjs','start.cjs','player.cjs','session-guard.cjs'].map(name=>path.join(__dirname,name)).concat([path.join(MOD,'tests/verify-player-1.3.cjs'),path.join(MOD,'tests/verify-connection-path.cjs'),path.join(MOD,'scripts/transport.js'),path.join(ROOT,'preparation.json')]);}
 function assertLaunchApproved(){
  const file=path.join(ROOT,'acceptance-gate.json');
  if(!fs.existsSync(file))throw Error('PLAYER_GATE_NOT_READY');
@@ -102,16 +102,18 @@ const closePreviousRoomQuery='('+async function(){
 }.toString()+')()';
 async function run(attempt='201',options={}){
  if(!/^\d{3}$/.test(attempt))throw Error('INVALID_ATTEMPT');
+ const durationMs=options.durationMs??(options.uiCheck?15*60*1000:null);
+ if(durationMs!==null&&(!Number.isFinite(durationMs)||durationMs<=0))throw Error('INVALID_PLAYER_DURATION');
  if(!options.uiCheck)assertLaunchApproved();
  assertPrepared();
  const {start}=require('./start.cjs'),session=await start(SOURCE,attempt,{mode:'manual',uiCheck:!!options.uiCheck});
  const [host,guest]=session.clients;
- const report={baseline:'008',mode:options.uiCheck?'manual-lifecycle-check':'visible-player',status:'STARTING',playerFeedback:'PENDING',events:[],roles:{},generations:{host:{},guest:{}}};
+ const report={baseline:'008',mode:options.uiCheck?'manual-lifecycle-check':'visible-player',status:'STARTING',timeLimitMs:durationMs,playerFeedback:'PENDING',events:[],roles:{},generations:{host:{},guest:{}}};
  const output=path.join(session.dir,'player-session.json');
  write(path.join(ROOT,'active-controller.json'),{pid:process.pid,attempt});
  write(path.join(session.dir,'controller.json'),{pid:process.pid,attempt});
  let stopRequested=false,boundPair='',sceneGenerations={host:-1,guest:-1},connectedAt=0,visibleSnapshotsTaken=false;
- const deadline=Date.now()+(options.durationMs||15*60*1000);
+ const startedAt=Date.now(),deadline=durationMs===null?Infinity:startedAt+durationMs;
  const save=()=>write(output,report);
  const endSignal=()=>{stopRequested=true;};
  process.on('SIGTERM',endSignal);process.on('SIGINT',endSignal);
@@ -147,6 +149,7 @@ async function run(attempt='201',options={}){
      const client=session.clients[i],state=states[i],probes=await client.call('evaluate',probeQuery);
      const value=summarize(state,probes);
      value.signalingErrors=await client.call('evaluate',"CattailP2PPhase2.getAuditEntries().filter(row=>/^signaling-.*error$|^signaling-reconnect-exhausted$/.test(row.type)).length");
+     if(!options.uiCheck&&!value.visible)throw Error('PLAYER_WINDOW_NOT_VISIBLE');
      report.roles[client.role]=value;report.generations[client.role][String(state.generation)]=value;
      if(value.physicalProgressMutations!==0||value.diskProgressRows!==0||value.unhandledErrors!==0||value.iceServers!==0||value.signalingErrors!==0)throw Error('PLAYER_ISOLATION_CHECK_FAILED');
     }
@@ -162,7 +165,7 @@ async function run(attempt='201',options={}){
      }
      if(newlyConnected&&options.onConnected)options.onConnected({clients:session.clients,report});
     }else if(Date.now()-connectedAt>15000)throw Error('PLAYER_CONNECTION_TIMEOUT');
-   }else if(!boundPair&&Date.now()>deadline-(options.durationMs||15*60*1000)+60000)throw Error('PLAYER_STARTUP_TIMEOUT');
+   }else if(!boundPair&&Date.now()-startedAt>60000)throw Error('PLAYER_STARTUP_TIMEOUT');
    save();await pause(500);
   }
   if(report.status==='AWAITING_PLAYER'||report.status==='STARTING'){

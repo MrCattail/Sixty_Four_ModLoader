@@ -3842,6 +3842,26 @@
 			}
 		],
 		"random": {
+			"eraserHint": {
+				"en": "Click + drag to delete multiple",
+				"sch": null,
+				"modsch": "点击并拖动框选范围，可批量删除建筑"
+			},
+			"relocatorHint": {
+				"en": "Click + drag to move multiple. <div class=\"key\">Shift</div> to clone",
+				"sch": null,
+				"modsch": "点击并拖动框选范围，可批量移动建筑。按住<div class=\"key\">Shift</div> 可复制"
+			},
+			"relocate": {
+				"en": "Move",
+				"sch": null,
+				"modsch": "移动"
+			},
+			"clone": {
+				"en": "Clone",
+				"sch": null,
+				"modsch": "复制"
+			},
 			"paste": {
 				"en": "A save code has been copied to the clipboard. Now paste it somewhere safe.",
 				"sch": "储存码已复制到剪贴簿。现在请将它粘贴到安全的地方。",

@@ -19,7 +19,9 @@ const sources = Object.fromEntries(['game.js', 'ui.js', 'stuff.js', 'codex.js'].
 const manifest = JSON.parse(fs.readFileSync(path.join(MOD_ROOT, 'mod.json'), 'utf8'))
 const locale = JSON.parse(fs.readFileSync(path.join(MOD_ROOT, 'locale/dynamic-details.json'), 'utf8'))
 const catalog = JSON.parse(fs.readFileSync(path.join(GAME_ROOT, 'modloader/translations.json'), 'utf8'))
-const report = { checks: [], screenshots: [], blockedRequests: [], nativeDepthSamples: 0 }
+const FULL_ENTRIES = manifest.entries.slice()
+const HOT_ONLY = process.env.MINE_CHART_HOT_ONLY === '1'
+const report = { checks: [], screenshots: [], blockedRequests: [], nativeDepthSamples: 0, hotScenarios: [], hotFailures: [], coldStartupFindings: [] }
 fs.mkdirSync(OUTPUT, { recursive: true })
 const check = async (name, callback) => { await callback(); report.checks.push(name); console.log('PASS ' + name) }
 const near = (actual, expected, message, tolerance = 2e-12) => assert.ok(Math.abs(actual - expected) <= tolerance, message + ': ' + actual + ' != ' + expected)
@@ -52,7 +54,7 @@ function nativeOracle() {
 
 // Run exactly the installed native Cloud, Entity, Pump and Game frame methods.
 // Constructors/world actions are not invoked; the fixture supplies inert data.
-function fixture() {
+function fixture(options = {}) {
 	window.fixtureNow = 10000
 	// Explicit existing UI preference in this disposable profile. A missing value
 	// currently triggers the unrelated legacy core opacity fallback of 0.25.
@@ -61,6 +63,49 @@ function fixture() {
 	Object.defineProperty(performance, 'now', { value: () => window.fixtureNow })
 	const browserRaf = requestAnimationFrame.bind(window)
 	window.requestAnimationFrame = () => 0
+	if (options.hot) {
+		window.hotTrace = []
+		window.hotApis = []
+		window.hotPhase = 'bootstrap'
+		window.hotRecord = (kind, data = {}) => hotTrace.push({ sequence: hotTrace.length, phase: hotPhase, kind, ...data })
+		localStorage.setItem('modloader:Cattail_TweaksQuality_Dynamic-Details:config:enableBuildingDetails', JSON.stringify(!options.cold))
+		if (options.disk) {
+			// Read-only virtual files: no Node require, native IPC, real files or saves.
+			const root = '/fixture/game', files = new Map([
+				[root + '/mods/Cattail_TweaksQuality_Dynamic-Details/mod.json', JSON.stringify(options.manifest)],
+				[root + '/modloader/translations.json', JSON.stringify(options.catalog)]
+			])
+			const normalize = value => String(value).replace(/\\/g, '/').replace(/\/+/g, '/')
+			const deny = (operation, target) => { hotRecord('file-denied', { operation, target: String(target) }); throw new Error('Fixture denies ' + operation + ': ' + target) }
+			const virtualFs = {
+				existsSync(target) { const name = normalize(target); hotRecord('file-exists', { target: name }); return files.has(name) || name === root + '/mods' },
+				readFileSync(target) { const name = normalize(target); hotRecord('file-read', { target: name }); if (!files.has(name)) return deny('read', name); return files.get(name) },
+				readdirSync(target) { const name = normalize(target); hotRecord('file-list', { target: name }); if (name !== root + '/mods') return deny('list', name); return [{ name: 'Cattail_TweaksQuality_Dynamic-Details', isDirectory: () => true, isFile: () => false }] },
+				statSync(target) { if (!files.has(normalize(target))) return deny('stat', target); return { mtimeMs: 1, mtime: new Date(0), isFile: () => true, isDirectory: () => false } },
+				watch(target) { if (!files.has(normalize(target))) return deny('watch', target); hotRecord('virtual-watch', { target: normalize(target) }); return { close() {} } }
+			}
+			for (const operation of ['writeFileSync', 'appendFileSync', 'mkdirSync', 'rmSync', 'unlinkSync', 'renameSync', 'cpSync', 'copyFileSync', 'mkdtempSync']) virtualFs[operation] = target => deny(operation, target)
+			ModLoader.state.modFileTools = { fs: virtualFs, path: { join: (...parts) => normalize(parts.join('/')), dirname: value => normalize(value).split('/').slice(0, -1).join('/'), basename: value => normalize(value).split('/').at(-1) }, gameRoot: root, modsDir: root + '/mods', enabledPath: root + '/mods/enabled.json', shell: null, clipboard: null, ipcRenderer: null, dialog: null, childProcess: null, os: { homedir: () => '/fixture/home', EOL: '\n' } }
+		}
+		const originalRegister = ModLoader.register
+		ModLoader.register = function (definition) {
+			const source = document.currentScript?.src?.split('/').at(-1) || 'unknown'
+			const originalInit = definition.init
+			return originalRegister.call(this, { ...definition, init(api) {
+				hotApis.push({ source, api })
+				const originalGet = api.config.get
+				api.config.get = function (key, fallback) { const value = originalGet.call(this, key, fallback); if (key === 'enableBuildingDetails' || /MineDistribution|mineDistribution/.test(key)) hotRecord('bound-get', { source, key, value, valueType: typeof value }); return value }
+				hotRecord('entry-init', { source, modId: api.id })
+				return originalInit?.call(definition, api)
+			} })
+		}
+		const originalStage = ModLoader.stage
+		ModLoader.stage = async function (name, ...args) { hotRecord('stage-start', { name }); const result = await originalStage.call(this, name, ...args); hotRecord('stage-end', { name }); return result }
+		const originalSet = Storage.prototype.setItem
+		Storage.prototype.setItem = function (key, value) { if (String(key).startsWith('modloader:Cattail_TweaksQuality_Dynamic-Details:config:')) hotRecord('storage-set', { key, value: String(value), argumentType: typeof value }); return originalSet.call(this, key, value) }
+		addEventListener('modloader:config-preview', event => hotRecord('config-preview', { detail: event.detail }))
+		document.addEventListener('change', event => { const input = event.target; if (input?.dataset?.modloaderConfigKey) hotRecord('control-change', { key: input.dataset.modloaderConfigKey, checked: input.checked, value: input.value, trusted: event.isTrusted }) }, true)
+	}
 	window.boot = async () => {
 		const ctx = new Proxy({ measureText: () => ({ width: 70 }) }, { get: (target, key) => key in target ? target[key] : () => {} })
 		window.game = Object.assign(Object.create(Game.prototype), {
@@ -72,6 +117,7 @@ function fixture() {
 			stats: { totalPlayTime: 0, totalResourcesMined: [100, 100, 0, 0, 0, 0, 0, 0, 0, 0] },
 			mouse: { xy: [innerWidth - 20, innerHeight / 2], sxy: [innerWidth - 20, innerHeight / 2], cursorVisible: true, state: 0 },
 			altActive: true, shiftPressed: true, hoveredCell: [0, 0], currentHint: {}, entitiesInGame: {},
+			preventSaving: true, preventCloud: true,
 			canRelocate: () => false, canAfford: () => true, makeReadable: value => String(Math.round(value * 100) / 100),
 			pronounce(...keys) {
 				let value = this.words?.[this.language]
@@ -83,7 +129,12 @@ function fixture() {
 			}
 		})
 		for (const method of ['renderConductors', 'renderChasmVFX', 'renderEntities', 'renderEntitiesAbstract', 'renderHoveredCell', 'renderVFX', 'renderHollowEvents', 'renderSlowdown', 'renderGrid', 'renderSOI', 'renderAffected', 'renderResources']) game[method] = () => {}
+		if (options.hot) {
+			await ModLoader.stage('beforeGamePrepare', game, [])
+			await ModLoader.stage('beforeVanillaScripts', game)
+		}
 		await ModLoader.stage('afterVanillaScripts', game)
+		if (options.hot) game.codex = ModLoader.applyData(abstract_getCodex(), game)
 		game.words = ModLoader.applyWords(abstract_getWords(), game)
 		window.pumps = ['pump', 'pump2'].map((name, index) => {
 			const entity = Object.assign(Object.create(index ? Pump2.prototype : Pump.prototype), {
@@ -111,7 +162,23 @@ function fixture() {
 		}
 		window.setConfig = (key, value) => ModLoader.setConfigValue('Cattail_TweaksQuality_Dynamic-Details', key, value)
 		window.snapshotWorld = () => JSON.stringify({ resources: game.resources, stats: game.stats, depths: pumps.map(pump => pump.depth) })
+		if (options.hot) await ModLoader.stage('afterGameInit', game)
 		step()
+		if (options.hot) {
+			window.hotOldPanel = pumps[0].hint._cattailDynamicDetails
+			window.hotSnapshot = (key, expected, phase) => {
+				window.hotPhase = phase
+				const publicValue = ModLoader.getConfigValue('Cattail_TweaksQuality_Dynamic-Details', key, '__missing__')
+				const closureValues = hotApis.map(({ source, api }) => ({ source, value: api.config.get(key, '__missing__') }))
+				const raw = localStorage.getItem('modloader:Cattail_TweaksQuality_Dynamic-Details:config:' + key)
+				let parsed; try { parsed = raw === null ? null : JSON.parse(raw) } catch (_) { parsed = raw }
+				const input = document.querySelector('[data-modloader-config-key="' + key + '"]')
+				const panel = pumps[0].hint._cattailDynamicDetails, root = panel?.chartRoot, state = panel?.mineDistributionState
+				const data = { key, expected, publicValue, publicType: typeof publicValue, closureValues, rawStorage: raw, parsedStorage: parsed, parsedType: typeof parsed, control: input ? { checked: input.checked, value: input.value, tag: input.tagName, type: input.type } : null, buildingInstalled: !!CattailDynamicDetails.buildingDetailsInstalled, oldPanelSame: panel === hotOldPanel, chart: { exists: !!root, hidden: root?.hidden, connected: !!root?.isConnected, view: root?.dataset.view, visibility: root?.dataset.visibility, geometryBuilds: state?.geometryBuilds, geometryView: state?.geometry?.view, resourceIds: root ? [...root.querySelectorAll('.cattail-mine-legend-item[data-resource-id]')].map(row => Number(row.dataset.resourceId)) : [], anonymous: root?.querySelectorAll('.cattail-mine-unknown-icon').length || 0 }, menuOpen: !!document.getElementById('modloader-panel'), world: snapshotWorld(), issues: ModLoader.state.issues }
+				hotRecord('snapshot', data); return data
+			}
+			hotRecord('ready', { entries: hotApis.map(item => item.source), stageNames: hotTrace.filter(event => event.kind === 'stage-end').map(event => event.name), disk: !!options.disk, cold: !!options.cold })
+		}
 		window.requestAnimationFrame = browserRaf
 		window.ready = true
 	}
@@ -126,21 +193,22 @@ const allowlist = new Map([
 	['/img/resources.png', path.join(GAME_ROOT, 'img/resources.png')],
 	['/mods/' + MOD + '/img/zopacityhint.svg', path.join(MOD_ROOT, 'img/zopacityhint.svg')],
 	...['game.js', 'ui.js', 'stuff.js'].map(name => ['/scripts/' + name, path.join(GAME_ROOT, 'scripts', name)]),
-	...ENTRIES.map(name => ['/mods/' + MOD + '/' + name, path.join(MOD_ROOT, name)]),
+	...FULL_ENTRIES.map(name => ['/mods/' + MOD + '/' + name, path.join(MOD_ROOT, name)]),
 	['/mods/' + MOD + '/locale/dynamic-details.json', path.join(MOD_ROOT, 'locale/dynamic-details.json')]
 ])
 const server = http.createServer((req, res) => {
 	const url = new URL(req.url, 'http://localhost')
 	let body, type = 'text/javascript'
-	if (url.pathname === '/') {
+	if (url.pathname === '/' || url.pathname === '/hot') {
 		type = 'text/html'
+		const options = url.pathname === '/hot' ? { hot: true, disk: url.searchParams.get('files') === 'disk', cold: url.searchParams.get('cold') === '1', manifest, catalog } : {}
 		body = '<!doctype html><meta charset="utf-8"><link rel="stylesheet" href="/cascade.css"><style>@font-face{font-family:Montserrat;src:url(/font/Montserrat-Regular.woff2)}body{background:#b9b9c0}</style><body>' +
 			['game.js', 'ui.js', 'stuff.js'].map(name => '<script src="/scripts/' + name + '"></script>').join('') +
-			'<script src="/scripts/words.js"></script><script src="/codex.js"></script><script src="/modloader/loader.js"></script><script>(' + fixture.toString() + ')();boot().catch(error=>window.bootError=error.stack)</script>'
+			'<script src="/scripts/words.js"></script><script src="/codex.js"></script><script src="/modloader/loader.js"></script><script>(' + fixture.toString() + ')(' + JSON.stringify(options).replace(/</g, '\\u003c') + ');boot().catch(error=>window.bootError=error.stack)</script>'
 	} else if (url.pathname === '/mods/enabled.json') {
 		type = 'application/json'; body = JSON.stringify({ mods: [MOD] })
 	} else if (url.pathname === '/mods/' + MOD + '/mod.json') {
-		type = 'application/json'; body = JSON.stringify({ ...manifest, entries: ENTRIES })
+		type = 'application/json'; body = JSON.stringify(url.searchParams.get('full') === '1' ? manifest : { ...manifest, entries: ENTRIES })
 	} else if (url.pathname === '/codex.js') body = codexSource
 	else if (allowlist.has(url.pathname)) {
 		const target = allowlist.get(url.pathname)
@@ -153,6 +221,124 @@ const server = http.createServer((req, res) => {
 	if (body === undefined) { res.writeHead(404); res.end(); return }
 	res.writeHead(200, { 'Content-Type': type, 'Cache-Control': 'no-store' }); res.end(body)
 })
+
+async function runHotTrace(browser, origin) {
+	const scenarios = [
+		{ name: 'loaded-only-existing-card', disk: false, cold: false },
+		{ name: 'readonly-disk-existing-card', disk: true, cold: false },
+		{ name: 'loaded-only-cold-building-disabled', disk: false, cold: true },
+		{ name: 'readonly-disk-cold-building-disabled', disk: true, cold: true }
+	]
+	for (const scenario of scenarios) {
+		const result = { ...scenario, steps: [], expectations: [], errors: [], consoleWarnings: [], trace: [] }
+		report.hotScenarios.push(result)
+		const context = await browser.newContext({ viewport: { width: 1440, height: 1000 } })
+		await context.route('**/*', route => {
+			const requestUrl = route.request().url()
+			if (!requestUrl.startsWith(origin + '/')) return route.abort()
+			if (requestUrl === origin + '/mods/' + MOD + '/mod.json') return route.continue({ url: requestUrl + '?full=1' })
+			return route.continue()
+		})
+		const page = await context.newPage()
+		page.on('pageerror', error => result.errors.push(error.stack))
+		page.on('console', message => { if (['warning', 'error'].includes(message.type())) result.consoleWarnings.push(message.text()) })
+		const expect = (name, actual, expected, category = 'existing-card') => {
+			let passed = false
+			try { assert.deepEqual(actual, expected); passed = true } catch (_) {}
+			const entry = { name, actual, expected, passed, category }
+			result.expectations.push(entry)
+			if (!passed && category === 'cold-startup') report.coldStartupFindings.push({ scenario: scenario.name, ...entry })
+			else if (!passed) report.hotFailures.push({ scenario: scenario.name, ...entry })
+		}
+		const snap = async (key, value, phase) => {
+			const valueSnapshot = await page.evaluate(({ key, value, phase }) => hotSnapshot(key, value, phase), { key, value, phase })
+			result.steps.push({ phase, ...valueSnapshot })
+			return valueSnapshot
+		}
+		const openMenu = async () => {
+			await page.keyboard.press('Control+m')
+			await page.locator('#modloader-panel').waitFor({ state: 'visible' })
+			const row = page.locator('.modloader-mod-row').first()
+			if (!(await row.getAttribute('class')).includes('modloader-mod-row-expanded')) await row.locator('.modloader-mod-title').click()
+		}
+		const closeAndHover = async () => {
+			await page.keyboard.press('Control+m')
+			await page.locator('#modloader-panel').waitFor({ state: 'detached' })
+			await page.mouse.move(1000, 500)
+			await page.evaluate(() => { game.mouse.xy = game.mouse.sxy = [1000, 500]; step(0) })
+		}
+		const checkSnapshot = (data, value, label, category = 'existing-card') => {
+			expect(label + ' public getter', data.publicValue, value, category)
+			expect(label + ' all nine init(api) closure getters', data.closureValues.map(item => item.value), FULL_ENTRIES.map(() => value), category)
+			expect(label + ' raw localStorage encoding', data.rawStorage, JSON.stringify(value), category)
+			expect(label + ' parsed localStorage type', data.parsedType, typeof value, category)
+			expect(label + ' parsed localStorage value', data.parsedStorage, value, category)
+		}
+		try {
+			await page.goto(origin + '/hot?files=' + (scenario.disk ? 'disk' : 'loaded') + '&cold=' + Number(scenario.cold))
+			await page.waitForFunction(() => window.ready || window.bootError, null, { polling: 100, timeout: 15000 })
+			const bootError = await page.evaluate(() => window.bootError)
+			expect('complete bootstrap succeeds', bootError, undefined)
+			if (bootError) throw new Error(bootError)
+			const ready = await page.evaluate(() => hotTrace.find(item => item.kind === 'ready'))
+			expect('all actual manifest entries initialize in their declared order', ready.entries, FULL_ENTRIES.map(entry => entry.split('/').at(-1)))
+			expect('all Loader lifecycle stages complete', ready.stageNames, ['beforeGamePrepare', 'beforeVanillaScripts', 'afterVanillaScripts', 'afterGameInit'])
+			await snap('enableMineDistributionChart', true, 'initial-card')
+			if (scenario.cold) {
+				await openMenu()
+				const input = page.locator('[data-modloader-config-key="enableBuildingDetails"]')
+				expect('cold checkbox initially false', await input.isChecked(), false)
+				await input.click()
+				await snap('enableBuildingDetails', true, 'cold-ui-before-save')
+				await page.locator('.modloader-save-button').click()
+				await snap('enableBuildingDetails', true, 'cold-ui-after-save')
+				await closeAndHover()
+				const after = await snap('enableBuildingDetails', true, 'cold-closed-rehover')
+				checkSnapshot(after, true, 'cold persisted total switch')
+				expect('cold hot-enable installs building details', after.buildingInstalled, true, 'cold-startup')
+				expect('cold hot-enable displays chart', after.chart.exists && !after.chart.hidden && after.chart.connected, true, 'cold-startup')
+			} else {
+				for (const [key, value] of [['enableMineDistributionChart', false], ['enableMineDistributionChart', true], ['mineDistributionChartView', 'bands'], ['mineDistributionChartView', 'stacked'], ['mineDistributionVisibility', 'all'], ['mineDistributionVisibility', 'anonymous'], ['mineDistributionVisibility', 'discovered']]) {
+					await openMenu()
+					const label = key + '=' + String(value)
+					await snap(key, value, label + ':before-click')
+					const control = page.locator('[data-modloader-config-key="' + key + '"]')
+					if (typeof value === 'boolean') await control.click()
+					else {
+						await control.locator('.modloader-select-button').click()
+						await page.locator('.modloader-select-menu:visible .modloader-select-option[data-value-key="string:' + value + '"]').click()
+					}
+					const clicked = await snap(key, value, label + ':after-click-before-close')
+					checkSnapshot(clicked, value, label + ' immediately after real click')
+					await closeAndHover()
+					const after = await snap(key, value, label + ':closed-rehover')
+					checkSnapshot(after, value, label + ' after closing menu and hovering')
+					expect(label + ' updates the existing panel', after.oldPanelSame, true)
+					expect(label + ' menu is closed', after.menuOpen, false)
+					if (key === 'enableMineDistributionChart') expect(label + ' actual existing chart visibility', after.chart.exists && !after.chart.hidden && after.chart.connected, value)
+					else if (key === 'mineDistributionChartView') expect(label + ' actual existing chart geometry', after.chart.view, value)
+					else {
+						expect(label + ' actual existing chart disclosure', after.chart.visibility, value)
+						expect(label + ' actual legend resource ids', after.chart.resourceIds, value === 'all' ? [0, 1, 2, 3, 4, 5, 6, 7] : [0, 1])
+						expect(label + ' anonymous count', after.chart.anonymous, value === 'anonymous' ? 6 : 0)
+					}
+					console.log('TRACE ' + scenario.name + ' ' + label + ': public=' + JSON.stringify(after.publicValue) + ', raw=' + after.rawStorage + ', chart=' + JSON.stringify(after.chart))
+				}
+			}
+			expect('no page exceptions', result.errors, [])
+			console.log('TRACE complete ' + scenario.name + ': ' + result.expectations.filter(item => item.passed).length + '/' + result.expectations.length + ' expectations')
+		} catch (error) {
+			result.runnerError = error.stack
+			report.hotFailures.push({ scenario: scenario.name, name: 'runner completes', error: error.stack })
+			console.error('TRACE runner ' + scenario.name + ': ' + error.message)
+		} finally {
+			result.trace = await page.evaluate(() => window.hotTrace || []).catch(() => [])
+			await page.screenshot({ path: path.join(OUTPUT, 'hot-' + scenario.name + '.png') }).catch(() => {})
+			fs.writeFileSync(path.join(OUTPUT, 'hot-' + scenario.name + '.json'), JSON.stringify(result, null, 2) + '\n')
+			await context.close()
+		}
+	}
+}
 
 async function main() {
 	let playwright
@@ -169,6 +355,13 @@ async function main() {
 	await context.route('**/*', route => route.request().url().startsWith(origin + '/') ? route.continue() : route.abort())
 	const page = await context.newPage()
 	try {
+		await runHotTrace(browser, origin)
+		if (HOT_ONLY) {
+			report.status = report.hotFailures.length ? 'failed' : report.coldStartupFindings.length ? 'passed-with-separate-cold-startup-findings' : 'passed'
+			if (report.hotFailures.length) process.exitCode = 1
+			console.log('TRACE summary: ' + report.hotScenarios.length + ' scenarios, ' + report.hotFailures.length + ' existing-card failures, ' + report.coldStartupFindings.length + ' separate cold-startup findings; ' + OUTPUT)
+			return
+		}
 		await page.goto(origin + '/')
 		await page.waitForFunction(() => window.ready || window.bootError, null, { polling: 100, timeout: 15000 })
 		assert.equal(await page.evaluate(() => window.bootError), undefined)
@@ -421,7 +614,8 @@ async function main() {
 			assert.deepEqual(result, { inactive: true, transitionRestored: true, layoutClassRestored: true, left: true, same: true })
 		})
 		assert.deepEqual(errors, [], 'zero browser page exceptions')
-		report.status = 'passed'
+		report.status = report.hotFailures.length ? 'failed' : report.coldStartupFindings.length ? 'passed-with-separate-cold-startup-findings' : 'passed'
+		if (report.hotFailures.length) process.exitCode = 1
 	} finally {
 		report.browserErrors = errors
 		await browser.close()

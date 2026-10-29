@@ -1,0 +1,2848 @@
+{
+  "id": "Cattail_TweaksQuality_Tweaks",
+  "config": {
+    "enableWindowPresets": {
+      "type": "boolean",
+      "label": {
+        "sch": "窗口预设",
+        "modsch": "窗口预设",
+        "en": "Window presets",
+        "ru": "Настройки окна",
+        "de": "Fenstervorgaben",
+        "ptbr": "Predefinições de janela",
+        "it": "Preimpostazioni finestra",
+        "es": "Preajustes de ventana",
+        "fr": "Préréglages de fenêtre",
+        "nl": "Venstervoorinstellingen",
+        "cz": "Předvolby okna",
+        "pl": "Ustawienia okna",
+        "jp": "ウィンドウプリセット",
+        "kr": "창 프리셋",
+        "tch": "視窗預設",
+        "thai": "ค่าหน้าต่างสำเร็จรูป",
+        "hu": "Ablakbeállítások",
+        "lv": "Loga iestatījumu sagataves",
+        "ro": "Presetări pentru fereastră",
+        "no": "Vindusforvalg"
+      },
+      "default": true,
+      "description": {
+        "sch": "提供全屏、无边框和普通窗口的显示预设，可按主显示器能力选择宽高比与分辨率。",
+        "modsch": "提供全屏、无边框和普通窗口的显示预设，可按主显示器能力选择宽高比与分辨率。",
+        "en": "Provide fullscreen, borderless and windowed display presets, with aspect ratios and resolutions based on the primary display.",
+        "ru": "Предлагает полноэкранный, безрамочный и оконный режимы с разрешениями и пропорциями по возможностям основного монитора.",
+        "de": "Vorgaben für Vollbild, randloses und normales Fenster; Seitenverhältnisse und Auflösungen richten sich nach dem Hauptbildschirm.",
+        "ptbr": "Oferece tela cheia, sem bordas e janela, com proporções e resoluções conforme a tela principal.",
+        "it": "Offre schermo intero, senza bordi e finestra, con proporzioni e risoluzioni in base allo schermo principale.",
+        "es": "Ofrece pantalla completa, sin bordes y ventana, con relaciones de aspecto y resoluciones según la pantalla principal.",
+        "fr": "Propose des modes plein écran, sans bordure et fenêtré, avec formats et résolutions adaptés à l'écran principal.",
+        "nl": "Biedt volledig scherm, randloos en venstermodus, met beeldverhoudingen en resoluties op basis van het hoofdscherm.",
+        "cz": "Nabízí celou obrazovku, bezokrajový režim a okno, s poměry stran a rozlišeními podle hlavního monitoru.",
+        "pl": "Udostępnia pełny ekran, tryb bez ramek i okno, z proporcjami i rozdzielczościami dostosowanymi do głównego monitora.",
+        "jp": "全画面、ボーダーレス、通常ウィンドウのプリセットを提供し、メイン画面に応じて縦横比と解像度を選べます。",
+        "kr": "전체 화면, 테두리 없는 창, 일반 창 프리셋을 제공하며 주 모니터에 맞는 화면 비율과 해상도를 선택합니다.",
+        "tch": "提供全螢幕、無邊框和一般視窗的顯示預設，可依主顯示器能力選擇寬高比與解析度。",
+        "thai": "มีโหมดเต็มจอ ไร้ขอบ และหน้าต่าง พร้อมอัตราส่วนและความละเอียดตามความสามารถของจอหลัก",
+        "hu": "Teljes képernyős, keret nélküli és ablakos előbeállításokat kínál, a fő kijelzőhöz igazodó képaránnyal és felbontással.",
+        "lv": "Piedāvā pilnekrāna, bezapmaļu un parastu logu ar galvenajam ekrānam piemērotām proporcijām un izšķirtspējām.",
+        "ro": "Oferă ecran complet, fără margini și fereastră, cu proporții și rezoluții adaptate ecranului principal.",
+        "no": "Tilbyr fullskjerm, kantløst og vanlig vindu, med sideforhold og oppløsninger tilpasset hovedskjermen."
+      },
+      "reloadPolicy": "hot",
+      "section": "window",
+      "sectionLabel": {
+        "sch": "游戏窗口",
+        "modsch": "游戏窗口",
+        "en": "Game Window",
+        "ru": "Игровое окно",
+        "de": "Spielfenster",
+        "ptbr": "Janela do jogo",
+        "it": "Finestra di gioco",
+        "es": "Ventana del juego",
+        "fr": "Fenêtre du jeu",
+        "nl": "Spelvenster",
+        "cz": "Herní okno",
+        "pl": "Okno gry",
+        "jp": "ゲームウィンドウ",
+        "kr": "게임 창",
+        "tch": "遊戲視窗",
+        "thai": "หน้าต่างเกม",
+        "hu": "Játékablak",
+        "lv": "Spēles logs",
+        "ro": "Fereastra jocului",
+        "no": "Spillvindu"
+      }
+    },
+    "windowMode": {
+      "type": "select",
+      "label": {
+        "sch": "窗口模式",
+        "modsch": "窗口模式",
+        "en": "Window mode",
+        "ru": "Режим окна",
+        "de": "Fenstermodus",
+        "ptbr": "Modo de janela",
+        "it": "Modalità finestra",
+        "es": "Modo de ventana",
+        "fr": "Mode de fenêtre",
+        "nl": "Venstermodus",
+        "cz": "Režim okna",
+        "pl": "Tryb okna",
+        "jp": "ウィンドウモード",
+        "kr": "창 모드",
+        "tch": "視窗模式",
+        "thai": "โหมดหน้าต่าง",
+        "hu": "Ablakmód",
+        "lv": "Loga režīms",
+        "ro": "Modul ferestrei",
+        "no": "Vindusmodus"
+      },
+      "default": "fullscreen",
+      "description": {
+        "sch": "选择全屏、无边框或普通窗口。无边框的系统标题栏会在下次启动游戏后移除。",
+        "modsch": "选择全屏、无边框或普通窗口。无边框的系统标题栏会在下次启动游戏后移除。",
+        "en": "Choose fullscreen, borderless or windowed mode. Borderless mode removes the system title bar after the next game restart.",
+        "ru": "Выберите полный экран, окно без рамки или обычное окно. В безрамочном режиме заголовок исчезнет после перезапуска игры.",
+        "de": "Vollbild, randloses oder normales Fenster wählen. Im randlosen Modus verschwindet die Systemtitelleiste nach dem nächsten Spielstart.",
+        "ptbr": "Escolha tela cheia, sem bordas ou janela. O modo sem bordas remove a barra de título após reiniciar o jogo.",
+        "it": "Scegli schermo intero, senza bordi o finestra. Senza bordi rimuove la barra del titolo al prossimo riavvio del gioco.",
+        "es": "Elige pantalla completa, sin bordes o ventana. El modo sin bordes quita la barra de título al reiniciar el juego.",
+        "fr": "Choisit plein écran, sans bordure ou fenêtré. La barre de titre disparaît au prochain lancement en mode sans bordure.",
+        "nl": "Kies volledig scherm, randloos of venster. Randloos verwijdert de systeemtitelbalk na de volgende herstart.",
+        "cz": "Vyberte celou obrazovku, bezokrajový režim nebo okno. Bezokrajový režim odstraní záhlaví při příštím spuštění.",
+        "pl": "Wybierz pełny ekran, okno bez ramek lub zwykłe okno. Pasek tytułu znika po następnym uruchomieniu w trybie bez ramek.",
+        "jp": "全画面、ボーダーレス、通常ウィンドウを選択します。ボーダーレスのタイトルバーは次回起動時に消えます。",
+        "kr": "전체 화면, 테두리 없는 창, 일반 창을 선택합니다. 테두리 없는 창의 제목 표시줄은 다음 실행 시 제거됩니다.",
+        "tch": "選擇全螢幕、無邊框或一般視窗。無邊框的系統標題列會在下次啟動遊戲後移除。",
+        "thai": "เลือกเต็มจอ ไร้ขอบ หรือหน้าต่างปกติ โหมดไร้ขอบจะนำแถบชื่อระบบออกเมื่อเปิดเกมครั้งถัดไป",
+        "hu": "Teljes képernyős, keret nélküli vagy ablakos mód választható. Keret nélkül a címsor a következő indításkor tűnik el.",
+        "lv": "Izvēlieties pilnekrāna, bezapmaļu vai parastu logu. Bezapmaļu režīmā virsrakstjosla pazūd pēc nākamās spēles palaišanas.",
+        "ro": "Alege ecran complet, fără margini sau fereastră. Fără margini elimină bara de titlu la următoarea pornire a jocului.",
+        "no": "Velg fullskjerm, kantløst eller vanlig vindu. Kantløst fjerner systemets tittellinje etter neste spillstart."
+      },
+      "reloadPolicy": "hot",
+      "section": "window",
+      "options": [
+        {
+          "value": "fullscreen",
+          "label": {
+            "sch": "全屏",
+            "modsch": "全屏",
+            "en": "Fullscreen",
+            "ru": "Полный экран",
+            "de": "Vollbild",
+            "ptbr": "Tela cheia",
+            "it": "Schermo intero",
+            "es": "Pantalla completa",
+            "fr": "Plein écran",
+            "nl": "Volledig scherm",
+            "cz": "Celá obrazovka",
+            "pl": "Pełny ekran",
+            "jp": "フルスクリーン",
+            "kr": "전체 화면",
+            "tch": "全螢幕",
+            "thai": "เต็มจอ",
+            "hu": "Teljes képernyő",
+            "lv": "Pilnekrāns",
+            "ro": "Ecran complet",
+            "no": "Fullskjerm"
+          }
+        },
+        {
+          "value": "borderless",
+          "label": {
+            "sch": "无边框",
+            "modsch": "无边框",
+            "en": "Borderless",
+            "ru": "Без рамки",
+            "de": "Rahmenlos",
+            "ptbr": "Sem borda",
+            "it": "Senza bordi",
+            "es": "Sin bordes",
+            "fr": "Sans bordure",
+            "nl": "Randloos",
+            "cz": "Bez rámečku",
+            "pl": "Bez ramki",
+            "jp": "ボーダーレス",
+            "kr": "테두리 없음",
+            "tch": "無邊框",
+            "thai": "ไร้ขอบ",
+            "hu": "Keret nélküli",
+            "lv": "Bez malām",
+            "ro": "Fără bordură",
+            "no": "Kantløs"
+          }
+        },
+        {
+          "value": "window",
+          "label": {
+            "sch": "窗口",
+            "modsch": "窗口",
+            "en": "Window",
+            "ru": "Окно",
+            "de": "Fenster",
+            "ptbr": "Janela",
+            "it": "Finestra",
+            "es": "Ventana",
+            "fr": "Fenêtre",
+            "nl": "Venster",
+            "cz": "Okno",
+            "pl": "Okno",
+            "jp": "ウィンドウ",
+            "kr": "창",
+            "tch": "視窗",
+            "thai": "หน้าต่าง",
+            "hu": "Ablak",
+            "lv": "Logs",
+            "ro": "Fereastră",
+            "no": "Vindu"
+          }
+        }
+      ],
+      "valueLabels": {
+        "fullscreen": {
+          "sch": "全屏",
+          "modsch": "全屏",
+          "en": "Fullscreen",
+          "ru": "Полный экран",
+          "de": "Vollbild",
+          "ptbr": "Tela cheia",
+          "it": "Schermo intero",
+          "es": "Pantalla completa",
+          "fr": "Plein écran",
+          "nl": "Volledig scherm",
+          "cz": "Celá obrazovka",
+          "pl": "Pełny ekran",
+          "jp": "フルスクリーン",
+          "kr": "전체 화면",
+          "tch": "全螢幕",
+          "thai": "เต็มจอ",
+          "hu": "Teljes képernyő",
+          "lv": "Pilnekrāns",
+          "ro": "Ecran complet",
+          "no": "Fullskjerm"
+        },
+        "borderless": {
+          "sch": "无边框",
+          "modsch": "无边框",
+          "en": "Borderless",
+          "ru": "Без рамки",
+          "de": "Rahmenlos",
+          "ptbr": "Sem borda",
+          "it": "Senza bordi",
+          "es": "Sin bordes",
+          "fr": "Sans bordure",
+          "nl": "Randloos",
+          "cz": "Bez rámečku",
+          "pl": "Bez ramki",
+          "jp": "ボーダーレス",
+          "kr": "테두리 없음",
+          "tch": "無邊框",
+          "thai": "ไร้ขอบ",
+          "hu": "Keret nélküli",
+          "lv": "Bez malām",
+          "ro": "Fără bordură",
+          "no": "Kantløs"
+        },
+        "window": {
+          "sch": "窗口",
+          "modsch": "窗口",
+          "en": "Window",
+          "ru": "Окно",
+          "de": "Fenster",
+          "ptbr": "Janela",
+          "it": "Finestra",
+          "es": "Ventana",
+          "fr": "Fenêtre",
+          "nl": "Venster",
+          "cz": "Okno",
+          "pl": "Okno",
+          "jp": "ウィンドウ",
+          "kr": "창",
+          "tch": "視窗",
+          "thai": "หน้าต่าง",
+          "hu": "Ablak",
+          "lv": "Logs",
+          "ro": "Fereastră",
+          "no": "Vindu"
+        }
+      }
+    },
+    "windowAspectRatio": {
+      "type": "select",
+      "label": {
+        "sch": "窗口宽高比",
+        "modsch": "窗口宽高比",
+        "en": "Window aspect ratio",
+        "ru": "Пропорции окна",
+        "de": "Fensterseitenverhältnis",
+        "ptbr": "Proporção da janela",
+        "it": "Proporzioni finestra",
+        "es": "Relación de aspecto de ventana",
+        "fr": "Format de fenêtre",
+        "nl": "Vensterbeeldverhouding",
+        "cz": "Poměr stran okna",
+        "pl": "Proporcje okna",
+        "jp": "ウィンドウの縦横比",
+        "kr": "창 화면 비율",
+        "tch": "視窗寬高比",
+        "thai": "อัตราส่วนหน้าต่าง",
+        "hu": "Ablak képaránya",
+        "lv": "Loga malu attiecība",
+        "ro": "Raportul ferestrei",
+        "no": "Vinduets sideforhold"
+      },
+      "default": "16:9",
+      "description": {
+        "sch": "决定可选窗口分辨率的宽高比；21:9和32:9仅在显示器足够宽时提供。",
+        "modsch": "决定可选窗口分辨率的宽高比；21:9和32:9仅在显示器足够宽时提供。",
+        "en": "Set the aspect ratio of available window resolutions; 21:9 and 32:9 require a sufficiently wide display.",
+        "ru": "Определяет пропорции доступных разрешений; 21:9 и 32:9 доступны на достаточно широком мониторе.",
+        "de": "Bestimmt das Seitenverhältnis der verfügbaren Auflösungen; 21:9 und 32:9 erfordern einen ausreichend breiten Bildschirm.",
+        "ptbr": "Define a proporção das resoluções disponíveis; 21:9 e 32:9 exigem uma tela suficientemente larga.",
+        "it": "Determina le proporzioni delle risoluzioni disponibili; 21:9 e 32:9 richiedono uno schermo abbastanza largo.",
+        "es": "Determina las resoluciones disponibles; 21:9 y 32:9 requieren una pantalla suficientemente ancha.",
+        "fr": "Détermine le format des résolutions disponibles ; 21:9 et 32:9 nécessitent un écran assez large.",
+        "nl": "Bepaalt de beeldverhouding van beschikbare resoluties; 21:9 en 32:9 vereisen een breed genoeg scherm.",
+        "cz": "Určuje poměr dostupných rozlišení; 21:9 a 32:9 vyžadují dostatečně široký monitor.",
+        "pl": "Określa proporcje dostępnych rozdzielczości; 21:9 i 32:9 wymagają odpowiednio szerokiego monitora.",
+        "jp": "選べる解像度の縦横比を設定します。21:9と32:9には十分に横長の画面が必要です。",
+        "kr": "선택 가능한 해상도의 비율을 정합니다. 21:9와 32:9는 충분히 넓은 모니터에서 제공됩니다.",
+        "tch": "決定可選視窗解析度的寬高比；21:9和32:9僅在顯示器足夠寬時提供。",
+        "thai": "กำหนดอัตราส่วนของความละเอียดที่เลือกได้ โดย 21:9 และ 32:9 ต้องใช้จอที่กว้างเพียงพอ",
+        "hu": "Meghatározza a felbontások képarányát; a 21:9 és 32:9 elég széles kijelzőt igényel.",
+        "lv": "Nosaka pieejamo izšķirtspēju proporcijas; 21:9 un 32:9 vajadzīgs pietiekami plats ekrāns.",
+        "ro": "Determină proporțiile rezoluțiilor disponibile; 21:9 și 32:9 cer un ecran suficient de lat.",
+        "no": "Bestemmer sideforholdet til tilgjengelige oppløsninger; 21:9 og 32:9 krever en bred nok skjerm."
+      },
+      "reloadPolicy": "hot",
+      "section": "window",
+      "options": [
+        {
+          "value": "1:1",
+          "label": "1:1"
+        },
+        {
+          "value": "4:3",
+          "label": "4:3"
+        },
+        {
+          "value": "16:9",
+          "label": "16:9"
+        }
+      ],
+      "valueLabels": {
+        "1:1": {
+          "sch": "1:1",
+          "modsch": "1:1",
+          "en": "1:1",
+          "ru": "1:1",
+          "de": "1:1",
+          "ptbr": "1:1",
+          "it": "1:1",
+          "es": "1:1",
+          "fr": "1:1",
+          "nl": "1:1",
+          "cz": "1:1",
+          "pl": "1:1",
+          "jp": "1:1",
+          "kr": "1:1",
+          "tch": "1:1",
+          "thai": "1:1",
+          "hu": "1:1",
+          "lv": "1:1",
+          "ro": "1:1",
+          "no": "1:1"
+        },
+        "4:3": {
+          "sch": "4:3",
+          "modsch": "4:3",
+          "en": "4:3",
+          "ru": "4:3",
+          "de": "4:3",
+          "ptbr": "4:3",
+          "it": "4:3",
+          "es": "4:3",
+          "fr": "4:3",
+          "nl": "4:3",
+          "cz": "4:3",
+          "pl": "4:3",
+          "jp": "4:3",
+          "kr": "4:3",
+          "tch": "4:3",
+          "thai": "4:3",
+          "hu": "4:3",
+          "lv": "4:3",
+          "ro": "4:3",
+          "no": "4:3"
+        },
+        "16:9": {
+          "sch": "16:9",
+          "modsch": "16:9",
+          "en": "16:9",
+          "ru": "16:9",
+          "de": "16:9",
+          "ptbr": "16:9",
+          "it": "16:9",
+          "es": "16:9",
+          "fr": "16:9",
+          "nl": "16:9",
+          "cz": "16:9",
+          "pl": "16:9",
+          "jp": "16:9",
+          "kr": "16:9",
+          "tch": "16:9",
+          "thai": "16:9",
+          "hu": "16:9",
+          "lv": "16:9",
+          "ro": "16:9",
+          "no": "16:9"
+        },
+        "21:9": {
+          "sch": "21:9",
+          "modsch": "21:9",
+          "en": "21:9",
+          "ru": "21:9",
+          "de": "21:9",
+          "ptbr": "21:9",
+          "it": "21:9",
+          "es": "21:9",
+          "fr": "21:9",
+          "nl": "21:9",
+          "cz": "21:9",
+          "pl": "21:9",
+          "jp": "21:9",
+          "kr": "21:9",
+          "tch": "21:9",
+          "thai": "21:9",
+          "hu": "21:9",
+          "lv": "21:9",
+          "ro": "21:9",
+          "no": "21:9"
+        },
+        "32:9": {
+          "sch": "32:9",
+          "modsch": "32:9",
+          "en": "32:9",
+          "ru": "32:9",
+          "de": "32:9",
+          "ptbr": "32:9",
+          "it": "32:9",
+          "es": "32:9",
+          "fr": "32:9",
+          "nl": "32:9",
+          "cz": "32:9",
+          "pl": "32:9",
+          "jp": "32:9",
+          "kr": "32:9",
+          "tch": "32:9",
+          "thai": "32:9",
+          "hu": "32:9",
+          "lv": "32:9",
+          "ro": "32:9",
+          "no": "32:9"
+        }
+      }
+    },
+    "windowResolution": {
+      "type": "select",
+      "label": {
+        "sch": "窗口分辨率",
+        "modsch": "窗口分辨率",
+        "en": "Window resolution",
+        "ru": "Разрешение окна",
+        "de": "Fensterauflösung",
+        "ptbr": "Resolução da janela",
+        "it": "Risoluzione finestra",
+        "es": "Resolución de ventana",
+        "fr": "Résolution de fenêtre",
+        "nl": "Vensterresolutie",
+        "cz": "Rozlišení okna",
+        "pl": "Rozdzielczość okna",
+        "jp": "ウィンドウ解像度",
+        "kr": "창 해상도",
+        "tch": "視窗解析度",
+        "thai": "ความละเอียดหน้าต่าง",
+        "hu": "Ablak felbontása",
+        "lv": "Loga izšķirtspēja",
+        "ro": "Rezoluția ferestrei",
+        "no": "Vindusoppløsning"
+      },
+      "default": "1280x720",
+      "description": {
+        "sch": "调整窗口的分辨率，切换后立即应用到窗口。",
+        "modsch": "调整窗口的分辨率，切换后立即应用到窗口。",
+        "en": "Change the window resolution and apply it immediately.",
+        "ru": "Изменяет разрешение окна и сразу применяет его.",
+        "de": "Ändert die Fensterauflösung und wendet sie sofort an.",
+        "ptbr": "Altera a resolução da janela e aplica imediatamente.",
+        "it": "Cambia la risoluzione della finestra e la applica subito.",
+        "es": "Cambia la resolución de la ventana y la aplica de inmediato.",
+        "fr": "Change la résolution de la fenêtre et l'applique immédiatement.",
+        "nl": "Verandert de vensterresolutie en past deze direct toe.",
+        "cz": "Změní rozlišení okna a ihned je použije.",
+        "pl": "Zmienia rozdzielczość okna i stosuje ją od razu.",
+        "jp": "ウィンドウの解像度を変更し、すぐに適用します。",
+        "kr": "창 해상도를 변경하고 즉시 적용합니다.",
+        "tch": "調整視窗的解析度，切換後立即套用至視窗。",
+        "thai": "เปลี่ยนความละเอียดหน้าต่างและใช้ทันที",
+        "hu": "Módosítja és azonnal alkalmazza az ablak felbontását.",
+        "lv": "Maina loga izšķirtspēju un uzreiz to piemēro.",
+        "ro": "Schimbă rezoluția ferestrei și o aplică imediat.",
+        "no": "Endrer vinduets oppløsning og bruker den med en gang."
+      },
+      "reloadPolicy": "hot",
+      "section": "window",
+      "options": [
+        {
+          "value": "1280x720",
+          "label": "1280 x 720"
+        }
+      ]
+    },
+    "enableBetterEscape": {
+      "type": "boolean",
+      "label": {
+        "en": "Optimize ESC cancellation [1.3]",
+        "sch": "优化ESC返回的逻辑 [1.3]",
+        "modsch": "优化ESC返回的逻辑 [1.3]",
+        "tch": "最佳化ESC返回邏輯 [1.3]",
+        "ru": "Оптимизировать отмену через ESC [1.3]",
+        "de": "ESC-Abbruchlogik optimieren [1.3]",
+        "ptbr": "Otimizar cancelamento com ESC [1.3]",
+        "it": "Ottimizza annullamento con ESC [1.3]",
+        "es": "Optimizar la cancelación con ESC [1.3]",
+        "fr": "Optimiser l’annulation par ESC [1.3]",
+        "nl": "Annuleren met ESC optimaliseren [1.3]",
+        "cz": "Optimalizovat rušení pomocí ESC [1.3]",
+        "pl": "Optymalizuj anulowanie przez ESC [1.3]",
+        "jp": "ESCのキャンセル動作を最適化 [1.3]",
+        "kr": "ESC 취소 동작 최적화 [1.3]",
+        "thai": "ปรับปรุงการยกเลิกด้วย ESC [1.3]",
+        "hu": "ESC megszakítás optimalizálása [1.3]",
+        "lv": "Optimizēt atcelšanu ar ESC [1.3]",
+        "ro": "Optimizează anularea prin ESC [1.3]",
+        "no": "Optimaliser avbryting med ESC [1.3]"
+      },
+      "default": true,
+      "description": {
+        "en": "Press ESC to cancel Q dismantling, E relocation, building placement or the open shop instead of opening the game menu.",
+        "sch": "在Q拆除、E搬迁、建造建筑和打开商店时，按ESC取消当前状态，而非回到游戏菜单。",
+        "modsch": "在Q拆除、E搬迁、建造建筑和打开商店时，按ESC取消当前状态，而非回到游戏菜单。",
+        "tch": "在Q拆除、E搬遷、建造建築和開啟商店時，按ESC取消目前狀態，而非返回遊戲選單。",
+        "ru": "ESC отменяет разборку Q, перенос E, размещение здания или открытый магазин вместо открытия меню игры.",
+        "de": "ESC beendet Q-Abbau, E-Versetzen, Gebäudeplatzierung oder den offenen Laden, statt das Spielmenü zu öffnen.",
+        "ptbr": "ESC cancela desmontagem Q, movimentação E, construção ou a loja aberta em vez de abrir o menu do jogo.",
+        "it": "ESC annulla smontaggio Q, spostamento E, costruzione o negozio aperto invece di aprire il menu di gioco.",
+        "es": "ESC cancela el desmontaje Q, el traslado E, la colocación o la tienda abierta en vez de abrir el menú del juego.",
+        "fr": "ESC annule le démontage Q, le déplacement E, le placement ou la boutique ouverte au lieu d'ouvrir le menu du jeu.",
+        "nl": "ESC annuleert Q-afbraak, E-verplaatsing, gebouwplaatsing of de geopende winkel in plaats van het spelmenu te openen.",
+        "cz": "ESC zruší rozebírání Q, přesun E, stavění nebo otevřený obchod místo otevření herního menu.",
+        "pl": "ESC anuluje rozbiórkę Q, przenoszenie E, stawianie lub otwarty sklep zamiast otwierać menu gry.",
+        "jp": "Q解体、E移設、建物配置、ショップ表示中のESCは、ゲームメニューを開く代わりに現在の状態を解除します。",
+        "kr": "Q 철거, E 이전, 건물 배치, 상점 열기 상태에서 ESC를 누르면 게임 메뉴 대신 현재 상태를 취소합니다.",
+        "thai": "ESC ยกเลิกโหมดรื้อถอน Q ย้าย E วางอาคาร หรือร้านค้าที่เปิดอยู่ แทนการเปิดเมนูเกม",
+        "hu": "Az ESC a Q bontást, E áthelyezést, építést vagy nyitott boltot szakítja meg a játékmenü megnyitása helyett.",
+        "lv": "ESC atceļ Q nojaukšanu, E pārvietošanu, būvniecību vai atvērtu veikalu, nevis atver spēles izvēlni.",
+        "ro": "ESC anulează demontarea Q, mutarea E, amplasarea sau magazinul deschis în loc să deschidă meniul jocului.",
+        "no": "ESC avbryter Q-riving, E-flytting, byggeplassering eller åpen butikk i stedet for å åpne spillmenyen."
+      },
+      "reloadPolicy": "hot",
+      "section": "improvements",
+      "sectionLabel": {
+        "sch": "功能优化",
+        "modsch": "功能优化",
+        "en": "Feature Improvements",
+        "ru": "Улучшения функций",
+        "de": "Funktionsverbesserungen",
+        "ptbr": "Melhorias de funcionalidades",
+        "it": "Miglioramenti delle funzionalità",
+        "es": "Mejoras de funciones",
+        "fr": "Améliorations des fonctionnalités",
+        "nl": "Functieverbeteringen",
+        "cz": "Vylepšení funkcí",
+        "pl": "Ulepszenia funkcji",
+        "jp": "機能改善",
+        "kr": "기능 개선",
+        "tch": "功能優化",
+        "thai": "การปรับปรุงฟังก์ชัน",
+        "hu": "Funkciófejlesztések",
+        "lv": "Funkciju uzlabojumi",
+        "ro": "Îmbunătățiri ale funcțiilor",
+        "no": "Funksjonsforbedringer"
+      }
+    },
+    "enableEndingSkip": {
+      "type": "boolean",
+      "label": "Ending skips and faster credits",
+      "default": true,
+      "description": "Add skip buttons to the ending; hold Space to speed up the credits. Afterwards, you can return to before the ending without starting the next run.",
+      "section": "improvements"
+    },
+    "enableBetterKernelRangePreview": {
+      "type": "boolean",
+      "label": {
+        "en": "Improve Supercritical Core range preview",
+        "sch": "改进超临界内核范围的预览",
+        "modsch": "改进超临界内核范围的预览",
+        "tch": "改善超臨界核心範圍預覽",
+        "ru": "Улучшить предпросмотр сверхкритического ядра",
+        "de": "Reichweitenvorschau des überkritischen Kerns verbessern",
+        "ptbr": "Melhorar a prévia do núcleo supercrítico",
+        "it": "Migliora l'anteprima del nucleo supercritico",
+        "es": "Mejorar la vista previa del núcleo supercrítico",
+        "fr": "Améliorer l'aperçu du noyau supercritique",
+        "nl": "Bereikvoorbeeld van de superkritische kern verbeteren",
+        "cz": "Lepší náhled dosahu nadkritického jádra",
+        "pl": "Lepszy podgląd zasięgu rdzenia nadkrytycznego",
+        "jp": "超臨界コアの範囲プレビューを改善",
+        "kr": "초임계 코어 범위 미리 보기 개선",
+        "thai": "ปรับปรุงตัวอย่างระยะของแกนวิกฤตยิ่งยวด",
+        "hu": "Szuperkritikus mag hatókörének jobb előnézete",
+        "lv": "Uzlabot superkritiskā kodola diapazona priekšskatījumu",
+        "ro": "Îmbunătățește previzualizarea nucleului supercritic",
+        "no": "Bedre forhåndsvisning av superkritisk kjernerekkevidde"
+      },
+      "default": true,
+      "description": {
+        "en": "Preview the actual scan coverage when placing a Supercritical Core.",
+        "sch": "放置超临界内核时，可预览实际扫描覆盖范围。",
+        "modsch": "放置超临界内核时，可预览实际扫描覆盖范围。",
+        "tch": "放置超臨界核心時，可預覽實際掃描覆蓋範圍。",
+        "ru": "Показывает реальную область сканирования при размещении сверхкритического ядра.",
+        "de": "Zeigt beim Platzieren des überkritischen Kerns die tatsächliche Scanabdeckung.",
+        "ptbr": "Mostra a cobertura real da varredura ao posicionar um núcleo supercrítico.",
+        "it": "Mostra la copertura reale della scansione quando posizioni un nucleo supercritico.",
+        "es": "Muestra la cobertura real del escaneo al colocar un núcleo supercrítico.",
+        "fr": "Affiche la couverture réelle du balayage lors du placement d'un noyau supercritique.",
+        "nl": "Toont bij plaatsing de werkelijke scandekking van een superkritische kern.",
+        "cz": "Při umístění nadkritického jádra zobrazí skutečné pokrytí skenování.",
+        "pl": "Pokazuje rzeczywisty obszar skanowania podczas ustawiania rdzenia nadkrytycznego.",
+        "jp": "超臨界コアを配置するとき、実際のスキャン範囲を表示します。",
+        "kr": "초임계 코어를 배치할 때 실제 스캔 범위를 미리 봅니다.",
+        "thai": "แสดงพื้นที่สแกนจริงขณะวางแกนวิกฤตยิ่งยวด",
+        "hu": "Elhelyezéskor a szuperkritikus mag tényleges pásztázási területét mutatja.",
+        "lv": "Novietojot superkritisko kodolu, rāda faktisko skenēšanas pārklājumu.",
+        "ro": "Arată acoperirea reală a scanării la amplasarea unui nucleu supercritic.",
+        "no": "Viser faktisk skannedekning når du plasserer en superkritisk kjerne."
+      },
+      "reloadPolicy": "hot",
+      "section": "improvements"
+    },
+    "enableGradientRelocationPunctureAllow": {
+      "type": "boolean",
+      "label": {
+        "en": "Allow relocating Gradient Wells onto Punctures",
+        "sch": "允许丰度矿井直接搬迁至隧穿洞上",
+        "modsch": "允许丰度矿井直接搬迁至隧穿洞上",
+        "tch": "允許豐度礦井直接搬遷至隧穿洞上",
+        "ru": "Перенос Gradient Well на Puncture",
+        "de": "Gradient Wells auf Punctures versetzen",
+        "ptbr": "Permitir mover Gradient Wells sobre Punctures",
+        "it": "Spostare i Gradient Wells sulle Punctures",
+        "es": "Permitir trasladar Gradient Wells sobre Punctures",
+        "fr": "Déplacer les Gradient Wells sur les Punctures",
+        "nl": "Gradient Wells op Punctures verplaatsen",
+        "cz": "Přesun Gradient Wells na Punctures",
+        "pl": "Przenoszenie Gradient Wells na Punctures",
+        "jp": "Gradient WellをPuncture上へ移設可能にする",
+        "kr": "Gradient Well을 Puncture 위로 이전 허용",
+        "thai": "อนุญาตให้ย้าย Gradient Well ไปบน Puncture",
+        "hu": "Gradient Well áthelyezése Puncture fölé",
+        "lv": "Pārvietot Gradient Wells uz Punctures",
+        "ro": "Permite mutarea Gradient Wells pe Punctures",
+        "no": "Flytt Gradient Wells til Punctures"
+      },
+      "default": true,
+      "description": {
+        "en": "Fix the base game's restriction that prevents relocating a Gradient Well onto a Puncture.",
+        "sch": "避免原版丰度矿井无法搬迁至隧穿洞上的问题。",
+        "modsch": "避免原版丰度矿井无法搬迁至隧穿洞上的问题。",
+        "tch": "避免原版豐度礦井無法搬遷至隧穿洞上的問題。",
+        "ru": "Исправляет ограничение игры, мешающее переносить Gradient Well на Puncture.",
+        "de": "Behebt die Einschränkung des Grundspiels, die das Versetzen eines Gradient Well auf eine Puncture verhindert.",
+        "ptbr": "Corrige a restrição do jogo que impede mover um Gradient Well sobre uma Puncture.",
+        "it": "Corregge il limite del gioco che impedisce di spostare un Gradient Well su una Puncture.",
+        "es": "Corrige la restricción del juego que impide trasladar un Gradient Well sobre una Puncture.",
+        "fr": "Corrige la restriction du jeu empêchant de déplacer un Gradient Well sur une Puncture.",
+        "nl": "Verhelpt de beperking die verhindert een Gradient Well op een Puncture te verplaatsen.",
+        "cz": "Opravuje omezení hry, které brání přesunu Gradient Well na Puncture.",
+        "pl": "Naprawia ograniczenie gry uniemożliwiające przeniesienie Gradient Well na Puncture.",
+        "jp": "Gradient WellをPuncture上へ移設できない元の制限を修正します。",
+        "kr": "Gradient Well을 Puncture 위로 이전할 수 없는 원본 게임의 제한을 수정합니다.",
+        "thai": "แก้ข้อจำกัดเดิมที่ทำให้ย้าย Gradient Well ไปบน Puncture ไม่ได้",
+        "hu": "Javítja az alapjáték korlátozását, amely megakadályozza a Gradient Well áthelyezését Puncture fölé.",
+        "lv": "Labo spēles ierobežojumu, kas neļauj pārvietot Gradient Well uz Puncture.",
+        "ro": "Corectează restricția jocului care împiedică mutarea unui Gradient Well pe o Puncture.",
+        "no": "Retter grunnspillets begrensning som hindrer flytting av en Gradient Well til en Puncture."
+      },
+      "reloadPolicy": "hot",
+      "section": "improvements"
+    },
+    "enableGradientRelocationNoPenalty": {
+      "type": "boolean",
+      "label": {
+        "en": "Preserve Gradient Well output after relocation",
+        "sch": "允许丰度矿井搬迁后保持原产率",
+        "modsch": "允许丰度矿井搬迁后保持原产率",
+        "tch": "允許豐度礦井搬遷後保持原產率",
+        "ru": "Сохранять производительность Gradient Well при переносе",
+        "de": "Ertrag von Gradient Wells nach dem Versetzen behalten",
+        "ptbr": "Preservar a produção dos Gradient Wells movidos",
+        "it": "Mantieni la produzione dei Gradient Wells spostati",
+        "es": "Conservar la producción del Gradient Well trasladado",
+        "fr": "Conserver le rendement des Gradient Wells déplacés",
+        "nl": "Opbrengst van verplaatste Gradient Wells behouden",
+        "cz": "Zachovat výnos přesunutých Gradient Wells",
+        "pl": "Zachowanie wydajności przeniesionego Gradient Well",
+        "jp": "Gradient Well移設後も生産率を維持",
+        "kr": "Gradient Well 이전 후 생산율 유지",
+        "thai": "คงผลผลิต Gradient Well หลังย้าย",
+        "hu": "Gradient Well hozamának megőrzése áthelyezéskor",
+        "lv": "Saglabāt Gradient Well ražību pēc pārvietošanas",
+        "ro": "Păstrează producția Gradient Well după mutare",
+        "no": "Behold produksjonen ved flytting av Gradient Wells"
+      },
+      "default": true,
+      "description": {
+        "en": "Prevent a Gradient Well upgraded through a Puncture from losing half its output after relocation.",
+        "sch": "避免已经隧穿洞升级的丰度矿井在搬迁后产量减半的问题。",
+        "modsch": "避免已经隧穿洞升级的丰度矿井在搬迁后产量减半的问题。",
+        "tch": "避免已經隧穿洞升級的豐度礦井在搬遷後產量減半的問題。",
+        "ru": "Не даёт производительности Gradient Well, улучшенного через Puncture, уменьшиться вдвое после переноса.",
+        "de": "Verhindert halbierten Ertrag nach dem Versetzen eines durch eine Puncture verbesserten Gradient Well.",
+        "ptbr": "Evita perder metade da produção ao mover um Gradient Well aprimorado por uma Puncture.",
+        "it": "Evita il dimezzamento della produzione spostando un Gradient Well potenziato tramite una Puncture.",
+        "es": "Evita que un Gradient Well mejorado mediante una Puncture pierda la mitad de producción al trasladarlo.",
+        "fr": "Évite de diviser par deux le rendement après déplacement d'un Gradient Well amélioré via une Puncture.",
+        "nl": "Voorkomt halvering van de opbrengst na verplaatsing van een via een Puncture verbeterde Gradient Well.",
+        "cz": "Brání polovičnímu výnosu po přesunu Gradient Well vylepšeného pomocí Puncture.",
+        "pl": "Zapobiega spadkowi produkcji o połowę po przeniesieniu Gradient Well ulepszonego przez Puncture.",
+        "jp": "Punctureで強化したGradient Wellの生産量が移設後に半減する問題を防ぎます。",
+        "kr": "Puncture로 강화한 Gradient Well이 이전 후 생산량을 절반 잃는 문제를 방지합니다.",
+        "thai": "ป้องกันผลผลิตลดครึ่งหนึ่งหลังย้าย Gradient Well ที่อัปเกรดผ่าน Puncture",
+        "hu": "Megakadályozza a Puncture által fejlesztett Gradient Well termelésének feleződését áthelyezés után.",
+        "lv": "Neļauj ar Puncture uzlabota Gradient Well ražībai samazināties uz pusi pēc pārvietošanas.",
+        "ro": "Împiedică înjumătățirea producției după mutarea unui Gradient Well îmbunătățit printr-o Puncture.",
+        "no": "Hindrer halvert produksjon etter flytting av en Gradient Well oppgradert via en Puncture."
+      },
+      "reloadPolicy": "hot",
+      "section": "improvements"
+    },
+    "enableOfflineSimulationSkip": {
+      "type": "boolean",
+      "label": "Disable offline progress simulation",
+      "default": true,
+      "description": "Skip simulated offline gains when loading a save.",
+      "reloadPolicy": "hot",
+      "section": "disabledFeatures",
+      "sectionLabel": {
+        "sch": "禁用功能",
+        "modsch": "禁用功能",
+        "en": "Disabled Features",
+        "ru": "Отключение функций",
+        "de": "Funktionen deaktivieren",
+        "ptbr": "Desativar funcionalidades",
+        "it": "Disattivazione funzionalità",
+        "es": "Desactivar funciones",
+        "fr": "Désactivation de fonctionnalités",
+        "nl": "Functies uitschakelen",
+        "cz": "Vypnutí funkcí",
+        "pl": "Wyłączanie funkcji",
+        "jp": "機能の無効化",
+        "kr": "기능 비활성화",
+        "tch": "停用功能",
+        "thai": "การปิดฟังก์ชัน",
+        "hu": "Funkciók kikapcsolása",
+        "lv": "Funkciju atspējošana",
+        "ro": "Dezactivarea funcțiilor",
+        "no": "Deaktivering av funksjoner"
+      }
+    },
+    "enableSurgeFlashBlock": {
+      "type": "boolean",
+      "label": "Disable surge fullscreen flashes",
+      "default": true,
+      "description": "Suppress fullscreen flashes when an Energy Stabilizer activates its surge effect.",
+      "reloadPolicy": "hot",
+      "section": "disabledFeatures"
+    },
+    "enableGradientFlashBlock": {
+      "type": "boolean",
+      "label": "Disable Gradient Well fullscreen flashes",
+      "default": true,
+      "description": "Suppress fullscreen flashes when a Gradient Well collects Reality in the Void dimension.",
+      "reloadPolicy": "hot",
+      "section": "disabledFeatures"
+    },
+    "enableRealityReturnFadeSkip": {
+      "type": "boolean",
+      "label": "Disable the white fade when returning to Reality",
+      "default": true,
+      "description": "Remove the white fade when returning from the Void to Reality and show the clear scene immediately.",
+      "reloadPolicy": "hot",
+      "section": "disabledFeatures"
+    },
+    "enableWaypointFadeSkip": {
+      "type": "boolean",
+      "label": "Disable Waypoint black fades",
+      "default": true,
+      "description": "Remove the black fade after using a Waypoint and show the clear scene immediately.",
+      "reloadPolicy": "hot",
+      "section": "disabledFeatures"
+    },
+    "enableZoomResetBlock": {
+      "type": "boolean",
+      "label": "Disable zoom reset on a Shift/Ctrl tap",
+      "default": true,
+      "description": "Pressing and releasing Shift or Ctrl alone no longer resets the camera zoom.",
+      "reloadPolicy": "hot",
+      "section": "disabledFeatures"
+    },
+    "enableClearViewGridBlock": {
+      "type": "boolean",
+      "label": {
+        "en": "Disable the Clear View floor grid",
+        "sch": "禁用辅助视图的地板网格",
+        "modsch": "禁用辅助视图的地板网格",
+        "tch": "停用輔助視圖的地板網格",
+        "ru": "Отключить сетку вспомогательного вида",
+        "de": "Bodenraster der Hilfsansicht deaktivieren",
+        "ptbr": "Desativar grade da visão auxiliar",
+        "it": "Disattiva griglia della vista ausiliaria",
+        "es": "Desactivar la cuadrícula de la vista auxiliar",
+        "fr": "Désactiver la grille de la vue auxiliaire",
+        "nl": "Vloerraster van de hulpweergave uitschakelen",
+        "cz": "Vypnout mřížku pomocného pohledu",
+        "pl": "Wyłącz siatkę widoku pomocniczego",
+        "jp": "補助表示の床グリッドを無効化",
+        "kr": "보조 화면의 바닥 격자 비활성화",
+        "thai": "ปิดตารางพื้นในมุมมองช่วย",
+        "hu": "Segédnézet padlórácsának kikapcsolása",
+        "lv": "Izslēgt palīgskata grīdas režģi",
+        "ro": "Dezactivează grila vederii auxiliare",
+        "no": "Deaktiver gulvrutenett i hjelpevisning"
+      },
+      "default": false,
+      "description": {
+        "en": "Hide the Clear View floor grid while using Alt, building, dismantling or relocating buildings.",
+        "sch": "屏蔽在Alt、建造、拆除和搬迁建筑时辅助视图下的地板网格。",
+        "modsch": "屏蔽在Alt、建造、拆除和搬迁建筑时辅助视图下的地板网格。",
+        "tch": "屏蔽在Alt、建造、拆除和搬遷建築時輔助視圖下的地板網格。",
+        "ru": "Скрывает сетку вспомогательного вида при Alt, строительстве, разборке и переносе зданий.",
+        "de": "Blendet das Bodenraster der Hilfsansicht bei Alt, Bauen, Abbauen und Versetzen aus.",
+        "ptbr": "Oculta a grade da visão auxiliar com Alt e ao construir, desmontar ou mover edifícios.",
+        "it": "Nasconde la griglia ausiliaria con Alt e durante costruzione, smontaggio e spostamento degli edifici.",
+        "es": "Oculta la cuadrícula auxiliar al usar Alt, construir, desmontar o trasladar edificios.",
+        "fr": "Masque la grille de la vue auxiliaire avec Alt et pendant la construction, le démontage ou le déplacement.",
+        "nl": "Verbergt het hulpraster bij Alt, bouwen, afbreken en verplaatsen.",
+        "cz": "Skryje mřížku pomocného pohledu při Alt, stavění, rozebírání a přesouvání.",
+        "pl": "Ukrywa siatkę pomocniczą przy Alt, budowaniu, rozbieraniu i przenoszeniu budynków.",
+        "jp": "Alt、建設、解体、移設中の補助表示で床グリッドを非表示にします。",
+        "kr": "Alt, 건설, 철거, 건물 이전 중 보조 화면의 바닥 격자를 숨깁니다.",
+        "thai": "ซ่อนตารางพื้นของมุมมองช่วยขณะใช้ Alt สร้าง รื้อถอน หรือย้ายอาคาร",
+        "hu": "Elrejti a segédrácsot Alt, építés, bontás és áthelyezés közben.",
+        "lv": "Slēpj palīgskata režģi pie Alt, būvēšanas, nojaukšanas un ēku pārvietošanas.",
+        "ro": "Ascunde grila auxiliară la Alt, construire, demontare și mutare.",
+        "no": "Skjuler hjelperutenettet ved Alt, bygging, riving og flytting."
+      },
+      "reloadPolicy": "hot",
+      "section": "disabledFeatures"
+    },
+    "enableClearViewClipBlock": {
+      "type": "boolean",
+      "label": {
+        "en": "Disable Clear View building clipping",
+        "sch": "禁用辅助视图的建筑裁切",
+        "modsch": "禁用辅助视图的建筑裁切",
+        "tch": "停用輔助視圖的建築裁切",
+        "ru": "Отключить обрезку зданий во вспомогательном виде",
+        "de": "Gebäudezuschnitt der Hilfsansicht deaktivieren",
+        "ptbr": "Desativar recorte de edifícios na visão auxiliar",
+        "it": "Disattiva ritaglio edifici nella vista ausiliaria",
+        "es": "Desactivar el recorte de edificios en la vista auxiliar",
+        "fr": "Désactiver la découpe des bâtiments en vue auxiliaire",
+        "nl": "Gebouwuitsnijding in de hulpweergave uitschakelen",
+        "cz": "Vypnout ořez budov v pomocném pohledu",
+        "pl": "Wyłącz przycinanie budynków w widoku pomocniczym",
+        "jp": "補助表示の建物切り抜きを無効化",
+        "kr": "보조 화면의 건물 잘라내기 비활성화",
+        "thai": "ปิดการตัดภาพอาคารในมุมมองช่วย",
+        "hu": "Segédnézet épületvágásának kikapcsolása",
+        "lv": "Izslēgt ēku apgriešanu palīgskatā",
+        "ro": "Dezactivează decuparea clădirilor în vederea auxiliară",
+        "no": "Deaktiver bygningsklipping i hjelpevisning"
+      },
+      "default": false,
+      "description": {
+        "en": "Disable building clipping in Clear View while using Alt, building, dismantling or relocating buildings.",
+        "sch": "屏蔽在Alt、建造、拆除和搬迁建筑时辅助视图下的建筑裁切。",
+        "modsch": "屏蔽在Alt、建造、拆除和搬迁建筑时辅助视图下的建筑裁切。",
+        "tch": "屏蔽在Alt、建造、拆除和搬遷建築時輔助視圖下的建築裁切。",
+        "ru": "Отключает обрезку зданий при Alt, строительстве, разборке и переносе.",
+        "de": "Deaktiviert den Gebäudezuschnitt der Hilfsansicht bei Alt, Bauen, Abbauen und Versetzen.",
+        "ptbr": "Desativa o recorte de edifícios com Alt e ao construir, desmontar ou mover edifícios.",
+        "it": "Disattiva il ritaglio degli edifici con Alt e durante costruzione, smontaggio e spostamento.",
+        "es": "Desactiva el recorte de edificios al usar Alt, construir, desmontar o trasladar edificios.",
+        "fr": "Désactive la découpe des bâtiments avec Alt et pendant la construction, le démontage ou le déplacement.",
+        "nl": "Schakelt gebouwuitsnijding uit bij Alt, bouwen, afbreken en verplaatsen.",
+        "cz": "Vypne ořez budov při Alt, stavění, rozebírání a přesouvání.",
+        "pl": "Wyłącza przycinanie budynków przy Alt, budowaniu, rozbieraniu i przenoszeniu.",
+        "jp": "Alt、建設、解体、移設中の補助表示で建物の切り抜きを無効にします。",
+        "kr": "Alt, 건설, 철거, 건물 이전 중 보조 화면의 건물 잘라내기를 비활성화합니다.",
+        "thai": "ปิดการตัดภาพอาคารขณะใช้ Alt สร้าง รื้อถอน หรือย้ายอาคาร",
+        "hu": "Kikapcsolja az épületvágást Alt, építés, bontás és áthelyezés közben.",
+        "lv": "Izslēdz ēku apgriešanu pie Alt, būvēšanas, nojaukšanas un pārvietošanas.",
+        "ro": "Dezactivează decuparea clădirilor la Alt, construire, demontare și mutare.",
+        "no": "Deaktiverer bygningsklipping ved Alt, bygging, riving og flytting."
+      },
+      "reloadPolicy": "hot",
+      "section": "disabledFeatures"
+    },
+    "enableCardHoverFix": {
+      "type": "boolean",
+      "label": {
+        "en": "Fix information card flicker while panning [1.3]",
+        "sch": "修复拖动视角时信息卡片闪烁 [1.3]",
+        "modsch": "修复拖动视角时信息卡片闪烁 [1.3]",
+        "tch": "修復拖動視角時資訊卡閃爍 [1.3]",
+        "ru": "Исправить мерцание карточек при движении камеры [1.3]",
+        "de": "Flackern von Infokarten beim Schwenken beheben [1.3]",
+        "ptbr": "Corrigir fichas piscando ao mover a câmera [1.3]",
+        "it": "Correggi sfarfallio delle schede muovendo la visuale [1.3]",
+        "es": "Corregir el parpadeo de fichas al mover la cámara [1.3]",
+        "fr": "Corriger le scintillement des fiches en déplaçant la vue [1.3]",
+        "nl": "Knipperende infokaarten bij camerabeweging verhelpen [1.3]",
+        "cz": "Opravit blikání informačních karet při pohybu [1.3]",
+        "pl": "Napraw miganie kart podczas ruchu kamery [1.3]",
+        "jp": "視点移動時の情報カード点滅を修正 [1.3]",
+        "kr": "시점 이동 중 정보 카드 깜빡임 수정 [1.3]",
+        "thai": "แก้การกะพริบของการ์ดข้อมูลขณะเลื่อนกล้อง [1.3]",
+        "hu": "Mozgatáskor villogó információs kártyák javítása [1.3]",
+        "lv": "Labot informācijas kartīšu mirgošanu kustībā [1.3]",
+        "ro": "Corectează pâlpâirea fișelor la mișcarea camerei [1.3]",
+        "no": "Rett flimrende infokort ved kamerabevegelse [1.3]"
+      },
+      "default": true,
+      "description": {
+        "en": "Fix building information cards flickering when moving the camera quickly with the right mouse button held.",
+        "sch": "修复按住右键快速移动镜头时建筑信息卡闪烁的问题。",
+        "modsch": "修复按住右键快速移动镜头时建筑信息卡闪烁的问题。",
+        "tch": "修復按住右鍵快速移動鏡頭時建築資訊卡閃爍的問題。",
+        "ru": "Убирает мерцание карточек зданий при быстром движении камеры с зажатой правой кнопкой мыши.",
+        "de": "Behebt flackernde Gebäudeinfos bei schneller Kamerabewegung mit gedrückter rechter Maustaste.",
+        "ptbr": "Corrige fichas de edifícios piscando ao mover rapidamente a câmera com o botão direito pressionado.",
+        "it": "Corregge lo sfarfallio delle schede degli edifici spostando velocemente la camera con il tasto destro premuto.",
+        "es": "Corrige las fichas de edificios que parpadean al mover rápidamente la cámara con el botón derecho pulsado.",
+        "fr": "Corrige le scintillement des fiches de bâtiments lors des mouvements rapides avec le bouton droit maintenu.",
+        "nl": "Verhelpt knipperende gebouwkaarten bij snelle camerabeweging met ingedrukte rechtermuisknop.",
+        "cz": "Opravuje blikání karet budov při rychlém pohybu kamery s drženým pravým tlačítkem.",
+        "pl": "Naprawia miganie kart budynków podczas szybkiego ruchu kamery z przytrzymanym prawym przyciskiem.",
+        "jp": "右ボタンを押して素早くカメラを動かした際の建物情報カードの点滅を修正します。",
+        "kr": "오른쪽 버튼을 누른 채 카메라를 빠르게 움직일 때 건물 정보 카드가 깜빡이는 문제를 수정합니다.",
+        "thai": "แก้การ์ดข้อมูลอาคารกะพริบเมื่อเลื่อนกล้องเร็วโดยกดปุ่มเมาส์ขวาค้าง",
+        "hu": "Javítja az épületkártyák villogását gyors kameramozgatáskor, lenyomott jobb egérgombbal.",
+        "lv": "Labo ēku kartīšu mirgošanu, ātri pārvietojot kameru ar turētu labo peles pogu.",
+        "ro": "Corectează pâlpâirea fișelor clădirilor când camera se mișcă rapid cu butonul drept apăsat.",
+        "no": "Retter flimring i bygningskort når kameraet flyttes raskt med høyre museknapp holdt inne."
+      },
+      "reloadPolicy": "hot",
+      "section": "fixes",
+      "sectionLabel": {
+        "sch": "漏洞修复",
+        "modsch": "漏洞修复",
+        "en": "Bug Fixes",
+        "ru": "Исправления ошибок",
+        "de": "Fehlerbehebungen",
+        "ptbr": "Correções de erros",
+        "it": "Correzioni di bug",
+        "es": "Correcciones de errores",
+        "fr": "Corrections de bugs",
+        "nl": "Bugfixes",
+        "cz": "Opravy chyb",
+        "pl": "Poprawki błędów",
+        "jp": "不具合修正",
+        "kr": "버그 수정",
+        "tch": "錯誤修正",
+        "thai": "การแก้ไขบั๊ก",
+        "hu": "Hibajavítások",
+        "lv": "Kļūdu labojumi",
+        "ro": "Remedieri de erori",
+        "no": "Feilrettinger"
+      }
+    },
+    "enableEraserIconFix": {
+      "type": "boolean",
+      "label": {
+        "en": "Fix dismantle button tier icon mismatch [1.3]",
+        "sch": "修复拆解按钮图标等级不一致 [1.3]",
+        "modsch": "修复拆解按钮图标等级不一致 [1.3]",
+        "tch": "修復拆解按鈕圖示等級不一致 [1.3]",
+        "ru": "Исправить уровень значка разборки [1.3]",
+        "de": "Falsche Stufe im Abbau-Symbol beheben [1.3]",
+        "ptbr": "Corrigir nível do ícone de desmontagem [1.3]",
+        "it": "Correggi livello dell'icona di smontaggio [1.3]",
+        "es": "Corregir el nivel del icono de desmontaje [1.3]",
+        "fr": "Corriger le niveau de l'icône de démontage [1.3]",
+        "nl": "Verkeerd niveau van het afbraakpictogram verhelpen [1.3]",
+        "cz": "Opravit úroveň ikony rozebrání [1.3]",
+        "pl": "Napraw poziom ikony rozbiórki [1.3]",
+        "jp": "解体ボタンのレベルアイコン不一致を修正 [1.3]",
+        "kr": "철거 버튼 아이콘 등급 불일치 수정 [1.3]",
+        "thai": "แก้ระดับไอคอนปุ่มรื้อถอนไม่ตรงกัน [1.3]",
+        "hu": "Bontásikon hibás szintjének javítása [1.3]",
+        "lv": "Labot nojaukšanas ikonas līmeņa neatbilstību [1.3]",
+        "ro": "Corectează nivelul pictogramei de demontare [1.3]",
+        "no": "Rett feil nivå på riveikonet [1.3]"
+      },
+      "default": true,
+      "description": {
+        "en": "Fix the dismantle button reverting to its first-tier icon when a language change rebuilds the shop.",
+        "sch": "修复在切换语言后因为商店重建导致拆解按钮图标显示最初等级的问题。",
+        "modsch": "修复在切换语言后因为商店重建导致拆解按钮图标显示最初等级的问题。",
+        "tch": "修復切換語言後因商店重建，導致拆解按鈕圖示顯示最初等級的問題。",
+        "ru": "Исправляет возврат значка разборки к первому уровню после перестройки магазина при смене языка.",
+        "de": "Verhindert, dass das Abbau-Symbol nach einem Sprachwechsel und Ladenneuaufbau wieder die erste Stufe zeigt.",
+        "ptbr": "Corrige o ícone voltando ao nível inicial quando uma mudança de idioma reconstrói a loja.",
+        "it": "Corregge l'icona che torna al primo livello quando un cambio lingua ricostruisce il negozio.",
+        "es": "Corrige el icono que vuelve al primer nivel cuando un cambio de idioma reconstruye la tienda.",
+        "fr": "Corrige l'icône revenant au premier niveau lorsque le changement de langue reconstruit la boutique.",
+        "nl": "Verhelpt terugval naar het eerste pictogramniveau wanneer een taalwissel de winkel opnieuw opbouwt.",
+        "cz": "Opravuje návrat ikony na první úroveň po obnovení obchodu při změně jazyka.",
+        "pl": "Naprawia powrót ikony do pierwszego poziomu po przebudowie sklepu przy zmianie języka.",
+        "jp": "言語切替によるショップ再構築で、解体アイコンが初期レベルに戻る問題を修正します。",
+        "kr": "언어 변경으로 상점이 재구성될 때 철거 아이콘이 처음 등급으로 돌아가는 문제를 수정합니다.",
+        "thai": "แก้ไอคอนกลับเป็นระดับแรกเมื่อการเปลี่ยนภาษาสร้างร้านค้าใหม่",
+        "hu": "Javítja, hogy nyelvváltáskor a bolt újraépítése az első szintre állítja az ikont.",
+        "lv": "Labo ikonas atgriešanos pirmajā līmenī, kad valodas maiņa pārbūvē veikalu.",
+        "ro": "Corectează revenirea pictogramei la primul nivel când schimbarea limbii reconstruiește magazinul.",
+        "no": "Retter at riveikonet går tilbake til første nivå når språkbytte bygger butikken på nytt."
+      },
+      "reloadPolicy": "hot",
+      "section": "fixes"
+    },
+    "enableExplainerFix": {
+      "type": "boolean",
+      "label": "Fix hint language mismatch",
+      "default": true,
+      "description": "Fix hints failing to change language when the game language changes.",
+      "reloadPolicy": "hot",
+      "section": "fixes"
+    },
+    "enableShopScrollFix": {
+      "type": "boolean",
+      "label": {
+        "en": "Fix shop scroll positioning [1.2.1]",
+        "sch": "修复商店滚动定位 [1.2.1]",
+        "modsch": "修复商店滚动定位 [1.2.1]",
+        "tch": "修復商店捲動定位 [1.2.1]",
+        "ru": "Исправить прокрутку магазина [1.2.1]",
+        "de": "Scrollposition des Ladens korrigieren [1.2.1]",
+        "ptbr": "Corrigir rolagem da loja [1.2.1]",
+        "it": "Correggi scorrimento del negozio [1.2.1]",
+        "es": "Corregir el desplazamiento de la tienda [1.2.1]",
+        "fr": "Corriger le défilement de la boutique [1.2.1]",
+        "nl": "Winkelscrollpositie herstellen [1.2.1]",
+        "cz": "Opravit posouvání obchodu [1.2.1]",
+        "pl": "Napraw przewijanie sklepu [1.2.1]",
+        "jp": "ショップのスクロール位置を修正 [1.2.1]",
+        "kr": "상점 스크롤 위치 수정 [1.2.1]",
+        "thai": "แก้ตำแหน่งเลื่อนร้านค้า [1.2.1]",
+        "hu": "Bolt görgetési helyének javítása [1.2.1]",
+        "lv": "Labot veikala ritināšanas pozīciju [1.2.1]",
+        "ro": "Corectează derularea magazinului [1.2.1]",
+        "no": "Rett butikkens rulleposisjon [1.2.1]"
+      },
+      "default": true,
+      "description": {
+        "en": "Fix automatic shop positioning shifting the game view upward and exposing a white strip at the bottom.",
+        "sch": "修复了商店自动定位建筑时，游戏画面会上移并露出底部白边的问题。",
+        "modsch": "修复了商店自动定位建筑时，游戏画面会上移并露出底部白边的问题。",
+        "tch": "修復商店自動定位建築時，遊戲畫面上移並露出底部白邊的問題。",
+        "ru": "Не даёт автоматическому переходу к зданию сдвигать изображение вверх и открывать белую полосу снизу.",
+        "de": "Verhindert, dass die automatische Gebäudepositionierung das Spielbild nach oben verschiebt und unten einen weißen Rand freilegt.",
+        "ptbr": "Evita que o foco automático em edifícios desloque o jogo para cima e revele uma faixa branca inferior.",
+        "it": "Evita che il centraggio automatico degli edifici sposti il gioco verso l'alto mostrando una striscia bianca in basso.",
+        "es": "Evita que el centrado automático de edificios desplace la imagen hacia arriba y deje una franja blanca inferior.",
+        "fr": "Évite que le centrage automatique d'un bâtiment décale le jeu vers le haut et révèle une bande blanche en bas.",
+        "nl": "Voorkomt dat automatische gebouwselectie het spel omhoog schuift en onderaan een witte strook toont.",
+        "cz": "Brání posunu hry nahoru a odkrytí bílého pruhu dole při automatickém zaměření budovy.",
+        "pl": "Zapobiega przesuwaniu obrazu w górę i odsłanianiu białego pasa na dole przy automatycznym wskazywaniu budynku.",
+        "jp": "ショップの自動位置合わせでゲーム画面が上にずれ、下端に白い帯が出る問題を修正します。",
+        "kr": "상점이 건물로 자동 이동할 때 화면이 위로 밀려 아래 흰 띠가 드러나는 문제를 수정합니다.",
+        "thai": "ป้องกันการเลื่อนไปยังอาคารอัตโนมัติทำให้ภาพเกมขยับขึ้นและเผยแถบสีขาวด้านล่าง",
+        "hu": "Megakadályozza, hogy az automatikus épületre ugrás felfelé tolja a játékot, és alul fehér sávot mutasson.",
+        "lv": "Neļauj automātiskajai ēkas fokusēšanai pabīdīt spēli augšup un atsegt baltu joslu apakšā.",
+        "ro": "Împiedică focalizarea automată a clădirilor să deplaseze jocul în sus și să expună o bandă albă jos.",
+        "no": "Hindrer at automatisk bygningsfokus flytter spillbildet opp og viser en hvit stripe nederst."
+      },
+      "reloadPolicy": "hot",
+      "section": "fixes"
+    },
+    "enableCameraAngle": {
+      "type": "boolean",
+      "label": "Custom camera angles",
+      "default": true,
+      "description": "Change camera tilt and rotation live. C + wheel adjusts tilt, V + wheel adjusts rotation, and B switches or resets the view.",
+      "reloadPolicy": "hot",
+      "section": "visuals",
+      "sectionLabel": {
+        "sch": "视角与视效",
+        "modsch": "视角与视效",
+        "en": "Camera & Visuals",
+        "ru": "Камера и визуальные эффекты",
+        "de": "Kamera und Darstellung",
+        "ptbr": "Câmera e efeitos visuais",
+        "it": "Visuale ed effetti visivi",
+        "es": "Cámara y efectos visuales",
+        "fr": "Caméra et effets visuels",
+        "nl": "Camera en visuele effecten",
+        "cz": "Kamera a vizuální efekty",
+        "pl": "Kamera i efekty wizualne",
+        "jp": "視点と視覚効果",
+        "kr": "시점 및 시각 효과",
+        "tch": "視角與視效",
+        "thai": "มุมมองและเอฟเฟกต์ภาพ",
+        "hu": "Kamera és vizuális hatások",
+        "lv": "Kamera un vizuālie efekti",
+        "ro": "Cameră și efecte vizuale",
+        "no": "Kamera og visuelle effekter"
+      }
+    },
+    "cameraPitch": {
+      "type": "slider",
+      "valueType": "number",
+      "label": "Camera tilt angle",
+      "default": 0.87,
+      "min": 0.18,
+      "max": 1.15,
+      "step": 0.01,
+      "description": "Change tilt live. Higher values give a more top-down view.",
+      "reloadPolicy": "hot",
+      "section": "visuals"
+    },
+    "cameraYaw": {
+      "type": "slider",
+      "valueType": "number",
+      "label": "Camera rotation angle",
+      "default": 45,
+      "min": -180,
+      "max": 180,
+      "step": 1,
+      "description": "Change rotation live. Increasing the value rotates clockwise; decreasing it rotates counterclockwise.",
+      "reloadPolicy": "hot",
+      "section": "visuals"
+    },
+    "enableCameraZoom": {
+      "type": "boolean",
+      "label": "Custom camera zoom",
+      "default": true,
+      "description": "Change the camera viewing distance.",
+      "section": "visuals"
+    },
+    "cameraZoomMin": {
+      "type": "number",
+      "label": "Farthest viewing distance",
+      "default": 0.03,
+      "min": 0.03,
+      "max": 1,
+      "step": 0.01,
+      "description": "Change the far zoom limit. Lower values show a larger area of the world.",
+      "section": "visuals"
+    },
+    "cameraZoomMax": {
+      "type": "number",
+      "label": "Nearest viewing distance",
+      "default": 4,
+      "min": 1,
+      "max": 24,
+      "step": 0.1,
+      "description": "Change the near zoom limit. Higher values show a smaller area of the world.",
+      "section": "visuals"
+    },
+    "cameraZoomFallback": {
+      "type": "number",
+      "label": "Default zoom distance",
+      "default": 1,
+      "min": 0.03,
+      "max": 24,
+      "step": 0.01,
+      "description": "Set the fallback zoom value used when the zoom distance becomes invalid.",
+      "section": "visuals"
+    },
+    "enableCameraZoomAnchor": {
+      "type": "boolean",
+      "label": "Zoom around the mouse",
+      "default": true,
+      "description": "When zooming with Shift/Ctrl + mouse wheel, use the mouse position as the center instead of the screen center.",
+      "reloadPolicy": "hot",
+      "section": "visuals"
+    },
+    "enableCameraWaypointAnchor": {
+      "type": "boolean",
+      "label": "Teleport around the mouse",
+      "default": true,
+      "description": "After Waypoint travel, keep the destination Waypoint at the mouse position instead of returning it to the screen center.",
+      "reloadPolicy": "hot",
+      "section": "visuals"
+    },
+    "enableArrowAnchor": {
+      "type": "boolean",
+      "label": "Align the origin arrow tip with the mouse",
+      "default": true,
+      "description": "Align the arrow tip with the mouse when far from the origin, keeping the centered arrow from covering the pointer.",
+      "reloadPolicy": "hot",
+      "section": "visuals"
+    },
+    "enableResourceSpriteBright": {
+      "type": "boolean",
+      "label": {
+        "en": "Keep resource icons and lines bright",
+        "sch": "资源图标和绘线始终明亮",
+        "modsch": "资源图标和绘线始终明亮",
+        "tch": "資源圖示和繪線始終明亮",
+        "ru": "Сохранять яркость значков и линий ресурсов",
+        "de": "Ressourcensymbole und Linien hell halten",
+        "ptbr": "Manter ícones e linhas de recursos claros",
+        "it": "Mantieni luminosi icone e collegamenti delle risorse",
+        "es": "Mantener brillantes los iconos y líneas de recursos",
+        "fr": "Garder les icônes et lignes de ressources lumineuses",
+        "nl": "Resourcepictogrammen en lijnen helder houden",
+        "cz": "Zachovat jas ikon a čar zdrojů",
+        "pl": "Zachowaj jasność ikon i linii zasobów",
+        "jp": "資源アイコンと線を常に明るく",
+        "kr": "자원 아이콘과 선을 항상 밝게",
+        "thai": "ให้ไอคอนและเส้นทรัพยากรสว่างเสมอ",
+        "hu": "Erőforrásikonok és vonalak maradjanak világosak",
+        "lv": "Saglabāt resursu ikonas un līnijas gaišas",
+        "ro": "Păstrează luminoase pictogramele și liniile resurselor",
+        "no": "Hold ressursikoner og linjer lyse"
+      },
+      "default": false,
+      "description": {
+        "en": "Resource icons and lines remain bright even with the dimming overlay enabled.",
+        "sch": "即使开启变暗遮罩，资源图标和连线也不会变暗。",
+        "modsch": "即使开启变暗遮罩，资源图标和连线也不会变暗。",
+        "tch": "即使開啟變暗遮罩，資源圖示和連線也不會變暗。",
+        "ru": "Значки и линии ресурсов остаются яркими даже под затемняющей маской.",
+        "de": "Ressourcensymbole und Linien bleiben auch mit Verdunkelungsmaske hell.",
+        "ptbr": "Ícones e linhas de recursos continuam claros mesmo com a camada de escurecimento ativa.",
+        "it": "Icone e collegamenti restano luminosi anche con la maschera di oscuramento.",
+        "es": "Los iconos y líneas siguen brillantes incluso con la capa de oscurecimiento.",
+        "fr": "Les icônes et lignes restent lumineuses même avec le masque d'assombrissement.",
+        "nl": "Pictogrammen en lijnen blijven helder met de verduisteringslaag aan.",
+        "cz": "Ikony a čáry zůstávají jasné i při zapnutém ztmavení.",
+        "pl": "Ikony i linie zasobów pozostają jasne mimo włączonego przyciemnienia.",
+        "jp": "暗くするオーバーレイが有効でも、資源アイコンと接続線を明るく保ちます。",
+        "kr": "어둡게 하는 오버레이가 켜져 있어도 자원 아이콘과 연결선은 밝게 유지합니다.",
+        "thai": "ไอคอนและเส้นทรัพยากรยังสว่างแม้เปิดชั้นลดความสว่าง",
+        "hu": "Az ikonok és vonalak a sötétítő réteg mellett is világosak maradnak.",
+        "lv": "Ikonas un līnijas paliek gaišas arī ar ieslēgtu aptumšošanas slāni.",
+        "ro": "Pictogramele și liniile rămân luminoase chiar cu stratul de întunecare activ.",
+        "no": "Ikoner og linjer forblir lyse selv med mørkleggingslaget på."
+      },
+      "reloadPolicy": "hot",
+      "section": "visuals"
+    },
+    "enableChasmLineAlwaysVisible": {
+      "type": "boolean",
+      "label": "Always render Chasm lines",
+      "default": true,
+      "description": "Keep rendering Chasm lines even when they are far away.",
+      "reloadPolicy": "hot",
+      "section": "visuals"
+    },
+    "enableClearViewGridStyle": {
+      "type": "boolean",
+      "label": {
+        "en": "Use the Tweaks floor grid style",
+        "sch": "使用Tweaks模组的地板网格的样式",
+        "modsch": "使用Tweaks模组的地板网格的样式",
+        "tch": "使用Tweaks模組的地板網格樣式",
+        "ru": "Стиль сетки пола Tweaks",
+        "de": "Tweaks-Bodenrasterstil verwenden",
+        "ptbr": "Usar estilo de grade do Tweaks",
+        "it": "Usa lo stile griglia di Tweaks",
+        "es": "Usar el estilo de cuadrícula de Tweaks",
+        "fr": "Utiliser le style de grille Tweaks",
+        "nl": "Tweaks-vloerrasterstijl gebruiken",
+        "cz": "Použít styl mřížky Tweaks",
+        "pl": "Użyj stylu siatki Tweaks",
+        "jp": "Tweaksの床グリッドスタイルを使用",
+        "kr": "Tweaks 바닥 격자 스타일 사용",
+        "thai": "ใช้รูปแบบตารางพื้นของ Tweaks",
+        "hu": "Tweaks padlórácsstílus használata",
+        "lv": "Lietot Tweaks grīdas režģa stilu",
+        "ro": "Folosește stilul grilei Tweaks",
+        "no": "Bruk Tweaks-stilen for gulvrutenett"
+      },
+      "default": false,
+      "description": {
+        "en": "Replace the base game's Clear View floor grid style with the Tweaks style.",
+        "sch": "辅助视图的地板网格用Tweaks模组的样式替换掉原版的样式。",
+        "modsch": "辅助视图的地板网格用Tweaks模组的样式替换掉原版的样式。",
+        "tch": "輔助視圖的地板網格使用Tweaks模組樣式取代原版樣式。",
+        "ru": "Заменяет исходную сетку вспомогательного вида стилем Tweaks.",
+        "de": "Ersetzt den ursprünglichen Bodenrasterstil der Hilfsansicht durch den Tweaks-Stil.",
+        "ptbr": "Substitui o estilo original da grade da visão auxiliar pelo estilo Tweaks.",
+        "it": "Sostituisce la griglia originale della vista ausiliaria con lo stile Tweaks.",
+        "es": "Sustituye la cuadrícula original de la vista auxiliar por el estilo de Tweaks.",
+        "fr": "Remplace la grille d'origine de la vue auxiliaire par le style Tweaks.",
+        "nl": "Vervangt de oorspronkelijke hulprasterstijl door de Tweaks-stijl.",
+        "cz": "Nahradí původní mřížku pomocného pohledu stylem Tweaks.",
+        "pl": "Zastępuje oryginalną siatkę widoku pomocniczego stylem Tweaks.",
+        "jp": "補助表示の元の床グリッドをTweaksのスタイルに置き換えます。",
+        "kr": "보조 화면의 원본 바닥 격자 스타일을 Tweaks 스타일로 교체합니다.",
+        "thai": "แทนตารางพื้นเดิมของมุมมองช่วยด้วยรูปแบบ Tweaks",
+        "hu": "Az eredeti segédnézeti padlórácsot a Tweaks stílusára cseréli.",
+        "lv": "Aizstāj sākotnējo palīgskata grīdas režģi ar Tweaks stilu.",
+        "ro": "Înlocuiește grila originală a vederii auxiliare cu stilul Tweaks.",
+        "no": "Erstatter hjelpevisningens opprinnelige rutenett med Tweaks-stilen."
+      },
+      "reloadPolicy": "hot",
+      "section": "visuals"
+    },
+    "enableQuickSettings": {
+      "type": "boolean",
+      "label": "Bottom quick settings buttons",
+      "default": true,
+      "description": "Add quick settings revealed by moving the mouse down at the bottom center. Controls include the dimming overlay, reduced flashes, floor color and floor grid.",
+      "section": "other",
+      "sectionLabel": {
+        "sch": "额外功能",
+        "modsch": "额外功能",
+        "en": "Extra Features",
+        "ru": "Дополнительные функции",
+        "de": "Zusatzfunktionen",
+        "ptbr": "Funcionalidades extras",
+        "it": "Funzionalità extra",
+        "es": "Funciones adicionales",
+        "fr": "Fonctionnalités supplémentaires",
+        "nl": "Extra functies",
+        "cz": "Další funkce",
+        "pl": "Dodatkowe funkcje",
+        "jp": "追加機能",
+        "kr": "추가 기능",
+        "tch": "額外功能",
+        "thai": "ฟังก์ชันเสริม",
+        "hu": "Extra funkciók",
+        "lv": "Papildu funkcijas",
+        "ro": "Funcții suplimentare",
+        "no": "Ekstrafunksjoner"
+      }
+    },
+    "enablePlayTimeDisplay": {
+      "type": "boolean",
+      "label": "Show total play time",
+      "default": true,
+      "description": "Show the current save's total play time.",
+      "reloadPolicy": "hot",
+      "section": "other"
+    },
+    "playTimeDisplayPosition": {
+      "type": "slider",
+      "label": "Play time display position",
+      "default": 1,
+      "description": "Change the position of the total play time display.",
+      "reloadPolicy": "hot",
+      "valueType": "integer",
+      "min": 0,
+      "max": 2,
+      "step": 1,
+      "valueLabels": {
+        "0": {
+          "en": "bottom-left",
+          "sch": "左下角",
+          "modsch": "左下角",
+          "ru": "Внизу слева",
+          "de": "Unten links",
+          "ptbr": "Inferior esquerdo",
+          "it": "In basso a sinistra",
+          "es": "Abajo izquierda",
+          "fr": "En bas a gauche",
+          "nl": "Linksonder",
+          "cz": "Vlevo dole",
+          "pl": "Lewy dol",
+          "jp": "左下",
+          "kr": "왼쪽 아래",
+          "tch": "左下角",
+          "thai": "มุมซ้ายล่าง",
+          "hu": "Bal also",
+          "lv": "Apaksa pa kreisi",
+          "ro": "Jos stanga",
+          "no": "Nederst til venstre"
+        },
+        "1": {
+          "en": "top-center",
+          "sch": "顶部居中",
+          "modsch": "顶部居中",
+          "ru": "Вверху по центру",
+          "de": "Oben mittig",
+          "ptbr": "Superior central",
+          "it": "In alto al centro",
+          "es": "Arriba centro",
+          "fr": "En haut au centre",
+          "nl": "Boven midden",
+          "cz": "Nahore uprostred",
+          "pl": "Gora srodek",
+          "jp": "上部中央",
+          "kr": "상단 중앙",
+          "tch": "頂部置中",
+          "thai": "กึ่งกลางด้านบน",
+          "hu": "Felul kozepen",
+          "lv": "Augsa centra",
+          "ro": "Sus centru",
+          "no": "Overst i midten"
+        },
+        "2": {
+          "en": "bottom-right",
+          "sch": "右下角",
+          "modsch": "右下角",
+          "ru": "Внизу справа",
+          "de": "Unten rechts",
+          "ptbr": "Inferior direito",
+          "it": "In basso a destra",
+          "es": "Abajo derecha",
+          "fr": "En bas a droite",
+          "nl": "Rechtsonder",
+          "cz": "Vpravo dole",
+          "pl": "Prawy dol",
+          "jp": "右下",
+          "kr": "오른쪽 아래",
+          "tch": "右下角",
+          "thai": "มุมขวาล่าง",
+          "hu": "Jobb also",
+          "lv": "Apaksa pa labi",
+          "ro": "Jos dreapta",
+          "no": "Nederst til hoyre"
+        }
+      },
+      "valueAliases": {
+        "bottom-left": 0,
+        "bottom left": 0,
+        "left-bottom": 0,
+        "left bottom": 0,
+        "left": 0,
+        "top-center": 1,
+        "top center": 1,
+        "center-top": 1,
+        "top": 1,
+        "bottom-right": 2,
+        "bottom right": 2,
+        "bottom": 2,
+        "right": 2
+      },
+      "section": "other"
+    },
+    "enableExplainer": {
+      "type": "slider",
+      "valueType": "number",
+      "label": {
+        "sch": "新手引导提示",
+        "modsch": "新手引导提示",
+        "en": "Tutorial hints",
+        "tch": "新手引導提示",
+        "ru": "Подсказки для новичков",
+        "de": "Tutorial-Hinweise",
+        "ptbr": "Dicas do tutorial",
+        "it": "Suggerimenti del tutorial",
+        "es": "Consejos del tutorial",
+        "fr": "Conseils du tutoriel",
+        "nl": "Tutorialtips",
+        "cz": "Výukové tipy",
+        "pl": "Wskazówki samouczka",
+        "jp": "初心者向けヒント",
+        "kr": "초보자 안내",
+        "thai": "คำแนะนำสำหรับผู้เริ่มต้น",
+        "hu": "Oktatási tippek",
+        "lv": "Pamācības padomi",
+        "ro": "Indicații pentru începători",
+        "no": "Opplæringstips"
+      },
+      "description": {
+        "sch": "给尚不熟悉游戏基础操作的玩家的引导提示。提示句会出现在屏幕下方居中位置。",
+        "modsch": "给尚不熟悉游戏基础操作的玩家的引导提示。提示句会出现在屏幕下方居中位置。",
+        "en": "Guidance for players unfamiliar with basic game controls. Hints appear at the bottom center of the screen.",
+        "tch": "給尚不熟悉遊戲基本操作的玩家的引導提示。提示句會出現在畫面下方中央位置。",
+        "ru": "Подсказки для игроков, ещё не знакомых с основным управлением. Отображаются внизу по центру экрана.",
+        "de": "Hinweise für Spieler, die die grundlegende Steuerung noch nicht kennen. Sie erscheinen unten in der Bildschirmmitte.",
+        "ptbr": "Orientações para jogadores que ainda não conhecem os controles básicos. As dicas aparecem na parte inferior central da tela.",
+        "it": "Indicazioni per chi non conosce ancora i comandi di base. I suggerimenti appaiono in basso al centro dello schermo.",
+        "es": "Indicaciones para quienes aún no conocen los controles básicos. Aparecen en la parte inferior central de la pantalla.",
+        "fr": "Conseils pour les joueurs découvrant les commandes de base. Ils apparaissent en bas au centre de l’écran.",
+        "nl": "Uitleg voor spelers die de basisbesturing nog niet kennen. Tips verschijnen onderaan in het midden van het scherm.",
+        "cz": "Nápověda pro hráče, kteří ještě neznají základní ovládání. Tipy se zobrazují dole uprostřed obrazovky.",
+        "pl": "Wskazówki dla graczy nieznających podstawowego sterowania. Pojawiają się na dole, pośrodku ekranu.",
+        "jp": "基本操作にまだ慣れていないプレイヤー向けのヒントです。画面下部の中央に表示されます。",
+        "kr": "게임의 기본 조작에 익숙하지 않은 플레이어를 위한 안내입니다. 화면 하단 중앙에 표시됩니다.",
+        "thai": "คำแนะนำสำหรับผู้เล่นที่ยังไม่คุ้นเคยกับการควบคุมพื้นฐาน โดยแสดงที่กึ่งกลางด้านล่างของหน้าจอ",
+        "hu": "Útmutatás az alapvető irányítást még nem ismerő játékosoknak. A tippek a képernyő alján, középen jelennek meg.",
+        "lv": "Norādes spēlētājiem, kuri vēl nepārzina pamata vadību. Padomi parādās ekrāna apakšdaļā centrā.",
+        "ro": "Îndrumări pentru jucătorii care nu cunosc încă comenzile de bază. Apar în partea de jos, în centrul ecranului.",
+        "no": "Veiledning for spillere som ennå ikke kjenner de grunnleggende kontrollene. Tips vises nederst midt på skjermen."
+      },
+      "default": 0,
+      "min": 0,
+      "max": 1,
+      "step": 1,
+      "section": "other",
+      "reloadPolicy": "reload",
+      "valueLabels": {
+        "0": {
+          "en": "Off",
+          "sch": "关闭",
+          "modsch": "关闭",
+          "tch": "關閉",
+          "ru": "Выключено",
+          "de": "Aus",
+          "ptbr": "Desligado",
+          "it": "Disattivato",
+          "es": "Desactivado",
+          "fr": "Désactivé",
+          "nl": "Uit",
+          "cz": "Vypnuto",
+          "pl": "Wyłączone",
+          "jp": "オフ",
+          "kr": "끄기",
+          "thai": "ปิด",
+          "hu": "Ki",
+          "lv": "Izslēgts",
+          "ro": "Dezactivat",
+          "no": "Av"
+        },
+        "1": {
+          "en": "On",
+          "sch": "开启",
+          "modsch": "开启",
+          "tch": "開啟",
+          "ru": "Включено",
+          "de": "Ein",
+          "ptbr": "Ligado",
+          "it": "Attivato",
+          "es": "Activado",
+          "fr": "Activé",
+          "nl": "Aan",
+          "cz": "Zapnuto",
+          "pl": "Włączone",
+          "jp": "オン",
+          "kr": "켜기",
+          "thai": "เปิด",
+          "hu": "Be",
+          "lv": "Ieslēgts",
+          "ro": "Activat",
+          "no": "På"
+        }
+      }
+    },
+    "enableFloorColor": {
+      "type": "boolean",
+      "label": "Floor color",
+      "default": true,
+      "description": "Change the floor color in the Reality dimension live.",
+      "reloadPolicy": "hot",
+      "section": "other"
+    },
+    "floorColor": {
+      "type": "color",
+      "label": "Custom floor color",
+      "default": "#FFFFFF",
+      "defaultColor": "#FFFFFF",
+      "description": "Pick one!",
+      "reloadPolicy": "hot",
+      "section": "other"
+    },
+    "enableGrid": {
+      "type": "boolean",
+      "label": "Show floor grid",
+      "default": true,
+      "description": "Keep the floor grid visible.",
+      "reloadPolicy": "hot",
+      "section": "other"
+    },
+    "floorGridRealityColor": {
+      "type": "color",
+      "label": "Custom Reality floor grid color",
+      "default": "#CBC3E5",
+      "defaultColor": "#1D232B",
+      "allowAuto": true,
+      "icon": {
+        "type": "procedural",
+        "renderer": "voidAltarWave",
+        "fill": "currentColor"
+      },
+      "autoLabel": {
+        "en": "Auto",
+        "sch": "自动",
+        "modsch": "自动",
+        "tch": "自動",
+        "ru": "Avto",
+        "de": "Auto",
+        "ptbr": "Auto",
+        "it": "Auto",
+        "es": "Auto",
+        "fr": "Auto",
+        "nl": "Auto",
+        "cz": "Auto",
+        "pl": "Auto",
+        "jp": "Auto",
+        "kr": "Auto",
+        "thai": "Auto",
+        "hu": "Auto",
+        "lv": "Auto",
+        "ro": "Auto",
+        "no": "Auto"
+      },
+      "description": "Pick one!",
+      "reloadPolicy": "hot",
+      "section": "other"
+    },
+    "floorGridVoidColor": {
+      "type": "color",
+      "label": "Custom Void floor grid color",
+      "default": "#121212",
+      "defaultColor": "#FFFFFF",
+      "allowAuto": true,
+      "icon": {
+        "type": "procedural",
+        "renderer": "voidAltarWave",
+        "fill": "currentColor"
+      },
+      "autoLabel": {
+        "en": "Auto",
+        "sch": "自动",
+        "modsch": "自动",
+        "tch": "自動",
+        "ru": "Avto",
+        "de": "Auto",
+        "ptbr": "Auto",
+        "it": "Auto",
+        "es": "Auto",
+        "fr": "Auto",
+        "nl": "Auto",
+        "cz": "Auto",
+        "pl": "Auto",
+        "jp": "Auto",
+        "kr": "Auto",
+        "thai": "Auto",
+        "hu": "Auto",
+        "lv": "Auto",
+        "ro": "Auto",
+        "no": "Auto"
+      },
+      "description": "Pick one!",
+      "reloadPolicy": "hot",
+      "section": "other"
+    },
+    "enableResourceSpriteGlow": {
+      "type": "boolean",
+      "label": "Resource glow colors",
+      "default": true,
+      "description": "Change the glow colors around resource icons in the inventory panel live.",
+      "reloadPolicy": "hot",
+      "section": "other"
+    },
+    "resourceGlowColor": {
+      "type": "colorPalette",
+      "label": "Custom resource glow colors",
+      "default": {
+        "0": "#484856",
+        "1": "#FDE591",
+        "2": "#795CF0",
+        "3": "#DB5C5C",
+        "4": "#A2E689",
+        "5": "#CCF2FF",
+        "6": "#D7D7E0",
+        "7": "#D3AC92",
+        "9": "#FFFFFF"
+      },
+      "share": true,
+      "entries": [
+        {
+          "key": "0",
+          "label": "Charonite",
+          "icon": {
+            "type": "resource",
+            "index": 0
+          }
+        },
+        {
+          "key": "1",
+          "label": "Elmerine",
+          "icon": {
+            "type": "resource",
+            "index": 1
+          }
+        },
+        {
+          "key": "2",
+          "label": "Qanetite",
+          "icon": {
+            "type": "resource",
+            "index": 2
+          }
+        },
+        {
+          "key": "3",
+          "label": "Beta-Pylene",
+          "icon": {
+            "type": "resource",
+            "index": 3
+          }
+        },
+        {
+          "key": "4",
+          "label": "Hell Gem",
+          "icon": {
+            "type": "resource",
+            "index": 4
+          }
+        },
+        {
+          "key": "5",
+          "label": "Chromalit",
+          "icon": {
+            "type": "resource",
+            "index": 5
+          }
+        },
+        {
+          "key": "6",
+          "label": "Celestial foam",
+          "icon": {
+            "type": "resource",
+            "index": 6
+          }
+        },
+        {
+          "key": "7",
+          "label": "Hollow stone",
+          "icon": {
+            "type": "resource",
+            "index": 7
+          }
+        },
+        {
+          "key": "8",
+          "label": "Void",
+          "icon": {
+            "type": "resource",
+            "index": 8
+          }
+        },
+        {
+          "key": "9",
+          "label": "Reality",
+          "icon": {
+            "type": "resource",
+            "index": 9
+          }
+        }
+      ],
+      "description": "Pick one!",
+      "reloadPolicy": "hot",
+      "section": "other",
+      "shareType": "CattailResourceGlowColors"
+    },
+    "enableStableCubeResourceCache": {
+      "type": "boolean",
+      "label": {
+        "en": "Optimize stable Cube rendering",
+        "sch": "优化稳定矿方体渲染",
+        "modsch": "优化稳定矿方体渲染",
+        "tch": "最佳化穩定礦方體繪製",
+        "ru": "Оптимизировать стабильные Кубы",
+        "de": "Stabile Cubes optimieren",
+        "ptbr": "Otimizar Cubes estáveis",
+        "it": "Ottimizza Cubes stabili",
+        "es": "Optimizar Cubes estables",
+        "fr": "Optimiser les Cubes stables",
+        "nl": "Stabiele Cubes optimaliseren",
+        "cz": "Optimalizovat stabilní Cubes",
+        "pl": "Optymalizuj stabilne Cubes",
+        "jp": "安定したキューブの描画を最適化",
+        "kr": "안정된 큐브 렌더링 최적화",
+        "thai": "เพิ่มประสิทธิภาพการวาดคิวบ์เสถียร",
+        "hu": "Stabil Cubes rajzolásának optimalizálása",
+        "lv": "Optimizēt stabilus Cubes",
+        "ro": "Optimizează Cubes stabile",
+        "no": "Optimaliser stabile Cubes"
+      },
+      "default": true,
+      "description": {
+        "en": "Combine the small resource sprites inside stable Cubes into a cached image to avoid drawing each sprite repeatedly.",
+        "sch": "将稳定的矿方体内的每个小资源贴图合并为一张贴图并缓存，避免其重复绘制。",
+        "modsch": "将稳定的矿方体内的每个小资源贴图合并为一张贴图并缓存，避免其重复绘制。",
+        "tch": "將穩定礦方體內的小資源貼圖合併為一張貼圖並快取，避免逐個重複繪製。",
+        "ru": "Объединяет маленькие изображения ресурсов внутри стабильных Кубов в кэш, сокращая повторную отрисовку каждого ресурса.",
+        "de": "Fasst kleine Ressourcentexturen in stabilen Cubes zu einem zwischengespeicherten Bild zusammen, statt jede wiederholt zu zeichnen.",
+        "ptbr": "Combina as pequenas imagens de recursos dos Cubes estáveis em uma imagem em cache para evitar desenhos individuais repetidos.",
+        "it": "Combina le piccole immagini delle risorse nei Cubes stabili in un'immagine in cache per evitare disegni individuali ripetuti.",
+        "es": "Combina las pequeñas texturas de recursos de los Cubes estables en una imagen en caché para evitar dibujarlas por separado repetidamente.",
+        "fr": "Réunit les petites textures de ressources des Cubes stables dans une image en cache pour éviter de les redessiner séparément.",
+        "nl": "Combineert kleine resourcetexturen in stabiele Cubes tot een cachebeeld om herhaald individueel tekenen te vermijden.",
+        "cz": "Sloučí malé obrázky zdrojů stabilních Cubes do mezipaměti, aby se nekreslily opakovaně jednotlivě.",
+        "pl": "Łączy małe obrazy zasobów stabilnych Cubes w obraz w pamięci podręcznej, ograniczając osobne powtarzane rysowanie.",
+        "jp": "安定したキューブ内の小さな資源画像を1枚にまとめてキャッシュし、個別の繰り返し描画を減らします。",
+        "kr": "안정된 큐브 안의 작은 자원 이미지를 하나로 합쳐 캐시하고 개별 반복 그리기를 줄입니다.",
+        "thai": "รวมภาพทรัพยากรเล็กภายในคิวบ์เสถียรเป็นภาพแคชเดียว เพื่อลดการวาดซ้ำแยกแต่ละชิ้น",
+        "hu": "A stabil Cubes kis erőforrásképeit egy gyorsítótárazott képpé egyesíti, elkerülve az ismételt külön rajzolást.",
+        "lv": "Apvieno mazos resursu attēlus stabilos Cubes vienā kešotā attēlā, samazinot atkārtotu atsevišķu zīmēšanu.",
+        "ro": "Combină imaginile mici ale resurselor din Cubes stabile într-o imagine în cache, evitând redesenarea individuală repetată.",
+        "no": "Samler små ressursbilder i stabile Cubes i ett hurtiglagret bilde for å unngå gjentatt enkelttegning."
+      },
+      "reloadPolicy": "hot",
+      "section": "performance",
+      "sectionLabel": {
+        "sch": "性能优化",
+        "modsch": "性能优化",
+        "en": "Performance Optimization",
+        "ru": "Оптимизация производительности",
+        "de": "Leistungsoptimierung",
+        "ptbr": "Otimização de desempenho",
+        "it": "Ottimizzazione delle prestazioni",
+        "es": "Optimización del rendimiento",
+        "fr": "Optimisation des performances",
+        "nl": "Prestatieoptimalisatie",
+        "cz": "Optimalizace výkonu",
+        "pl": "Optymalizacja wydajności",
+        "jp": "パフォーマンス最適化",
+        "kr": "성능 최적화",
+        "tch": "效能優化",
+        "thai": "การเพิ่มประสิทธิภาพ",
+        "hu": "Teljesítményoptimalizálás",
+        "lv": "Veiktspējas optimizācija",
+        "ro": "Optimizarea performanței",
+        "no": "Ytelsesoptimalisering"
+      }
+    },
+    "enableDamagedCubeResourceCache": {
+      "type": "boolean",
+      "label": {
+        "en": "Optimize damaged Cube rendering",
+        "sch": "优化受损矿方体渲染",
+        "modsch": "优化受损矿方体渲染",
+        "tch": "最佳化受損礦方體繪製",
+        "ru": "Оптимизировать повреждённые Кубы",
+        "de": "Beschädigte Cubes optimieren",
+        "ptbr": "Otimizar Cubes danificados",
+        "it": "Ottimizza Cubes danneggiati",
+        "es": "Optimizar Cubes dañados",
+        "fr": "Optimiser les Cubes endommagés",
+        "nl": "Beschadigde Cubes optimaliseren",
+        "cz": "Optimalizovat poškozené Cubes",
+        "pl": "Optymalizuj uszkodzone Cubes",
+        "jp": "損傷したキューブの描画を最適化",
+        "kr": "손상된 큐브 렌더링 최적화",
+        "thai": "เพิ่มประสิทธิภาพการวาดคิวบ์เสียหาย",
+        "hu": "Sérült Cubes rajzolásának optimalizálása",
+        "lv": "Optimizēt bojātus Cubes",
+        "ro": "Optimizează Cubes deteriorate",
+        "no": "Optimaliser skadde Cubes"
+      },
+      "default": true,
+      "description": {
+        "en": "Combine resource sprites inside damaged Cubes into a cached image and shake the whole resource image, reducing per-resource drawing and shake calculations. Requires Optimize stable Cube rendering.",
+        "sch": "将破碎的矿方体内的每个小资源贴图合并为一张贴图并缓存，并改为整张资源贴图抖动，减少逐个资源的绘制和抖动计算。需开启“优化稳定矿方体渲染”。",
+        "modsch": "将破碎的矿方体内的每个小资源贴图合并为一张贴图并缓存，并改为整张资源贴图抖动，减少逐个资源的绘制和抖动计算。需开启“优化稳定矿方体渲染”。",
+        "tch": "將受損礦方體內的小資源貼圖合併快取，改為整張資源貼圖抖動，減少逐個資源的繪製和抖動計算。需開啟「最佳化穩定礦方體繪製」。",
+        "ru": "Объединяет ресурсы повреждённых Кубов в кэш и трясёт всё изображение ресурсов, сокращая отдельную отрисовку и расчёты тряски. Требуется Оптимизировать стабильные Кубы.",
+        "de": "Speichert Ressourcentexturen beschädigter Cubes als Gesamtbild und lässt dieses Bild zittern; weniger Einzelzeichnungen und Zitterberechnungen. Erfordert Stabile Cubes optimieren.",
+        "ptbr": "Combina os recursos de Cubes danificados em cache e faz a imagem inteira dos recursos tremer, reduzindo desenhos e cálculos individuais. Requer Otimizar Cubes estáveis.",
+        "it": "Combina le risorse dei Cubes danneggiati in cache e fa tremare l'intera immagine delle risorse, riducendo disegni e calcoli individuali. Richiede Ottimizza Cubes stabili.",
+        "es": "Combina los recursos de Cubes dañados en caché y sacude toda la imagen de recursos, reduciendo dibujos y cálculos individuales. Requiere Optimizar Cubes estables.",
+        "fr": "Réunit les ressources des Cubes endommagés en cache et fait trembler l'image entière des ressources pour réduire les dessins et calculs individuels. Nécessite Optimiser les Cubes stables.",
+        "nl": "Combineert resources in beschadigde Cubes tot een cachebeeld en laat dat hele resourcebeeld trillen, met minder losse tekeningen en berekeningen. Vereist Stabiele Cubes optimaliseren.",
+        "cz": "Sloučí zdroje poškozených Cubes do jednoho obrázku a třese celým obrázkem zdrojů, čímž omezí samostatné kreslení a výpočty. Vyžaduje Optimalizovat stabilní Cubes.",
+        "pl": "Łączy zasoby uszkodzonych Cubes w obraz podręczny i potrząsa całym obrazem zasobów, zmniejszając osobne rysowanie i obliczenia. Wymaga Optymalizuj stabilne Cubes.",
+        "jp": "損傷キューブ内の資源画像をまとめてキャッシュし、資源画像全体を揺らして個別描画と揺れ計算を減らします。「安定したキューブの描画を最適化」が必要です。",
+        "kr": "손상된 큐브의 자원 이미지를 합쳐 캐시하고 자원 이미지 전체를 흔들어 개별 그리기와 흔들림 계산을 줄입니다. 안정된 큐브 렌더링 최적화가 필요합니다.",
+        "thai": "รวมทรัพยากรภายในคิวบ์เสียหายเป็นภาพแคชและสั่นภาพทรัพยากรทั้งภาพ เพื่อลดการวาดและคำนวณแยกชิ้น ต้องเปิดเพิ่มประสิทธิภาพการวาดคิวบ์เสถียร",
+        "hu": "A sérült Cubes erőforrásait közös képbe gyorsítótárazza és ezt a teljes erőforrásképet rázza, csökkentve a külön rajzolást és számítást. Stabil Cubes rajzolásának optimalizálása szükséges.",
+        "lv": "Apvieno bojāto Cubes resursus kešotā attēlā un kustina visu resursu attēlu, samazinot atsevišķu zīmēšanu un vibrācijas aprēķinus. Vajadzīgs Optimizēt stabilus Cubes.",
+        "ro": "Combină resursele din Cubes deteriorate în cache și scutură întreaga imagine a resurselor, reducând desenarea și calculele individuale. Necesită Optimizează Cubes stabile.",
+        "no": "Samler ressursene i skadde Cubes i et hurtiglagret bilde og rister hele ressursbildet, med mindre enkelttegning og risteberegning. Krever Optimaliser stabile Cubes."
+      },
+      "reloadPolicy": "hot",
+      "section": "performance"
+    },
+    "enablePlacementShadowReuse": {
+      "type": "boolean",
+      "label": {
+        "en": "Optimize building occupancy shadows",
+        "sch": "优化建筑占位阴影",
+        "modsch": "优化建筑占位阴影",
+        "tch": "最佳化建築占位陰影",
+        "ru": "Оптимизировать тени занятых клеток",
+        "de": "Gebäude-Belegungsschatten optimieren",
+        "ptbr": "Otimizar sombras de ocupação de edifícios",
+        "it": "Ottimizza ombre di occupazione degli edifici",
+        "es": "Optimizar sombras de ocupación de edificios",
+        "fr": "Optimiser les ombres d'occupation des bâtiments",
+        "nl": "Gebouwbezettingsschaduwen optimaliseren",
+        "cz": "Optimalizovat stíny obsazených polí",
+        "pl": "Optymalizuj cienie zajętości budynków",
+        "jp": "建物の占有影を最適化",
+        "kr": "건물 점유 그림자 최적화",
+        "thai": "เพิ่มประสิทธิภาพเงาพื้นที่อาคาร",
+        "hu": "Épületfoglaltsági árnyékok optimalizálása",
+        "lv": "Optimizēt ēku aizņemtības ēnas",
+        "ro": "Optimizează umbrele de ocupare ale clădirilor",
+        "no": "Optimaliser skygger for bygningsbelegg"
+      },
+      "description": {
+        "en": "Reuse building render positions from the current frame instead of scanning the entire map cell by cell for shadow positions.",
+        "sch": "复用当前帧建筑渲染位置，避免逐格扫描全图寻找阴影位置。",
+        "modsch": "复用当前帧建筑渲染位置，避免逐格扫描全图寻找阴影位置。",
+        "tch": "重用目前影格的建築繪製位置，避免逐格掃描全圖尋找陰影位置。",
+        "ru": "Повторно использует позиции отрисовки зданий текущего кадра вместо поиска теней перебором всех клеток карты.",
+        "de": "Verwendet Gebäude-Renderpositionen des aktuellen Bildes erneut, statt die ganze Karte zellenweise nach Schattenpositionen abzusuchen.",
+        "ptbr": "Reutiliza posições de renderização do quadro atual, evitando procurar sombras ao percorrer toda a grade do mapa.",
+        "it": "Riutilizza le posizioni di rendering del fotogramma corrente evitando di cercare le ombre scorrendo tutta la mappa casella per casella.",
+        "es": "Reutiliza las posiciones de renderizado del fotograma actual sin buscar sombras recorriendo toda la cuadrícula del mapa.",
+        "fr": "Réutilise les positions de rendu des bâtiments de l'image actuelle sans parcourir toute la carte case par case pour trouver les ombres.",
+        "nl": "Hergebruikt gebouwrenderposities van het huidige beeld in plaats van de hele kaart cel voor cel naar schaduwposities te doorzoeken.",
+        "cz": "Využívá vykreslovací pozice budov aktuálního snímku místo hledání stínů skenováním celé mapy po políčkách.",
+        "pl": "Wykorzystuje pozycje renderowania z bieżącej klatki zamiast szukać cieni, przeglądając całą mapę pole po polu.",
+        "jp": "現在フレームの建物描画位置を再利用し、マップ全体をマスごとに調べて影を探す処理を省きます。",
+        "kr": "현재 프레임의 건물 렌더링 위치를 재사용하여 전체 지도를 칸마다 훑으며 그림자 위치를 찾지 않습니다.",
+        "thai": "ใช้ตำแหน่งวาดอาคารของเฟรมปัจจุบันซ้ำ แทนการค้นหาเงาโดยสแกนทั้งแผนที่ทีละช่อง",
+        "hu": "Az aktuális képkocka épületrajzolási helyeit használja újra a teljes térkép cellánkénti árnyékkeresése helyett.",
+        "lv": "Izmanto pašreizējā kadra ēku renderēšanas pozīcijas, nevis meklē ēnas, pārbaudot visu karti pa šūnām.",
+        "ro": "Reutilizează pozițiile de randare din cadrul curent fără a căuta umbre parcurgând întreaga hartă celulă cu celulă.",
+        "no": "Gjenbruker bygningenes tegnestillinger fra gjeldende bilde i stedet for å søke hele kartet celle for celle etter skygger."
+      },
+      "default": true,
+      "reloadPolicy": "hot",
+      "section": "performance"
+    },
+    "enableBuildingSpriteCache": {
+      "type": "boolean",
+      "label": {
+        "en": "Optimize building sprite rendering",
+        "sch": "优化建筑贴图渲染",
+        "modsch": "优化建筑贴图渲染",
+        "tch": "最佳化建築貼圖繪製",
+        "ru": "Оптимизировать текстуры зданий",
+        "de": "Gebäudetexturen optimieren",
+        "ptbr": "Otimizar imagens de edifícios",
+        "it": "Ottimizza immagini degli edifici",
+        "es": "Optimizar texturas de edificios",
+        "fr": "Optimiser les textures des bâtiments",
+        "nl": "Gebouwtexturen optimaliseren",
+        "cz": "Optimalizovat textury budov",
+        "pl": "Optymalizuj tekstury budynków",
+        "jp": "建物画像の描画を最適化",
+        "kr": "건물 이미지 렌더링 최적화",
+        "thai": "เพิ่มประสิทธิภาพภาพอาคาร",
+        "hu": "Épülettextúrák optimalizálása",
+        "lv": "Optimizēt ēku tekstūras",
+        "ro": "Optimizează texturile clădirilor",
+        "no": "Optimaliser bygningsteksturer"
+      },
+      "default": true,
+      "description": {
+        "en": "Cache frames for selected buildings at the current scale, reducing repeated cropping and scaling while preserving animation and state changes.",
+        "sch": "缓存部分建筑当前缩放比例下的各帧贴图，减少重复裁切和缩放，保留原有动画与状态变化。",
+        "modsch": "缓存部分建筑当前缩放比例下的各帧贴图，减少重复裁切和缩放，保留原有动画与状态变化。",
+        "tch": "快取部分建築目前縮放比例下的各影格貼圖，減少重複裁切和縮放，保留原有動畫與狀態變化。",
+        "ru": "Кэширует кадры некоторых зданий в текущем масштабе, сокращая обрезку и масштабирование с сохранением анимации и смены состояний.",
+        "de": "Speichert Bilder ausgewählter Gebäude in aktueller Skalierung zwischen, spart Zuschnitt und Skalierung und erhält Animationen und Zustandswechsel.",
+        "ptbr": "Armazena quadros de certos edifícios na escala atual, reduzindo recortes e redimensionamentos sem perder animações e mudanças de estado.",
+        "it": "Memorizza fotogrammi di alcuni edifici alla scala attuale, riducendo ritagli e ridimensionamenti e conservando animazioni e cambi di stato.",
+        "es": "Almacena fotogramas de ciertos edificios a la escala actual para reducir recortes y escalados, conservando animaciones y cambios de estado.",
+        "fr": "Met en cache les images de certains bâtiments à l'échelle actuelle, réduisant découpes et redimensionnements tout en conservant animations et changements d'état.",
+        "nl": "Bewaart frames van bepaalde gebouwen op de huidige schaal om uitsnijden en schalen te beperken, met behoud van animaties en toestandswissels.",
+        "cz": "Ukládá snímky vybraných budov v aktuálním měřítku, omezuje ořez a škálování při zachování animací a změn stavu.",
+        "pl": "Przechowuje klatki wybranych budynków w bieżącej skali, ograniczając przycinanie i skalowanie przy zachowaniu animacji i zmian stanu.",
+        "jp": "一部の建物の各フレームを現在の倍率でキャッシュし、アニメーションや状態変化を保ちながら切り抜きと拡縮を減らします。",
+        "kr": "일부 건물의 프레임을 현재 배율로 캐시하여 반복 잘라내기와 확대를 줄이고 애니메이션과 상태 변화를 유지합니다.",
+        "thai": "แคชแต่ละเฟรมของอาคารบางชนิดที่ขนาดปัจจุบัน เพื่อลดการตัดและย่อขยายซ้ำ โดยคงภาพเคลื่อนไหวและการเปลี่ยนสถานะ",
+        "hu": "Kiválasztott épületek képkockáit a jelenlegi méretben tárolja, kevesebb vágással és méretezéssel, megőrizve az animációkat és állapotváltásokat.",
+        "lv": "Kešo atsevišķu ēku kadrus pašreizējā mērogā, samazinot apgriešanu un mērogošanu un saglabājot animācijas un stāvokļu maiņas.",
+        "ro": "Memorează cadrele unor clădiri la scara curentă pentru a reduce decuparea și scalarea, păstrând animațiile și schimbările de stare.",
+        "no": "Lagrer bilder fra utvalgte bygninger i gjeldende skala for å redusere beskjæring og skalering, med animasjoner og tilstandsendringer bevart."
+      },
+      "reloadPolicy": "hot",
+      "section": "performance"
+    },
+    "enableBuildingBatchCache": {
+      "type": "boolean",
+      "label": {
+        "en": "Optimize grouped building rendering",
+        "sch": "优化建筑成组渲染",
+        "modsch": "优化建筑成组渲染",
+        "tch": "最佳化建築群組繪製",
+        "ru": "Оптимизировать групповую отрисовку зданий",
+        "de": "Gruppiertes Gebäuderendering optimieren",
+        "ptbr": "Otimizar renderização agrupada de edifícios",
+        "it": "Ottimizza rendering raggruppato degli edifici",
+        "es": "Optimizar renderizado agrupado de edificios",
+        "fr": "Optimiser le rendu groupé des bâtiments",
+        "nl": "Gegroepeerde gebouwrendering optimaliseren",
+        "cz": "Optimalizovat skupinové vykreslování budov",
+        "pl": "Optymalizuj grupowe rysowanie budynków",
+        "jp": "建物のまとめ描画を最適化",
+        "kr": "건물 묶음 렌더링 최적화",
+        "thai": "เพิ่มประสิทธิภาพการวาดอาคารเป็นกลุ่ม",
+        "hu": "Csoportos épületrajzolás optimalizálása",
+        "lv": "Optimizēt grupētu ēku renderēšanu",
+        "ro": "Optimizează randarea grupată a clădirilor",
+        "no": "Optimaliser gruppert bygningstegning"
+      },
+      "default": true,
+      "description": {
+        "en": "Combine consecutive, visually stable buildings in render order into a cached image to reduce individual draws; update it when relevant visual state changes.",
+        "sch": "将绘制顺序中连续且状态稳定的建筑合并为一张贴图并缓存，减少逐栋绘制；画面相关状态变化时更新。",
+        "modsch": "将绘制顺序中连续且状态稳定的建筑合并为一张贴图并缓存，减少逐栋绘制；画面相关状态变化时更新。",
+        "tch": "將繪製順序中連續且狀態穩定的建築合併快取，減少逐棟繪製；相關畫面狀態變化時更新。",
+        "ru": "Объединяет последовательные визуально стабильные здания в порядке отрисовки в кэш; обновляет его при изменении важных визуальных состояний.",
+        "de": "Fasst aufeinanderfolgende, visuell stabile Gebäude in Zeichenreihenfolge zu einem Cachebild zusammen; relevante Zustandsänderungen aktualisieren es.",
+        "ptbr": "Combina edifícios consecutivos e visualmente estáveis na ordem de desenho em uma imagem em cache; atualiza quando o estado visual relevante muda.",
+        "it": "Combina edifici consecutivi e visivamente stabili nell'ordine di disegno in un'immagine in cache; la aggiorna quando cambia lo stato visivo pertinente.",
+        "es": "Combina edificios consecutivos y visualmente estables en orden de dibujo en una imagen en caché; la actualiza cuando cambia el estado visual relevante.",
+        "fr": "Réunit les bâtiments consécutifs et visuellement stables dans l'ordre de rendu en une image en cache ; actualise celle-ci lorsque l'état visuel change.",
+        "nl": "Combineert opeenvolgende, visueel stabiele gebouwen in tekenvolgorde tot een cachebeeld; werkt dit bij als de relevante visuele toestand verandert.",
+        "cz": "Sloučí po sobě jdoucí vizuálně stabilní budovy v pořadí kreslení do obrázku v mezipaměti; obnoví jej při relevantních změnách obrazu.",
+        "pl": "Łączy kolejne, wizualnie stabilne budynki w kolejności rysowania w obraz podręczny; aktualizuje go przy istotnych zmianach wizualnych.",
+        "jp": "描画順で連続し、見た目が安定した建物を1枚にキャッシュして個別描画を減らします。関連する表示状態の変化時に更新します。",
+        "kr": "그리기 순서상 연속되고 시각 상태가 안정된 건물을 하나의 이미지로 캐시합니다. 관련 시각 상태가 바뀌면 갱신합니다.",
+        "thai": "รวมอาคารที่ต่อเนื่องตามลำดับวาดและมีภาพคงที่เป็นภาพแคชเดียว ลดการวาดแยก และอัปเดตเมื่อสถานะภาพที่เกี่ยวข้องเปลี่ยน",
+        "hu": "A rajzolási sorrendben egymást követő, vizuálisan stabil épületeket közös gyorsítótárazott képpé egyesíti, és változáskor frissíti.",
+        "lv": "Apvieno secīgas, vizuāli stabilas ēkas zīmēšanas secībā kešotā attēlā; to atjaunina, mainoties saistītajam attēla stāvoklim.",
+        "ro": "Combină clădirile consecutive și vizual stabile în ordinea desenării într-o imagine în cache; o actualizează când starea vizuală relevantă se schimbă.",
+        "no": "Samler påfølgende, visuelt stabile bygninger i tegnerekkefølge i ett hurtiglagret bilde; oppdaterer det ved relevante visuelle endringer."
+      },
+      "reloadPolicy": "hot",
+      "section": "performance"
+    },
+    "enableResourceSpriteCache": {
+      "type": "boolean",
+      "label": {
+        "en": "Optimize resource icons",
+        "sch": "优化资源图标",
+        "modsch": "优化资源图标",
+        "tch": "最佳化資源圖示",
+        "ru": "Оптимизировать значки ресурсов",
+        "de": "Ressourcensymbole optimieren",
+        "ptbr": "Otimizar ícones de recursos",
+        "it": "Ottimizza icone delle risorse",
+        "es": "Optimizar iconos de recursos",
+        "fr": "Optimiser les icônes de ressources",
+        "nl": "Resourcepictogrammen optimaliseren",
+        "cz": "Optimalizovat ikony zdrojů",
+        "pl": "Optymalizuj ikony zasobów",
+        "jp": "資源アイコンを最適化",
+        "kr": "자원 아이콘 최적화",
+        "thai": "เพิ่มประสิทธิภาพไอคอนทรัพยากร",
+        "hu": "Erőforrásikonok optimalizálása",
+        "lv": "Optimizēt resursu ikonas",
+        "ro": "Optimizează pictogramele resurselor",
+        "no": "Optimaliser ressursikoner"
+      },
+      "default": true,
+      "description": {
+        "en": "Cache scaled icons used by the inventory panel and flying resource transfers, reducing repeated cropping and scaling.",
+        "sch": "缓存库存面板和飞行资源转移特效使用的缩放图标，减少重复裁切和缩放。",
+        "modsch": "缓存库存面板和飞行资源转移特效使用的缩放图标，减少重复裁切和缩放。",
+        "tch": "快取庫存面板和飛行資源轉移特效的縮放圖示，減少重複裁切和縮放。",
+        "ru": "Кэширует масштабированные значки инвентаря и летящих передач, сокращая повторную обрезку и масштабирование.",
+        "de": "Speichert skalierte Inventar- und fliegende Transfersymbole zwischen und verringert wiederholten Zuschnitt und Skalierung.",
+        "ptbr": "Armazena ícones redimensionados do inventário e das transferências voadoras para reduzir recortes e redimensionamentos repetidos.",
+        "it": "Memorizza icone ridimensionate dell'inventario e dei trasferimenti in volo per ridurre ritagli e ridimensionamenti ripetuti.",
+        "es": "Almacena los iconos escalados del inventario y las transferencias volantes para reducir recortes y escalados repetidos.",
+        "fr": "Met en cache les icônes redimensionnées de l'inventaire et des transferts volants pour réduire découpes et redimensionnements répétés.",
+        "nl": "Bewaart geschaalde inventaris- en vliegende transferpictogrammen om herhaald uitsnijden en schalen te beperken.",
+        "cz": "Ukládá škálované ikony inventáře a létajících přesunů, omezuje opakovaný ořez a škálování.",
+        "pl": "Przechowuje przeskalowane ikony ekwipunku i latających transferów, ograniczając powtarzane przycinanie i skalowanie.",
+        "jp": "在庫パネルと飛行する資源転送の拡縮済みアイコンをキャッシュし、繰り返す切り抜きと拡縮を減らします。",
+        "kr": "인벤토리와 날아가는 자원 전송 효과의 확대된 아이콘을 캐시하여 반복 잘라내기와 배율 조정을 줄입니다.",
+        "thai": "แคชไอคอนที่ปรับขนาดแล้วในคลังและเอฟเฟกต์ถ่ายโอนทรัพยากรที่ลอยอยู่ เพื่อลดการตัดและย่อขยายซ้ำ",
+        "hu": "A készlet és repülő erőforrásátvitel méretezett ikonjait tárolja a többszöri vágás és méretezés csökkentésére.",
+        "lv": "Kešo mērogotas inventāra un lidojošo pārsūtījumu ikonas, samazinot atkārtotu apgriešanu un mērogošanu.",
+        "ro": "Memorează pictogramele scalate din inventar și transferurile zburătoare pentru a reduce decuparea și scalarea repetată.",
+        "no": "Hurtiglagrer skalerte inventarikoner og flygende ressursoverføringer for mindre gjentatt beskjæring og skalering."
+      },
+      "reloadPolicy": "hot",
+      "section": "performance"
+    },
+    "enableResourceExplosionPathReuse": {
+      "type": "boolean",
+      "label": {
+        "en": "Optimize resource explosion trails",
+        "sch": "优化资源爆炸光迹",
+        "modsch": "优化资源爆炸光迹",
+        "tch": "最佳化資源爆炸光跡",
+        "ru": "Оптимизировать следы взрыва ресурсов",
+        "de": "Ressourcenexplosionsspuren optimieren",
+        "ptbr": "Otimizar rastros de explosão de recursos",
+        "it": "Ottimizza scie delle esplosioni di risorse",
+        "es": "Optimizar estelas de explosión de recursos",
+        "fr": "Optimiser les traînées d'explosion des ressources",
+        "nl": "Resource-explosiesporen optimaliseren",
+        "cz": "Optimalizovat stopy výbuchů zdrojů",
+        "pl": "Optymalizuj smugi eksplozji zasobów",
+        "jp": "資源爆発の軌跡を最適化",
+        "kr": "자원 폭발 궤적 최적화",
+        "thai": "เพิ่มประสิทธิภาพรอยแสงระเบิดทรัพยากร",
+        "hu": "Erőforrásrobbanási fénycsíkok optimalizálása",
+        "lv": "Optimizēt resursu sprādzienu takas",
+        "ro": "Optimizează dârele exploziilor de resurse",
+        "no": "Optimaliser ressurseksplosjonsspor"
+      },
+      "default": true,
+      "description": {
+        "en": "Simplify position calculations for resource explosion trails and draw them directly to reduce repeated computation.",
+        "sch": "简化资源爆炸光迹的位置计算，并直接绘制光迹，减少重复计算开销。",
+        "modsch": "简化资源爆炸光迹的位置计算，并直接绘制光迹，减少重复计算开销。",
+        "tch": "簡化資源爆炸光跡的位置計算並直接繪製光跡，減少重複計算開銷。",
+        "ru": "Упрощает вычисление позиций следов взрыва и рисует их напрямую, сокращая повторные расчёты.",
+        "de": "Vereinfacht Positionsberechnungen der Explosionsspuren und zeichnet sie direkt, um wiederholte Berechnungen zu sparen.",
+        "ptbr": "Simplifica posições dos rastros de explosão e os desenha diretamente para reduzir cálculos repetidos.",
+        "it": "Semplifica le posizioni delle scie delle esplosioni e le disegna direttamente per ridurre i calcoli ripetuti.",
+        "es": "Simplifica las posiciones de las estelas de explosión y las dibuja directamente para reducir cálculos repetidos.",
+        "fr": "Simplifie le calcul de position des traînées d'explosion et les dessine directement pour réduire les calculs répétés.",
+        "nl": "Vereenvoudigt posities van explosiesporen en tekent ze direct om herhaalde berekeningen te beperken.",
+        "cz": "Zjednodušuje polohy stop výbuchů a kreslí je přímo, čímž omezuje opakované výpočty.",
+        "pl": "Upraszcza pozycje smug eksplozji i rysuje je bezpośrednio, ograniczając powtarzane obliczenia.",
+        "jp": "資源爆発軌跡の位置計算を簡略化して直接描画し、重複計算を減らします。",
+        "kr": "자원 폭발 궤적의 위치 계산을 단순화하고 직접 그려 반복 계산을 줄입니다.",
+        "thai": "ลดความซับซ้อนการคำนวณตำแหน่งรอยแสงระเบิดและวาดโดยตรง เพื่อลดการคำนวณซ้ำ",
+        "hu": "Egyszerűsíti a robbanási fénycsíkok helyszámítását, és közvetlenül rajzolja őket az ismételt számítás csökkentésére.",
+        "lv": "Vienkāršo sprādzienu taku pozīciju aprēķinus un zīmē tās tieši, samazinot atkārtotus aprēķinus.",
+        "ro": "Simplifică pozițiile dârelor de explozie și le desenează direct pentru a reduce calculele repetate.",
+        "no": "Forenkler posisjonsberegningen av eksplosjonsspor og tegner dem direkte for å redusere gjentatte beregninger."
+      },
+      "reloadPolicy": "hot",
+      "section": "performance"
+    },
+    "enableChasmLineWebGL": {
+      "type": "boolean",
+      "label": "Optimize Chasm line rendering",
+      "default": true,
+      "description": "Render Chasm lines with WebGL to reduce rendering overhead; use Canvas 2D when disabled.",
+      "reloadPolicy": "hot",
+      "section": "performance"
+    },
+    "enableChasmTransferIndex": {
+      "type": "boolean",
+      "label": {
+        "en": "Optimize Chasm resource transfer trails",
+        "sch": "优化逆裂缝资源传输光迹",
+        "modsch": "优化逆裂缝资源传输光迹",
+        "tch": "最佳化逆裂縫資源傳輸光跡",
+        "ru": "Оптимизировать следы передачи ресурсов в разломе",
+        "de": "Ressourcentransferspuren im Riss optimieren",
+        "ptbr": "Otimizar rastros de transferência do abismo",
+        "it": "Ottimizza scie dei trasferimenti della voragine",
+        "es": "Optimizar estelas de transferencia del abismo",
+        "fr": "Optimiser les traînées de transfert du gouffre",
+        "nl": "Resourceoverdrachtsporen in de kloof optimaliseren",
+        "cz": "Optimalizovat stopy přenosu v trhlině",
+        "pl": "Optymalizuj smugi transferu w rozpadlinie",
+        "jp": "裂け目の資源転送軌跡を最適化",
+        "kr": "균열 자원 전송 궤적 최적화",
+        "thai": "เพิ่มประสิทธิภาพรอยแสงถ่ายโอนในรอยแยก",
+        "hu": "Hasadék erőforrásátviteli fénycsíkjainak optimalizálása",
+        "lv": "Optimizēt resursu pārsūtīšanas takas plaisā",
+        "ro": "Optimizează dârele de transfer din fisură",
+        "no": "Optimaliser ressursoverføringsspor i kløften"
+      },
+      "default": true,
+      "description": {
+        "en": "Index resource transfer trail paths in the Chasm to reduce repeated path searches and position calculations.",
+        "sch": "为逆裂缝中的资源传输光迹建立路径索引，减少重复查找路径和计算位置的开销。",
+        "modsch": "为逆裂缝中的资源传输光迹建立路径索引，减少重复查找路径和计算位置的开销。",
+        "tch": "為逆裂縫資源傳輸光跡建立路徑索引，減少重複搜尋路徑和計算位置的開銷。",
+        "ru": "Индексирует пути следов ресурсов в разломе, сокращая повторный поиск пути и вычисление позиций.",
+        "de": "Indiziert die Pfade bewegter Ressourcenspuren im Riss und spart wiederholte Pfadsuchen und Positionsberechnungen.",
+        "ptbr": "Indexa os caminhos dos rastros de recursos no abismo, reduzindo buscas e cálculos de posição repetidos.",
+        "it": "Indicizza i percorsi delle scie di risorse nella voragine per ridurre ricerche e calcoli di posizione ripetuti.",
+        "es": "Indexa las rutas de las estelas de recursos del abismo para reducir búsquedas y cálculos de posición repetidos.",
+        "fr": "Indexe les trajets des traînées de ressources du gouffre pour réduire recherches et calculs de position répétés.",
+        "nl": "Indexeert paden van resourceoverdrachtsporen in de kloof en vermindert herhaald zoeken en positie berekenen.",
+        "cz": "Indexuje cesty stop zdrojů v trhlině a omezuje opakované hledání cesty a výpočty polohy.",
+        "pl": "Indeksuje trasy smug zasobów w rozpadlinie, ograniczając wyszukiwanie trasy i obliczenia pozycji.",
+        "jp": "裂け目内の資源転送軌跡に経路索引を作り、経路探索と位置計算の繰り返しを減らします。",
+        "kr": "균열 안의 자원 전송 궤적 경로를 색인화하여 반복 경로 검색과 위치 계산을 줄입니다.",
+        "thai": "สร้างดัชนีเส้นทางรอยแสงทรัพยากรในรอยแยก เพื่อลดการค้นหาเส้นทางและคำนวณตำแหน่งซ้ำ",
+        "hu": "Indexeli az átviteli fénycsíkok útvonalát, csökkentve az ismételt keresést és helyszámítást.",
+        "lv": "Indeksē resursu taku ceļus plaisā, samazinot atkārtotu ceļa meklēšanu un pozīciju aprēķinus.",
+        "ro": "Indexează traseele dârelor de resurse din fisură pentru a reduce căutările și calculele de poziție repetate.",
+        "no": "Indekserer banene til ressursspor i kløften for færre gjentatte banesøk og posisjonsberegninger."
+      },
+      "reloadPolicy": "hot",
+      "section": "performance"
+    },
+    "enableBuildingWebGLRecorder": {
+      "type": "boolean",
+      "label": {
+        "en": "[Testing] WebGL draw recording",
+        "sch": "[测试用] WebGL 绘制记录",
+        "modsch": "[测试用] WebGL 绘制记录",
+        "tch": "[測試用] WebGL繪製記錄",
+        "ru": "[Тест] Запись отрисовки WebGL",
+        "de": "[Test] WebGL-Zeichenaufzeichnung",
+        "ptbr": "[Teste] Registro de desenho WebGL",
+        "it": "[Test] Registrazione disegno WebGL",
+        "es": "[Pruebas] Registro de dibujo WebGL",
+        "fr": "[Test] Enregistrement du dessin WebGL",
+        "nl": "[Test] WebGL-tekenregistratie",
+        "cz": "[Test] Záznam kreslení WebGL",
+        "pl": "[Test] Rejestr rysowania WebGL",
+        "jp": "[テスト用] WebGL描画記録",
+        "kr": "[테스트용] WebGL 그리기 기록",
+        "thai": "[ทดสอบ] บันทึกคำสั่งวาด WebGL",
+        "hu": "[Teszt] WebGL-rajzolás rögzítése",
+        "lv": "[Tests] WebGL zīmēšanas ieraksts",
+        "ro": "[Test] Înregistrare desen WebGL",
+        "no": "[Test] WebGL-tegneregistrering"
+      },
+      "default": false,
+      "description": {
+        "en": "Record building draw commands and state, and count commands, compatibility and recording time for WebGL experiments. Unnecessary for normal play; enabling it adds runtime overhead.",
+        "sch": "记录建筑绘制指令与状态，统计指令数量、兼容情况和记录耗时，供WebGL实验分析。日常游玩不需要开启，开启会增加运行开销。",
+        "modsch": "记录建筑绘制指令与状态，统计指令数量、兼容情况和记录耗时，供WebGL实验分析。日常游玩不需要开启，开启会增加运行开销。",
+        "tch": "記錄建築繪製指令與狀態，統計指令數量、相容情況和記錄耗時，供WebGL實驗分析。日常遊玩不需開啟，開啟會增加執行開銷。",
+        "ru": "Записывает команды и состояния отрисовки зданий, их количество, совместимость и время записи для опытов WebGL. В обычной игре не нужна; повышает нагрузку.",
+        "de": "Zeichnet Gebäudebefehle und Zustände auf und erfasst Anzahl, Kompatibilität und Aufzeichnungszeit für WebGL-Experimente. Für normales Spielen unnötig; erhöht den Laufzeitaufwand.",
+        "ptbr": "Registra comandos e estados de desenho de edifícios, quantidade, compatibilidade e tempo de registro para experimentos WebGL. Desnecessário no jogo normal; aumenta o custo de execução.",
+        "it": "Registra comandi e stati di disegno degli edifici, quantità, compatibilità e tempo di registrazione per esperimenti WebGL. Non serve nel gioco normale; aumenta il carico di esecuzione.",
+        "es": "Registra órdenes y estados de dibujo de edificios, cantidad, compatibilidad y tiempo de registro para experimentar con WebGL. No hace falta al jugar normalmente; añade carga de ejecución.",
+        "fr": "Enregistre commandes et états de dessin des bâtiments, leur nombre, la compatibilité et le temps d'enregistrement pour les essais WebGL. Inutile en jeu normal ; augmente la charge d'exécution.",
+        "nl": "Registreert gebouwtekenopdrachten en toestand, aantallen, compatibiliteit en registratietijd voor WebGL-experimenten. Niet nodig voor normaal spelen; verhoogt de uitvoeringslast.",
+        "cz": "Zaznamenává příkazy a stav kreslení budov, počty, kompatibilitu a dobu záznamu pro pokusy WebGL. Při běžném hraní není potřeba; zvyšuje zátěž.",
+        "pl": "Rejestruje polecenia i stany rysowania budynków, liczbę, zgodność i czas rejestracji do eksperymentów WebGL. Zbędny w zwykłej grze; zwiększa obciążenie.",
+        "jp": "建物描画の命令と状態、命令数、互換性、記録時間を記録し、WebGL実験の分析に使います。通常プレイには不要で、有効にすると実行負荷が増えます。",
+        "kr": "건물 그리기 명령과 상태, 명령 수, 호환 여부와 기록 시간을 기록하여 WebGL 실험을 분석합니다. 일반 플레이에는 필요 없으며 켜면 실행 부담이 늘어납니다.",
+        "thai": "บันทึกคำสั่งและสถานะการวาดอาคาร จำนวนคำสั่ง ความเข้ากันได้ และเวลาบันทึก เพื่อวิเคราะห์การทดลอง WebGL ไม่จำเป็นสำหรับการเล่นปกติ และเพิ่มภาระการทำงานเมื่อเปิด",
+        "hu": "Épületrajzolási parancsokat, állapotot, darabszámot, kompatibilitást és rögzítési időt rögzít WebGL-kísérletekhez. Normál játékhoz nem kell; növeli a futási terhelést.",
+        "lv": "Ieraksta ēku zīmēšanas komandas un stāvokļus, skaitu, saderību un ierakstīšanas laiku WebGL eksperimentiem. Parastai spēlei nav vajadzīgs; palielina izpildes slodzi.",
+        "ro": "Înregistrează comenzi și stări de desen ale clădirilor, numărul, compatibilitatea și timpul de înregistrare pentru experimente WebGL. Inutil în jocul obișnuit; crește costul execuției.",
+        "no": "Registrerer bygningers tegnekommandoer og tilstand, antall, kompatibilitet og registreringstid for WebGL-forsøk. Unødvendig ved vanlig spilling; øker kjørekostnaden."
+      },
+      "reloadPolicy": "hot",
+      "section": "performance"
+    }
+  },
+  "configCompatibility": {
+    "version": 1,
+    "keys": {
+      "enableWindowSizePresets": "enableWindowPresets",
+      "windowPresentationMode": "windowMode",
+      "windowSizePreset": "windowResolution",
+      "enableEscapeActionFix": "enableBetterEscape",
+      "enableScanRangePreview": "enableBetterKernelRangePreview",
+      "enableGradientPunctureRelocationFix": "enableGradientRelocationPunctureAllow",
+      "enableGradientRelocationPenaltyFix": "enableGradientRelocationNoPenalty",
+      "disableIdleSplash": "enableOfflineSimulationSkip",
+      "enableStabilizerSurgeFlashReduction": "enableSurgeFlashBlock",
+      "disableGradientLightningFlash": "enableGradientFlashBlock",
+      "enableVoidReturnFadeSkip": "enableRealityReturnFadeSkip",
+      "enableWaypointTeleportFadeSkip": "enableWaypointFadeSkip",
+      "disableShiftCtrlZoomShortcut": "enableZoomResetBlock",
+      "disableClearViewGrid": "enableClearViewGridBlock",
+      "disableClearViewBuildingClipping": "enableClearViewClipBlock",
+      "enableRightDragHoverFix": "enableCardHoverFix",
+      "enableEraserTierIconFix": "enableEraserIconFix",
+      "enableShopScrollAnchorFix": "enableShopScrollFix",
+      "enableDynamicCamera": "enableCameraAngle",
+      "enableViewDistance": "enableCameraZoom",
+      "farthestZoom": "cameraZoomMin",
+      "closestZoom": "cameraZoomMax",
+      "fallbackZoom": "cameraZoomFallback",
+      "enableMouseAnchoredZoom": "enableCameraZoomAnchor",
+      "enableMouseAnchoredWaypointTeleport": "enableCameraWaypointAnchor",
+      "enableOriginArrowTipAnchor": "enableArrowAnchor",
+      "enableResourceLayersAboveReducedFlashes": "enableResourceSpriteBright",
+      "enableChasmLineDistanceOverride": "enableChasmLineAlwaysVisible",
+      "useTweaksClearViewGridStyle": "enableClearViewGridStyle",
+      "enableAccessibilityButtons": "enableQuickSettings",
+      "enablePlayTimeCounter": "enablePlayTimeDisplay",
+      "playTimeCounterPosition": "playTimeDisplayPosition",
+      "tutorialHints": "enableExplainer",
+      "enableFloorColorOverride": "enableFloorColor",
+      "floorColorOverrideRealityColor": "floorColor",
+      "enableFloorGridLines": "enableGrid",
+      "floorGridLineRealityColor": "floorGridRealityColor",
+      "floorGridLineVoidColor": "floorGridVoidColor",
+      "enableResourceGlowColors": "enableResourceSpriteGlow",
+      "resourceGlowColors": "resourceGlowColor",
+      "enableCubeResourceRenderCache": "enableStableCubeResourceCache",
+      "enableDamagedCubeResourceRenderCache": "enableDamagedCubeResourceCache",
+      "enablePlacementShadowTraversalReuse": "enablePlacementShadowReuse",
+      "enableEntitySpriteRenderCache": "enableBuildingSpriteCache",
+      "enableEntitySliceRenderCache": "enableBuildingBatchCache",
+      "enableResourceIconRenderCache": "enableResourceSpriteCache",
+      "enableResourceExplosionBezierFastPath": "enableResourceExplosionPathReuse",
+      "enableChasmLineRenderer": "enableChasmLineWebGL",
+      "enableChasmTransferPathIndex": "enableChasmTransferIndex",
+      "enableExperimentalEntityWebGLRecorder": "enableBuildingWebGLRecorder"
+    },
+    "sections": {
+      "gameWindow": "window",
+      "featureImprovements": "improvements",
+      "bugFixes": "fixes",
+      "cameraVisuals": "visuals",
+      "extraFeatures": "other",
+      "performanceOptimizations": "performance"
+    },
+    "sources": {
+      "enableWindowPresets": [
+        {
+          "key": "enableWindowSizePresets"
+        }
+      ],
+      "windowMode": [
+        {
+          "key": "windowPresentationMode"
+        }
+      ],
+      "windowResolution": [
+        {
+          "key": "windowSizePreset"
+        }
+      ],
+      "enableBetterEscape": [
+        {
+          "key": "enableEscapeActionFix"
+        }
+      ],
+      "enableBetterKernelRangePreview": [
+        {
+          "key": "enableScanRangePreview"
+        }
+      ],
+      "enableGradientRelocationPunctureAllow": [
+        {
+          "key": "enableGradientPunctureRelocationFix"
+        }
+      ],
+      "enableGradientRelocationNoPenalty": [
+        {
+          "key": "enableGradientRelocationPenaltyFix"
+        }
+      ],
+      "enableOfflineSimulationSkip": [
+        {
+          "key": "disableIdleSplash"
+        }
+      ],
+      "enableSurgeFlashBlock": [
+        {
+          "key": "enableStabilizerSurgeFlashReduction"
+        }
+      ],
+      "enableGradientFlashBlock": [
+        {
+          "key": "disableGradientLightningFlash"
+        }
+      ],
+      "enableRealityReturnFadeSkip": [
+        {
+          "key": "enableVoidReturnFadeSkip"
+        }
+      ],
+      "enableWaypointFadeSkip": [
+        {
+          "key": "enableWaypointTeleportFadeSkip"
+        }
+      ],
+      "enableZoomResetBlock": [
+        {
+          "key": "disableShiftCtrlZoomShortcut"
+        }
+      ],
+      "enableClearViewGridBlock": [
+        {
+          "key": "disableClearViewGrid"
+        }
+      ],
+      "enableClearViewClipBlock": [
+        {
+          "key": "disableClearViewBuildingClipping"
+        }
+      ],
+      "enableCardHoverFix": [
+        {
+          "key": "enableRightDragHoverFix"
+        }
+      ],
+      "enableEraserIconFix": [
+        {
+          "key": "enableEraserTierIconFix"
+        }
+      ],
+      "enableShopScrollFix": [
+        {
+          "key": "enableShopScrollAnchorFix"
+        }
+      ],
+      "enableCameraAngle": [
+        {
+          "key": "enableDynamicCamera"
+        },
+        {
+          "modId": "Cattail_TweaksQuality_Dynamic-Camera",
+          "key": "enableDynamicCamera"
+        }
+      ],
+      "enableCameraZoom": [
+        {
+          "key": "enableViewDistance"
+        }
+      ],
+      "cameraZoomMin": [
+        {
+          "key": "farthestZoom"
+        },
+        {
+          "modId": "Cattail_TweaksQuality_View-Distance",
+          "key": "farthestZoom"
+        }
+      ],
+      "cameraZoomMax": [
+        {
+          "key": "closestZoom"
+        },
+        {
+          "modId": "Cattail_TweaksQuality_View-Distance",
+          "key": "closestZoom"
+        }
+      ],
+      "cameraZoomFallback": [
+        {
+          "key": "fallbackZoom"
+        },
+        {
+          "modId": "Cattail_TweaksQuality_View-Distance",
+          "key": "fallbackZoom"
+        }
+      ],
+      "enableCameraZoomAnchor": [
+        {
+          "key": "enableMouseAnchoredZoom"
+        }
+      ],
+      "enableCameraWaypointAnchor": [
+        {
+          "key": "enableMouseAnchoredWaypointTeleport"
+        }
+      ],
+      "enableArrowAnchor": [
+        {
+          "key": "enableOriginArrowTipAnchor"
+        }
+      ],
+      "enableResourceSpriteBright": [
+        {
+          "key": "enableResourceLayersAboveReducedFlashes"
+        }
+      ],
+      "enableChasmLineAlwaysVisible": [
+        {
+          "key": "enableChasmLineDistanceOverride"
+        }
+      ],
+      "enableClearViewGridStyle": [
+        {
+          "key": "useTweaksClearViewGridStyle"
+        }
+      ],
+      "enableQuickSettings": [
+        {
+          "key": "enableAccessibilityButtons"
+        }
+      ],
+      "enablePlayTimeDisplay": [
+        {
+          "key": "enablePlayTimeCounter"
+        }
+      ],
+      "playTimeDisplayPosition": [
+        {
+          "key": "playTimeCounterPosition",
+          "operations": [
+            {
+              "kind": "map",
+              "unless": {
+                "key": "playTimeCounterPositionOrderV2",
+                "equals": true
+              },
+              "normalizeText": true,
+              "values": [
+                [
+                  0,
+                  2
+                ],
+                [
+                  false,
+                  2
+                ],
+                [
+                  "0",
+                  2
+                ],
+                [
+                  2,
+                  0
+                ],
+                [
+                  "2",
+                  0
+                ]
+              ]
+            },
+            {
+              "kind": "map",
+              "normalizeText": true,
+              "fallback": 2,
+              "values": [
+                [
+                  1,
+                  1
+                ],
+                [
+                  true,
+                  1
+                ],
+                [
+                  "1",
+                  1
+                ],
+                [
+                  "top",
+                  1
+                ],
+                [
+                  "top-center",
+                  1
+                ],
+                [
+                  "top center",
+                  1
+                ],
+                [
+                  "center-top",
+                  1
+                ],
+                [
+                  0,
+                  0
+                ],
+                [
+                  "0",
+                  0
+                ],
+                [
+                  "left",
+                  0
+                ],
+                [
+                  "bottom-left",
+                  0
+                ],
+                [
+                  "bottom left",
+                  0
+                ],
+                [
+                  "left-bottom",
+                  0
+                ],
+                [
+                  "left bottom",
+                  0
+                ],
+                [
+                  2,
+                  2
+                ],
+                [
+                  false,
+                  2
+                ],
+                [
+                  "2",
+                  2
+                ],
+                [
+                  "right",
+                  2
+                ],
+                [
+                  "bottom-right",
+                  2
+                ],
+                [
+                  "bottom right",
+                  2
+                ]
+              ]
+            }
+          ]
+        },
+        {
+          "modId": "Cattail_TweaksQuality_Dynamic-Details",
+          "key": "playTimeCounterPosition",
+          "operations": [
+            {
+              "kind": "map",
+              "normalizeText": true,
+              "values": [
+                [
+                  0,
+                  2
+                ],
+                [
+                  false,
+                  2
+                ],
+                [
+                  "0",
+                  2
+                ],
+                [
+                  2,
+                  0
+                ],
+                [
+                  "2",
+                  0
+                ]
+              ]
+            },
+            {
+              "kind": "map",
+              "normalizeText": true,
+              "fallback": 2,
+              "values": [
+                [
+                  1,
+                  1
+                ],
+                [
+                  true,
+                  1
+                ],
+                [
+                  "1",
+                  1
+                ],
+                [
+                  "top",
+                  1
+                ],
+                [
+                  "top-center",
+                  1
+                ],
+                [
+                  "top center",
+                  1
+                ],
+                [
+                  "center-top",
+                  1
+                ],
+                [
+                  0,
+                  0
+                ],
+                [
+                  "0",
+                  0
+                ],
+                [
+                  "left",
+                  0
+                ],
+                [
+                  "bottom-left",
+                  0
+                ],
+                [
+                  "bottom left",
+                  0
+                ],
+                [
+                  "left-bottom",
+                  0
+                ],
+                [
+                  "left bottom",
+                  0
+                ],
+                [
+                  2,
+                  2
+                ],
+                [
+                  false,
+                  2
+                ],
+                [
+                  "2",
+                  2
+                ],
+                [
+                  "right",
+                  2
+                ],
+                [
+                  "bottom-right",
+                  2
+                ],
+                [
+                  "bottom right",
+                  2
+                ]
+              ]
+            }
+          ]
+        }
+      ],
+      "enableExplainer": [
+        {
+          "key": "tutorialHints"
+        }
+      ],
+      "enableFloorColor": [
+        {
+          "key": "enableFloorColorOverride"
+        }
+      ],
+      "floorColor": [
+        {
+          "key": "floorColorOverrideRealityColor"
+        }
+      ],
+      "enableGrid": [
+        {
+          "key": "enableFloorGridLines"
+        }
+      ],
+      "floorGridRealityColor": [
+        {
+          "key": "floorGridLineRealityColor"
+        }
+      ],
+      "floorGridVoidColor": [
+        {
+          "key": "floorGridLineVoidColor"
+        }
+      ],
+      "enableResourceSpriteGlow": [
+        {
+          "key": "enableResourceGlowColors"
+        }
+      ],
+      "resourceGlowColor": [
+        {
+          "key": "resourceGlowColors"
+        }
+      ],
+      "enableStableCubeResourceCache": [
+        {
+          "key": "enableCubeResourceRenderCache"
+        }
+      ],
+      "enableDamagedCubeResourceCache": [
+        {
+          "key": "enableDamagedCubeResourceRenderCache"
+        }
+      ],
+      "enablePlacementShadowReuse": [
+        {
+          "key": "enablePlacementShadowTraversalReuse"
+        }
+      ],
+      "enableBuildingSpriteCache": [
+        {
+          "key": "enableEntitySpriteRenderCache"
+        }
+      ],
+      "enableBuildingBatchCache": [
+        {
+          "key": "enableEntitySliceRenderCache"
+        }
+      ],
+      "enableResourceSpriteCache": [
+        {
+          "key": "enableResourceIconRenderCache"
+        }
+      ],
+      "enableResourceExplosionPathReuse": [
+        {
+          "key": "enableResourceExplosionBezierFastPath"
+        }
+      ],
+      "enableChasmLineWebGL": [
+        {
+          "key": "enableChasmLineRenderer",
+          "fallback": true,
+          "operations": [
+            {
+              "kind": "notFalse"
+            },
+            {
+              "kind": "and",
+              "source": {
+                "key": "chasmLineRendererMode"
+              },
+              "reject": [
+                "0",
+                "canvas",
+                "canvas2d",
+                "canvas 2d",
+                "vanilla"
+              ],
+              "rejectNonPositive": true
+            }
+          ]
+        }
+      ],
+      "enableChasmTransferIndex": [
+        {
+          "key": "enableChasmTransferPathIndex"
+        }
+      ],
+      "enableBuildingWebGLRecorder": [
+        {
+          "key": "enableExperimentalEntityWebGLRecorder"
+        }
+      ],
+      "cameraPitch": [
+        {
+          "key": "defaultPitch"
+        },
+        {
+          "modId": "Cattail_TweaksQuality_Dynamic-Camera",
+          "key": "cameraPitch"
+        },
+        {
+          "modId": "Cattail_TweaksQuality_Dynamic-Camera",
+          "key": "defaultPitch"
+        }
+      ],
+      "cameraYaw": [
+        {
+          "key": "defaultYaw"
+        },
+        {
+          "modId": "Cattail_TweaksQuality_Dynamic-Camera",
+          "key": "cameraYaw"
+        },
+        {
+          "modId": "Cattail_TweaksQuality_Dynamic-Camera",
+          "key": "defaultYaw"
+        }
+      ],
+      "enableExplainerFix": [
+        {
+          "key": "enableExplainerLanguageFix"
+        }
+      ]
+    },
+    "layoutBackupKey": "identifierMigrationBackupV1"
+  }
+}

@@ -207,16 +207,16 @@
           }
         },
         "Cattail_TweaksQuality_Dynamic-Details": {
-          "name": "Dynamic Details",
-          "description": "Adds Alt+Shift dynamic building detail panels and shop build-availability countdowns without modifying vanilla scripts.",
+          "name": "Dynamic Information Expansion",
+          "description": "Adds more building details, resource flow tracking, resource change line charts, direction indicators, coordinate teleportation, and more. Click “?” at the bottom left to see the shortcuts for these features.",
           "config": {
             "cookieDirectionPassword": {
-              "label": "Cookie direction password",
-              "description": "Enter cookie to show the cookie direction indicator before Cookie Clicker is achieved."
+              "label": "Cookie Easter egg location [password required]",
+              "description": "Enter the cookie password to reveal the cookie location."
             },
             "resourceSourceLineRenderer": {
-              "label": "Resource source line renderer",
-              "description": "Choose how resource source lines are rendered. Press O in game to switch this value.",
+              "label": "Optimize resource flow tracking lines",
+              "description": "Renders resource flow tracking lines with WebGL to avoid stuttering caused by the original Canvas 2D rendering. Press O to switch.",
               "valueLabels": [
                 "Canvas 2D",
                 "WebGL"
@@ -224,24 +224,48 @@
             },
             "enableMineDistributionChart": {
               "label": "Mineral depth distribution chart",
-              "description": "Show mineral depth distribution charts on extended mine detail cards."
+              "description": "Provides mineral depth distribution charts in extended mine information."
             },
             "mineDistributionChartView": {
               "label": "Mineral distribution chart style",
-              "description": "Choose a stacked probability chart or separate mineral bands.",
+              "description": "Choose a stacked probability chart or separate mineral distribution bands.",
               "valueLabels": {
                 "stacked": "Stacked probability chart",
                 "bands": "Separate mineral bands"
               }
             },
             "mineDistributionVisibility": {
-              "label": "Mineral visibility",
-              "description": "Choose how undiscovered minerals appear in the distribution chart.",
+              "label": "Mineral visibility conditions",
+              "description": "Choose all minerals, anonymous undiscovered minerals, or discovered minerals only",
               "valueLabels": {
                 "all": "Show all minerals",
                 "anonymous": "Anonymize undiscovered minerals",
                 "discovered": "Discovered minerals only"
               }
+            },
+            "enableBuildingDetails": {
+              "label": "Building information+",
+              "description": "Shows more building information, such as exact production efficiency and bonus values. Press Alt+Shift."
+            },
+            "enableResourceSourceDetails": {
+              "label": "Resource flow tracking",
+              "description": "Shows resource sources and consumers, with optional lines marking related buildings. Press Alt+Shift."
+            },
+            "enableResourceSourceLineChart": {
+              "label": "Resource change line chart",
+              "description": "While hovering a resource icon, use the mouse wheel to switch the vanilla bar chart to a line chart and view detailed changes in resource quantities."
+            },
+            "enableCoordinateOverlay": {
+              "label": "Current coordinates",
+              "description": "Shows the coordinates of the current tile or building beside the cursor. Press Alt+C."
+            },
+            "enableDirectionPointers": {
+              "label": "Important building directions",
+              "description": "Shows arrows around the cursor pointing to important buildings and the world origin."
+            },
+            "enableBuildCountdown": {
+              "label": "Estimated time until buildable",
+              "description": "Shows how long buildings with insufficient resources are estimated to take to become buildable, based on current resources and production rates."
             }
           }
         },
@@ -485,6 +509,10 @@
             "enableBuildingWebGLRecorder": {
               "label": "[Testing] WebGL draw recording",
               "description": "Record building draw commands and state, and count commands, compatibility and recording time for WebGL experiments. Unnecessary for normal play; enabling it adds runtime overhead."
+            },
+            "enableEmptySoundWarningFix": {
+              "label": "Fix repeated empty sound effect warnings",
+              "description": "Fix warnings caused when some buildings try to delete an empty sound effect returned while the game is muted."
             }
           }
         },
@@ -758,20 +786,20 @@
           }
         },
         "Cattail_TweaksQuality_Dynamic-Details": {
-          "name": "动态详情",
-          "description": "添加 Alt+Shift 动态建筑详情面板和商店建造可用倒计时，不修改原版脚本。",
+          "name": "动态信息扩展",
+          "description": "提供建筑更多详情、资源流向追踪、资源变化量折线图、方向指示、坐标传送等等功能。请点击左下角的“？”查阅这些功能所需的快捷键。",
           "config": {
             "cookieDirectionPassword": {
-              "label": "饼干方向密码",
-              "description": "输入 cookie 可在达成 Cookie Clicker 前显示饼干方向指示。"
+              "label": "饼干彩蛋位置[需要密码]",
+              "description": "输入饼干的密码，就能显示饼干的位置。"
             },
             "resourceSourceLineRenderer": {
-              "label": "资源来源连线渲染",
-              "description": "选择资源来源连线的渲染方式。游戏中按 O 也会切换这个值。"
+              "label": "优化资源流向追踪绘线",
+              "description": "将资源流向追踪的绘线改为WebGL方式渲染，避免使用原版Canvas 2D方式渲染造成的卡顿。可以按下“O”键切换。"
             },
             "enableMineDistributionChart": {
               "label": "矿物深度分布图",
-              "description": "在矿井的扩展建筑信息卡片中显示矿物深度分布图。"
+              "description": "在矿井的扩展建筑信息中提供矿物深度分布图。"
             },
             "mineDistributionChartView": {
               "label": "矿物分布图样式",
@@ -782,13 +810,37 @@
               }
             },
             "mineDistributionVisibility": {
-              "label": "矿物显示范围",
-              "description": "选择分布图如何显示尚未发现的矿物。",
+              "label": "矿物显示范围条件",
+              "description": "选择所有矿物、匿名显示未发现矿物和仅已发现的矿物",
               "valueLabels": {
                 "all": "全部公开",
                 "anonymous": "未发现矿物匿名",
                 "discovered": "仅已发现矿物"
               }
+            },
+            "enableBuildingDetails": {
+              "label": "建筑信息+",
+              "description": "显示更多的建筑信息，比如具体的生产效率和增益数值。需按下“Alt+Shift”。"
+            },
+            "enableResourceSourceDetails": {
+              "label": "资源流向追踪",
+              "description": "显示资源的获取和消耗来源，并且可以开启连线标示相关建筑。需按下“Alt+Shift”。"
+            },
+            "enableResourceSourceLineChart": {
+              "label": "资源变化量折线图",
+              "description": "鼠标悬停资源图标时，可用鼠标滚轮将原版柱状图切换为折线图，查看资源数量的详细变化。"
+            },
+            "enableCoordinateOverlay": {
+              "label": "当前坐标",
+              "description": "在鼠标旁边显示当前方格或者当前建筑的坐标。需按下“Alt+C”。"
+            },
+            "enableDirectionPointers": {
+              "label": "重要建筑指向",
+              "description": "在鼠标周围显示指向重要建筑和世界原点的箭头。"
+            },
+            "enableBuildCountdown": {
+              "label": "建筑可建造预计时间",
+              "description": "在商店中显示资源不足的建筑根据当前资源和生产率预计还需多久才能建造。"
             }
           }
         },
@@ -1032,6 +1084,10 @@
             "enableBuildingWebGLRecorder": {
               "label": "[测试用] WebGL 绘制记录",
               "description": "记录建筑绘制指令与状态，统计指令数量、兼容情况和记录耗时，供WebGL实验分析。日常游玩不需要开启，开启会增加运行开销。"
+            },
+            "enableEmptySoundWarningFix": {
+              "label": "修复空音效持续报错",
+              "description": "修复部分建筑会在游戏静音设置下返回空音效并被尝试删除从而输出警告的问题。"
             }
           }
         },
@@ -1305,20 +1361,20 @@
           }
         },
         "Cattail_TweaksQuality_Dynamic-Details": {
-          "name": "动态详情",
-          "description": "添加 Alt+Shift 动态建筑详情面板和商店建造可用倒计时，不修改原版脚本。",
+          "name": "动态信息扩展",
+          "description": "提供建筑更多详情、资源流向追踪、资源变化量折线图、方向指示、坐标传送等等功能。请点击左下角的“？”查阅这些功能所需的快捷键。",
           "config": {
             "cookieDirectionPassword": {
-              "label": "饼干方向密码",
-              "description": "输入 cookie 可在达成 Cookie Clicker 前显示饼干方向指示。"
+              "label": "饼干彩蛋位置[需要密码]",
+              "description": "输入饼干的密码，就能显示饼干的位置。"
             },
             "resourceSourceLineRenderer": {
-              "label": "资源来源连线渲染",
-              "description": "选择资源来源连线的渲染方式。游戏中按 O 也会切换这个值。"
+              "label": "优化资源流向追踪绘线",
+              "description": "将资源流向追踪的绘线改为WebGL方式渲染，避免使用原版Canvas 2D方式渲染造成的卡顿。可以按下“O”键切换。"
             },
             "enableMineDistributionChart": {
               "label": "矿物深度分布图",
-              "description": "在矿井的扩展建筑信息卡片中显示矿物深度分布图。"
+              "description": "在矿井的扩展建筑信息中提供矿物深度分布图。"
             },
             "mineDistributionChartView": {
               "label": "矿物分布图样式",
@@ -1329,13 +1385,37 @@
               }
             },
             "mineDistributionVisibility": {
-              "label": "矿物显示范围",
-              "description": "选择分布图如何显示尚未发现的矿物。",
+              "label": "矿物显示范围条件",
+              "description": "选择所有矿物、匿名显示未发现矿物和仅已发现的矿物",
               "valueLabels": {
                 "all": "全部公开",
                 "anonymous": "未发现矿物匿名",
                 "discovered": "仅已发现矿物"
               }
+            },
+            "enableBuildingDetails": {
+              "label": "建筑信息+",
+              "description": "显示更多的建筑信息，比如具体的生产效率和增益数值。需按下“Alt+Shift”。"
+            },
+            "enableResourceSourceDetails": {
+              "label": "资源流向追踪",
+              "description": "显示资源的获取和消耗来源，并且可以开启连线标示相关建筑。需按下“Alt+Shift”。"
+            },
+            "enableResourceSourceLineChart": {
+              "label": "资源变化量折线图",
+              "description": "鼠标悬停资源图标时，可用鼠标滚轮将原版柱状图切换为折线图，查看资源数量的详细变化。"
+            },
+            "enableCoordinateOverlay": {
+              "label": "当前坐标",
+              "description": "在鼠标旁边显示当前方格或者当前建筑的坐标。需按下“Alt+C”。"
+            },
+            "enableDirectionPointers": {
+              "label": "重要建筑指向",
+              "description": "在鼠标周围显示指向重要建筑和世界原点的箭头。"
+            },
+            "enableBuildCountdown": {
+              "label": "建筑可建造预计时间",
+              "description": "在商店中显示资源不足的建筑根据当前资源和生产率预计还需多久才能建造。"
             }
           }
         },
@@ -1579,6 +1659,10 @@
             "enableBuildingWebGLRecorder": {
               "label": "[测试用] WebGL 绘制记录",
               "description": "记录建筑绘制指令与状态，统计指令数量、兼容情况和记录耗时，供WebGL实验分析。日常游玩不需要开启，开启会增加运行开销。"
+            },
+            "enableEmptySoundWarningFix": {
+              "label": "修复空音效持续报错",
+              "description": "修复部分建筑会在游戏静音设置下返回空音效并被尝试删除从而输出警告的问题。"
             }
           }
         },
@@ -1847,14 +1931,15 @@
           }
         },
         "Cattail_TweaksQuality_Dynamic-Details": {
-          "name": "動態詳情",
+          "name": "動態資訊擴充",
           "config": {
             "cookieDirectionPassword": {
-              "label": "餅乾方向密碼"
+              "label": "餅乾彩蛋位置[需要密碼]",
+              "description": "輸入餅乾的密碼，就能顯示餅乾的位置。"
             },
             "enableMineDistributionChart": {
               "label": "礦物深度分布圖",
-              "description": "在礦井的擴充建築資訊卡片中顯示礦物深度分布圖。"
+              "description": "在礦井的擴充建築資訊中提供礦物深度分布圖。"
             },
             "mineDistributionChartView": {
               "label": "礦物分布圖樣式",
@@ -1865,15 +1950,44 @@
               }
             },
             "mineDistributionVisibility": {
-              "label": "礦物顯示範圍",
-              "description": "選擇分布圖如何顯示尚未發現的礦物。",
+              "label": "礦物顯示範圍條件",
+              "description": "選擇所有礦物、匿名顯示未發現礦物和僅已發現的礦物",
               "valueLabels": {
                 "all": "全部公開",
                 "anonymous": "未發現礦物匿名",
                 "discovered": "僅已發現礦物"
               }
+            },
+            "enableBuildingDetails": {
+              "label": "建築資訊+",
+              "description": "顯示更多的建築資訊，比如具體的生產效率和增益數值。需按下「Alt+Shift」。"
+            },
+            "enableResourceSourceDetails": {
+              "label": "資源流向追蹤",
+              "description": "顯示資源的取得和消耗來源，並且可以開啟連線標示相關建築。需按下「Alt+Shift」。"
+            },
+            "enableResourceSourceLineChart": {
+              "label": "資源變化量折線圖",
+              "description": "滑鼠懸停資源圖示時，可用滑鼠滾輪將原版柱狀圖切換為折線圖，查看資源數量的詳細變化。"
+            },
+            "enableCoordinateOverlay": {
+              "label": "目前座標",
+              "description": "在滑鼠旁邊顯示目前方格或者目前建築的座標。需按下「Alt+C」。"
+            },
+            "enableDirectionPointers": {
+              "label": "重要建築指向",
+              "description": "在滑鼠周圍顯示指向重要建築和世界原點的箭頭。"
+            },
+            "enableBuildCountdown": {
+              "label": "建築可建造預計時間",
+              "description": "在商店中顯示資源不足的建築根據目前資源和生產率預計還需多久才能建造。"
+            },
+            "resourceSourceLineRenderer": {
+              "label": "最佳化資源流向追蹤繪線",
+              "description": "將資源流向追蹤的繪線改為WebGL方式算繪，避免使用原版Canvas 2D方式算繪造成的卡頓。可以按下「O」鍵切換。"
             }
-          }
+          },
+          "description": "提供建築更多詳情、資源流向追蹤、資源變化量折線圖、方向指示、座標傳送等等功能。請點擊左下角的「？」查閱這些功能所需的快捷鍵。"
         },
         "Cattail_TweaksQuality_Resource-Watcher": {
           "name": "資源監視器"
@@ -2113,6 +2227,10 @@
             "enableBuildingWebGLRecorder": {
               "label": "[測試用] WebGL繪製記錄",
               "description": "記錄建築繪製指令與狀態，統計指令數量、相容情況和記錄耗時，供WebGL實驗分析。日常遊玩不需開啟，開啟會增加執行開銷。"
+            },
+            "enableEmptySoundWarningFix": {
+              "label": "修復空音效持續報錯",
+              "description": "修復部分建築會在遊戲靜音設定下回傳空音效，並被嘗試刪除而輸出警告的問題。"
             }
           }
         },
@@ -2286,33 +2404,63 @@
           }
         },
         "Cattail_TweaksQuality_Dynamic-Details": {
-          "name": "Динамические сведения",
+          "name": "Расширенная динамическая информация",
           "config": {
             "cookieDirectionPassword": {
-              "label": "Пароль направления печенья"
+              "label": "Местоположение печенья [нужен пароль]",
+              "description": "Введите пароль печенья, чтобы показать его местоположение."
             },
             "enableMineDistributionChart": {
-              "label": "График распределения минералов по глубине",
-              "description": "Показывать распределение минералов по глубине в расширенных карточках шахт."
+              "label": "Распределение минералов по глубине",
+              "description": "Добавляет график распределения минералов по глубине в расширенные сведения о шахтах."
             },
             "mineDistributionChartView": {
               "label": "Вид графика распределения минералов",
-              "description": "Выберите график вероятностей с накоплением или отдельные полосы минералов.",
+              "description": "Выберите график вероятностей с накоплением или отдельные полосы распределения минералов.",
               "valueLabels": {
                 "stacked": "График вероятностей с накоплением",
                 "bands": "Отдельные полосы минералов"
               }
             },
             "mineDistributionVisibility": {
-              "label": "Видимость минералов",
-              "description": "Выберите, как показывать неоткрытые минералы на графике распределения.",
+              "label": "Условия отображения минералов",
+              "description": "Выберите все минералы, анонимные неоткрытые минералы или только открытые минералы",
               "valueLabels": {
                 "all": "Показывать все минералы",
                 "anonymous": "Скрывать названия неоткрытых минералов",
                 "discovered": "Только открытые минералы"
               }
+            },
+            "enableBuildingDetails": {
+              "label": "Информация о зданиях+",
+              "description": "Показывает больше сведений о зданиях, включая точную эффективность производства и бонусы. Нажмите Alt+Shift."
+            },
+            "enableResourceSourceDetails": {
+              "label": "Отслеживание потоков ресурсов",
+              "description": "Показывает источники и потребителей ресурсов; можно включить линии к связанным зданиям. Нажмите Alt+Shift."
+            },
+            "enableResourceSourceLineChart": {
+              "label": "График изменения ресурсов",
+              "description": "Наведите курсор на значок ресурса и колесом мыши переключите исходную столбчатую диаграмму на линейный график подробных изменений количества ресурсов."
+            },
+            "enableCoordinateOverlay": {
+              "label": "Текущие координаты",
+              "description": "Показывает возле курсора координаты текущей клетки или здания. Нажмите Alt+C."
+            },
+            "enableDirectionPointers": {
+              "label": "Направления важных зданий",
+              "description": "Показывает вокруг курсора стрелки к важным зданиям и началу координат мира."
+            },
+            "enableBuildCountdown": {
+              "label": "Ожидаемое время до постройки",
+              "description": "Показывает в магазине примерное время до доступности зданий с нехваткой ресурсов, исходя из текущих запасов и производства."
+            },
+            "resourceSourceLineRenderer": {
+              "label": "Оптимизация линий потоков ресурсов",
+              "description": "Рисует линии потоков ресурсов через WebGL, избегая задержек исходного Canvas 2D. Для переключения нажмите O."
             }
-          }
+          },
+          "description": "Добавляет подробности о зданиях, отслеживание потоков ресурсов, графики изменения ресурсов, указатели направления, телепортацию по координатам и другое. Нажмите «?» слева внизу, чтобы узнать сочетания клавиш."
         },
         "Cattail_TweaksQuality_Resource-Watcher": {
           "name": "Монитор ресурсов"
@@ -2552,6 +2700,10 @@
             "enableBuildingWebGLRecorder": {
               "label": "[Тест] Запись отрисовки WebGL",
               "description": "Записывает команды и состояния отрисовки зданий, их количество, совместимость и время записи для опытов WebGL. В обычной игре не нужна; повышает нагрузку."
+            },
+            "enableEmptySoundWarningFix": {
+              "label": "Исправить повторные предупреждения о пустом звуке",
+              "description": "Исправляет предупреждения, возникающие, когда некоторые здания пытаются удалить пустой звуковой эффект, возвращённый при выключенном звуке игры."
             }
           }
         },
@@ -2725,33 +2877,63 @@
           }
         },
         "Cattail_TweaksQuality_Dynamic-Details": {
-          "name": "Dynamische Details",
+          "name": "Dynamische Informationserweiterung",
           "config": {
             "cookieDirectionPassword": {
-              "label": "Cookie-Richtungspasswort"
+              "label": "Keks-Easter-Egg-Position [Passwort nötig]",
+              "description": "Das Keks-Passwort eingeben, um die Keksposition anzuzeigen."
             },
             "enableMineDistributionChart": {
-              "label": "Diagramm der Mineralverteilung nach Tiefe",
-              "description": "Mineralverteilung nach Tiefe in erweiterten Mineninfokarten anzeigen."
+              "label": "Mineralverteilung nach Tiefe",
+              "description": "Ergänzt Diagramme zur Mineralverteilung nach Tiefe in den erweiterten Mineninformationen."
             },
             "mineDistributionChartView": {
               "label": "Darstellung der Mineralverteilung",
-              "description": "Gestapeltes Wahrscheinlichkeitsdiagramm oder getrennte Mineralbänder wählen.",
+              "description": "Zwischen gestapeltem Wahrscheinlichkeitsdiagramm und getrennten Mineralverteilungsbändern wählen.",
               "valueLabels": {
                 "stacked": "Gestapeltes Wahrscheinlichkeitsdiagramm",
                 "bands": "Getrennte Mineralbänder"
               }
             },
             "mineDistributionVisibility": {
-              "label": "Sichtbarkeit der Minerale",
-              "description": "Wählen, wie unentdeckte Minerale im Verteilungsdiagramm angezeigt werden.",
+              "label": "Bedingungen für die Mineralanzeige",
+              "description": "Alle Minerale, unentdeckte Minerale anonym oder nur entdeckte Minerale wählen",
               "valueLabels": {
                 "all": "Alle Minerale anzeigen",
                 "anonymous": "Unentdeckte Minerale anonymisieren",
                 "discovered": "Nur entdeckte Minerale"
               }
+            },
+            "enableBuildingDetails": {
+              "label": "Gebäudeinformationen+",
+              "description": "Zeigt weitere Gebäudeinformationen wie genaue Produktionseffizienz und Bonuswerte. Alt+Shift drücken."
+            },
+            "enableResourceSourceDetails": {
+              "label": "Ressourcenfluss verfolgen",
+              "description": "Zeigt Ressourcenquellen und Verbraucher; Verbindungslinien zu beteiligten Gebäuden lassen sich einschalten. Alt+Shift drücken."
+            },
+            "enableResourceSourceLineChart": {
+              "label": "Liniendiagramm der Ressourcenänderung",
+              "description": "Mit dem Mausrad über einem Ressourcensymbol vom ursprünglichen Balkendiagramm zum Liniendiagramm wechseln, um Mengenänderungen genauer zu sehen."
+            },
+            "enableCoordinateOverlay": {
+              "label": "Aktuelle Koordinaten",
+              "description": "Zeigt neben dem Mauszeiger die Koordinaten des aktuellen Feldes oder Gebäudes. Alt+C drücken."
+            },
+            "enableDirectionPointers": {
+              "label": "Richtung wichtiger Gebäude",
+              "description": "Zeigt um den Mauszeiger Pfeile zu wichtigen Gebäuden und zum Weltursprung."
+            },
+            "enableBuildCountdown": {
+              "label": "Geschätzte Zeit bis zum Bau",
+              "description": "Zeigt im Shop anhand aktueller Ressourcen und Produktionsraten die geschätzte Wartezeit bis zum Bau derzeit nicht bezahlbarer Gebäude."
+            },
+            "resourceSourceLineRenderer": {
+              "label": "Ressourcenflusslinien optimieren",
+              "description": "Zeichnet Ressourcenflusslinien mit WebGL, um Ruckeln durch das ursprüngliche Canvas 2D zu vermeiden. Mit O umschalten."
             }
-          }
+          },
+          "description": "Ergänzt Gebäudedetails, Ressourcenflussverfolgung, Liniendiagramme zu Ressourcenänderungen, Richtungsanzeigen, Koordinatenteleportation und mehr. Die Tastenkürzel stehen unter „?“ unten links."
         },
         "Cattail_TweaksQuality_Resource-Watcher": {
           "name": "Ressourcenmonitor"
@@ -2991,6 +3173,10 @@
             "enableBuildingWebGLRecorder": {
               "label": "[Test] WebGL-Zeichenaufzeichnung",
               "description": "Zeichnet Gebäudebefehle und Zustände auf und erfasst Anzahl, Kompatibilität und Aufzeichnungszeit für WebGL-Experimente. Für normales Spielen unnötig; erhöht den Laufzeitaufwand."
+            },
+            "enableEmptySoundWarningFix": {
+              "label": "Wiederholte Warnungen bei leeren Soundeffekten beheben",
+              "description": "Behebt Warnungen, die entstehen, wenn manche Gebäude bei stummgeschaltetem Spiel einen leeren Soundeffekt zurückgeben und anschließend dessen Löschung versuchen."
             }
           }
         },
@@ -3164,33 +3350,63 @@
           }
         },
         "Cattail_TweaksQuality_Dynamic-Details": {
-          "name": "Detalhes dinâmicos",
+          "name": "Expansão de informações dinâmicas",
           "config": {
             "cookieDirectionPassword": {
-              "label": "Senha da direção do cookie"
+              "label": "Local do segredo do biscoito [exige senha]",
+              "description": "Digite a senha do biscoito para mostrar sua localização."
             },
             "enableMineDistributionChart": {
-              "label": "Gráfico de distribuição de minerais por profundidade",
-              "description": "Mostrar a distribuição de minerais por profundidade nos cartões ampliados das minas."
+              "label": "Distribuição de minerais por profundidade",
+              "description": "Oferece gráficos de distribuição de minerais por profundidade nas informações ampliadas das minas."
             },
             "mineDistributionChartView": {
-              "label": "Estilo do gráfico de distribuição de minerais",
-              "description": "Escolha um gráfico de probabilidade empilhado ou faixas separadas de minerais.",
+              "label": "Estilo do gráfico de distribuição",
+              "description": "Escolha um gráfico de probabilidade empilhado ou faixas separadas de distribuição de minerais.",
               "valueLabels": {
                 "stacked": "Gráfico de probabilidade empilhado",
                 "bands": "Faixas separadas de minerais"
               }
             },
             "mineDistributionVisibility": {
-              "label": "Visibilidade dos minerais",
-              "description": "Escolha como os minerais não descobertos aparecem no gráfico de distribuição.",
+              "label": "Condições de exibição de minerais",
+              "description": "Escolha todos os minerais, minerais não descobertos anônimos ou apenas minerais descobertos",
               "valueLabels": {
                 "all": "Mostrar todos os minerais",
                 "anonymous": "Anonimizar minerais não descobertos",
                 "discovered": "Somente minerais descobertos"
               }
+            },
+            "enableBuildingDetails": {
+              "label": "Informações de construções+",
+              "description": "Mostra mais informações, como eficiência exata de produção e valores de bônus. Pressione Alt+Shift."
+            },
+            "enableResourceSourceDetails": {
+              "label": "Rastreamento do fluxo de recursos",
+              "description": "Mostra fontes e consumidores de recursos e permite ativar linhas para indicar as construções relacionadas. Pressione Alt+Shift."
+            },
+            "enableResourceSourceLineChart": {
+              "label": "Gráfico de variação de recursos",
+              "description": "Passe o mouse sobre um ícone de recurso e use a roda para trocar o gráfico de barras original por um gráfico de linhas com mudanças detalhadas nas quantidades."
+            },
+            "enableCoordinateOverlay": {
+              "label": "Coordenadas atuais",
+              "description": "Mostra ao lado do cursor as coordenadas do bloco ou da construção atual. Pressione Alt+C."
+            },
+            "enableDirectionPointers": {
+              "label": "Direção de construções importantes",
+              "description": "Mostra setas ao redor do cursor apontando para construções importantes e a origem do mundo."
+            },
+            "enableBuildCountdown": {
+              "label": "Tempo estimado até poder construir",
+              "description": "Mostra na loja o tempo estimado até poder construir com base nos recursos atuais e na produção, quando faltam recursos."
+            },
+            "resourceSourceLineRenderer": {
+              "label": "Otimizar linhas de fluxo de recursos",
+              "description": "Desenha as linhas de fluxo com WebGL para evitar travamentos causados pelo Canvas 2D original. Pressione O para alternar."
             }
-          }
+          },
+          "description": "Adiciona detalhes de construções, rastreamento do fluxo de recursos, gráficos de variação, indicadores de direção, teleporte por coordenadas e mais. Clique em “?” no canto inferior esquerdo para ver os atalhos."
         },
         "Cattail_TweaksQuality_Resource-Watcher": {
           "name": "Monitor de recursos"
@@ -3430,6 +3646,10 @@
             "enableBuildingWebGLRecorder": {
               "label": "[Teste] Registro de desenho WebGL",
               "description": "Registra comandos e estados de desenho de edifícios, quantidade, compatibilidade e tempo de registro para experimentos WebGL. Desnecessário no jogo normal; aumenta o custo de execução."
+            },
+            "enableEmptySoundWarningFix": {
+              "label": "Corrigir avisos repetidos de efeitos sonoros vazios",
+              "description": "Corrige os avisos gerados quando algumas construções tentam excluir um efeito sonoro vazio retornado enquanto o jogo está sem som."
             }
           }
         },
@@ -3603,33 +3823,63 @@
           }
         },
         "Cattail_TweaksQuality_Dynamic-Details": {
-          "name": "Dettagli dinamici",
+          "name": "Espansione delle informazioni dinamiche",
           "config": {
             "cookieDirectionPassword": {
-              "label": "Password direzione cookie"
+              "label": "Posizione del biscotto segreto [password richiesta]",
+              "description": "Inserisci la password del biscotto per mostrarne la posizione."
             },
             "enableMineDistributionChart": {
-              "label": "Grafico della distribuzione dei minerali per profondità",
-              "description": "Mostra la distribuzione dei minerali per profondità nelle schede dettagliate delle miniere."
+              "label": "Distribuzione dei minerali per profondità",
+              "description": "Fornisce grafici della distribuzione dei minerali per profondità nelle informazioni ampliate delle miniere."
             },
             "mineDistributionChartView": {
-              "label": "Stile del grafico di distribuzione dei minerali",
-              "description": "Scegli un grafico di probabilità sovrapposte o bande separate per i minerali.",
+              "label": "Stile del grafico di distribuzione",
+              "description": "Scegli un grafico di probabilità sovrapposte o bande separate di distribuzione dei minerali.",
               "valueLabels": {
                 "stacked": "Grafico di probabilità sovrapposte",
                 "bands": "Bande separate per i minerali"
               }
             },
             "mineDistributionVisibility": {
-              "label": "Visibilità dei minerali",
-              "description": "Scegli come mostrare i minerali non scoperti nel grafico di distribuzione.",
+              "label": "Condizioni di visibilità dei minerali",
+              "description": "Scegli tutti i minerali, quelli non scoperti anonimi o soltanto quelli scoperti",
               "valueLabels": {
                 "all": "Mostra tutti i minerali",
                 "anonymous": "Anonimizza i minerali non scoperti",
                 "discovered": "Solo minerali scoperti"
               }
+            },
+            "enableBuildingDetails": {
+              "label": "Informazioni edifici+",
+              "description": "Mostra più informazioni, tra cui efficienza produttiva precisa e valori dei bonus. Premi Alt+Shift."
+            },
+            "enableResourceSourceDetails": {
+              "label": "Tracciamento del flusso di risorse",
+              "description": "Mostra fonti e consumatori delle risorse e consente di attivare linee verso gli edifici coinvolti. Premi Alt+Shift."
+            },
+            "enableResourceSourceLineChart": {
+              "label": "Grafico delle variazioni delle risorse",
+              "description": "Passa su un’icona di risorsa e usa la rotella per passare dal grafico a barre originale a un grafico a linee delle variazioni dettagliate delle quantità."
+            },
+            "enableCoordinateOverlay": {
+              "label": "Coordinate attuali",
+              "description": "Mostra accanto al cursore le coordinate della casella o dell’edificio attuale. Premi Alt+C."
+            },
+            "enableDirectionPointers": {
+              "label": "Direzione degli edifici importanti",
+              "description": "Mostra attorno al cursore frecce verso gli edifici importanti e l’origine del mondo."
+            },
+            "enableBuildCountdown": {
+              "label": "Tempo stimato prima di costruire",
+              "description": "Mostra nel negozio il tempo stimato per poter costruire gli edifici con risorse insufficienti, in base alle risorse e alla produzione attuali."
+            },
+            "resourceSourceLineRenderer": {
+              "label": "Ottimizza le linee dei flussi di risorse",
+              "description": "Disegna le linee con WebGL per evitare gli scatti causati dal Canvas 2D originale. Premi O per cambiare."
             }
-          }
+          },
+          "description": "Aggiunge dettagli degli edifici, tracciamento dei flussi di risorse, grafici delle variazioni, indicatori di direzione, teletrasporto per coordinate e altro. Fai clic su “?” in basso a sinistra per i tasti rapidi."
         },
         "Cattail_TweaksQuality_Resource-Watcher": {
           "name": "Monitor risorse"
@@ -3869,6 +4119,10 @@
             "enableBuildingWebGLRecorder": {
               "label": "[Test] Registrazione disegno WebGL",
               "description": "Registra comandi e stati di disegno degli edifici, quantità, compatibilità e tempo di registrazione per esperimenti WebGL. Non serve nel gioco normale; aumenta il carico di esecuzione."
+            },
+            "enableEmptySoundWarningFix": {
+              "label": "Correggi gli avvisi ripetuti per effetti sonori vuoti",
+              "description": "Corregge gli avvisi generati quando alcuni edifici tentano di eliminare un effetto sonoro vuoto restituito mentre l'audio del gioco è disattivato."
             }
           }
         },
@@ -4042,33 +4296,63 @@
           }
         },
         "Cattail_TweaksQuality_Dynamic-Details": {
-          "name": "Detalles dinámicos",
+          "name": "Ampliación de información dinámica",
           "config": {
             "cookieDirectionPassword": {
-              "label": "Contraseña de dirección de cookie"
+              "label": "Ubicación del secreto de la galleta [requiere contraseña]",
+              "description": "Introduce la contraseña de la galleta para mostrar su ubicación."
             },
             "enableMineDistributionChart": {
-              "label": "Gráfico de distribución de minerales por profundidad",
-              "description": "Muestra la distribución de minerales por profundidad en las tarjetas ampliadas de las minas."
+              "label": "Distribución de minerales por profundidad",
+              "description": "Ofrece gráficos de distribución de minerales por profundidad en la información ampliada de las minas."
             },
             "mineDistributionChartView": {
-              "label": "Estilo del gráfico de distribución de minerales",
-              "description": "Elige un gráfico de probabilidad apilado o bandas de minerales separadas.",
+              "label": "Estilo del gráfico de distribución",
+              "description": "Elige un gráfico de probabilidad apilado o bandas separadas de distribución de minerales.",
               "valueLabels": {
                 "stacked": "Gráfico de probabilidad apilado",
                 "bands": "Bandas de minerales separadas"
               }
             },
             "mineDistributionVisibility": {
-              "label": "Visibilidad de minerales",
-              "description": "Elige cómo aparecen los minerales sin descubrir en el gráfico de distribución.",
+              "label": "Condiciones de visibilidad de minerales",
+              "description": "Elige todos los minerales, los no descubiertos anónimos o solo los descubiertos",
               "valueLabels": {
                 "all": "Mostrar todos los minerales",
                 "anonymous": "Anonimizar minerales sin descubrir",
                 "discovered": "Solo minerales descubiertos"
               }
+            },
+            "enableBuildingDetails": {
+              "label": "Información de edificios+",
+              "description": "Muestra más información, como la eficiencia de producción exacta y los valores de bonificación. Pulsa Alt+Shift."
+            },
+            "enableResourceSourceDetails": {
+              "label": "Seguimiento del flujo de recursos",
+              "description": "Muestra fuentes y consumidores de recursos y permite activar líneas hacia los edificios relacionados. Pulsa Alt+Shift."
+            },
+            "enableResourceSourceLineChart": {
+              "label": "Gráfico de cambios de recursos",
+              "description": "Pasa el cursor por un icono de recurso y usa la rueda para cambiar el gráfico de barras original por uno de líneas y ver los cambios detallados de cantidad."
+            },
+            "enableCoordinateOverlay": {
+              "label": "Coordenadas actuales",
+              "description": "Muestra junto al cursor las coordenadas de la casilla o el edificio actual. Pulsa Alt+C."
+            },
+            "enableDirectionPointers": {
+              "label": "Dirección de edificios importantes",
+              "description": "Muestra alrededor del cursor flechas hacia edificios importantes y el origen del mundo."
+            },
+            "enableBuildCountdown": {
+              "label": "Tiempo estimado hasta poder construir",
+              "description": "Muestra en la tienda cuánto falta para construir edificios sin recursos suficientes, según los recursos y la producción actuales."
+            },
+            "resourceSourceLineRenderer": {
+              "label": "Optimizar líneas de flujo de recursos",
+              "description": "Dibuja las líneas con WebGL para evitar tirones causados por el Canvas 2D original. Pulsa O para cambiar."
             }
-          }
+          },
+          "description": "Añade detalles de edificios, seguimiento del flujo de recursos, gráficos de cambios, indicadores de dirección, teletransporte por coordenadas y más. Haz clic en “?” abajo a la izquierda para consultar los atajos."
         },
         "Cattail_TweaksQuality_Resource-Watcher": {
           "name": "Monitor de recursos"
@@ -4308,6 +4592,10 @@
             "enableBuildingWebGLRecorder": {
               "label": "[Pruebas] Registro de dibujo WebGL",
               "description": "Registra órdenes y estados de dibujo de edificios, cantidad, compatibilidad y tiempo de registro para experimentar con WebGL. No hace falta al jugar normalmente; añade carga de ejecución."
+            },
+            "enableEmptySoundWarningFix": {
+              "label": "Corregir avisos repetidos de efectos de sonido vacíos",
+              "description": "Corrige los avisos que aparecen cuando algunos edificios intentan eliminar un efecto de sonido vacío devuelto mientras el juego está silenciado."
             }
           }
         },
@@ -4481,33 +4769,63 @@
           }
         },
         "Cattail_TweaksQuality_Dynamic-Details": {
-          "name": "Détails dynamiques",
+          "name": "Extension des informations dynamiques",
           "config": {
             "cookieDirectionPassword": {
-              "label": "Mot de passe de direction du cookie"
+              "label": "Position du biscuit secret [mot de passe requis]",
+              "description": "Saisissez le mot de passe du biscuit pour afficher sa position."
             },
             "enableMineDistributionChart": {
-              "label": "Graphique de répartition des minéraux selon la profondeur",
-              "description": "Affiche la répartition des minéraux selon la profondeur dans les fiches détaillées des mines."
+              "label": "Répartition des minéraux selon la profondeur",
+              "description": "Fournit des graphiques de répartition des minéraux selon la profondeur dans les informations détaillées des mines."
             },
             "mineDistributionChartView": {
-              "label": "Style du graphique de répartition des minéraux",
-              "description": "Choisir un graphique de probabilités empilées ou des bandes minérales distinctes.",
+              "label": "Style du graphique de répartition",
+              "description": "Choisissez un graphique de probabilités empilées ou des bandes distinctes de répartition des minéraux.",
               "valueLabels": {
                 "stacked": "Graphique de probabilités empilées",
                 "bands": "Bandes minérales distinctes"
               }
             },
             "mineDistributionVisibility": {
-              "label": "Visibilité des minéraux",
-              "description": "Choisir comment afficher les minéraux non découverts dans le graphique de répartition.",
+              "label": "Conditions d’affichage des minéraux",
+              "description": "Choisissez tous les minéraux, les minéraux inconnus anonymisés ou seulement les minéraux découverts",
               "valueLabels": {
                 "all": "Afficher tous les minéraux",
                 "anonymous": "Anonymiser les minéraux non découverts",
                 "discovered": "Minéraux découverts uniquement"
               }
+            },
+            "enableBuildingDetails": {
+              "label": "Informations des bâtiments+",
+              "description": "Affiche plus d’informations, dont l’efficacité de production précise et les valeurs des bonus. Appuyez sur Alt+Shift."
+            },
+            "enableResourceSourceDetails": {
+              "label": "Suivi des flux de ressources",
+              "description": "Affiche les sources et consommateurs de ressources et permet d’activer des lignes vers les bâtiments concernés. Appuyez sur Alt+Shift."
+            },
+            "enableResourceSourceLineChart": {
+              "label": "Courbe de variation des ressources",
+              "description": "Survolez une icône de ressource et utilisez la molette pour remplacer l’histogramme d’origine par une courbe montrant les variations détaillées des quantités."
+            },
+            "enableCoordinateOverlay": {
+              "label": "Coordonnées actuelles",
+              "description": "Affiche près du curseur les coordonnées de la case ou du bâtiment actuel. Appuyez sur Alt+C."
+            },
+            "enableDirectionPointers": {
+              "label": "Direction des bâtiments importants",
+              "description": "Affiche autour du curseur des flèches vers les bâtiments importants et l’origine du monde."
+            },
+            "enableBuildCountdown": {
+              "label": "Temps estimé avant construction",
+              "description": "Affiche dans la boutique le délai estimé avant de pouvoir construire les bâtiments manquant de ressources, selon les stocks et la production actuels."
+            },
+            "resourceSourceLineRenderer": {
+              "label": "Optimiser les lignes des flux de ressources",
+              "description": "Trace les lignes avec WebGL pour éviter les saccades du rendu Canvas 2D d’origine. Appuyez sur O pour changer."
             }
-          }
+          },
+          "description": "Ajoute des détails sur les bâtiments, le suivi des flux de ressources, des courbes de variation, des indicateurs de direction, la téléportation par coordonnées, etc. Cliquez sur « ? » en bas à gauche pour les raccourcis."
         },
         "Cattail_TweaksQuality_Resource-Watcher": {
           "name": "Moniteur de ressources"
@@ -4747,6 +5065,10 @@
             "enableBuildingWebGLRecorder": {
               "label": "[Test] Enregistrement du dessin WebGL",
               "description": "Enregistre commandes et états de dessin des bâtiments, leur nombre, la compatibilité et le temps d'enregistrement pour les essais WebGL. Inutile en jeu normal ; augmente la charge d'exécution."
+            },
+            "enableEmptySoundWarningFix": {
+              "label": "Corriger les avertissements répétés de sons vides",
+              "description": "Corrige les avertissements produits lorsque certains bâtiments tentent de supprimer un effet sonore vide renvoyé quand le jeu est en mode muet."
             }
           }
         },
@@ -4920,33 +5242,63 @@
           }
         },
         "Cattail_TweaksQuality_Dynamic-Details": {
-          "name": "Dynamische details",
+          "name": "Dynamische informatie-uitbreiding",
           "config": {
             "cookieDirectionPassword": {
-              "label": "Cookie-richtingswachtwoord"
+              "label": "Locatie van het geheime koekje [wachtwoord nodig]",
+              "description": "Voer het koekjeswachtwoord in om de locatie te tonen."
             },
             "enableMineDistributionChart": {
-              "label": "Grafiek van mineraalverdeling per diepte",
-              "description": "Toon de mineraalverdeling per diepte op uitgebreide mijninformatiekaarten."
+              "label": "Mineraalverdeling per diepte",
+              "description": "Biedt mineraalverdelingsgrafieken per diepte in de uitgebreide mijninformatie."
             },
             "mineDistributionChartView": {
-              "label": "Stijl van de mineraalverdelingsgrafiek",
-              "description": "Kies een gestapelde kansgrafiek of aparte mineraalbanden.",
+              "label": "Stijl van mineraalverdelingsgrafiek",
+              "description": "Kies een gestapelde kansgrafiek of afzonderlijke mineraalverdelingsbanden.",
               "valueLabels": {
                 "stacked": "Gestapelde kansgrafiek",
                 "bands": "Aparte mineraalbanden"
               }
             },
             "mineDistributionVisibility": {
-              "label": "Zichtbaarheid van mineralen",
-              "description": "Kies hoe niet-ontdekte mineralen in de verdelingsgrafiek verschijnen.",
+              "label": "Voorwaarden voor mineraalweergave",
+              "description": "Kies alle mineralen, anonieme onontdekte mineralen of alleen ontdekte mineralen",
               "valueLabels": {
                 "all": "Alle mineralen tonen",
                 "anonymous": "Niet-ontdekte mineralen anonimiseren",
                 "discovered": "Alleen ontdekte mineralen"
               }
+            },
+            "enableBuildingDetails": {
+              "label": "Gebouwinformatie+",
+              "description": "Toont meer gebouwinformatie, zoals exacte productie-efficiëntie en bonuswaarden. Druk op Alt+Shift."
+            },
+            "enableResourceSourceDetails": {
+              "label": "Grondstofstromen volgen",
+              "description": "Toont bronnen en verbruikers van grondstoffen, met optionele lijnen naar betrokken gebouwen. Druk op Alt+Shift."
+            },
+            "enableResourceSourceLineChart": {
+              "label": "Lijngrafiek van grondstofveranderingen",
+              "description": "Gebruik het muiswiel boven een grondstofpictogram om het oorspronkelijke staafdiagram te vervangen door een lijngrafiek met gedetailleerde hoeveelheidsveranderingen."
+            },
+            "enableCoordinateOverlay": {
+              "label": "Huidige coördinaten",
+              "description": "Toont naast de cursor de coördinaten van het huidige vak of gebouw. Druk op Alt+C."
+            },
+            "enableDirectionPointers": {
+              "label": "Richting van belangrijke gebouwen",
+              "description": "Toont pijlen rond de cursor naar belangrijke gebouwen en de wereldoorsprong."
+            },
+            "enableBuildCountdown": {
+              "label": "Geschatte tijd tot bouwen",
+              "description": "Toont in de winkel hoe lang het naar schatting duurt voordat gebouwen met te weinig grondstoffen gebouwd kunnen worden, op basis van voorraad en productie."
+            },
+            "resourceSourceLineRenderer": {
+              "label": "Grondstofstroomlijnen optimaliseren",
+              "description": "Tekent lijnen met WebGL om haperingen van de oorspronkelijke Canvas 2D-weergave te vermijden. Druk op O om te wisselen."
             }
-          }
+          },
+          "description": "Voegt gebouwdetails, grondstofstromen, lijngrafieken van veranderingen, richtingsaanwijzers, coördinatenteleportatie en meer toe. Klik linksonder op “?” voor de sneltoetsen."
         },
         "Cattail_TweaksQuality_Resource-Watcher": {
           "name": "Grondstoffenmonitor"
@@ -5186,6 +5538,10 @@
             "enableBuildingWebGLRecorder": {
               "label": "[Test] WebGL-tekenregistratie",
               "description": "Registreert gebouwtekenopdrachten en toestand, aantallen, compatibiliteit en registratietijd voor WebGL-experimenten. Niet nodig voor normaal spelen; verhoogt de uitvoeringslast."
+            },
+            "enableEmptySoundWarningFix": {
+              "label": "Herhaalde waarschuwingen voor lege geluidseffecten verhelpen",
+              "description": "Verhelpt waarschuwingen die ontstaan wanneer sommige gebouwen een leeg geluidseffect teruggeven terwijl het spel is gedempt en dit vervolgens proberen te verwijderen."
             }
           }
         },
@@ -5359,33 +5715,63 @@
           }
         },
         "Cattail_TweaksQuality_Dynamic-Details": {
-          "name": "Dynamické detaily",
+          "name": "Rozšíření dynamických informací",
           "config": {
             "cookieDirectionPassword": {
-              "label": "Heslo směru sušenky"
+              "label": "Poloha sušenkového tajemství [vyžaduje heslo]",
+              "description": "Zadejte heslo sušenky a zobrazí se její poloha."
             },
             "enableMineDistributionChart": {
-              "label": "Graf rozložení minerálů podle hloubky",
-              "description": "Zobrazovat rozložení minerálů podle hloubky v rozšířených informačních kartách dolů."
+              "label": "Rozložení minerálů podle hloubky",
+              "description": "Poskytuje grafy rozložení minerálů podle hloubky v rozšířených informacích o dolech."
             },
             "mineDistributionChartView": {
               "label": "Styl grafu rozložení minerálů",
-              "description": "Vyberte skládaný graf pravděpodobnosti nebo samostatná pásma minerálů.",
+              "description": "Vyberte skládaný graf pravděpodobnosti nebo samostatná pásma rozložení minerálů.",
               "valueLabels": {
                 "stacked": "Skládaný graf pravděpodobnosti",
                 "bands": "Samostatná pásma minerálů"
               }
             },
             "mineDistributionVisibility": {
-              "label": "Viditelnost minerálů",
-              "description": "Vyberte způsob zobrazení neobjevených minerálů v grafu rozložení.",
+              "label": "Podmínky zobrazení minerálů",
+              "description": "Vyberte všechny minerály, anonymní neobjevené minerály nebo pouze objevené minerály",
               "valueLabels": {
                 "all": "Zobrazit všechny minerály",
                 "anonymous": "Anonymizovat neobjevené minerály",
                 "discovered": "Pouze objevené minerály"
               }
+            },
+            "enableBuildingDetails": {
+              "label": "Informace o budovách+",
+              "description": "Zobrazuje další údaje, například přesnou efektivitu výroby a hodnoty bonusů. Stiskněte Alt+Shift."
+            },
+            "enableResourceSourceDetails": {
+              "label": "Sledování toku surovin",
+              "description": "Zobrazuje zdroje a spotřebitele surovin a umožňuje zapnout čáry k souvisejícím budovám. Stiskněte Alt+Shift."
+            },
+            "enableResourceSourceLineChart": {
+              "label": "Spojnicový graf změn surovin",
+              "description": "Nad ikonou suroviny přepněte kolečkem myši původní sloupcový graf na spojnicový graf podrobných změn množství."
+            },
+            "enableCoordinateOverlay": {
+              "label": "Aktuální souřadnice",
+              "description": "Vedle kurzoru zobrazuje souřadnice aktuálního políčka nebo budovy. Stiskněte Alt+C."
+            },
+            "enableDirectionPointers": {
+              "label": "Směr důležitých budov",
+              "description": "Kolem kurzoru zobrazuje šipky k důležitým budovám a počátku světa."
+            },
+            "enableBuildCountdown": {
+              "label": "Odhad času do možnosti stavby",
+              "description": "V obchodě ukazuje odhad času do možnosti postavit budovy s nedostatkem surovin podle aktuálních zásob a výroby."
+            },
+            "resourceSourceLineRenderer": {
+              "label": "Optimalizace čar toku surovin",
+              "description": "Kreslí čáry pomocí WebGL a předchází tak zadrhávání původního Canvas 2D. Přepínejte klávesou O."
             }
-          }
+          },
+          "description": "Přidává podrobnosti budov, sledování toku surovin, grafy změn, ukazatele směru, teleportaci podle souřadnic a další. Klávesové zkratky najdete pod „?“ vlevo dole."
         },
         "Cattail_TweaksQuality_Resource-Watcher": {
           "name": "Sledování surovin"
@@ -5625,6 +6011,10 @@
             "enableBuildingWebGLRecorder": {
               "label": "[Test] Záznam kreslení WebGL",
               "description": "Zaznamenává příkazy a stav kreslení budov, počty, kompatibilitu a dobu záznamu pro pokusy WebGL. Při běžném hraní není potřeba; zvyšuje zátěž."
+            },
+            "enableEmptySoundWarningFix": {
+              "label": "Opravit opakovaná varování o prázdných zvukových efektech",
+              "description": "Opravuje varování vznikající, když se některé budovy pokusí odstranit prázdný zvukový efekt vrácený při ztlumeném zvuku hry."
             }
           }
         },
@@ -5798,33 +6188,63 @@
           }
         },
         "Cattail_TweaksQuality_Dynamic-Details": {
-          "name": "Dynamiczne szczegóły",
+          "name": "Rozszerzone informacje dynamiczne",
           "config": {
             "cookieDirectionPassword": {
-              "label": "Hasło kierunku ciasteczka"
+              "label": "Położenie sekretnego ciastka [wymaga hasła]",
+              "description": "Wpisz hasło ciastka, aby pokazać jego położenie."
             },
             "enableMineDistributionChart": {
-              "label": "Wykres rozkładu minerałów według głębokości",
-              "description": "Pokazuj rozkład minerałów według głębokości na rozszerzonych kartach informacji o kopalniach."
+              "label": "Rozkład minerałów według głębokości",
+              "description": "Udostępnia wykresy rozkładu minerałów według głębokości w rozszerzonych informacjach o kopalniach."
             },
             "mineDistributionChartView": {
               "label": "Styl wykresu rozkładu minerałów",
-              "description": "Wybierz skumulowany wykres prawdopodobieństwa lub osobne pasma minerałów.",
+              "description": "Wybierz skumulowany wykres prawdopodobieństwa lub oddzielne pasma rozkładu minerałów.",
               "valueLabels": {
                 "stacked": "Skumulowany wykres prawdopodobieństwa",
                 "bands": "Osobne pasma minerałów"
               }
             },
             "mineDistributionVisibility": {
-              "label": "Widoczność minerałów",
-              "description": "Wybierz sposób wyświetlania nieodkrytych minerałów na wykresie rozkładu.",
+              "label": "Warunki wyświetlania minerałów",
+              "description": "Wybierz wszystkie minerały, anonimowe nieodkryte minerały lub tylko odkryte minerały",
               "valueLabels": {
                 "all": "Pokaż wszystkie minerały",
                 "anonymous": "Anonimizuj nieodkryte minerały",
                 "discovered": "Tylko odkryte minerały"
               }
+            },
+            "enableBuildingDetails": {
+              "label": "Informacje o budynkach+",
+              "description": "Pokazuje więcej informacji, np. dokładną wydajność produkcji i wartości premii. Naciśnij Alt+Shift."
+            },
+            "enableResourceSourceDetails": {
+              "label": "Śledzenie przepływu zasobów",
+              "description": "Pokazuje źródła i odbiorców zasobów oraz pozwala włączyć linie do powiązanych budynków. Naciśnij Alt+Shift."
+            },
+            "enableResourceSourceLineChart": {
+              "label": "Wykres zmian zasobów",
+              "description": "Najedź na ikonę zasobu i użyj kółka myszy, aby zmienić oryginalny wykres słupkowy na liniowy i zobaczyć szczegółowe zmiany ilości."
+            },
+            "enableCoordinateOverlay": {
+              "label": "Aktualne współrzędne",
+              "description": "Pokazuje obok kursora współrzędne bieżącego pola lub budynku. Naciśnij Alt+C."
+            },
+            "enableDirectionPointers": {
+              "label": "Kierunek ważnych budynków",
+              "description": "Pokazuje wokół kursora strzałki do ważnych budynków i początku świata."
+            },
+            "enableBuildCountdown": {
+              "label": "Szacowany czas do budowy",
+              "description": "Pokazuje w sklepie szacowany czas do możliwości budowy przy braku zasobów, na podstawie bieżących zapasów i produkcji."
+            },
+            "resourceSourceLineRenderer": {
+              "label": "Optymalizacja linii przepływu zasobów",
+              "description": "Rysuje linie za pomocą WebGL, unikając przycięć oryginalnego Canvas 2D. Naciśnij O, aby przełączyć."
             }
-          }
+          },
+          "description": "Dodaje szczegóły budynków, śledzenie przepływu zasobów, wykresy zmian, wskazówki kierunku, teleportację według współrzędnych i więcej. Kliknij „?” w lewym dolnym rogu, aby zobaczyć skróty."
         },
         "Cattail_TweaksQuality_Resource-Watcher": {
           "name": "Monitor zasobów"
@@ -6064,6 +6484,10 @@
             "enableBuildingWebGLRecorder": {
               "label": "[Test] Rejestr rysowania WebGL",
               "description": "Rejestruje polecenia i stany rysowania budynków, liczbę, zgodność i czas rejestracji do eksperymentów WebGL. Zbędny w zwykłej grze; zwiększa obciążenie."
+            },
+            "enableEmptySoundWarningFix": {
+              "label": "Napraw powtarzające się ostrzeżenia o pustych dźwiękach",
+              "description": "Naprawia ostrzeżenia pojawiające się, gdy niektóre budynki próbują usunąć pusty efekt dźwiękowy zwrócony przy wyciszonym dźwięku gry."
             }
           }
         },
@@ -6237,33 +6661,63 @@
           }
         },
         "Cattail_TweaksQuality_Dynamic-Details": {
-          "name": "動的詳細",
+          "name": "動的情報拡張",
           "config": {
             "cookieDirectionPassword": {
-              "label": "クッキー方向パスワード"
+              "label": "隠しクッキーの場所[パスワードが必要]",
+              "description": "クッキーのパスワードを入力すると、その場所を表示します。"
             },
             "enableMineDistributionChart": {
               "label": "鉱物の深度分布図",
-              "description": "鉱山の拡張情報カードに鉱物の深度分布図を表示します。"
+              "description": "鉱山の拡張情報に鉱物の深度分布図を表示します。"
             },
             "mineDistributionChartView": {
               "label": "鉱物分布図の表示形式",
-              "description": "積み上げ確率グラフまたは鉱物別の分布帯を選択します。",
+              "description": "積み上げ確率グラフまたは鉱物別の分布帯を選びます。",
               "valueLabels": {
                 "stacked": "積み上げ確率グラフ",
                 "bands": "鉱物別の分布帯"
               }
             },
             "mineDistributionVisibility": {
-              "label": "鉱物の表示範囲",
-              "description": "分布図で未発見の鉱物をどのように表示するか選択します。",
+              "label": "鉱物の表示条件",
+              "description": "すべての鉱物、未発見の鉱物を匿名表示、発見済みの鉱物のみから選びます",
               "valueLabels": {
                 "all": "すべての鉱物を公開",
                 "anonymous": "未発見の鉱物を匿名で表示",
                 "discovered": "発見済みの鉱物のみ"
               }
+            },
+            "enableBuildingDetails": {
+              "label": "建物情報+",
+              "description": "具体的な生産効率やボーナス値など、建物の情報を詳しく表示します。Alt+Shiftを押してください。"
+            },
+            "enableResourceSourceDetails": {
+              "label": "資源の流れを追跡",
+              "description": "資源の供給元と消費先を表示し、関連する建物を線で示せます。Alt+Shiftを押してください。"
+            },
+            "enableResourceSourceLineChart": {
+              "label": "資源変化の折れ線グラフ",
+              "description": "資源アイコンにカーソルを合わせ、マウスホイールで元の棒グラフを折れ線グラフに切り替え、資源量の詳しい変化を確認できます。"
+            },
+            "enableCoordinateOverlay": {
+              "label": "現在の座標",
+              "description": "カーソルの横に現在のマスまたは建物の座標を表示します。Alt+Cを押してください。"
+            },
+            "enableDirectionPointers": {
+              "label": "重要な建物の方向",
+              "description": "カーソルの周囲に重要な建物と世界の原点を指す矢印を表示します。"
+            },
+            "enableBuildCountdown": {
+              "label": "建設可能になるまでの予想時間",
+              "description": "資源不足の建物について、現在の資源量と生産速度から建設可能になるまでの予想時間をショップに表示します。"
+            },
+            "resourceSourceLineRenderer": {
+              "label": "資源追跡の描線を最適化",
+              "description": "資源追跡の線をWebGLで描画し、元のCanvas 2D描画によるカクつきを回避します。Oキーで切り替えられます。"
             }
-          }
+          },
+          "description": "建物の詳細、資源の流れの追跡、資源変化の折れ線グラフ、方向表示、座標へのテレポートなどを提供します。必要なショートカットは左下の「？」で確認できます。"
         },
         "Cattail_TweaksQuality_Resource-Watcher": {
           "name": "資源ウォッチャー"
@@ -6503,6 +6957,10 @@
             "enableBuildingWebGLRecorder": {
               "label": "[テスト用] WebGL描画記録",
               "description": "建物描画の命令と状態、命令数、互換性、記録時間を記録し、WebGL実験の分析に使います。通常プレイには不要で、有効にすると実行負荷が増えます。"
+            },
+            "enableEmptySoundWarningFix": {
+              "label": "空の効果音による警告の繰り返しを修正",
+              "description": "ゲームのミュート時に一部の建物が空の効果音を返し、その削除を試みて警告を出す問題を修正します。"
             }
           }
         },
@@ -6676,14 +7134,15 @@
           }
         },
         "Cattail_TweaksQuality_Dynamic-Details": {
-          "name": "동적 세부 정보",
+          "name": "동적 정보 확장",
           "config": {
             "cookieDirectionPassword": {
-              "label": "쿠키 방향 암호"
+              "label": "쿠키 이스터에그 위치[암호 필요]",
+              "description": "쿠키 암호를 입력하면 쿠키 위치를 표시합니다."
             },
             "enableMineDistributionChart": {
               "label": "광물 깊이별 분포도",
-              "description": "확장된 광산 정보 카드에 광물 깊이별 분포도를 표시합니다."
+              "description": "광산의 확장 건물 정보에 광물 깊이별 분포도를 제공합니다."
             },
             "mineDistributionChartView": {
               "label": "광물 분포도 스타일",
@@ -6694,15 +7153,44 @@
               }
             },
             "mineDistributionVisibility": {
-              "label": "광물 표시 범위",
-              "description": "분포도에서 미발견 광물을 표시하는 방식을 선택합니다.",
+              "label": "광물 표시 범위 조건",
+              "description": "모든 광물, 미발견 광물 익명 표시, 발견한 광물만 표시 중 선택합니다",
               "valueLabels": {
                 "all": "모든 광물 공개",
                 "anonymous": "미발견 광물 익명 표시",
                 "discovered": "발견한 광물만 표시"
               }
+            },
+            "enableBuildingDetails": {
+              "label": "건물 정보+",
+              "description": "정확한 생산 효율과 보너스 수치 등 더 많은 건물 정보를 표시합니다. Alt+Shift를 누르세요."
+            },
+            "enableResourceSourceDetails": {
+              "label": "자원 흐름 추적",
+              "description": "자원의 공급원과 소비처를 표시하고 관련 건물을 선으로 표시할 수 있습니다. Alt+Shift를 누르세요."
+            },
+            "enableResourceSourceLineChart": {
+              "label": "자원 변화 선 그래프",
+              "description": "자원 아이콘 위에서 마우스 휠로 기존 막대그래프를 선 그래프로 바꾸어 자원량의 자세한 변화를 확인합니다."
+            },
+            "enableCoordinateOverlay": {
+              "label": "현재 좌표",
+              "description": "마우스 옆에 현재 칸 또는 건물의 좌표를 표시합니다. Alt+C를 누르세요."
+            },
+            "enableDirectionPointers": {
+              "label": "중요 건물 방향",
+              "description": "마우스 주변에 중요 건물과 세계 원점을 가리키는 화살표를 표시합니다."
+            },
+            "enableBuildCountdown": {
+              "label": "건설 가능 예상 시간",
+              "description": "자원이 부족한 건물을 지을 수 있을 때까지 걸리는 시간을 현재 자원과 생산량에 따라 상점에 표시합니다."
+            },
+            "resourceSourceLineRenderer": {
+              "label": "자원 흐름 추적 선 최적화",
+              "description": "추적 선을 WebGL로 그려 기존 Canvas 2D 렌더링의 끊김을 방지합니다. O키로 전환할 수 있습니다."
             }
-          }
+          },
+          "description": "건물 상세 정보, 자원 흐름 추적, 자원 변화 선 그래프, 방향 표시, 좌표 순간이동 등을 제공합니다. 필요한 단축키는 왼쪽 아래의 “?”에서 확인하세요."
         },
         "Cattail_TweaksQuality_Resource-Watcher": {
           "name": "자원 감시기"
@@ -6942,6 +7430,10 @@
             "enableBuildingWebGLRecorder": {
               "label": "[테스트용] WebGL 그리기 기록",
               "description": "건물 그리기 명령과 상태, 명령 수, 호환 여부와 기록 시간을 기록하여 WebGL 실험을 분석합니다. 일반 플레이에는 필요 없으며 켜면 실행 부담이 늘어납니다."
+            },
+            "enableEmptySoundWarningFix": {
+              "label": "빈 효과음 경고 반복 수정",
+              "description": "게임이 음소거된 상태에서 일부 건물이 반환한 빈 효과음을 삭제하려고 시도해 경고가 출력되는 문제를 수정합니다."
             }
           }
         },
@@ -7115,33 +7607,63 @@
           }
         },
         "Cattail_TweaksQuality_Dynamic-Details": {
-          "name": "รายละเอียดแบบไดนามิก",
+          "name": "ส่วนขยายข้อมูลแบบไดนามิก",
           "config": {
             "cookieDirectionPassword": {
-              "label": "รหัสทิศทางคุกกี้"
+              "label": "ตำแหน่งคุกกี้ลับ [ต้องใช้รหัสผ่าน]",
+              "description": "ป้อนรหัสผ่านคุกกี้เพื่อแสดงตำแหน่งคุกกี้"
             },
             "enableMineDistributionChart": {
               "label": "แผนภูมิการกระจายแร่ตามความลึก",
-              "description": "แสดงแผนภูมิการกระจายแร่ตามความลึกในการ์ดข้อมูลเหมืองแบบขยาย"
+              "description": "เพิ่มแผนภูมิการกระจายแร่ตามความลึกในข้อมูลเหมืองแบบขยาย"
             },
             "mineDistributionChartView": {
               "label": "รูปแบบแผนภูมิการกระจายแร่",
-              "description": "เลือกกราฟความน่าจะเป็นแบบซ้อนหรือแถบแร่แยกกัน",
+              "description": "เลือกกราฟความน่าจะเป็นแบบซ้อนหรือแถบการกระจายแร่แยกกัน",
               "valueLabels": {
                 "stacked": "กราฟความน่าจะเป็นแบบซ้อน",
                 "bands": "แถบแร่แยกกัน"
               }
             },
             "mineDistributionVisibility": {
-              "label": "ขอบเขตการแสดงแร่",
-              "description": "เลือกวิธีแสดงแร่ที่ยังไม่ค้นพบในแผนภูมิการกระจาย",
+              "label": "เงื่อนไขการแสดงแร่",
+              "description": "เลือกแร่ทั้งหมด แร่ที่ยังไม่ค้นพบแบบไม่ระบุชื่อ หรือเฉพาะแร่ที่ค้นพบแล้ว",
               "valueLabels": {
                 "all": "เปิดเผยแร่ทั้งหมด",
                 "anonymous": "ไม่ระบุชื่อแร่ที่ยังไม่ค้นพบ",
                 "discovered": "เฉพาะแร่ที่ค้นพบแล้ว"
               }
+            },
+            "enableBuildingDetails": {
+              "label": "ข้อมูลสิ่งก่อสร้าง+",
+              "description": "แสดงข้อมูลเพิ่ม เช่น ประสิทธิภาพการผลิตและค่าโบนัสที่แน่นอน กด Alt+Shift"
+            },
+            "enableResourceSourceDetails": {
+              "label": "ติดตามการไหลของทรัพยากร",
+              "description": "แสดงแหล่งผลิตและผู้ใช้ทรัพยากร และเปิดเส้นเชื่อมสิ่งก่อสร้างที่เกี่ยวข้องได้ กด Alt+Shift"
+            },
+            "enableResourceSourceLineChart": {
+              "label": "กราฟเส้นการเปลี่ยนแปลงทรัพยากร",
+              "description": "ชี้ไอคอนทรัพยากรแล้วใช้ล้อเมาส์สลับกราฟแท่งเดิมเป็นกราฟเส้น เพื่อดูการเปลี่ยนแปลงปริมาณอย่างละเอียด"
+            },
+            "enableCoordinateOverlay": {
+              "label": "พิกัดปัจจุบัน",
+              "description": "แสดงพิกัดช่องหรือสิ่งก่อสร้างปัจจุบันข้างเมาส์ กด Alt+C"
+            },
+            "enableDirectionPointers": {
+              "label": "ทิศทางสิ่งก่อสร้างสำคัญ",
+              "description": "แสดงลูกศรรอบเมาส์ไปยังสิ่งก่อสร้างสำคัญและจุดกำเนิดโลก"
+            },
+            "enableBuildCountdown": {
+              "label": "เวลาคาดการณ์จนสร้างได้",
+              "description": "แสดงในร้านค้าว่าสิ่งก่อสร้างที่ทรัพยากรไม่พอจะสร้างได้ในอีกเท่าไร ตามทรัพยากรและอัตราผลิตปัจจุบัน"
+            },
+            "resourceSourceLineRenderer": {
+              "label": "ปรับเส้นติดตามทรัพยากรให้ลื่นไหล",
+              "description": "วาดเส้นด้วย WebGL เพื่อหลีกเลี่ยงอาการกระตุกจาก Canvas 2D เดิม กด O เพื่อสลับ"
             }
-          }
+          },
+          "description": "เพิ่มรายละเอียดสิ่งก่อสร้าง การติดตามการไหลของทรัพยากร กราฟเส้นการเปลี่ยนแปลง ตัวชี้ทิศทาง การวาร์ปตามพิกัด และอื่น ๆ คลิก “?” มุมล่างซ้ายเพื่อดูปุ่มลัด"
         },
         "Cattail_TweaksQuality_Resource-Watcher": {
           "name": "ตัวเฝ้าดูทรัพยากร"
@@ -7381,6 +7903,10 @@
             "enableBuildingWebGLRecorder": {
               "label": "[ทดสอบ] บันทึกคำสั่งวาด WebGL",
               "description": "บันทึกคำสั่งและสถานะการวาดอาคาร จำนวนคำสั่ง ความเข้ากันได้ และเวลาบันทึก เพื่อวิเคราะห์การทดลอง WebGL ไม่จำเป็นสำหรับการเล่นปกติ และเพิ่มภาระการทำงานเมื่อเปิด"
+            },
+            "enableEmptySoundWarningFix": {
+              "label": "แก้คำเตือนเอฟเฟกต์เสียงว่างที่เกิดซ้ำ",
+              "description": "แก้ปัญหาที่สิ่งปลูกสร้างบางชนิดพยายามลบเอฟเฟกต์เสียงว่างที่ส่งคืนขณะปิดเสียงเกม จนทำให้เกิดคำเตือน"
             }
           }
         },
@@ -7554,33 +8080,63 @@
           }
         },
         "Cattail_TweaksQuality_Dynamic-Details": {
-          "name": "Dinamikus részletek",
+          "name": "Dinamikus információbővítés",
           "config": {
             "cookieDirectionPassword": {
-              "label": "Sütiirány jelszó"
+              "label": "Süti titkos helye [jelszó szükséges]",
+              "description": "A süti jelszavával megjeleníthető a süti helye."
             },
             "enableMineDistributionChart": {
-              "label": "Ásványok mélység szerinti eloszlásdiagramja",
-              "description": "Az ásványok mélység szerinti eloszlását mutatja a bővített bányainformációs kártyákon."
+              "label": "Ásványok mélység szerinti eloszlása",
+              "description": "Ásványok mélység szerinti eloszlásdiagramját mutatja a bővített bányainformációkban."
             },
             "mineDistributionChartView": {
-              "label": "Az ásványeloszlás-diagram stílusa",
-              "description": "Halmozott valószínűségi diagram vagy külön ásványsávok választhatók.",
+              "label": "Ásványeloszlási diagram stílusa",
+              "description": "Válassz halmozott valószínűségi diagramot vagy külön ásványeloszlási sávokat.",
               "valueLabels": {
                 "stacked": "Halmozott valószínűségi diagram",
                 "bands": "Külön ásványsávok"
               }
             },
             "mineDistributionVisibility": {
-              "label": "Ásványok láthatósága",
-              "description": "Válassza ki, hogyan jelenjenek meg a fel nem fedezett ásványok az eloszlásdiagramon.",
+              "label": "Ásványmegjelenítési feltételek",
+              "description": "Válassz minden ásványt, névtelen felfedezetlen ásványokat vagy csak felfedezett ásványokat",
               "valueLabels": {
                 "all": "Összes ásvány megjelenítése",
                 "anonymous": "Fel nem fedezett ásványok név nélkül",
                 "discovered": "Csak felfedezett ásványok"
               }
+            },
+            "enableBuildingDetails": {
+              "label": "Épületinformáció+",
+              "description": "Több adatot mutat, például a pontos termelési hatékonyságot és bónuszértékeket. Nyomd meg az Alt+Shift billentyűket."
+            },
+            "enableResourceSourceDetails": {
+              "label": "Nyersanyagáramlás követése",
+              "description": "Megmutatja a nyersanyagok forrásait és fogyasztóit; bekapcsolhatók a kapcsolódó épületeket jelző vonalak. Alt+Shift."
+            },
+            "enableResourceSourceLineChart": {
+              "label": "Nyersanyagváltozás vonaldiagramja",
+              "description": "A nyersanyagikon fölött az egérgörgővel válthatsz az eredeti oszlopdiagramról a mennyiségi változásokat részletesen mutató vonaldiagramra."
+            },
+            "enableCoordinateOverlay": {
+              "label": "Jelenlegi koordináták",
+              "description": "A kurzor mellett megjeleníti az aktuális mező vagy épület koordinátáit. Nyomd meg az Alt+C billentyűket."
+            },
+            "enableDirectionPointers": {
+              "label": "Fontos épületek iránya",
+              "description": "A kurzor körül nyilakkal jelzi a fontos épületek és a világ origójának irányát."
+            },
+            "enableBuildCountdown": {
+              "label": "Becsült idő az építhetőségig",
+              "description": "A boltban jelzi, hogy a jelenlegi készletek és termelés alapján mennyi idő múlva építhetők a nyersanyaghiányos épületek."
+            },
+            "resourceSourceLineRenderer": {
+              "label": "Nyersanyagáramlási vonalak optimalizálása",
+              "description": "WebGL-lel rajzolja a vonalakat az eredeti Canvas 2D akadozásának elkerülésére. Az O billentyűvel válthatsz."
             }
-          }
+          },
+          "description": "További épületadatokat, nyersanyagáramlás-követést, változási vonaldiagramokat, irányjelzőket, koordinátás teleportálást és egyebeket kínál. A gyorsbillentyűkért kattints a bal alsó „?” jelre."
         },
         "Cattail_TweaksQuality_Resource-Watcher": {
           "name": "Erőforrás-figyelő"
@@ -7820,6 +8376,10 @@
             "enableBuildingWebGLRecorder": {
               "label": "[Teszt] WebGL-rajzolás rögzítése",
               "description": "Épületrajzolási parancsokat, állapotot, darabszámot, kompatibilitást és rögzítési időt rögzít WebGL-kísérletekhez. Normál játékhoz nem kell; növeli a futási terhelést."
+            },
+            "enableEmptySoundWarningFix": {
+              "label": "Üres hangeffektusok ismétlődő figyelmeztetéseinek javítása",
+              "description": "Javítja azokat a figyelmeztetéseket, amelyek akkor jelennek meg, amikor egyes épületek a játék némításakor visszaadott üres hangeffektust próbálják törölni."
             }
           }
         },
@@ -7993,33 +8553,63 @@
           }
         },
         "Cattail_TweaksQuality_Dynamic-Details": {
-          "name": "Dinamiska informācija",
+          "name": "Dinamiskās informācijas paplašinājums",
           "config": {
             "cookieDirectionPassword": {
-              "label": "Cepuma virziena parole"
+              "label": "Slepenā cepuma atrašanās vieta [vajag paroli]",
+              "description": "Ievadiet cepuma paroli, lai parādītu tā atrašanās vietu."
             },
             "enableMineDistributionChart": {
-              "label": "Minerālu sadalījuma diagramma pēc dziļuma",
-              "description": "Rādīt minerālu sadalījumu pēc dziļuma paplašinātajās raktuvju informācijas kartītēs."
+              "label": "Minerālu sadalījums pēc dziļuma",
+              "description": "Paplašinātajā raktuvju informācijā nodrošina minerālu sadalījuma diagrammu pēc dziļuma."
             },
             "mineDistributionChartView": {
               "label": "Minerālu sadalījuma diagrammas stils",
-              "description": "Izvēlieties uzkrāto varbūtību diagrammu vai atsevišķas minerālu joslas.",
+              "description": "Izvēlieties uzkrāto varbūtību diagrammu vai atsevišķas minerālu sadalījuma joslas.",
               "valueLabels": {
                 "stacked": "Uzkrāto varbūtību diagramma",
                 "bands": "Atsevišķas minerālu joslas"
               }
             },
             "mineDistributionVisibility": {
-              "label": "Minerālu redzamība",
-              "description": "Izvēlieties, kā sadalījuma diagrammā attēlot neatklātos minerālus.",
+              "label": "Minerālu attēlošanas nosacījumi",
+              "description": "Izvēlieties visus minerālus, anonīmus neatklātos minerālus vai tikai atklātos minerālus",
               "valueLabels": {
                 "all": "Rādīt visus minerālus",
                 "anonymous": "Anonimizēt neatklātos minerālus",
                 "discovered": "Tikai atklātie minerāli"
               }
+            },
+            "enableBuildingDetails": {
+              "label": "Ēku informācija+",
+              "description": "Rāda vairāk ēku datu, piemēram, precīzu ražošanas efektivitāti un bonusu vērtības. Nospiediet Alt+Shift."
+            },
+            "enableResourceSourceDetails": {
+              "label": "Resursu plūsmas izsekošana",
+              "description": "Rāda resursu avotus un patērētājus; var ieslēgt līnijas uz saistītajām ēkām. Nospiediet Alt+Shift."
+            },
+            "enableResourceSourceLineChart": {
+              "label": "Resursu izmaiņu līniju grafiks",
+              "description": "Virs resursa ikonas ar peles ritenīti pārslēdziet sākotnējo stabiņu diagrammu uz līniju grafiku, lai redzētu detalizētas daudzuma izmaiņas."
+            },
+            "enableCoordinateOverlay": {
+              "label": "Pašreizējās koordinātas",
+              "description": "Blakus kursoram rāda pašreizējā lauciņa vai ēkas koordinātas. Nospiediet Alt+C."
+            },
+            "enableDirectionPointers": {
+              "label": "Svarīgu ēku virziens",
+              "description": "Ap kursoru rāda bultas uz svarīgām ēkām un pasaules sākumpunktu."
+            },
+            "enableBuildCountdown": {
+              "label": "Aptuvenais laiks līdz būvēšanai",
+              "description": "Veikalā rāda, pēc cik ilga laika varēs būvēt ēkas ar nepietiekamiem resursiem, ņemot vērā krājumus un ražošanu."
+            },
+            "resourceSourceLineRenderer": {
+              "label": "Resursu plūsmas līniju optimizācija",
+              "description": "Zīmē līnijas ar WebGL, lai novērstu sākotnējās Canvas 2D attēlošanas raustīšanos. Pārslēdziet ar O."
             }
-          }
+          },
+          "description": "Pievieno ēku detaļas, resursu plūsmas izsekošanu, izmaiņu līniju grafikus, virzienu norādes, teleportāciju pēc koordinātām un citu. Īsinājumtaustiņus skatiet, nospiežot “?” apakšā pa kreisi."
         },
         "Cattail_TweaksQuality_Resource-Watcher": {
           "name": "Resursu pārraugs"
@@ -8259,6 +8849,10 @@
             "enableBuildingWebGLRecorder": {
               "label": "[Tests] WebGL zīmēšanas ieraksts",
               "description": "Ieraksta ēku zīmēšanas komandas un stāvokļus, skaitu, saderību un ierakstīšanas laiku WebGL eksperimentiem. Parastai spēlei nav vajadzīgs; palielina izpildes slodzi."
+            },
+            "enableEmptySoundWarningFix": {
+              "label": "Novērst atkārtotus brīdinājumus par tukšiem skaņas efektiem",
+              "description": "Novērš brīdinājumus, kas rodas, kad dažas ēkas mēģina dzēst tukšu skaņas efektu, kas atgriezts, kamēr spēles skaņa ir izslēgta."
             }
           }
         },
@@ -8432,33 +9026,63 @@
           }
         },
         "Cattail_TweaksQuality_Dynamic-Details": {
-          "name": "Detalii dinamice",
+          "name": "Extindere de informații dinamice",
           "config": {
             "cookieDirectionPassword": {
-              "label": "Parolă direcție cookie"
+              "label": "Locul fursecului secret [necesită parolă]",
+              "description": "Introdu parola fursecului pentru a-i afișa poziția."
             },
             "enableMineDistributionChart": {
-              "label": "Graficul distribuției mineralelor după adâncime",
-              "description": "Afișează distribuția mineralelor după adâncime în cardurile extinse de informații ale minelor."
+              "label": "Distribuția mineralelor după adâncime",
+              "description": "Oferă grafice ale distribuției mineralelor după adâncime în informațiile extinse ale minelor."
             },
             "mineDistributionChartView": {
-              "label": "Stilul graficului de distribuție a mineralelor",
-              "description": "Alege un grafic de probabilitate suprapus sau benzi separate pentru minerale.",
+              "label": "Stilul graficului de distribuție",
+              "description": "Alege un grafic de probabilitate suprapus sau benzi separate de distribuție a mineralelor.",
               "valueLabels": {
                 "stacked": "Grafic de probabilitate suprapus",
                 "bands": "Benzi separate pentru minerale"
               }
             },
             "mineDistributionVisibility": {
-              "label": "Vizibilitatea mineralelor",
-              "description": "Alege cum apar mineralele nedescoperite în graficul de distribuție.",
+              "label": "Condiții de afișare a mineralelor",
+              "description": "Alege toate mineralele, minerale nedescoperite anonime sau doar minerale descoperite",
               "valueLabels": {
                 "all": "Afișează toate mineralele",
                 "anonymous": "Anonimizează mineralele nedescoperite",
                 "discovered": "Doar minerale descoperite"
               }
+            },
+            "enableBuildingDetails": {
+              "label": "Informații despre clădiri+",
+              "description": "Arată mai multe informații, precum eficiența exactă a producției și valorile bonusurilor. Apasă Alt+Shift."
+            },
+            "enableResourceSourceDetails": {
+              "label": "Urmărirea fluxului de resurse",
+              "description": "Arată sursele și consumatorii de resurse și permite activarea liniilor către clădirile implicate. Apasă Alt+Shift."
+            },
+            "enableResourceSourceLineChart": {
+              "label": "Graficul variației resurselor",
+              "description": "Deasupra unei pictograme de resursă, folosește rotița pentru a înlocui graficul original cu bare cu unul liniar al variațiilor detaliate ale cantității."
+            },
+            "enableCoordinateOverlay": {
+              "label": "Coordonate curente",
+              "description": "Arată lângă cursor coordonatele celulei sau clădirii curente. Apasă Alt+C."
+            },
+            "enableDirectionPointers": {
+              "label": "Direcția clădirilor importante",
+              "description": "Arată în jurul cursorului săgeți către clădirile importante și originea lumii."
+            },
+            "enableBuildCountdown": {
+              "label": "Timp estimat până la construire",
+              "description": "Arată în magazin timpul estimat până când clădirile cu resurse insuficiente pot fi construite, pe baza resurselor și producției curente."
+            },
+            "resourceSourceLineRenderer": {
+              "label": "Optimizarea liniilor fluxului de resurse",
+              "description": "Desenează liniile cu WebGL pentru a evita sacadările randării Canvas 2D originale. Apasă O pentru a comuta."
             }
-          }
+          },
+          "description": "Adaugă detalii despre clădiri, urmărirea fluxului de resurse, grafice ale variațiilor, indicatoare de direcție, teleportare prin coordonate și altele. Apasă „?” în stânga jos pentru scurtături."
         },
         "Cattail_TweaksQuality_Resource-Watcher": {
           "name": "Monitor resurse"
@@ -8698,6 +9322,10 @@
             "enableBuildingWebGLRecorder": {
               "label": "[Test] Înregistrare desen WebGL",
               "description": "Înregistrează comenzi și stări de desen ale clădirilor, numărul, compatibilitatea și timpul de înregistrare pentru experimente WebGL. Inutil în jocul obișnuit; crește costul execuției."
+            },
+            "enableEmptySoundWarningFix": {
+              "label": "Corectează avertismentele repetate pentru efecte sonore goale",
+              "description": "Corectează avertismentele apărute când unele clădiri încearcă să șteargă un efect sonor gol returnat în timp ce sunetul jocului este oprit."
             }
           }
         },
@@ -8871,33 +9499,63 @@
           }
         },
         "Cattail_TweaksQuality_Dynamic-Details": {
-          "name": "Dynamiske detaljer",
+          "name": "Dynamisk informasjonsutvidelse",
           "config": {
             "cookieDirectionPassword": {
-              "label": "Passord for kjeksretning"
+              "label": "Det hemmelige kjeksstedet [passord kreves]",
+              "description": "Skriv inn kjekspassordet for å vise kjeksens plassering."
             },
             "enableMineDistributionChart": {
-              "label": "Diagram over mineralfordeling etter dybde",
-              "description": "Vis mineralfordeling etter dybde på utvidede informasjonskort for gruver."
+              "label": "Mineralfordeling etter dybde",
+              "description": "Gir diagrammer over mineralfordeling etter dybde i utvidet gruveinformasjon."
             },
             "mineDistributionChartView": {
               "label": "Stil for mineralfordelingsdiagram",
-              "description": "Velg et stablet sannsynlighetsdiagram eller separate mineralbånd.",
+              "description": "Velg et stablet sannsynlighetsdiagram eller separate mineralfordelingsbånd.",
               "valueLabels": {
                 "stacked": "Stablet sannsynlighetsdiagram",
                 "bands": "Separate mineralbånd"
               }
             },
             "mineDistributionVisibility": {
-              "label": "Synlighet for mineraler",
-              "description": "Velg hvordan uoppdagede mineraler vises i fordelingsdiagrammet.",
+              "label": "Vilkår for mineralvisning",
+              "description": "Velg alle mineraler, anonyme uoppdagede mineraler eller bare oppdagede mineraler",
               "valueLabels": {
                 "all": "Vis alle mineraler",
                 "anonymous": "Anonymiser uoppdagede mineraler",
                 "discovered": "Bare oppdagede mineraler"
               }
+            },
+            "enableBuildingDetails": {
+              "label": "Bygningsinformasjon+",
+              "description": "Viser flere opplysninger, som nøyaktig produksjonseffektivitet og bonusverdier. Trykk Alt+Shift."
+            },
+            "enableResourceSourceDetails": {
+              "label": "Sporing av ressursflyt",
+              "description": "Viser ressurskilder og forbrukere, med valgfrie linjer til berørte bygninger. Trykk Alt+Shift."
+            },
+            "enableResourceSourceLineChart": {
+              "label": "Linjediagram for ressursendringer",
+              "description": "Hold pekeren over et ressursikon og bruk musehjulet for å bytte fra det opprinnelige søylediagrammet til et linjediagram med detaljerte mengdeendringer."
+            },
+            "enableCoordinateOverlay": {
+              "label": "Gjeldende koordinater",
+              "description": "Viser koordinatene til gjeldende rute eller bygning ved siden av pekeren. Trykk Alt+C."
+            },
+            "enableDirectionPointers": {
+              "label": "Retning til viktige bygninger",
+              "description": "Viser piler rundt pekeren mot viktige bygninger og verdens origo."
+            },
+            "enableBuildCountdown": {
+              "label": "Anslått tid til bygging",
+              "description": "Viser i butikken hvor lenge det anslås å ta før bygninger med for få ressurser kan bygges, basert på nåværende ressurser og produksjon."
+            },
+            "resourceSourceLineRenderer": {
+              "label": "Optimaliser ressursflytlinjer",
+              "description": "Tegner linjene med WebGL for å unngå hakking fra den opprinnelige Canvas 2D-gjengivelsen. Trykk O for å bytte."
             }
-          }
+          },
+          "description": "Legger til bygningsdetaljer, sporing av ressursflyt, linjediagrammer for endringer, retningsvisere, koordinatteleportering og mer. Klikk på «?» nederst til venstre for hurtigtastene."
         },
         "Cattail_TweaksQuality_Resource-Watcher": {
           "name": "Ressursovervåker"
@@ -9137,6 +9795,10 @@
             "enableBuildingWebGLRecorder": {
               "label": "[Test] WebGL-tegneregistrering",
               "description": "Registrerer bygningers tegnekommandoer og tilstand, antall, kompatibilitet og registreringstid for WebGL-forsøk. Unødvendig ved vanlig spilling; øker kjørekostnaden."
+            },
+            "enableEmptySoundWarningFix": {
+              "label": "Rett gjentatte advarsler om tomme lydeffekter",
+              "description": "Retter advarsler som oppstår når enkelte bygninger forsøker å slette en tom lydeffekt som returneres mens spillet er dempet."
             }
           }
         },

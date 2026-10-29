@@ -66,11 +66,18 @@ const extract = value => typeof value?.modsch === 'string' ? value.modsch : Arra
 	simplified.splash.language = '语言：简体中文'
 	const traditional = converter.convertWords(simplified); traditional.splash.language = '語言：繁體中文'
 	assert.equal(json(copy.sch), json(simplified)); assert.equal(json(copy.tch), json(traditional))
-	assert.equal(Object.keys(flatten(copy.sch)).length, 752); assert.equal(Object.keys(flatten(copy.tch)).length, 752)
+	assert.equal(Object.keys(flatten(copy.sch)).length, 756); assert.equal(Object.keys(flatten(copy.tch)).length, 756)
 	assert.equal(copy.sch.messages.length, 425); assert.equal(copy.tch.messages.length, 425)
 	assert.equal(copy.sch.credits.length, 50); assert.equal(copy.tch.credits.length, 50)
-	assert.equal(copy.sch.credits[43], '简体中文汉化优化：空灵灵'); assert.equal(copy.sch.credits[49], native.en.credits[48])
-	checks.push('real Settings action exports all 752 fields, 425 messages and 50 credits per Chinese locale')
+	assert.equal(copy.sch.credits[42], '简体中文：空灵灵(Cattail), Daisy Chan, kevinlee7, YuLun')
+	assert.equal(copy.sch.credits[43], '繁體中文：空灵灵(Cattail), Daisy Chan, kevinlee7')
+	assert.equal(copy.sch.credits[49], '')
+
+	assert.equal(copy.sch.random.eraserHint, '点击并拖动框选范围，可批量删除建筑')
+	assert.equal(copy.sch.random.relocatorHint, '点击并拖动框选范围，可批量移动建筑。按住<div class="key">Shift</div> 可复制')
+	assert.equal(copy.sch.random.relocate, '移动'); assert.equal(copy.sch.random.clone, '复制')
+	assert.ok(copy.tch.random.relocatorHint.includes('<div class="key">Shift</div>'))
+	checks.push('real Settings action exports all 756 fields, 425 messages and 50 credits per Chinese locale')
 	assert.equal(json(Object.keys(copy)), json(Object.keys(native)))
 	for (const key of Object.keys(native)) if (key !== 'sch' && key !== 'tch') assert.equal(json(copy[key]), json(native[key]), key)
 	const exterior = source => {

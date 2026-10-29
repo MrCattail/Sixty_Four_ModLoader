@@ -75,13 +75,16 @@ check('HTML attributes, placeholders, literal paths and URLs are preserved', () 
 	assert.equal(converter.convertText('打开 mods/简体中文/locale.js。设置'), '打開 mods/简体中文/locale.js。設置')
 })
 let words, firstMs, repeatMs
-check('all 752 fields and 425 messages derive without changing native languages or source', () => {
+check('all 756 fields and 425 messages derive without changing native languages or source', () => {
 	words = getWords()
 	const nativeBefore = json(words)
 	const begin = performance.now(); loader.applyWords(words); firstMs = performance.now() - begin
 	const simplified = flatten(words.modsch), traditional = flatten(words.modtch)
-	assert.equal(simplified.size, 752); assert.equal(traditional.size, 752)
+	assert.equal(simplified.size, 756); assert.equal(traditional.size, 756)
 	assert.equal(words.modtch.messages.length, 425)
+	assert.equal(words.modtch.random.eraserHint, '點擊並拖動框選範圍，可批量刪除建築')
+	assert.equal(words.modtch.random.relocatorHint, '點擊並拖動框選範圍，可批量移動建築。按住<div class="key">Shift</div> 可複製')
+	assert.equal(words.modtch.random.relocate, '移動'); assert.equal(words.modtch.random.clone, '複製')
 	assert.equal(words.modtch.splash.language, '語言：繁體中文[優化]')
 	for (const [key, value] of simplified) if (key !== 'splash.language') assert.equal(traditional.get(key), converter.convertText(value), key)
 	const nativeAfter = { ...words }; delete nativeAfter.modsch; delete nativeAfter.modtch
@@ -209,6 +212,6 @@ check('native language menu receives names without re-running afterWords', () =>
 	assert.equal(hooks, before)
 	assert.equal(menuWords.modtch.messages, undefined, 'Menu bridge supplies only labels')
 })
-console.log(JSON.stringify({ result: 'PASS', groups: checks.length, checks, fields: 752, messages: 425,
+console.log(JSON.stringify({ result: 'PASS', groups: checks.length, checks, fields: 756, messages: 425,
 	initMs: +initMs.toFixed(2), firstWordsMs: +firstMs.toFixed(2), cachedWordsMs: +repeatMs.toFixed(2),
 	boundary: 'Real source in isolated VM; DOM/side effects are fixtures, no player-game acceptance' }, null, 2))

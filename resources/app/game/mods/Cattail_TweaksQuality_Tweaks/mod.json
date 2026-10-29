@@ -72,7 +72,8 @@
     "scripts/shop-scroll-fix.js",
     "scripts/gradient-relocation-puncture-allow.js",
     "scripts/gradient-relocation-no-penalty.js",
-    "scripts/kernel-range-preview.js"
+    "scripts/kernel-range-preview.js",
+    "scripts/sound-source-guard.js"
   ],
   "conflicts": [
     "Cattail_TweaksQuality_View-Distance",
@@ -1098,6 +1099,56 @@
         "lv": "Labo ikonas atgriešanos pirmajā līmenī, kad valodas maiņa pārbūvē veikalu.",
         "ro": "Corectează revenirea pictogramei la primul nivel când schimbarea limbii reconstruiește magazinul.",
         "no": "Retter at riveikonet går tilbake til første nivå når språkbytte bygger butikken på nytt."
+      },
+      "reloadPolicy": "hot",
+      "section": "fixes"
+    },
+    "enableEmptySoundWarningFix": {
+      "type": "boolean",
+      "label": {
+        "sch": "修复空音效持续报错",
+        "modsch": "修复空音效持续报错",
+        "en": "Fix repeated empty sound effect warnings",
+        "ru": "Исправить повторные предупреждения о пустом звуке",
+        "de": "Wiederholte Warnungen bei leeren Soundeffekten beheben",
+        "ptbr": "Corrigir avisos repetidos de efeitos sonoros vazios",
+        "it": "Correggi gli avvisi ripetuti per effetti sonori vuoti",
+        "es": "Corregir avisos repetidos de efectos de sonido vacíos",
+        "fr": "Corriger les avertissements répétés de sons vides",
+        "nl": "Herhaalde waarschuwingen voor lege geluidseffecten verhelpen",
+        "cz": "Opravit opakovaná varování o prázdných zvukových efektech",
+        "pl": "Napraw powtarzające się ostrzeżenia o pustych dźwiękach",
+        "jp": "空の効果音による警告の繰り返しを修正",
+        "kr": "빈 효과음 경고 반복 수정",
+        "tch": "修復空音效持續報錯",
+        "thai": "แก้คำเตือนเอฟเฟกต์เสียงว่างที่เกิดซ้ำ",
+        "hu": "Üres hangeffektusok ismétlődő figyelmeztetéseinek javítása",
+        "lv": "Novērst atkārtotus brīdinājumus par tukšiem skaņas efektiem",
+        "ro": "Corectează avertismentele repetate pentru efecte sonore goale",
+        "no": "Rett gjentatte advarsler om tomme lydeffekter"
+      },
+      "default": true,
+      "description": {
+        "sch": "修复部分建筑会在游戏静音设置下返回空音效并被尝试删除从而输出警告的问题。",
+        "modsch": "修复部分建筑会在游戏静音设置下返回空音效并被尝试删除从而输出警告的问题。",
+        "en": "Fix warnings caused when some buildings try to delete an empty sound effect returned while the game is muted.",
+        "ru": "Исправляет предупреждения, возникающие, когда некоторые здания пытаются удалить пустой звуковой эффект, возвращённый при выключенном звуке игры.",
+        "de": "Behebt Warnungen, die entstehen, wenn manche Gebäude bei stummgeschaltetem Spiel einen leeren Soundeffekt zurückgeben und anschließend dessen Löschung versuchen.",
+        "ptbr": "Corrige os avisos gerados quando algumas construções tentam excluir um efeito sonoro vazio retornado enquanto o jogo está sem som.",
+        "it": "Corregge gli avvisi generati quando alcuni edifici tentano di eliminare un effetto sonoro vuoto restituito mentre l'audio del gioco è disattivato.",
+        "es": "Corrige los avisos que aparecen cuando algunos edificios intentan eliminar un efecto de sonido vacío devuelto mientras el juego está silenciado.",
+        "fr": "Corrige les avertissements produits lorsque certains bâtiments tentent de supprimer un effet sonore vide renvoyé quand le jeu est en mode muet.",
+        "nl": "Verhelpt waarschuwingen die ontstaan wanneer sommige gebouwen een leeg geluidseffect teruggeven terwijl het spel is gedempt en dit vervolgens proberen te verwijderen.",
+        "cz": "Opravuje varování vznikající, když se některé budovy pokusí odstranit prázdný zvukový efekt vrácený při ztlumeném zvuku hry.",
+        "pl": "Naprawia ostrzeżenia pojawiające się, gdy niektóre budynki próbują usunąć pusty efekt dźwiękowy zwrócony przy wyciszonym dźwięku gry.",
+        "jp": "ゲームのミュート時に一部の建物が空の効果音を返し、その削除を試みて警告を出す問題を修正します。",
+        "kr": "게임이 음소거된 상태에서 일부 건물이 반환한 빈 효과음을 삭제하려고 시도해 경고가 출력되는 문제를 수정합니다.",
+        "tch": "修復部分建築會在遊戲靜音設定下回傳空音效，並被嘗試刪除而輸出警告的問題。",
+        "thai": "แก้ปัญหาที่สิ่งปลูกสร้างบางชนิดพยายามลบเอฟเฟกต์เสียงว่างที่ส่งคืนขณะปิดเสียงเกม จนทำให้เกิดคำเตือน",
+        "hu": "Javítja azokat a figyelmeztetéseket, amelyek akkor jelennek meg, amikor egyes épületek a játék némításakor visszaadott üres hangeffektust próbálják törölni.",
+        "lv": "Novērš brīdinājumus, kas rodas, kad dažas ēkas mēģina dzēst tukšu skaņas efektu, kas atgriezts, kamēr spēles skaņa ir izslēgta.",
+        "ro": "Corectează avertismentele apărute când unele clădiri încearcă să șteargă un efect sonor gol returnat în timp ce sunetul jocului este oprit.",
+        "no": "Retter advarsler som oppstår når enkelte bygninger forsøker å slette en tom lydeffekt som returneres mens spillet er dempet."
       },
       "reloadPolicy": "hot",
       "section": "fixes"

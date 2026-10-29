@@ -212,8 +212,8 @@ ModLoader.register({
 .cattail-classic-shop .itemCounter { position: absolute; top: calc(var(--unit) * .4); right: calc(var(--unit) * .6); font-size: calc(var(--unit) * .8); color: #aab; }
 .cattail-classic-shop .existed { position: absolute; top: 6px; left: 6px; background: #ffe978; color: #222; padding: 4px 6px; border-radius: 3px; font-weight: 600; }
 .cattail-classic-shop.minimized .shopItem { padding: calc(var(--unit) * 2) var(--unit); }
-.cattail-classic-shop.minimized .imageVessel, .cattail-classic-shop.minimized .itemDescription { display: none; }
-.cattail-classic-shop.minimized .newItem .itemDescription { display: block; }
+.cattail-classic-shop.minimized .itemDescription { display: none; }
+.shop.cattail-classic-shop.minimized .cattail-shop-category-item-meta { display: flex; }
 .cattail-classic-shop.minimized .itemHeader { font-size: calc(var(--unit) * .9); margin-bottom: calc(var(--unit) * .5); overflow-wrap: anywhere; }
 .cattail-classic-shop .shopPack { display: none; position: relative; overflow: hidden; margin-bottom: var(--unit); border-radius: 4px; box-shadow: 0 calc(var(--unit) * .24) calc(var(--unit) * .48) #0001; }
 .cattail-classic-shop .shopPack.visible { display: block; }

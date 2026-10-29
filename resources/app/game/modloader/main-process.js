@@ -5,7 +5,7 @@ const path = require('path')
 const { spawn } = require('child_process')
 // One-run diagnostics are inactive unless the explicit launch switch is present.
 let startupProbeService = null
-if (app.commandLine?.hasSwitch?.('modloader-startup-probe')) {
+if (app.commandLine?.hasSwitch?.('modloader-startup-probe') && fs.existsSync(path.join(__dirname, 'diagnostics', 'startup-main.js'))) {
   try { startupProbeService = require('./diagnostics/startup-main.js').createService({
     enabled: true, electron: require('electron'), outputRoot: path.join(__dirname, 'state', 'startup-probes')
   }) } catch (_) { /* Optional probe failure must not block normal startup. */ }

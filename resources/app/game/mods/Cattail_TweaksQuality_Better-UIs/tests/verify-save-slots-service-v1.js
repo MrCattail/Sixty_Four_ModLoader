@@ -192,7 +192,7 @@ async function main() {
 		assert.equal(manifest.config.enableIndependentAutoSave.type, 'boolean')
 		assert.equal(manifest.config.enableIndependentAutoSave.section, manifest.config.enableSaveSlots.section)
 		assert.equal(manifest.config.enableIndependentAutoSave.default, true)
-		assert.equal(manifest.translations.sch.config.enableIndependentAutoSave.label, '独立自动存档')
+		assert.equal(manifest.translations.sch.config.enableIndependentAutoSave.label, '更好的存档逻辑')
 	})
 	console.log(`Better UIs native Save Slots service v1: ${passed} checks passed.`)
 }

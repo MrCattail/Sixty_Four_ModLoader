@@ -12,6 +12,7 @@ ModLoader.register({
 			label: function () { return text('shortcutCategoryWorldEditing', 'World Editing') },
 			order: 20
 		})
+		const SHARED_COMBINATION_IDS = new Set(['cancel-layer', 'temporary-pin', 'card-opacity'])
 		let currentGame = null
 		let installTimer = null
 		let installed = false
@@ -103,6 +104,7 @@ ModLoader.register({
 				description: function () { return text(descriptionKey, id) },
 				order,
 				category: CATEGORY,
+				allowSharedCombination: SHARED_COMBINATION_IDS.has(id),
 				visible: isEnabled,
 				active,
 				context

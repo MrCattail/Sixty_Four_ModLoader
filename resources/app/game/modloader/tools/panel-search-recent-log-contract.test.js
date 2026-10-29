@@ -7,10 +7,9 @@ const vm = require('node:vm')
 
 const modloaderDir = path.resolve(__dirname, '..')
 const loaderPath = path.join(modloaderDir, 'loader.js')
-const translationsPath = path.join(modloaderDir, 'translations.json')
 const readmePath = path.join(modloaderDir, 'README.md')
 const source = fs.readFileSync(loaderPath, 'utf8')
-const translations = JSON.parse(fs.readFileSync(translationsPath, 'utf8'))
+const translations = require('./helpers/translation-contract-fixtures.js').loadTranslationFixture()
 const readme = fs.readFileSync(readmePath, 'utf8')
 
 const helperSource = source.match(/\tconst normalizePanelSearchText = function \(value\) \{[\s\S]*?\n\t\}(?=\n\n\tconst showPanelChoice)/)

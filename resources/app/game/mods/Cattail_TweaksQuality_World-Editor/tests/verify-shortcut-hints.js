@@ -269,6 +269,7 @@ assert.equal(i18n.t('en', 'shortcutCategoryWorldEditing'), 'World Editing', 'Eng
 
 const result = loadFoundation(i18n)
 assert.equal(result.registrations.length, 16, 'World Editor should register 16 functional shortcut hints')
+const sharedCombinationIds = new Set(['cancel-layer', 'temporary-pin', 'card-opacity'])
 for (const expected of EXPECTED) {
 	const entry = byId(result, expected.id)
 	assert.deepEqual(JSON.parse(JSON.stringify(entry.keys)), expected.keys, expected.id + ' should expose the approved chord or alternatives')
@@ -280,6 +281,7 @@ for (const expected of EXPECTED) {
 	assert.ok(entry.description().trim(), expected.id + ' should have a localized description')
 	assert.equal(typeof entry.visible, 'function', expected.id + ' should use dynamic visibility')
 	assert.equal(typeof entry.active, 'function', expected.id + ' should use dynamic availability')
+	assert.equal(entry.allowSharedCombination, sharedCombinationIds.has(expected.id), expected.id + ' should declare only approved shared combinations')
 }
 result.game.language = 'en'
 assert.equal(byId(result, 'toggle-editor').category.label(), 'World Editing', 'category should update when the live game language changes')

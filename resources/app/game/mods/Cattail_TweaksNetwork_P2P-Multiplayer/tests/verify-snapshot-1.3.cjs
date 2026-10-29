@@ -1,0 +1,100 @@
+'use strict';
+const assert=require('assert/strict'),fs=require('fs'),path=require('path'),{EventEmitter}=require('events'),{PassThrough}=require('stream');
+const vm=require('vm');
+const tool=path.resolve(__dirname,'../tools/snapshot-1.3'),controller=require(path.join(tool,'snapshot.cjs')),world=require(path.join(tool,'snapshot-world.js')),wire=require(path.join(tool,'snapshot-wire.js')),fixtures=require(path.join(tool,'fixtures.cjs'));
+const {ROOT,write,read,pause}=controller;
+function sample(sessionId='desktop13-snapshot-001') {return {format:world.FORMAT,sessionId,epoch:1,revision:1,sceneId:world.SCENE,resources:[128,0,64,0,0,0,0,0,0,0],entities:[{netId:1,name:'pump',position:[0,0],fields:{depth:0}},{netId:2,name:'conductor',position:[3,0],fields:{}},{netId:3,name:'silo',position:[6,0],fields:{fill:0,state:0}}]};}
+function mainFixture(mode){
+ const proc=new EventEmitter(),app=new EventEmitter(),ipcMain=new EventEmitter(),timers=[];let quits=0,closes=0,destroyed=false;
+ Object.assign(proc,{pid:1,argv:['electron','--p2p-role=host','--attempt=999','--p2p-mode='+mode],versions:process.versions,connected:true,send(){},env:{CATTAIL_P2P_DESKTOP13:'1',CATTAIL_P2P_SAFE_TEST:'1',CATTAIL_P2P_ROLE:'host',CATTAIL_P2P_SESSION:'desktop13-snapshot-999',CATTAIL_P2P_TEST_ROOT:ROOT}});
+ Object.assign(app,{setPath(){},setAppLogsPath(){},disableHardwareAcceleration(){},commandLine:{appendSwitch(){}},whenReady:()=>new Promise(()=>{}),exit(){},quit(){quits++;}});ipcMain.handle=()=>{};
+ const requireLocal=name=>name==='electron'?{app,ipcMain}:name==='./fixtures.cjs'?fixtures:name==='./game/modloader/main-process.js'?{configureSaveCloud(){},configureMainWindowHost(){}}:name==='os'?{networkInterfaces:()=>({})}:name==='fs'?{mkdirSync(){},writeFileSync(){}}:require(name);
+ const context=vm.createContext({require:requireLocal,__dirname:path.join(ROOT,'runtime/resources/app'),process:proc,console,setTimeout(fn,ms){timers.push(ms);return {unref(){}};}});vm.runInContext(fs.readFileSync(path.join(tool,'main.cjs'),'utf8'),context);
+ const win={isDestroyed:()=>destroyed,webContents:{isDestroyed:()=>destroyed},close(){destroyed=true;closes++;}};context.testWindow=win;vm.runInContext('win=testWindow',context);
+ return {timers,proc,win,get quits(){return quits;},get closes(){return closes;},quit(sender){ipcMain.emit('quit',{sender});}};
+}
+async function pure(){
+ let count=0;async function check(name,run){await run();count++;console.log('PASS '+name);}
+ await check('schema roundtrip is detached, preserves zero and empty collections',()=>{const value=sample(),result=world.validate(value,value.sessionId);value.resources[0]=999;value.entities[0].position[0]=10;assert.equal(result.resources[0],128);assert.equal(result.entities[0].position[0],0);assert.equal(result.resources[1],0);result.entities=[];assert.deepEqual(world.decode(world.encode(result,result.sessionId),result.sessionId),result);});
+ await check('schema rejects unknown identity, extension and unsafe keys',()=>{for(const key of ['steamId','ownerHash','permanents','modloader','__proto__']){const value=sample();Object.defineProperty(value,key,{value:{},enumerable:true});assert.throws(()=>world.validate(value,value.sessionId));}});
+ await check('schema context rejects old sessions, epochs, revisions and formats',()=>{for(const [key,value]of [['sessionId','desktop13-snapshot-999'],['epoch',0],['revision',2],['format','p2p-v2']]){const data=sample();data[key]=value;assert.throws(()=>world.validate(data,'desktop13-snapshot-001'));}});
+ await check('numeric and collection boundaries never coerce false, NaN or Infinity',()=>{for(const value of [false,-1,NaN,Infinity,1e9+1]){const data=sample();data.resources[0]=value;assert.throws(()=>world.validate(data,data.sessionId));}const data=sample();data.resources.pop();assert.throws(()=>world.validate(data,data.sessionId));});
+ await check('unknown active cubes, entity fields, duplicate ids and cells reject',()=>{for(const change of [data=>data.entities[0].name='cube',data=>data.entities[0].fields.extra=1,data=>data.entities[1].netId=1,data=>data.entities[1].position=[0,0],data=>data.entities[0].position=[65,0],data=>data.entities[0].position=[0.5,0],data=>data.entities[2].fields.state=1]){const data=sample();change(data);assert.throws(()=>world.validate(data,data.sessionId));}});
+ await check('UTF8 and pre-parse byte caps refuse damaged or excessive payloads',()=>{assert.throws(()=>world.decode(Buffer.from([0xc0,0xaf]),sample().sessionId));assert.throws(()=>world.decode(Buffer.alloc(65537),sample().sessionId));});
+ await check('real fragmentation reassembles multiple chunks and applies once',()=>{const data=sample();data.entities=Array.from({length:64},(_,i)=>({netId:i+1,name:'silo',position:[i-32,1],fields:{fill:0,state:0}}));const batch=wire.frameBytes(Buffer.from(JSON.stringify(data,null,2)),data.sessionId);assert.ok(batch.frames.length>3);let applied=0;const receiver=new wire.Receiver(data.sessionId,clean=>{assert.deepEqual(clean,world.validate(data,data.sessionId));applied++;});for(const frame of batch.frames)receiver.accept(frame);assert.equal(applied,1);assert.equal(receiver.receipt.sha256,batch.sha256);assert.throws(()=>receiver.accept(batch.frames[0]),/ALREADY_APPLIED/);assert.equal(applied,1);});
+ await check('incomplete, reordered and corrupt fragments leave application untouched',()=>{const data=sample(),batch=wire.frames(data,data.sessionId);let applied=0;for(const kind of ['missing','order','corrupt']){const receiver=new wire.Receiver(data.sessionId,()=>applied++);receiver.accept(batch.frames[0]);if(kind==='missing')assert.throws(()=>receiver.accept(batch.frames.at(-1)),/MISSING/);else{const part=Buffer.from(batch.frames[1]);if(kind==='order')part.writeUInt32BE(1,4);else part[part.length-1]^=1;try{receiver.accept(part);receiver.accept(batch.frames.at(-1));assert.fail('corruption accepted');}catch(error){assert.match(error.message,/CHUNK|CHECKSUM/);}}assert.equal(receiver.pending,null);}assert.equal(applied,0);});
+ await check('receive timeout frees buffered state without applying a world',()=>{let expire,applied=0,cleared=0;const data=sample(),receiver=new wire.Receiver(data.sessionId,()=>applied++,{setTimer:callback=>(expire=callback,7),clearTimer:()=>cleared++});receiver.accept(wire.frames(data,data.sessionId).frames[0]);expire();assert.equal(receiver.pending,null);assert.equal(receiver.lastRejection,'RECEIVE_TIMEOUT');assert.equal(applied,0);assert.equal(cleared,1);});
+ await check('browser timers retain their Window receiver across begin and finish',()=>{let scheduled=0,cleared=0;const isolated={exports:{}};const context=vm.createContext({module:isolated,require:name=>name==='./snapshot-world.js'?world:require(name),Buffer,ArrayBuffer,tag:'window-timer',setTimeout(){assert.equal(this.tag,'window-timer');scheduled++;return 1;},clearTimeout(){assert.equal(this.tag,'window-timer');cleared++;}});vm.runInContext(fs.readFileSync(path.join(tool,'snapshot-wire.js'),'utf8'),context);const data=sample(),receiver=new isolated.exports.Receiver(data.sessionId,()=>{});for(const frame of wire.frames(data,data.sessionId).frames)receiver.accept(frame);assert.equal(scheduled,1);assert.equal(cleared,1);assert.equal(receiver.complete,true);});
+ await check('missing sender acknowledgement has a bounded active-phase deadline',async()=>{
+  const timers=[],isolated={exports:{}},channel={label:wire.LABEL,ordered:true,maxRetransmits:null,maxPacketLifeTime:null,readyState:'open',bufferedAmount:0,send(){},close(){this.readyState='closed';}};
+  class PC{constructor(){this.iceGatheringState='complete';this.localDescription={toJSON:()=>({type:'offer',sdp:''})};}createDataChannel(){return channel;}createOffer(){return {};}setLocalDescription(){return Promise.resolve();}getStats(){return Promise.resolve(new Map());}close(){this.connectionState='closed';}}
+  const context=vm.createContext({module:isolated,require:name=>name==='./snapshot-world.js'?world:require(name),Buffer,ArrayBuffer,setTimeout(callback,ms){timers.push({callback,ms});return timers.length;},clearTimeout(){}});vm.runInContext(fs.readFileSync(path.join(tool,'snapshot-wire.js'),'utf8'),context);
+  const cfg=fixtures.config('host'),api=isolated.exports.install({RTCPeerConnection:PC,CattailP2PEarlySession:{assertReady(){}},addEventListener(){}},cfg,{capture:()=>sample(),state:()=>({ready:true}),setWire(){},notice(){},setConnection(){}});await api.offer();await api.send();assert.equal(timers.length,1);assert.equal(timers[0].ms,10000);timers[0].callback();assert.equal((await api.state()).lastError,'ACK_TIMEOUT');api.close();
+ });
+ await check('failed construction does not acknowledge or commit receiver completion',()=>{const data=sample(),receiver=new wire.Receiver(data.sessionId,()=>{throw Error('BUILD_FAIL');}),batch=wire.frames(data,data.sessionId);receiver.accept(batch.frames[0]);receiver.accept(batch.frames[1]);assert.throws(()=>receiver.accept(batch.frames[2]),/BUILD_FAIL/);assert.equal(receiver.complete,false);assert.equal(receiver.receipt,null);assert.equal(receiver.pending,null);});
+ await check('fixed roles, identities, profiles and attempts reject ambiguous input',()=>{assert.notEqual(fixtures.config('host').identity,fixtures.config('guest').identity);assert.notEqual(fixtures.config('host').profile,fixtures.config('guest').profile);for(const args of [['guest1'],['none'],['host','../'],['host','001','other']])assert.throws(()=>fixtures.config(...args));assert.equal(fixtures.inside(ROOT,'C:/outside'),false);});
+ await check('child closure rejects in-flight control instead of hanging',async()=>{const child=new EventEmitter();child.connected=true;child.exitCode=null;child.signalCode=null;child.send=()=>{};const client=controller.clientFor(child,'host'),pending=client.call('status');child.emit('exit',0,null);await assert.rejects(pending,/CLOSED/);assert.equal(client.exited,true);});
+ await check('read-only early guard rejects wrong identity before storage construction',()=>{const guard=require(path.join(tool,'session-guard.cjs')),ipc={send(){},invoke(){},sendSync(){}};assert.throws(()=>guard.install({}, {...fixtures.config('host'),identity:'real-account'},ipc),/CONTEXT/);});
+ await check('new runtime cannot be prepared over existing evidence',()=>assert.throws(()=>controller.prepare(),/EXISTS/));
+ await check('manual launch gate refuses missing acceptance before creating an attempt',()=>{if(!fs.existsSync(path.join(ROOT,'acceptance-gate.json')))assert.throws(()=>controller.assertGate());else controller.assertGate();});
+ await check('both modes reject foreign Quit; own Quit is idempotent and manual has no lifetime timer',()=>{for(const mode of ['manual','automated']){const fixture=mainFixture(mode);assert.equal(fixture.timers.includes(180000),mode==='automated');fixture.quit({});assert.equal(fixture.closes,0);fixture.quit(fixture.win.webContents);fixture.proc.emit('disconnect');assert.equal(fixture.closes,1);assert.equal(fixture.quits,1);}});
+ await check('partial startup cleans its one owned child without force or game launch',async()=>{
+  let calls=0,number=890;while(fs.existsSync(path.join(ROOT,'reports',String(number))))number++;if(number>899)throw Error('NO_PURE_ATTEMPT_AVAILABLE');const attempt=String(number);
+  await assert.rejects(()=>controller.start(attempt,'automated',{spawn(){if(++calls===2)throw Error('INJECTED_SPAWN_FAILURE');const child=new EventEmitter();child.stdout=new PassThrough();child.stderr=new PassThrough();child.connected=true;child.exitCode=null;child.signalCode=null;child.pid=-1;child.send=message=>{if(message.method==='shutdown')setImmediate(()=>{child.emit('message',{id:message.id,result:true});child.exitCode=0;child.emit('exit',0,null);});};return child;}}),/INJECTED/);
+  const cleanup=read(path.join(ROOT,'reports',attempt,'cleanup.json'));assert.equal(cleanup.allExited,true);assert.equal(cleanup.forced,0);assert.deepEqual(cleanup.residual,[]);assert.equal(cleanup.exitCodes[0].code,0);
+ });
+ return count;
+}
+const quitCode=proofFile=>'('+function(proofFile){
+ const splash=DEBUG.splash;if(!splash.isShown)splash.show();const nodes=Array.from(splash.element.querySelectorAll('.menuItem')).filter(node=>node.textContent.trim()===splash.say('quit'));if(nodes.length!==1)throw Error('QUIT_BUTTON_NOT_FOUND');
+ const guard=CattailP2PEarlySession,before=guard.snapshot(),space=DEBUG.spaceport,send=space.send;
+ space.send=function(channel,...args){if(channel==='quit'){space.send=send;const after=guard.snapshot();require('fs').writeFileSync(proofFile,JSON.stringify({nativeButton:true,memoryBefore:before.saveResults.length,memoryAfter:after.saveResults.length,storeBefore:before.audit.ipcByChannel['invoke:store']||0,storeAfter:after.audit.ipcByChannel['invoke:store']||0,physicalMutation:after.audit.physicalMutation,errors:after.errors.length,quitDenied:after.audit.ipcByChannel['send:quit']||0}));}return send.call(this,channel,...args);};setTimeout(()=>nodes[0].click(),100);return true;
+}.toString()+')('+JSON.stringify(proofFile)+')';
+async function liveCase(attempt,index){
+ const ctx=await controller.start(attempt);let result=null,cleanup;
+ try{
+  await ctx.negotiate();
+  if(index===2){
+   const before=await ctx.states();for(const kind of ['old-session','missing','checksum','unknown']){await ctx.clients[0].call('evaluate','Snapshot13.wire.testInvalid('+JSON.stringify(kind)+')');await pause(150);}
+   const rejected=await ctx.states();assert.equal(rejected.guest.world.applied,false);assert.equal(rejected.guest.world.worldDigest,before.guest.world.worldDigest);for(const code of ['WIRE_CONTEXT','MISSING_CHUNKS','CHECKSUM_MISMATCH','UNSUPPORTED_ENTITY'])assert.ok(rejected.guest.wire.receiver.rejectionCodes.includes(code));
+  }
+  await ctx.clients[0].call('evaluate','document.getElementById("snapshot13-send").click();true');
+  let states=await ctx.wait(value=>value.host.wire.ack&&value.guest.world.applied,10000);
+  assert.equal(states.host.world.sha256,states.guest.world.sha256);assert.equal(states.host.wire.ack.sha256,states.guest.world.sha256);assert.equal(states.guest.wire.receiver.receipt.bytes,states.host.wire.ack.bytes);
+  for(const role of ['host','guest']){controller.assertSafe(states[role],role,attempt,'automated');assert.equal(states[role].world.entities,3);assert.equal(states[role].world.nativeTypes,true);assert.equal(states[role].wire.path.path,'direct');}
+  if(index===1){
+   const before=states,started=Date.now();
+   while(Date.now()-started<20500||Object.values(states).some(state=>state.guard.saveTimes.length<2)){await pause(500);states=await ctx.states();if(Date.now()-started>30000)throw Error('AUTOSAVE_PROOF_TIMEOUT');}
+   for(const role of ['host','guest']){assert.equal(states[role].world.worldDigest,before[role].world.worldDigest);assert.ok(states[role].world.frames>before[role].world.frames+20);assert.ok(states[role].world.cycles>before[role].world.cycles);const times=states[role].guard.saveTimes;assert.ok(times[1]-times[0]>=9500);assert.ok(states[role].guard.audit.memoryPut>=2);}
+   await ctx.clients[0].call('screenshot','snapshot');await ctx.clients[1].call('screenshot','snapshot');
+  }
+  if(index===2){await ctx.clients[0].call('evaluate','Snapshot13.wire.testInvalid("duplicate")');await pause(150);const after=await ctx.states();assert.equal(after.guest.world.worldDigest,states.guest.world.worldDigest);assert.ok(after.guest.wire.receiver.rejectionCodes.includes('ALREADY_APPLIED'));states=after;}
+  if(index===3){
+   const before=states;
+   await ctx.clients[1].call('evaluate',`(()=>{const g=DEBUG;g.processE();g.processQ();g.processClick();g.addEntity('pump',[10,10]);g.clearCell([0,0]);g.relocate(g.stuff[0],[10,10]);g.simulateIdleTime(800000);g.updateGamepad(16);g.mouse.state=1;g.hoveredEntity=g.stuff.find(e=>e.name==='silo');g.processDown();g.processMove();g.processUp();g.hoveredEntity.refill();window.dispatchEvent(new KeyboardEvent('keydown',{code:'KeyE',bubbles:true}));window.dispatchEvent(new KeyboardEvent('keydown',{code:'KeyW',bubbles:true}));return true;})()`);
+   await pause(250);await ctx.clients[1].call('evaluate',`window.dispatchEvent(new KeyboardEvent('keyup',{code:'KeyW',bubbles:true}));document.getElementById('snapshot13-menu').click();true`);
+   states=await ctx.states();assert.notDeepEqual(states.guest.world.camera,before.guest.world.camera);assert.deepEqual(states.host.world.camera,before.host.world.camera);assert.equal(states.guest.world.menuOpen,true);assert.equal(states.host.world.menuOpen,false);assert.equal(states.guest.world.worldDigest,before.guest.world.worldDigest);assert.ok(states.guest.world.blocked>before.guest.world.blocked);
+   const proof=await ctx.clients[1].call('evaluate',`(async()=>{const c=CattailP2PEarlySession,g=DEBUG;const raw=await c.testRawStoreWrite();let denied=0;for(const channel of ['save','store','achieve','updateStat','updateAccumulatedPlaytime','reset']){if(g.spaceport.send(channel,{})===false)denied++;if(await g.spaceport.invoke(channel,{})===false)denied++;}try{localStorage.setItem('outside-snapshot-schema','x');}catch(e){denied++;}return {raw,denied};})()`);assert.equal(proof.raw,true);assert.equal(proof.denied,13);
+   await ctx.clients[1].call('evaluate',`document.getElementById('snapshot13-menu').click();true`);
+  }
+  if(index===4||index===5){const client=ctx.clients[index===4?1:0],proof=path.join(ctx.dir,client.role+'-native-quit.json');await client.call('evaluate',quitCode(proof));const end=Date.now()+8000;while(!client.lifecycle.closing&&!client.exited&&Date.now()<end)await pause(100);assert.ok(client.lifecycle.closing||client.exited);const native=read(proof);assert.ok(native.memoryAfter>native.memoryBefore);assert.ok(native.storeAfter>native.storeBefore);assert.equal(native.quitDenied,0);assert.equal(native.errors,0);assert.equal(native.physicalMutation,0);}
+  if(index===6){await ctx.clients[1].call('reload').catch(()=>{});const end=Date.now()+8000;while(!ctx.clients[1].exited&&Date.now()<end)await pause(100);assert.equal(ctx.clients[1].lifecycle.reloading,true);assert.equal(ctx.clients[1].exited,true);}
+  if(index===7){for(const client of ctx.clients)client.child.disconnect();const end=Date.now()+8000;while(ctx.clients.some(client=>!client.exited)&&Date.now()<end)await pause(100);assert.ok(ctx.clients.every(client=>client.exited));}
+  if(index<4)states=await ctx.states();
+  for(const role of ['host','guest'])controller.assertSafe(states[role],role,attempt,'automated');
+  for(const client of ctx.clients)if(!client.exited&&!client.lifecycle.closing){const summary=await client.call('summary');assert.equal(summary.pathsConfined,true);assert.equal(summary.counters.realCloudCalls,0);assert.equal(summary.counters.realSteamInitializations,0);assert.equal(summary.counters.externalCompleted,0);}
+  result={attempt,case:index,status:'PASS',instances:Object.fromEntries(Object.entries(states).map(([role,state])=>[role,controller.cleanStatus(state)]))};
+ }catch(error){result={attempt,case:index,status:'FAIL',error:error.message};throw error;}
+ finally{cleanup=await ctx.stop();result={...result,cleanup};write(path.join(ctx.dir,'automated-case.json'),result);}
+ assert.equal(cleanup.ok,true);return result;
+}
+async function run(){
+ const pureCount=await pure();let cases=[];
+ if(process.argv.includes('--live')){
+  for(let index=1;index<=7;index++){const attempt=String(Number(process.env.SNAPSHOT_CASE_START||1)+index-1).padStart(3,'0');console.log('START live '+attempt+' case '+index);const result=await liveCase(attempt,index);cases.push({attempt,case:index,status:'PASS',cleanup:result.cleanup});console.log('PASS live '+attempt+' case '+index);}
+  controller.prior();controller.assertPrepared();write(path.join(ROOT,'verification.json'),{approval:'18A',status:'AUTO_PASS',pureCount,liveCount:cases.length,total:pureCount+cases.length,cases,playerFeedback:'PENDING'});
+ }
+ console.log('SNAPSHOT_VERIFY='+pureCount+' pure + '+cases.length+' live');return {pureCount,cases};
+}
+module.exports={sample,pure,liveCase,run};
+if(require.main===module)run().catch(error=>{console.error(error.stack);process.exitCode=1;});

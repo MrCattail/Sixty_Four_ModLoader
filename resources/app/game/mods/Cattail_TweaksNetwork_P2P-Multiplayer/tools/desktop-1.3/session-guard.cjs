@@ -2,8 +2,11 @@
 module.exports.install=function(window,config,ipcRenderer){
 const {indexedDB,IDBDatabase,IDBObjectStore,IDBKeyRange,Storage,localStorage,navigator}=window;
 const rawIpc={send:ipcRenderer.send.bind(ipcRenderer),invoke:ipcRenderer.invoke.bind(ipcRenderer),sendSync:ipcRenderer.sendSync.bind(ipcRenderer)};
-if(!['host','guest'].includes(config.role)||config.identity!=='P2P_SYNTHETIC_'+config.role.toUpperCase()+'_13')throw Error('INVALID_IDENTITY');
-const {ROOT}=require('./fixtures.cjs');if(require('path').resolve(config.root)!==ROOT)throw Error('INVALID_ROOT');
+if(!['host','guest'].includes(config.role))throw Error('INVALID_IDENTITY');
+const {ROOT,PLAYER_ROOT,FOUR_ROOT,config:makeConfig}=require('./fixtures.cjs');if(require('path').resolve(config.root)!==ROOT)throw Error('INVALID_ROOT');
+const expected=ROOT===FOUR_ROOT?makeConfig(config.role,config.attempt,config.mode,config.instance):null;
+if(config.identity!==(expected?.identity||'P2P_SYNTHETIC_'+config.role.toUpperCase()+'_13'))throw Error('INVALID_IDENTITY');
+if(expected&&(require('path').resolve(config.profile)!==expected.profile||config.sessionId!==expected.sessionId))throw Error('INVALID_FOUR_CONTEXT');
 const DB='sixtyfour_warehouse',STORE='charps_memory_slots',ID=config.identity;
 const prefKey='abstractv03_preferences'+ID;
 const progressKeys=new Set(['abstractv03'+ID,'abstractv03_permanents'+ID,'abstractv03_glory'+ID,'sixtyfourabsoluteslocal']);
@@ -103,6 +106,7 @@ Storage.prototype.removeItem=function(key){
 };
 Storage.prototype.clear=function(){if(enabled)throw error('STORAGE_CLEAR_BLOCKED');return rawStorage.clear.call(this);};
 const privateChannels=new Set(['getMyStuff','gameError']);
+if(config.mode==='manual'&&[PLAYER_ROOT,FOUR_ROOT].includes(ROOT))privateChannels.add('quit');
 const privateInvokes=new Set(['modloader:snapshots:activate','modloader:app-window','modloader:libraries:runtime','modloader:snapshots:runtime','modloader:clear-view-probe']);
 function ipcDenied(kind,channel){audit.ipcDenied++;const key=kind+':'+channel;audit.ipcByChannel[key]=(audit.ipcByChannel[key]||0)+1;}
 ipcRenderer.send=function(channel,...args){if(!privateChannels.has(channel)){ipcDenied('send',channel);return false;}return rawIpc.send(channel,...args);};
@@ -123,7 +127,7 @@ function validate(options={}){
  if(config.protocol!=='p2p-desktop-13-v1'||config.expectedVersion!=='1.3'||config.localOnly!==true)throw error('INVALID_EARLY_CONTEXT');
  if(options.role&&options.role!==config.role)throw error('EARLY_ROLE_MISMATCH');
  if(options.testRoot&&require('path').resolve(options.testRoot)!==require('path').resolve(config.root))throw error('EARLY_ROOT_MISMATCH');
- if(options.sessionId&&options.sessionId!=='desktop13-'+config.attempt)throw error('EARLY_SESSION_MISMATCH');
+ if(options.sessionId&&options.sessionId!==(config.sessionId||'desktop13-'+config.attempt))throw error('EARLY_SESSION_MISMATCH');
  return true;
 }
 validate();

@@ -7,10 +7,9 @@ const vm = require('node:vm')
 
 const loaderPath = path.resolve(__dirname, '..', 'loader.js')
 const readmePath = path.resolve(__dirname, '..', 'README.md')
-const translationsPath = path.resolve(__dirname, '..', 'translations.json')
 const source = fs.readFileSync(loaderPath, 'utf8')
 const readme = fs.readFileSync(readmePath, 'utf8')
-const translations = JSON.parse(fs.readFileSync(translationsPath, 'utf8'))
+const translations = require('./helpers/translation-contract-fixtures.js').loadTranslationFixture()
 
 assert.match(source, /version: '0\.5\.0'/)
 assert.match(source, /const SHORTCUT_API_VERSION = 1/)
@@ -20,6 +19,8 @@ assert.match(source, /const registerShortcut = function/)
 assert.match(source, /const updateShortcut = function/)
 assert.match(source, /const unregisterShortcut = function/)
 assert.match(source, /const createUiShortcutsApi = function/)
+assert.match(source, /allowSharedCombination/)
+assert.match(source, /Potential shortcut overlap/)
 assert.match(source, /const renderShortcutPanel = function/)
 assert.match(source, /const refreshShortcutLayout = function/)
 assert.match(source, /const shortcutMutationAffectsLayout = function/)
@@ -82,6 +83,8 @@ assert.match(readme, /Inactive main-button regions blend into the white body/)
 assert.match(readme, /external side buttons remain white and outlined until `Mouse3` or\s+`Mouse4` fills\s+the corresponding button yellow/)
 assert.match(readme, /Mouse interactions outside the list do not\s+close it/)
 assert.match(readme, /`Esc` is not handled by the\s+shortcut list and remains available to the game without changing the list's open\s+state/)
+assert.match(readme, /`allowSharedCombination: true`/)
+assert.match(readme, /both registrations/)
 
 const shortcutUiLifecycleSource = source.slice(source.indexOf('const ensureShortcutUi = function'), source.indexOf('const refreshShortcutUi = function'))
 assert.ok(shortcutUiLifecycleSource, 'Shortcut UI lifecycle source exists')
@@ -153,6 +156,12 @@ const fakeDocument = {
 	querySelector() { return null }
 }
 
+const animationFrames = []
+let animationFrameId = 1
+const flushAnimationFrames = function () {
+	while (animationFrames.length) animationFrames.shift()()
+}
+
 const sandbox = {
 	window: {
 		addEventListener() {},
@@ -167,7 +176,7 @@ const sandbox = {
 	console: { log() {}, warn() {} },
 	performance: { now() { return 0 } },
 	localStorage: { getItem() { return null }, setItem() {} },
-	requestAnimationFrame() { return 1 },
+	requestAnimationFrame(callback) { animationFrames.push(callback); return animationFrameId++ },
 	cancelAnimationFrame() {},
 	setTimeout,
 	clearTimeout,
@@ -227,15 +236,82 @@ assert.deepEqual(
 )
 
 const betaApi = modLoader.forMod('beta').ui.shortcuts
+let betaActive = false
+let betaVisible = true
 const duplicateCombo = betaApi.register({
 	id: 'more-info',
 	keys: [ 'Shift', 'Space' ],
 	description: 'More information',
+	visible: () => betaVisible,
+	active: () => betaActive,
 	source: 'game',
 	category: { id: 'editor', label: 'Different category', order: 99 }
 })
 assert.equal(modLoader.state.shortcutEntries['beta:more-info'].source, 'mod', 'a public Mod cannot spoof a reserved source')
-assert.ok(modLoader.state.shortcutDiagnostics.some(item => item.code === 'duplicate-combination'))
+flushAnimationFrames()
+assert.equal(modLoader.state.shortcutDiagnostics.some(item => item.code === 'duplicate-combination'), false, 'inactive duplicate combinations do not warn')
+
+betaActive = true
+betaVisible = false
+betaApi.refresh()
+flushAnimationFrames()
+assert.equal(modLoader.state.shortcutDiagnostics.some(item => item.code === 'duplicate-combination'), false, 'hidden duplicate combinations do not warn')
+
+betaVisible = true
+modLoader.state.shortcutSettings.enabled = false
+modLoader.state.shortcutSettings.mods.beta = false
+betaApi.refresh()
+flushAnimationFrames()
+const activeOverlap = modLoader.state.shortcutDiagnostics.find(item => item.code === 'duplicate-combination')
+assert.ok(activeOverlap, 'simultaneously visible and active combinations warn')
+assert.match(activeOverlap.message, /Potential shortcut overlap/)
+assert.match(activeOverlap.message, /Shift\+Space/)
+assert.match(activeOverlap.message, /alpha:open-editor/)
+assert.match(activeOverlap.message, /beta:more-info/)
+modLoader.state.shortcutSettings.enabled = true
+modLoader.state.shortcutSettings.mods.beta = true
+
+const gammaApi = modLoader.forMod('gamma').ui.shortcuts
+const deltaApi = modLoader.forMod('delta').ui.shortcuts
+const partialAlternative = gammaApi.register({
+	id: 'partial-alternative',
+	keys: [['Ctrl', 'Y'], ['Meta', 'Y']],
+	description: 'Partial alternative'
+})
+const reorderedChord = deltaApi.register({
+	id: 'reordered-chord',
+	keys: ['Y', 'Ctrl'],
+	description: 'Reordered chord'
+})
+flushAnimationFrames()
+assert.ok(modLoader.state.shortcutDiagnostics.some(item => item.code === 'duplicate-combination' && item.message.includes('Ctrl+Y') && item.message.includes('gamma:partial-alternative') && item.message.includes('delta:reordered-chord')), 'individual alternatives and modifier order are compared canonically')
+
+const sharedOne = gammaApi.register({
+	id: 'shared-one',
+	keys: 'F6',
+	description: 'Shared one',
+	allowSharedCombination: true
+})
+const sharedTwo = deltaApi.register({
+	id: 'shared-two',
+	keys: 'F6',
+	description: 'Shared two',
+	allowSharedCombination: true
+})
+const oneSidedOne = gammaApi.register({
+	id: 'one-sided-one',
+	keys: 'F7',
+	description: 'One-sided one',
+	allowSharedCombination: true
+})
+const oneSidedTwo = deltaApi.register({
+	id: 'one-sided-two',
+	keys: 'F7',
+	description: 'One-sided two'
+})
+flushAnimationFrames()
+assert.equal(modLoader.state.shortcutDiagnostics.some(item => item.code === 'duplicate-combination' && item.message.includes('F6')), false, 'both registrations may explicitly allow a shared combination')
+assert.ok(modLoader.state.shortcutDiagnostics.some(item => item.code === 'duplicate-combination' && item.message.includes('F7')), 'one-sided shared-combination permission does not suppress the warning')
 
 const invalid = alphaApi.register({ id: 'unsafe', keys: '<script>', description: 'Unsafe' })
 assert.equal(invalid.update({ description: 'Still inert' }), false)
@@ -245,6 +321,12 @@ assert.equal(modLoader.state.shortcutEntries['alpha:unsafe'], undefined)
 assert.equal(duplicateCombo.unregister(), true)
 assert.equal(pointerPreview.unregister(), true)
 assert.equal(replacement.unregister(), true)
+assert.equal(partialAlternative.unregister(), true)
+assert.equal(reorderedChord.unregister(), true)
+assert.equal(sharedOne.unregister(), true)
+assert.equal(sharedTwo.unregister(), true)
+assert.equal(oneSidedOne.unregister(), true)
+assert.equal(oneSidedTwo.unregister(), true)
 assert.equal(Object.keys(modLoader.state.shortcutEntries).length, 0)
 
 console.log('Shortcut API v1 contract passed: ownership, normalization, generation-safe handles, diagnostics, UI structure, documentation, and 20 languages.')

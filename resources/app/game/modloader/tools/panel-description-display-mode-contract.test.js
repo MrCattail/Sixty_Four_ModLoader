@@ -6,9 +6,8 @@ const path = require('node:path')
 const vm = require('node:vm')
 
 const loaderPath = path.resolve(__dirname, '..', 'loader.js')
-const translationsPath = path.resolve(__dirname, '..', 'translations.json')
 const source = fs.readFileSync(loaderPath, 'utf8')
-const translations = JSON.parse(fs.readFileSync(translationsPath, 'utf8'))
+const translations = require('./helpers/translation-contract-fixtures.js').loadTranslationFixture()
 
 assert.match(source, /panelSettings: \{[^}]*descriptionDisplayMode: 'hover'[^}]*\}/)
 assert.match(source, /const isValidPanelDescriptionDisplayMode = function \(value\) \{[\s\S]*?return value === 'hover' \|\| value === 'inline'[\s\S]*?\}/)

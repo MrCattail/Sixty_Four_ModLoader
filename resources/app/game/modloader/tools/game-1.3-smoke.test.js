@@ -16,7 +16,7 @@ const protectedFiles = [...core, 'resources/app/game/mods/enabled.json', 'modloa
 const hash = file => crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex')
 const baseline = Object.fromEntries(protectedFiles.map(file => [file, hash(path.join(source, file))]))
 const copy = (from, to) => { fs.mkdirSync(path.dirname(to), { recursive: true }); fs.copyFileSync(from, to) }
-const restoreManifest = JSON.parse(fs.readFileSync(path.join(source, 'Codex-md/development_restore_20261003.json'), 'utf8').replace(/^\uFEFF/, ''))
+const restoreManifest = JSON.parse(fs.readFileSync(path.join(__dirname, 'development_restore_20261003.json'), 'utf8').replace(/^\uFEFF/, ''))
 const modHashes = restoreManifest.Files.filter(file => file.Path.startsWith('resources/app/game/mods/')).map(file => ({ path: file.Path, hash: hash(path.join(source, file.Path)) }))
 
 function treeHashes(dir) {

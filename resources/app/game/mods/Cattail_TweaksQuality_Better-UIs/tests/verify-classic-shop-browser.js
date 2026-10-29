@@ -124,12 +124,22 @@ async function main() {
 			await page.locator('[data-classic-item="pump"]').click()
 			assert.deepEqual(await page.evaluate(() => ({ picks: game.picks, world: game.worldClicks })), { picks: ['pump'], world: 0 })
 		})
-		await check('classic minimize and shared corner dock', async () => {
+		await check('classic hides only descriptions including new buildings and restores them', async () => {
+			const card = page.locator('[data-classic-item="pump"]')
+			await card.evaluate(el => el.classList.add('newItem'))
+			assert.equal(await card.locator('.itemDescription').isVisible(), true)
 			await page.locator('.cattail-classic-size-toggle').click()
 			assert.equal(await page.locator('.cattail-classic-shop').evaluate(el => el.classList.contains('minimized')), true)
-			assert.equal(await page.locator('[data-classic-item="pump"] .imageVessel').isVisible(), false)
+			for (const selector of ['.imageVessel', '.itemHeader', '.itemPrice']) {
+				assert.equal(await card.locator(selector).isVisible(), true, selector)
+			}
+			assert.equal(await card.locator('.itemDescription').isVisible(), false)
+			await card.evaluate(el => el.classList.remove('newItem'))
+			assert.equal(await card.locator('.itemDescription').isVisible(), false)
 			assert.equal(await page.locator('.modloader-ui-dock .cattail-classic-size-toggle').count(), 1)
 			await page.locator('.cattail-classic-size-toggle').click()
+			assert.equal(await card.locator('.itemDescription').isVisible(), true)
+			assert.equal(await card.locator('.imageVessel').isVisible(), true)
 		})
 		await check('compact eight-category toggle and native controls stay separate', async () => {
 			await page.locator('.cattail-shop-compact-toggle').click()
@@ -140,6 +150,16 @@ async function main() {
 			assert.equal(await page.evaluate(() => game.store.isOpen), true)
 			await page.locator('[data-shop-item="pump"]').click()
 			assert.deepEqual(await page.evaluate(() => game.picks), ['pump', 'pump'])
+		})
+		await check('description toggle preserves compact category icons names prices and purchase', async () => {
+			const row = page.locator('[data-shop-item="pump"]')
+			for (const hidden of [true, false]) {
+				await page.locator('.cattail-classic-size-toggle').click()
+				assert.equal(await page.locator('.cattail-classic-shop').evaluate(el => el.classList.contains('minimized')), hidden)
+				for (const selector of ['.cattail-shop-category-item-icon', '.cattail-shop-category-item-name', '.itemPrice']) {
+					assert.equal(await row.locator(selector).isVisible(), true, selector)
+				}
+			}
 		})
 		await check('unaffordable rows remain inspectable and cannot purchase', async () => {
 			await page.evaluate(() => { game.resources = Array(10).fill(0); game.store.visibilityUpdate() })

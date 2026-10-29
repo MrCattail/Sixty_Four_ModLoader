@@ -218,11 +218,28 @@ async function run() {
 		assert.deepEqual((await store.list(context(), { area: 'cache', bucket: 'thumbnails' })).map(item => item.name), ['two.png'])
 
 		const events = []
-		const watch = await store.watch(context(), event => events.push(event))
+		let resolveNotification
+		const notification = new Promise(resolve => { resolveNotification = resolve })
+		const watch = await store.watch(context(), event => {
+			events.push(event)
+			resolveNotification()
+		})
 		assert.ok(watcherCallback)
 		watcherCallback('change', '.cache\\thumbnails\\two.png')
 		watcherCallback('change', restored.name)
-		await new Promise(resolve => setTimeout(resolve, 30))
+		// Wait for delivery rather than assuming filesystem checks finish in 30ms.
+		// Keep a hard failure if the watcher never delivers the notification.
+		let notificationTimeout
+		try {
+			await Promise.race([
+				notification,
+				new Promise((resolve, reject) => {
+					notificationTimeout = setTimeout(() => reject(new Error('Library watch notification timed out after 5000ms')), 5000)
+				})
+			])
+		} finally {
+			clearTimeout(notificationTimeout)
+		}
 		assert.equal(events.length, 1)
 		assert.deepEqual(events[0].names, [restored.name])
 		watch.close()

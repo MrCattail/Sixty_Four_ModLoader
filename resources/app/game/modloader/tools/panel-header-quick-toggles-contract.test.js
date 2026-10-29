@@ -6,9 +6,8 @@ const path = require('node:path')
 const vm = require('node:vm')
 
 const loaderPath = path.resolve(__dirname, '..', 'loader.js')
-const translationsPath = path.resolve(__dirname, '..', 'translations.json')
 const source = fs.readFileSync(loaderPath, 'utf8')
-const translations = JSON.parse(fs.readFileSync(translationsPath, 'utf8'))
+const translations = require('./helpers/translation-contract-fixtures.js').loadTranslationFixture()
 
 const quickToggleHelpers = source.match(/\tconst getPanelThemeQuickToggle = function \(\) \{[\s\S]*?\n\t\}(?=\n\n\tconst clearPanelAutoHideTimer)/)
 assert.ok(quickToggleHelpers, 'panel quick-toggle state helpers exist before auto-hide timer management')

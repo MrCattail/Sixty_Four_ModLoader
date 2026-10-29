@@ -4,7 +4,7 @@ const fs = require('node:fs')
 const path = require('node:path')
 const vm = require('node:vm')
 const loader = fs.readFileSync(path.resolve(__dirname, '../loader.js'), 'utf8')
-const manifest = JSON.parse(fs.readFileSync(path.resolve(__dirname, '../../mods/Cattail_TweaksQuality_Tweaks/mod.json'), 'utf8'))
+const manifest = JSON.parse(fs.readFileSync(path.resolve(__dirname, 'fixtures/config-identifier-v0.5.0.json'), 'utf8'))
 const modId = manifest.id
 const storageKey = key => `modloader:${modId}:config:${key}`
 const panelKey = 'modloader:panelState'

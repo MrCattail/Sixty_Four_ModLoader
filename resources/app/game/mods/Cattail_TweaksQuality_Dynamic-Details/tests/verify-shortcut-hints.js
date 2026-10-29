@@ -102,6 +102,11 @@ async function main() {
 			assert.equal(await page.evaluate(() => ddEntries().length), 18)
 			assert.equal(await page.evaluate(() => new Set(ddEntries().map(e => e.category.id)).size), 1)
 			assert.deepEqual(await page.evaluate(() => ddEntries().map(e => e.order)), Array.from({ length: 18 }, (_, i) => i + 1))
+			assert.deepEqual(await page.evaluate(() => ddEntries().filter(e => e.allowSharedCombination).map(e => e.id)), [
+				'building-hold', 'building-pin', 'opacity-wheel', 'opacity-scope',
+				'resource-hold', 'resource-pin', 'line-lock', 'coordinates-hold',
+				'teleport-close', 'directions-hold', 'directions-pin'
+			])
 			await page.locator('#modloader-shortcut-button').click()
 			await page.waitForFunction(() => document.querySelectorAll('.modloader-shortcut-row').length === 18)
 			assert.ok(await page.locator('.modloader-shortcut-context').count() > 0)
@@ -239,6 +244,8 @@ async function main() {
 			assert.deepEqual(errors, [])
 			const issues = await page.evaluate(() => ModLoader.state.shortcutDiagnostics.filter(d => /invalid|text-error|visible-error|active-error|category-conflict/.test(d.code)))
 			assert.deepEqual(issues, [])
+			const overlaps = await page.evaluate(() => ModLoader.state.shortcutDiagnostics.filter(d => d.code === 'duplicate-combination'))
+			assert.deepEqual(overlaps, [])
 		})
 		fs.writeFileSync(path.join(output, 'report.json'), JSON.stringify({ passed: results.length, results, browser: browser.version(), output }, null, 2))
 		console.log(JSON.stringify({ passed: results.length, output }))

@@ -110,7 +110,7 @@
       "enableExclusiveAudio": true,
       "trySupportedChannelLayouts": true,
       "disableOutOfProcessAudioService": true,
-      "enableChromiumAudioLog": true
+      "enableChromiumAudioLog": false
     }
   }
 }

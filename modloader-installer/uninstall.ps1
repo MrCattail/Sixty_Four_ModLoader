@@ -6,6 +6,7 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'filesystem.ps1')
 
 function Resolve-GameRoot {
 	param([string]$Path)
@@ -27,9 +28,7 @@ function Resolve-GameRoot {
 function New-DirectoryIfMissing {
 	param([string]$Path)
 
-	if (-not (Test-Path -LiteralPath $Path)) {
-		New-Item -ItemType Directory -Force -Path $Path | Out-Null
-	}
+	New-InstallerDirectory $Path
 }
 
 if (-not $ConfirmUninstall) {
@@ -62,14 +61,14 @@ foreach ($file in $manifest.files) {
 	$target = Join-Path $targetRoot $file.relativePath
 	if ($file.exists) {
 		$source = Join-Path $backupPath $file.relativePath
-		if (-not (Test-Path -LiteralPath $source)) {
+		if (-not (Test-InstallerPath $source)) {
 			throw "Backup file missing: $source"
 		}
 		New-DirectoryIfMissing -Path (Split-Path -Parent $target)
-		Copy-Item -LiteralPath $source -Destination $target -Force
+		Copy-InstallerFile $source $target
 		Write-Host "Restored $($file.relativePath)"
-	} elseif (Test-Path -LiteralPath $target) {
-		Remove-Item -LiteralPath $target -Force
+	} elseif (Test-InstallerPath $target) {
+		Remove-InstallerFile $target
 		Write-Host "Removed installed file $($file.relativePath)"
 	}
 }
@@ -77,7 +76,8 @@ foreach ($file in $manifest.files) {
 if ($RemoveModloaderFiles) {
 	$modloaderPath = Join-Path $targetGame 'modloader'
 	if (Test-Path -LiteralPath $modloaderPath) {
-		Remove-Item -LiteralPath $modloaderPath -Recurse -Force
+		$cleanupPath = Assert-InstallerChildPath $targetGame $modloaderPath
+		Remove-InstallerDirectory $cleanupPath
 		Write-Host "Removed $modloaderPath"
 	}
 }

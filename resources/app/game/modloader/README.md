@@ -199,9 +199,9 @@ integration if fully reverting; never overwrite later edits with whole backups.
 Validation: tools/clear-view-probe-contract.test.js,
 tools/clear-view-ablation-contract.test.js and tools/clear-view-grid-contract.test.js,
 plus the existing LoaderOnly suite and isolated Electron tests. Player profiling
-and performance fixes remain separate. Chinese grid protocol instructions:
-Codex-md/clear_view_grid_probe_20261006.md; earlier modes:
-Codex-md/clear_view_probe_20261006.md.
+and performance fixes remain separate. Historical grid-protocol findings and
+earlier modes are summarized in Codex-md/progress_RenderAPI.md#doc-cleanup-20261028-render;
+the one-off capture instructions were removed after completion.
 
 ## Storage Snapshot API
 
@@ -442,6 +442,7 @@ const shortcut = api.ui.shortcuts.register({
   },
   visible: () => api.config.get('enabled', true),
   active: () => !document.querySelector('.splash'),
+  allowSharedCombination: true,
   context: { en: 'Available during gameplay', sch: '在游戏中可用' }
 })
 
@@ -485,8 +486,16 @@ wheel yellow, and wheel directions add the dark arrow inside that yellow region.
 The target region uses the same yellow accent as the keycap bottom edge; the
 token remains available through the element's accessible label and title
 without visible `Mouse1`/`WheelUp` text.
-The same combination may be displayed by multiple entries and only produces a
-diagnostic warning.
+Potential overlaps are checked per normalized chord, so modifier order does not
+matter and one matching alternative is enough. A `duplicate-combination`
+diagnostic is recorded only while both registrations' own `visible` and `active`
+values resolve true. Hiding shortcut hints globally or for one Mod changes only
+the display and does not disable the Mod's real control or this overlap check.
+Two registrations may deliberately share a chord by both setting
+`allowSharedCombination: true`; one-sided permission does not suppress the
+warning. A true warning identifies the normalized combination and both
+`modId:id` registrations. ModLoader still never executes, blocks, or remaps the
+underlying controls.
 
 `description`, `context`, and `category.label` accept a plain string, a locale
 map, or a function returning either. `visible: false` hides a feature that is
@@ -1158,7 +1167,7 @@ The fixed enabled Better UIs independent-auto-save.js entry is loaded before nat
 
 The private tweaks-save-policy-v2 protocol uses the existing trusted main-window channel. Begin returns a token and record references, never requests a full renderer seed. Commits contain only changed slot descriptors and new current/history records. Better UIs owns snapshot isolation, local IDB completion, explicit cloud checkpoints and retries, content checksums, the two-file auto ring and publish-last index. Ten-second autosaves, four-minute source histories and opening Save Slots stay local; explicit save/collection actions and menu Quit submit the pending changes. No enabled-policy error falls back to a full collection. The cloud reader reconstructs the legacy charpsMemory baseline plus the optional delta index even when the setting is off. Disabling/reloading restores native saves; an updated native baseline supersedes the older delta index. New delta data requires this reader.
 
-Better UIs service v1 keeps source.index/activeIndex tied to the verified physical working auto slot; its source name describes the played manual slot. Manual entry receipts keep manual indices. This ownership migration requires a full Electron restart; later setting changes require save and reload. Current validation and player/Steam limitations are recorded in Codex-md/progress_BetterUI.md; Codex-md/save_policy_20261020.md retains the original implementation history.
+Better UIs service v1 keeps source.index/activeIndex tied to the verified physical working auto slot; its source name describes the played manual slot. Manual entry receipts keep manual indices. This ownership migration requires a full Electron restart; later setting changes require save and reload. Current validation and player/Steam limitations are recorded in Codex-md/progress_BetterUI.md; Codex-md/progress_BetterUI.md#doc-cleanup-20261028-save retains the original implementation history.
 
 ## 一次性启动分层探针（默认关闭）
 

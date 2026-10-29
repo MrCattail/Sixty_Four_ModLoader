@@ -22,6 +22,11 @@ ModLoader.register({
 			const state = () => core.getShortcutState(currentGame)
 			const locale = () => texts[currentGame?.language] || texts.en
 			const category = { id: 'dynamic-details-information', label: () => locale().category, order: 30 }
+			const sharedCombinationIds = new Set([
+				'building-hold', 'building-pin', 'opacity-wheel', 'opacity-scope',
+				'resource-hold', 'resource-pin', 'line-lock', 'coordinates-hold',
+				'teleport-close', 'directions-hold', 'directions-pin'
+			])
 			const entries = [
 				['building-hold', ['Alt', 'Shift'], 'building', s => s.buildingContext, 0],
 				['building-pin', ['Ctrl', 'Alt'], 'building', s => s.buildingContext && !s.hoveredResource, 0],
@@ -45,6 +50,7 @@ ModLoader.register({
 			entries.forEach(([id, keys, feature, available, context], index) => {
 				handles.push(shortcuts.register({
 					id, keys, order: index + 1, category,
+					allowSharedCombination: sharedCombinationIds.has(id),
 					description: () => locale().labels[index],
 					context: () => locale().contexts[context],
 					visible: () => { const s = state(); return s[feature] && (id !== 'opacity-scope' || s.building) },
