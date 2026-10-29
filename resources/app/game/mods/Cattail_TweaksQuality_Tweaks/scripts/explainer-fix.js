@@ -2,14 +2,13 @@
 	const MOD_ID = 'Cattail_TweaksQuality_Tweaks'
 	const configKey = 'enableExplainerFix'
 	const legacyConfigKey = 'enableExplainerLanguageFix'
-	const installedKey = '__cattailExplainerFixInstalled'
+	const installedKey = '__cattailTweaksExplainerFixInstalled'
 	const styleId = 'cattail-explainer-fix-style'
 	const voidClass = 'cattail-explainer-void'
 
 	ModLoader.register({
 		id: MOD_ID,
 		init(api) {
-			migrateLegacyExplainerConfig(api)
 			api.on('afterVanillaScripts', function () {
 				installExplainerFix(api)
 			})
@@ -17,17 +16,18 @@
 	})
 
 	function installExplainerFix(api) {
-		if (window[installedKey] || typeof Game === 'undefined' || typeof Explainer === 'undefined') return
+		const ExplainerType = typeof DesktopExplainer !== 'undefined' ? DesktopExplainer : typeof Explainer !== 'undefined' ? Explainer : null
+		if (window[installedKey] || typeof Game === 'undefined' || !ExplainerType) return
 		window[installedKey] = true
 		ensureExplainerFixStyle()
 
-		Explainer.prototype.refreshLanguage = function () {
+		ExplainerType.prototype.refreshLanguage = function () {
 			if (!isExplainerFixEnabled(api) || !this.state || this.finished || !this.stuff?.[this.next]) return
 			this.element.innerHTML = this.master.pronounce('explainer', this.next)
 			updateExplainerTheme(this, api)
 		}
 
-		api.patch(Explainer.prototype, 'update', function (original) {
+		api.patch(ExplainerType.prototype, 'update', function (original) {
 			return function (...args) {
 				const result = original.apply(this, args)
 				updateExplainerTheme(this, api)

@@ -41,12 +41,16 @@ ModLoader.register({
 				return api.config.get('enabled', true) !== false
 			}
 
+			function isEnding() {
+				return !!(game?.pinhole || game?.credits || game?.stats?.gameIsFinished)
+			}
+
 			function snapshot() {
 				const enabled = isEnabled()
 				return {
 					version: '0.1.1',
 					enabled,
-					active: !disposed && enabled && active,
+					active: !disposed && enabled && !isEnding() && active,
 					revision,
 					lastReason,
 					disposed
@@ -68,7 +72,7 @@ ModLoader.register({
 			function transition(next, reason) {
 				if (disposed) return false
 				next = !!next
-				if (next && !isEnabled()) return false
+				if (next && (!isEnabled() || isEnding())) return false
 				if (active === next) return false
 				active = next
 				revision += 1
@@ -82,7 +86,7 @@ ModLoader.register({
 				game,
 				isEnabled,
 				isActive() {
-					if (active && !isEnabled()) transition(false, 'config-disabled')
+					if (active && (!isEnabled() || isEnding())) transition(false, isEnding() ? 'ending' : 'config-disabled')
 					return !disposed && isEnabled() && active
 				},
 				activate(reason) {

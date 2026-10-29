@@ -12,7 +12,10 @@
     "gameLanguage": true
   },
   "entries": [
+    "scripts/classic-shop.js",
     "scripts/shop-categories.js",
+    "scripts/native-accordion-shop.js",
+    "scripts/independent-auto-save.js",
     "scripts/save-slots.js",
     "scripts/language-menu.js",
     "scripts/settings-page.js"
@@ -23,391 +26,739 @@
     "Cattail_TweaksQuality_Shop-Categories"
   ],
   "config": {
+    "shopVersion": {
+      "type": "select",
+      "label": "Shop style version",
+      "default": "1.3",
+      "options": [
+        "1.2.1",
+        "1.3"
+      ],
+      "valueLabels": {
+        "1.2.1": "1.2 shop",
+        "1.3": "1.3 shop"
+      },
+      "description": "Provides shop styles from versions 1.2 and 1.3.",
+      "section": "shopCategories"
+    },
     "enableShopCategories": {
       "type": "boolean",
-      "label": "Shop categories",
+      "label": "Shop building categories [1.2]",
       "default": true,
-      "description": "Show the optional categorized compact building shop view.",
+      "description": "Provides categories for the version 1.2 shop style.",
       "section": "shopCategories"
     },
     "enableSaveSlots": {
       "type": "boolean",
-      "label": "Save slots",
+      "label": "Better save management",
       "default": true,
-      "description": "Show the in-game save-slot page with import and export actions.",
+      "description": "Provides save renaming, copying, deletion, and importing and exporting bundles containing multiple saves.",
+      "section": "saveSlots"
+    },
+    "enableIndependentAutoSave": {
+      "type": "boolean",
+      "label": "Better save logic",
+      "default": true,
+      "description": "Keeps autosaving separate from all save slots instead of directly overwriting the save currently being played.",
       "section": "saveSlots"
     },
     "enableLanguageMenu": {
       "type": "boolean",
-      "label": "Language menu",
+      "label": "Language selection list",
       "default": true,
-      "description": "Use the scrollable language selection page on the splash menu.",
+      "description": "Changes language selection on the main menu to a scrollable list for easier browsing and selection.",
       "section": "languageMenu"
     },
     "enableSettingsPage": {
       "type": "boolean",
       "label": "Settings page",
       "default": true,
-      "description": "Add the in-game settings page to the splash menu.",
+      "description": "Adds an entry to the settings page on the main menu, where various settings can be adjusted conveniently.",
       "section": "settingsPage"
     }
   },
-  "description": "Combines shop categories, save slots, and the language menu into one multi-entry interface quality mod.",
+  "description": "Provides better save management, a language selection list, shop style switching, and a settings page.",
   "reloadOnConfigChange": true,
   "translations": {
     "sch": {
-      "name": "更好的UI界面",
-      "description": "将商店分类、存档栏和语言菜单整合为一个界面优化 mod。",
+      "name": "更好的UI",
+      "description": "提供更好的存档管理、语言选择列表、商店样式切换和设置页面。",
       "config": {
+        "shopVersion": {
+          "label": "商店样式版本",
+          "description": "提供1.2版本和1.3版本的商店样式。",
+          "valueLabels": {
+            "1.2.1": "1.2商店",
+            "1.3": "1.3 商店"
+          }
+        },
         "enableShopCategories": {
-          "label": "商店分类",
-          "description": "可将建筑建造卡的视图切换至可按照分类进行收缩/展开。"
+          "label": "商店建筑分类 [1.2]",
+          "description": "提供1.2版本的商店样式的分类。"
         },
         "enableSaveSlots": {
-          "label": "存档栏",
-          "description": "新增游戏内存档页，并提供导入和导出功能。"
+          "label": "更好的存档管理",
+          "description": "提供存档的改名、复制、删除和导入、导出多存档整合包等功能。"
         },
         "enableLanguageMenu": {
-          "label": "语言菜单",
-          "description": "语言切换功能新增滚动列表。"
+          "label": "语言选择列表",
+          "description": "将主菜单的语言选择改为可滚动列表，方便查看和选择语言。"
         },
         "enableSettingsPage": {
           "label": "设置页面",
-          "description": "在主菜单新增游戏内设置页面。"
+          "description": "在主菜单中提供设置页面的入口，设置页面里可以方便调整各种设置。"
+        },
+        "enableIndependentAutoSave": {
+          "label": "更好的存档逻辑",
+          "description": "将自动存档功能独立于所有存档之外，而不是直接覆盖正在游玩的存档。"
         }
       }
     },
     "modsch": {
-      "name": "更好的UI界面",
-      "description": "将商店分类、存档栏和语言菜单整合为一个界面优化 mod。",
+      "name": "更好的UI",
+      "description": "提供更好的存档管理、语言选择列表、商店样式切换和设置页面。",
       "config": {
+        "shopVersion": {
+          "label": "商店样式版本",
+          "description": "提供1.2版本和1.3版本的商店样式。",
+          "valueLabels": {
+            "1.2.1": "1.2商店",
+            "1.3": "1.3 商店"
+          }
+        },
         "enableShopCategories": {
-          "label": "建筑分类",
-          "description": "可将建筑建造卡的视图切换至可按照分类进行收缩/展开。"
+          "label": "商店建筑分类 [1.2]",
+          "description": "提供1.2版本的商店样式的分类。"
         },
         "enableSaveSlots": {
-          "label": "存档栏",
-          "description": "新增游戏内存档页，并提供导入和导出功能。"
+          "label": "更好的存档管理",
+          "description": "提供存档的改名、复制、删除和导入、导出多存档整合包等功能。"
         },
         "enableLanguageMenu": {
-          "label": "语言菜单",
-          "description": "语言切换功能新增滚动列表。"
+          "label": "语言选择列表",
+          "description": "将主菜单的语言选择改为可滚动列表，方便查看和选择语言。"
         },
         "enableSettingsPage": {
           "label": "设置页面",
-          "description": "在主菜单新增游戏内设置页面。"
+          "description": "在主菜单中提供设置页面的入口，设置页面里可以方便调整各种设置。"
+        },
+        "enableIndependentAutoSave": {
+          "label": "更好的存档逻辑",
+          "description": "将自动存档功能独立于所有存档之外，而不是直接覆盖正在游玩的存档。"
         }
       }
     },
     "en": {
       "name": "Better UIs",
       "config": {
+        "shopVersion": {
+          "label": "Shop style version",
+          "description": "Provides shop styles from versions 1.2 and 1.3.",
+          "valueLabels": {
+            "1.2.1": "1.2 shop",
+            "1.3": "1.3 shop"
+          }
+        },
         "enableShopCategories": {
-          "label": "Shop categories",
-          "description": "Show the optional categorized compact building shop view."
+          "label": "Shop building categories [1.2]",
+          "description": "Provides categories for the version 1.2 shop style."
         },
         "enableSaveSlots": {
-          "label": "Save slots",
-          "description": "Show the in-game save-slot page with import and export actions."
+          "label": "Better save management",
+          "description": "Provides save renaming, copying, deletion, and importing and exporting bundles containing multiple saves."
         },
         "enableLanguageMenu": {
-          "label": "Language menu",
-          "description": "Use the scrollable language selection page on the splash menu."
+          "label": "Language selection list",
+          "description": "Changes language selection on the main menu to a scrollable list for easier browsing and selection."
         },
         "enableSettingsPage": {
-          "label": "Settings page"
+          "label": "Settings page",
+          "description": "Adds an entry to the settings page on the main menu, where various settings can be adjusted conveniently."
+        },
+        "enableIndependentAutoSave": {
+          "label": "Better save logic",
+          "description": "Keeps autosaving separate from all save slots instead of directly overwriting the save currently being played."
         }
       },
-      "description": "Combines shop categories, save slots, and the language menu into one multi-entry interface quality mod."
+      "description": "Provides better save management, a language selection list, shop style switching, and a settings page."
     },
     "ru": {
       "name": "Улучшенный интерфейс",
       "config": {
+        "shopVersion": {
+          "label": "Версия стиля магазина",
+          "description": "Предоставляет стили магазина из версий 1.2 и 1.3.",
+          "valueLabels": {
+            "1.2.1": "Магазин 1.2",
+            "1.3": "Магазин 1.3"
+          }
+        },
         "enableShopCategories": {
-          "label": "Категории магазина"
+          "label": "Категории построек магазина [1.2]",
+          "description": "Добавляет категории для стиля магазина версии 1.2."
         },
         "enableSaveSlots": {
-          "label": "Ячейки сохранения"
+          "label": "Улучшенное управление сохранениями",
+          "description": "Позволяет переименовывать, копировать и удалять сохранения, а также импортировать и экспортировать пакеты из нескольких сохранений."
         },
         "enableLanguageMenu": {
-          "label": "Меню языка"
+          "label": "Список выбора языка",
+          "description": "Заменяет выбор языка в главном меню прокручиваемым списком для удобного просмотра и выбора."
         },
         "enableSettingsPage": {
-          "label": "Страница настроек"
+          "label": "Страница настроек",
+          "description": "Добавляет в главное меню вход на страницу настроек для удобного изменения различных параметров."
+        },
+        "enableIndependentAutoSave": {
+          "label": "Улучшенная логика сохранения",
+          "description": "Отделяет автосохранение от всех слотов сохранений, не перезаписывая напрямую текущее игровое сохранение."
         }
-      }
+      },
+      "description": "Улучшает управление сохранениями, добавляет список языков, выбор стиля магазина и страницу настроек."
     },
     "de": {
-      "name": "Bessere Oberflächen",
+      "name": "Bessere Benutzeroberflächen",
       "config": {
+        "shopVersion": {
+          "label": "Shop-Stilversion",
+          "description": "Bietet die Shop-Stile der Versionen 1.2 und 1.3.",
+          "valueLabels": {
+            "1.2.1": "Shop 1.2",
+            "1.3": "Shop 1.3"
+          }
+        },
         "enableShopCategories": {
-          "label": "Shop-Kategorien"
+          "label": "Gebäudekategorien im Shop [1.2]",
+          "description": "Bietet Kategorien für den Shop-Stil der Version 1.2."
         },
         "enableSaveSlots": {
-          "label": "Speicherplätze"
+          "label": "Bessere Spielstandverwaltung",
+          "description": "Ermöglicht das Umbenennen, Kopieren und Löschen von Spielständen sowie den Import und Export von Paketen mit mehreren Spielständen."
         },
         "enableLanguageMenu": {
-          "label": "Sprachmenü"
+          "label": "Sprachauswahlliste",
+          "description": "Ersetzt die Sprachauswahl im Hauptmenü durch eine scrollbare Liste zum einfachen Durchsehen und Auswählen."
         },
         "enableSettingsPage": {
-          "label": "Einstellungsseite"
+          "label": "Einstellungsseite",
+          "description": "Fügt dem Hauptmenü einen Zugang zur Einstellungsseite hinzu, auf der verschiedene Einstellungen bequem angepasst werden können."
+        },
+        "enableIndependentAutoSave": {
+          "label": "Bessere Speicherlogik",
+          "description": "Trennt das automatische Speichern von allen Spielstandplätzen, statt den aktuell gespielten Spielstand direkt zu überschreiben."
         }
-      }
+      },
+      "description": "Bietet eine bessere Spielstandverwaltung, eine Sprachauswahlliste, wechselbare Shop-Stile und eine Einstellungsseite."
     },
     "ptbr": {
       "name": "Interfaces melhores",
       "config": {
+        "shopVersion": {
+          "label": "Versão do estilo da loja",
+          "description": "Oferece os estilos de loja das versões 1.2 e 1.3.",
+          "valueLabels": {
+            "1.2.1": "Loja 1.2",
+            "1.3": "Loja 1.3"
+          }
+        },
         "enableShopCategories": {
-          "label": "Categorias da loja"
+          "label": "Categorias de construções da loja [1.2]",
+          "description": "Oferece categorias para o estilo de loja da versão 1.2."
         },
         "enableSaveSlots": {
-          "label": "Espaços de save"
+          "label": "Melhor gerenciamento de saves",
+          "description": "Permite renomear, copiar e excluir saves, além de importar e exportar pacotes com vários saves."
         },
         "enableLanguageMenu": {
-          "label": "Menu de idioma"
+          "label": "Lista de seleção de idioma",
+          "description": "Transforma a seleção de idioma do menu principal em uma lista rolável para facilitar a consulta e a escolha."
         },
         "enableSettingsPage": {
-          "label": "Página de configurações"
+          "label": "Página de configurações",
+          "description": "Adiciona ao menu principal um acesso à página de configurações para ajustar diversas opções com facilidade."
+        },
+        "enableIndependentAutoSave": {
+          "label": "Melhor lógica de salvamento",
+          "description": "Mantém o salvamento automático separado de todos os slots, sem sobrescrever diretamente o save em uso."
         }
-      }
+      },
+      "description": "Oferece melhor gerenciamento de saves, lista de idiomas, troca de estilo da loja e página de configurações."
     },
     "it": {
-      "name": "Interfacce migliori",
+      "name": "Interfacce migliorate",
       "config": {
+        "shopVersion": {
+          "label": "Versione dello stile del negozio",
+          "description": "Offre gli stili del negozio delle versioni 1.2 e 1.3.",
+          "valueLabels": {
+            "1.2.1": "Negozio 1.2",
+            "1.3": "Negozio 1.3"
+          }
+        },
         "enableShopCategories": {
-          "label": "Categorie negozio"
+          "label": "Categorie di edifici del negozio [1.2]",
+          "description": "Offre categorie per lo stile del negozio della versione 1.2."
         },
         "enableSaveSlots": {
-          "label": "Slot salvataggio"
+          "label": "Gestione dei salvataggi migliorata",
+          "description": "Consente di rinominare, copiare ed eliminare salvataggi e di importare ed esportare pacchetti con più salvataggi."
         },
         "enableLanguageMenu": {
-          "label": "Menu lingua"
+          "label": "Elenco di selezione della lingua",
+          "description": "Trasforma la selezione della lingua nel menu principale in un elenco scorrevole per facilitarne la consultazione e la scelta."
         },
         "enableSettingsPage": {
-          "label": "Pagina impostazioni"
+          "label": "Pagina delle impostazioni",
+          "description": "Aggiunge al menu principale un accesso alla pagina delle impostazioni per regolare comodamente varie opzioni."
+        },
+        "enableIndependentAutoSave": {
+          "label": "Logica di salvataggio migliorata",
+          "description": "Mantiene il salvataggio automatico separato da tutti gli slot, senza sovrascrivere direttamente il salvataggio in uso."
         }
-      }
+      },
+      "description": "Offre una migliore gestione dei salvataggi, un elenco delle lingue, la scelta dello stile del negozio e una pagina delle impostazioni."
     },
     "es": {
       "name": "Interfaces mejoradas",
       "config": {
+        "shopVersion": {
+          "label": "Versión del estilo de tienda",
+          "description": "Ofrece los estilos de tienda de las versiones 1.2 y 1.3.",
+          "valueLabels": {
+            "1.2.1": "Tienda 1.2",
+            "1.3": "Tienda 1.3"
+          }
+        },
         "enableShopCategories": {
-          "label": "Categorías de tienda"
+          "label": "Categorías de edificios de la tienda [1.2]",
+          "description": "Ofrece categorías para el estilo de tienda de la versión 1.2."
         },
         "enableSaveSlots": {
-          "label": "Ranuras de guardado"
+          "label": "Mejor gestión de partidas",
+          "description": "Permite renombrar, copiar y eliminar partidas, además de importar y exportar paquetes con varias partidas."
         },
         "enableLanguageMenu": {
-          "label": "Menú de idioma"
+          "label": "Lista de selección de idioma",
+          "description": "Convierte la selección de idioma del menú principal en una lista desplazable para facilitar la consulta y la elección."
         },
         "enableSettingsPage": {
-          "label": "Página de ajustes"
+          "label": "Página de ajustes",
+          "description": "Añade al menú principal un acceso a la página de ajustes para cambiar cómodamente distintas opciones."
+        },
+        "enableIndependentAutoSave": {
+          "label": "Mejor lógica de guardado",
+          "description": "Mantiene el guardado automático separado de todos los espacios de guardado, sin sobrescribir directamente la partida en uso."
         }
-      }
+      },
+      "description": "Ofrece una mejor gestión de partidas, una lista de idiomas, selección del estilo de tienda y una página de ajustes."
     },
     "fr": {
       "name": "Interfaces améliorées",
       "config": {
+        "shopVersion": {
+          "label": "Version du style de boutique",
+          "description": "Propose les styles de boutique des versions 1.2 et 1.3.",
+          "valueLabels": {
+            "1.2.1": "Boutique 1.2",
+            "1.3": "Boutique 1.3"
+          }
+        },
         "enableShopCategories": {
-          "label": "Catégories de boutique"
+          "label": "Catégories de bâtiments de la boutique [1.2]",
+          "description": "Propose des catégories pour le style de boutique de la version 1.2."
         },
         "enableSaveSlots": {
-          "label": "Emplacements de sauvegarde"
+          "label": "Gestion améliorée des sauvegardes",
+          "description": "Permet de renommer, copier et supprimer les sauvegardes, ainsi que d’importer et d’exporter des packs contenant plusieurs sauvegardes."
         },
         "enableLanguageMenu": {
-          "label": "Menu de langue"
+          "label": "Liste de sélection de langue",
+          "description": "Remplace le choix de langue du menu principal par une liste déroulante pour faciliter la consultation et la sélection."
         },
         "enableSettingsPage": {
-          "label": "Page des paramètres"
+          "label": "Page de paramètres",
+          "description": "Ajoute au menu principal un accès à la page de paramètres pour ajuster facilement diverses options."
+        },
+        "enableIndependentAutoSave": {
+          "label": "Logique de sauvegarde améliorée",
+          "description": "Sépare la sauvegarde automatique de tous les emplacements, sans écraser directement la sauvegarde en cours de jeu."
         }
-      }
+      },
+      "description": "Propose une meilleure gestion des sauvegardes, une liste de langues, le choix du style de boutique et une page de paramètres."
     },
     "nl": {
       "name": "Betere interfaces",
       "config": {
+        "shopVersion": {
+          "label": "Winkelstijlversie",
+          "description": "Biedt de winkelstijlen van versies 1.2 en 1.3.",
+          "valueLabels": {
+            "1.2.1": "Winkel 1.2",
+            "1.3": "Winkel 1.3"
+          }
+        },
         "enableShopCategories": {
-          "label": "Winkelcategorieën"
+          "label": "Gebouwcategorieën in de winkel [1.2]",
+          "description": "Biedt categorieën voor de winkelstijl van versie 1.2."
         },
         "enableSaveSlots": {
-          "label": "Opslagsleuven"
+          "label": "Beter opslagbeheer",
+          "description": "Maakt hernoemen, kopiëren en verwijderen van opgeslagen spellen mogelijk, evenals import en export van bundels met meerdere opgeslagen spellen."
         },
         "enableLanguageMenu": {
-          "label": "Taalmenu"
+          "label": "Taalselectielijst",
+          "description": "Verandert de taalselectie in het hoofdmenu in een schuifbare lijst om eenvoudig te bladeren en te kiezen."
         },
         "enableSettingsPage": {
-          "label": "Instellingenpagina"
+          "label": "Instellingenpagina",
+          "description": "Voegt aan het hoofdmenu een ingang naar de instellingenpagina toe om diverse instellingen eenvoudig aan te passen."
+        },
+        "enableIndependentAutoSave": {
+          "label": "Betere opslaglogica",
+          "description": "Houdt automatisch opslaan gescheiden van alle opslagslots in plaats van het huidige opgeslagen spel direct te overschrijven."
         }
-      }
+      },
+      "description": "Biedt beter opslagbeheer, een taalselectielijst, wisselbare winkelstijlen en een instellingenpagina."
     },
     "cz": {
       "name": "Lepší rozhraní",
       "config": {
+        "shopVersion": {
+          "label": "Verze stylu obchodu",
+          "description": "Nabízí styly obchodu z verzí 1.2 a 1.3.",
+          "valueLabels": {
+            "1.2.1": "Obchod 1.2",
+            "1.3": "Obchod 1.3"
+          }
+        },
         "enableShopCategories": {
-          "label": "Kategorie obchodu"
+          "label": "Kategorie budov v obchodě [1.2]",
+          "description": "Nabízí kategorie pro styl obchodu verze 1.2."
         },
         "enableSaveSlots": {
-          "label": "Pozice uložení"
+          "label": "Lepší správa uložených her",
+          "description": "Umožňuje přejmenovat, kopírovat a odstranit uložené hry a importovat i exportovat balíčky více uložených her."
         },
         "enableLanguageMenu": {
-          "label": "Nabídka jazyka"
+          "label": "Seznam pro výběr jazyka",
+          "description": "Mění výběr jazyka v hlavní nabídce na posuvný seznam pro snadné prohlížení a výběr."
         },
         "enableSettingsPage": {
-          "label": "Stránka nastavení"
+          "label": "Stránka nastavení",
+          "description": "Přidává do hlavní nabídky vstup na stránku nastavení pro pohodlné úpravy různých voleb."
+        },
+        "enableIndependentAutoSave": {
+          "label": "Lepší logika ukládání",
+          "description": "Odděluje automatické ukládání od všech pozic namísto přímého přepisování právě hrané uložené hry."
         }
-      }
+      },
+      "description": "Nabízí lepší správu uložených her, seznam jazyků, přepínání stylu obchodu a stránku nastavení."
     },
     "pl": {
-      "name": "Lepsze interfejsy",
+      "name": "Lepszy interfejs",
       "config": {
+        "shopVersion": {
+          "label": "Wersja stylu sklepu",
+          "description": "Udostępnia style sklepu z wersji 1.2 i 1.3.",
+          "valueLabels": {
+            "1.2.1": "Sklep 1.2",
+            "1.3": "Sklep 1.3"
+          }
+        },
         "enableShopCategories": {
-          "label": "Kategorie sklepu"
+          "label": "Kategorie budynków sklepu [1.2]",
+          "description": "Udostępnia kategorie dla stylu sklepu z wersji 1.2."
         },
         "enableSaveSlots": {
-          "label": "Sloty zapisu"
+          "label": "Lepsze zarządzanie zapisami",
+          "description": "Umożliwia zmianę nazw, kopiowanie i usuwanie zapisów oraz importowanie i eksportowanie pakietów zawierających wiele zapisów."
         },
         "enableLanguageMenu": {
-          "label": "Menu języka"
+          "label": "Lista wyboru języka",
+          "description": "Zmienia wybór języka w menu głównym na przewijaną listę ułatwiającą przeglądanie i wybór."
         },
         "enableSettingsPage": {
-          "label": "Strona ustawień"
+          "label": "Strona ustawień",
+          "description": "Dodaje w menu głównym wejście na stronę ustawień, gdzie można wygodnie zmieniać różne opcje."
+        },
+        "enableIndependentAutoSave": {
+          "label": "Lepsza logika zapisu",
+          "description": "Oddziela automatyczny zapis od wszystkich miejsc zapisu, zamiast bezpośrednio nadpisywać aktualnie używany zapis."
         }
-      }
+      },
+      "description": "Zapewnia lepsze zarządzanie zapisami, listę języków, zmianę stylu sklepu i stronę ustawień."
     },
     "jp": {
       "name": "UI改善",
       "config": {
+        "shopVersion": {
+          "label": "ショップ表示バージョン",
+          "description": "バージョン1.2と1.3のショップ表示を提供します。",
+          "valueLabels": {
+            "1.2.1": "1.2ショップ",
+            "1.3": "1.3ショップ"
+          }
+        },
         "enableShopCategories": {
-          "label": "ショップ分類"
+          "label": "ショップの建物カテゴリ [1.2]",
+          "description": "バージョン1.2のショップ表示にカテゴリを提供します。"
         },
         "enableSaveSlots": {
-          "label": "セーブスロット"
+          "label": "セーブ管理の改善",
+          "description": "セーブの名前変更、コピー、削除、複数セーブをまとめたパックのインポートとエクスポートなどを提供します。"
         },
         "enableLanguageMenu": {
-          "label": "言語メニュー"
+          "label": "言語選択リスト",
+          "description": "メインメニューの言語選択をスクロール可能なリストに変更し、確認と選択を容易にします。"
         },
         "enableSettingsPage": {
-          "label": "設定ページ"
+          "label": "設定ページ",
+          "description": "メインメニューに設定ページへの入口を追加し、さまざまな設定を簡単に調整できるようにします。"
+        },
+        "enableIndependentAutoSave": {
+          "label": "セーブ処理の改善",
+          "description": "プレイ中のセーブを直接上書きせず、すべてのセーブスロットから独立して自動保存します。"
         }
-      }
+      },
+      "description": "セーブ管理、言語選択リスト、ショップ表示の切り替え、設定ページを提供します。"
     },
     "kr": {
-      "name": "개선된 UI",
+      "name": "더 나은 UI",
       "config": {
+        "shopVersion": {
+          "label": "상점 스타일 버전",
+          "description": "1.2 버전과 1.3 버전의 상점 스타일을 제공합니다.",
+          "valueLabels": {
+            "1.2.1": "1.2 상점",
+            "1.3": "1.3 상점"
+          }
+        },
         "enableShopCategories": {
-          "label": "상점 카테고리"
+          "label": "상점 건물 분류 [1.2]",
+          "description": "1.2 버전 상점 스타일에 분류를 제공합니다."
         },
         "enableSaveSlots": {
-          "label": "저장 슬롯"
+          "label": "더 나은 저장 관리",
+          "description": "저장 이름 변경, 복사, 삭제 및 여러 저장 파일을 묶은 패키지의 가져오기와 내보내기 등을 제공합니다."
         },
         "enableLanguageMenu": {
-          "label": "언어 메뉴"
+          "label": "언어 선택 목록",
+          "description": "메인 메뉴의 언어 선택을 스크롤 가능한 목록으로 바꾸어 언어를 편리하게 확인하고 선택합니다."
         },
         "enableSettingsPage": {
-          "label": "설정 페이지"
+          "label": "설정 페이지",
+          "description": "메인 메뉴에 설정 페이지 입구를 추가하여 다양한 설정을 편리하게 조정할 수 있습니다."
+        },
+        "enableIndependentAutoSave": {
+          "label": "더 나은 저장 방식",
+          "description": "플레이 중인 저장을 직접 덮어쓰는 대신 모든 저장 슬롯과 분리하여 자동 저장합니다."
         }
-      }
+      },
+      "description": "더 나은 저장 관리, 언어 선택 목록, 상점 스타일 전환과 설정 페이지를 제공합니다."
     },
     "tch": {
-      "name": "更好的介面",
+      "name": "更好的UI",
       "config": {
+        "shopVersion": {
+          "label": "商店樣式版本",
+          "description": "提供1.2版本和1.3版本的商店樣式。",
+          "valueLabels": {
+            "1.2.1": "1.2商店",
+            "1.3": "1.3 商店"
+          }
+        },
         "enableShopCategories": {
-          "label": "商店分類"
+          "label": "商店建築分類 [1.2]",
+          "description": "提供1.2版本的商店樣式的分類。"
         },
         "enableSaveSlots": {
-          "label": "存檔欄"
+          "label": "更好的存檔管理",
+          "description": "提供存檔的改名、複製、刪除和匯入、匯出多存檔整合包等功能。"
         },
         "enableLanguageMenu": {
-          "label": "語言選單"
+          "label": "語言選擇列表",
+          "description": "將主選單的語言選擇改為可捲動列表，方便查看和選擇語言。"
         },
         "enableSettingsPage": {
-          "label": "設定頁面"
+          "label": "設定頁面",
+          "description": "在主選單中提供設定頁面的入口，設定頁面裡可以方便調整各種設定。"
+        },
+        "enableIndependentAutoSave": {
+          "label": "更好的存檔邏輯",
+          "description": "將自動存檔功能獨立於所有存檔之外，而不是直接覆寫正在遊玩的存檔。"
         }
-      }
+      },
+      "description": "提供更好的存檔管理、語言選擇列表、商店樣式切換和設定頁面。"
     },
     "thai": {
       "name": "UI ที่ดีขึ้น",
       "config": {
+        "shopVersion": {
+          "label": "เวอร์ชันรูปแบบร้านค้า",
+          "description": "มีรูปแบบร้านค้าจากเวอร์ชัน 1.2 และ 1.3 ให้เลือก",
+          "valueLabels": {
+            "1.2.1": "ร้านค้า 1.2",
+            "1.3": "ร้านค้า 1.3"
+          }
+        },
         "enableShopCategories": {
-          "label": "หมวดหมู่ร้านค้า"
+          "label": "หมวดหมู่สิ่งก่อสร้างในร้านค้า [1.2]",
+          "description": "เพิ่มหมวดหมู่ให้รูปแบบร้านค้าเวอร์ชัน 1.2"
         },
         "enableSaveSlots": {
-          "label": "ช่องเซฟ"
+          "label": "การจัดการเซฟที่ดีขึ้น",
+          "description": "รองรับการเปลี่ยนชื่อ คัดลอก ลบเซฟ รวมถึงนำเข้าและส่งออกแพ็กที่รวมหลายเซฟ"
         },
         "enableLanguageMenu": {
-          "label": "เมนูภาษา"
+          "label": "รายการเลือกภาษา",
+          "description": "เปลี่ยนการเลือกภาษาในเมนูหลักเป็นรายการที่เลื่อนได้ เพื่อให้ดูและเลือกภาษาได้สะดวก"
         },
         "enableSettingsPage": {
-          "label": "หน้าการตั้งค่า"
+          "label": "หน้าการตั้งค่า",
+          "description": "เพิ่มทางเข้าหน้าการตั้งค่าในเมนูหลัก เพื่อให้ปรับการตั้งค่าต่าง ๆ ได้สะดวก"
+        },
+        "enableIndependentAutoSave": {
+          "label": "ระบบบันทึกที่ดีขึ้น",
+          "description": "แยกการบันทึกอัตโนมัติออกจากช่องเซฟทั้งหมด แทนการเขียนทับเซฟที่กำลังเล่นโดยตรง"
         }
-      }
+      },
+      "description": "เพิ่มการจัดการเซฟที่ดีขึ้น รายการเลือกภาษา การสลับรูปแบบร้านค้า และหน้าการตั้งค่า"
     },
     "hu": {
-      "name": "Jobb felületek",
+      "name": "Jobb felület",
       "config": {
+        "shopVersion": {
+          "label": "Boltstílus verziója",
+          "description": "Az 1.2-es és 1.3-as verzió boltstílusát kínálja.",
+          "valueLabels": {
+            "1.2.1": "1.2-es bolt",
+            "1.3": "1.3-as bolt"
+          }
+        },
         "enableShopCategories": {
-          "label": "Bolt kategóriái"
+          "label": "Épületkategóriák a boltban [1.2]",
+          "description": "Kategóriákat biztosít az 1.2-es verzió boltstílusához."
         },
         "enableSaveSlots": {
-          "label": "Mentési helyek"
+          "label": "Jobb mentéskezelés",
+          "description": "Lehetővé teszi a mentések átnevezését, másolását, törlését, valamint több mentést tartalmazó csomagok importálását és exportálását."
         },
         "enableLanguageMenu": {
-          "label": "Nyelv menü"
+          "label": "Nyelvválasztó lista",
+          "description": "A főmenü nyelvválasztóját görgethető listává alakítja az egyszerűbb áttekintés és választás érdekében."
         },
         "enableSettingsPage": {
-          "label": "Beállítások oldala"
+          "label": "Beállítási oldal",
+          "description": "A főmenüben belépést biztosít a beállítási oldalra, ahol kényelmesen módosíthatók a különféle beállítások."
+        },
+        "enableIndependentAutoSave": {
+          "label": "Jobb mentési logika",
+          "description": "Az automatikus mentést minden mentési helytől elkülöníti a jelenleg játszott mentés közvetlen felülírása helyett."
         }
-      }
+      },
+      "description": "Jobb mentéskezelést, nyelvválasztó listát, váltható boltstílust és beállítási oldalt kínál."
     },
     "lv": {
-      "name": "Labākas saskarnes",
+      "name": "Uzlabota saskarne",
       "config": {
+        "shopVersion": {
+          "label": "Veikala stila versija",
+          "description": "Piedāvā 1.2 un 1.3 versijas veikala stilus.",
+          "valueLabels": {
+            "1.2.1": "1.2 veikals",
+            "1.3": "1.3 veikals"
+          }
+        },
         "enableShopCategories": {
-          "label": "Veikala kategorijas"
+          "label": "Veikala ēku kategorijas [1.2]",
+          "description": "Nodrošina kategorijas 1.2 versijas veikala stilam."
         },
         "enableSaveSlots": {
-          "label": "Saglabāšanas vietas"
+          "label": "Labāka saglabājumu pārvaldība",
+          "description": "Ļauj pārdēvēt, kopēt un dzēst saglabājumus, kā arī importēt un eksportēt pakotnes ar vairākiem saglabājumiem."
         },
         "enableLanguageMenu": {
-          "label": "Valodas izvēlne"
+          "label": "Valodu izvēles saraksts",
+          "description": "Pārveido valodas izvēli galvenajā izvēlnē par ritināmu sarakstu ērtai pārlūkošanai un izvēlei."
         },
         "enableSettingsPage": {
-          "label": "Iestatījumu lapa"
+          "label": "Iestatījumu lapa",
+          "description": "Pievieno galvenajai izvēlnei ieeju iestatījumu lapā, kur ērti pielāgot dažādus iestatījumus."
+        },
+        "enableIndependentAutoSave": {
+          "label": "Labāka saglabāšanas loģika",
+          "description": "Nošķir automātisko saglabāšanu no visām saglabājumu vietām, nevis tieši pārraksta pašlaik spēlēto saglabājumu."
         }
-      }
+      },
+      "description": "Nodrošina labāku saglabājumu pārvaldību, valodu izvēles sarakstu, veikala stila maiņu un iestatījumu lapu."
     },
     "ro": {
-      "name": "Interfețe mai bune",
+      "name": "Interfață îmbunătățită",
       "config": {
+        "shopVersion": {
+          "label": "Versiunea stilului magazinului",
+          "description": "Oferă stilurile de magazin din versiunile 1.2 și 1.3.",
+          "valueLabels": {
+            "1.2.1": "Magazin 1.2",
+            "1.3": "Magazin 1.3"
+          }
+        },
         "enableShopCategories": {
-          "label": "Categorii magazin"
+          "label": "Categorii de clădiri în magazin [1.2]",
+          "description": "Oferă categorii pentru stilul de magazin al versiunii 1.2."
         },
         "enableSaveSlots": {
-          "label": "Sloturi salvare"
+          "label": "Gestionare îmbunătățită a salvărilor",
+          "description": "Permite redenumirea, copierea și ștergerea salvărilor, precum și importul și exportul pachetelor cu mai multe salvări."
         },
         "enableLanguageMenu": {
-          "label": "Meniu limbă"
+          "label": "Listă de selectare a limbii",
+          "description": "Transformă selectarea limbii din meniul principal într-o listă derulabilă, pentru consultare și alegere ușoară."
         },
         "enableSettingsPage": {
-          "label": "Pagină de setări"
+          "label": "Pagină de setări",
+          "description": "Adaugă în meniul principal o intrare către pagina de setări, unde pot fi ajustate comod diverse opțiuni."
+        },
+        "enableIndependentAutoSave": {
+          "label": "Logică de salvare îmbunătățită",
+          "description": "Separă salvarea automată de toate sloturile, în loc să suprascrie direct salvarea folosită în prezent."
         }
-      }
+      },
+      "description": "Oferă o gestionare mai bună a salvărilor, o listă de limbi, schimbarea stilului magazinului și o pagină de setări."
     },
     "no": {
       "name": "Bedre grensesnitt",
       "config": {
+        "shopVersion": {
+          "label": "Butikkstilversjon",
+          "description": "Tilbyr butikkstilene fra versjon 1.2 og 1.3.",
+          "valueLabels": {
+            "1.2.1": "1.2-butikk",
+            "1.3": "1.3-butikk"
+          }
+        },
         "enableShopCategories": {
-          "label": "Butikkategorier"
+          "label": "Bygningskategorier i butikken [1.2]",
+          "description": "Tilbyr kategorier for butikkstilen fra versjon 1.2."
         },
         "enableSaveSlots": {
-          "label": "Lagringsplasser"
+          "label": "Bedre lagringsadministrasjon",
+          "description": "Lar deg gi nytt navn til, kopiere og slette lagringer samt importere og eksportere pakker med flere lagringer."
         },
         "enableLanguageMenu": {
-          "label": "Språkmeny"
+          "label": "Språkvalgliste",
+          "description": "Endrer språkvalget i hovedmenyen til en rullbar liste for enkel oversikt og valg."
         },
         "enableSettingsPage": {
-          "label": "Innstillingsside"
+          "label": "Innstillingsside",
+          "description": "Legger til en inngang til innstillingssiden i hovedmenyen, der ulike innstillinger enkelt kan justeres."
+        },
+        "enableIndependentAutoSave": {
+          "label": "Bedre lagringslogikk",
+          "description": "Holder automatisk lagring atskilt fra alle lagringsplasser i stedet for å overskrive lagringen du spiller direkte."
         }
-      }
+      },
+      "description": "Gir bedre lagringsadministrasjon, en språkvalgliste, bytte av butikkstil og en innstillingsside."
     }
   }
 }

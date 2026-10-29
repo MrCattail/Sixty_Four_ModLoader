@@ -2978,7 +2978,10 @@ ModLoader.register({
 					})
 				}
 				if (!confirmedProposal?.signature) return null
-				creative.setDialogOpen?.(true, 'blueprint-placement-running')
+				// Native transactions acquire their own busy/save gate synchronously.
+				// A synthetic dialog flag here would reject the very operation it owns.
+				const useLegacyDialogLock = !Array.isArray(game.saveSlots)
+				if (useLegacyDialogLock) creative.setDialogOpen?.(true, 'blueprint-placement-running')
 				let result
 				try {
 					markPlacementProbe('execute.called', {
@@ -3007,7 +3010,7 @@ ModLoader.register({
 						snapshotCreated: !!result?.snapshotId
 					})
 				} finally {
-					creative.setDialogOpen?.(false, 'blueprint-placement-finished')
+					if (useLegacyDialogLock) creative.setDialogOpen?.(false, 'blueprint-placement-finished')
 				}
 				await controller?.refreshNow?.(
 					result?.executed ? 'placement-complete' : 'placement-recoverable-failure'

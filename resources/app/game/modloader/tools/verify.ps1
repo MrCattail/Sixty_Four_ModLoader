@@ -1,14 +1,19 @@
+param([switch]$LoaderOnly, [string]$ExpectedVersion)
 . "$PSScriptRoot\common.ps1"
+if ($LoaderOnly) { Write-Host "Legacy -LoaderOnly: installation checks only; feature suites moved to verify-development.ps1." }
+if (-not $ExpectedVersion) { $ExpectedVersion = $env:MODLOADER_EXPECTED_VERSION }
 
 $checks = @(
 	[ordered]@{ file = 'index.html'; pattern = 'modloader/loader.js'; description = 'index loads ModLoader' },
 	[ordered]@{ file = 'scripts\game.js'; pattern = 'ModLoader?.stage(`beforeVanillaScripts`'; description = 'game beforeVanillaScripts hook' },
+	[ordered]@{ file = 'scripts\game.js'; pattern = 'ModLoader?.stage(`beforeGamePrepare`'; description = 'game early 1.3 preparation hook' },
+	[ordered]@{ file = 'scripts\game.js'; pattern = 'return window.ModLoader?.applySave(saveState, this) || saveState'; description = '1.3 object save contract' },
 	[ordered]@{ file = 'scripts\game.js'; pattern = 'ModLoader?.applyData'; description = 'game data hook' },
 	[ordered]@{ file = 'scripts\game.js'; pattern = 'ModLoader?.applyWords'; description = 'game words hook' },
 	[ordered]@{ file = 'scripts\game.js'; pattern = 'ModLoader?.applySave'; description = 'game save hook' },
 	[ordered]@{ file = 'scripts\game.js'; pattern = 'ModLoader?.applySoundList'; description = 'audio sample hook' },
 	[ordered]@{ file = 'scripts\sprites.js'; pattern = 'ModLoader?.resolveAsset'; description = 'sprite asset hook' },
-	[ordered]@{ file = 'scripts\ui.js'; pattern = 'ModLoader?.resolveAsset'; description = 'shop icon asset hook' },
+	[ordered]@{ file = 'scripts\ui.js'; pattern = 'ModLoader?.resolveAsset(e.shopImage'; description = 'active 1.3 Store icon asset hook' },
 	[ordered]@{ file = '..\main.js'; pattern = 'ModLoaderMainProcess.attachWindow(win, { accountId: STEAMID })'; description = 'main process bridge and trusted account scope' },
 	[ordered]@{ file = '..\main.js'; pattern = 'ModLoaderMainProcess.getMainWindowOptions'; description = 'main window before-create options hook' },
 	[ordered]@{ file = '..\main.js'; pattern = 'ModLoaderMainProcess.afterMainWindowCreated(win)'; description = 'main window after-create hook' },
@@ -25,7 +30,7 @@ $checks = @(
 	[ordered]@{ file = 'modloader\main-process.js'; pattern = 'modloader:libraries:runtime'; description = 'Library API 1.1 main-process IPC support' },
 	[ordered]@{ file = 'modloader\main-process.js'; pattern = 'collectLibraryDeclarations'; description = 'manifest-declared library discovery' },
 	[ordered]@{ file = 'modloader\loader.js'; pattern = 'window.ModLoader = api'; description = 'loader exports API' },
-	[ordered]@{ file = 'modloader\loader.js'; pattern = "version: '0.4.0'"; description = 'ModLoader 0.4.0 runtime version' },
+	[ordered]@{ file = 'modloader\loader.js'; pattern = 'const SHORTCUT_API_VERSION = 1'; description = 'Mod Keyboard Shortcut API v1 support' },
 	[ordered]@{ file = 'modloader\loader.js'; pattern = "const SNAPSHOT_API_VERSION = '1.0.0'"; description = 'Storage Snapshot API v1 support' },
 	[ordered]@{ file = 'modloader\loader.js'; pattern = "const LIBRARY_API_VERSION = '1.1.0'"; description = 'Library API 1.1 renderer support' },
 	[ordered]@{ file = 'modloader\loader.js'; pattern = 'modloader.saveInstanceId = saveInstanceId'; description = 'snapshot save-lineage identity support' },
@@ -113,103 +118,21 @@ foreach ($relativePath in $modloaderJavaScriptFiles) {
 	}
 }
 
-$renderApiContractTestPath = Join-Path $PSScriptRoot 'render-api-v1-contract.test.js'
-if (Test-Path -LiteralPath $renderApiContractTestPath) {
-	if ($nodeCommand) {
-		& $nodeCommand.Source $renderApiContractTestPath
-		$results += [ordered]@{
-			description = 'Render API v1 runtime contract'
-			file = 'modloader\tools\render-api-v1-contract.test.js'
-			pattern = 'version, capabilities, ownership, conflicts, scope restore, master switch'
-			ok = $LASTEXITCODE -eq 0
-		}
-	} else {
-		$warnings += 'Node.js is not available; skipped Render API v1 runtime contract check.'
-	}
+$loaderPath = Join-Path $GameRoot 'modloader/loader.js'
+$loaderText = Get-Content -LiteralPath $loaderPath -Raw -Encoding UTF8
+$actualVersion = if ($loaderText -match 'version\s*:\s*[''"]([^''"]+)[''"]') { $Matches[1] } else { '' }
+if (-not $ExpectedVersion) {
+    $packagePath = Join-Path $GameRoot '../../../modloader-installer/modloader-package.json'
+    if (Test-Path -LiteralPath $packagePath) { $ExpectedVersion = (Get-Content -LiteralPath $packagePath -Raw | ConvertFrom-Json).version }
 }
-
-$snapshotContractTests = @(
-	[ordered]@{ file = 'ui-page-menu-scroll-contract.test.js'; description = 'UI page menu scroll contract'; pattern = 'automatic max-height, inertial wheel, ModLoader scrollbar styling' },
-	[ordered]@{ file = 'panel-description-display-mode-contract.test.js'; description = 'Panel description display mode contract'; pattern = 'hover default, inline descriptions, translated settings' },
-	[ordered]@{ file = 'panel-header-quick-toggles-contract.test.js'; description = 'Panel header quick toggles contract'; pattern = 'button order, sun/moon, pin states, persistence, manual edge hiding, themes, translations' },
-	[ordered]@{ file = 'settings-api-v1-contract.test.js'; description = 'Settings API v1 contract'; pattern = 'registration, actions, shared renderer, typed values, validation, persistence, themes, scrolling, tooltips, cleanup' },
-	[ordered]@{ file = 'chinese-optimization-open-translation-contract.test.js'; description = 'Chinese Optimization open translation contract'; pattern = '20 languages, feature detection, immediate select, Explorer reveal, default association' },
-	[ordered]@{ file = 'snapshot-container-v1-contract.test.js'; description = 'Snapshot export container v1 contract'; pattern = 'binary framing, metadata, checksum, corruption rejection' },
-	[ordered]@{ file = 'snapshot-store-v1-contract.test.js'; description = 'Snapshot store v1 contract'; pattern = 'validation, isolation, queueing, rotation, quarantine, cleanup' },
-	[ordered]@{ file = 'snapshot-api-v1-contract.test.js'; description = 'Storage Snapshot API v1 runtime contract'; pattern = 'bound Mod API, data types, safe errors, save identity, admin UI boundary' },
-	[ordered]@{ file = 'library-store-v1-contract.test.js'; description = 'Library store v1 contract'; pattern = 'declarations, path isolation, atomic writes, revision conflicts, trash, quarantine, cache, watcher' },
-	[ordered]@{ file = 'library-api-v1-contract.test.js'; description = 'Library API 1.1 runtime contract'; pattern = 'bound named handle, safe dialogs, no path leakage, declared extensions, size and symlink rejection, atomic revision-matched export' }
-)
-foreach ($contract in $snapshotContractTests) {
-	$contractPath = Join-Path $PSScriptRoot $contract.file
-	if (-not (Test-Path -LiteralPath $contractPath)) {
-		$results += [ordered]@{
-			description = $contract.description
-			file = "modloader\tools\$($contract.file)"
-			pattern = 'file exists'
-			ok = $false
-		}
-		continue
-	}
-	if ($nodeCommand) {
-		& $nodeCommand.Source $contractPath
-		$results += [ordered]@{
-			description = $contract.description
-			file = "modloader\tools\$($contract.file)"
-			pattern = $contract.pattern
-			ok = $LASTEXITCODE -eq 0
-		}
-	} else {
-		$warnings += "Node.js is not available; skipped $($contract.description)."
-	}
-}
-
-$modFeatureContractTests = @(
-	[ordered]@{
-		path = 'mods\Cattail_TweaksQuality_Better-UIs\tests\verify-save-slots-service-v1.js'
-		description = 'Better UIs Save Slots Service v1 contract'
-		pattern = 'atomic batch creation, activation rollback, lineage finalization, name conflict'
-	},
-	[ordered]@{
-		path = 'mods\Cattail_TweaksQuality_Better-UIs\tests\verify-shop-categories-tooltips.js'
-		description = 'Better UIs Shop Categories tooltip contract'
-		pattern = 'localized vanilla descriptions, shared API delay, disabled-card coverage, rebuild cleanup'
-	},
-	[ordered]@{
-		path = 'mods\Cattail_TweaksQuality_World-Editor\tests\verify-4a-2a.js'
-		description = 'World Editor 4A-2a creative mode contract'
-		pattern = 'save persistence, in-place identity, fork identity removal, input and full-mode gates'
-	}
-)
-foreach ($contract in $modFeatureContractTests) {
-	$contractPath = Join-Path $GameRoot $contract.path
-	if (-not (Test-Path -LiteralPath $contractPath)) {
-		$results += [ordered]@{
-			description = $contract.description
-			file = $contract.path
-			pattern = 'file exists'
-			ok = $false
-		}
-		continue
-	}
-	if ($nodeCommand) {
-		& $nodeCommand.Source $contractPath
-		$results += [ordered]@{
-			description = $contract.description
-			file = $contract.path
-			pattern = $contract.pattern
-			ok = $LASTEXITCODE -eq 0
-		}
-	} else {
-		$warnings += "Node.js is not available; skipped $($contract.description)."
-	}
-}
-
+$results += @{ description = 'Loader version matches source/package'; ok = ([bool]$actualVersion -and (-not $ExpectedVersion -or $actualVersion -ceq $ExpectedVersion)) }
+if (-not $ExpectedVersion) { $warnings += 'Expected package version unavailable; consistency not checked.' }
 $enabledNames = @()
 $enabledPath = Join-Path $GameRoot 'mods\enabled.json'
 try {
     $enabledConfig = Get-Content -LiteralPath $enabledPath -Raw -Encoding UTF8 | ConvertFrom-Json
-    $enabledNames = @($enabledConfig.mods | ForEach-Object { [string]$_ })
+    if ($null -eq $enabledConfig.mods -or $enabledConfig.mods -isnot [System.Array] -or @($enabledConfig.mods | Where-Object { $_ -isnot [string] }).Count) { throw 'enabled.json mods must be an array of strings' }
+    $enabledNames = @($enabledConfig.mods)
     $results += [ordered]@{
         description = 'mods enabled.json parses'
         file = 'mods\enabled.json'
@@ -222,50 +145,6 @@ try {
         file = 'mods\enabled.json'
         pattern = 'valid JSON'
         ok = $false
-    }
-}
-
-$optimizedChineseFolder = -join @('Cattail_Tweaks_', [char]0x7b80, [char]0x4f53, [char]0x4e2d, [char]0x6587, [char]0x4f18, [char]0x5316)
-$optimizedChineseRoot = Join-Path $GameRoot (Join-Path 'mods' $optimizedChineseFolder)
-if (Test-Path -LiteralPath $optimizedChineseRoot) {
-    if ($enabledNames -notcontains $optimizedChineseFolder) {
-        $warnings += 'Optimized Simplified Chinese locale is installed but disabled; enable it in Ctrl+M and Save & Reload before selecting Simplified Chinese [optimized].'
-    } else {
-        try {
-            $manifest = Get-Content -LiteralPath (Join-Path $optimizedChineseRoot 'mod.json') -Raw -Encoding UTF8 | ConvertFrom-Json
-            $hasLanguage = @($manifest.languages) -contains 'modsch'
-            $results += [ordered]@{
-                description = 'optimized Chinese locale declares modsch'
-                file = 'mods\<optimized Chinese>\mod.json'
-                pattern = 'languages includes modsch'
-                ok = $hasLanguage
-            }
-        } catch {
-            $results += [ordered]@{
-                description = 'optimized Chinese locale manifest parses'
-                file = 'mods\<optimized Chinese>\mod.json'
-                pattern = 'valid JSON'
-                ok = $false
-            }
-        }
-
-        try {
-            $locale = Get-Content -LiteralPath (Join-Path $optimizedChineseRoot 'locale\modsch.json') -Raw -Encoding UTF8 | ConvertFrom-Json
-            $hasWords = $null -ne $locale.modsch -and $null -ne $locale.modsch.splash -and $null -ne $locale.modsch.splash.language
-            $results += [ordered]@{
-                description = 'optimized Chinese locale words load'
-                file = 'mods\<optimized Chinese>\locale\modsch.json'
-                pattern = 'modsch.splash.language'
-                ok = $hasWords
-            }
-        } catch {
-            $results += [ordered]@{
-                description = 'optimized Chinese locale words load'
-                file = 'mods\<optimized Chinese>\locale\modsch.json'
-                pattern = 'valid JSON with modsch words'
-                ok = $false
-            }
-        }
     }
 }
 
@@ -286,4 +165,4 @@ if ($failed.Count) {
 }
 
 Write-Host ""
-Write-Host "Verification passed."
+Write-Host "Installation checks passed (not functional or player acceptance)."

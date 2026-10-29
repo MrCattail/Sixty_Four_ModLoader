@@ -2,6 +2,67 @@
 
 Dynamic Details adds optional building detail cards, resource-source panels, coordinate tools, direction pointers, and shop countdowns. Version `0.1.1` also publishes a read-only production telemetry API for other mods.
 
+## Mine depth distributions
+
+Both excavation-channel tiers show a mineral probability chart in their expanded building card. Use the existing Alt + Shift or Ctrl + Alt detail controls. Three settings in the building-details group control the chart: **Mineral depth distribution** (enabled by default), **Distribution chart style** (stacked area or separate mineral bands), and **Mineral visibility** (all, anonymous undiscovered minerals, or discovered minerals only). Changes save immediately and apply without reloading; the building-details master switch also controls the chart. The default view is stacked, with only discovered minerals shown.
+
+The depth axis uses a continuous `log1p(meters / 100)` scale, including zero, with actual meter/kilometer tick labels. The full range is derived from the active mineral table; the current vanilla table fits within 10,000 km. A deeper channel extends the range. A white dot on the depth axis and a perpendicular guide follow the particular channel being inspected. The stacked view places depth horizontally; the separate bands place it vertically and use the same absolute 0–100% probability-width scale for every mineral. Small probabilities remain available as numeric values rather than being enlarged visually. Legends use the game's resource icons at 16 pixels high, with a neutral question mark for undiscovered anonymous minerals. The card keeps the nonlinear-axis label and current depth, without extra depth/probability suffixes or the resource-unit explanation paragraph.
+
+Probabilities describe one generated resource unit, not the chance that a whole cube contains a mineral. The game takes the maximum weight among a mineral's overlapping distribution segments, then normalizes across all minerals. Ordinary channel cubes make 64 draws, so actual cube contents fluctuate. A mineral is discovered when this save's cumulative received amount (`stats.totalResourcesMined`) exceeds zero, including resources received through conversion. Spending the last unit does not hide it again; minerals still inside uncollected cubes do not count yet. Hiding undiscovered minerals never rescales the remaining probabilities. Anonymous minerals use neutral colors and labels.
+
+The independent SVG component lives in `scripts/pump-distribution-chart.js`. It keeps curve geometry separate from the card's frequently refreshed text and updates the marker at most 30 times per second through the existing Cloud lifecycle. It adds no timer, animation loop, random draws, game-data writes, or Render API layer. Mine cards adapt to narrow windows, flip around the cursor near an edge, and shrink to fit unusually short viewports. The rest of the game's cards retain their native positioning.
+
+Run `node resources/app/game/mods/Cattail_TweaksQuality_Dynamic-Details/tests/verify-pump-distribution-chart.js` for native-probability comparisons and isolated browser checks. The new chart and its three settings have all 20 manifest languages with English fallback. Runtime chart words remain separate from manifest/settings translations. The test uses synthetic game data and fresh browser storage; player acceptance remains separate.
+
+## ModLoader shortcut hints
+
+All 18 existing keyboard/mouse actions are listed through ModLoader's display-only Shortcut API. Open the lower-left `?` to see the **Information and diagnostics** category. Disabled features hide their entries; enabled features with unmet conditions keep an inactive row explaining the required context. ModLoader's global and per-Mod shortcut visibility preferences still apply.
+
+| Keys | Action / context |
+| --- | --- |
+| Alt + Shift | Hold building details over a building or supported cell hint. |
+| Ctrl + Alt | Pin/unpin building details in that context, unless a resource is hovered. |
+| Z + wheel up/down | Change card opacity while Alt/details are active, outside resource-source controls. |
+| Middle mouse | Switch whole-card/detail-only opacity in a building context. |
+| Alt | Hold sources/consumers over a resource icon on the main plane. |
+| Ctrl + Alt | Pin/unpin the hovered resource panel. |
+| Shift | Temporarily preview resource links; with a line lock, preview the hovered resource and restore the lock on release or leaving the icons. Otherwise requires Alt or a pinned resource panel. |
+| Middle mouse | Lock, transfer or release links over a resource icon. |
+| Wheel up/down | Toggle the resource bar/line chart over an icon after its unlock, with the line-chart setting enabled. |
+| O | Switch resource links between Canvas 2D and WebGL. |
+| F8 | Toggle the resource-source performance profiler (diagnostics). |
+| Alt | Hold hovered-cell coordinates. |
+| Alt + C | Pin/unpin coordinates. |
+| Alt + Shift + C | Open coordinate teleport on an empty cell. |
+| Enter | Confirm teleport while its panel has focus. |
+| Escape | Close teleport while its panel has focus. |
+| Alt + Shift | Hold important-target directions on an empty cell. |
+| Ctrl + Alt | Pin/unpin directions on an empty cell, outside building/resource controls. |
+
+The consumer provides its own descriptions and conditions in all 20 manifest languages, with English fallback. These texts are separate from the four-language game-detail dictionary and manifest/settings translations. The API does not intercept or rebind input; existing controls and persistence remain owned by Dynamic Details. Repeated combinations represent different contexts and may produce the API's expected conflict warnings.
+
+`scripts/shortcut-hints.js` registers after game initialization and cleans its own handles on replacement. A private read-only core snapshot refreshes hints when context changes; focus events also refresh them. This adds no timer or animation loop. A Loader without the Shortcut API safely skips the hints.
+
+Run `node resources/app/game/mods/Cattail_TweaksQuality_Dynamic-Details/tests/verify-shortcut-hints.js` for the real Loader registry/panel, 20 languages, feature/context states, actual input and lifecycle checks. It runs in fresh isolated browser contexts with synthetic game/world data. Player acceptance remains separate.
+
+## Shop build countdown (desktop 1.3)
+
+The existing `enableBuildCountdown` setting displays an estimated build time under an unaffordable item's price. It supports the native 1.3 shop without Better UIs, plus Better UIs' native layout, 1.2.1-style list, eight-category compact view and 1.3 capsule layout. Affordable, locked, only-one and other-plane items have no active countdown.
+
+The estimate retains the recent net-resource-flow model: a 30-second window, a two-second minimum sample, roughly one-second display updates, the longest missing-resource wait, and the existing storage-cap oscillation safeguards. Unknown or nonpositive income displays `--`; durations round up to whole seconds. Orbifold theoretical production is a separate task.
+
+The feature follows the real Store card/price maps and its existing update lifecycle. It restores countdowns after price clearing and language rebuilds, cleans its old nodes on Store replacement, and adds no polling loop. Compact-view price signatures ignore countdown nodes so changing seconds does not replace rows or tooltip targets. Purchase rules and handlers remain native.
+
+Run `node resources/app/game/mods/Cattail_TweaksQuality_Dynamic-Details/tests/verify-build-countdown-browser.js` from the checkout. This uses real Store and Game resource methods in an isolated browser with synthetic world data and actions; it does not open a player profile or replace in-game acceptance.
+
+## Resource-source line controls
+
+Middle-click a resource to lock its income/consumption lines. While A is locked, hold Shift over B to temporarily show only B; release Shift or move away from the resource icons to restore A. This preview does not require Alt and does not change the saved lock. Hovering A draws one set of lines. Middle-clicking B still transfers the lock, and middle-clicking the locked resource releases it.
+
+Without a line lock, Shift retains the existing requirement of an active Alt resource view or a pinned resource panel. Pinned-panel virtual hover does not override a locked line's real-mouse preview. Canvas2D and WebGL, with Render API enabled or disabled, share this selection rule.
+
+Run `node resources/app/game/mods/Cattail_TweaksQuality_Dynamic-Details/tests/verify-resource-source-links.js` for the isolated real-Canvas/WebGL drawing checks. These use synthetic world/events and Render API callbacks; in-game acceptance is separate.
+
 ## Production telemetry API
 
 The API is available after vanilla scripts load:

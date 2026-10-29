@@ -1,8 +1,13 @@
 (function () {
 	'use strict'
 
+	// Private opt-in preload; no collector or timers are created by the Loader.
+	const startupProbe = typeof window === 'undefined' ? null : window.__modloaderStartupProbe
+	const observeStartup = (name, run, detail) => startupProbe ? startupProbe.observe(name, run, detail) : run()
+	startupProbe?.mark('loader-enter')
+
 	const state = {
-		version: '0.4.0',
+		version: '0.5.0',
 		booted: false,
 		mods: [],
 		modById: {},
@@ -13,6 +18,8 @@
 		languages: [],
 		log: [],
 		orphanEntities: [],
+		loadedSaveMetadata: {},
+		snapshotActivationSerial: 0,
 		enabledConfig: { mods: [] },
 		enabledEntries: [],
 		issues: [],
@@ -40,6 +47,8 @@
 		panelPreferredHideEdge: null,
 		panelModOrder: [],
 		panelConfigSectionOrder: {},
+		panelConfigLayout: {},
+		panelRecentLogExpanded: false,
 		panelSettings: { theme: 'dark', hideMode: 'auto', autoHideSeconds: 3, hideMenuDetails: false, hideModFileDetails: false, descriptionDisplayMode: 'hover', sortConfigSections: true, renderApiEnabled: true },
 		panelSettingsOpen: false,
 		panelStateLoaded: false,
@@ -47,6 +56,18 @@
 		uiButtons: {},
 		uiDocks: {},
 		uiProceduralIconRenderers: {},
+		shortcutEntries: {},
+		shortcutDiagnostics: [],
+		shortcutDiagnosticKeys: new Set(),
+		shortcutGeneration: 1,
+		shortcutSettings: { enabled: true, mods: {} },
+		shortcutOpen: false,
+		shortcutButton: null,
+		shortcutPanel: null,
+		shortcutUiInstalled: false,
+		shortcutRefreshFrame: 0,
+		shortcutMutationObserver: null,
+		shortcutResizeObserver: null,
 		gameHudHidden: false,
 		gameHudSnapshot: null,
 		gameHudItems: {},
@@ -161,7 +182,9 @@
 	const applyStatusCorner = function (el, corner) {
 		const vertical = corner.startsWith('top') ? 'top' : 'bottom'
 		const horizontal = corner.endsWith('left') ? 'left' : 'right'
-		el.style.left = horizontal === 'left' ? `${STATUS_MARGIN}px` : 'auto'
+		const shortcutOffset = corner === 'bottom-left' ? getShortcutStatusLeft() : STATUS_MARGIN
+		el.classList.toggle('modloader-shortcut-status-offset', corner === 'bottom-left' && shortcutOffset > STATUS_MARGIN)
+		el.style.left = horizontal === 'left' ? `${shortcutOffset}px` : 'auto'
 		el.style.right = horizontal === 'right' ? `${STATUS_MARGIN}px` : 'auto'
 		el.style.top = vertical === 'top' ? `${STATUS_MARGIN}px` : 'auto'
 		el.style.bottom = vertical === 'bottom' ? `${STATUS_MARGIN}px` : 'auto'
@@ -386,6 +409,7 @@
 		const changed = state.vanillaGameHudHidden !== hidden
 		state.vanillaGameHudHidden = hidden
 		applyVanillaGameHudVisibilityToDocks()
+		requestShortcutRefresh()
 		if (changed && typeof window !== 'undefined') {
 			window.dispatchEvent(new CustomEvent('modloader:vanilla-game-hud', { detail: { hidden, game } }))
 		}
@@ -2282,17 +2306,24 @@
 		if (typeof Game === 'undefined' || !Game.prototype || typeof Game.prototype[methodName] !== 'function') return false
 		state.renderPatchedMethods[methodName] = true
 		api.patch(Game.prototype, methodName, function (original) {
+			if (methodName === 'renderGrid') clearViewNativeGrid = original
 			return function (...args) {
 				const game = this
+				const draw = function () {
+					if (methodName === 'renderGrid') clearViewProbe?.observeGrid(game)
+					if (methodName === 'renderGrid' && clearViewProbe?.interceptGrid(game, original, args)) return undefined
+					if (methodName === 'renderGrid' && clearViewProbe?.skipGrid(game, original)) return undefined
+					return original.apply(game, args)
+				}
 				return measureRenderTiming(methodName, function () {
 					const layerId = getRenderMethodLayer(methodName)
-					if (!isRenderApiEnabled() || !layerId || !hasRenderLayerDemand(layerId)) return original.apply(game, args)
+					if (!isRenderApiEnabled() || !layerId || !hasRenderLayerDemand(layerId)) return draw()
 					const manager = ensureRenderLayerManager(game)
 					const frameState = getRenderLayerFrameState(layerId, manager)
 					if (!frameState.shouldDraw) return undefined
 					try {
 						const result = withRenderLayer(game, layerId, function () {
-							return original.apply(game, args)
+							return draw()
 						})
 						frameState.drew = true
 						return result
@@ -2309,6 +2340,7 @@
 	const installRenderApi = function (game) {
 		if (game) state.game = game
 		if (typeof Game === 'undefined' || !Game.prototype) return
+		preparePlacementProbe()
 		if (!state.renderInstalled) {
 			state.renderInstalled = true
 			state.renderTouchModeOverlayStyle = detectTouchModeOverlayStyle(Game.prototype.renderloop)
@@ -2551,6 +2583,7 @@
 		style.id = 'modloader-game-hud-style'
 		style.textContent = [
 			'body.modloader-game-hud-ready .shop,',
+			'body.modloader-game-hud-ready .store,',
 			'body.modloader-game-hud-ready .shopToggle,',
 			'body.modloader-game-hud-ready .chatIcon,',
 			'body.modloader-game-hud-ready .messenger,',
@@ -2566,6 +2599,8 @@
 			'body.modloader-game-hud-ready .modloader-ui-dock-game-top-right,',
 			'body.modloader-game-hud-ready .modloader-game-hud-item { transition: transform .26s cubic-bezier(.2,.8,.2,1), opacity .18s ease, filter .26s ease; will-change: transform, opacity; }',
 			'body.modloader-game-hud-hidden .shop { transform: translateX(calc(100% + 32px)); opacity: 0; pointer-events: none; }',
+			'body.modloader-game-hud-hidden .store { opacity: 0; visibility: hidden; }',
+			'body.modloader-game-hud-hidden .store, body.modloader-game-hud-hidden .store * { pointer-events: none !important; }',
 			'body.modloader-game-hud-hidden .shopToggle,',
 			'body.modloader-game-hud-hidden .chatIcon,',
 			'body.modloader-game-hud-hidden .explainer,',
@@ -2651,11 +2686,14 @@
 
 	const captureVanillaGameHudState = function (game) {
 		const messenger = game?.messenger
-		const shop = game?.shop
+		const shop = game?.store || game?.shop
 		const vessel = shop?.vessel
 		return {
 			messengerShown: messenger?.messagesShown === 1,
 			messengerScrollTop: messenger?.element?.scrollTop || 0,
+			storeCategories: shop === game?.store && shop?.html?.types ? Object.fromEntries(Object.entries(shop.html.types).map(function ([id, category]) {
+				return [id, { closed: !!category.button?.classList?.contains('closed'), scrollTop: category.wrap?.scrollTop || 0 }]
+			})) : null,
 			shopScrollTop: vessel?.scrollTop || 0,
 			shopMinimized: !!vessel?.classList?.contains('minimized'),
 			shopToggleToggled: !!shop?.shopToggle?.classList?.contains('toggled'),
@@ -2673,7 +2711,7 @@
 		game.removeHint?.()
 		game.hoveredResource = false
 		game.hoveredLabel = false
-		const shop = game.shop
+		const shop = game.store || game.shop
 		if (shop?.vessel?.classList?.contains('visible')) shop.vessel.classList.remove('visible')
 		shop?.mobileToggle?.classList?.remove('active')
 	}
@@ -2681,7 +2719,7 @@
 	const restoreVanillaGameHudState = function (game, snapshot) {
 		if (!game || !snapshot) return
 		const messenger = game.messenger
-		const shop = game.shop
+		const shop = game.store || game.shop
 		const vessel = shop?.vessel
 		if (vessel) {
 			vessel.classList.toggle('minimized', !!snapshot.shopMinimized)
@@ -2690,6 +2728,17 @@
 		}
 		shop?.shopToggle?.classList?.toggle('toggled', !!snapshot.shopToggleToggled)
 		shop?.mobileToggle?.classList?.toggle('active', !!snapshot.mobileToggleActive)
+		if (snapshot.storeCategories && shop === game.store && shop?.html?.types) {
+			for (const [id, saved] of Object.entries(snapshot.storeCategories)) {
+				const category = shop.html.types[id]
+				if (!category?.button) continue
+				category.button.classList.toggle('closed', saved.closed)
+				if (!saved.closed && !category.button.classList.contains('hidden')) shop.adjustWrap?.(category.wrap)
+			}
+			shop.isOpen = Object.values(shop.html.types).some(function (category) {
+				return category.button && !category.button.classList.contains('closed') && !category.button.classList.contains('hidden')
+			})
+		}
 		if (shop?.items?.length) {
 			for (const item of shop.items) item?.html?.classList?.remove('selected')
 			shop.selectedId = Math.min(Math.max(0, snapshot.shopSelectedId || 0), shop.items.length - 1)
@@ -2704,6 +2753,10 @@
 		const restoreScroll = function () {
 			if (vessel) vessel.scrollTop = snapshot.shopScrollTop || 0
 			if (messenger?.element) messenger.element.scrollTop = snapshot.messengerScrollTop || 0
+			for (const [id, saved] of Object.entries(snapshot.storeCategories || {})) {
+				const wrap = shop?.html?.types?.[id]?.wrap
+				if (wrap) wrap.scrollTop = saved.scrollTop || 0
+			}
 		}
 		requestAnimationFrame(restoreScroll)
 		setTimeout(restoreScroll, 140)
@@ -2830,6 +2883,7 @@
 		state.gameHudHidden = hidden
 		applyGameHudBodyClass()
 		syncGameHudEntries()
+		requestShortcutRefresh()
 		window.dispatchEvent(new CustomEvent('modloader:game-hud', { detail: { hidden, game } }))
 		return state.gameHudHidden
 	}
@@ -2911,6 +2965,13 @@
 		if (game) state.game = game
 		if (!state.vanillaGameHudSyncInstalled) {
 			state.vanillaGameHudSyncInstalled = true
+			if (typeof Store !== 'undefined' && Store.prototype) {
+				patchVanillaGameHudSyncMethod(Store.prototype, 'compositionUpdate', function (store) { return store.master })
+			}
+			if (typeof DesktopStoreVersion !== 'undefined' && DesktopStoreVersion.prototype) {
+				patchVanillaGameHudSyncMethod(DesktopStoreVersion.prototype, 'reinit', function (store) { return store.master })
+				patchVanillaGameHudSyncMethod(DesktopStoreVersion.prototype, 'visibilityUpdate', function (store) { return store.master })
+			}
 			if (typeof Shop !== 'undefined' && Shop.prototype) {
 				patchVanillaGameHudSyncMethod(Shop.prototype, 'init', function (shop) { return shop.master })
 				patchVanillaGameHudSyncMethod(Shop.prototype, 'check', function (shop) { return shop.master })
@@ -3555,6 +3616,7 @@
 			icons: createUiIconsApi(modId),
 			theme: createUiThemeApi(),
 			settings: createUiSettingsApi(modId),
+			shortcuts: createUiShortcutsApi(modId),
 			pages: createUiPagesApi(modId)
 		}
 	}
@@ -3605,7 +3667,18 @@
 			close: '\u5173\u95ed', hideToEdge: '\u9690\u85cf\u5230\u8fb9\u7f18', showFromEdge: '\u663e\u793a ModLoader \u83dc\u5355', menuSettings: 'Mod \u83dc\u5355\u8bbe\u7f6e', themeMode: '\u4eae\u8272 / \u6697\u8272\u6a21\u5f0f', darkMode: '\u6697\u8272', lightMode: '\u4eae\u8272', hideMode: '\u81ea\u52a8\u9690\u85cf\u6a21\u5f0f', autoHide: '\u81ea\u52a8\u9690\u85cf', manualHide: '\u624b\u52a8\u9690\u85cf', sortMod: '\u6392\u5e8f mod', sortConfigSection: '\u6392\u5e8f\u5b50\u529f\u80fd', configSectionSorting: '\u5b50\u529f\u80fd\u624b\u52a8\u6392\u5e8f', configSectionSortingOn: '\u5f00\u542f', configSectionSortingOff: '\u5173\u95ed', renderApi: '\u6e32\u67d3 API', renderApiOn: '\u5f00\u542f', renderApiOff: '\u5173\u95ed', renderApiLayerDemands: '\u5df2\u9700\u6c42\u56fe\u5c42', renderApiCreatedLayers: '\u5df2\u521b\u5efa\u56fe\u5c42', renderApiCallbacks: '\u56de\u8c03 \u6d3b\u8dc3/\u603b\u6570', renderApiLayerDemanders: '\u9700\u6c42\u5668 \u6d3b\u8dc3/\u603b\u6570', renderApiMethodRoutes: '\u5df2\u8def\u7531\u65b9\u6cd5', renderApiTiming: '\u8017\u65f6', autoHideDelay: '\u81ea\u52a8\u9690\u85cf\u79d2\u6570', secondsSuffix: '\u79d2', hideMenuDetails: '\u9690\u85cf\u83dc\u5355\u8be6\u60c5', hideModFileDetails: '\u9690\u85cf mod \u6587\u4ef6\u8be6\u60c5', show: '\u663e\u793a', hide: '\u9690\u85cf', installedMods: '\u5df2\u5b89\u88c5 mod', enabledEntries: '\u542f\u7528\u6761\u76ee', loadedMods: '\u5df2\u52a0\u8f7d mod', issues: '\u95ee\u9898', dataPatches: '\u6570\u636e\u8865\u4e01', wordPatches: '\u6587\u672c\u8865\u4e01', registeredLanguages: '\u5df2\u6ce8\u518c\u8bed\u8a00', orphanEntities: '\u5b64\u7acb\u5b9e\u4f53', modManager: 'Mod \u7ba1\u7406', selectAll: '\u5168\u9009', toggleNote: '\u5728\u4e0b\u65b9\u5f00\u5173 mod \u6216\u7f16\u8f91\u914d\u7f6e\u3002', changesRequireReload: '\u6539\u52a8\u9700\u8981 reload\u3002', configSaveNote: '\u914d\u7f6e\u5df2\u4fdd\u5b58\u5230 localStorage\uff1b\u90e8\u5206 mod \u9700\u8981 reload \u751f\u6548\u3002', saveReload: '\u4fdd\u5b58\u5e76 Reload', saveConfig: '\u4fdd\u5b58\u914d\u7f6e', insert: '\u5bfc\u5165', folder: '\u6587\u4ef6\u5939', deleteMod: '\u5220\u9664 mod', config: '\u914d\u7f6e', recentLog: '\u6700\u8fd1\u65e5\u5fd7', noLogEntries: '\u6682\u65e0\u65e5\u5fd7\u3002', noModsFound: '\u6ca1\u6709\u627e\u5230\u5e26 mod.json \u7684 mod\u3002', fileAccessUnavailable: '\u6587\u4ef6\u8bbf\u95ee\u4e0d\u53ef\u7528\u3002', fileAccessLoadedOnly: '\u6587\u4ef6\u8bbf\u95ee\u4e0d\u53ef\u7528\uff0c\u6240\u4ee5\u53ea\u80fd\u663e\u793a\u5df2\u52a0\u8f7d\u7684 mod\u3002', reloadHot: '\u652f\u6301\u70ed\u5f00\u5173\uff0c\u5f53\u524d\u4ecd\u5efa\u8bae reload', reloadRestart: '\u9700\u8981\u91cd\u542f', reloadRequired: '\u9700\u8981 reload', idPrefix: 'id\uff1a{value}', uniquePrefix: '\u552f\u4e00\u7801\uff1a{value}', depsPrefix: '\u4f9d\u8d56\uff1a{value}', conflictsPrefix: '\u51b2\u7a81\uff1a{value}', missingDependencies: '\u7f3a\u5c11\u4f9d\u8d56\uff1a{value}', conflictsEnabled: '\u5df2\u542f\u7528\u51b2\u7a81\uff1a{value}', savedReloading: '\u5df2\u4fdd\u5b58\uff0c\u6b63\u5728 reload...', saveFailed: '\u4fdd\u5b58\u5931\u8d25\uff1a{value}', configSaved: '\u914d\u7f6e\u5df2\u4fdd\u5b58\u3002', noChanges: '\u6ca1\u6709\u9700\u8981\u4fdd\u5b58\u7684\u6539\u52a8\u3002', changesCanceled: '\u5df2\u53d6\u6d88\u672a\u4fdd\u5b58\u7684\u6539\u52a8\u3002', openFolderFailed: '\u65e0\u6cd5\u6253\u5f00\u6587\u4ef6\u5939\uff1a{value}', deleteTitle: '\u5220\u9664 Mod\uff1f', deleteMessage: '\u4ece mods \u6587\u4ef6\u5939\u5220\u9664 {name}\uff1f\u8fd9\u4e2a\u64cd\u4f5c\u4e0d\u80fd\u64a4\u9500\u3002', deleteConfirm: '\u5220\u9664', cancel: '\u53d6\u6d88', replaceTitle: '\u66ff\u6362 Mod\uff1f', replaceMessage: 'mods \u91cc\u5df2\u7ecf\u6709 {name}\u3002\u662f\u5426\u7528\u5bfc\u5165\u7684 mod \u66ff\u6362\u5b83\uff1f', replaceConfirm: '\u66ff\u6362', deletedMod: '\u5df2\u5220\u9664 {name}\u3002\u5df2\u7ecf\u8fd0\u884c\u7684\u4ee3\u7801\u9700\u8981 reload \u624d\u4f1a\u5378\u8f7d\u3002', deleteFailed: '\u5220\u9664\u5931\u8d25\uff1a{value}', importHint: '\u628a\u6587\u4ef6\u62d6\u5230\u8fd9\u91cc\u6216\u590d\u5236', importDetail: '\u53ef\u4ee5\u628a mod zip \u5305\u76f4\u63a5\u62d6\u5165\uff0c\u6216\u8005\u590d\u5236 zip \u5305\u540e\u5728\u8fd9\u91cc\u6309\u7c98\u8d34\u5feb\u6377\u952e\uff0cModLoader \u4f1a\u81ea\u52a8\u89e3\u5305\u5230 mods \u6587\u4ef6\u5939\u3002', importWaiting: '\u7b49\u5f85 zip \u6587\u4ef6...', importNoZip: '\u8bf7\u62d6\u5165\u6216\u7c98\u8d34 .zip \u6587\u4ef6\u3002', importNoPath: '\u65e0\u6cd5\u8bfb\u53d6\u8be5\u6587\u4ef6\u8def\u5f84\u3002', importing: '\u6b63\u5728\u5bfc\u5165 {name}...', importedMod: '\u5df2\u5bfc\u5165 {name}\u3002\u9700\u8981\u65f6\u52fe\u9009\u5b83\u5e76\u4fdd\u5b58 reload\u3002', importFailed: '\u5bfc\u5165\u5931\u8d25\uff1a{value}', importModeOff: '\u8fd4\u56de mod \u5217\u8868', invalidZip: '\u53ea\u80fd\u5bfc\u5165 .zip mod \u5305\u3002', zipNoMod: '\u8fd9\u4e2a zip \u5185\u6ca1\u6709 mod.json\u3002', zipMultipleMods: '\u8fd9\u4e2a zip \u5305\u542b\u591a\u4e2a mod \u6587\u4ef6\u5939\uff1b\u8bf7\u4e00\u6b21\u5bfc\u5165\u4e00\u4e2a mod\u3002', zipExtractFailed: '\u65e0\u6cd5\u89e3\u538b zip\uff1a{value}', folderOpened: '\u5df2\u6253\u5f00 mods \u6587\u4ef6\u5939\u3002', replaceRenamedUniqueTitle: '\u53d1\u73b0\u540c\u552f\u4e00\u7801 Mod', replaceRenamedUniqueMessage: '\u65b0\u6587\u4ef6\u8ddf\u5df2\u6709\u6587\u4ef6\u6709\u76f8\u540c\u7684 mod \u552f\u4e00\u7801\uff0c\u5b83\u5f88\u53ef\u80fd\u662f\u65e7\u6587\u4ef6\u7684\u66f4\u65b0\u548c\u6539\u540d\u3002\n{oldName} \u2192 {newName}\n\u662f\u5426\u8986\u76d6\u65e7\u6587\u4ef6\uff1f', replaceRenamedPreviousTitle: '\u53d1\u73b0 Mod \u6539\u540d', replaceRenamedPreviousMessage: '\u8fd9\u4e2a\u65b0\u6587\u4ef6\u662f\u5df2\u6709\u6587\u4ef6\u7684\u6539\u540d\u3002\n{oldName} \u2192 {newName}\n\u662f\u5426\u8986\u76d6\u65e7\u6587\u4ef6\uff1f', replaceOld: '\u8986\u76d6', keepImported: '\u4e0d\u8986\u76d6\uff08\u52a0\u5165\u65b0\u6587\u4ef6\uff09', uniqueCodeEditTitle: '\u63a8\u8350\u4fee\u6539 mod \u552f\u4e00\u7801', uniqueCodeEditMessage: '\u8fd9\u4e24\u4e2a mod \u4f1a\u5171\u7528\u540c\u4e00\u4e2a mod \u552f\u4e00\u7801\u3002\u662f\u5426\u5728\u52a0\u5165\u65b0\u6587\u4ef6\u524d\u4fee\u6539\u5bfc\u5165 mod \u7684\u552f\u4e00\u7801\uff1f', uniqueCodeLabel: 'mod \u552f\u4e00\u7801', uniqueCodeConfirm: '\u786e\u8ba4\u4fee\u6539', uniqueCodeSkip: '\u5426\uff08\u4e0d\u4fee\u6539\uff09', manifestReadFailed: '\u65e0\u6cd5\u8bfb\u53d6 mod.json\uff1a{value}', translationFile: '\u7ffb\u8bd1', translationFileTitle: '\u6253\u5f00\u7ffb\u8bd1\u6587\u4ef6', translationFileSynced: '\u7ffb\u8bd1\u6587\u4ef6\u5df2\u540c\u6b65\uff1a{path}', translationFileFailed: '\u7ffb\u8bd1\u6587\u4ef6\u5931\u8d25\uff1a{value}'
 		}
 	}
+	PANEL_TEXT.en.configSectionSorting = 'Config layout sorting'
+	PANEL_TEXT.sch.configSectionSorting = '\u914d\u7f6e\u5e03\u5c40\u624b\u52a8\u6392\u5e8f'
 	Object.assign(PANEL_TEXT.en, {
+		searchHint: 'Search helps you find the config you want faster.',
+		searchPlaceholder: 'Search Mods, sections, or config...',
+		search: 'Search',
+		searchResultMod: 'Mod',
+		searchResultSection: 'Section',
+		searchResultConfig: 'Config',
+		searchNoResults: 'No matching items.',
+		recentLogExpand: 'Expand recent log',
+		recentLogCollapse: 'Collapse recent log',
 		devTools: 'DevTools',
 		devToolsTitle: 'Open DevTools',
 		devToolsOpened: 'DevTools opened.',
@@ -3648,9 +3721,28 @@
 		snapshotDetectedReason: 'Detected issue',
 		descriptionDisplayMode: 'Description display',
 		descriptionDisplayHover: 'Hover',
-		descriptionDisplayInline: 'Inline'
+		descriptionDisplayInline: 'Inline',
+		shortcutTips: 'Shortcut tips',
+		shortcutTipsEnabled: 'On',
+		shortcutTipsDisabled: 'Off',
+		shortcutTipsMods: 'Shortcut visibility by Mod',
+		shortcutTipsToggle: 'Show keyboard shortcuts',
+		shortcutSourceGame: 'Original game',
+		shortcutSourceModLoader: 'ModLoader',
+		shortcutSourceMods: 'Mods',
+		shortcutCategoryOther: 'Other',
+		shortcutContextInactive: 'Not available in the current context'
 	})
 	Object.assign(PANEL_TEXT.sch, {
+		searchHint: '\u641c\u7d22\u53ef\u66f4\u5feb\u627e\u5230\u60f3\u8981\u7684\u914d\u7f6e\u3002',
+		searchPlaceholder: '\u641c\u7d22 Mod\u3001\u5206\u7c7b\u6216\u914d\u7f6e\u2026\u2026',
+		search: '\u641c\u7d22',
+		searchResultMod: 'Mod',
+		searchResultSection: '\u5206\u7c7b',
+		searchResultConfig: '\u914d\u7f6e',
+		searchNoResults: '\u672a\u627e\u5230\u5339\u914d\u9879\u3002',
+		recentLogExpand: '\u5c55\u5f00\u6700\u8fd1\u65e5\u5fd7',
+		recentLogCollapse: '\u6536\u8d77\u6700\u8fd1\u65e5\u5fd7',
 		devTools: 'DevTools',
 		devToolsTitle: '\u6253\u5f00 DevTools',
 		devToolsOpened: 'DevTools \u5df2\u6253\u5f00\u3002',
@@ -3704,7 +3796,17 @@
 		snapshotDetectedReason: '\u68c0\u6d4b\u5230\u7684\u95ee\u9898',
 		descriptionDisplayMode: '\u63d0\u793a\u663e\u793a',
 		descriptionDisplayHover: '\u60ac\u6d6e',
-		descriptionDisplayInline: '\u76f4\u63a5\u663e\u793a'
+		descriptionDisplayInline: '\u76f4\u63a5\u663e\u793a',
+		shortcutTips: '\u5feb\u6377\u952e\u63d0\u793a',
+		shortcutTipsEnabled: '\u5f00\u542f',
+		shortcutTipsDisabled: '\u5173\u95ed',
+		shortcutTipsMods: '\u6309 Mod \u8bbe\u7f6e\u5feb\u6377\u952e\u53ef\u89c1\u6027',
+		shortcutTipsToggle: '\u663e\u793a\u952e\u76d8\u5feb\u6377\u952e',
+		shortcutSourceGame: '\u539f\u6e38\u620f',
+		shortcutSourceModLoader: 'ModLoader',
+		shortcutSourceMods: 'Mod',
+		shortcutCategoryOther: '\u5176\u4ed6',
+		shortcutContextInactive: '\u5f53\u524d\u60c5\u5883\u4e0b\u4e0d\u53ef\u7528'
 	})
 	PANEL_TEXT.modsch = PANEL_TEXT.sch
 	PANEL_TEXT.tch = PANEL_TEXT.sch
@@ -3713,8 +3815,37 @@
 	const TRANSLATION_CATALOG_KIND = 'sixty-four.modloader.translations'
 	const TRANSLATION_CATALOG_FORMAT_VERSION = 1
 	const TRANSLATION_CATALOG_META_KEY = '_meta'
+	// Registered variants derive game words after all Mod hooks and share display fallbacks.
+	const languageVariants = new Map()
+	const languageMenuLabels = new Map()
+	let languageMenuPatched = false
+	const getLanguageVariant = function () {
+		return languageVariants.get(String(state.game?.language || '').trim().toLowerCase())
+	}
+	const transformLocalizedText = function (text) {
+		const variant = getLanguageVariant()
+		return variant && typeof text === 'string' ? variant.transformText(text) : text
+	}
+	const transformLanguageWords = function (value, transform) {
+		if (typeof value === 'string') return transform(value)
+		if (Array.isArray(value)) return value.map(function (item) { return transformLanguageWords(item, transform) })
+		if (!value || typeof value !== 'object') return value
+		const out = {}
+		for (const key of Object.keys(value)) out[key] = transformLanguageWords(value[key], transform)
+		return out
+	}
+	const applyLanguageVariants = function (words) {
+		for (const [id, variant] of languageVariants) {
+			const source = words?.[variant.sourceLanguage]
+			if (!source || typeof source !== 'object') continue
+			const converted = transformLanguageWords(source, variant.transformText)
+			words[id] = deepMerge(isObject(words[id]) ? words[id] : {}, converted)
+			if (variant.languageName && words[id].splash) words[id].splash.language = variant.languageName
+		}
+		return words
+	}
 	const getPanelLanguage = function () {
-		const language = state.game?.language || ''
+		const language = getLanguageVariant()?.sourceLanguage || state.game?.language || ''
 		if (language === 'sch' || language === 'modsch') return 'sch'
 		if (language === 'tch') return 'tch'
 		return 'en'
@@ -3732,6 +3863,14 @@
 	}
 
 	const getCatalogPanelText = function (language, key) {
+		if (getLanguageVariant()) {
+			for (const candidate of getLocaleCandidates()) {
+				if (candidate === 'en' && language !== 'en' && PANEL_TEXT[language]?.[key]) continue
+				const value = state.translationCatalog?.languages?.[candidate]?.modloader?.[key]
+				if (typeof value === 'string' && value) return value
+			}
+			return ''
+		}
 		const group = getCatalogLanguageGroup(language)
 		const value = group?.modloader?.[key]
 		return typeof value === 'string' ? value : ''
@@ -3739,7 +3878,7 @@
 
 	const t = function (key, values) {
 		const language = getPanelLanguage()
-		const source = getCatalogPanelText(language, key) || PANEL_TEXT[language]?.[key] || PANEL_TEXT.en[key] || key
+		const source = transformLocalizedText(getCatalogPanelText(language, key) || PANEL_TEXT[language]?.[key] || PANEL_TEXT.en[key] || key)
 		return source.replace(/\{(\w+)\}/g, function (match, name) {
 			return values && values[name] !== undefined ? String(values[name]) : match
 		})
@@ -3759,6 +3898,7 @@
 		const panel = getPanelLanguage()
 		const out = []
 		addUniqueLocaleCandidate(out, raw)
+		addUniqueLocaleCandidate(out, getLanguageVariant()?.sourceLanguage)
 		addUniqueLocaleCandidate(out, panel)
 		if (raw === 'modsch' || panel === 'sch') {
 			addUniqueLocaleCandidate(out, 'modsch')
@@ -3776,12 +3916,12 @@
 	}
 
 	const pickLocalizedText = function (value, candidates) {
-		if (typeof value === 'string') return value
+		if (typeof value === 'string') return transformLocalizedText(value)
 		if (!isLocaleObject(value)) return ''
 		for (const language of candidates) {
-			if (typeof value[language] === 'string') return value[language]
+			if (typeof value[language] === 'string') return transformLocalizedText(value[language])
 		}
-		return typeof value.en === 'string' ? value.en : ''
+		return typeof value.en === 'string' ? transformLocalizedText(value.en) : ''
 	}
 
 	const getManifestTranslationRoot = function (manifest) {
@@ -3845,6 +3985,655 @@
 		if (!values) return text
 		for (const key in values) text = text.replace(new RegExp('\\{' + key + '\\}', 'g'), values[key])
 		return text
+	}
+
+	const SHORTCUT_API_VERSION = 1
+	const SHORTCUT_SOURCE_ORDER = Object.freeze([ 'game', 'loader', 'mod' ])
+	const SHORTCUT_MAX_ALTERNATIVES = 8
+	const SHORTCUT_MAX_CHORD_TOKENS = 6
+	const SHORTCUT_DIAGNOSTIC_LIMIT = 100
+	const SHORTCUT_TOKEN_ALIASES = Object.freeze({
+		control: 'Ctrl', ctrl: 'Ctrl', alt: 'Alt', option: 'Alt', shift: 'Shift', meta: 'Meta', command: 'Meta', cmd: 'Meta', win: 'Meta',
+		space: 'Space', spacebar: 'Space', enter: 'Enter', return: 'Enter', escape: 'Esc', esc: 'Esc', tab: 'Tab', backspace: 'Backspace',
+		delete: 'Delete', del: 'Delete', insert: 'Insert', home: 'Home', end: 'End', pageup: 'PageUp', pagedown: 'PageDown', capslock: 'CapsLock',
+		arrowup: 'ArrowUp', up: 'ArrowUp', arrowdown: 'ArrowDown', down: 'ArrowDown', arrowleft: 'ArrowLeft', left: 'ArrowLeft', arrowright: 'ArrowRight', right: 'ArrowRight',
+		wheelup: 'WheelUp', wheeldown: 'WheelDown', bracketleft: '[', bracketright: ']', comma: ',', period: '.', slash: '/', backslash: '\\',
+		semicolon: ';', quote: "'", backquote: '`', minus: '-', equal: '=', plus: '+'
+	})
+	const SHORTCUT_MOUSE_VISUALS = Object.freeze({
+		Mouse1: 'left',
+		Mouse2: 'right',
+		Mouse3: 'side-forward',
+		Mouse4: 'side-back',
+		Mouse5: 'middle',
+		WheelUp: 'wheel-up',
+		WheelDown: 'wheel-down'
+	})
+
+	const shortcutEntryKey = function (modId, id) {
+		return String(modId || 'anonymous') + ':' + String(id || '')
+	}
+
+	const pushShortcutDiagnostic = function (code, message, details, uniqueKey) {
+		const key = String(uniqueKey || code + ':' + message)
+		if (state.shortcutDiagnosticKeys.has(key)) return
+		state.shortcutDiagnosticKeys.add(key)
+		state.shortcutDiagnostics.push({ code, message, details: details || null })
+		if (state.shortcutDiagnostics.length > SHORTCUT_DIAGNOSTIC_LIMIT) state.shortcutDiagnostics.shift()
+		warn(message, details || '')
+	}
+
+	const normalizeShortcutToken = function (value) {
+		const text = String(value ?? '').trim()
+		if (!text) return ''
+		const alias = SHORTCUT_TOKEN_ALIASES[text.toLowerCase()]
+		if (alias) return alias
+		if (/^[a-z]$/i.test(text)) return text.toUpperCase()
+		if (/^[0-9]$/.test(text)) return text
+		if (/^f(?:[1-9]|1[0-9]|2[0-4])$/i.test(text)) return text.toUpperCase()
+		if (/^mouse[1-5]$/i.test(text)) return 'Mouse' + text.slice(-1)
+		return ''
+	}
+
+	const normalizeShortcutChord = function (value) {
+		let values = Array.isArray(value) ? value.slice() : [ value ]
+		if (values.length === 1 && typeof values[0] === 'string' && values[0] !== '+' && values[0].includes('+')) {
+			values = values[0].split(/\s*\+\s*/)
+		}
+		if (!values.length || values.length > SHORTCUT_MAX_CHORD_TOKENS) throw new Error('Shortcut chords require 1-' + SHORTCUT_MAX_CHORD_TOKENS + ' tokens.')
+		const chord = values.map(normalizeShortcutToken)
+		if (chord.some(function (token) { return !token })) throw new Error('Shortcut keys contain an unsupported token.')
+		return chord
+	}
+
+	const normalizeShortcutKeys = function (value) {
+		let alternatives
+		if (typeof value === 'string') alternatives = [ [ value ] ]
+		else if (Array.isArray(value) && value.length && value.every(function (item) { return typeof item === 'string' })) alternatives = [ value ]
+		else if (Array.isArray(value) && value.length && value.every(Array.isArray)) alternatives = value
+		else throw new Error('Shortcut keys must be a token, a chord array, or an array of chord arrays.')
+		if (alternatives.length > SHORTCUT_MAX_ALTERNATIVES) throw new Error('Shortcut keys allow at most ' + SHORTCUT_MAX_ALTERNATIVES + ' alternatives.')
+		return alternatives.map(normalizeShortcutChord)
+	}
+
+	const isShortcutTextValue = function (value, optional) {
+		if (optional && (value === undefined || value === null || value === '')) return true
+		if (typeof value === 'function') return true
+		if (typeof value === 'string') return !!value.trim()
+		if (!isLocaleObject(value)) return false
+		const values = Object.values(value)
+		return values.length > 0 && values.every(function (text) { return typeof text === 'string' }) && values.some(function (text) { return !!text.trim() })
+	}
+
+	const normalizeShortcutOrder = function (value, fallback) {
+		const number = Number(value)
+		return Number.isFinite(number) ? number : fallback
+	}
+
+	const normalizeShortcutCategory = function (value) {
+		if (value === undefined || value === null) return { id: 'other', label: null, order: 100 }
+		if (!isLocaleObject(value)) throw new Error('Shortcut category must be an object.')
+		const id = String(value.id || '').trim()
+		if (!/^[a-z0-9][a-z0-9._-]{0,79}$/i.test(id)) throw new Error('Shortcut category id is invalid.')
+		if (!isShortcutTextValue(value.label, false)) throw new Error('Shortcut category label is required.')
+		return { id, label: value.label, order: normalizeShortcutOrder(value.order, 100) }
+	}
+
+	const normalizeShortcutEntry = function (modId, options, source, generation) {
+		if (!isLocaleObject(options)) throw new Error('Shortcut registration must be an object.')
+		const id = String(options.id || '').trim()
+		if (!/^[a-z0-9][a-z0-9._-]{0,99}$/i.test(id)) throw new Error('Shortcut id is invalid.')
+		if (!isShortcutTextValue(options.description, false)) throw new Error('Shortcut description is required.')
+		if (!isShortcutTextValue(options.context, true)) throw new Error('Shortcut context must be localized text or a text function.')
+		if (options.visible !== undefined && typeof options.visible !== 'boolean' && typeof options.visible !== 'function') throw new Error('Shortcut visible must be a boolean or function.')
+		if (options.active !== undefined && typeof options.active !== 'boolean' && typeof options.active !== 'function') throw new Error('Shortcut active must be a boolean or function.')
+		return {
+			id,
+			key: shortcutEntryKey(modId, id),
+			modId: String(modId || 'anonymous'),
+			source: SHORTCUT_SOURCE_ORDER.includes(source) ? source : 'mod',
+			keys: normalizeShortcutKeys(options.keys),
+			description: options.description,
+			context: options.context,
+			visible: options.visible === undefined ? true : options.visible,
+			active: options.active === undefined ? true : options.active,
+			allowSharedCombination: options.allowSharedCombination === true,
+			order: normalizeShortcutOrder(options.order, 100),
+			category: normalizeShortcutCategory(options.category),
+			generation,
+			raw: Object.assign({}, options)
+		}
+	}
+
+	const shortcutTextSignature = function (value) {
+		if (typeof value === 'function') return 'function'
+		if (typeof value === 'string') return value
+		try { return JSON.stringify(value) } catch (error) { return String(value) }
+	}
+
+	const shortcutCategoryMatches = function (a, b) {
+		return !!a && !!b && a.id === b.id && a.order === b.order && shortcutTextSignature(a.label) === shortcutTextSignature(b.label)
+	}
+
+	const shortcutConflictTokenOrder = function (token) {
+		const modifierOrder = { Ctrl: 0, Alt: 1, Shift: 2, Meta: 3 }
+		if (Object.prototype.hasOwnProperty.call(modifierOrder, token)) return modifierOrder[token]
+		if (/^(?:Mouse|Wheel)/.test(token)) return 20
+		return 10
+	}
+
+	const shortcutChordConflictSignature = function (chord) {
+		return Array.from(new Set(chord)).sort(function (a, b) {
+			return (shortcutConflictTokenOrder(a) - shortcutConflictTokenOrder(b)) || a.localeCompare(b)
+		}).join('+')
+	}
+
+	const shortcutConflictCombinations = function (entry) {
+		return new Set(entry.keys.map(shortcutChordConflictSignature))
+	}
+
+	const recordShortcutCategoryConflicts = function (entry) {
+		for (const key in state.shortcutEntries) {
+			const other = state.shortcutEntries[key]
+			if (!other || other.key === entry.key) continue
+			if (other.modId !== entry.modId && other.source === 'mod' && entry.source === 'mod' && other.category.id === entry.category.id && !shortcutCategoryMatches(other.category, entry.category)) {
+				const pair = [ other.modId, entry.modId ].sort().join('|')
+				pushShortcutDiagnostic('category-conflict', 'Shortcut category metadata conflicts for ' + entry.category.id + '; the conflicting Mod will be isolated.', { mods: pair }, 'category-conflict:' + entry.category.id + ':' + pair)
+			}
+		}
+	}
+
+	const recordShortcutCombinationConflicts = function (entryStates) {
+		for (let index = 0; index < entryStates.length; index++) {
+			const firstState = entryStates[index]
+			if (!firstState.visible || !firstState.active) continue
+			const first = firstState.entry
+			const firstCombinations = shortcutConflictCombinations(first)
+			for (let otherIndex = index + 1; otherIndex < entryStates.length; otherIndex++) {
+				const secondState = entryStates[otherIndex]
+				if (!secondState.visible || !secondState.active) continue
+				const second = secondState.entry
+				if (first.allowSharedCombination && second.allowSharedCombination) continue
+				const secondCombinations = shortcutConflictCombinations(second)
+				const pairEntries = [ first.key, second.key ].sort()
+				const pair = pairEntries.join('|')
+				for (const combination of firstCombinations) {
+					if (!secondCombinations.has(combination)) continue
+					pushShortcutDiagnostic(
+						'duplicate-combination',
+						'Potential shortcut overlap for ' + combination + ': ' + pairEntries[0] + ' and ' + pairEntries[1] + ' are both visible and active.',
+						{ entries: pairEntries, combination },
+						'duplicate-combination:' + pair + ':' + combination
+					)
+				}
+			}
+		}
+	}
+
+	const inertShortcutHandle = function () {
+		return Object.freeze({ update() { return false }, unregister() { return false } })
+	}
+
+	const createShortcutHandle = function (modId, id, generation) {
+		return Object.freeze({
+			update(patch) { return updateShortcut(modId, id, generation, patch) },
+			unregister() { return unregisterShortcut(modId, id, generation) }
+		})
+	}
+
+	const registerShortcut = function (modId, options, source) {
+		const generation = state.shortcutGeneration++
+		let entry
+		try {
+			entry = normalizeShortcutEntry(modId, options, source, generation)
+		} catch (error) {
+			pushShortcutDiagnostic('invalid-registration', 'Ignoring invalid shortcut registration from ' + (modId || 'anonymous') + ': ' + error.message, null, 'invalid-registration:' + (modId || 'anonymous') + ':' + String(options?.id || generation))
+			return inertShortcutHandle()
+		}
+		const previous = state.shortcutEntries[entry.key]
+		if (previous) pushShortcutDiagnostic('duplicate-id', 'Replacing duplicate shortcut id ' + entry.id + ' from ' + entry.modId + '.', null, 'duplicate-id:' + entry.key + ':' + generation)
+		const sibling = Object.values(state.shortcutEntries).find(function (candidate) { return candidate.modId === entry.modId && candidate.key !== entry.key })
+		if (sibling && !shortcutCategoryMatches(sibling.category, entry.category)) {
+			pushShortcutDiagnostic('mod-category-conflict', 'A Mod may declare only one shortcut category; keeping the existing category for ' + entry.modId + '.', null, 'mod-category-conflict:' + entry.modId)
+			entry.category = sibling.category
+		}
+		state.shortcutEntries[entry.key] = entry
+		recordShortcutCategoryConflicts(entry)
+		requestShortcutRefresh()
+		requestAnimationFrame(refreshOpenPanel)
+		return createShortcutHandle(entry.modId, entry.id, generation)
+	}
+
+	const updateShortcut = function (modId, id, generation, patch) {
+		const key = shortcutEntryKey(modId, id)
+		const current = state.shortcutEntries[key]
+		if (!current || current.generation !== generation || !isLocaleObject(patch)) return false
+		if (patch.id !== undefined && String(patch.id) !== current.id) {
+			pushShortcutDiagnostic('immutable-id', 'Shortcut ids cannot be changed by update().', { modId, id }, 'immutable-id:' + key)
+			return false
+		}
+		let next
+		try {
+			next = normalizeShortcutEntry(modId, Object.assign({}, current.raw, patch, { id: current.id }), current.source, generation)
+		} catch (error) {
+			pushShortcutDiagnostic('invalid-update', 'Ignoring invalid shortcut update from ' + modId + ': ' + error.message, { id }, 'invalid-update:' + key + ':' + error.message)
+			return false
+		}
+		state.shortcutEntries[key] = next
+		if (Object.prototype.hasOwnProperty.call(patch, 'category')) {
+			for (const siblingKey in state.shortcutEntries) {
+				const sibling = state.shortcutEntries[siblingKey]
+				if (sibling.modId !== next.modId || sibling.key === key) continue
+				sibling.category = next.category
+				sibling.raw = Object.assign({}, sibling.raw, { category: patch.category })
+			}
+		}
+		recordShortcutCategoryConflicts(next)
+		requestShortcutRefresh()
+		return true
+	}
+
+	const unregisterShortcut = function (modId, id, generation) {
+		const key = shortcutEntryKey(modId, id)
+		const current = state.shortcutEntries[key]
+		if (!current || current.generation !== generation) return false
+		delete state.shortcutEntries[key]
+		requestShortcutRefresh()
+		requestAnimationFrame(refreshOpenPanel)
+		return true
+	}
+
+	const createUiShortcutsApi = function (modId) {
+		return Object.freeze({
+			version: SHORTCUT_API_VERSION,
+			register(options) { return registerShortcut(modId, options, 'mod') },
+			refresh() { requestShortcutRefresh() }
+		})
+	}
+
+	const getShortcutModOrder = function (modId) {
+		const mod = state.modById[modId]
+		const path = mod?.path || modId
+		const index = state.panelModOrder.indexOf(path)
+		return index >= 0 ? index : Number.MAX_SAFE_INTEGER
+	}
+
+	const getShortcutModName = function (modId) {
+		const mod = state.modById[modId]
+		return getLocalizedModName(mod) || String(modId || '')
+	}
+
+	const getRegisteredShortcutModIds = function () {
+		return Array.from(new Set(Object.values(state.shortcutEntries).filter(function (entry) { return entry.source === 'mod' }).map(function (entry) { return entry.modId }))).sort(function (a, b) {
+			return (getShortcutModOrder(a) - getShortcutModOrder(b)) || getShortcutModName(a).localeCompare(getShortcutModName(b)) || a.localeCompare(b)
+		})
+	}
+
+	const resolveShortcutText = function (value, entry, fallback) {
+		let resolved = value
+		if (typeof value === 'function') {
+			try {
+				resolved = value(Object.freeze({ modId: entry.modId, id: entry.id, game: state.game, state }))
+			} catch (error) {
+				pushShortcutDiagnostic('text-error', 'Shortcut text provider failed for ' + entry.key + ': ' + error.message, null, 'text-error:' + entry.key + ':' + error.message)
+				resolved = ''
+			}
+		}
+		return pickLocalizedText(resolved, getLocaleCandidates()) || fallback || ''
+	}
+
+	const evaluateShortcutPredicate = function (value, entry, fallback, kind) {
+		if (typeof value !== 'function') return value === undefined ? fallback : value !== false
+		try { return value(Object.freeze({ modId: entry.modId, id: entry.id, game: state.game, state })) !== false }
+		catch (error) {
+			pushShortcutDiagnostic(kind + '-error', 'Shortcut ' + kind + ' predicate failed for ' + entry.key + ': ' + error.message, null, kind + '-error:' + entry.key + ':' + error.message)
+			return false
+		}
+	}
+
+	const resolveShortcutEntryStates = function () {
+		return Object.values(state.shortcutEntries).map(function (entry) {
+			const visible = evaluateShortcutPredicate(entry.visible, entry, true, 'visible')
+			return { entry, visible, active: visible && evaluateShortcutPredicate(entry.active, entry, true, 'active') }
+		})
+	}
+
+	const getVisibleShortcutEntries = function (entryStates) {
+		loadPanelState()
+		return entryStates.filter(function (entryState) {
+			return entryState.visible && state.shortcutSettings.mods[entryState.entry.modId] !== false
+		}).map(function (entryState) { return entryState.entry })
+	}
+
+	const getShortcutSourceLabel = function (source) {
+		if (source === 'game') return t('shortcutSourceGame')
+		if (source === 'loader') return t('shortcutSourceModLoader')
+		return t('shortcutSourceMods')
+	}
+
+	const getShortcutCategoryLabel = function (category, entry) {
+		return resolveShortcutText(category?.label, entry, t('shortcutCategoryOther'))
+	}
+
+	const sortShortcutEntries = function (entries) {
+		return entries.slice().sort(function (a, b) {
+			return (getShortcutModOrder(a.modId) - getShortcutModOrder(b.modId)) || getShortcutModName(a.modId).localeCompare(getShortcutModName(b.modId)) || (a.order - b.order) || a.id.localeCompare(b.id)
+		})
+	}
+
+	const buildShortcutViewModel = function (entries) {
+		const sections = []
+		for (const source of SHORTCUT_SOURCE_ORDER) {
+			const sourceEntries = entries.filter(function (entry) { return entry.source === source })
+			if (!sourceEntries.length) continue
+			const categories = []
+			if (source !== 'mod') {
+				categories.push({ category: null, mods: [ { modId: source, name: getShortcutSourceLabel(source), entries: sortShortcutEntries(sourceEntries) } ] })
+			} else {
+				const byMod = new Map()
+				for (const entry of sourceEntries) {
+					if (!byMod.has(entry.modId)) byMod.set(entry.modId, [])
+					byMod.get(entry.modId).push(entry)
+				}
+				const canonical = new Map()
+				const groups = new Map()
+				const modIds = Array.from(byMod.keys()).sort(function (a, b) { return (getShortcutModOrder(a) - getShortcutModOrder(b)) || a.localeCompare(b) })
+				for (const modId of modIds) {
+					const modEntries = sortShortcutEntries(byMod.get(modId))
+					const category = modEntries[0].category
+					let groupKey = category.id
+					if (!canonical.has(category.id)) canonical.set(category.id, category)
+					else if (!shortcutCategoryMatches(canonical.get(category.id), category)) groupKey += '::' + modId
+					if (!groups.has(groupKey)) groups.set(groupKey, { category, mods: [] })
+					groups.get(groupKey).mods.push({ modId, name: getShortcutModName(modId), entries: modEntries })
+				}
+				categories.push(...Array.from(groups.values()).sort(function (a, b) { return (a.category.order - b.category.order) || a.category.id.localeCompare(b.category.id) }))
+			}
+			sections.push({ source, label: getShortcutSourceLabel(source), categories })
+		}
+		return sections
+	}
+
+	const ensureShortcutStyle = function () {
+		if (document.getElementById('modloader-shortcut-style')) return
+		const style = document.createElement('style')
+		style.id = 'modloader-shortcut-style'
+		style.textContent = `
+			#modloader-shortcut-button { appearance:none; position:absolute; left:calc(var(--unit) * 3.35); bottom:calc(var(--unit) * .5); z-index:2; width:calc(var(--unit) * 2.5); height:calc(var(--unit) * 2.5); box-sizing:border-box; display:none; place-items:center; padding:0; border:1px solid rgba(255,255,255,.34); border-radius:50%; background:rgba(24,25,29,.92); color:#fff; box-shadow:0 4px 10px rgba(0,0,0,.2); font:700 calc(var(--unit) * 1.35)/1 Montserrat,Arial,sans-serif; cursor:pointer; user-select:none; }
+			#modloader-shortcut-button:hover { transform:translateY(-1px); box-shadow:0 6px 14px rgba(0,0,0,.26); }
+			#modloader-shortcut-button:focus-visible { outline:2px solid #fff; outline-offset:2px; }
+			#modloader-shortcut-button.modloader-shortcut-theme-light { border-color:rgba(0,0,0,.12); background:#fff; color:#202126; box-shadow:0 4px 8px rgba(0,0,0,.1); }
+			#modloader-shortcut-panel { position:fixed; z-index:2; display:none; box-sizing:border-box; overflow-x:hidden; overflow-y:auto; padding:4px 6px 10px 16px; border:0; background:transparent; color:#fff; scrollbar-width:thin; scrollbar-color:rgba(255,255,255,.72) transparent; font-family:Montserrat,Arial,sans-serif; text-shadow:none; direction:rtl; outline:none; }
+			#modloader-shortcut-panel::-webkit-scrollbar { width:5px; }
+			#modloader-shortcut-panel::-webkit-scrollbar-track { background:transparent; }
+			#modloader-shortcut-panel::-webkit-scrollbar-thumb { border-radius:3px; background:rgba(255,255,255,.72); }
+			#modloader-shortcut-panel.modloader-shortcut-panel-open { display:block; }
+			.modloader-shortcut-source { margin:0 0 16px; direction:ltr; }
+			.modloader-shortcut-source-title { margin:0 0 9px; font-size:18px; font-weight:800; letter-spacing:.08em; text-transform:uppercase; }
+			.modloader-shortcut-category-title { margin:12px 0 7px; font-size:16px; font-weight:700; opacity:.86; }
+			.modloader-shortcut-mod-title { margin:9px 0 6px; font-size:15px; font-weight:650; opacity:.74; }
+			.modloader-shortcut-row { display:grid; grid-template-columns:minmax(116px,max-content) minmax(0,1fr); align-items:center; gap:14px; min-height:37px; padding:4px 0; }
+			.modloader-shortcut-row-inactive { opacity:.7; }
+			.modloader-shortcut-keys { display:inline-flex; align-items:center; flex-wrap:wrap; gap:6px; min-width:0; }
+			.modloader-shortcut-chord { display:inline-flex; align-items:center; gap:5px; }
+			.modloader-shortcut-key { display:inline-grid; place-items:center; box-sizing:border-box; min-width:32px; height:30px; padding:0 8px; border:1px solid rgba(0,0,0,.2); border-radius:6px; background:#fff; color:#17181b; box-shadow:0 2px 0 #ffe0b5,0 3px 7px rgba(0,0,0,.22); font:700 13.25px/1 Montserrat,Arial,sans-serif; }
+			.modloader-shortcut-key-space { min-width:112px; }
+			.modloader-shortcut-space-mark { width:16px; height:5px; border:1.5px solid #17181b; border-top:0; border-radius:0 0 3px 3px; }
+			.modloader-shortcut-key-mouse { min-width:34px; width:34px; height:30px; padding:0; border:0; border-radius:0; justify-content:flex-end; background:transparent; box-shadow:none; }
+			.modloader-shortcut-mouse { position:relative; display:block; box-sizing:border-box; width:28px; height:30px; border:1px solid rgba(0,0,0,.2); border-radius:10px; background:#fff; box-shadow:0 2px 0 #ffe0b5,0 3px 7px rgba(0,0,0,.22); overflow:visible; }
+			.modloader-shortcut-mouse-button { position:absolute; z-index:1; top:1px; width:13px; height:12px; background:#fff; }
+			.modloader-shortcut-mouse-button-left { left:1px; border-radius:9px 0 0 0; }
+			.modloader-shortcut-mouse-button-right { right:1px; border-radius:0 9px 0 0; }
+			.modloader-shortcut-mouse-side { position:absolute; z-index:3; left:-3px; box-sizing:border-box; width:3px; height:6px; border:1px solid rgba(0,0,0,.2); border-radius:2px 0 0 2px; background:#fff; }
+			.modloader-shortcut-mouse-side.modloader-shortcut-mouse-side-forward { top:8px; }
+			.modloader-shortcut-mouse-side.modloader-shortcut-mouse-side-back { top:16px; }
+			.modloader-shortcut-mouse-wheel { position:absolute; z-index:4; left:50%; top:3px; box-sizing:border-box; width:7px; height:10px; border:1px solid rgba(0,0,0,.2); border-radius:4px; background:#fff; transform:translateX(-50%); }
+			.modloader-shortcut-mouse-left .modloader-shortcut-mouse-button-left,
+			.modloader-shortcut-mouse-right .modloader-shortcut-mouse-button-right,
+			.modloader-shortcut-mouse-side-forward .modloader-shortcut-mouse-side-forward,
+			.modloader-shortcut-mouse-side-back .modloader-shortcut-mouse-side-back,
+			.modloader-shortcut-mouse-middle .modloader-shortcut-mouse-wheel,
+			.modloader-shortcut-mouse-wheel-up .modloader-shortcut-mouse-wheel,
+			.modloader-shortcut-mouse-wheel-down .modloader-shortcut-mouse-wheel { background:#ffe0b5; }
+			.modloader-shortcut-mouse-wheel-up .modloader-shortcut-mouse-wheel::after,
+			.modloader-shortcut-mouse-wheel-down .modloader-shortcut-mouse-wheel::after { content:""; position:absolute; left:50%; top:50%; width:3px; height:3px; border:solid #17181b; border-width:0 1.5px 1.5px 0; transform-origin:center; }
+			.modloader-shortcut-mouse-wheel-up .modloader-shortcut-mouse-wheel::after { transform:translate(-50%,-35%) rotate(-135deg); }
+			.modloader-shortcut-mouse-wheel-down .modloader-shortcut-mouse-wheel::after { transform:translate(-50%,-65%) rotate(45deg); }
+			.modloader-shortcut-plus,.modloader-shortcut-or { font-size:13.25px; font-weight:800; opacity:.82; }
+			.modloader-shortcut-description { min-width:0; font-size:15px; line-height:1.35; }
+			.modloader-shortcut-context { display:block; margin-top:2px; font-size:12px; opacity:.78; }
+			.mobile #modloader-shortcut-button,.mobile #modloader-shortcut-panel { display:none !important; }
+		`
+		document.head.appendChild(style)
+	}
+
+	const renderShortcutMouseToken = function (visual) {
+		const mouse = element('span', 'modloader-shortcut-mouse modloader-shortcut-mouse-' + visual)
+		mouse.setAttribute('aria-hidden', 'true')
+		mouse.appendChild(element('span', 'modloader-shortcut-mouse-button modloader-shortcut-mouse-button-left'))
+		mouse.appendChild(element('span', 'modloader-shortcut-mouse-button modloader-shortcut-mouse-button-right'))
+		mouse.appendChild(element('span', 'modloader-shortcut-mouse-side modloader-shortcut-mouse-side-forward'))
+		mouse.appendChild(element('span', 'modloader-shortcut-mouse-side modloader-shortcut-mouse-side-back'))
+		mouse.appendChild(element('span', 'modloader-shortcut-mouse-wheel'))
+		return mouse
+	}
+
+	const renderShortcutKeys = function (keys) {
+		const wrap = element('span', 'modloader-shortcut-keys')
+		keys.forEach(function (chord, chordIndex) {
+			if (chordIndex) wrap.appendChild(element('span', 'modloader-shortcut-or', '/'))
+			const chordElement = element('span', 'modloader-shortcut-chord')
+			chord.forEach(function (token, tokenIndex) {
+				if (tokenIndex) chordElement.appendChild(element('span', 'modloader-shortcut-plus', '+'))
+				const mouseVisual = SHORTCUT_MOUSE_VISUALS[token]
+				const key = element('span', 'modloader-shortcut-key' + (mouseVisual ? ' modloader-shortcut-key-mouse' : token === 'Space' ? ' modloader-shortcut-key-space' : ''))
+				if (mouseVisual) {
+					key.setAttribute('role', 'img')
+					key.setAttribute('aria-label', token)
+					key.setAttribute('title', token)
+				}
+				if (mouseVisual) key.appendChild(renderShortcutMouseToken(mouseVisual))
+				else if (token === 'Space') {
+					const mark = element('span', 'modloader-shortcut-space-mark')
+					mark.setAttribute('aria-label', 'Space')
+					key.appendChild(mark)
+				} else key.textContent = token
+				chordElement.appendChild(key)
+			})
+			wrap.appendChild(chordElement)
+		})
+		return wrap
+	}
+
+	const renderShortcutPanel = function (panel, entries, activeByKey) {
+		panel.innerHTML = ''
+		for (const section of buildShortcutViewModel(entries)) {
+			const source = element('section', 'modloader-shortcut-source')
+			source.appendChild(element('div', 'modloader-shortcut-source-title', section.label))
+			for (const category of section.categories) {
+				if (section.source === 'mod') source.appendChild(element('div', 'modloader-shortcut-category-title', getShortcutCategoryLabel(category.category, category.mods[0].entries[0])))
+				for (const mod of category.mods) {
+					if (section.source === 'mod') source.appendChild(element('div', 'modloader-shortcut-mod-title', mod.name))
+					for (const entry of mod.entries) {
+						const active = activeByKey.has(entry.key) ? activeByKey.get(entry.key) : evaluateShortcutPredicate(entry.active, entry, true, 'active')
+						const row = element('div', 'modloader-shortcut-row' + (active ? '' : ' modloader-shortcut-row-inactive'))
+						row.appendChild(renderShortcutKeys(entry.keys))
+						const description = element('span', 'modloader-shortcut-description', resolveShortcutText(entry.description, entry, entry.id))
+						if (!active) description.appendChild(element('span', 'modloader-shortcut-context', resolveShortcutText(entry.context, entry, t('shortcutContextInactive'))))
+						row.appendChild(description)
+						source.appendChild(row)
+					}
+				}
+			}
+			panel.appendChild(source)
+		}
+	}
+
+	const observeShortcutLayoutNode = function (node) {
+		if (!node || !state.shortcutResizeObserver) return
+		try { state.shortcutResizeObserver.observe(node) } catch (error) {}
+	}
+
+	const shortcutMutationAffectsLayout = function (records) {
+		return records.some(function (record) {
+			const target = record.target
+			if (target === document.body || target?.matches?.('.messenger,.chatIcon') || target?.closest?.('.messenger,.chatIcon')) return true
+			return [ ...record.addedNodes, ...record.removedNodes ].some(function (node) {
+				return node?.matches?.('.messenger,.chatIcon') || node?.querySelector?.('.messenger,.chatIcon')
+			})
+		})
+	}
+
+	const refreshShortcutLayout = function () {
+		const panel = state.shortcutPanel
+		if (!panel || !state.shortcutOpen) return
+		const game = state.game
+		const pixelRatio = Number(game?.pixelRatio) || Number(window.devicePixelRatio) || 1
+		const canvasRect = game?.canvas?.getBoundingClientRect?.() || { left: 0, top: 0 }
+		let top = Math.max(72, window.innerHeight * .12)
+		if (Array.isArray(game?.resourceHomes) && game.resourceHomes.length && Number(game?.screenUnit) > 0) {
+			const maxY = Math.max(...game.resourceHomes.map(function (home) { return Number(home?.[1]) || 0 }))
+			top = canvasRect.top + (maxY + Number(game.screenUnit) * .55) / pixelRatio
+		}
+		const messenger = document.querySelector('.messenger')
+		const chatIcon = document.querySelector('.chatIcon')
+		observeShortcutLayoutNode(messenger)
+		observeShortcutLayoutNode(chatIcon)
+		let bottom = window.innerHeight - 72
+		let widthSource = 0
+		let left = 8
+		if (messenger) {
+			const rect = messenger.getBoundingClientRect()
+			const style = typeof getComputedStyle === 'function' ? getComputedStyle(messenger) : null
+			widthSource = rect.width
+			left = rect.left
+			if (rect.height > 0 && style?.display !== 'none' && style?.visibility !== 'hidden') bottom = Math.min(bottom, rect.top - 10)
+		}
+		if (chatIcon) {
+			const rect = chatIcon.getBoundingClientRect()
+			if (!widthSource && rect.width) widthSource = rect.width * 8.8
+			if (!messenger) left = rect.left
+			bottom = Math.min(bottom, rect.top - 10)
+		}
+		const unitCss = Number(game?.screenUnit) > 0 ? Number(game.screenUnit) / pixelRatio : 18
+		const width = Math.max(180, Math.min(440, widthSource || unitCss * 22, window.innerWidth - left - 12))
+		const availableHeight = Math.floor(bottom - top)
+		panel.style.left = Math.round(Math.max(4, left)) + 'px'
+		panel.style.top = Math.round(top) + 'px'
+		panel.style.width = Math.round(width) + 'px'
+		panel.style.maxHeight = Math.max(0, availableHeight) + 'px'
+		const unavailable = availableHeight < 96
+		panel.style.visibility = unavailable ? 'hidden' : 'visible'
+		panel.style.pointerEvents = unavailable ? 'none' : 'auto'
+		panel.setAttribute('aria-hidden', unavailable ? 'true' : 'false')
+	}
+
+	const getShortcutStatusLeft = function () {
+		const button = state.shortcutButton
+		if (!button || !button.isConnected || button.style.display === 'none') return STATUS_MARGIN
+		const rect = button.getBoundingClientRect?.()
+		if (rect?.right > 0) return Math.ceil(rect.right + STATUS_MARGIN)
+		const pixelRatio = Number(state.game?.pixelRatio) || Number(window.devicePixelRatio) || 1
+		const unit = Number(state.game?.screenUnit) > 0 ? Number(state.game.screenUnit) / pixelRatio : 18
+		return Math.ceil(unit * 5.85 + STATUS_MARGIN)
+	}
+
+	const syncShortcutStatusPosition = function () {
+		const status = document.getElementById('modloader-status')
+		if (status && !state.statusDragging) applyStatusCorner(status, readStatusCorner())
+	}
+
+	const ensureShortcutUi = function () {
+		if (!document.body) return null
+		ensureShortcutStyle()
+		let button = document.getElementById('modloader-shortcut-button')
+		if (!button) {
+			button = element('button')
+			button.id = 'modloader-shortcut-button'
+			button.type = 'button'
+			button.textContent = '?'
+			button.setAttribute('aria-controls', 'modloader-shortcut-panel')
+			document.body.appendChild(button)
+		}
+		let panel = document.getElementById('modloader-shortcut-panel')
+		if (!panel) {
+			panel = element('div')
+			panel.id = 'modloader-shortcut-panel'
+			panel.tabIndex = -1
+			panel.setAttribute('role', 'dialog')
+			document.body.appendChild(panel)
+		}
+		state.shortcutButton = button
+		state.shortcutPanel = panel
+		if (!state.shortcutUiInstalled) {
+			state.shortcutUiInstalled = true
+			button.addEventListener('click', function (event) {
+				event.preventDefault()
+				event.stopPropagation()
+				const opening = !state.shortcutOpen
+				state.shortcutOpen = opening
+				requestShortcutRefresh()
+				if (opening) requestAnimationFrame(function () { state.shortcutPanel?.focus?.() })
+				else {
+					const activeElement = document.activeElement
+					if (activeElement === button || activeElement === panel) activeElement.blur?.()
+				}
+			})
+			window.addEventListener('resize', requestShortcutRefresh)
+			if (typeof MutationObserver !== 'undefined') {
+				state.shortcutMutationObserver = new MutationObserver(function (records) {
+					if (shortcutMutationAffectsLayout(records)) requestShortcutRefresh()
+				})
+				state.shortcutMutationObserver.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: [ 'class', 'style' ] })
+			}
+			if (typeof ResizeObserver !== 'undefined') state.shortcutResizeObserver = new ResizeObserver(requestShortcutRefresh)
+			registerGameHudItem('ModLoader', { id: 'shortcut-tips-button', element: button, side: 'bottom', managed: true })
+			registerGameHudItem('ModLoader', { id: 'shortcut-tips-panel', element: panel, side: 'left', managed: true })
+			setPanelTooltipText(button, t('shortcutTipsToggle'))
+			installPanelTooltips(button)
+		}
+		return { button, panel }
+	}
+
+	const refreshShortcutUi = function () {
+		loadPanelState()
+		const allEntries = Object.values(state.shortcutEntries)
+		const entryStates = resolveShortcutEntryStates()
+		recordShortcutCombinationConflicts(entryStates)
+		const activeByKey = new Map(entryStates.map(function (entryState) { return [ entryState.entry.key, entryState.active ] }))
+		const entries = state.shortcutSettings.enabled !== false ? getVisibleShortcutEntries(entryStates) : []
+		if (!allEntries.length && !state.shortcutButton) {
+			syncShortcutStatusPosition()
+			return
+		}
+		const ui = ensureShortcutUi()
+		if (!ui) return
+		const mobile = !!state.game?.isMobile || document.body.classList.contains('mobile')
+		const available = entries.length > 0 && state.shortcutSettings.enabled !== false && !mobile
+		const show = available && !state.vanillaGameHudHidden
+		if (!available) state.shortcutOpen = false
+		ui.button.style.display = show ? 'grid' : 'none'
+		ui.button.classList.toggle('modloader-shortcut-theme-light', getPanelThemeMode() === 'light')
+		ui.button.setAttribute('aria-expanded', show && state.shortcutOpen ? 'true' : 'false')
+		setPanelTooltipText(ui.button, t('shortcutTipsToggle'))
+		ui.panel.classList.toggle('modloader-shortcut-theme-light', getPanelThemeMode() === 'light')
+		ui.panel.classList.toggle('modloader-shortcut-panel-open', show && state.shortcutOpen)
+		ui.panel.style.display = show && state.shortcutOpen ? 'block' : 'none'
+		ui.panel.setAttribute('aria-label', t('shortcutTips'))
+		ui.panel.setAttribute('aria-hidden', show && state.shortcutOpen ? 'false' : 'true')
+		if (show && state.shortcutOpen) {
+			renderShortcutPanel(ui.panel, entries, activeByKey)
+			refreshShortcutLayout()
+		}
+		syncShortcutStatusPosition()
+	}
+
+	const requestShortcutRefresh = function () {
+		if (state.shortcutRefreshFrame) return
+		state.shortcutRefreshFrame = requestAnimationFrame(function () {
+			state.shortcutRefreshFrame = 0
+			refreshShortcutUi()
+		})
 	}
 
 	const CONFIG_INLINE_TEXT = {
@@ -3990,6 +4779,9 @@
 			#modloader-panel.modloader-panel-modal-open > :not(.modloader-modal) { filter: blur(4px); opacity: .52; pointer-events: none; user-select: none; }
 			#modloader-panel h2 { flex: 1 1 auto; min-width: 0; margin: 0; font-size: 16px; }
 			#modloader-panel h3 { margin: 14px 0 6px; font-size: 13px; color: var(--modloader-text); }
+			#modloader-panel .modloader-mod-heading { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; margin: 14px 0 6px; }
+			#modloader-panel .modloader-mod-heading h3 { margin: 0; }
+			#modloader-panel .modloader-mod-heading-note { color: var(--modloader-text-muted); font-size: 11px; }
 			#modloader-panel button, #modloader-panel input, #modloader-panel textarea, #modloader-panel select { font: inherit; }
 			#modloader-panel .modloader-panel-header { display: flex; align-items: center; gap: 10px; margin: -3px -3px 8px; padding: 3px; cursor: grab; user-select: none; touch-action: none; }
 			#modloader-panel .modloader-panel-header:active { cursor: grabbing; }
@@ -4023,7 +4815,7 @@
 			#modloader-panel.modloader-panel-hidden-bottom .modloader-panel-tab { border-radius: 8px 8px 0 0; }
 			#modloader-panel .modloader-panel-tab-logo { width: 24px; height: 24px; border-radius: 5px; background: url('img/logo/sheet.png'); background-size: 400% 200%; box-shadow: inset 0 0 0 1px rgba(255,255,255,.14), 0 2px 8px rgba(0,0,0,.22); }
 			#modloader-panel .modloader-panel-settings-page { display: grid; gap: 9px; max-height: 0; margin: 0; padding: 0; border-top: 1px solid transparent; border-bottom: 1px solid transparent; opacity: 0; overflow: hidden; pointer-events: none; transform: translateY(-5px); transition: max-height .28s cubic-bezier(.18, .86, .2, 1), margin-bottom .28s cubic-bezier(.18, .86, .2, 1), padding-top .28s cubic-bezier(.18, .86, .2, 1), padding-bottom .28s cubic-bezier(.18, .86, .2, 1), border-color .24s ease, opacity .2s ease, transform .28s cubic-bezier(.18, .86, .2, 1); }
-			#modloader-panel .modloader-panel-settings-page.active { max-height: min(42vh, 420px); margin-bottom: 12px; padding: 10px 0 11px; border-color: var(--modloader-border); opacity: 1; pointer-events: auto; transform: translateY(0); }
+			#modloader-panel .modloader-panel-settings-page.active { max-height: min(42vh, 420px); overflow-x: hidden; overflow-y: auto; margin-bottom: 12px; padding: 10px 0 11px; border-color: var(--modloader-border); opacity: 1; pointer-events: auto; transform: translateY(0); }
 			#modloader-panel .modloader-panel-settings-title { color: var(--modloader-text-strong); font-weight: 600; }
 			#modloader-panel .modloader-panel-settings-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; color: var(--modloader-text); }
 			#modloader-panel .modloader-panel-settings-actions { display: inline-flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; }
@@ -4048,6 +4840,7 @@
 			#modloader-panel.modloader-panel-theme-light .modloader-panel-settings-option.active { background: var(--modloader-primary-bg); color: var(--modloader-primary-text); }
 			#modloader-panel.modloader-panel-theme-light .modloader-panel-settings-number-wrap { color: var(--modloader-text-muted); }
 			#modloader-panel.modloader-panel-theme-light .modloader-mod-toolbar { background: var(--modloader-panel-bg); }
+			#modloader-panel.modloader-panel-theme-light .modloader-search-input { background: #fff; }
 			#modloader-panel.modloader-panel-theme-light .modloader-mod-row, #modloader-panel.modloader-panel-theme-light .modloader-panel-log, #modloader-panel.modloader-panel-theme-light .modloader-import-zone { border-color: var(--modloader-border); background: var(--modloader-surface); }
 			#modloader-panel.modloader-panel-theme-light .modloader-import-zone.dragging { border-color: var(--modloader-focus-border); background: var(--modloader-surface-active); }
 			#modloader-panel.modloader-panel-theme-light .modloader-import-copy { color: var(--modloader-text); }
@@ -4075,10 +4868,34 @@
 			#modloader-panel .modloader-panel-issues { margin: 8px 0 0; padding: 8px 8px 8px 24px; border-radius: 6px; background: rgba(255, 196, 87, .12); color: rgba(255,255,255,.92); }
 			#modloader-panel .modloader-panel-issue-error { color: var(--modloader-error-text); }
 			#modloader-panel .modloader-panel-issue-warn { color: var(--modloader-warning-text); }
-			#modloader-panel .modloader-mod-toolbar { position: sticky; top: -14px; z-index: 2; display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 8px -2px 10px; padding: 8px 2px; background: var(--modloader-panel-bg); }
-			#modloader-panel .modloader-toolbar-left { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; min-width: 0; }
+			#modloader-panel .modloader-mod-toolbar { position: sticky; top: -14px; z-index: 4; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 12px; margin: 8px -2px 10px; padding: 8px 2px; background: var(--modloader-panel-bg); }
+			#modloader-panel .modloader-toolbar-left { display: inline-flex; flex: 1 1 330px; align-items: center; gap: 4px 8px; min-width: 0; }
 			#modloader-panel .modloader-select-all-control { display: inline-flex; align-items: center; gap: 7px; flex: 0 0 auto; color: var(--modloader-control-text); font-size: 12px; cursor: pointer; user-select: none; }
 			#modloader-panel .modloader-select-all-text { transform: translateY(.5px); }
+			#modloader-panel .modloader-search-control { position: relative; display: inline-flex; flex: 1 1 220px; align-items: center; gap: 6px; min-width: 150px; max-width: 460px; }
+			#modloader-panel .modloader-search-field { position: relative; display: flex; flex: 1 1 auto; min-width: 0; }
+			#modloader-panel .modloader-search-input { box-sizing: border-box; width: 100%; min-width: 0; height: 31px; border: 1px solid var(--modloader-input-border); border-radius: 6px; padding: 6px 31px 6px 9px; background: var(--modloader-input-bg); color: var(--modloader-input-text); outline: none; appearance: none; -webkit-appearance: none; }
+			#modloader-panel .modloader-search-input:focus { border-color: var(--modloader-focus-border); box-shadow: 0 0 0 2px color-mix(in srgb, var(--modloader-focus-border) 35%, transparent); }
+			#modloader-panel .modloader-search-input::-webkit-search-cancel-button { display: none; -webkit-appearance: none; }
+			#modloader-panel .modloader-search-clear { position: absolute; right: 4px; top: 50%; width: 23px; height: 23px; border: 0; border-radius: 5px; padding: 0; background: transparent; color: var(--modloader-control-text); cursor: pointer; transform: translateY(-50%); }
+			#modloader-panel .modloader-search-clear:before, #modloader-panel .modloader-search-clear:after { content: ''; position: absolute; left: 50%; top: 50%; width: 13px; height: 1.8px; border-radius: 999px; background: currentColor; transform-origin: center; }
+			#modloader-panel .modloader-search-clear:before { transform: translate(-50%, -50%) rotate(45deg); }
+			#modloader-panel .modloader-search-clear:after { transform: translate(-50%, -50%) rotate(-45deg); }
+			#modloader-panel .modloader-search-clear:hover, #modloader-panel .modloader-search-clear:focus-visible { outline: none; background: var(--modloader-surface-hover); color: var(--modloader-control-text-hover); }
+			#modloader-panel .modloader-search-button { flex: 0 0 auto; min-width: 96px; justify-content: center; white-space: nowrap; }
+			#modloader-panel .modloader-search-button > span:last-child { white-space: nowrap; }
+			#modloader-panel .modloader-search-results { position: absolute; left: 0; right: 0; top: calc(100% + 5px); z-index: 8; display: none; max-height: min(44vh, 330px); overflow-x: hidden; overflow-y: auto; border: 1px solid var(--modloader-border-strong); border-radius: 7px; padding: 4px; background: var(--modloader-panel-bg); box-shadow: 0 12px 28px rgba(0,0,0,.38); }
+			#modloader-panel .modloader-search-results.active { display: grid; gap: 3px; }
+			#modloader-panel .modloader-search-result { display: grid; grid-template-columns: minmax(0, 1fr); gap: 2px; width: 100%; border: 0; border-radius: 5px; padding: 7px 8px; background: transparent; color: var(--modloader-control-text); text-align: left; cursor: pointer; }
+			#modloader-panel .modloader-search-result:hover, #modloader-panel .modloader-search-result:focus-visible { outline: none; background: var(--modloader-surface-hover); color: var(--modloader-control-text-hover); }
+			#modloader-panel .modloader-search-result-type { flex: 0 0 auto; color: var(--modloader-text-muted); font-size: 11px; font-weight: 600; }
+			#modloader-panel .modloader-search-result-label { min-width: 0; overflow: hidden; color: var(--modloader-text-strong); font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+			#modloader-panel .modloader-search-result-context { display: flex; align-items: baseline; gap: 5px; min-width: 0; overflow: hidden; color: var(--modloader-text-subtle); font-size: 11px; white-space: nowrap; }
+			#modloader-panel .modloader-search-result-separator { flex: 0 0 auto; color: var(--modloader-text-subtle); }
+			#modloader-panel .modloader-search-result-path { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+			#modloader-panel .modloader-search-empty { padding: 8px; color: var(--modloader-text-muted); text-align: center; }
+			#modloader-panel .modloader-search-target-highlight { animation: modloader-search-target-highlight 1.5s ease-out; }
+			@keyframes modloader-search-target-highlight { 0%, 38% { border-color: var(--modloader-focus-border); box-shadow: 0 0 0 3px color-mix(in srgb, var(--modloader-focus-border) 40%, transparent); background: var(--modloader-surface-active); } 100% { box-shadow: none; } }
 			#modloader-panel .modloader-panel-note { color: var(--modloader-text); }
 			#modloader-panel .modloader-panel-reload-note { display: none; color: var(--modloader-warning-text); }
 			#modloader-panel .modloader-panel-reload-note.active { display: inline; }
@@ -4106,6 +4923,8 @@
 			#modloader-panel .modloader-action-icon-snapshots:before, #modloader-panel .modloader-action-icon-snapshots:after { content: ''; position: absolute; box-sizing: border-box; width: 12px; height: 9px; border: 1.5px solid currentColor; border-radius: 2px; }
 			#modloader-panel .modloader-action-icon-snapshots:before { left: 1px; top: 1px; opacity: .56; }
 			#modloader-panel .modloader-action-icon-snapshots:after { left: 3px; top: 5px; background: var(--modloader-control-bg); }
+			#modloader-panel .modloader-action-icon-search:before { content: ''; position: absolute; left: 1px; top: 1px; width: 8px; height: 8px; border: 1.8px solid currentColor; border-radius: 50%; box-sizing: border-box; }
+			#modloader-panel .modloader-action-icon-search:after { content: ''; position: absolute; left: 9px; top: 9px; width: 6px; height: 1.8px; border-radius: 999px; background: currentColor; transform: rotate(45deg); transform-origin: left center; }
 			#modloader-panel .modloader-action-icon-translation:before { content: 'Aa'; position: absolute; left: 50%; top: 50%; transform: translate(-50%, -52%); font: 700 10px/1 Montserrat, Arial, sans-serif; letter-spacing: -.5px; }
 			#modloader-panel .modloader-action-icon-export:before, #modloader-panel .modloader-action-icon-import:before { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -55%); font: 700 13px/1 Montserrat, Arial, sans-serif; }
 			#modloader-panel .modloader-action-icon-export:before { content: '\\2191'; }
@@ -4207,14 +5026,25 @@
 			#modloader-panel .modloader-config-section-moving { z-index: 3; will-change: transform; }
 			#modloader-panel .modloader-config-section-dragging { z-index: 7; opacity: 1; margin-top: 0; border: 1px solid rgba(207,233,255,.34); border-radius: 7px; padding: 8px; background: rgba(16,22,28,.82); box-shadow: 0 18px 38px rgba(0,0,0,.46), 0 0 0 1px rgba(207,233,255,.12), inset 0 1px 0 rgba(255,255,255,.08); backdrop-filter: blur(14px) saturate(1.18); -webkit-backdrop-filter: blur(14px) saturate(1.18); pointer-events: none; will-change: left, top; }
 			#modloader-panel .modloader-config-section-placeholder { min-height: 20px; border: 1px solid transparent; border-radius: 6px; background: transparent; box-sizing: border-box; transition: height .16s ease, min-height .16s ease; }
+			#modloader-panel .modloader-config-section-body:empty { min-height: 24px; border: 1px dashed var(--modloader-border); border-radius: 6px; }
 			#modloader-panel .modloader-mod-config-scroll > .modloader-config-field:first-child, #modloader-panel .modloader-config-section-body .modloader-config-field:first-child { margin-top: 0; }
 			#modloader-panel .modloader-config-field { display: grid; grid-template-columns: minmax(130px, .8fr) minmax(170px, 1fr); gap: 4px 10px; align-items: center; margin-top: 6px; }
+			#modloader-panel .modloader-config-field-sortable { border-radius: 6px; cursor: grab; transition: background .14s ease, box-shadow .14s ease, opacity .14s ease; }
+			#modloader-panel .modloader-config-field-sortable .modloader-config-text { user-select: none; -webkit-user-select: none; }
+			#modloader-panel .modloader-config-field-sortable input, #modloader-panel .modloader-config-field-sortable button, #modloader-panel .modloader-config-field-sortable select, #modloader-panel .modloader-config-field-sortable textarea, #modloader-panel .modloader-config-field-sortable a, #modloader-panel .modloader-config-field-sortable [contenteditable="true"] { cursor: auto; }
+			#modloader-panel .modloader-config-item-pressing { background: var(--modloader-surface-hover); box-shadow: inset 0 0 0 1px var(--modloader-border); }
+			#modloader-panel .modloader-config-item-moving { will-change: transform; }
+			#modloader-panel .modloader-config-item-dragging { z-index: 8; box-sizing: border-box; margin-top: 0; border: 1px solid rgba(207,233,255,.34); border-radius: 7px; padding: 6px; background: rgba(16,22,28,.88); box-shadow: 0 16px 34px rgba(0,0,0,.42), 0 0 0 1px rgba(207,233,255,.12), inset 0 1px 0 rgba(255,255,255,.08); backdrop-filter: blur(14px) saturate(1.18); -webkit-backdrop-filter: blur(14px) saturate(1.18); cursor: grabbing; pointer-events: none; will-change: left, top; }
+			#modloader-panel .modloader-config-item-placeholder { min-height: 28px; margin-top: 6px; border: 1px solid transparent; border-radius: 6px; background: transparent; box-sizing: border-box; }
+			#modloader-panel .modloader-config-section-body > .modloader-config-item-placeholder:first-child, #modloader-panel .modloader-mod-config-scroll > .modloader-config-item-placeholder:first-child { margin-top: 0; }
+			#modloader-panel .modloader-config-item-standalone { margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--modloader-border); }
 			#modloader-panel .modloader-config-section-start { margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--modloader-border); }
 			#modloader-panel.modloader-panel-theme-light .modloader-config-section, #modloader-panel.modloader-panel-theme-light .modloader-config-section-start { border-top-color: var(--modloader-border); }
 			#modloader-panel.modloader-panel-theme-light .modloader-config-section-title { color: var(--modloader-text); }
 			#modloader-panel.modloader-panel-theme-light .modloader-config-section-sort { color: var(--modloader-text-subtle); }
 			#modloader-panel.modloader-panel-theme-light .modloader-config-section-sort:hover { color: var(--modloader-control-text-hover); background: var(--modloader-surface-hover); }
 			#modloader-panel.modloader-panel-theme-light .modloader-config-section-dragging { border-color: rgba(18,20,22,.16); background: rgba(250,250,247,.86); box-shadow: 0 16px 34px rgba(0,0,0,.2), 0 0 0 1px rgba(18,20,22,.08), inset 0 1px 0 rgba(255,255,255,.7); }
+			#modloader-panel.modloader-panel-theme-light .modloader-config-item-dragging { border-color: rgba(18,20,22,.16); background: rgba(250,250,247,.9); box-shadow: 0 14px 30px rgba(0,0,0,.18), 0 0 0 1px rgba(18,20,22,.08), inset 0 1px 0 rgba(255,255,255,.72); }
 			#modloader-panel .modloader-config-field-disabled { opacity: .52; }
 			#modloader-panel .modloader-config-text { min-width: 0; }
 			#modloader-panel .modloader-config-label { display: block; color: var(--modloader-text-strong); overflow-wrap: anywhere; }
@@ -4247,6 +5077,11 @@
 			#modloader-panel .modloader-config-number-reset, #modloader-panel .modloader-config-slider-reset { border: 1px solid var(--modloader-control-border); border-radius: 5px; padding: 5px 7px; background: var(--modloader-control-bg); color: var(--modloader-control-text); cursor: pointer; }
 			#modloader-panel .modloader-config-number-reset:hover:not(:disabled), #modloader-panel .modloader-config-slider-reset:hover:not(:disabled) { background: var(--modloader-control-bg-hover); border-color: var(--modloader-control-border-hover); color: var(--modloader-control-text-hover); }
 			#modloader-panel .modloader-config-number-reset:disabled, #modloader-panel .modloader-config-slider-reset:disabled { cursor: default; opacity: .45; }
+			#modloader-panel .modloader-recent-log-heading { margin: 14px 0 6px; }
+			#modloader-panel .modloader-recent-log-toggle { display: flex; align-items: center; justify-content: space-between; gap: 10px; width: 100%; border: 0; border-radius: 5px; padding: 4px 5px; background: transparent; color: var(--modloader-text); text-align: left; font-weight: 600; cursor: pointer; }
+			#modloader-panel .modloader-recent-log-toggle:hover, #modloader-panel .modloader-recent-log-toggle:focus-visible { outline: none; background: var(--modloader-surface-hover); color: var(--modloader-text-strong); }
+			#modloader-panel .modloader-recent-log-chevron { width: 7px; height: 7px; border-right: 1.8px solid currentColor; border-bottom: 1.8px solid currentColor; transform: rotate(45deg) translate(-1px, -1px); transition: transform .16s ease; }
+			#modloader-panel .modloader-recent-log-toggle[aria-expanded="true"] .modloader-recent-log-chevron { transform: rotate(225deg) translate(-1px, -1px); }
 			#modloader-panel .modloader-config-slider { display: grid; grid-template-columns: minmax(0, 1fr) 66px auto; gap: 4px 8px; align-items: center; width: 100%; min-width: 0; --modloader-slider-thumb-half: 14px; }
 			#modloader-panel .modloader-config-slider-labeled { grid-template-columns: minmax(0, 1fr) auto; }
 			#modloader-panel .modloader-config-slider-range { appearance: none; -webkit-appearance: none; width: 100%; min-width: 0; height: 32px; margin: 0; background: transparent; cursor: grab; outline: none; }
@@ -4329,6 +5164,10 @@
 			#modloader-panel .modloader-modal-button-danger { background: var(--modloader-danger-bg); color: var(--modloader-danger-text); border-color: var(--modloader-danger-border); }
 			@media (max-width: 640px) {
 				#modloader-panel .modloader-panel-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+				#modloader-panel .modloader-toolbar-left, #modloader-panel .modloader-toolbar-actions { flex: 1 1 100%; }
+				#modloader-panel .modloader-toolbar-actions { justify-content: flex-end; }
+				#modloader-panel .modloader-search-control { max-width: none; }
+				#modloader-panel .modloader-search-button { font-size: 11px; }
 				#modloader-panel .modloader-snapshot-meta { grid-template-columns: 1fr; }
 				#modloader-panel .modloader-config-field { grid-template-columns: 1fr; }
 				#modloader-panel .modloader-config-error { grid-column: auto; }
@@ -4381,6 +5220,210 @@
 			state.modFileTools = null
 		}
 		return state.modFileTools
+	}
+
+	// Temporary diagnostics are lazy-loaded and never alter Render API routing.
+	let clearViewProbe = null
+	let clearViewNativeGrid = null
+	let placementProbeController = null
+	let placementRenderHooks = null
+	const preparePlacementProbe = function () {
+		if (placementProbeController || typeof Game === 'undefined') return
+		const tools = getModFileTools()
+		if (!tools?.ipcRenderer) return
+		if (!placementRenderHooks) {
+			const hooksPath = tools.path.join(tools.gameRoot, 'modloader', 'placement-render-hooks.js')
+			if (tools.fs.existsSync(hooksPath)) {
+				try {
+					placementRenderHooks = require(hooksPath).install(Game.prototype)
+					window.__cattailPlacementRenderHooksV1 = placementRenderHooks
+				} catch (error) { warn('Placement rendering adapter skipped.', error) }
+			}
+		}
+		const modulePath = tools.path.join(tools.gameRoot, 'modloader', 'diagnostics', 'placement-probe.js')
+		if (!tools.fs.existsSync(modulePath)) return
+		try { placementProbeController = require(modulePath).installNativeHooks(Game.prototype, placementRenderHooks) }
+		catch (error) { warn('Optional placement probe skipped.', error) }
+	}
+	const placementProbeConfiguration = function () {
+		const values = {}
+		for (const key of ['enablePlacementShadowReuse', 'enableClearViewGridBlock', 'enableClearViewClipBlock', 'enableClearViewGridStyle',
+			'enableGrid', 'enableCameraAngle', 'cameraPitch', 'cameraYaw', 'enableCameraZoom', 'cameraZoomMin',
+			'enableBuildingSpriteCache', 'enableBuildingBatchCache', 'enableBuildingWebGLRecorder']) {
+			values[key] = getConfigValue('Cattail_TweaksQuality_Tweaks', key, null)
+		}
+		values.renderApiEnabled = isRenderApiEnabled()
+		values.renderTimingEnabled = !!state.renderTimingEnabled
+		values.resourceProfilerEnabled = !!window.cattailResourceSourceProfiler?.isEnabled?.()
+		return values
+	}
+	const getClearViewProbe = function () {
+		if (clearViewProbe) return clearViewProbe
+		const tools = getModFileTools()
+		if (!tools?.ipcRenderer) throw new Error('探针需要桌面游戏环境。')
+		const modulePath = tools.path.join(tools.gameRoot, 'modloader', 'diagnostics', 'clear-view-probe.js')
+		if (!tools.fs.existsSync(modulePath)) throw new Error('当前安装未包含可选诊断组件。')
+		clearViewProbe = require(modulePath).createClient({
+			window, document, ipc: tools.ipcRenderer, getGame: () => state.game,
+			getNativeGrid: () => clearViewNativeGrid,
+			getPlacementController: () => placementProbeController, placementConfiguration: placementProbeConfiguration,
+			isMenuOpen: () => !!document.getElementById('modloader-panel') && !state.panelHidden,
+			closeMenu() { if (document.getElementById('modloader-panel')) togglePanel() },
+			metadata() { return { loaderVersion: state.version, mods: state.mods.map(mod => ({ id: mod.id, version: mod.manifest.version })), renderApiEnabled: isRenderApiEnabled(), existingRenderTimingEnabled: !!state.renderTimingEnabled, resourceProfilerEnabled: !!window.cattailResourceSourceProfiler?.isEnabled?.() } },
+			notify(message) {
+				state.clearViewProbeMessage = message
+				updateClearViewProbeControls()
+				let toast = document.getElementById('modloader-probe-notice')
+				if (!toast) { toast = document.createElement('div'); toast.id = 'modloader-probe-notice'; document.body.appendChild(toast) }
+				toast.style.cssText = 'position:fixed;left:50%;top:12px;transform:translateX(-50%);z-index:2147483647;background:#171b20;color:#fff;padding:10px 16px;border-radius:8px;font:14px sans-serif;pointer-events:none;max-width:80vw;overflow-wrap:anywhere'
+				toast.textContent = transformLocalizedText(message)
+				clearTimeout(toast.__probeTimer)
+				toast.__probeTimer = setTimeout(() => toast.remove(), 2500)
+			},
+			onChange: () => updateClearViewProbeControls()
+		})
+		return clearViewProbe
+	}
+	const startClearViewOriginIfArmed = async function (game) {
+		const tools = getModFileTools()
+		if (!tools?.ipcRenderer || !tools.fs.existsSync(tools.path.join(tools.gameRoot, 'modloader', 'diagnostics', 'clear-view-origin.js'))) return
+		try {
+			const response = await tools.ipcRenderer.invoke('modloader:clear-view-probe', { action: 'consume-origin' })
+			if (!response?.ok) throw new Error(response?.error || 'Startup probe unavailable')
+			if (response.result) getClearViewProbe().startOrigin(game)
+		} catch (error) { warn('Startup origin probe skipped; game initialization continues.', error) }
+	}
+	const updateClearViewProbeControls = function (providedRoot) {
+		const root = providedRoot || document.getElementById('modloader-clear-view-probe')
+		if (!root) return
+		const phase = clearViewProbe?.status().phase || 'idle'
+		for (const button of root.querySelectorAll('button')) {
+			button.disabled = button.dataset.probeAction === 'start' ? phase !== 'idle' : button.dataset.probeAction === 'stop' ? !['arming', 'starting', 'recording', 'export-failed'].includes(phase) : false
+		}
+		root.querySelector('[data-probe-status]').textContent = transformLocalizedText(state.clearViewProbeMessage || '默认关闭。新版放置细分记录20秒，分项对照60秒需保持手持建筑和镜头不动；旧对照仅供旧版Alt诊断。')
+	}
+	const renderClearViewProbeControls = function (parent) {
+		const tools = getModFileTools()
+		if (!tools?.fs.existsSync(tools.path.join(tools.gameRoot, 'modloader', 'diagnostics', 'clear-view-probe.js'))) return
+		const root = element('div', 'modloader-panel-settings-row')
+		root.id = 'modloader-clear-view-probe'
+		root.style.cssText = 'display:flex;flex-direction:column;align-items:stretch;gap:8px'
+		root.appendChild(element('strong', '', transformLocalizedText('清晰视图探针（临时）')))
+		const actions = element('div', 'modloader-panel-settings-actions')
+		actions.style.flexWrap = 'wrap'
+		for (const item of [
+			...(tools.fs.existsSync(tools.path.join(tools.gameRoot, 'modloader', 'diagnostics', 'placement-probe.js')) ? [
+				['放置细分记录（20秒）', 'start', () => getClearViewProbe().start('placement-light')],
+				['放置深入记录（20秒）', 'start', () => getClearViewProbe().start('placement-deep')],
+				['放置分项对照（60秒）', 'start', () => getClearViewProbe().start('placement-ablation')]
+			] : []),
+			...(tools.fs.existsSync(tools.path.join(tools.gameRoot, 'modloader', 'diagnostics', 'clear-view-origin.js')) ? [
+				['预备下次启动来源记录', 'start', () => getClearViewProbe().armOrigin()],
+				['取消下次启动记录', 'cancel-origin', () => getClearViewProbe().cancelOrigin()]
+			] : []),
+			['线宽／线端对照（96 秒）', 'start', () => getClearViewProbe().start('grid-threshold')],
+			['网格内部对照（72 秒）', 'start', () => getClearViewProbe().start('grid-ablation')],
+			['自动裁剪／网格对照（60 秒）', 'start', () => getClearViewProbe().start('ablation')],
+			['轻量记录', 'start', () => getClearViewProbe().start('light')],
+			['深入记录', 'start', () => getClearViewProbe().start('deep')],
+			['停止并导出', 'stop', () => getClearViewProbe().finish()],
+			['打开记录文件夹', 'folder', () => getClearViewProbe().openFolder()]
+		]) {
+			const button = createPanelActionButton('devtools', transformLocalizedText(item[0]), transformLocalizedText(item[0]))
+			button.dataset.probeAction = item[1]
+			button.onclick = async function (event) {
+				event.preventDefault()
+				try { await item[2]() }
+				catch (error) { state.clearViewProbeMessage = error.message; updateClearViewProbeControls() }
+			}
+			actions.appendChild(button)
+		}
+		root.appendChild(actions)
+		const status = element('div')
+		status.dataset.probeStatus = 'true'
+		status.style.cssText = 'font-size:12px;line-height:1.5;overflow-wrap:anywhere'
+		root.appendChild(status)
+		parent.appendChild(root)
+		updateClearViewProbeControls(root)
+	}
+
+	// Temporary periodic-stall capture: opt-in switch, no persistent config value.
+	let periodicStallProbe = null
+	const updatePeriodicStallProbeControls = function (providedRoot) {
+		const root = providedRoot || document.getElementById('modloader-periodic-stall-probe')
+		if (!root) return
+		const phase = periodicStallProbe?.status().phase || 'idle'
+		const busy = ['arming', 'starting', 'recording'].includes(phase)
+		root.querySelector('[data-stall-toggle]').checked = busy
+		root.querySelector('[data-stall-toggle]').disabled = ['stopping', 'export-failed'].includes(phase)
+		root.querySelector('[data-stall-mode]').disabled = phase !== 'idle'
+		root.querySelector('[data-stall-retry]').hidden = phase !== 'export-failed'
+		root.querySelector('[data-stall-retry]').style.display = phase === 'export-failed' ? '' : 'none'
+		root.querySelector('[data-stall-status]').textContent = transformLocalizedText(state.periodicStallProbeMessage || '默认关闭。开启后关闭菜单，3 秒后采集；到时自动关闭并保存本地记录。')
+	}
+	const getPeriodicStallProbe = function () {
+		if (periodicStallProbe) return periodicStallProbe
+		const tools = getModFileTools()
+		if (!tools?.ipcRenderer) throw new Error('探针需要桌面游戏环境。')
+		const modulePath = tools.path.join(tools.gameRoot, 'modloader', 'diagnostics', 'periodic-stall-probe.js')
+		if (!tools.fs.existsSync(modulePath)) throw new Error('当前安装未包含可选诊断组件。')
+		periodicStallProbe = require(modulePath).createClient({
+			window, document, ipc: tools.ipcRenderer, getGame: () => state.game,
+			isOtherBusy: () => !!clearViewProbe && clearViewProbe.status().phase !== 'idle',
+			isMenuOpen: () => !!document.getElementById('modloader-panel') && !state.panelHidden,
+			closeMenu() { if (document.getElementById('modloader-panel')) togglePanel() },
+			metadata() {
+				const game = state.game
+				const slots = Object.values(game?.saveSlots || {})
+				return { loaderVersion: state.version, mods: state.mods.map(mod => ({ id: mod.id, version: mod.manifest.version })),
+					renderApiEnabled: isRenderApiEnabled(), existingRenderTimingEnabled: !!state.renderTimingEnabled,
+					entityCount: game?.stuff?.length || 0, slotCount: slots.length,
+					historyEntryCount: slots.reduce((count, slot) => count + (slot?.stack?.length || 0), 0) }
+			},
+			onChange: () => updatePeriodicStallProbeControls(),
+			notify(message) {
+				state.periodicStallProbeMessage = message
+				updatePeriodicStallProbeControls()
+				let toast = document.getElementById('modloader-stall-notice')
+				if (!toast) { toast = document.createElement('div'); toast.id = 'modloader-stall-notice'; document.body.appendChild(toast) }
+				toast.style.cssText = 'position:fixed;left:50%;top:12px;transform:translateX(-50%);z-index:2147483647;background:#171b20;color:#fff;padding:10px 16px;border-radius:8px;font:14px sans-serif;pointer-events:none;max-width:80vw;overflow-wrap:anywhere'
+				toast.textContent = transformLocalizedText(message)
+				clearTimeout(toast.__probeTimer); toast.__probeTimer = setTimeout(() => toast.remove(), 2500)
+			}
+		})
+		return periodicStallProbe
+	}
+	const renderPeriodicStallProbeControls = function (parent) {
+		const tools = getModFileTools()
+		if (!tools?.fs.existsSync(tools.path.join(tools.gameRoot, 'modloader', 'diagnostics', 'periodic-stall-probe.js'))) return
+		const root = element('div', 'modloader-panel-settings-row')
+		root.id = 'modloader-periodic-stall-probe'
+		root.style.cssText = 'display:flex;flex-direction:column;align-items:stretch;gap:8px'
+		root.appendChild(element('strong', '', transformLocalizedText('周期卡顿探针（临时）')))
+		const label = element('label')
+		label.style.cssText = 'display:flex;align-items:center;gap:8px;cursor:pointer'
+		const toggle = document.createElement('input')
+		toggle.type = 'checkbox'; toggle.dataset.stallToggle = 'true'
+		label.appendChild(toggle); label.appendChild(document.createTextNode(transformLocalizedText('启用探针（到时自动关闭）'))); root.appendChild(label)
+		const actions = element('div', 'modloader-panel-settings-actions'); actions.style.flexWrap = 'wrap'
+		const mode = document.createElement('select'); mode.dataset.stallMode = 'true'; mode.setAttribute('aria-label', transformLocalizedText('探针记录模式'))
+		mode.style.cssText = 'max-width:100%;padding:8px 10px;border:1px solid var(--modloader-border,rgba(255,255,255,.18));border-radius:6px;background:var(--modloader-surface,#25292d);color:var(--modloader-control-text,#eee);font:inherit'
+		for (const [value, text] of [['120', '轻量记录 · 2 分钟'], ['300', '轻量记录 · 5 分钟'], ['deep', '深入记录 · 20 秒']]) {
+			const option = document.createElement('option'); option.value = value; option.textContent = transformLocalizedText(text); mode.appendChild(option)
+		}
+		actions.appendChild(mode)
+		const failure = error => { state.periodicStallProbeMessage = error.message; updatePeriodicStallProbeControls(root) }
+		toggle.onchange = async function () {
+			try { if (toggle.checked) await getPeriodicStallProbe().start({ deep: mode.value === 'deep', seconds: Number(mode.value) }); else await getPeriodicStallProbe().finish() }
+			catch (error) { failure(error) }
+		}
+		const retry = createPanelActionButton('devtools', transformLocalizedText('重试导出'), transformLocalizedText('重试导出')); retry.dataset.stallRetry = 'true'
+		retry.onclick = () => { void getPeriodicStallProbe().finish().catch(failure) }; actions.appendChild(retry)
+		const folder = createPanelActionButton('devtools', transformLocalizedText('打开周期卡顿记录'), transformLocalizedText('打开周期卡顿记录'))
+		folder.onclick = () => { void getPeriodicStallProbe().openFolder().catch(failure) }; actions.appendChild(folder)
+		root.appendChild(actions)
+		const status = element('div'); status.dataset.stallStatus = 'true'; status.style.cssText = 'font-size:12px;line-height:1.5;overflow-wrap:anywhere'; root.appendChild(status)
+		parent.appendChild(root); updatePeriodicStallProbeControls(root)
 	}
 
 	const openDevToolsFromPanel = function () {
@@ -5366,6 +6409,8 @@
 	}
 	const dispatchConfigPreview = function (model) {
 		if (!model || model.invalid) return
+		const alias = model.mod?.manifest?.configCompatibility?.keys?.[model.item?.key]
+		if (alias) model = { ...model, item: { ...model.item, key: alias } }
 		try {
 			window.dispatchEvent(new CustomEvent('modloader:config-preview', {
 				detail: {
@@ -5379,6 +6424,10 @@
 	}
 
 	const readConfigForPanel = function (mod) {
+		if (mod.manifest.configCompatibility) {
+			state.configCompatibilityMods ||= {}
+			state.configCompatibilityMods[mod.id] = mod
+		}
 		const liveConfig = state.configs[mod.id]
 		const schemaSource = liveConfig?.schema?.length ? liveConfig.schema : normalizeConfigSchema(mod.manifest.config)
 		const schema = schemaSource.map(function (item) {
@@ -5397,7 +6446,7 @@
 			if (isSettingsActionItem(item)) continue
 			const liveValue = liveConfig?.values ? liveConfig.values[item.key] : undefined
 			values[item.key] = liveValue === undefined
-				? parseStoredConfig(localStorage.getItem(storageKey(mod.id, item.key)), item.default)
+				? (mod.manifest.configCompatibility ? readCompatibleConfigValue(mod, item) : parseStoredConfig(localStorage.getItem(storageKey(mod.id, item.key)), item.default))
 				: cloneConfigValue(liveValue)
 		}
 		return { schema, values }
@@ -5409,6 +6458,99 @@
 		if (typeof raw === 'string' || typeof raw === 'number' || typeof raw === 'boolean') return String(raw)
 		if (isObject(raw)) return String(raw.id || raw.key || raw.name || raw.en || raw.sch || raw.modsch || '')
 		return ''
+	}
+
+	const mapCompatibleConfigSectionKey = function (mod, key) {
+		const sections = mod.manifest?.configCompatibility?.sections
+		if (!sections) return key
+		return String(key).replace(/^section:([^#]+)(#\d+)?$/, function (all, id, suffix) {
+			return 'section:' + (sections[id] || id) + (suffix || '')
+		})
+	}
+
+	const mapCompatiblePanelConfigLayout = function (mod, stored) {
+		const compatibility = mod.manifest?.configCompatibility
+		if (!compatibility || !stored?.blocks?.length) return stored
+		const keys = compatibility.keys || {}
+		const canonical = function (key) { return keys[key] || key }
+		const originalKeys = new Set()
+		const originalSections = new Set()
+		for (const block of stored.blocks) {
+			if (block.type === 'section') {
+				if (mapCompatibleConfigSectionKey(mod, block.key) === block.key) originalSections.add(block.key)
+				for (const key of block.items || []) if (canonical(key) === key) originalKeys.add(key)
+			} else if (block.type === 'item' && canonical(block.key) === block.key) originalKeys.add(block.key)
+		}
+		const mappedItems = function (items) {
+			return (items || []).filter(function (key) { return canonical(key) === key || !originalKeys.has(canonical(key)) }).map(canonical)
+		}
+		const blocks = [], sections = new Map(), deferred = new Map()
+		for (const source of stored.blocks) {
+			if (source.type === 'section') {
+				const key = mapCompatibleConfigSectionKey(mod, source.key)
+				const items = mappedItems(source.items)
+				if (source.key !== key && originalSections.has(key)) {
+					deferred.set(key, (deferred.get(key) || []).concat(items))
+					continue
+				}
+				if (sections.has(key)) { sections.get(key).items.push(...items); continue }
+				const block = { ...source, key, items }
+				sections.set(key, block); blocks.push(block)
+			} else if (source.type === 'item') {
+				if (source.key !== canonical(source.key) && originalKeys.has(canonical(source.key))) continue
+				blocks.push({ ...source, key: canonical(source.key) })
+			} else blocks.push({ ...source })
+		}
+		for (const [key, items] of deferred) if (sections.has(key)) sections.get(key).items.push(...items)
+		return { ...stored, blocks }
+	}
+
+	const mapCompatibleConfigSectionOrder = function (mod, order) {
+		if (!mod.manifest?.configCompatibility || !Array.isArray(order)) return order
+		const originals = new Set(order.filter(function (key) { return mapCompatibleConfigSectionKey(mod, key) === key }))
+		const result = []
+		for (const key of order) {
+			const mapped = mapCompatibleConfigSectionKey(mod, key)
+			if (mapped !== key && originals.has(mapped)) continue
+			if (!result.includes(mapped)) result.push(mapped)
+		}
+		return result
+	}
+
+	const prepareCompatiblePanelState = function (payload, previous) {
+		payload.configLayout = { ...payload.configLayout }
+		payload.configSectionOrder = { ...payload.configSectionOrder }
+		for (const mod of Object.values(state.configCompatibilityMods || {})) {
+			const compatibility = mod.manifest?.configCompatibility
+			if (!compatibility) continue
+			const key = getPanelConfigSectionOrderKey(mod)
+			const oldLayout = previous.configLayout?.[key]
+			const oldOrder = previous.configSectionOrder?.[key]
+			const mappedLayout = mapCompatiblePanelConfigLayout(mod, oldLayout)
+			const mappedOrder = mapCompatibleConfigSectionOrder(mod, oldOrder)
+			const hasOld = JSON.stringify(oldLayout) !== JSON.stringify(mappedLayout) || JSON.stringify(oldOrder) !== JSON.stringify(mappedOrder)
+			try {
+				if (hasOld) {
+					const backupKey = 'modloader:' + mod.id + ':' + (compatibility.layoutBackupKey || 'identifierMigrationBackupV1')
+					const existing = localStorage.getItem(backupKey)
+					if (existing === null) localStorage.setItem(backupKey, JSON.stringify({ version: 1, modId: mod.id, layout: oldLayout, sectionOrder: oldOrder }))
+					else {
+						const backup = JSON.parse(existing)
+						if (backup?.version !== 1 || backup.modId !== mod.id) throw new Error('Unrecognized layout backup')
+					}
+				}
+				if (payload.configLayout[key]) payload.configLayout[key] = mapCompatiblePanelConfigLayout(mod, payload.configLayout[key])
+				if (payload.configSectionOrder[key]) payload.configSectionOrder[key] = mapCompatibleConfigSectionOrder(mod, payload.configSectionOrder[key])
+			} catch (error) {
+				// Never replace an old layout if its recoverable snapshot could not be saved.
+				if (oldLayout === undefined) delete payload.configLayout[key]
+				else payload.configLayout[key] = oldLayout
+				if (oldOrder === undefined) delete payload.configSectionOrder[key]
+				else payload.configSectionOrder[key] = oldOrder
+				console.warn('[ModLoader] Identifier layout migration deferred for ' + mod.id, error)
+			}
+		}
+		return payload
 	}
 
 	const getConfigSectionLabel = function (mod, item) {
@@ -5429,7 +6571,7 @@
 
 	const applyPanelConfigSectionOrder = function (mod, groups) {
 		const key = getPanelConfigSectionOrderKey(mod)
-		const stored = state.panelConfigSectionOrder[key] || []
+		const stored = mapCompatibleConfigSectionOrder(mod, state.panelConfigSectionOrder[key] || [])
 		if (!stored.length) return groups
 		const order = new Map()
 		stored.forEach(function (sectionKey, index) {
@@ -5442,7 +6584,7 @@
 		})
 	}
 
-	const buildConfigSectionGroups = function (mod, schema) {
+	const buildRawConfigSectionGroups = function (mod, schema) {
 		const groups = []
 		const usedKeys = {}
 		let current = null
@@ -5454,15 +6596,91 @@
 				current = {
 					key: makeUniqueConfigSectionKey(baseKey, usedKeys),
 					sectionId,
-					label: getConfigSectionLabel(mod, item),
+					label: '',
 					items: [],
 					originalIndex: groups.length
 				}
 				groups.push(current)
 			}
+			if (!current.label) current.label = getConfigSectionLabel(mod, item)
 			current.items.push(item)
 		}
-		return applyPanelConfigSectionOrder(mod, groups)
+		return groups
+	}
+
+	const buildConfigSectionGroups = function (mod, schema) {
+		return applyPanelConfigSectionOrder(mod, buildRawConfigSectionGroups(mod, schema))
+	}
+
+	const createResolvedConfigSection = function (group) {
+		return {
+			type: 'section',
+			key: group.key,
+			sectionId: group.sectionId,
+			label: group.label,
+			items: [],
+			originalIndex: group.originalIndex
+		}
+	}
+
+	const resolvePanelConfigLayout = function (mod, schema) {
+		const rawGroups = buildRawConfigSectionGroups(mod, schema)
+		const modKey = getPanelConfigSectionOrderKey(mod)
+		const stored = mapCompatiblePanelConfigLayout(mod, state.panelConfigLayout[modKey])
+		if (!stored?.blocks?.length) {
+			return applyPanelConfigSectionOrder(mod, rawGroups).map(function (group) {
+				const resolved = createResolvedConfigSection(group)
+				resolved.items = group.items.slice()
+				return resolved
+			})
+		}
+
+		const groupByKey = new Map(rawGroups.map(function (group) { return [ group.key, group ] }))
+		const itemByKey = new Map()
+		for (const item of schema) {
+			const key = String(item?.key || '')
+			if (key && !itemByKey.has(key)) itemByKey.set(key, item)
+		}
+		const blocks = []
+		const sectionBlocks = new Map()
+		const usedItems = new Set()
+		for (const storedBlock of stored.blocks) {
+			if (storedBlock.type === 'section') {
+				const group = groupByKey.get(storedBlock.key)
+				if (!group || sectionBlocks.has(group.key)) continue
+				const block = createResolvedConfigSection(group)
+				for (const itemKey of storedBlock.items || []) {
+					const item = itemByKey.get(itemKey)
+					if (!item || usedItems.has(itemKey)) continue
+					usedItems.add(itemKey)
+					block.items.push(item)
+				}
+				sectionBlocks.set(group.key, block)
+				blocks.push(block)
+				continue
+			}
+			if (storedBlock.type !== 'item') continue
+			const itemKey = String(storedBlock.key || '')
+			const item = itemByKey.get(itemKey)
+			if (!item || usedItems.has(itemKey)) continue
+			usedItems.add(itemKey)
+			blocks.push({ type: 'item', key: itemKey, item })
+		}
+		for (const group of rawGroups) {
+			let block = sectionBlocks.get(group.key)
+			for (const item of group.items) {
+				const itemKey = String(item?.key || '')
+				if (!itemKey || usedItems.has(itemKey)) continue
+				if (!block) {
+					block = createResolvedConfigSection(group)
+					sectionBlocks.set(group.key, block)
+					blocks.push(block)
+				}
+				usedItems.add(itemKey)
+				block.items.push(item)
+			}
+		}
+		return blocks
 	}
 
 	const syncPanelConfigSectionOrderForMod = function (mod, sectionModels) {
@@ -5470,6 +6688,32 @@
 		if (!key) return
 		const order = sectionModels.map(function (section) { return section.key }).filter(Boolean)
 		if (order.length > 1) state.panelConfigSectionOrder[key] = order
+		else delete state.panelConfigSectionOrder[key]
+	}
+
+	const syncPanelConfigLayoutForMod = function (rowModel) {
+		const key = getPanelConfigSectionOrderKey(rowModel?.mod)
+		if (!key || !rowModel?.configScroll) return
+		const blocks = []
+		const sectionKeys = []
+		for (const child of Array.from(rowModel.configScroll.children)) {
+			const sectionModel = child.__modloaderConfigSectionModel
+			if (sectionModel) {
+				const items = []
+				for (const field of Array.from(sectionModel.body?.children || [])) {
+					const itemKey = String(field.__modloaderConfigItemModel?.item?.key || '')
+					if (itemKey) items.push(itemKey)
+				}
+				blocks.push({ type: 'section', key: sectionModel.key, items })
+				sectionKeys.push(sectionModel.key)
+				continue
+			}
+			const itemKey = String(child.__modloaderConfigItemModel?.item?.key || '')
+			if (itemKey) blocks.push({ type: 'item', key: itemKey })
+		}
+		if (blocks.length) state.panelConfigLayout[key] = { blocks }
+		else delete state.panelConfigLayout[key]
+		if (sectionKeys.length > 1) state.panelConfigSectionOrder[key] = sectionKeys
 		else delete state.panelConfigSectionOrder[key]
 	}
 	const formatConfigInputValue = function (value, type) {
@@ -7605,6 +8849,40 @@
 		return button
 	}
 
+	const normalizePanelSearchText = function (value) {
+		let text = String(value ?? '')
+		try { text = text.normalize('NFKC') } catch (error) {}
+		return text.trim().replace(/\s+/g, ' ').toLowerCase()
+	}
+
+	const getPanelSearchMatchRank = function (query, fields) {
+		const needle = normalizePanelSearchText(query)
+		if (!needle) return -1
+		let best = Number.MAX_SAFE_INTEGER
+		for (const field of fields || []) {
+			const haystack = normalizePanelSearchText(field)
+			if (!haystack) continue
+			if (haystack === needle) return 0
+			if (haystack.startsWith(needle)) best = Math.min(best, 1)
+			else if (haystack.includes(needle)) best = Math.min(best, 2)
+		}
+		return best === Number.MAX_SAFE_INTEGER ? -1 : best
+	}
+
+	const rankPanelSearchResults = function (query, entries, limit) {
+		const max = Math.max(0, Number(limit) || 0)
+		if (!normalizePanelSearchText(query) || !max) return []
+		return (entries || []).map(function (entry, index) {
+			return { entry, index, rank: getPanelSearchMatchRank(query, entry.fields) }
+		}).filter(function (item) {
+			return item.rank >= 0
+		}).sort(function (a, b) {
+			const aOrder = Number(typeof a.entry.order === 'function' ? a.entry.order() : a.entry.order || 0)
+			const bOrder = Number(typeof b.entry.order === 'function' ? b.entry.order() : b.entry.order || 0)
+			return a.rank - b.rank || aOrder - bOrder || a.index - b.index
+		}).slice(0, max).map(function (item) { return item.entry })
+	}
+
 	const showPanelChoice = function (panel, options) {
 		return new Promise(function (resolve) {
 			const modal = element('div', 'modloader-modal')
@@ -7862,6 +9140,20 @@
 	}
 
 	const installLanguageBridge = function () {
+		// Native Splash reads abstract_getWords directly to list language names.
+		// Supply only cached labels here; running afterWords twice can repeat Mod effects.
+		if (!languageMenuPatched && typeof window.abstract_getWords === 'function') {
+			languageMenuPatched = true
+			api.patch(window, 'abstract_getWords', function (original) {
+				return function () {
+					const words = original.apply(this, arguments)
+					for (const [id, label] of languageMenuLabels) {
+						if (!words[id]) words[id] = { splash: { language: label } }
+					}
+					return words
+				}
+			}, 'modloader')
+		}
 		if (state.languagePatched || typeof Game === 'undefined') return
 		state.languagePatched = true
 		api.patch(Game.prototype, 'changeLanguage', function (original) {
@@ -7870,6 +9162,7 @@
 				state.game = this
 				showStatus()
 				requestAnimationFrame(refreshOpenPanel)
+				requestShortcutRefresh()
 				return result
 			}
 		}, 'modloader')
@@ -8056,6 +9349,49 @@
 		return true
 	}
 
+	const readPanelConfigLayout = function (source) {
+		const result = {}
+		if (!source || typeof source !== 'object' || Array.isArray(source)) return result
+		for (const modKey in source) {
+			const sourceBlocks = source[modKey]?.blocks
+			if (!Array.isArray(sourceBlocks)) continue
+			const blocks = []
+			for (const sourceBlock of sourceBlocks) {
+				if (!sourceBlock || typeof sourceBlock !== 'object') continue
+				if (sourceBlock.type === 'section') {
+					const key = String(sourceBlock.key || '')
+					if (!key) continue
+					const items = Array.isArray(sourceBlock.items)
+						? sourceBlock.items.map(function (itemKey) { return String(itemKey || '') }).filter(Boolean)
+						: []
+					blocks.push({ type: 'section', key, items })
+					continue
+				}
+				if (sourceBlock.type !== 'item') continue
+				const key = String(sourceBlock.key || '')
+				if (key) blocks.push({ type: 'item', key })
+			}
+			if (blocks.length) result[String(modKey)] = { blocks }
+		}
+		return result
+	}
+
+	const clonePanelConfigLayout = function (source) {
+		return readPanelConfigLayout(source)
+	}
+
+	const samePanelConfigLayout = function (a, b) {
+		const left = readPanelConfigLayout(a)
+		const right = readPanelConfigLayout(b)
+		const leftKeys = Object.keys(left).sort()
+		const rightKeys = Object.keys(right).sort()
+		if (!sameStringList(leftKeys, rightKeys)) return false
+		for (const key of leftKeys) {
+			if (JSON.stringify(left[key]) !== JSON.stringify(right[key])) return false
+		}
+		return true
+	}
+
 	const getPanelConfigSectionOrderKey = function (mod) {
 		return String(mod?.path || mod?.id || '')
 	}
@@ -8080,6 +9416,8 @@
 				state.panelModOrder = stored.modOrder.map(function (path) { return String(path || '') }).filter(Boolean)
 			}
 			state.panelConfigSectionOrder = readPanelConfigSectionOrder(stored.configSectionOrder)
+			state.panelConfigLayout = readPanelConfigLayout(stored.configLayout)
+			state.panelRecentLogExpanded = stored.recentLogExpanded === true
 			if (isObject(stored.settings)) {
 				if (isValidPanelTheme(stored.settings.theme)) state.panelSettings.theme = stored.settings.theme
 				if (isValidPanelHideMode(stored.settings.hideMode)) state.panelSettings.hideMode = stored.settings.hideMode
@@ -8089,6 +9427,13 @@
 				if (isValidPanelDescriptionDisplayMode(stored.settings.descriptionDisplayMode)) state.panelSettings.descriptionDisplayMode = stored.settings.descriptionDisplayMode
 				state.panelSettings.sortConfigSections = stored.settings.sortConfigSections !== false
 				state.panelSettings.renderApiEnabled = stored.settings.renderApiEnabled !== false
+			}
+			if (isObject(stored.shortcuts)) {
+				state.shortcutSettings.enabled = stored.shortcuts.enabled !== false
+				if (isObject(stored.shortcuts.mods)) {
+					state.shortcutSettings.mods = {}
+					for (const modId in stored.shortcuts.mods) state.shortcutSettings.mods[String(modId)] = stored.shortcuts.mods[modId] !== false
+				}
 			}
 			if (isValidPanelEdge(stored.hiddenSide)) state.panelHiddenSide = stored.hiddenSide
 			else if (activeTab) state.panelHiddenSide = activeTab.edge
@@ -8103,7 +9448,8 @@
 			const restoreAsTab = hasRestoreOverride
 				? options.restoreAsTab === true
 				: state.panelHidden || (isPanelAutoHideEnabled() && !!document.getElementById('modloader-panel'))
-			localStorage.setItem(PANEL_STATE_STORAGE_KEY, JSON.stringify({
+			const previous = JSON.parse(localStorage.getItem(PANEL_STATE_STORAGE_KEY) || '{}')
+			let payload = { ...(isObject(previous) ? previous : {}),
 				position: state.panelPosition,
 				hidden: state.panelHidden,
 				restoreAsTab,
@@ -8112,8 +9458,13 @@
 				tabPositions: state.panelTabPositions,
 				modOrder: state.panelModOrder,
 				configSectionOrder: state.panelConfigSectionOrder,
-				settings: state.panelSettings
-			}))
+				configLayout: state.panelConfigLayout,
+				recentLogExpanded: state.panelRecentLogExpanded === true,
+				settings: state.panelSettings,
+				shortcuts: { enabled: state.shortcutSettings.enabled !== false, mods: state.shortcutSettings.mods }
+			}
+			if (state.configCompatibilityMods) payload = prepareCompatiblePanelState(payload, isObject(previous) ? previous : {})
+			localStorage.setItem(PANEL_STATE_STORAGE_KEY, JSON.stringify(payload))
 		} catch (error) {}
 	}
 
@@ -8315,6 +9666,7 @@
 		panel.classList.toggle('modloader-panel-manual-hide', !isPanelAutoHideEnabled())
 		panel.classList.toggle('modloader-panel-description-inline', shouldShowPanelDescriptionsInline())
 		refreshSettingsSurfaceThemes()
+		requestShortcutRefresh()
 		syncPanelSettingsPageState(panel)
 		if (!isPanelAutoHideEnabled()) clearPanelAutoHideTimer()
 	}
@@ -8329,6 +9681,19 @@
 		if (!state.panelSettingsOpen) return
 		state.panelSettingsOpen = false
 		syncPanelSettingsPageState(panel)
+	}
+
+	const getPanelEscapeAction = function (options) {
+		if (!options || options.hidden || options.blocked) return null
+		if (options.configExpanded) return 'config'
+		if (options.settingsOpen) return 'settings'
+		return 'hide'
+	}
+
+	const consumePanelEscapeEvent = function (event) {
+		event.preventDefault()
+		event.stopPropagation()
+		event.stopImmediatePropagation?.()
 	}
 
 	const formatPanelTooltipLayoutNumber = function (value) {
@@ -8376,6 +9741,17 @@
 		}
 	}
 
+	let panelTooltipOwner = null
+	const claimPanelTooltipOwner = function (owner) {
+		panelTooltipOwner = owner || null
+		return panelTooltipOwner
+	}
+	const releasePanelTooltipOwner = function (owner) {
+		if (owner && panelTooltipOwner !== owner) return false
+		panelTooltipOwner = null
+		return true
+	}
+
 	const getPanelTooltipElement = function () {
 		let tooltip = document.getElementById('modloader-panel-tooltip')
 		if (!tooltip) {
@@ -8388,11 +9764,13 @@
 		return tooltip
 	}
 
-	const hidePanelTooltip = function () {
+	const hidePanelTooltip = function (owner) {
+		if (!releasePanelTooltipOwner(owner)) return false
 		const tooltip = document.getElementById('modloader-panel-tooltip')
-		if (!tooltip) return
+		if (!tooltip) return true
 		tooltip.classList.remove('active')
 		tooltip.setAttribute('aria-hidden', 'true')
+		return true
 	}
 
 	const syncPanelTooltipLayout = function (tooltip) {
@@ -8458,14 +9836,15 @@
 		return getPanelThemeMode() === 'light'
 	}
 
-	const showPanelTooltip = function (target, point) {
+	const showPanelTooltip = function (target, point, owner) {
 		const text = String(target?.dataset?.modloaderPanelTooltip || '').trim()
 		const isDescription = target?.dataset?.modloaderPanelTooltipKind === 'description'
 		const settingsSurface = target.closest?.('.modloader-settings-surface')
 		const descriptionMode = settingsSurface?.dataset?.modloaderSettingsDescriptionMode || getPanelDescriptionDisplayMode()
-		if (!text || (isDescription && descriptionMode === 'inline')) return hidePanelTooltip()
+		if (!text || (isDescription && descriptionMode === 'inline')) return hidePanelTooltip(owner)
 		const panel = settingsSurface || target.closest?.('#modloader-panel')
 		const tooltip = getPanelTooltipElement()
+		claimPanelTooltipOwner(owner)
 		tooltip.textContent = text
 		const tooltipLight = resolvePanelTooltipLightTheme(target, panel)
 		tooltip.classList.toggle('modloader-panel-tooltip-light', tooltipLight)
@@ -8483,8 +9862,11 @@
 	const installPanelTooltips = function (root, addCleanup) {
 		if (!root) return function () {}
 		if (root.__modloaderPanelTooltipCleanup) root.__modloaderPanelTooltipCleanup()
+		const owner = Object.freeze({ root })
 		let activeTarget = null
 		let activePoint = null
+		let pointerActive = false
+		let focusActive = false
 		let ready = false
 		let frame = 0
 		let delayTimer = 0
@@ -8503,7 +9885,7 @@
 			frame = requestAnimationFrame(function () {
 				frame = 0
 				if (activeTarget !== target || !ready) return
-				showPanelTooltip(target, activePoint)
+				showPanelTooltip(target, activePoint, owner)
 			})
 		}
 		const beginReveal = function (target, delayMs) {
@@ -8519,12 +9901,15 @@
 			else reveal()
 		}
 		const clear = function () {
+			const hadActiveTarget = !!activeTarget
 			activeTarget = null
 			activePoint = null
+			pointerActive = false
+			focusActive = false
 			ready = false
 			clearDelay()
 			clearFrame()
-			hidePanelTooltip()
+			if (hadActiveTarget) hidePanelTooltip(owner)
 		}
 		const pointFromEvent = function (event) {
 			if (!Number.isFinite(event?.clientX) || !Number.isFinite(event?.clientY)) return null
@@ -8532,12 +9917,11 @@
 		}
 		const activate = function (event) {
 			const target = getPanelTooltipTarget(event.target, root)
-			if (!target) {
-				if (event.type === 'focusin') clear()
-				return
-			}
+			if (!target) return
 			const point = pointFromEvent(event)
 			if (target === activeTarget) {
+				if (event.type === 'focusin') focusActive = true
+				else pointerActive = true
 				activePoint = point || activePoint
 				if (event.type === 'focusin' && !ready) beginReveal(target, 0)
 				else if (ready) sync(target)
@@ -8545,9 +9929,11 @@
 			}
 			clearDelay()
 			clearFrame()
-			hidePanelTooltip()
+			hidePanelTooltip(owner)
 			activeTarget = target
 			activePoint = point
+			pointerActive = event.type !== 'focusin'
+			focusActive = event.type === 'focusin'
 			const delayMs = event.type === 'focusin' ? 0 : getPanelTooltipDelayMs(target)
 			beginReveal(target, delayMs)
 		}
@@ -8559,8 +9945,13 @@
 		}
 		const deactivate = function (event) {
 			if (!activeTarget) return
+			const target = getPanelTooltipTarget(event.target, root)
+			if (!target || target !== activeTarget) return
 			const next = getPanelTooltipTarget(event.relatedTarget, root)
 			if (next === activeTarget) return
+			if (event.type === 'focusout') focusActive = false
+			else pointerActive = false
+			if (pointerActive || focusActive) return
 			clear()
 		}
 		root.addEventListener('pointerover', activate)
@@ -8938,8 +10329,10 @@
 		const selected = new Set(originalSelected)
 		const originalPanelModOrder = state.panelModOrder.slice()
 		const originalPanelConfigSectionOrder = clonePanelConfigSectionOrder(state.panelConfigSectionOrder)
+		const originalPanelConfigLayout = clonePanelConfigLayout(state.panelConfigLayout)
 		const rowModels = []
 		const configModels = []
+		const searchEntries = []
 
 		let panel = document.getElementById('modloader-panel')
 		if (!panel) {
@@ -8948,6 +10341,7 @@
 			document.body.appendChild(panel)
 		}
 
+		const settingsScrollTop = panel.querySelector('.modloader-panel-settings-page')?.scrollTop || 0
 		if (panel.__modloaderCleanup) panel.__modloaderCleanup()
 		panel.innerHTML = ''
 		const cleanupFns = []
@@ -9112,6 +10506,26 @@
 				clearPanelAutoHideTimer()
 			}
 		})
+		addSettingsRow(t('shortcutTips'), [
+			{ value: true, label: t('shortcutTipsEnabled') },
+			{ value: false, label: t('shortcutTipsDisabled') }
+		], state.shortcutSettings.enabled !== false, function (value) {
+			state.shortcutSettings.enabled = value !== false
+			requestShortcutRefresh()
+		})
+		const shortcutModIds = getRegisteredShortcutModIds()
+		if (shortcutModIds.length) {
+			settingsPage.appendChild(element('div', 'modloader-panel-settings-title modloader-panel-settings-subtitle', t('shortcutTipsMods')))
+			for (const modId of shortcutModIds) {
+				addSettingsRow(getShortcutModName(modId), [
+					{ value: true, label: t('show') },
+					{ value: false, label: t('hide') }
+				], state.shortcutSettings.mods[modId] !== false, function (value) {
+					state.shortcutSettings.mods[modId] = value !== false
+					requestShortcutRefresh()
+				})
+			}
+		}
 		const addSettingsButtonRow = function (label, buttons) {
 			const row = element('div', 'modloader-panel-settings-row')
 			row.appendChild(element('span', '', label))
@@ -9159,6 +10573,8 @@
 			{ value: true, label: t('renderApiOn') },
 			{ value: false, label: t('renderApiOff') }
 		], isRenderApiEnabled(), function (value) { setRenderApiEnabled(value !== false) })
+		renderPeriodicStallProbeControls(settingsPage)
+		renderClearViewProbeControls(settingsPage)
 		addSettingsButtonRow(t('devTools'), [
 			{
 				icon: 'devtools',
@@ -9200,6 +10616,8 @@
 			}
 		])
 		panel.appendChild(settingsPage)
+		addCleanup(api.ui.settings.scroll.attach(settingsPage))
+		settingsPage.scrollTop = settingsScrollTop
 
 		const panelMouseEnter = function () { clearPanelAutoHideTimer() }
 		const panelMouseLeave = function () { schedulePanelAutoHide(panel) }
@@ -9267,11 +10685,12 @@
 			panel.appendChild(summary)
 		}
 
-		panel.appendChild(element('h3', '', t('modManager')))
+		const modHeading = element('div', 'modloader-mod-heading')
+		modHeading.append(element('h3', '', t('modManager')), element('span', 'modloader-mod-heading-note', t('toggleNote')))
+		panel.appendChild(modHeading)
 		if (available.errorMessage) panel.appendChild(element('div', 'modloader-panel-error', available.errorMessage))
 
 		const toolbar = element('div', 'modloader-mod-toolbar')
-		const note = element('span', 'modloader-panel-note', t('toggleNote'))
 		const reloadNote = element('span', 'modloader-panel-reload-note', t('changesRequireReload'))
 		const configNote = element('span', 'modloader-panel-config-note', t('configSaveNote'))
 		const message = element('span', 'modloader-panel-note', '')
@@ -9283,6 +10702,8 @@
 		const insert = createPanelActionButton('plus', t('insert'), t('insert'))
 		const folder = createPanelActionButton('folder', t('folder'), t('folder'))
 		const snapshots = createPanelActionButton('snapshots', t('snapshots'), t('snapshotsOpenTitle'))
+		const searchButton = createPanelActionButton('search', t('search'), t('search'))
+		searchButton.classList.add('modloader-search-button')
 		save.disabled = true
 		cancelChanges.disabled = true
 		insert.disabled = !getModFileTools()
@@ -9295,7 +10716,25 @@
 		selectAll.setAttribute('role', 'switch')
 		selectAll.setAttribute('aria-label', t('selectAll'))
 		selectAllWrap.append(selectAll, element('span', 'modloader-select-all-text', t('selectAll')))
-		left.append(selectAllWrap, note, document.createTextNode(' '), reloadNote, document.createTextNode(' '), configNote, document.createTextNode(' '), message)
+		const searchControl = element('span', 'modloader-search-control')
+		const searchField = element('span', 'modloader-search-field')
+		const searchInput = element('input', 'modloader-search-input')
+		searchInput.type = 'search'
+		searchInput.placeholder = t('searchPlaceholder')
+		searchInput.autocomplete = 'off'
+		searchInput.spellcheck = false
+		const searchClear = element('button', 'modloader-search-clear')
+		searchClear.type = 'button'
+		searchClear.hidden = true
+		searchClear.setAttribute('aria-label', `${t('cancel')} ${t('search')}`)
+		const searchResults = element('div', 'modloader-search-results')
+		searchResults.id = 'modloader-panel-search-results'
+		searchInput.setAttribute('aria-label', t('searchPlaceholder'))
+		searchInput.setAttribute('aria-controls', searchResults.id)
+		searchInput.setAttribute('aria-expanded', 'false')
+		searchField.append(searchInput, searchClear)
+		searchControl.append(searchField, searchButton, searchResults)
+		left.append(selectAllWrap, searchControl, reloadNote, configNote, message)
 		actions.append(cancelChanges, snapshots, insert, folder, save)
 		toolbar.append(left, actions)
 		panel.appendChild(toolbar)
@@ -9323,6 +10762,7 @@
 		let expandedRow = null
 		let configAnimating = false
 		let configAnimationTimer = null
+		let pendingEscapeConfigCollapse = false
 		let importMode = false
 		let listOrderDirty = !sameStringList(getOrderedSelectedPaths(mods, selected, true), originalSelected)
 
@@ -9406,6 +10846,10 @@
 			}, function () {
 				rowModel.container.classList.add('modloader-mod-row-expanded')
 				configAnimating = false
+				if (pendingEscapeConfigCollapse && expandedRow === rowModel) {
+					pendingEscapeConfigCollapse = false
+					collapseConfigRow(rowModel, true)
+				}
 			})
 		}
 
@@ -9414,6 +10858,107 @@
 			if (expandedRow === rowModel) collapseConfigRow(rowModel, true)
 			else expandConfigRow(rowModel)
 		}
+
+		let searchHighlightTimer = null
+		const closeSearchResults = function () {
+			searchResults.classList.remove('active')
+			searchInput.setAttribute('aria-expanded', 'false')
+		}
+		const highlightPanelSearchTarget = function (target) {
+			if (!target) return
+			for (const highlighted of panel.querySelectorAll('.modloader-search-target-highlight')) highlighted.classList.remove('modloader-search-target-highlight')
+			if (searchHighlightTimer) clearTimeout(searchHighlightTimer)
+			target.classList.remove('modloader-search-target-highlight')
+			target.getBoundingClientRect()
+			target.classList.add('modloader-search-target-highlight')
+			searchHighlightTimer = setTimeout(function () {
+				target.classList.remove('modloader-search-target-highlight')
+				searchHighlightTimer = null
+			}, 1500)
+		}
+		addCleanup(function () {
+			if (searchHighlightTimer) clearTimeout(searchHighlightTimer)
+		})
+		const jumpToPanelSearchEntry = function (entry) {
+			if (!entry?.rowModel?.container) return
+			closeSearchResults()
+			searchInput.blur()
+			const rowModel = entry.rowModel
+			const needsExpansion = rowModel.configModels.length && expandedRow !== rowModel
+			if (needsExpansion && configAnimating) {
+				setTimeout(function () { jumpToPanelSearchEntry(entry) }, 380)
+				return
+			}
+			if (needsExpansion) expandConfigRow(rowModel)
+			setTimeout(function () {
+				if (!document.body.contains(rowModel.container)) return
+				rowModel.container.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
+				const target = entry.target || rowModel.container
+				if (target !== rowModel.container) target.scrollIntoView({ block: 'center', behavior: 'smooth' })
+				highlightPanelSearchTarget(target)
+			}, needsExpansion ? 380 : 0)
+		}
+		const renderPanelSearchResults = function () {
+			const query = normalizePanelSearchText(searchInput.value)
+			searchClear.hidden = !query
+			searchResults.replaceChildren()
+			if (!query) {
+				closeSearchResults()
+				return []
+			}
+			const results = rankPanelSearchResults(query, searchEntries, 5)
+			if (!results.length) {
+				searchResults.appendChild(element('div', 'modloader-search-empty', t('searchNoResults')))
+			} else {
+				for (const entry of results) {
+					const result = element('button', 'modloader-search-result')
+					result.type = 'button'
+					const resultContext = element('span', 'modloader-search-result-context')
+					resultContext.appendChild(element('span', 'modloader-search-result-type', t(entry.type === 'mod' ? 'searchResultMod' : entry.type === 'section' ? 'searchResultSection' : 'searchResultConfig')))
+					if (entry.context) {
+						resultContext.append(element('span', 'modloader-search-result-separator', '|'), element('span', 'modloader-search-result-path', entry.context))
+					}
+					result.append(element('span', 'modloader-search-result-label', entry.label), resultContext)
+					result.onclick = function (event) {
+						event.preventDefault()
+						event.stopPropagation()
+						jumpToPanelSearchEntry(entry)
+					}
+					searchResults.appendChild(result)
+				}
+			}
+			searchResults.classList.add('active')
+			searchInput.setAttribute('aria-expanded', 'true')
+			return results
+		}
+		searchInput.addEventListener('input', renderPanelSearchResults)
+		const restorePanelSearchResults = function () {
+			if (normalizePanelSearchText(searchInput.value)) renderPanelSearchResults()
+		}
+		searchInput.addEventListener('focus', restorePanelSearchResults)
+		searchInput.addEventListener('click', restorePanelSearchResults)
+		searchInput.addEventListener('keydown', function (event) {
+			if (event.key !== 'Enter') return
+			event.preventDefault()
+			renderPanelSearchResults()
+		})
+		searchButton.onclick = function (event) {
+			event.preventDefault()
+			renderPanelSearchResults()
+			searchInput.focus()
+		}
+		searchClear.onclick = function (event) {
+			event.preventDefault()
+			event.stopPropagation()
+			searchInput.value = ''
+			renderPanelSearchResults()
+			searchInput.focus()
+		}
+		const closeSearchOnOutsidePointer = function (event) {
+			if (!searchControl.contains(event.target)) closeSearchResults()
+		}
+		document.addEventListener('pointerdown', closeSearchOnOutsidePointer, true)
+		addCleanup(function () { document.removeEventListener('pointerdown', closeSearchOnOutsidePointer, true) })
 
 		const getCurrentSelectedPaths = function () {
 			return getOrderedSelectedPaths(mods, selected, listOrderDirty)
@@ -9448,6 +10993,7 @@
 				clearTimeout(configAnimationTimer)
 				configAnimationTimer = null
 			}
+			pendingEscapeConfigCollapse = false
 			configAnimating = false
 			if (expandedRow) collapseConfigRow(expandedRow, false)
 			if (importMode) setImportMode(false)
@@ -9456,6 +11002,7 @@
 			resetConfigModels()
 			state.panelModOrder = originalPanelModOrder.slice()
 			state.panelConfigSectionOrder = clonePanelConfigSectionOrder(originalPanelConfigSectionOrder)
+			state.panelConfigLayout = clonePanelConfigLayout(originalPanelConfigLayout)
 			listOrderDirty = !sameStringList(getOrderedSelectedPaths(mods, selected, true), originalSelected)
 			state.panelMessage = t('changesCanceled')
 			savePanelState()
@@ -9667,17 +11214,15 @@
 
 		const captureConfigSectionRects = function (rowModel, draggedSection) {
 			const rects = new Map()
-			for (const sectionModel of rowModel.sectionModels || []) {
-				const section = sectionModel.container
-				if (section === draggedSection || section.parentNode !== rowModel.configScroll) continue
-				rects.set(section, section.getBoundingClientRect())
+			for (const child of Array.from(rowModel.configScroll?.children || [])) {
+				if (child === draggedSection || child.classList.contains('modloader-config-section-placeholder')) continue
+				rects.set(child, child.getBoundingClientRect())
 			}
 			return rects
 		}
 
 		const animateConfigSectionsFromRects = function (rowModel, firstRects) {
-			for (const sectionModel of rowModel.sectionModels || []) {
-				const section = sectionModel.container
+			for (const section of Array.from(rowModel.configScroll?.children || [])) {
 				const first = firstRects.get(section)
 				if (!first || section.parentNode !== rowModel.configScroll) continue
 				const last = section.getBoundingClientRect()
@@ -9699,8 +11244,8 @@
 		}
 
 		const getConfigSectionBeforeNode = function (rowModel, clientY, draggedSection, placeholder) {
-			const sections = (rowModel.sectionModels || []).map(function (sectionModel) { return sectionModel.container }).filter(function (section) {
-				return section.parentNode === rowModel.configScroll && section !== draggedSection && section !== placeholder
+			const sections = Array.from(rowModel.configScroll?.children || []).filter(function (section) {
+				return section !== draggedSection && section !== placeholder
 			})
 			for (const section of sections) {
 				const rect = section.getBoundingClientRect()
@@ -9734,13 +11279,11 @@
 			for (const child of Array.from(rowModel.configScroll.children)) {
 				if (child.__modloaderConfigSectionModel) ordered.push(child.__modloaderConfigSectionModel)
 			}
-			if (ordered.length === rowModel.sectionModels.length) {
-				rowModel.sectionModels.length = 0
-				rowModel.sectionModels.push(...ordered)
-				syncPanelConfigSectionOrderForMod(rowModel.mod, rowModel.sectionModels)
-				savePanelState()
-				refreshRows(true)
-			}
+			rowModel.sectionModels.length = 0
+			rowModel.sectionModels.push(...ordered)
+			syncPanelConfigLayoutForMod(rowModel)
+			savePanelState()
+			refreshRows(true)
 		}
 
 		const installConfigSectionSortDrag = function (rowModel, sectionModel, handle) {
@@ -9803,6 +11346,201 @@
 			}, true)
 			addCleanup(function () {
 				if (placeholder?.parentNode) finishConfigSectionSortDrag(rowModel, sectionModel, placeholder, false)
+				clearDrag()
+			})
+		}
+
+		const captureConfigItemRects = function (parent, draggedField, placeholder) {
+			const rects = new Map()
+			for (const child of Array.from(parent?.children || [])) {
+				if (child === draggedField || child === placeholder || !child.__modloaderConfigItemModel) continue
+				rects.set(child, child.getBoundingClientRect())
+			}
+			return rects
+		}
+
+		const animateConfigItemsFromRects = function (parent, firstRects) {
+			for (const child of Array.from(parent?.children || [])) {
+				const first = firstRects.get(child)
+				if (!first) continue
+				const last = child.getBoundingClientRect()
+				const dx = first.left - last.left
+				const dy = first.top - last.top
+				if (!dx && !dy) continue
+				child.classList.add('modloader-config-item-moving')
+				child.style.transition = 'none'
+				child.style.transform = `translate(${dx}px, ${dy}px)`
+				child.getBoundingClientRect()
+				child.style.transition = 'transform .18s cubic-bezier(.2, .8, .2, 1)'
+				child.style.transform = ''
+				setTimeout(function () {
+					child.classList.remove('modloader-config-item-moving')
+					child.style.transition = ''
+					child.style.transform = ''
+				}, 220)
+			}
+		}
+
+		const getConfigItemBeforeNode = function (parent, clientY, draggedField, placeholder) {
+			for (const child of Array.from(parent?.children || [])) {
+				if (child === draggedField || child === placeholder || !child.__modloaderConfigItemModel) continue
+				const rect = child.getBoundingClientRect()
+				if (clientY < rect.top + rect.height / 2) return child
+			}
+			return null
+		}
+
+		const findConfigItemDropSection = function (rowModel, clientX, clientY, originSectionModel, startedStandalone) {
+			for (const sectionModel of rowModel.sectionModels || []) {
+				if (!startedStandalone && sectionModel !== originSectionModel) continue
+				const section = sectionModel.container
+				if (section.parentNode !== rowModel.configScroll) continue
+				const rect = sectionModel.body.getBoundingClientRect()
+				if (clientX >= rect.left && clientX <= rect.right && clientY >= rect.top - 5 && clientY <= rect.bottom + 5) return sectionModel
+			}
+			return null
+		}
+
+		const updateConfigItemPlaceholder = function (parent, placeholder, beforeNode, draggedField) {
+			if (!parent || (placeholder.parentNode === parent && beforeNode === placeholder.nextSibling)) return
+			const oldParent = placeholder.parentNode
+			const oldRects = captureConfigItemRects(oldParent, draggedField, placeholder)
+			const newRects = oldParent === parent ? oldRects : captureConfigItemRects(parent, draggedField, placeholder)
+			parent.insertBefore(placeholder, beforeNode)
+			if (oldParent) animateConfigItemsFromRects(oldParent, oldRects)
+			if (parent !== oldParent) animateConfigItemsFromRects(parent, newRects)
+		}
+
+		const installConfigItemSortDrag = function (rowModel, itemModel) {
+			const field = itemModel?.container
+			if (!field) return
+			field.classList.add('modloader-config-field-sortable')
+			let holdTimer = null
+			let moveHandler = null
+			let upHandler = null
+			let cancelHandler = null
+			let placeholder = null
+			let active = false
+			let moved = false
+			let startX = 0
+			let startY = 0
+			let offsetY = 0
+			let originSectionModel = null
+			let startedStandalone = false
+			let suppressClick = false
+			const clearHold = function () {
+				if (holdTimer) clearTimeout(holdTimer)
+				holdTimer = null
+				field.classList.remove('modloader-config-item-pressing')
+			}
+			const clearDrag = function () {
+				clearHold()
+				if (moveHandler) document.removeEventListener('pointermove', moveHandler, true)
+				if (upHandler) document.removeEventListener('pointerup', upHandler, true)
+				if (cancelHandler) document.removeEventListener('pointercancel', cancelHandler, true)
+				moveHandler = null
+				upHandler = null
+				cancelHandler = null
+			}
+			const finishDrag = function (commit) {
+				if (!active) return
+				const parent = placeholder?.parentNode
+				if (parent) parent.insertBefore(field, placeholder)
+				if (placeholder?.parentNode) placeholder.remove()
+				placeholder = null
+				field.classList.remove('modloader-config-item-dragging')
+				field.classList.toggle('modloader-config-item-standalone', field.parentNode === rowModel.configScroll)
+				field.style.position = ''
+				field.style.left = ''
+				field.style.top = ''
+				field.style.width = ''
+				field.style.height = ''
+				field.style.transform = ''
+				field.style.transition = ''
+				field.removeAttribute('aria-grabbed')
+				active = false
+				suppressClick = true
+				setTimeout(function () { suppressClick = false }, 0)
+				if (!commit || !moved) return
+				syncPanelConfigLayoutForMod(rowModel)
+				savePanelState()
+				refreshRows(true)
+			}
+			field.addEventListener('click', function (event) {
+				if (!suppressClick) return
+				event.preventDefault()
+				event.stopImmediatePropagation()
+			}, true)
+			field.addEventListener('pointerdown', function (event) {
+				if (event.button !== undefined && event.button !== 0) return
+				if (configAnimating || importMode) return
+				const textTarget = event.target === field || event.target?.closest?.('.modloader-config-text')
+				if (!textTarget || !field.contains(event.target)) return
+				startX = event.clientX
+				startY = event.clientY
+				moved = false
+				active = false
+				field.classList.add('modloader-config-item-pressing')
+				const beginDrag = function () {
+					holdTimer = null
+					if (!field.isConnected || configAnimating || importMode) return
+					const rect = field.getBoundingClientRect()
+					const parent = field.parentNode
+					originSectionModel = parent?.parentNode?.__modloaderConfigSectionModel || null
+					startedStandalone = parent === rowModel.configScroll
+					offsetY = startY - rect.top
+					placeholder = element('div', 'modloader-config-item-placeholder')
+					placeholder.style.height = Math.max(28, Math.round(rect.height)) + 'px'
+					parent.insertBefore(placeholder, field)
+					field.classList.remove('modloader-config-item-pressing', 'modloader-config-item-standalone')
+					field.classList.add('modloader-config-item-dragging')
+					field.setAttribute('aria-grabbed', 'true')
+					field.style.position = 'fixed'
+					const style = window.getComputedStyle(field)
+					const frame = parseFloat(style.paddingLeft) + parseFloat(style.paddingRight) + parseFloat(style.borderLeftWidth) + parseFloat(style.borderRightWidth)
+					field.style.left = Math.round(rect.left) + 'px'
+					field.style.top = Math.round(rect.top) + 'px'
+					field.style.width = Math.max(0, Math.round(rect.width - frame)) + 'px'
+					panel.appendChild(field)
+					active = true
+				}
+				holdTimer = setTimeout(beginDrag, 300)
+				moveHandler = function (moveEvent) {
+					const dx = moveEvent.clientX - startX
+					const dy = moveEvent.clientY - startY
+					if (!active) {
+						if (Math.abs(dx) + Math.abs(dy) > 5) clearHold()
+						return
+					}
+					moveEvent.preventDefault()
+					if (Math.abs(dx) + Math.abs(dy) > 3) moved = true
+					field.style.top = Math.round(moveEvent.clientY - offsetY) + 'px'
+					const scrollRect = rowModel.configScroll.getBoundingClientRect()
+					if (moveEvent.clientY < scrollRect.top + 24) rowModel.configScroll.scrollTop -= 10
+					else if (moveEvent.clientY > scrollRect.bottom - 24) rowModel.configScroll.scrollTop += 10
+					const dropSection = findConfigItemDropSection(rowModel, moveEvent.clientX, moveEvent.clientY, originSectionModel, startedStandalone)
+					if (dropSection) {
+						updateConfigItemPlaceholder(dropSection.body, placeholder, getConfigItemBeforeNode(dropSection.body, moveEvent.clientY, field, placeholder), field)
+						return
+					}
+					updateConfigItemPlaceholder(rowModel.configScroll, placeholder, getConfigSectionBeforeNode(rowModel, moveEvent.clientY, field, placeholder), field)
+				}
+				upHandler = function () {
+					clearHold()
+					if (active) finishDrag(true)
+					clearDrag()
+				}
+				cancelHandler = function () {
+					clearHold()
+					if (active) finishDrag(false)
+					clearDrag()
+				}
+				document.addEventListener('pointermove', moveHandler, true)
+				document.addEventListener('pointerup', upHandler, true)
+				document.addEventListener('pointercancel', cancelHandler, true)
+			}, true)
+			addCleanup(function () {
+				if (active) finishDrag(false)
 				clearDrag()
 			})
 		}
@@ -9969,7 +11707,8 @@
 			const enabledDirty = !sameStringList(orderedSelected, originalSelected)
 			const modOrderDirty = !sameStringList(state.panelModOrder, originalPanelModOrder)
 			const sectionOrderDirty = state.panelSettings.sortConfigSections !== false && !samePanelConfigSectionOrder(state.panelConfigSectionOrder, originalPanelConfigSectionOrder)
-			const orderDirty = modOrderDirty || sectionOrderDirty
+			const configLayoutDirty = state.panelSettings.sortConfigSections !== false && !samePanelConfigLayout(state.panelConfigLayout, originalPanelConfigLayout)
+			const orderDirty = modOrderDirty || sectionOrderDirty || configLayoutDirty
 			const reloadDirty = enabledDirty || configReloadDirty
 			reloadNote.classList.toggle('active', reloadDirty)
 			configNote.classList.toggle('active', configDirty && !configReloadDirty)
@@ -10078,6 +11817,8 @@
 					model = {
 						mod,
 						item,
+						label: localizedConfigLabel || item.key,
+						description: localizedConfigDescription,
 						input: fieldHandle.input,
 						fieldHandle,
 						container: field,
@@ -10095,6 +11836,7 @@
 						rowConfigModels.push(model)
 						configModels.push(model)
 					}
+					field.__modloaderConfigItemModel = model
 					return field
 				}
 				if (state.panelSettings.sortConfigSections === false) {
@@ -10106,11 +11848,16 @@
 						previousConfigSection = configSection || ''
 					}
 				} else {
-					const configGroups = buildConfigSectionGroups(mod, modConfig.schema)
-					const canSortConfigSections = configGroups.length > 1
-					for (const group of configGroups) {
+					const configLayout = resolvePanelConfigLayout(mod, modConfig.schema)
+					const canSortConfigSections = configLayout.length > 1
+					for (const group of configLayout) {
+						if (group.type === 'item') {
+							const field = createConfigField(group.item, configScroll)
+							field.classList.add('modloader-config-item-standalone')
+							continue
+						}
 						const section = element('div', 'modloader-config-section')
-						const sectionModel = { mod, key: group.key, container: section, handle: null }
+						const sectionModel = { mod, key: group.key, label: group.label || '', container: section, body: null, handle: null }
 						section.__modloaderConfigSectionModel = sectionModel
 						if (group.label) {
 							const sectionHeader = element('div', 'modloader-config-section-header')
@@ -10133,6 +11880,7 @@
 							section.appendChild(sectionSort)
 						}
 						const sectionBody = element('div', 'modloader-config-section-body')
+						sectionModel.body = sectionBody
 						for (const item of group.items) createConfigField(item, sectionBody)
 						section.appendChild(sectionBody)
 						configScroll.appendChild(section)
@@ -10173,11 +11921,14 @@
 			const index = element('span', 'modloader-mod-index', String(modOrdinal))
 			const rowActions = element('div', 'modloader-mod-actions')
 			rowActions.append(deleteButton, sortButton, index)
-			const rowModel = { mod, checkbox, container: row, warning, configModels: rowConfigModels, sectionModels: rowSectionModels, configScroll, index }
+			const rowModel = { mod, localizedName: localizedModName, checkbox, container: row, warning, configModels: rowConfigModels, sectionModels: rowSectionModels, configScroll, index }
 			row.__modloaderRowModel = rowModel
 			for (const sectionModel of rowSectionModels) {
 				sectionModel.rowModel = rowModel
 				installConfigSectionSortDrag(rowModel, sectionModel, sectionModel.handle)
+			}
+			if (state.panelSettings.sortConfigSections !== false) {
+				for (const itemModel of rowConfigModels) installConfigItemSortDrag(rowModel, itemModel)
 			}
 			installSortDrag(rowModel, sortButton)
 			row.onclick = function (event) {
@@ -10187,6 +11938,65 @@
 			row.append(checkbox, main, rowActions)
 			list.appendChild(row)
 			rowModels.push(rowModel)
+			const getLiveSearchOrder = function (target) {
+				return function () {
+					const rowIndex = Math.max(0, rowModels.indexOf(rowModel))
+					if (!target || target === row) return rowIndex * 10000
+					const targets = Array.from(row.querySelectorAll('.modloader-config-section, .modloader-config-field'))
+					return rowIndex * 10000 + Math.max(1, targets.indexOf(target) + 1)
+				}
+			}
+
+			const modContext = localizedModName !== mod.path ? mod.path : (mod.id && mod.id !== localizedModName ? mod.id : '')
+			searchEntries.push({
+				type: 'mod',
+				label: localizedModName,
+				context: modContext,
+				fields: [ localizedModName, mod.path, mod.id ],
+				order: getLiveSearchOrder(row),
+				rowModel,
+				target: row
+			})
+			const sectionTargets = new Map()
+			for (const sectionModel of rowSectionModels) {
+				if (!sectionModel.label || sectionTargets.has(sectionModel.key)) continue
+				sectionTargets.set(sectionModel.key, { label: sectionModel.label, target: sectionModel.container })
+			}
+			if (!rowSectionModels.length) {
+				for (const model of rowConfigModels) {
+					const sectionLabel = getConfigSectionLabel(mod, model.item)
+					const sectionKey = getConfigSectionId(model.item) || sectionLabel
+					if (!sectionLabel || sectionTargets.has(sectionKey)) continue
+					sectionTargets.set(sectionKey, { label: sectionLabel, target: model.container })
+				}
+			}
+			for (const sectionTarget of sectionTargets.values()) {
+				const sectionLabel = sectionTarget.label
+				const target = sectionTarget.target
+				searchEntries.push({
+					type: 'section',
+					label: sectionLabel,
+					context: localizedModName,
+					fields: [ sectionLabel ],
+					order: getLiveSearchOrder(target),
+					rowModel,
+					target
+				})
+			}
+			for (const model of rowConfigModels) {
+				const displayedSection = state.panelSettings.sortConfigSections === false
+					? getConfigSectionLabel(mod, model.item)
+					: model.container.closest('.modloader-config-section')?.querySelector('.modloader-config-section-title')?.textContent || ''
+				searchEntries.push({
+					type: 'config',
+					label: model.label,
+					context: [ localizedModName, displayedSection ].filter(Boolean).join(' \u2192 '),
+					fields: [ model.label, model.description, model.item.key ],
+					order: getLiveSearchOrder(model.container),
+					rowModel,
+					target: model.container
+				})
+			}
 		}
 
 		if (!mods.length) list.appendChild(element('div', 'modloader-panel-note', t('noModsFound')))
@@ -10242,16 +12052,59 @@
 			if (!importMode || !document.getElementById('modloader-panel')) return
 			importClipboardZip(event)
 		}
+		let panelEscapeHandledUntilKeyup = false
+		const isPanelEscapeEvent = function (event) {
+			return event.key === 'Escape' || event.code === 'Escape' || event.keyCode === 27
+		}
 		const documentKeyHandler = function (event) {
+			if (isPanelEscapeEvent(event) && document.getElementById('modloader-panel') === panel) {
+				if (event.repeat && panelEscapeHandledUntilKeyup) {
+					consumePanelEscapeEvent(event)
+					return
+				}
+				if (!event.repeat) panelEscapeHandledUntilKeyup = false
+				if (!state.panelHidden && searchResults.classList.contains('active')) {
+					panelEscapeHandledUntilKeyup = true
+					consumePanelEscapeEvent(event)
+					closeSearchResults()
+					searchInput.blur()
+					return
+				}
+				const escapeAction = getPanelEscapeAction({
+					hidden: state.panelHidden,
+					blocked: panel.classList.contains('modloader-panel-modal-open') || !!document.querySelector('.modloader-select-menu'),
+					configExpanded: !!expandedRow,
+					settingsOpen: state.panelSettingsOpen
+				})
+				if (escapeAction) {
+					panelEscapeHandledUntilKeyup = true
+					consumePanelEscapeEvent(event)
+					if (escapeAction === 'config') {
+						if (configAnimating) pendingEscapeConfigCollapse = true
+						else collapseConfigRow(expandedRow, true)
+					} else if (escapeAction === 'settings') {
+						closePanelSettingsPage(panel)
+						savePanelState()
+					} else {
+						hidePanelToEdge(panel, true)
+					}
+					return
+				}
+			}
 			if (!importMode || !document.getElementById('modloader-panel')) return
 			if (!(event.ctrlKey || event.metaKey) || event.key.toLowerCase() !== 'v') return
 			importClipboardZip(event)
 		}
+		const documentKeyupHandler = function (event) {
+			if (isPanelEscapeEvent(event)) panelEscapeHandledUntilKeyup = false
+		}
 		document.addEventListener('paste', documentPasteHandler, true)
 		document.addEventListener('keydown', documentKeyHandler, true)
+		document.addEventListener('keyup', documentKeyupHandler, true)
 		addCleanup(function () {
 			document.removeEventListener('paste', documentPasteHandler, true)
 			document.removeEventListener('keydown', documentKeyHandler, true)
+			document.removeEventListener('keyup', documentKeyupHandler, true)
 		})
 
 		save.onclick = function () {
@@ -10275,11 +12128,31 @@
 			}
 		}
 
-		panel.appendChild(element('h3', '', t('recentLog')))
 		const lines = state.log.slice(-12).map(function (entry) {
 			return `${entry.level}: ${entry.args.map(function (arg) { return arg instanceof Error ? arg.message : String(arg) }).join(' ')}`
 		})
-		panel.appendChild(element('pre', 'modloader-panel-log', lines.join('\n') || t('noLogEntries')))
+		const recentLogHeading = element('h3', 'modloader-recent-log-heading')
+		const recentLogToggle = element('button', 'modloader-recent-log-toggle')
+		recentLogToggle.type = 'button'
+		const recentLog = element('pre', 'modloader-panel-log', lines.join('\n') || t('noLogEntries'))
+		recentLog.id = 'modloader-panel-recent-log'
+		const syncRecentLogState = function () {
+			const expanded = state.panelRecentLogExpanded === true
+			recentLog.hidden = !expanded
+			recentLogToggle.setAttribute('aria-expanded', expanded ? 'true' : 'false')
+			recentLogToggle.setAttribute('aria-label', t(expanded ? 'recentLogCollapse' : 'recentLogExpand'))
+			setPanelTooltipText(recentLogToggle, t(expanded ? 'recentLogCollapse' : 'recentLogExpand'))
+		}
+		recentLogToggle.setAttribute('aria-controls', recentLog.id)
+		recentLogToggle.append(element('span', '', t('recentLog')), element('span', 'modloader-recent-log-chevron'))
+		recentLogToggle.onclick = function () {
+			state.panelRecentLogExpanded = !state.panelRecentLogExpanded
+			syncRecentLogState()
+			savePanelState()
+		}
+		recentLogHeading.appendChild(recentLogToggle)
+		panel.append(recentLogHeading, recentLog)
+		syncRecentLogState()
 
 		refreshRows()
 		if (state.panelMessage) {
@@ -10392,7 +12265,7 @@
 	}
 
 	const loadScript = function (url) {
-		return new Promise(function (resolve, reject) {
+		return observeStartup('entry:' + String(url).split(/[?#]/)[0], () => new Promise(function (resolve, reject) {
 			const script = document.createElement('script')
 			script.type = 'text/javascript'
 			script.src = url
@@ -10401,7 +12274,7 @@
 				reject(new Error(`Failed to load script: ${url}`))
 			}
 			document.head.appendChild(script)
-		})
+		}))
 	}
 
 	const normalizeEnabled = function (enabled) {
@@ -10450,25 +12323,75 @@
 		}
 	}
 
+	// Manifest-declared identifier compatibility. Reads are side-effect free.
+	const readCompatibleConfigValue = function (mod, item) {
+		const own = localStorage.getItem(storageKey(mod.id, item.key))
+		if (own !== null) return parseStoredConfig(own, item.default)
+		const sources = mod.manifest.configCompatibility?.sources?.[item.key] || []
+		for (const source of sources) {
+			const sourceId = source.modId || mod.id
+			const raw = localStorage.getItem(storageKey(sourceId, source.key))
+			if (raw === null && !Object.prototype.hasOwnProperty.call(source, 'fallback')) continue
+			let value = raw === null ? source.fallback : parseStoredConfig(raw, item.default)
+			for (const operation of source.operations || []) {
+				if (operation.unless) {
+					const condition = operation.unless
+					const stored = localStorage.getItem(storageKey(condition.modId || mod.id, condition.key))
+					if (stored !== null && parseStoredConfig(stored, null) === condition.equals) continue
+				}
+				if (operation.kind === 'notFalse') value = value !== false
+				else if (operation.kind === 'map') {
+					const input = operation.normalizeText && typeof value === 'string' ? value.trim().toLowerCase() : value
+					const match = (operation.values || []).find(function (pair) { return pair[0] === input })
+					if (match) value = match[1]
+					else if (Object.prototype.hasOwnProperty.call(operation, 'fallback')) value = operation.fallback
+				} else if (operation.kind === 'and') {
+					// A blocked prerequisite read cannot accidentally enable a renderer.
+					try {
+						const other = operation.source || {}
+						const stored = localStorage.getItem(storageKey(other.modId || mod.id, other.key))
+						if (stored === null) continue
+						const parsed = parseStoredConfig(stored, null)
+						const number = Number(parsed)
+						const rejected = (operation.reject || []).includes(String(parsed ?? '').trim().toLowerCase())
+						value = value !== false && !rejected && !(operation.rejectNonPositive && Number.isFinite(number) && number <= 0)
+					} catch (error) { value = false }
+				}
+			}
+			return value
+		}
+		return item.default
+	}
+
 	const loadModConfig = function (mod) {
 		const schema = normalizeConfigSchema(mod.manifest.config)
 		const values = {}
 		for (const item of schema) {
 			const fallback = item.default
-			values[item.key] = parseStoredConfig(localStorage.getItem(storageKey(mod.id, item.key)), fallback)
+			values[item.key] = mod.manifest.configCompatibility
+				? readCompatibleConfigValue(mod, item)
+				: parseStoredConfig(localStorage.getItem(storageKey(mod.id, item.key)), fallback)
 			item.type = item.type || inferConfigType(fallback)
 		}
 		state.configs[mod.id] = { schema, values }
+		if (mod.manifest.configCompatibility) {
+			state.configs[mod.id].compatibility = mod.manifest.configCompatibility
+			state.configCompatibilityMods ||= {}
+			state.configCompatibilityMods[mod.id] = mod
+		}
 	}
 
 	const getConfigValue = function (modId, key, fallback) {
 		const config = state.configs[modId]
 		if (!config) return fallback
+		key = config.compatibility?.keys?.[key] || key
 		return config.values[key] === undefined ? fallback : config.values[key]
 	}
 
 	const setConfigValue = function (modId, key, value) {
 		if (!state.configs[modId]) state.configs[modId] = { schema: [], values: {} }
+		const compatibility = state.configs[modId].compatibility || state.configCompatibilityMods?.[modId]?.manifest?.configCompatibility
+		key = compatibility?.keys?.[key] || key
 		state.configs[modId].values[key] = value
 		localStorage.setItem(storageKey(modId, key), JSON.stringify(value))
 		showStatus()
@@ -10591,7 +12514,7 @@
 		let current = payload
 		for (const hook of hooks) {
 			try {
-				const result = hook.fn(current, context)
+				const result = observeStartup('hook:' + hook.modId + ':' + name, () => hook.fn(current, context))
 				if (result !== undefined) current = result
 			} catch (error) {
 				warn(`Hook ${name} from ${hook.modId} failed`, error)
@@ -10645,6 +12568,7 @@
 	}
 
 	const establishLoadedSnapshotIdentity = function (save) {
+		state.snapshotActivationSerial++
 		const loaded = String(save?.modloader?.saveInstanceId || '').trim().toLowerCase()
 		if (SNAPSHOT_SAVE_ID_PATTERN.test(loaded)) {
 			state.snapshotSaveInstanceId = loaded
@@ -10702,8 +12626,14 @@
 		}
 	}
 
-	const verifyPersistedSnapshotIdentity = function (game, saveInstanceId) {
+	const verifyPersistedSnapshotIdentity = async function (game, saveInstanceId, slotId = game?.currentSlotId) {
 		try {
+			if (game?.version === '1.3') {
+				if (typeof game.readFromSlot !== 'function' || slotId === undefined) return false
+				const slot = await game.readFromSlot(slotId)
+				return game.currentSlotId === slotId &&
+					String(slot?.stack?.[0]?.state?.modloader?.saveInstanceId || '').toLowerCase() === saveInstanceId
+			}
 			const key = `abstractv03${game?.steamId || ''}`
 			const encoded = localStorage.getItem(key)
 			if (!encoded || typeof game?.decodeSave !== 'function') return false
@@ -10714,14 +12644,15 @@
 		}
 	}
 
-	const persistSnapshotIdentity = function (game) {
+	const persistSnapshotIdentity = async function (game) {
 		const saveInstanceId = ensureCurrentSnapshotIdentity()
-		if (!state.snapshotIdentityNeedsPersistence) return
+		const slotId = game?.currentSlotId
+		if (!state.snapshotIdentityNeedsPersistence && game?.version !== '1.3') return
 		if (!game || typeof game.saveGame !== 'function' || game.preventSaving || game.preventCloud) {
 			throw new ModLoaderSnapshotError('UNAVAILABLE', 'Snapshot storage is unavailable.')
 		}
-		game.saveGame()
-		if (!verifyPersistedSnapshotIdentity(game, saveInstanceId)) {
+		if (state.snapshotIdentityNeedsPersistence) await game.saveGame()
+		if (!await verifyPersistedSnapshotIdentity(game, saveInstanceId, slotId) || state.snapshotSaveInstanceId !== saveInstanceId) {
 			throw new ModLoaderSnapshotError('UNAVAILABLE', 'Snapshot storage is unavailable.')
 		}
 		state.snapshotIdentityNeedsPersistence = false
@@ -10729,21 +12660,29 @@
 
 	const activateSnapshotContext = async function (game) {
 		if (state.snapshotContextReady && state.snapshotContextGame === game && state.snapshotContextToken) return state.snapshotCapabilities
+		const activationSerial = ++state.snapshotActivationSerial
 		state.snapshotContextReady = false
 		state.snapshotContextToken = ''
 		state.snapshotContextGame = game || null
 		try {
 			ensureCurrentSnapshotIdentity()
-			persistSnapshotIdentity(game)
+			const saveInstanceId = state.snapshotSaveInstanceId
+			const slotId = game?.currentSlotId
+			await persistSnapshotIdentity(game)
+			if (state.snapshotActivationSerial !== activationSerial) return null
 			const result = await invokeSnapshotIpc('modloader:snapshots:activate', {
-				saveInstanceId: state.snapshotSaveInstanceId
+				saveInstanceId
 			})
+			if (state.snapshotActivationSerial !== activationSerial || state.snapshotSaveInstanceId !== saveInstanceId || state.snapshotContextGame !== game || game?.currentSlotId !== slotId) {
+				throw new ModLoaderSnapshotError('UNAVAILABLE', 'The active save changed during snapshot activation.')
+			}
 			state.snapshotContextToken = String(result?.token || '')
 			state.snapshotCapabilities = clone(result?.capabilities || {})
 			state.snapshotContextReady = !!state.snapshotContextToken
 			state.snapshotIssueReported = false
 			return state.snapshotCapabilities
 		} catch (error) {
+			if (state.snapshotActivationSerial !== activationSerial) return null
 			state.snapshotCapabilities = null
 			if (!state.snapshotIssueReported) {
 				state.snapshotIssueReported = true
@@ -11064,6 +13003,7 @@
 
 		async boot() {
 			if (state.booted) return state
+			const bootSpan = startupProbe?.begin('loader:boot')
 			state.booted = true
 
 			readTranslationCatalogFromDisk({ silent: true })
@@ -11096,6 +13036,7 @@
 			info(`Loaded ${state.mods.length} enabled mod manifest(s).`)
 			showStatus()
 			requestAnimationFrame(restorePanelAfterLoad)
+			startupProbe?.end(bootSpan)
 			return state
 		},
 
@@ -11117,9 +13058,21 @@
 		},
 
 		async stage(name, context, payload) {
+			const stageSpan = startupProbe?.begin('stage:' + name)
+			if (name === 'beforeGamePrepare') startupProbe?.attachGame(context)
 			if (context?.language) state.game = context
+			if (name === 'beforeGamePrepare') {
+				if (context?.version !== '1.3' || context?.isMobile) throw new Error('ModLoader requires the desktop game 1.3.')
+				state.game = context
+				await api.boot()
+				// This fixed Better UIs entry selects the save policy before native loading.
+				const better = state.modById['Cattail_TweaksQuality_Better-UIs']
+				if (better?.path === 'Cattail_TweaksQuality_Better-UIs' && getModEntryFiles(better.manifest).includes('scripts/independent-auto-save.js')) await loadScript(better.basePath + 'scripts/independent-auto-save.js')
+			}
 			if (name === 'beforeVanillaScripts') await api.boot()
 			if (name === 'afterVanillaScripts') {
+				// Capture whitelisted native leaves before Mod entries/hooks wrap them.
+				preparePlacementProbe()
 				await api.loadEntries()
 				if (uiPages.length) ensureUiPagesInstalled()
 				installLanguageBridge()
@@ -11129,25 +13082,29 @@
 			if (name === 'afterGameInit') {
 				installGameHud(context)
 				installVanillaGameHudSync(context)
-				await activateSnapshotContext(context)
+				await observeStartup('loader:snapshot-context', () => activateSnapshotContext(context))
 				requestAnimationFrame(refreshOpenPanel)
 				requestAnimationFrame(restorePanelAfterLoad)
 				requestAnimationFrame(syncUiDocks)
 				requestAnimationFrame(syncGameHudEntries)
 				requestAnimationFrame(function () { syncVanillaGameHudVisibility(context) })
+				requestShortcutRefresh()
 			}
 
 			const hooks = state.hooks[name] || []
 			let current = payload
 			for (const hook of hooks) {
 				try {
-					const result = await hook.fn(current, context)
+					const result = await observeStartup('hook:' + hook.modId + ':' + name, () => hook.fn(current, context))
 					if (result !== undefined) current = result
 				} catch (error) {
 					warn(`Hook ${name} from ${hook.modId} failed`, error)
 				}
 			}
-			if (name === 'afterVanillaScripts' || name === 'afterGameInit') installRenderApi(context)
+			if (name === 'afterVanillaScripts' || name === 'afterGameInit') observeStartup('loader:render-install', () => installRenderApi(context))
+			if (name === 'afterVanillaScripts') await startClearViewOriginIfArmed(context)
+			if (name === 'afterGameInit') clearViewProbe?.gameReady(context)
+			startupProbe?.end(stageSpan)
 			return current
 		},
 
@@ -11164,7 +13121,7 @@
 			if (mod.hooks) {
 				for (const name in mod.hooks) api.on(name, mod.hooks[name], mod.id)
 			}
-			if (typeof mod.init === 'function') mod.init(api.forMod(mod.id))
+			if (typeof mod.init === 'function') observeStartup('mod-init:' + mod.id, () => mod.init(api.forMod(mod.id)))
 		},
 
 		forMod(modId) {
@@ -11172,7 +13129,7 @@
 				id: modId,
 				on(name, fn) { api.on(name, fn, modId) },
 				registerEntity(id, klass, dataEntry) { api.registerEntity(id, klass, dataEntry, modId) },
-				registerLanguage(id) { api.registerLanguage(id) },
+				registerLanguage(id, options) { return api.registerLanguage(id, options) },
 				patch(target, methodName, wrapper) { return api.patch(target, methodName, wrapper, modId) },
 				appWindow: createAppWindowApi(),
 				windows: createWindowApi(modId),
@@ -11202,8 +13159,23 @@
 			state.entityPatches[id] = { klass, dataEntry: dataEntry || {}, modId: modId || 'anonymous' }
 		},
 
-		registerLanguage(id) {
+		registerLanguage(id, options) {
+			if (options) {
+				if (typeof id !== 'string' || !/^[a-z][a-z0-9-]*$/.test(id) ||
+					typeof options.sourceLanguage !== 'string' || !/^[a-z][a-z0-9-]*$/.test(options.sourceLanguage) ||
+					id === options.sourceLanguage || typeof options.transformText !== 'function') {
+					throw new TypeError('A language variant requires an id, a different sourceLanguage and transformText.')
+				}
+				// Only one derivation step is supported; registration order must not affect output.
+				if (languageVariants.has(options.sourceLanguage) ||
+					Array.from(languageVariants.values()).some(function (variant) { return variant.sourceLanguage === id })) {
+					throw new TypeError('Language variants must derive from a base language, not another variant.')
+				}
+				languageVariants.set(id, { sourceLanguage: options.sourceLanguage, transformText: options.transformText,
+					languageName: typeof options.languageName === 'string' ? options.languageName : '' })
+			}
 			if (id && state.languages.indexOf(id) === -1) state.languages.push(id)
+			if (options) return true
 		},
 
 		applyLanguages(languages) {
@@ -11227,13 +13199,23 @@
 
 		applyWords(words, game) {
 			for (const item of state.wordPatches) deepMerge(words, item.patch)
-			return runHookSync('afterWords', words, game)
+			const localized = applyLanguageVariants(runHookSync('afterWords', words, game))
+			languageMenuLabels.clear()
+			for (const id of state.languages) {
+				const label = localized?.[id]?.splash?.language
+				if (typeof label === 'string') languageMenuLabels.set(id, label)
+			}
+			return localized
 		},
 
 		applyLoadedSave(save, game) {
+			if (!save || typeof save !== 'object' || Array.isArray(save)) throw new TypeError('Expected a game save state object.')
+			state.loadedSaveMetadata = clone(save.modloader || {})
 			state.orphanEntities = Array.isArray(save?.modloader?.orphanEntities) ? save.modloader.orphanEntities.slice() : []
 			establishLoadedSnapshotIdentity(save)
 			const loaded = runHookSync('beforeSaveLoad', save, game)
+			if (!loaded || typeof loaded !== 'object' || Array.isArray(loaded)) throw new TypeError('beforeSaveLoad must preserve the save state object.')
+			state.loadedSaveMetadata = clone(loaded.modloader || {})
 			return setSnapshotSaveIdentity(loaded, state.snapshotSaveInstanceId)
 		},
 
@@ -11250,13 +13232,15 @@
 		},
 
 		applySave(save, game) {
-			save.modloader = save.modloader || {}
+			if (!save || typeof save !== 'object' || Array.isArray(save)) throw new TypeError('Expected a game save state object.')
+			save.modloader = Object.assign({}, clone(state.loadedSaveMetadata), save.modloader || {})
 			save.modloader.version = state.version
 			save.modloader.enabledMods = {}
 			for (const mod of state.mods) save.modloader.enabledMods[saveSafeText(mod.id)] = saveSafeText(mod.manifest.version || true)
 			if (state.orphanEntities.length) save.modloader.orphanEntities = state.orphanEntities.slice()
 			setSnapshotSaveIdentity(save, ensureCurrentSnapshotIdentity())
 			const prepared = runHookSync('beforeSaveWrite', save, game)
+			if (!prepared || typeof prepared !== 'object' || Array.isArray(prepared)) throw new TypeError('beforeSaveWrite must preserve the save state object.')
 			return setSnapshotSaveIdentity(prepared, state.snapshotSaveInstanceId)
 		},
 
@@ -11328,5 +13312,6 @@
 		}
 	}
 
+	startupProbe?.mark('loader-ready')
 	window.ModLoader = api
 })()

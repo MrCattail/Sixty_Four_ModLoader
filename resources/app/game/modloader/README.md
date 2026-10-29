@@ -2,6 +2,15 @@
 
 This loader keeps vanilla game files as stable as possible.
 
+## Game 1.3 development status
+
+The current adapter targets the desktop game **1.3 only**. The installer rejects
+other game versions before writing. ModLoader remains `0.5.0`; these development
+changes have passed source-copy, mocked runtime, and an isolated offline Electron
+smoke test. The user has reinstalled the Loader into the working game on 2026-10-06;
+this does not complete every Mod or Steam Cloud validation. Existing Mods
+still need their own 1.3 compatibility work before being enabled.
+
 ## Enable Mods
 
 Edit `mods/enabled.json`:
@@ -53,11 +62,31 @@ vanilla scripts exist.
 
 ## Main Hooks
 
+- `beforeGamePrepare`
 - `beforeVanillaScripts`
 - `afterVanillaScripts`
 - `afterData`
 - `afterWords`
 - `afterGameInit`
+
+`beforeGamePrepare` receives the native preload object before
+`prepareSavedGameData()`. It checks the desktop game version and boots manifest,
+language, and JSON patch registration. `beforeVanillaScripts` retains its
+idempotent boot call. Normal Mod JavaScript entries still load in
+`afterVanillaScripts`; registering an early hook from those entries is too late
+for the current startup. This stage alone is not a persistence sandbox.
+
+In 1.3, `applyLoadedSave`, `beforeSaveLoad`, `applySave`, and `beforeSaveWrite`
+receive and return the **state object**, not a legacy encoded save string or the
+outer slot/history envelope. Non-object hook results are rejected. ModLoader
+preserves unknown fields within loaded `state.modloader`; Mods remain responsible
+for their own top-level fields. Native slot history and `permanents` stay under
+the game's ownership.
+
+The native `Store` card image path uses the resource resolver. Shared Game HUD
+visibility tracks `game.store`, including store rebuilds and pointer interaction
+while hidden. Open category and category scroll state are restored even if the
+store rebuilds while hidden. Rendering in 1.3's new views still needs separate validation.
 
 ## In-Game Diagnostics
 
@@ -75,8 +104,104 @@ Both shortcuts update the existing `modloader:panelState` immediately and stay
 in sync with Menu Settings. Manual mode stops the auto-hide timer but still
 allows **Hide to edge** to be used explicitly.
 
+While the visible main panel is open, `Esc` closes one ModLoader layer per key
+press: an expanded Mod configuration first, then Menu Settings, then the panel
+itself to its remembered edge. A handled press is consumed before the game's
+native pause/menu shortcut, and holding the key cannot cascade through multiple
+layers. Unsaved configuration edits remain in memory when their row collapses.
+Once the panel is already edge-hidden, `Esc` belongs to the game again. Existing
+ModLoader select menus and modal prompts keep their own keyboard behavior.
+
 The lower-left status line also shows the loader version, enabled mod count,
 and `Ctrl+M` reminder.
+
+## Temporary clear-view probe (2026-10-06)
+
+Fully restart Electron after installing these local diagnostic changes. In
+Ctrl+M → Menu Settings, use 清晰视图探针（临时）. 轻量记录 records coarse
+method/frame timings; 深入记录 also captures selected Chromium trace categories.
+Both start after 3 seconds, stop after 20 seconds and export locally. Compare
+ordinary → Alt held → released in small and large windows at the same camera.
+Stop/export and open-folder controls are on the same row. No F8 binding.
+
+自动裁剪／网格对照（60 秒） is an explicitly selected temporary intervention.
+After the 3-second countdown, keep Alt held in the reality plane with no item in
+hand and the same window/camera. Five 12-second phases run automatically:
+baseline → omit outer entity clip → omit native grid → omit both → baseline.
+The first 3 seconds after each observed phase change are excluded. Releasing Alt,
+losing focus, resizing, changing camera/mode, cancellation or drawing exceptions
+ends the intervention and restores the saved methods. Partial records are labeled.
+
+**线宽／线端对照（96 秒）** adds eight fixed 12-second phases:
+native → 0.5/round → 1.0/round → 1.01/round → 1.5/round → 1.5/butt →
+1.01/butt → native. All variants keep native color/alpha, geometry, offsets and
+the same private grid call site; only width/cap change inside save/restore.
+It does not run Chromium tracing. The existing 20/60/72-second modes remain.
+Fully restart Electron before using the new mode; an old main process cannot
+silently shorten it. Hold Alt at the same window/camera until automatic restore.
+
+**网格内部对照（72 秒）** provides the earlier protocol:
+native → omit only stroke submission → use the Tweaks width formula → remove
+only the native color alpha (same RGB) → combine width and alpha → native.
+All six phases last 12 seconds. Geometry, half-pixel offsets, inherited state,
+entity clipping and layer routing remain unchanged. This is diagnosis, not a fix.
+Release Alt, leave the window, or change camera/size/mode to stop and export.
+
+The optional diagnostics/clear-view-probe.js, clear-view-main.js,
+clear-view-ablation.js and clear-view-grid.js modules
+are not a permanent Mod API. Recording defaults off. Instance wrappers preserve
+call semantics and stop without clobbering later wrappers. There is no added
+Render API route for renderEntitiesAbstract. Light/deep modes only observe it.
+The automatic intervention uses a source-guarded 1.3 loop with only the outer
+clip omitted; entity drawing and its own clipping remain. A private gate at the
+existing renderGrid native-call site retains layer setup, callbacks and timing.
+This gate is inactive outside the automatic intervention, not a public Mod API.
+The grid protocol handles the guarded native call inside this same gate; its
+first/last phases invoke the original function. It does not patch Canvas methods.
+Twice per phase it captures bounded geometry/projection and actual context
+metadata (canvas identity/dimensions, transform, alpha/blend, dash, cap/join,
+filter and shadow). Sampling frames and neighboring intervals are excluded.
+Native phase stroke counts are geometry estimates, not intercepted calls;
+modified phases count their constructed lines and issued/omitted strokes.
+The 96-second protocol also records requested caps and effective width/cap read
+after variant assignment on the two metadata frames. Native phases remain
+unintercepted: their effective field is null, and inherited context plus guarded
+source describe their parameters. Reference flags check the earlier main canvas,
+identity transform, native width 1.5 and inherited round cap; these flags do not
+compare every Canvas property or prove an engine branch. Read the complete raw
+context when checking comparability. Non-identity transforms require mapping
+widths before interpreting a device-space threshold.
+
+Reports are saved under state/performance-probes/<session>/: summary.md,
+frames.json, session.json and optional trace.json. Method time includes native
+waits and current Mod wrappers; inclusive rows overlap. Callback intervals are
+not presentation timestamps. Missing GPU tracks remain unmeasured; subtracting
+JavaScript time from a frame interval does not produce GPU hardware time.
+Stable-control groups now permit dynamic entity counts and retain count ranges
+plus the old strict-equality sample count. Both interval endpoints must be valid;
+phase transitions and settling are excluded. Original recordings are not rewritten.
+The automatic run retains up to 24,000 frames and 48,000 root calls (64 MiB export
+limit); normal runs keep their existing limits. Method rolling samples remain
+4,096 and explicitly report overflow. Compare per-phase frame rows and first/last
+baselines; the game world continues updating and is not a frozen benchmark.
+
+A main-process deadline stops tracing independently of the renderer. Missing
+renderer data is explicitly incomplete. Trace buffers and sample arrays are
+bounded; capture completeness must be checked before interpreting the result.
+The shipped Electron 28 crashes in getTraceBufferUsage and, in an isolated
+A/B, with enable_argument_filter=true at trace flush; neither path is used.
+Selected trace categories may include local script paths, but no screenshots,
+heap dumps, network bodies or serialized saves are requested.
+
+For removal, close the game, move out all four optional modules, and restart.
+Keep reports separately. Remove only this diagnostic loader/main-process
+integration if fully reverting; never overwrite later edits with whole backups.
+Validation: tools/clear-view-probe-contract.test.js,
+tools/clear-view-ablation-contract.test.js and tools/clear-view-grid-contract.test.js,
+plus the existing LoaderOnly suite and isolated Electron tests. Player profiling
+and performance fixes remain separate. Historical grid-protocol findings and
+earlier modes are summarized in Codex-md/progress_RenderAPI.md#doc-cleanup-20261028-render;
+the one-off capture instructions were removed after completion.
 
 ## Storage Snapshot API
 
@@ -112,6 +237,16 @@ trusted account or installation scope, and never accepts a save id from a Mod.
 A reset starts a new save lineage; older snapshots remain visible to the local
 administrator.
 
+For 1.3, a newly assigned identity is confirmed only after awaiting `saveGame()`
+and reading `readFromSlot(currentSlotId).stack[0].state.modloader.saveInstanceId`.
+An existing identity is read back without forcing a save. Failed persistence,
+readback mismatch, disabled saving, and a changed active slot prevent activation;
+stale asynchronous completions cannot replace a newer renderer context. The main
+bridge clears the previous context when the renderer requests startup data.
+Readback confirms local slot storage, not Steam Cloud synchronization. Copy/import,
+history rollback, and new-game-plus lineage policy still require explicit
+consumer-side adaptation; the existing reset contract does not settle them.
+
 Operations reject with `ModLoaderSnapshotError` and one of these stable codes:
 `UNAVAILABLE`, `NO_ACTIVE_SAVE`, `INVALID_PAYLOAD`, `TOO_LARGE`, `NOT_FOUND`,
 `CORRUPT`, `QUOTA`, or `IO`. Snapshot data is checksummed with SHA-256 and
@@ -126,7 +261,7 @@ The page cannot import a file, restore a snapshot, or overwrite a Steam save.
 
 ## Installation Library API
 
-ModLoader 0.4.0 exposes Library API `1.1.0` for persistent, install-wide,
+ModLoader 0.5.0 exposes Library API `1.1.0` for persistent, install-wide,
 Mod-owned document collections. A Mod must declare each named library in its
 enabled `mod.json`; the main process validates the declaration and owns every
 filesystem operation:
@@ -284,6 +419,111 @@ Game-corner buttons registered with `api.ui.registerCornerButton()` are treated
 as game HUD by default when they use a `game-*` dock. Pass `gameHud: false` to
 opt out, or `hudSide` to choose a different hide edge.
 
+## Mod Keyboard Shortcut API v1
+
+ModLoader 0.5.0 exposes a display-only shortcut registry at
+`api.ui.shortcuts`. It does not listen for, execute, block, or remap the Mod's
+actual controls. A Mod keeps ownership of its keyboard handling and registers
+only the player-facing description:
+
+```js
+const shortcut = api.ui.shortcuts.register({
+  id: 'open-editor',
+  keys: 'V',
+  description: {
+    en: 'Open or close World Editor',
+    sch: '打开或关闭世界编辑器'
+  },
+  order: 10,
+  category: {
+    id: 'editors',
+    label: { en: 'Editors', sch: '编辑器' },
+    order: 20
+  },
+  visible: () => api.config.get('enabled', true),
+  active: () => !document.querySelector('.splash'),
+  allowSharedCombination: true,
+  context: { en: 'Available during gameplay', sch: '在游戏中可用' }
+})
+
+shortcut.update({ keys: [['Ctrl', 'V'], ['Meta', 'V']] })
+shortcut.unregister()
+```
+
+`id`, `keys`, and `description` are required. `id` is stable within the bound
+Mod API. Registering the same id again atomically replaces the current entry;
+an older handle cannot update or unregister that replacement. Invalid entries
+return an inert handle and add a diagnostic warning. The public bound API always
+registers under the `Mod` source; the reserved `Original game` and `ModLoader`
+sources cannot be selected through registration options.
+
+`keys` accepts one token (`'V'`), one chord (`['Alt', 'Shift']`), or alternatives
+(`[['Ctrl', 'Z'], ['Meta', 'Z']]`). Supported tokens include letters, digits,
+`F1`-`F24`, modifiers, navigation/editing keys, punctuation, `Mouse1`-`Mouse5`,
+`WheelUp`, `WheelDown`, and `Space`. Tokens are normalized and rendered as safe
+keycaps or controlled mouse diagrams; `Space` uses the ModLoader spacebar symbol.
+Raw HTML is never accepted.
+
+Mouse tokens use one consistent top-down mouse diagram instead of a text keycap.
+`Mouse1` is the left button, `Mouse2` is the right button, `Mouse3` is the
+forward side button, `Mouse4` is the rear side button, and `Mouse5` is the
+clickable middle wheel. `WheelUp` and `WheelDown` use the same mouse silhouette
+with a directional wheel arrow. The diagram uses a near-square `28 x 30 px` body
+inside a `34 x 30 px` slot so its height matches a normal keycap. The body aligns
+right, leaving two `3 x 6 px` side buttons fully outside its left edge. They are
+narrow along the horizontal axis and use a `2 px 0 0 2 px` radius: only the two
+exposed left corners are rounded while the two corners touching the body remain
+square. The forward button starts at `8 px` and the rear button at `16 px`,
+centered around the body midpoint with a `2 px` gap.
+Both external side buttons keep a `1 px solid rgba(0, 0, 0, .2)` gray outline.
+The body uses the same `1 px solid rgba(0, 0, 0, .2)` outer edge as a normal
+keycap, a `10 px` body radius and no internal button separators.
+The wheel keeps a permanent `1 px solid rgba(0, 0, 0, .2)` gray outline in every
+mouse-token state. Inactive main-button regions blend into the white body; both
+external side buttons remain white and outlined until `Mouse3` or `Mouse4` fills
+the corresponding button yellow. Mouse5 and wheel directions fill the outlined
+wheel yellow, and wheel directions add the dark arrow inside that yellow region.
+The target region uses the same yellow accent as the keycap bottom edge; the
+token remains available through the element's accessible label and title
+without visible `Mouse1`/`WheelUp` text.
+Potential overlaps are checked per normalized chord, so modifier order does not
+matter and one matching alternative is enough. A `duplicate-combination`
+diagnostic is recorded only while both registrations' own `visible` and `active`
+values resolve true. Hiding shortcut hints globally or for one Mod changes only
+the display and does not disable the Mod's real control or this overlap check.
+Two registrations may deliberately share a chord by both setting
+`allowSharedCombination: true`; one-sided permission does not suppress the
+warning. A true warning identifies the normalized combination and both
+`modId:id` registrations. ModLoader still never executes, blocks, or remaps the
+underlying controls.
+
+`description`, `context`, and `category.label` accept a plain string, a locale
+map, or a function returning either. `visible: false` hides a feature that is
+disabled. `active: false` keeps the entry visible and adds its `context` text;
+when no context is provided, ModLoader uses its localized inactive message.
+Dynamic values are reevaluated on open, register/update/unregister, language,
+settings, HUD, chat/layout, and window changes. Call
+`api.ui.shortcuts.refresh()` after a Mod-specific state change.
+
+Each Mod should use one category `{ id, label, order }`. Display order is source
+(`Original game`, `ModLoader`, `Mods`), category number, the Mod order from
+`Ctrl+M`, shortcut `order`, and stable ids as tie-breakers. Matching category ids
+with matching metadata merge; conflicting metadata is warned and isolated so
+one Mod cannot rename or reorder another Mod's category.
+
+The desktop `?` button appears beside the chat button only while at least one
+visible registration exists. The transparent list uses a left-side scrollbar
+and stays between the Canvas resource row and the chat area. Opening or using
+chat does not close the shortcut list; the list instead shortens above the
+messenger and remains scrollable. Mouse interactions outside the list do not
+close it; click `?` again to close it explicitly. `Esc` is not handled by the
+shortcut list and remains available to the game without changing the list's open
+state. `H` hides and restores it with the game HUD. Splash, credits, mobile
+layout, an empty registry, and the global disabled setting hide the entry point.
+Reloading starts closed.
+`Ctrl+M` -> Menu Settings contains the global switch and one persistent
+visibility switch for each currently registered Mod.
+
 ## Render Layers API
 
 The Canvas2D Render API is a stable v1 contract. Read `api.render.version` (or
@@ -398,6 +638,42 @@ Mods can declare whether they follow the game's language switching with:
 
 The catalog only changes display text at runtime. It is local user data and is
 excluded from release packages so updates do not overwrite a player's edits.
+### Derived language variants
+
+The optional second argument to `api.registerLanguage(id, options)` registers a
+derived language and returns `true` when supported. Existing one-argument calls
+keep their behavior. `options` contains `sourceLanguage`, `transformText(text)`
+and an optional `languageName` (the full `splash.language` label). For example:
+
+```js
+api.registerLanguage('modtch', {
+  sourceLanguage: 'modsch',
+  transformText: convertToTraditional,
+  languageName: '語言：繁體中文[優化]'
+})
+```
+
+The converter must be synchronous and return a string. It owns any memoization
+and protection of markup/placeholders. Variants must derive directly from a base
+language; chained or self-referencing variants are rejected.
+
+After all `afterWords` hooks, Loader copies and converts the source word tree.
+Object keys and source values are unchanged; arrays are copied as a whole and
+existing target-only namespaces survive the merge. Native language-list reads
+receive cached display names without invoking Mod hooks again.
+
+For Loader UI, locale lookup tries the variant, its source language, normal
+Chinese aliases (where applicable), then English. Display templates are converted
+before dynamic values are substituted. Config keys, option values, paths used for
+file access and persisted values are not converted. Explicit variant entries in
+the translation catalog are supported without writing generated entries to disk.
+This does not translate arbitrary DOM or a Mod-owned custom UI.
+
+Chinese Optimization ships the offline OpenCC converter and registers `modtch`;
+there is no network/CDN dependency or conversion in the game frame loop.
+Older Loaders without the optional descriptor still receive the Mod fallback
+game word tree; complete Loader menu conversion requires this updated Loader.
+
 ## Example Building
 
 Enable the entity example with:
@@ -476,6 +752,78 @@ ordinary number values. Config-only saves do not reload the game automatically;
 mods that read config during startup still need a manual reload to apply those
 values.
 
+Config definitions can use a stable `section` id and a localized
+`sectionLabel` to form consecutive groups. With **Config layout sorting**
+enabled in Menu Settings, players can still drag whole section blocks and can
+also press a config row for 300 ms to start item sorting. A categorized item can
+be reordered inside its current section or dropped outside it as an independent
+unclassified row. An independent row can later be dropped into any section.
+Input, button, slider, select, and text-editing surfaces remain interactive and
+do not start the row drag.
+
+The custom block order, item order, and displayed section membership are stored
+only in `modloader:panelState`. They never rewrite a mod's `mod.json`, never
+change config values, and never change script execution order. Turning Config
+layout sorting off temporarily shows the schema order while retaining the
+custom layout for later use. Newly registered keys append to their schema
+section, removed keys are ignored, and the older saved section-only order is
+used automatically until the player makes an item-level layout change.
+
+### Renamed config identifiers
+
+Tweaks declares `configCompatibility` version 1 in its manifest. `keys` maps old
+config names to canonical names; `sections` maps old section IDs. Ordered
+`sources` describe older storage keys and the existing value conversions. The
+Loader uses these declarations for both enabled Mods and disabled-Mod panels.
+An actually saved canonical key wins, including false, zero, empty strings and
+null. Inherited reads do not write or remove storage. Normal saves and config
+sets write only the canonical key; old get/set names remain aliases. Preview
+events carry the canonical key once, using the existing cancel/save lifecycle.
+Mods without this declaration retain their existing config path.
+
+Panel layout reads map section blocks, child keys, detached items and the older
+section-only order while preserving custom placement. Canonical entries win
+when both spellings exist. Before replacing a persisted legacy layout, the
+Loader saves its original Tweaks layout and section order once to
+`modloader:Cattail_TweaksQuality_Tweaks:identifierMigrationBackupV1`. If that
+backup fails, the old persisted layout remains and a later save can retry.
+Other Mods and unrelated panel-state fields are retained. This is independent
+of game saves and the Storage Snapshot API.
+
+Tweaks keeps the `CattailResourceGlowColors` palette share type and accepts the
+old `resourceGlowColors` import field. Its canonical runtime helpers live under
+`window.CattailTweaks`; legacy global helpers forward to the same objects.
+Methods, return fields and receiver semantics are unchanged. The old
+`game.__cattailDynamicCameraState` field forwards to
+`game.__cattailTweaksCameraAngleState` for existing consumers.
+
+### Mod config search and recent log
+
+The **Mod Manager** heading keeps the normal "Toggle mods or edit config below"
+helper. The Mod config search beside **all** keeps its field-specific placeholder
+and uses the current game language to search localized Mod names, section labels,
+config labels, and config descriptions. It also accepts stable Mod folder names,
+Mod ids, and config keys, but does not search translated text from inactive
+languages or current config values. Exact matches rank before prefixes and
+substrings, with the current Mod and config layout breaking ties.
+
+The dropdown shows at most five read-only jump results across Mods, sections,
+and config items. Each result keeps its title on the first line and shows
+`type | path` on the second line without a type badge. Selecting one expands the
+Mod when needed, scrolls to the target, and highlights it briefly. Search results
+never toggle a Mod or edit a config value. Disabled Mods remain searchable; a Mod
+with a manifest load error offers only its Mod-level jump. Focusing or clicking a
+non-empty search field restores its results. The themed clear control clears the
+query and keeps focus; the query is also cleared when the panel closes and is not
+written to panel state. The search action does not wrap, and only the search field
+uses a white background in the light theme.
+
+**Recent Log starts collapsed** for a new panel state. Its whole heading and
+chevron toggle the latest twelve log lines, and the expanded state is remembered
+in `modloader:panelState`. When search results are open, Escape closes them and
+leaves the existing config, Menu Settings, and hide-to-edge Escape layers for
+subsequent presses.
+
 Color map config can use the built-in `resourceColors` control. It renders an
 optional Export colors / Import colors toolbar, then rows in this order:
 optional resource icon, color picker, hex color input, reset button. Other mods
@@ -499,7 +847,7 @@ Custom palettes can provide `resources`, `rows`, or `colors` entries with `id`,
 
 ## Settings UI API v1
 
-ModLoader 0.4.0 exposes the same settings controls used by the `Ctrl+M` panel
+ModLoader 0.5.0 exposes the same settings controls used by the `Ctrl+M` panel
 through `api.ui.settings`. The API is bound to the calling mod, uses
 `api.ui.settings.version === 1`, and supports these canonical types:
 
@@ -712,6 +1060,11 @@ controls, explicitly marked `[data-modloader-scroll-native]` elements, and
 nested scroll areas keep their own wheel behavior. Destroying a form also
 detaches its scroll surface automatically.
 
+The built-in Ctrl+M Menu Settings area also uses this scroll API. Its expanded
+height remains capped at `min(42vh, 420px)`, with the shared theme-aware scrollbar
+and inertial wheel behavior. Rebuilding the panel after a settings change retains
+the settings scroll position; panel teardown releases the scroll listeners.
+
 ### Tooltips and lifecycle
 
 Settings surfaces use scoped `.modloader-settings-surface` styles rather than
@@ -744,6 +1097,11 @@ to the current ModLoader theme. Pass `theme: 'global'` to make an external
 tooltip follow the current ModLoader dark/light selection instead. Other theme
 values also use the default plane behavior. `delayMs` adds an optional
 pointer delay from `0` to `10000` milliseconds; keyboard focus remains immediate.
+After reveal, a tooltip remains visible while pointer ownership or keyboard focus
+still belongs to its target, and it closes only after an actual target exit by
+both input paths, an owning-root scroll/resize, or explicit teardown. The shared
+portal owner prevents exit, scroll, or cleanup from an unrelated root from hiding
+the tooltip that another root currently owns.
 The shared portal uses the tooltip's own single glass surface, so its background,
 border, inset highlight, blur, and shadow do not require a separate opaque
 silhouette or a clipped custom path. One rendered line keeps the original
@@ -801,3 +1159,40 @@ ModLoader.register({
 
 If a save contains an entity whose mod is disabled, the loader keeps that
 entity in `save.modloader.orphanEntities` instead of crashing or deleting it.
+
+
+## Better UIs independent autosave (desktop 1.3.0.1, 2026-10-26)
+
+The fixed enabled Better UIs independent-auto-save.js entry is loaded before native save preparation and registers only once. It installs the optional independent autosave policy when enableSaveSlots and enableIndependentAutoSave are enabled. The new boolean keeps an explicit new choice and otherwise inherits a saved legacy Tweaks boolean on first load; no saved legacy choice defaults to enabled. The backend is owned and authorized by Better UIs. Existing v2 protocol, index filenames and saved metadata remain compatible, including overlay reads when the option is disabled. Other entries retain the normal lifecycle; this is not a general early-entry or arbitrary main-process Mod API.
+
+The private tweaks-save-policy-v2 protocol uses the existing trusted main-window channel. Begin returns a token and record references, never requests a full renderer seed. Commits contain only changed slot descriptors and new current/history records. Better UIs owns snapshot isolation, local IDB completion, explicit cloud checkpoints and retries, content checksums, the two-file auto ring and publish-last index. Ten-second autosaves, four-minute source histories and opening Save Slots stay local; explicit save/collection actions and menu Quit submit the pending changes. No enabled-policy error falls back to a full collection. The cloud reader reconstructs the legacy charpsMemory baseline plus the optional delta index even when the setting is off. Disabling/reloading restores native saves; an updated native baseline supersedes the older delta index. New delta data requires this reader.
+
+Better UIs service v1 keeps source.index/activeIndex tied to the verified physical working auto slot; its source name describes the played manual slot. Manual entry receipts keep manual indices. This ownership migration requires a full Electron restart; later setting changes require save and reload. Current validation and player/Steam limitations are recorded in Codex-md/progress_BetterUI.md; Codex-md/progress_BetterUI.md#doc-cleanup-20261028-save retains the original implementation history.
+
+## 一次性启动分层探针（默认关闭）
+
+遇到白屏、启动无响应或界面未显示时，可使用 tools/Start Startup Probe.cmd 启动一次诊断。不依赖 F12，也无需预先导出真实配置。
+
+1. 保存当前游戏并完整退出，确认没有 Sixty Four 进程。启动器发现已有进程时会提示退出，不会结束进程或另开第二份。
+2. 在本目录的 tools 文件夹中双击 Start Startup Probe.cmd。它只给这一次游戏进程添加 --modloader-startup-probe，不修改 Steam 启动项或持久化设置。
+3. 保持游戏窗口打开约 65 秒。探针采样 60 秒后自动停止，窗口截图最多再等待 5 秒；游戏继续运行，不自动退出、重启或修复。即使仍然白屏也可留下窗口等待收尾。
+4. 查看 state/startup-probes/latest.json 指向的本次目录：summary.txt 是摘要，summary.json 是最终/进行中状态，timeline.jsonl 是按时间排列的事件；window.png 最多一张，仅截取游戏窗口。采集中摘要每秒更新，主进程阻塞或异常退出时仍可检查已落盘的部分时间线。
+5. 后续正常从 Steam 或原游戏启动方式进入，即不启用探针。已有诊断文件不会自动上传或清空。
+
+### 记录内容与读取方法
+
+- 从主进程桥、页面前 preload、SDK require/initialize，到 Loader boot、各 entry、Mod init、同步/异步生命周期钩子，记录进入/完成/异常位置。
+- 对 Game 实例观察原生数据准备、脚本/样式/图片、资源/世界载入以及首三帧的实体/网格/资源绘制；后续保留帧与心跳计数。同步函数不会被改成 async，Promise 本身、参数、this、结果和异常的业务传播保持；探针不改变原型函数源码签名，实例观察继续委托当前的 Mod 原型补丁。
+- 同时覆盖 Render API 开/关。记录画布及祖先的尺寸、display、visibility、opacity、z-index、transform，以及可见原生/Loader图层的小块像素统计。隐藏或辅助图标 canvas 不计作场景显示，原生 Store 父容器零宽也不能单独判错。
+- summary 中 pending 是尚未返回的调用，不自动等于死锁。对照 timeline 的 begin/end：例如 stage:afterVanillaScripts 下 hook:某Mod:afterVanillaScripts 有 begin 无 end，可缩小到该回调；game:renderResources 的 error 可给出异常类型和脚本行列。正常加载与帧均推进但窗口仍白时，再比较图层样式、像素和截图。
+- 主进程心跳独立于渲染线程；若主进程本身同步堵死，它的定时器同样无法运行，只能依靠最后已写入的进入点和心跳。主桥导入之前的失败可能没有会话目录。像素读回有同步开销；若停点为probe:canvas-readback，应先视为诊断采样未返回。GPU故障、隐藏窗口截图过早或特殊 Mod 组合，仍需结合现场继续判断；探针不是性能基准或自动归因器。
+
+### 输出上限与数据边界
+
+一次最多 4000 条事件，时间线/摘要合计不超过 2 MiB，另有最多一张 8 MiB PNG；截图超时或过大只记录状态，不阻塞游戏。渲染端图像/事件观察也有独立上限。停止时只移除探针自己的监听器、计时器和包装，不恢复成过期的 Mod 方法，不覆盖已有 preload。
+
+不记录配置值、存档/IndexedDB内容、原始 IPC 参数、SDK token 或完整异常 message；异常保留类型及经过处理的脚本位置。探针不增加、跳过或取消保存/Steam Cloud操作。玩家通过启动器运行正式游戏时，游戏正常的配置与存档读写仍照常发生。窗口截图可能包含当时可见的游戏画面。
+
+这是 Loader 的私有可选诊断，不是新增 Mod 公共接口或正式白屏修复。源码/合同验证可运行 node tools/startup-probe-contract.test.js；游戏内采集、修复、诊断移除和发布分别处理。
+
+The optional periodic-stall diagnostic captures live webContents when binding a window. Its closed callback compares the captured identity without reading a destroyed BrowserWindow. The contract covers idle/active captures, pending trace setup, foreign windows and repeated binding. Isolated save launchers record uncaught main exceptions/rejections and attempted error dialogs without modal UI; any such error, nonzero exit or forced teardown fails acceptance.

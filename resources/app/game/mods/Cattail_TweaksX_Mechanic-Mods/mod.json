@@ -29,7 +29,8 @@
     "scripts/hollow-vent-reality.js",
     "scripts/hollow-time-flow.js",
     "scripts/flat-build-costs.js",
-    "scripts/super-silo.js"
+    "scripts/super-silo.js",
+    "scripts/unlock-pinhole.js"
   ],
   "conflicts": [
     "Cattail_TweaksX_Reality-Auto-Collect",

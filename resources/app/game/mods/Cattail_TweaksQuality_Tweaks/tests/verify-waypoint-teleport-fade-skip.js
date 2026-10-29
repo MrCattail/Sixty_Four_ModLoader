@@ -3,7 +3,7 @@ const fs = require('fs')
 const path = require('path')
 const vm = require('vm')
 
-const scriptPath = path.resolve(__dirname, '..', 'scripts', 'waypoint-teleport-fade-skip.js')
+const scriptPath = path.resolve(__dirname, '..', 'scripts', 'waypoint-fade-skip.js')
 const source = fs.readFileSync(scriptPath, 'utf8')
 
 function createHarness(enabled) {
@@ -42,7 +42,7 @@ function createHarness(enabled) {
 	const api = {
 		config: {
 			get(key, fallback) {
-				assert.strictEqual(key, 'enableWaypointTeleportFadeSkip')
+				assert.strictEqual(key, 'enableWaypointFadeSkip')
 				return enabled === undefined ? fallback : enabled
 			}
 		},

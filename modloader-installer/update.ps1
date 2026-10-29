@@ -8,6 +8,7 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'filesystem.ps1')
 
 function Resolve-GameRoot {
 	param([string]$Path)
@@ -29,9 +30,7 @@ function Resolve-GameRoot {
 function New-DirectoryIfMissing {
 	param([string]$Path)
 
-	if (-not (Test-Path -LiteralPath $Path)) {
-		New-Item -ItemType Directory -Force -Path $Path | Out-Null
-	}
+	New-InstallerDirectory $Path
 }
 
 function Copy-DirectoryContents {
@@ -42,11 +41,11 @@ function Copy-DirectoryContents {
 
 	$sourceRoot = (Resolve-Path -LiteralPath $Source).Path
 	New-DirectoryIfMissing -Path $Target
-	Get-ChildItem -LiteralPath $Source -Recurse -File | ForEach-Object {
+	Get-InstallerFiles $Source -SkipDevelopmentCaches | ForEach-Object {
 		$relative = $_.FullName.Substring($sourceRoot.Length).TrimStart('\')
 		$destination = Join-Path $Target $relative
 		New-DirectoryIfMissing -Path (Split-Path -Parent $destination)
-		Copy-Item -LiteralPath $_.FullName -Destination $destination -Force
+		Copy-InstallerFile $_.FullName $destination
 	}
 }
 
@@ -365,14 +364,17 @@ function Find-PackageZip {
 function Find-PackageRoot {
 	param([string]$ExtractRoot)
 
-	$candidates = @((Get-Item -LiteralPath $ExtractRoot)) + @(Get-ChildItem -LiteralPath $ExtractRoot -Directory -Recurse)
-	foreach ($candidate in $candidates) {
+	$candidates = [Collections.Generic.Queue[string]]::new()
+	$candidates.Enqueue([IO.Path]::GetFullPath($ExtractRoot))
+	while ($candidates.Count) {
+		$candidate = [pscustomobject]@{ FullName = $candidates.Dequeue() }
 		$installer = Join-Path $candidate.FullName 'modloader-installer\install.ps1'
 		$patcher = Join-Path $candidate.FullName 'modloader-installer\patch-source.ps1'
 		$loader = Join-Path $candidate.FullName 'resources\app\game\modloader\loader.js'
 		if ((Test-Path -LiteralPath $installer) -and (Test-Path -LiteralPath $patcher) -and (Test-Path -LiteralPath $loader)) {
 			return $candidate.FullName
 		}
+		foreach ($child in Get-InstallerDirectories $candidate.FullName) { $candidates.Enqueue($child.FullName) }
 	}
 
 	throw 'The zip does not look like a Sixty Four ModLoader package. Missing modloader-installer\install.ps1, modloader-installer\patch-source.ps1, or resources\app\game\modloader\loader.js.'
@@ -459,12 +461,13 @@ $targetRoot = Resolve-GameRoot -Path $GameRoot
 $currentInfo = Get-InstalledModLoaderInfo -Root $targetRoot
 $package = Find-PackageZip -ExplicitZipPath $ZipPath -CurrentInfo $currentInfo
 $zip = $package.Path
-$stamp = Get-Date -Format 'yyyyMMdd-HHmmss'
+$stamp = (Get-Date -Format 'yyyyMMdd-HHmmss-fff') + '-' + [Guid]::NewGuid().ToString('N').Substring(0,8)
 $tempRoot = Join-Path ([System.IO.Path]::GetTempPath()) "SixtyFour-ModLoader-Update-$stamp"
 
 try {
 	if (Test-Path -LiteralPath $tempRoot) {
-		Remove-Item -LiteralPath $tempRoot -Recurse -Force
+		$cleanupPath = Assert-InstallerChildPath ([IO.Path]::GetTempPath()) $tempRoot
+		Remove-InstallerDirectory $cleanupPath
 	}
 	New-DirectoryIfMissing -Path $tempRoot
 
@@ -474,7 +477,7 @@ try {
 	Write-Host "Package ModLoader version: $($package.Version)"
 	Write-Host "Package ModLoader build: $(Format-BuildTime $package.BuildTimeUtc)"
 	Write-Host "Extracting package..."
-	Expand-Archive -LiteralPath $zip -DestinationPath $tempRoot -Force
+	Expand-InstallerArchive $zip $tempRoot
 	$packageRoot = Find-PackageRoot -ExtractRoot $tempRoot
 	$replaceCurrentMods = Ask-ReplaceMods
 
@@ -508,11 +511,12 @@ try {
 	Write-Host ''
 	Write-Host 'ModLoader update completed.'
 	if (Ask-DeletePackage -PackagePath $zip) {
-		Remove-Item -LiteralPath $zip -Force
+		Remove-InstallerFile $zip
 		Write-Host "Deleted package: $zip"
 	}
 } finally {
 	if (Test-Path -LiteralPath $tempRoot) {
-		Remove-Item -LiteralPath $tempRoot -Recurse -Force
+		$cleanupPath = Assert-InstallerChildPath ([IO.Path]::GetTempPath()) $tempRoot
+		Remove-InstallerDirectory $cleanupPath
 	}
 }

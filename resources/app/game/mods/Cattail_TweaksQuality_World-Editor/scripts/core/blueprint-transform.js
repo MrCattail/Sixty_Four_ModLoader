@@ -372,14 +372,18 @@ ModLoader.register({
 					position: transformPoint(block.position, center, transformMatrix)
 				}))
 			})
+			const schemaVersion = Number(value.schemaVersion)
+			const supportsPaintedCubes = value.mode === 'full' && (schemaVersion === 7 || schemaVersion === 8)
 			const paintedService = globalThis[PAINTED_KEY]
-			const paintedCubes = (value.paintedCubes || []).map(function (record) {
-				const transformed = paintedService?.transformRecord?.(record, function (position) {
-					return transformPoint(position, center, transformMatrix)
+			const paintedCubes = supportsPaintedCubes
+				? (value.paintedCubes || []).map(function (record) {
+					const transformed = paintedService?.transformRecord?.(record, function (position) {
+						return transformPoint(position, center, transformMatrix)
+					})
+					if (!transformed) throw new TypeError('World Editor transform requires a valid painted cube record.')
+					return freezeContainer(transformed)
 				})
-				if (!transformed) throw new TypeError('World Editor transform requires a valid painted cube record.')
-				return freezeContainer(transformed)
-			})
+				: null
 			const surges = (value.surges || []).map(function (surge) {
 				const stabilizerPosition = normalizePoint(surge?.stabilizer?.position)
 				return freezeContainer(Object.assign({}, surge, {
@@ -409,16 +413,18 @@ ModLoader.register({
 			const contentBounds = value.contentBounds
 				? boundsWithSize(transformBounds(value.contentBounds.min, value.contentBounds.max, center, transformMatrix))
 				: contentBoundsFromEntities(entities)
-			return freezeContainer(Object.assign({}, value, {
+			const transformed = Object.assign({}, value, {
 				selections: Object.freeze(selections),
 				emptyCells: Object.freeze(emptyCells),
 				neutralCells: Object.freeze(neutralCells),
 				contentBounds,
 				entities: Object.freeze(entities),
 				blocks: Object.freeze(blocks),
-				paintedCubes: Object.freeze(paintedCubes),
 				surges: Object.freeze(surges)
-			}))
+			})
+			if (supportsPaintedCubes) transformed.paintedCubes = Object.freeze(paintedCubes)
+			else if (value.mode === 'full') delete transformed.paintedCubes
+			return freezeContainer(transformed)
 		}
 
 		function transformPivot(value) {

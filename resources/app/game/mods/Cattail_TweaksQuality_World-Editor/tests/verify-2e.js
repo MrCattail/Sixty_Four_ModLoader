@@ -602,7 +602,7 @@ function testHoverLayerI18nManifestAndReadOnlyBoundary() {
 	const manifest = JSON.parse(fs.readFileSync(path.join(MOD_ROOT, 'mod.json'), 'utf8'))
 	assert.equal(manifest.version, '0.6.0')
 	assert.equal(manifest.languageSupport.gameLanguage, true)
-	assert.equal(manifest.entry.length, 45)
+	assert.equal(manifest.entry.length, 47)
 	assert.equal(manifest.entry.filter(entry => /selection-controller/.test(entry)).length, 1)
 	assert.equal(manifest.entry.filter(entry => /resize-handles/.test(entry)).length, 1)
 

@@ -210,9 +210,54 @@ ModLoader.register({
 
 		namespace.installShopBuildCountdown = function () {
 			if (namespace.shopBuildCountdownInstalled) return
-			if (typeof Shop === 'undefined') return
+			if (typeof Store === 'undefined' || typeof DesktopStoreVersion === 'undefined') return
 			namespace.shopBuildCountdownInstalled = true
 			installBuildCountdown()
+		}
+
+		// Private read-only adapter for this Mod's display-only Shortcut API consumer.
+		const shortcutStateListeners = new Set()
+		let shortcutStateSignature = ''
+		namespace.getShortcutState = function (game = lastGame) {
+			const building = !!namespace.buildingDetailsInstalled && isBuildingDetailsFeatureEnabled()
+			const resources = !!namespace.resourceSourcesInstalled && isResourceSourceFeatureEnabled()
+			const coordinates = !!namespace.coordinateOverlayInstalled && isCoordinateOverlayFeatureEnabled()
+			const directions = !!namespace.directionPointersInstalled && isDirectionPointersFeatureEnabled()
+			const hoveredResource = resources && Number.isInteger(game?.hoveredResource)
+			const buildingContext = !!(building && game && isBuildingDetailContext(game))
+			const pinnedResource = resources && !!game?.[resourceSourceToggleKey]
+			const lineLocked = resources && !!game?.[resourceSourceLineLockKey]
+			const activeElement = document.activeElement
+			const editing = !!(activeElement?.isContentEditable || activeElement?.closest?.('input,textarea,select,[contenteditable="true"]'))
+			const panelFocused = !!(coordinateTeleportPanel?.visible && activeElement && coordinateTeleportPanel.element.contains(activeElement))
+			const playing = !!(game && !game.isMobile && !game.splash?.isShown && !game.credits && !game.pinhole && !game.entitiesInGame?.pinhole && !api.ui?.hud?.isHidden?.())
+			return Object.freeze({
+				building, resources, coordinates, directions,
+				opacity: !!window._cattailDynamicDetailsOpacityInstalled && (building || resources),
+				chart: resources && isResourceSourceLineChartEnabled(),
+				playing, ready: playing && !editing, panelFocused,
+				buildingContext, hoveredResource,
+				resourceView: hoveredResource && !game?.plane,
+				linePreview: !!(resources && !game?.plane && (lineLocked ? hoveredResource : (game?.altActive || pinnedResource) && (hoveredResource || (pinnedResource && Number.isInteger(game?.[resourceSourceLastResourceKey]))))),
+				chartContext: !!(hoveredResource && game?.entitiesInGame?.mega1b),
+				cell: !!(Array.isArray(game?.hoveredCell) && game?.mouse?.cursorVisible !== false),
+				emptyCell: !!(game && isCoordinateEmptyCellContext(game)),
+				opacityContext: !!(game && (game.altActive || game[detailToggleKey]) && !(hoveredResource || (pinnedResource && !buildingContext)))
+			})
+		}
+		namespace.subscribeShortcutState = function (listener) {
+			shortcutStateListeners.add(listener)
+			return () => shortcutStateListeners.delete(listener)
+		}
+		function notifyShortcutState(game = lastGame) {
+			if (!shortcutStateListeners.size) return
+			const state = namespace.getShortcutState(game)
+			const signature = JSON.stringify(state)
+			if (signature === shortcutStateSignature) return
+			shortcutStateSignature = signature
+			for (const listener of shortcutStateListeners) {
+				try { listener(state) } catch (error) { console.warn('[Cattail Dynamic Details] Shortcut refresh failed', error) }
+			}
 		}
 
 		namespace.isReady = true
@@ -372,6 +417,7 @@ ModLoader.register({
 			const current = hint[detailKey]
 			if (current?.entity === entity && current.widthKey === widthKey) return
 
+			if (current) namespace.pumpDistributionChart?.dispose(current)
 			if (current?.topFlow) current.topFlow.remove()
 			if (current?.line) current.line.remove()
 			if (current?.body) current.body.remove()
@@ -412,6 +458,7 @@ ModLoader.register({
 			panel.line.classList.toggle('active', active)
 			panel.body.classList.toggle('active', active)
 			if (!active) {
+				namespace.pumpDistributionChart?.update(panel, entity, false)
 				renderTopFlow(panel, game, null)
 				clearStableWidths(panel)
 				return
@@ -420,13 +467,17 @@ ModLoader.register({
 			const details = describeEntity(entity)
 			const now = performance.now()
 			const signature = details.signature + '|lang:' + (game.language || 'en')
-			if (signature === panel.lastSignature && now < panel.nextRefresh) return
+			if (signature === panel.lastSignature && now < panel.nextRefresh) {
+				namespace.pumpDistributionChart?.update(panel, entity, true)
+				return
+			}
 
 			panel.lastSignature = signature
 			panel.nextRefresh = now + (details.refreshMs || 500)
 			renderTopFlow(panel, game, details.topFlow)
 			renderDetails(panel.body, entity, details.rows)
 			stabilizeDetailWidths(panel)
+			namespace.pumpDistributionChart?.update(panel, entity, true)
 		}
 
 		function isDetailActive(game) {
@@ -554,7 +605,7 @@ ModLoader.register({
 		}
 
 		function showCoordinateTeleportPanel(game) {
-			if (!game || !Array.isArray(game.hoveredCell)) return
+			if (!game || !Array.isArray(game.hoveredCell) || !getCoordinateTeleportPointer(game)) return
 			const panel = getCoordinateTeleportPanel()
 			panel.u.value = String(game.hoveredCell[0])
 			panel.v.value = String(game.hoveredCell[1])
@@ -614,11 +665,17 @@ ModLoader.register({
 			return coordinateTeleportPanel
 		}
 
+		function getCoordinateTeleportPointer(game) {
+			const pointer = game?.mouse?.sxy
+			return Array.isArray(pointer) && Number.isFinite(pointer[0]) && Number.isFinite(pointer[1]) ? pointer : null
+		}
+
 		function positionCoordinateTeleportPanel(game, panel = coordinateTeleportPanel) {
-			if (!game || !panel?.element) return
+			const mouse = getCoordinateTeleportPointer(game)
+			if (!mouse || !panel?.element) return
 			const canvasRect = game.canvas?.getBoundingClientRect?.()
-			const baseX = (canvasRect?.left || 0) + (game.mouse?.offsetxy?.[0] || 0)
-			const baseY = (canvasRect?.top || 0) + (game.mouse?.offsetxy?.[1] || 0)
+			const baseX = (canvasRect?.left || 0) + mouse[0]
+			const baseY = (canvasRect?.top || 0) + mouse[1]
 			panel.element.style.left = baseX + 'px'
 			panel.element.style.top = baseY + 'px'
 			const rect = panel.element.getBoundingClientRect?.()
@@ -636,8 +693,7 @@ ModLoader.register({
 			const u = parseCoordinateTeleportValue(panel.u.value)
 			const v = parseCoordinateTeleportValue(panel.v.value)
 			if (!Number.isFinite(u) || !Number.isFinite(v)) return
-			teleportToCoordinate(game, [u, v])
-			hideCoordinateTeleportPanel()
+			if (teleportToCoordinate(game, [u, v])) hideCoordinateTeleportPanel()
 		}
 
 		function parseCoordinateTeleportValue(value) {
@@ -646,19 +702,29 @@ ModLoader.register({
 		}
 
 		function teleportToCoordinate(game, position) {
-			if (!game || !Array.isArray(position) || !Array.isArray(game.translation) || typeof game.uvToXY !== 'function') return
+			const mouse = getCoordinateTeleportPointer(game)
+			if (!mouse || !Array.isArray(position) || !Number.isFinite(position[0]) || !Number.isFinite(position[1]) ||
+				!Array.isArray(game.translation) || typeof game.uvToXY !== 'function' ||
+				typeof game.updatePointerState !== 'function' || typeof game.updateGlobalPositioning !== 'function') return false
 			const projected = game.uvToXY(position)
-			const zoom = Number(game.zoom) || 1
-			if (!Array.isArray(projected)) return
-			const ratio = Number(game.pixelRatio) || 1
-			const mouse = Array.isArray(game.mouse?.offsetxy) ? game.mouse.offsetxy : [0, 0]
+			const zoom = Number(game.zoom)
+			const ratio = Number(game.pixelRatio)
+			if (!Array.isArray(projected) || !Number.isFinite(projected[0]) || !Number.isFinite(projected[1]) ||
+				!Number.isFinite(zoom) || zoom <= 0 || !Number.isFinite(ratio) || ratio <= 0) return false
 			const desired = [
-				(Number(mouse[0]) || 0) * ratio - (Number(game.w2) || (Number(game.w) || 0) / 2),
-				(Number(mouse[1]) || 0) * ratio - (Number(game.h2) || (Number(game.h) || 0) / 2)
+				mouse[0] * ratio - (Number(game.w2) || (Number(game.w) || 0) / 2),
+				mouse[1] * ratio - (Number(game.h2) || (Number(game.h) || 0) / 2)
 			]
-			game.translation[0] += (projected[0] - desired[0]) / zoom
-			game.translation[1] += (projected[1] - desired[1]) / zoom
-			game.updateMouseData?.()
+			const translation = [
+				game.translation[0] + (projected[0] - desired[0]) / zoom,
+				game.translation[1] + (projected[1] - desired[1]) / zoom
+			]
+			if (!translation.every(Number.isFinite)) return false
+			game.translation[0] = translation[0]
+			game.translation[1] = translation[1]
+			game.updatePointerState()
+			game.updateGlobalPositioning()
+			return true
 		}
 		function installDirectionPointerToggle() {
 			if (window._cattailDynamicDirectionPointerToggleInstalled) return
@@ -1068,6 +1134,7 @@ ModLoader.register({
 						}
 					}
 					if (!shouldUseCoordinateRenderApiOverlay()) renderCoordinateOverlay(this)
+					notifyShortcutState(this)
 					return result
 				}
 			})
@@ -2400,7 +2467,7 @@ ModLoader.register({
 
 		function createOriginalConversionFlow(game, input, output) {
 			if (typeof Cloud === 'undefined' || typeof Cloud.prototype.addConvertersOutput !== 'function') return null
-			const cloud = new Cloud(game)
+			const cloud = new Cloud({ master: game })
 			cloud.addConvertersOutput(input, function () { return output })
 			cloud.update?.()
 			const vessel = cloud.element.querySelector('.converterOutputVessel')
@@ -2863,15 +2930,16 @@ ModLoader.register({
 					}
 					const previousHoveredResource = this.hoveredResource
 					if (Number.isInteger(previousHoveredResource)) rememberResourceSourceResource(this, previousHoveredResource)
+					// Select links before the pinned panel installs its virtual hover.
+					profileResourceSource(
+						'resource.links.total',
+						() => { if (!shouldUseResourceSourceRenderApiLinks(this)) renderResourceSourceLinks(this, this.ctx, { compositeGpuToCanvas: true }) },
+						() => getResourceSourceProfileDetail(this, getResourceSourceFocusResourceId(this))
+					)
 					const virtualHoveredResource = getResourceSourceVirtualHoveredResourceId(this)
 					const useVirtualHover = Number.isInteger(virtualHoveredResource) && !Number.isInteger(previousHoveredResource)
 					if (useVirtualHover) this.hoveredResource = virtualHoveredResource
 					try {
-						profileResourceSource(
-							'resource.links.total',
-							() => { if (!shouldUseResourceSourceRenderApiLinks(this)) renderResourceSourceLinks(this, this.ctx, { compositeGpuToCanvas: true }) },
-							() => getResourceSourceProfileDetail(this, getResourceSourceFocusResourceId(this))
-						)
 						const result = profileResourceSource(
 							'resource.vanilla.renderResources',
 							() => original.apply(this, args),
@@ -3801,13 +3869,18 @@ ModLoader.register({
 		}
 
 		function isResourceSourceLinkActive(game) {
-			if (!game) return false
-			if (isResourceSourceLineLockActive(game)) return Number.isInteger(getResourceSourceLineResourceId(game))
-			return !!(
-				game.shiftPressed &&
-				(game.altActive || isResourceSourceToggleActive(game)) &&
-				Number.isInteger(getResourceSourceFocusResourceId(game))
-			)
+			return Number.isInteger(getResourceSourceActiveLineResourceId(game))
+		}
+
+		function getResourceSourceActiveLineResourceId(game) {
+			if (!game) return null
+			if (isResourceSourceLineLockActive(game)) {
+				// Shift previews only the real hovered resource; it never changes the lock.
+				if (game.shiftPressed && Number.isInteger(game.hoveredResource)) return game.hoveredResource
+				return getResourceSourceLineResourceId(game)
+			}
+			if (game.shiftPressed && (game.altActive || isResourceSourceToggleActive(game))) return getResourceSourceFocusResourceId(game)
+			return null
 		}
 
 		function rememberResourceSourceResource(game, resourceId) {
@@ -3892,7 +3965,7 @@ ModLoader.register({
 				clearResourceSourceGpuLines(game)
 				return
 			}
-			const resourceId = isResourceSourceLineLockActive(game) ? getResourceSourceLineResourceId(game) : getResourceSourceFocusResourceId(game)
+			const resourceId = getResourceSourceActiveLineResourceId(game)
 			if (!Number.isInteger(resourceId)) {
 				clearResourceSourceGpuLines(game)
 				return
@@ -5625,37 +5698,59 @@ ModLoader.register({
 			return Math.max(min, Math.min(max, value))
 		}
 		function installBuildCountdown() {
-			if (typeof Shop === 'undefined') return
+			if (typeof Store === 'undefined' || typeof DesktopStoreVersion === 'undefined') return
 
 			installBuildCountdownStyles()
 			installBuildCountdownResourceEvents()
-			api.patch(Shop.prototype, 'updatePrice', function (original) {
-			  return function (item) {
-			    const result = original.call(this, item)
-			    ensureCountdownElement(item)
-			    updateCountdown(this, item, true)
-			    return result
-			  }
-			})
-
-			api.patch(Shop.prototype, 'updateElements', function (original) {
-			  return function () {
-			    const result = original.apply(this, arguments)
-			    sampleResourceSnapshot(this.master)
-			    updateShopCountdowns(this, true)
-			    return result
-			  }
-			})
-
-			api.patch(Shop.prototype, 'check', function (original) {
-			  return function () {
-			    prepareCompressedCountdownSignature(this)
-			    const result = original.apply(this, arguments)
-			    sampleResourceSnapshot(this.master)
-			    updateShopCountdowns(this, false)
-			    return result
-			  }
-			})
+			const adapters = new WeakMap()
+			const activeStores = new WeakMap()
+			const clearItem = item => {
+				item[buildCountdownElementKey]?.remove()
+				item.priceHtml?.classList.remove(buildCountdownActivePriceClass)
+			}
+			function refresh(store, force, initializing = false) {
+				const game = store.master
+				if (!game || game.isMobile || !store.html?.items) return
+				if (initializing) {
+					const previous = activeStores.get(game)
+					if (previous && previous !== store) {
+						for (const item of adapters.get(previous)?.items || []) clearItem(item)
+						adapters.delete(previous)
+					}
+					activeStores.set(game, store)
+				}
+				if (activeStores.has(game) && activeStores.get(game) !== store) return
+				let shop = adapters.get(store)
+				if (!shop) {
+					shop = { master: game, items: [] }
+					adapters.set(store, shop)
+				}
+				const previous = new Map(shop.items.map(item => [item.name, item]))
+				shop.items = Object.entries(store.html.items).map(([name, html]) => {
+					const priceHtml = store.html.priceContainers[name]
+					const old = previous.get(name)
+					previous.delete(name)
+					if (old?.html === html && old.priceHtml === priceHtml) return old
+					if (old) clearItem(old)
+					return { name, html, priceHtml }
+				})
+				for (const item of previous.values()) clearItem(item)
+				// Classic views move the real cards; the Store maps remain authoritative.
+				shop.vessel = shop.items[0]?.html?.closest('.cattail-classic-shop') || store.vessel
+				sampleResourceSnapshot(game)
+				updateShopCountdowns(shop, force)
+			}
+			for (const [prototype, method, force, initializing] of [
+				[DesktopStoreVersion.prototype, 'init', true, true],
+				[Store.prototype, 'compositionUpdate', true, false],
+				[DesktopStoreVersion.prototype, 'visibilityUpdate', false, false]
+			]) {
+				api.patch(prototype, method, original => function (...args) {
+					const result = original.apply(this, args)
+					refresh(this, force, initializing)
+					return result
+				})
+			}
 		}
 
 		function installBuildCountdownResourceEvents() {
@@ -5685,7 +5780,9 @@ ModLoader.register({
 		  const style = document.createElement('style')
 		  style.id = buildCountdownStyleId
 		  style.textContent = `
-		    .shop .shopItem .itemPrice .${buildCountdownClass} {
+		    .shop .shopItem .itemPrice .${buildCountdownClass},
+		    .store .item .itemPrice .${buildCountdownClass},
+		    .cattail-shop-category-item-meta .itemPrice .${buildCountdownClass} {
 		      display: none;
 		      clear: both;
 		      width: 100%;
@@ -5697,13 +5794,17 @@ ModLoader.register({
 		      line-height: 1.25;
 		      white-space: nowrap;
 		    }
-		    .shop .shopItem .itemPrice .${buildCountdownClass}.active {
+		    .shop .shopItem .itemPrice .${buildCountdownClass}.active,
+		    .store .item .itemPrice .${buildCountdownClass}.active,
+		    .cattail-shop-category-item-meta .itemPrice .${buildCountdownClass}.active {
 		      display: block;
 		    }
-		    .shop.darkShop .shopItem .itemPrice .${buildCountdownClass} {
+		    .shop.darkShop .shopItem .itemPrice .${buildCountdownClass},
+		    .store .item.dark .itemPrice .${buildCountdownClass} {
 		      color: rgba(205, 205, 214, 0.9);
 		    }
-		    .shop .shopItem.disabled .itemPrice .${buildCountdownClass} {
+		    .shop .shopItem.disabled .itemPrice .${buildCountdownClass},
+		    .store .item.disabled .itemPrice .${buildCountdownClass} {
 		      opacity: 0.95;
 		    }
 		    .shop.minimized .shopItem .itemPrice .${buildCountdownClass} {
@@ -5745,6 +5846,12 @@ ModLoader.register({
 		  const element = ensureCountdownElement(item)
 		  if (!element) return
 
+		  const entity = shop.master.codex?.entities?.[item.name]
+		  if (item.html?.classList.contains('hidden') || shop.master.onlyones?.[item.name] || (entity && (entity.type === 'dark') !== Boolean(shop.master.plane))) {
+		    setCountdownText(shop, item, element, '')
+		    item[buildCountdownNextRefreshKey] = 0
+		    return
+		  }
 		  const now = performance.now()
 		  const affordable = isAffordable(shop.master, item)
 		  if (!force && item[buildCountdownNextRefreshKey] && now < item[buildCountdownNextRefreshKey] && item[buildCountdownLastAffordableKey] === affordable) {
@@ -5792,33 +5899,12 @@ ModLoader.register({
 
 		function syncCountdownText(shop, item, element, text) {
 		  const nextText = text || ''
-		  if (isShopCategoriesCompressed(shop)) {
-		    clearOriginalCountdownElement(item, element)
-		    syncCategoryCountdownText(shop, item, nextText)
-		    return
-		  }
-
 		  if (element.textContent !== nextText) element.textContent = nextText
 		  element.classList.toggle('active', Boolean(nextText))
 		  if (item.priceHtml) {
 		    item.priceHtml.classList.toggle(buildCountdownActivePriceClass, Boolean(nextText))
 		  }
-		}
-
-		function prepareCompressedCountdownSignature(shop) {
-		  if (!isShopCategoriesCompressed(shop) || !Array.isArray(shop.items)) return
-		  for (const item of shop.items) {
-		    const element = item?.priceHtml?.querySelector?.('.' + buildCountdownClass)
-		    clearOriginalCountdownElement(item, element)
-		  }
-		}
-
-		function clearOriginalCountdownElement(item, element) {
-		  if (element) {
-		    if (element.textContent) element.textContent = ''
-		    element.classList.remove('active')
-		  }
-		  item?.priceHtml?.classList?.remove(buildCountdownActivePriceClass)
+		  if (isShopCategoriesCompressed(shop)) syncCategoryCountdownText(shop, item, nextText)
 		}
 
 		function syncCategoryCountdownText(shop, item, text) {

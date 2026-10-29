@@ -5,13 +5,12 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'filesystem.ps1')
 
 function New-DirectoryIfMissing {
 	param([string]$Path)
 
-	if (-not (Test-Path -LiteralPath $Path)) {
-		New-Item -ItemType Directory -Force -Path $Path | Out-Null
-	}
+	New-InstallerDirectory $Path
 }
 
 function Get-LoaderVersionFromText {
@@ -25,19 +24,45 @@ function Get-LoaderVersionFromText {
 }
 
 
+function Test-PlayerPackagePath {
+    param([string]$RelativePath, [string]$Area)
+    $relative = $RelativePath.Replace('\', '/').TrimStart('/')
+    if ($Area -eq 'mods' -and $relative -notmatch '(?i)^template_and_example(?:/|$)' -and $relative -match '(?i)^[^/]+/tests(?:/|$)') { return $false }
+    if ($Area -eq 'loader' -and $relative -ieq 'Translations-20260721-191815.json') { return $false }
+    if ($Area -eq 'mods' -and ($relative -ieq 'Cattail_TweaksNetwork_P2P-Multiplayer' -or $relative.StartsWith('Cattail_TweaksNetwork_P2P-Multiplayer/', [StringComparison]::OrdinalIgnoreCase))) { return $false }
+    if ($Area -eq 'mods' -and ($relative -ieq 'Archived' -or $relative.StartsWith('Archived/', [StringComparison]::OrdinalIgnoreCase))) { return $false }
+    if ($Area -eq 'installer' -and ($relative -eq 'tests' -or $relative.StartsWith('tests/', [StringComparison]::OrdinalIgnoreCase))) { return $false }
+    if ($Area -eq 'loader' -and ($relative -ieq 'diagnostics' -or $relative.StartsWith('diagnostics/', [StringComparison]::OrdinalIgnoreCase))) { return $false }
+    if ($Area -eq 'loader' -and $relative.StartsWith('tools/', [StringComparison]::OrdinalIgnoreCase)) {
+        return $relative.ToLowerInvariant() -in @('tools/verify.ps1','tools/common.ps1','tools/modifier-watch.ps1','tools/snapshot.ps1','tools/report.ps1','tools/restore.ps1','tools/readme.md')
+    }
+    return $true
+}
+
+function Assert-PlayerPackageEnabledMods {
+    param([string]$EnabledPath, [switch]$CleanEnabled)
+    if ($CleanEnabled) { return }
+    $enabled = Get-Content -LiteralPath $EnabledPath -Raw -Encoding UTF8 | ConvertFrom-Json
+    if (@($enabled.mods | Where-Object { $_ -ieq 'Cattail_TweaksNetwork_P2P-Multiplayer' }).Count) {
+        throw 'Player package excludes P2P but enabled.json still enables it. Adjust the source list explicitly or use CleanEnabled for the package copy.'
+    }
+}
+
 function Copy-DirectoryFiltered {
 	param(
 		[string]$Source,
 		[string]$Target,
-		[string[]]$ExcludePrefixes = @()
+		[string[]]$ExcludePrefixes = @(),
+        [string]$PackageArea = ''
 	)
 
 	$sourceRoot = (Resolve-Path -LiteralPath $Source).Path
 	New-DirectoryIfMissing -Path $Target
 
-	Get-ChildItem -LiteralPath $Source -Recurse -File | ForEach-Object {
+	Get-InstallerFiles $Source -ExcludeRelative $ExcludePrefixes -SkipDevelopmentCaches | ForEach-Object {
 		$relative = $_.FullName.Substring($sourceRoot.Length).TrimStart('\')
 		$normalized = $relative.Replace('\', '/')
+        if (-not (Test-PlayerPackagePath $normalized $PackageArea)) { return }
 		foreach ($prefix in $ExcludePrefixes) {
 			if ($normalized.StartsWith($prefix)) {
 				return
@@ -46,11 +71,12 @@ function Copy-DirectoryFiltered {
 
 		$destination = Join-Path $Target $relative
 		New-DirectoryIfMissing -Path (Split-Path -Parent $destination)
-		Copy-Item -LiteralPath $_.FullName -Destination $destination -Force
+		Copy-InstallerFile $_.FullName $destination
 	}
 }
 
 $packageRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
+Assert-PlayerPackageEnabledMods -EnabledPath (Join-Path $packageRoot 'resources/app/game/mods/enabled.json') -CleanEnabled:$CleanEnabled
 $stagingRoot = Join-Path $packageRoot 'dist\package-staging\SixtyFour-ModLoader'
 if ([System.IO.Path]::IsPathRooted($OutputPath)) {
 	$resolvedOutput = [System.IO.Path]::GetFullPath($OutputPath)
@@ -59,11 +85,13 @@ if ([System.IO.Path]::IsPathRooted($OutputPath)) {
 }
 
 if ($Clean -and (Test-Path -LiteralPath (Join-Path $packageRoot 'dist'))) {
-	Remove-Item -LiteralPath (Join-Path $packageRoot 'dist') -Recurse -Force
+	$cleanTarget = Assert-InstallerChildPath $packageRoot (Join-Path $packageRoot 'dist')
+	Remove-InstallerDirectory $cleanTarget
 }
 
 if (Test-Path -LiteralPath $stagingRoot) {
-	Remove-Item -LiteralPath $stagingRoot -Recurse -Force
+	$cleanTarget = Assert-InstallerChildPath (Join-Path $packageRoot 'dist') $stagingRoot
+	Remove-InstallerDirectory $cleanTarget
 }
 New-DirectoryIfMissing -Path $stagingRoot
 
@@ -71,16 +99,19 @@ New-DirectoryIfMissing -Path $stagingRoot
 Copy-DirectoryFiltered `
 	-Source (Join-Path $packageRoot 'modloader-installer') `
 	-Target (Join-Path $stagingRoot 'modloader-installer') `
+    -PackageArea installer `
 	-ExcludePrefixes @()
 
 Copy-DirectoryFiltered `
 	-Source (Join-Path $packageRoot 'resources\app\game\modloader') `
 	-Target (Join-Path $stagingRoot 'resources\app\game\modloader') `
-	-ExcludePrefixes @('state/', 'translations.json')
+	-PackageArea loader `
+	-ExcludePrefixes @('state/', 'backups/', 'translations.json')
 
 Copy-DirectoryFiltered `
 	-Source (Join-Path $packageRoot 'resources\app\game\mods') `
 	-Target (Join-Path $stagingRoot 'resources\app\game\mods') `
+    -PackageArea mods `
 	-ExcludePrefixes @()
 
 if ($CleanEnabled) {
@@ -145,7 +176,7 @@ $packageReadme | Set-Content -LiteralPath (Join-Path $stagingRoot 'README.md') -
 
 New-DirectoryIfMissing -Path (Split-Path -Parent $resolvedOutput)
 if (Test-Path -LiteralPath $resolvedOutput) {
-	Remove-Item -LiteralPath $resolvedOutput -Force
+	Remove-InstallerFile $resolvedOutput
 }
 
 $forbiddenCoreFiles = @(
@@ -162,5 +193,5 @@ foreach ($relativePath in $forbiddenCoreFiles) {
 	}
 }
 
-Compress-Archive -Path (Join-Path $stagingRoot '*') -DestinationPath $resolvedOutput -Force
+Compress-InstallerDirectory $stagingRoot $resolvedOutput
 Write-Host "Package created: $resolvedOutput"

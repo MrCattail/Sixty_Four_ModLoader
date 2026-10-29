@@ -71,7 +71,12 @@
 			if (surge) placed++
 		}
 
-		if (placed && typeof game.shop?.updateElements === 'function') game.shop.updateElements()
+		if (placed) {
+			if (typeof game.store?.compositionUpdate === 'function') {
+				game.store.compositionUpdate()
+				game.store.visibilityUpdate?.()
+			} else if (typeof game.shop?.updateElements === 'function') game.shop.updateElements()
+		}
 	}
 
 	function getSurgeTuning(api, scan) {
