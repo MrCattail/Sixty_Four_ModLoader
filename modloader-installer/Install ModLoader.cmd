@@ -56,6 +56,8 @@ if not exist "%SCRIPT_DIR%install.ps1" (
   exit /b 1
 )
 
+echo Installation may take a minute. Do not close this window.
+echo.
 powershell -NoProfile -ExecutionPolicy Bypass -File "%SCRIPT_DIR%install.ps1" -GameRoot "%GAME_ROOT%" -SourceRoot "%SOURCE_ROOT%" -Force
 set "RESULT=%ERRORLEVEL%"
 

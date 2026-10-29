@@ -335,6 +335,7 @@ ModLoader.register({
 					})
 				},
 				beginLiveStroke(request) {
+					try { requireReality({ plane: game.plane }, game) } catch (error) { return createRejectedLiveStroke(error.code) }
 					if (disposed) return createRejectedLiveStroke('NOT_READY')
 					const action = normalizeAction(request?.action)
 					const cubeMode = normalizeCubeMode(request?.cubeMode)
@@ -397,6 +398,7 @@ ModLoader.register({
 				let ready = false
 				let failedResult = null
 				let transaction = null
+				let closing = null
 				let refreshNeeded = false
 				const beginPromise = Promise.resolve(transactions.beginApplied({
 					kind: TRANSACTION_KIND,
@@ -415,6 +417,7 @@ ModLoader.register({
 					applyLiveCells(pendingCells.splice(0))
 					return result
 				}).catch(function (error) {
+					if (transaction) { abortLive(error); return null }
 					failedResult = failureResult(error)
 					closed = true
 					return null
@@ -449,6 +452,7 @@ ModLoader.register({
 					},
 					async commit() {
 						await beginPromise
+						if (closing) await closing
 						if (failedResult) return failedResult
 						if (!transaction || closed) return rejectedResult('INVALIDATED')
 						closed = true
@@ -479,8 +483,10 @@ ModLoader.register({
 					async cancel(reason) {
 						cancelled = true
 						await beginPromise
+						if (closing) await closing
 						if (!transaction || closed) return false
 						closed = true
+						if (transaction.isCurrent && !transaction.isCurrent()) return transaction.cancel('save-context-changed')
 						try {
 							rollbackLiveChanges(changes)
 						} catch (error) {
@@ -543,9 +549,28 @@ ModLoader.register({
 					return { ok: true, change: lastChange, limitReached: limit, queued, skipped, duplicate }
 				}
 
+				function abortLive(error) {
+					try {
+						if (transaction?.isCurrent && !transaction.isCurrent()) throw paintError('INVALIDATED', 'The active save changed.')
+						rollbackLiveChanges(changes)
+						closing = Promise.resolve(transaction?.cancel?.('live-write-failed'))
+						failedResult = failureResult(error)
+					} catch (rollbackError) {
+						failedResult = transaction?.blockRollback?.(rollbackError?.message) || failureResult(rollbackError)
+					}
+					closed = true
+					return { ok: false, reason: failedResult?.error?.code || 'INVALIDATED' }
+				}
+
 				function applyLiveCell(cellValue, deferRefresh, alreadyBatched) {
+					if (transaction?.isCurrent && !transaction.isCurrent()) {
+						closed = true
+						failedResult = transaction.blockRollback?.('The active save changed; the safety snapshot was retained.') || rejectedResult('INVALIDATED')
+						return { ok: false, reason: 'INVALIDATED' }
+					}
 					if (closed || cancelled || failedResult) return { ok: false, reason: failedResult?.error?.code || 'CLOSED' }
-					const cell = requireCell(cellValue)
+					let cell
+					try { requireReality({ plane: game.plane }, game); cell = requireCell(cellValue) } catch (error) { return abortLive(error) }
 					const key = cellKey(cell)
 					if (visited.has(key)) return { ok: true, duplicate: true }
 					visited.add(key)
@@ -553,8 +578,7 @@ ModLoader.register({
 					try {
 						inspection = inspectTarget(cell, options.action)
 					} catch (error) {
-						failedResult = failureResult(error)
-						return { ok: false, reason: failedResult.error.code }
+						return abortLive(error)
 					}
 					if (!inspection?.eligible) {
 						skippedCount += 1
@@ -572,8 +596,7 @@ ModLoader.register({
 							? paintState.buildGrowCubeSave(cell, options.recipe, options.growDurationMs, options.growLineage)
 							: paintState.buildStableCubeSave(cell, options.recipe))
 					if (options.action === 'paint' && !after) {
-						failedResult = rejectedResult('INVALID_SPEC')
-						return { ok: false, reason: 'INVALID_SPEC' }
+						return abortLive(paintError('INVALID_SPEC', 'The paint recipe could not be materialized.'))
 					}
 					const change = {
 						cell: cell.slice(),
@@ -589,6 +612,7 @@ ModLoader.register({
 							}
 							writeCell(cell, after, { forceReplace: change.operation === 'replace' })
 						}
+						changes.push(change)
 						const startedAt = nowMs()
 						if (alreadyBatched) write()
 						else withBatchedWorldWrites(write)
@@ -602,17 +626,8 @@ ModLoader.register({
 							refreshNeeded = true
 						}
 					} catch (error) {
-						try {
-							rollbackLiveChanges(changes)
-							transaction?.cancel?.('live-write-failed')
-						} catch (rollbackError) {
-							transaction?.blockRollback?.(rollbackError?.message || 'The live stroke rollback failed.')
-						}
-						failedResult = failureResult(error)
-						closed = true
-						return { ok: false, reason: failedResult.error.code }
+						return abortLive(error)
 					}
-					changes.push(change)
 					if (change.operation === 'erase') erasedCount += 1
 					else if (change.operation === 'replace') replacedCount += 1
 					else paintedCount += 1
@@ -653,6 +668,7 @@ ModLoader.register({
 				for (let index = changes.length - 1; index >= 0; index -= 1) {
 					const change = changes[index]
 					const current = captureCell(change.cell)
+					if (sameRuntimeTransactionSave(current, change.before)) continue
 					if (!sameRuntimeTransactionSave(current, change.after, true)) {
 						throw paintError('ROLLBACK_FAILED', 'A live painted cube stroke target changed before rollback.')
 					}
@@ -684,9 +700,17 @@ ModLoader.register({
 				})
 			}
 
+			function protectionReason(cell) {
+				const planner = globalThis[Symbol.for('cattail.world-editor.blueprint-preview-plan')]
+				if (!Array.isArray(game.saveSlots)) return null
+				if (!planner?.protectionReason) return 'protection-unavailable'
+				return planner.protectionReason(game, 'cube', { minU: cell[0], maxU: cell[0], minV: cell[1], maxV: cell[1] })
+			}
+
 			function inspectTarget(cellValue, actionValue) {
 				const cell = requireCell(cellValue)
 				const action = normalizeAction(actionValue)
+				if (protectionReason(cell)) return unavailableInspection(cell, action)
 				const occupancy = inspectOccupancy(game, cell)
 				if (!occupancy.known) return unavailableInspection(cell, action)
 				const before = occupancy.entity ? captureEntity(occupancy.entity, cell) : null
@@ -1059,6 +1083,7 @@ ModLoader.register({
 			function writeCell(cellValue, saveValue, options) {
 				const cell = requireCell(cellValue)
 				const save = normalizeSave(saveValue)
+				if (protectionReason(cell)) throw paintError('PROTECTED_TARGET', 'The target overlaps a protected memory region.')
 				const occupancy = inspectOccupancy(game, cell)
 				if (!occupancy.known) throw paintError('NOT_READY', 'The target cell could not be inspected.')
 				if (!save) {
@@ -1178,12 +1203,14 @@ ModLoader.register({
 
 			function withBatchedWorldWrites(callback) {
 				const restoreShopUpdates = deferMethod(game?.shop, 'updateElements')
+				const restoreStore = deferMethod(game?.store, 'compositionUpdate')
 				const restoreStuffSort = deferSort(game?.stuff)
 				try {
 					return callback()
 				} finally {
 					try {
 						restoreShopUpdates()
+						restoreStore()
 					} finally {
 						restoreStuffSort()
 					}
@@ -1249,9 +1276,11 @@ ModLoader.register({
 			}
 
 			function refreshWorld() {
+				game.store?.compositionUpdate?.()
 				game.shop?.updateElements?.()
 				game.shop?.check?.()
-				game.processMousemove2?.()
+				const refreshPointer = Array.isArray(game.saveSlots) ? game.processMove : game.processMousemove2
+				refreshPointer?.call(game)
 			}
 
 			async function writeChanges(context, record, saveForChange, operation) {
@@ -1351,6 +1380,9 @@ ModLoader.register({
 		}
 
 		function requireReality(context, game) {
+			if (Array.isArray(game?.saveSlots) && !globalThis[Symbol.for('cattail.world-editor.creative-mode')]?.snapshot?.().creativeMode) {
+				throw paintError('CREATIVE_REQUIRED', 'Painted cubes require Creative Mode.')
+			}
 			if (Number(context?.plane) !== 0 || !!game?.plane) {
 				throw paintError('PLANE_CHANGED', 'Painted cubes can only be edited on the reality plane.')
 			}

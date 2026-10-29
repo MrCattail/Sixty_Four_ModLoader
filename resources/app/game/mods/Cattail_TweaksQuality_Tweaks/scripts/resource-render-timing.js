@@ -1,7 +1,27 @@
 (function () {
+	// Publish one canonical API and a synchronized legacy alias. Never replace a foreign root.
+	const tweaksNamespace = (function () {
+		let namespace = window.CattailTweaks
+		if (namespace === undefined) namespace = window.CattailTweaks = {}
+		if (!namespace || typeof namespace !== 'object' || Array.isArray(namespace)) {
+			console.warn('[Tweaks] CattailTweaks namespace is occupied; retaining legacy access')
+			namespace = {}
+		}
+		const legacy = 'CattailTweaksResourceRenderTiming'
+		if (namespace.resourceRenderTiming === undefined && window[legacy] !== undefined) namespace.resourceRenderTiming = window[legacy]
+		const descriptor = Object.getOwnPropertyDescriptor(window, legacy)
+		if (!descriptor || descriptor.configurable) Object.defineProperty(window, legacy, {
+			configurable: true, enumerable: true,
+			get() { return namespace.resourceRenderTiming },
+			set(value) { namespace.resourceRenderTiming = value }
+		})
+		else console.warn('[Tweaks] Legacy API alias is not configurable: ' + legacy)
+		return namespace
+	})()
+
 	const MOD_ID = 'Cattail_TweaksQuality_Tweaks'
-	const installedKey = '__cattailResourceRenderTimingInstalled'
-	const apiKey = 'CattailTweaksResourceRenderTiming'
+	const installedKey = '__cattailTweaksResourceRenderTimingInstalled'
+	const apiKey = 'resourceRenderTiming'
 	const defaultSampleLimit = 240
 	let enabled = false
 	let sampleLimit = defaultSampleLimit
@@ -40,7 +60,7 @@
 	}
 
 	function installDebugApi() {
-		window[apiKey] = {
+		tweaksNamespace[apiKey] = {
 			enable(options = {}) {
 				enabled = true
 				sampleLimit = normalizeSampleLimit(options.samples || options.sampleLimit || sampleLimit)

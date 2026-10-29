@@ -1191,7 +1191,7 @@ async function testPreviewCommandLockLifecycle() {
 function testStaticUiLocalizationAndManifestContracts() {
 	const manifest = JSON.parse(source('mod.json'))
 	assert.equal(manifest.version, '0.6.0')
-	assert.equal(manifest.entry.length, 45)
+	assert.equal(manifest.entry.length, 47)
 	assert.ok(manifest.entry.indexOf(PLACEMENT_SOURCE) > manifest.entry.indexOf(PLAN_SOURCE))
 	assert.ok(manifest.entry.indexOf(PLACEMENT_SOURCE) < manifest.entry.indexOf('scripts/core/input-controller.js'))
 	assert.ok(manifest.entry.indexOf(DIALOG_SOURCE) > manifest.entry.indexOf('scripts/ui/card-opacity.js'))

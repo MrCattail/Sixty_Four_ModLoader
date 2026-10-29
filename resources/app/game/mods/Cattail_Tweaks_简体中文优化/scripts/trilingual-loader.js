@@ -133,6 +133,29 @@
 					}
 					target.shell.showItemInFolder(target.path)
 				}
+			},
+			{
+				key: 'exportAuthorWords',
+				type: 'action',
+				section: 'translationFile',
+				sectionLabel: 'Translation file',
+				label: 'Export words.js for the author',
+				description: 'Save a copy with the latest saved Simplified and Traditional translations. Keep all other languages.',
+				buttonLabel: 'Export words.js for the author',
+				pendingText: 'Preparing export…',
+				successText: 'Export saved.',
+				errorText: 'Could not export words.js: {value}',
+				async onAction(context) {
+					const exporter = globalThis.__cattailChineseAuthorExport
+					if (!exporter) throw new Error('Chinese Optimization author exporter was not loaded.')
+					const language = api.state?.game?.language || 'en'
+					const canceled = { sch: '已取消导出。', modsch: '已取消导出。', tch: '已取消匯出。', modtch: '已取消導出。' }
+					return exporter.exportFile(api, extractModsch, globalThis.__cattailChineseTraditional, {
+						title: context?.definition?.buttonLabel || 'Export words.js for the author',
+						success: context?.definition?.successText || 'Export saved.',
+						canceled: canceled[language] || 'Export canceled.'
+					})
+				}
 			}
 		])
 	}
@@ -147,8 +170,19 @@
 
 			// Validate the complete source during mod initialization so malformed edits fail early.
 			extractModsch(source, '')
+			const traditional = globalThis.__cattailChineseTraditional
+			if (!traditional) throw new Error('Chinese Optimization traditional converter was not loaded.')
+			const languageName = '語言：繁體中文[優化]'
+			const loaderDerivesWords = api.registerLanguage?.('modtch', {
+				sourceLanguage: 'modsch', transformText: traditional.convertText, languageName
+			}) === true
 			api.on('afterWords', function (words) {
 				words.modsch = mergeModsch(words.modsch, extractModsch(source, ''))
+				// Older Loaders ignore the optional variant descriptor; game text still works.
+				if (!loaderDerivesWords) {
+					words.modtch = mergeModsch(words.modtch, traditional.convertWords(words.modsch))
+					if (words.modtch.splash) words.modtch.splash.language = languageName
+				}
 				return words
 			})
 			registerTranslationFileSettings(api)

@@ -5,7 +5,7 @@ for %%I in ("%GAME_ROOT%") do set "GAME_ROOT=%%~fI"
 cd /d "%GAME_ROOT%"
 if "%GAME_ROOT:~-1%"=="\" set "GAME_ROOT=%GAME_ROOT:~0,-1%"
 
-echo Sixty Four ModLoader Verify
+echo Sixty Four ModLoader Installation Check
 echo.
 
 if not exist "resources\app\game\modloader\tools\verify.ps1" (

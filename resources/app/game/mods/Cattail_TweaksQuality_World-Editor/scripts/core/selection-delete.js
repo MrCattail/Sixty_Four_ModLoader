@@ -98,6 +98,8 @@ ModLoader.register({
 			let probeSequence = 0
 			let planningToken = 0
 			let disposed = false
+			const nativeRequests = new Map()
+			let nativeSequence = 0
 			let planning = false
 			let busy = false
 			let phase = 'idle'
@@ -118,6 +120,15 @@ ModLoader.register({
 						origin
 					})
 					requireCurrent(context)
+					let nativeRequest = null
+					if (origin === 'native') {
+						if (!creativeActive(creative, game)) throw deletionError('ECONOMY_MODE_CHANGED', 'Creative mode is required for this deletion.')
+						nativeRequest = nativeRequests.get(request.nativeToken)
+						if (!nativeRequest) throw deletionError('TARGET_CHANGED', 'The native deletion target expired.')
+						validateNativeTargets(nativeRequest)
+						request = { ...request, plan: await rebuildPlan(createCellsSource(nativeRequest.cells), () => !context.isCurrent()) }
+						validateNativeTargets(nativeRequest)
+					}
 					const requested = normalizePlanRequest(request?.plan)
 					const rebuilt = await rebuildPlan(requested.source, function () {
 						return !context.isCurrent()
@@ -165,6 +176,11 @@ ModLoader.register({
 						})
 						throw deletionError('TARGET_CHANGED', 'The selected deletion target changed after confirmation.')
 					}
+					if (nativeRequest) {
+						validateNativeTargets(nativeRequest)
+						const allowed = new Set(nativeRequest.targets.map(t => ensureIdentity(t.entity)))
+						if (rebuilt.removals.some(e => !allowed.has(e.identity))) throw deletionError('PROTECTED_TARGET', 'Native deletion would include an unselected related object.')
+					}
 					if (!rebuilt.removals.length) {
 						throw deletionError('NOTHING_SAFE', 'The selection contains no safely deletable buildings.')
 					}
@@ -174,7 +190,7 @@ ModLoader.register({
 					})
 					return {
 						summary: {
-							label: origin === 'cut' ? 'Selection cut' : 'Selection contents deletion',
+							label: origin === 'native' ? 'Native creative deletion' : origin === 'cut' ? 'Selection cut' : 'Selection contents deletion',
 							deleteCount: rebuilt.summary.safeCount,
 							protectedCount: rebuilt.summary.protectedCount,
 							crossBoundaryCount: rebuilt.summary.crossBoundaryCount
@@ -199,6 +215,10 @@ ModLoader.register({
 					requireGameMethods(game)
 					if (!context?.snapshotId) operationPayloads.clear()
 					let payload = operationPayload(context, record)
+					for (const target of payload.removals) {
+						const protection = globalThis[Symbol.for('cattail.world-editor.blueprint-preview-plan')]?.protectionReason?.(game, target.name, target.footprint)
+						if (protection) return denied('PROTECTED_TARGET', 'The target is protected: ' + protection)
+					}
 					if (creativeActive(creative, game) !== payload.economy.creative) {
 						return denied('ECONOMY_MODE_CHANGED', 'Creative mode changed after deletion was prepared.')
 					}
@@ -436,6 +456,7 @@ ModLoader.register({
 						const restoreBatchedWrites = beginBatchedWorldWrites(game)
 						try {
 							await rollbackMutations(context, state)
+							requireCurrent(context)
 							if (context?.direction !== 'undo') restoreRecordedRelations(state.payload.relations)
 						} finally {
 							restoreBatchedWrites()
@@ -937,6 +958,18 @@ ModLoader.register({
 						listeners.delete(listener)
 					}
 				},
+				executeNative(entities, input) {
+					const targets = Array.from(new Set(entities || [])).map(entity => ({ entity, position: entity.position.slice() }))
+					validateNativeTargets({ targets })
+					const cells = []
+					for (const { entity } of targets) {
+						const footprint = entityFootprint(entity, entity.position)
+						for (let u = footprint.minU; u <= footprint.maxU; u++) for (let v = footprint.minV; v <= footprint.maxV; v++) cells.push([u, v])
+					}
+					const nativeToken = ++nativeSequence
+					nativeRequests.set(nativeToken, { targets, cells })
+					return transactions.execute({ kind: TRANSACTION_KIND, input: normalizeInput(input), payload: { origin: 'native', nativeToken } }).finally(() => nativeRequests.delete(nativeToken))
+				},
 				planSelections(options) {
 					return plan(function () {
 						return createSelectionSource(options)
@@ -1031,6 +1064,15 @@ ModLoader.register({
 				}
 			}
 
+			function validateNativeTargets(request) {
+				if (!request.targets.length) throw deletionError('NOTHING_SAFE', 'No safely deletable building is selected.')
+				for (const target of request.targets) {
+					if (entityAt(game, target.position) !== target.entity || !samePlain(target.entity.position, target.position) || !game.canEraseEntity(target.entity)) {
+						throw deletionError('TARGET_CHANGED', 'The native deletion target changed after selection.')
+					}
+				}
+			}
+
 			function createCellsSource(cells, options) {
 				if (!Array.isArray(cells) || !cells.length) {
 					throw deletionError('INVALID_PLAN', 'At least one deletion cell is required.')
@@ -1110,6 +1152,11 @@ ModLoader.register({
 					const position = normalizePosition(entity?.position)
 					const footprint = position ? entityFootprint(entity, position) : null
 					const crossBoundary = !!footprint && footprintCrossesMask(footprint, cellKeys)
+					const protection = globalThis[Symbol.for('cattail.world-editor.blueprint-preview-plan')]?.protectionReason?.(game, name, footprint)
+					if (protection) {
+						protectedTargets.push(captureProtectedEntity(entity, protection, crossBoundary, attachedCubeOwners.has(entity) ? 'attached-cube' : name === 'cube' || name === 'surge' ? name : 'building'))
+						continue
+					}
 					const activeRelation = captureActiveStabilizerRelation(entity, entities)
 					if (activeRelation) activeRelations.set(relationKey(activeRelation), activeRelation)
 					if (name === 'cube') {
@@ -3643,6 +3690,7 @@ ModLoader.register({
 			async function rollbackMutations(context, state) {
 				let processed = 0
 				for (let index = state.mutations.length - 1; index >= 0; index -= 1) {
+					requireCurrent(context)
 					const mutation = state.mutations[index]
 					if (mutation.kind === 'created') {
 						rollbackCreatedMutation(state, mutation)
@@ -3666,6 +3714,7 @@ ModLoader.register({
 					processed += 1
 					if (processed % APPLY_CHUNK_SIZE === 0) await yieldTurn()
 				}
+				requireCurrent(context)
 				if (state.direction === 'undo') reconcileRollbackBaseline(state)
 			}
 
@@ -3763,12 +3812,16 @@ ModLoader.register({
 					identity = createIdentity('entity')
 					identityByEntity.set(entity, identity)
 				}
+				const native = globalThis[Symbol.for('cattail.world-editor.native-tools')]
+				if (native?.game === game) native.rememberRestoration('delete', identity, entity)
 				return identity
 			}
 
 			function assignIdentity(entity, identity) {
 				if (!entity || !identity) throw deletionError('APPLY_FAILED', 'An entity identity could not be assigned.')
 				identityByEntity.set(entity, identity)
+				const native = globalThis[Symbol.for('cattail.world-editor.native-tools')]
+				if (native?.game === game) native.restoreIdentity('delete', identity, entity)
 			}
 
 			function recoverableMissingRelationSurge(relation) {
@@ -4551,14 +4604,21 @@ ModLoader.register({
 			const counts = Object.assign({}, game.entitiesInGame || {})
 			const resources = numericArray(game.resources)
 			const steps = []
-			const eraserName = Number(game.eraserType) === 2
-				? 'eraser3'
-				: Number(game.eraserType) === 1
-					? 'eraser2'
-					: 'eraser'
+			// Native 1.3 demolition refunds buildings without an eraser commodity
+			// fee. Use the same native-save boundary as priceFor; only the legacy
+			// economy still quotes those products. eraserType still affects refunds.
+			const eraserName = Array.isArray(game?.saveSlots)
+				? null
+				: Number(game.eraserType) === 2
+					? 'eraser3'
+					: Number(game.eraserType) === 1
+						? 'eraser2'
+						: 'eraser'
 			for (const removal of removals) {
-				const eraserCost = priceFor(game, counts, eraserName, false)
-				pushEconomyStep(resources, steps, 'eraser-cost', eraserName, negateArray(eraserCost))
+				if (eraserName) {
+					const eraserCost = priceFor(game, counts, eraserName, false)
+					pushEconomyStep(resources, steps, 'eraser-cost', eraserName, negateArray(eraserCost))
+				}
 				const refund = priceFor(game, counts, removal.name, true)
 				pushEconomyStep(resources, steps, 'refund', removal.name, refund)
 				counts[removal.name] = Math.max(0, finiteOr(counts[removal.name], 0) - 1)
@@ -4580,6 +4640,7 @@ ModLoader.register({
 		}
 
 		function priceFor(game, counts, name, sale) {
+			if (Array.isArray(game?.saveSlots)) return globalThis[Symbol.for('cattail.world-editor.blueprint-preview-plan')].quotePrice(game, counts, name, sale)
 			const definition = game.codex?.entities?.[name]
 			if (!definition || !Array.isArray(definition.price)) {
 				throw deletionError('PRICE_UNAVAILABLE', 'A required building price is unavailable.')
@@ -4930,9 +4991,11 @@ ModLoader.register({
 						finiteOr(right?.position?.[0], 0) -
 						finiteOr(right?.position?.[1], 0)
 				})
+				game.store?.compositionUpdate?.()
 				game.shop?.updateElements?.()
 				game.shop?.check?.()
-				game.processMousemove2?.()
+				const refreshPointer = Array.isArray(game.saveSlots) ? game.processMove : game.processMousemove2
+				refreshPointer?.call(game)
 			} catch (refreshError) {
 				console.warn('[Cattail World Editor] Selection deletion world refresh failed.', refreshError)
 			}
@@ -4940,6 +5003,7 @@ ModLoader.register({
 
 		function beginBatchedWorldWrites(game) {
 			const restoreShopUpdates = deferMethod(game?.shop, 'updateElements')
+			const restoreStore = deferMethod(game?.store, 'compositionUpdate')
 			const restoreStuffSort = deferSort(game?.stuff)
 			let restored = false
 			return function restoreBatchedWorldWrites() {
@@ -4947,6 +5011,7 @@ ModLoader.register({
 				restored = true
 				try {
 					restoreShopUpdates()
+					restoreStore()
 				} finally {
 					restoreStuffSort()
 				}
@@ -5907,7 +5972,7 @@ ModLoader.register({
 		}
 
 		function normalizeOrigin(value) {
-			return String(value || '') === 'cut' ? 'cut' : 'delete'
+			return value === 'native' ? 'native' : String(value || '') === 'cut' ? 'cut' : 'delete'
 		}
 
 		function cutRetainedCubeRebaseAllowed(origin, source, direction) {

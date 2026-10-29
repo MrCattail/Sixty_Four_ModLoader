@@ -2699,6 +2699,215 @@ ModLoader.register({
 				creativeOperationFailed: 'Operasjonen i kreativ modus mislyktes.'
 			}
 		}
+		// Native forks preserve an ordinary checkpoint; legacy forks keep their original contract.
+		const CREATIVE_COPY_TEXT = {
+		  "en": [
+		    "{required} empty manual slots are required. Available: {count}.",
+		    "A protected history point will preserve your ordinary progress. The creative copy uses {required} empty slot.",
+		    "An ordinary save named {name} and a creative copy will be created. Required empty slots: {required}.",
+		    "Enable compatible Better UIs save slots to create a creative copy.",
+		    "Creative copy saved locally. Cloud sync is incomplete."
+		  ],
+		  "sch": [
+		    "需要 {required} 个空手动存档格。当前可用：{count}。",
+		    "将在原存档增加受保护历史点，保留当前普通进度。创造副本占用 {required} 个空位。",
+		    "将新建普通存档“{name}”及创造副本，共需 {required} 个空位。",
+		    "请启用兼容的 Better UIs 存档管理以创建创造副本。",
+		    "创造副本已保存在本地，云同步未完成。"
+		  ],
+		  "tch": [
+		    "需要 {required} 個空手動存檔格。目前可用：{count}。",
+		    "將在原存檔新增受保護歷史點，保留目前普通進度。創造副本佔用 {required} 個空位。",
+		    "將新增普通存檔「{name}」及創造副本，共需 {required} 個空位。",
+		    "請啟用相容的 Better UIs 存檔管理以建立創造副本。",
+		    "創造副本已儲存在本機，雲端同步未完成。"
+		  ],
+		  "ru": [
+		    "Требуется свободных ячеек: {required}. Доступно: {count}.",
+		    "Обычный прогресс сохранится в защищённой точке истории. Для творческой копии нужно ячеек: {required}.",
+		    "Будут созданы обычное сохранение {name} и творческая копия. Нужно ячеек: {required}.",
+		    "Включите совместимое управление сохранениями Better UIs.",
+		    "Творческая копия сохранена локально. Синхронизация с облаком не завершена."
+		  ],
+		  "de": [
+		    "Benötigte freie Speicherplätze: {required}. Verfügbar: {count}.",
+		    "Ein geschützter Verlaufspunkt bewahrt den normalen Fortschritt. Die Kreativkopie benötigt {required} freien Platz.",
+		    "Der normale Spielstand {name} und eine Kreativkopie werden erstellt. Benötigte freie Plätze: {required}.",
+		    "Aktiviere eine kompatible Speicherplatzverwaltung von Better UIs.",
+		    "Kreativkopie lokal gespeichert. Die Cloud-Synchronisierung ist nicht abgeschlossen."
+		  ],
+		  "ptbr": [
+		    "Espaços manuais livres necessários: {required}. Disponíveis: {count}.",
+		    "Um ponto protegido do histórico preservará o progresso normal. A cópia criativa usa {required} espaço livre.",
+		    "Serão criados o salvamento normal {name} e uma cópia criativa. Espaços necessários: {required}.",
+		    "Ative o gerenciamento de salvamentos compatível do Better UIs.",
+		    "Cópia criativa salva localmente. A sincronização com a nuvem não foi concluída."
+		  ],
+		  "it": [
+		    "Slot manuali liberi richiesti: {required}. Disponibili: {count}.",
+		    "Un punto protetto nella cronologia conserverà i progressi normali. La copia creativa usa {required} slot libero.",
+		    "Verranno creati il salvataggio normale {name} e una copia creativa. Slot richiesti: {required}.",
+		    "Attiva la gestione dei salvataggi compatibile di Better UIs.",
+		    "Copia creativa salvata localmente. Sincronizzazione cloud incompleta."
+		  ],
+		  "es": [
+		    "Espacios manuales libres necesarios: {required}. Disponibles: {count}.",
+		    "Un punto protegido del historial conservará el progreso normal. La copia creativa ocupa {required} espacio libre.",
+		    "Se crearán la partida normal {name} y una copia creativa. Espacios necesarios: {required}.",
+		    "Activa la gestión de partidas compatible de Better UIs.",
+		    "Copia creativa guardada localmente. La sincronización con la nube está incompleta."
+		  ],
+		  "fr": [
+		    "Emplacements manuels libres nécessaires : {required}. Disponibles : {count}.",
+		    "Un point protégé de l’historique conservera la progression normale. La copie créative utilise {required} emplacement libre.",
+		    "La sauvegarde normale {name} et une copie créative seront créées. Emplacements nécessaires : {required}.",
+		    "Activez la gestion des sauvegardes compatible de Better UIs.",
+		    "Copie créative enregistrée localement. Synchronisation cloud incomplète."
+		  ],
+		  "nl": [
+		    "Benodigde lege handmatige opslagplaatsen: {required}. Beschikbaar: {count}.",
+		    "Een beschermd geschiedenispunt bewaart je normale voortgang. De creatieve kopie gebruikt {required} lege plaats.",
+		    "Er worden een normale opslag {name} en een creatieve kopie gemaakt. Benodigde plaatsen: {required}.",
+		    "Schakel compatibel opslagbeheer van Better UIs in.",
+		    "Creatieve kopie lokaal opgeslagen. Cloudsynchronisatie is niet voltooid."
+		  ],
+		  "cz": [
+		    "Potřebné volné pozice: {required}. Dostupné: {count}.",
+		    "Chráněný bod historie zachová běžný postup. Kreativní kopie zabere {required} volnou pozici.",
+		    "Vznikne běžná uložená hra {name} a kreativní kopie. Potřebné pozice: {required}.",
+		    "Zapněte kompatibilní správu uložených her Better UIs.",
+		    "Kreativní kopie byla uložena místně. Synchronizace s cloudem není dokončena."
+		  ],
+		  "pl": [
+		    "Wymagane wolne miejsca: {required}. Dostępne: {count}.",
+		    "Chroniony punkt historii zachowa zwykłe postępy. Kopia kreatywna zajmie {required} wolne miejsce.",
+		    "Powstanie zwykły zapis {name} i kopia kreatywna. Wymagane miejsca: {required}.",
+		    "Włącz zgodne zarządzanie zapisami Better UIs.",
+		    "Kopia kreatywna zapisana lokalnie. Synchronizacja z chmurą nie została ukończona."
+		  ],
+		  "jp": [
+		    "空き手動セーブ枠が {required} 個必要です。現在：{count} 個。",
+		    "通常モードの現在の進行を保護された履歴に保存します。クリエイティブコピーは空き枠を {required} 個使用します。",
+		    "通常セーブ「{name}」とクリエイティブコピーを作成します。空き枠が {required} 個必要です。",
+		    "対応する Better UIs のセーブ管理を有効にしてください。",
+		    "クリエイティブコピーをローカルに保存しました。クラウド同期は未完了です。"
+		  ],
+		  "kr": [
+		    "빈 수동 저장 슬롯 {required}개가 필요합니다. 사용 가능: {count}개.",
+		    "일반 모드 진행 상황을 보호된 기록에 보존합니다. 크리에이티브 사본은 빈 슬롯 {required}개를 사용합니다.",
+		    "일반 저장 {name} 및 크리에이티브 사본을 생성합니다. 필요한 빈 슬롯: {required}개.",
+		    "호환되는 Better UIs 저장 관리를 활성화하세요.",
+		    "크리에이티브 사본이 로컬에 저장되었습니다. 클라우드 동기화가 완료되지 않았습니다."
+		  ],
+		  "thai": [
+		    "ต้องการช่องบันทึกว่าง {required} ช่อง มีอยู่: {count} ช่อง",
+		    "จะเก็บความคืบหน้าโหมดปกติในประวัติที่ป้องกันไว้ สำเนาโหมดสร้างใช้ช่องว่าง {required} ช่อง",
+		    "จะสร้างบันทึกปกติชื่อ {name} และสำเนาโหมดสร้าง ต้องการช่องว่าง {required} ช่อง",
+		    "เปิดใช้งานการจัดการบันทึก Better UIs รุ่นที่รองรับ",
+		    "บันทึกสำเนาโหมดสร้างในเครื่องแล้ว การซิงค์คลาวด์ยังไม่เสร็จ"
+		  ],
+		  "hu": [
+		    "Szükséges üres mentési helyek: {required}. Elérhető: {count}.",
+		    "Egy védett előzménypont megőrzi a normál haladást. A kreatív másolat {required} üres helyet használ.",
+		    "Létrejön a(z) {name} normál mentés és egy kreatív másolat. Szükséges helyek: {required}.",
+		    "Kapcsold be a Better UIs kompatibilis mentéskezelését.",
+		    "A kreatív másolat helyben mentve. A felhőszinkronizálás nem fejeződött be."
+		  ],
+		  "lv": [
+		    "Vajadzīgas {required} brīvas manuālās saglabāšanas vietas. Pieejamas: {count}.",
+		    "Aizsargāts vēstures punkts saglabās parasto progresu. Radošā kopija izmantos {required} brīvu vietu.",
+		    "Tiks izveidots parastais saglabājums {name} un radošā kopija. Vajadzīgas vietas: {required}.",
+		    "Ieslēdziet saderīgu Better UIs saglabājumu pārvaldību.",
+		    "Radošā kopija saglabāta lokāli. Mākoņa sinhronizācija nav pabeigta."
+		  ],
+		  "ro": [
+		    "Sunt necesare {required} sloturi manuale libere. Disponibile: {count}.",
+		    "Un punct protejat din istoric va păstra progresul normal. Copia creativă folosește {required} slot liber.",
+		    "Vor fi create salvarea normală {name} și o copie creativă. Sloturi necesare: {required}.",
+		    "Activează gestionarea compatibilă a salvărilor Better UIs.",
+		    "Copia creativă a fost salvată local. Sincronizarea în cloud este incompletă."
+		  ],
+		  "no": [
+		    "Ledige manuelle lagringsplasser som kreves: {required}. Tilgjengelig: {count}.",
+		    "Et beskyttet historikkpunkt bevarer vanlig fremdrift. Den kreative kopien bruker {required} ledig plass.",
+		    "En vanlig lagring kalt {name} og en kreativ kopi opprettes. Plasser som kreves: {required}.",
+		    "Aktiver kompatibel lagringsadministrasjon i Better UIs.",
+		    "Kreativ kopi lagret lokalt. Skysynkronisering er ikke fullført."
+		  ],
+		  "modsch": [
+		    "需要 {required} 个空手动存档格。当前可用：{count}。",
+		    "将在原存档增加受保护历史点，保留当前普通进度。创造副本占用 {required} 个空位。",
+		    "将新建普通存档“{name}”及创造副本，共需 {required} 个空位。",
+		    "请启用兼容的 Better UIs 存档管理以创建创造副本。",
+		    "创造副本已保存在本地，云同步未完成。"
+		  ]
+		}
+		// Like the native-tool/ending messages, new dialog variants stay private
+		// and do not change the versioned public UI-key catalog.
+		const CREATIVE_COPY_PRIVATE_TEXT = {}
+		for (const [language, values] of Object.entries(CREATIVE_COPY_TEXT)) {
+			const table = CREATIVE_TEXT[language]
+			CREATIVE_COPY_PRIVATE_TEXT[language] = Object.freeze({
+				creativeCopyReadyLegacy: table.creativeCopyReady,
+				creativeCopyReadyNew: values[2],
+				creativeCopyLocalOnly: values[4]
+			})
+			table.creativeCopyNeedsSlots = values[0]
+			table.creativeCopyReady = values[1]
+			table.creativeCopyUnavailable = values[3]
+		}
+		Object.freeze(CREATIVE_COPY_PRIVATE_TEXT)
+		const NATIVE_CREATIVE_TEXT = {
+			en: {
+				creativePinholeCheckpointing: 'Saving and checking the pre-ending save…',
+				creativePinholeCheckpointFailed: 'The pre-ending save or target could not be verified. Pinhole was not placed.',
+				creativePinholeExecutionFailed: 'Pinhole failed during execution. Reload the pre-ending save before editing again.',
+				nativeEraseHint: "Creative demolition: no resource refund. Protected objects are excluded.",
+				nativeRelocation: "Creative relocation",
+				nativeToolProtected: "This building or location is protected, or cannot be edited safely.",
+				nativeToolCreativeOnly: "Enable creative mode to use this relocation history.",
+				nativeToolBusy: "Another editor operation is active. Try again after it finishes.",
+				nativeToolChanged: "The selected building or destination changed. Select it again.",
+				nativeToolSwap: "Occupied-position swaps require two movable single-cell buildings.",
+				nativeToolNoMove: "The destination is the same as the starting position.",
+				creativeNativeEnableMessage: 'Enable creative mode in this save. Single building purchases and upgrades will be free; existing placement restrictions remain.',
+				creativeNativeDeferred: "The legacy bulk-copy action remains unavailable in creative mode. Use World Editor blueprints to copy buildings.",
+				creativeNativeReloadRequired: 'Creative writes are blocked. Reload the game before continuing; any created safety snapshot has been kept.'
+			},
+			sch: {
+				creativePinholeCheckpointing: '正在保存并核实结局前存档……',
+				creativePinholeCheckpointFailed: '结局前存档或目标核实失败，未放置 Pinhole。',
+				creativePinholeExecutionFailed: 'Pinhole 执行异常，请重新加载结局前存档后再编辑。',
+				nativeEraseHint: "创造拆除：不返还资源。受保护对象不会被选中。",
+				nativeRelocation: "创造搬迁",
+				nativeToolProtected: "该建筑或位置受到保护，或暂不支持安全编辑。",
+				nativeToolCreativeOnly: "请开启创造模式后再撤销或重做这次搬迁。",
+				nativeToolBusy: "其他编辑操作正在进行，请完成后再试。",
+				nativeToolChanged: "选中的建筑或目标位置已变化，请重新选择。",
+				nativeToolSwap: "占用位置交换仅支持两座可搬迁的单格建筑。",
+				nativeToolNoMove: "目标位置与原位置相同。",
+				creativeNativeEnableMessage: '在当前存档开启创造模式。单体建筑购买和升级免材料，原有放置限制继续生效。',
+				creativeNativeDeferred: "旧批量复制入口仍未开放创造模式；复制建筑请使用 World Editor 蓝图。",
+				creativeNativeReloadRequired: '创造写入已停止，请重新加载游戏后再继续；已创建的安全快照会保留。'
+			},
+			tch: {
+				creativePinholeCheckpointing: '正在儲存並核實結局前存檔……',
+				creativePinholeCheckpointFailed: '結局前存檔或目標核實失敗，未放置 Pinhole。',
+				creativePinholeExecutionFailed: 'Pinhole 執行異常，請重新載入結局前存檔後再編輯。',
+				nativeEraseHint: "創造拆除：不返還資源。受保護物件不會被選中。",
+				nativeRelocation: "創造搬遷",
+				nativeToolProtected: "此建築或位置受到保護，或暫不支援安全編輯。",
+				nativeToolCreativeOnly: "請開啟創造模式後再復原或重做這次搬遷。",
+				nativeToolBusy: "其他編輯操作正在進行，請完成後再試。",
+				nativeToolChanged: "選取的建築或目標位置已變更，請重新選取。",
+				nativeToolSwap: "占用位置交換僅支援兩座可搬遷的單格建築。",
+				nativeToolNoMove: "目標位置與原位置相同。",
+				creativeNativeEnableMessage: '在目前存檔開啟創造模式。單體建築購買和升級免材料，原有放置限制繼續生效。',
+				creativeNativeDeferred: "舊批次複製入口仍未開放創造模式；複製建築請使用 World Editor 藍圖。",
+				creativeNativeReloadRequired: '創造寫入已停止，請重新載入遊戲後再繼續；已建立的安全快照會保留。'
+			}
+		}
+		NATIVE_CREATIVE_TEXT.modsch = NATIVE_CREATIVE_TEXT.sch
 		const CREATIVE_ECONOMY_TEXT = {
 			en: {
 				creativeEconomySnapshotting: 'Creating safety snapshot…',
@@ -4521,6 +4730,68 @@ ModLoader.register({
 			no: { deleteConfirmPaintedMessage: '{buildings} bygninger, {ordinary} vanlige stabile kuber og {painted} malte kuber kan demonteres. {protected} beskyttede objekter blir stående; {cross} krysser utvalgsgrensen.', cutCubeOption: 'Fjern også kuber: {count} (vanlige {ordinary} / malte {painted}).', cutCubeSourceRemove: 'Etter kopiering fjernes de {count} kildekubene.', cutCubeSourceRetain: 'De {count} kubene kopieres; kildekubene blir stående.', cutSuccessRetainedCubes: 'Blåkopi kopiert. Kildekubene ble beholdt.' },
 			modsch: { deleteConfirmPaintedMessage: '可拆解建筑 {buildings} 栋、原版 Stable 矿方体 {ordinary} 个、绘制矿方体 {painted} 个；受保护对象 {protected} 个会保留；跨越选区边界 {cross} 个。', cutCubeOption: '同时移除 Cube：共 {count} 个（普通 {ordinary} / 绘制 {painted}）。', cutCubeSourceRemove: '复制成功后，将移除源位置的 {count} 个 Cube。', cutCubeSourceRetain: '将复制 {count} 个 Cube；源位置的 Cube 会保留。', cutSuccessRetainedCubes: '蓝图已复制；源位置的 Cube 已保留。' }
 		})
+		const SHORTCUT_TEXT = Object.freeze({
+			en: Object.freeze({
+				shortcutCategoryWorldEditing: 'World Editing', shortcutToggleEditor: 'Toggle World Editor', shortcutCancelLayer: 'Cancel current action or close editor', shortcutAddSelection: 'Add a selection', shortcutRemovePrimarySelection: 'Remove primary selection', shortcutDisassembleSelection: 'Safely dismantle selected objects', shortcutGenerateBlueprint: 'Create blueprint from selection', shortcutCutSelection: 'Cut selection into blueprint', shortcutPlaceBlueprint: 'Place active blueprint', shortcutRotateClockwise: 'Rotate blueprint clockwise', shortcutRotateCounterclockwise: 'Rotate blueprint counterclockwise', shortcutMirrorU: 'Mirror blueprint horizontally', shortcutMirrorV: 'Mirror blueprint vertically', shortcutTemporaryPin: 'Hold to temporarily pin blueprint', shortcutUndo: 'Undo last edit', shortcutRedo: 'Redo last edit', shortcutCardOpacity: 'Adjust card opacity', shortcutContextOpenEditor: 'Open World Editor first', shortcutContextCreateSelection: 'Create a selection first', shortcutContextOpenBlueprint: 'Open a blueprint preview first', shortcutContextNothingToUndo: 'Nothing to undo', shortcutContextNothingToRedo: 'Nothing to redo', shortcutContextShowEditableCard: 'Show a selection or blueprint card first'
+			}),
+			ru: Object.freeze({
+				shortcutCategoryWorldEditing: 'Редактирование мира', shortcutToggleEditor: 'Открыть или закрыть редактор мира', shortcutCancelLayer: 'Отменить текущее действие или закрыть редактор', shortcutAddSelection: 'Добавить область выбора', shortcutRemovePrimarySelection: 'Удалить основную область выбора', shortcutDisassembleSelection: 'Безопасно разобрать выбранные объекты', shortcutGenerateBlueprint: 'Создать чертёж из выделения', shortcutCutSelection: 'Вырезать выделение в чертёж', shortcutPlaceBlueprint: 'Разместить активный чертёж', shortcutRotateClockwise: 'Повернуть чертёж по часовой стрелке', shortcutRotateCounterclockwise: 'Повернуть чертёж против часовой стрелки', shortcutMirrorU: 'Отразить чертёж по горизонтали', shortcutMirrorV: 'Отразить чертёж по вертикали', shortcutTemporaryPin: 'Удерживать для временного закрепления чертежа', shortcutUndo: 'Отменить последнее изменение', shortcutRedo: 'Повторить последнее изменение', shortcutCardOpacity: 'Настроить прозрачность карточки', shortcutContextOpenEditor: 'Сначала откройте редактор мира', shortcutContextCreateSelection: 'Сначала создайте выделение', shortcutContextOpenBlueprint: 'Сначала откройте предпросмотр чертежа', shortcutContextNothingToUndo: 'Нечего отменять', shortcutContextNothingToRedo: 'Нечего повторять', shortcutContextShowEditableCard: 'Сначала откройте карточку выделения или чертежа'
+			}),
+			de: Object.freeze({
+				shortcutCategoryWorldEditing: 'Weltbearbeitung', shortcutToggleEditor: 'Welteditor ein- oder ausblenden', shortcutCancelLayer: 'Aktuelle Aktion abbrechen oder Editor schließen', shortcutAddSelection: 'Auswahl hinzufügen', shortcutRemovePrimarySelection: 'Primäre Auswahl entfernen', shortcutDisassembleSelection: 'Ausgewählte Objekte sicher zerlegen', shortcutGenerateBlueprint: 'Blaupause aus Auswahl erstellen', shortcutCutSelection: 'Auswahl als Blaupause ausschneiden', shortcutPlaceBlueprint: 'Aktive Blaupause platzieren', shortcutRotateClockwise: 'Blaupause im Uhrzeigersinn drehen', shortcutRotateCounterclockwise: 'Blaupause gegen den Uhrzeigersinn drehen', shortcutMirrorU: 'Blaupause horizontal spiegeln', shortcutMirrorV: 'Blaupause vertikal spiegeln', shortcutTemporaryPin: 'Halten, um Blaupause vorübergehend anzuheften', shortcutUndo: 'Letzte Bearbeitung rückgängig machen', shortcutRedo: 'Letzte Bearbeitung wiederholen', shortcutCardOpacity: 'Kartentransparenz anpassen', shortcutContextOpenEditor: 'Zuerst den Welteditor öffnen', shortcutContextCreateSelection: 'Zuerst eine Auswahl erstellen', shortcutContextOpenBlueprint: 'Zuerst eine Blaupausenvorschau öffnen', shortcutContextNothingToUndo: 'Nichts zum Rückgängigmachen', shortcutContextNothingToRedo: 'Nichts zum Wiederholen', shortcutContextShowEditableCard: 'Zuerst eine Auswahl- oder Blaupausenkarte anzeigen'
+			}),
+			ptbr: Object.freeze({
+				shortcutCategoryWorldEditing: 'Edição do mundo', shortcutToggleEditor: 'Abrir ou fechar o Editor de Mundo', shortcutCancelLayer: 'Cancelar a ação atual ou fechar o editor', shortcutAddSelection: 'Adicionar uma seleção', shortcutRemovePrimarySelection: 'Remover a seleção principal', shortcutDisassembleSelection: 'Desmontar com segurança os objetos selecionados', shortcutGenerateBlueprint: 'Criar projeto da seleção', shortcutCutSelection: 'Recortar seleção para um projeto', shortcutPlaceBlueprint: 'Posicionar o projeto ativo', shortcutRotateClockwise: 'Girar projeto no sentido horário', shortcutRotateCounterclockwise: 'Girar projeto no sentido anti-horário', shortcutMirrorU: 'Espelhar projeto horizontalmente', shortcutMirrorV: 'Espelhar projeto verticalmente', shortcutTemporaryPin: 'Segure para fixar o projeto temporariamente', shortcutUndo: 'Desfazer a última edição', shortcutRedo: 'Refazer a última edição', shortcutCardOpacity: 'Ajustar opacidade do cartão', shortcutContextOpenEditor: 'Abra primeiro o Editor de Mundo', shortcutContextCreateSelection: 'Crie primeiro uma seleção', shortcutContextOpenBlueprint: 'Abra primeiro uma prévia de projeto', shortcutContextNothingToUndo: 'Nada para desfazer', shortcutContextNothingToRedo: 'Nada para refazer', shortcutContextShowEditableCard: 'Mostre primeiro um cartão de seleção ou projeto'
+			}),
+			it: Object.freeze({
+				shortcutCategoryWorldEditing: 'Modifica del mondo', shortcutToggleEditor: 'Apri o chiudi Editor del mondo', shortcutCancelLayer: 'Annulla azione corrente o chiudi editor', shortcutAddSelection: 'Aggiungi una selezione', shortcutRemovePrimarySelection: 'Rimuovi selezione principale', shortcutDisassembleSelection: 'Smonta in sicurezza gli oggetti selezionati', shortcutGenerateBlueprint: 'Crea progetto dalla selezione', shortcutCutSelection: 'Taglia selezione in un progetto', shortcutPlaceBlueprint: 'Posiziona progetto attivo', shortcutRotateClockwise: 'Ruota progetto in senso orario', shortcutRotateCounterclockwise: 'Ruota progetto in senso antiorario', shortcutMirrorU: 'Rifletti progetto orizzontalmente', shortcutMirrorV: 'Rifletti progetto verticalmente', shortcutTemporaryPin: 'Tieni premuto per fissare temporaneamente il progetto', shortcutUndo: 'Annulla ultima modifica', shortcutRedo: 'Ripeti ultima modifica', shortcutCardOpacity: 'Regola opacità della scheda', shortcutContextOpenEditor: 'Apri prima Editor del mondo', shortcutContextCreateSelection: 'Crea prima una selezione', shortcutContextOpenBlueprint: 'Apri prima un\'anteprima del progetto', shortcutContextNothingToUndo: 'Nulla da annullare', shortcutContextNothingToRedo: 'Nulla da ripetere', shortcutContextShowEditableCard: 'Mostra prima una scheda di selezione o progetto'
+			}),
+			es: Object.freeze({
+				shortcutCategoryWorldEditing: 'Edición del mundo', shortcutToggleEditor: 'Abrir o cerrar el Editor del mundo', shortcutCancelLayer: 'Cancelar la acción actual o cerrar el editor', shortcutAddSelection: 'Añadir una selección', shortcutRemovePrimarySelection: 'Quitar selección principal', shortcutDisassembleSelection: 'Desmontar de forma segura los objetos seleccionados', shortcutGenerateBlueprint: 'Crear plano desde la selección', shortcutCutSelection: 'Cortar selección en un plano', shortcutPlaceBlueprint: 'Colocar plano activo', shortcutRotateClockwise: 'Girar plano en sentido horario', shortcutRotateCounterclockwise: 'Girar plano en sentido antihorario', shortcutMirrorU: 'Reflejar plano horizontalmente', shortcutMirrorV: 'Reflejar plano verticalmente', shortcutTemporaryPin: 'Mantener para fijar temporalmente el plano', shortcutUndo: 'Deshacer última edición', shortcutRedo: 'Rehacer última edición', shortcutCardOpacity: 'Ajustar opacidad de la tarjeta', shortcutContextOpenEditor: 'Abre primero el Editor del mundo', shortcutContextCreateSelection: 'Crea primero una selección', shortcutContextOpenBlueprint: 'Abre primero una vista previa del plano', shortcutContextNothingToUndo: 'Nada que deshacer', shortcutContextNothingToRedo: 'Nada que rehacer', shortcutContextShowEditableCard: 'Muestra primero una tarjeta de selección o plano'
+			}),
+			fr: Object.freeze({
+				shortcutCategoryWorldEditing: 'Modification du monde', shortcutToggleEditor: 'Ouvrir ou fermer l\'Éditeur de monde', shortcutCancelLayer: 'Annuler l\'action en cours ou fermer l\'éditeur', shortcutAddSelection: 'Ajouter une sélection', shortcutRemovePrimarySelection: 'Retirer la sélection principale', shortcutDisassembleSelection: 'Démonter les objets sélectionnés en toute sécurité', shortcutGenerateBlueprint: 'Créer un plan depuis la sélection', shortcutCutSelection: 'Couper la sélection en plan', shortcutPlaceBlueprint: 'Placer le plan actif', shortcutRotateClockwise: 'Tourner le plan dans le sens horaire', shortcutRotateCounterclockwise: 'Tourner le plan dans le sens antihoraire', shortcutMirrorU: 'Retourner le plan horizontalement', shortcutMirrorV: 'Retourner le plan verticalement', shortcutTemporaryPin: 'Maintenir pour épingler temporairement le plan', shortcutUndo: 'Annuler la dernière modification', shortcutRedo: 'Rétablir la dernière modification', shortcutCardOpacity: 'Régler l\'opacité de la carte', shortcutContextOpenEditor: 'Ouvrez d\'abord l\'Éditeur de monde', shortcutContextCreateSelection: 'Créez d\'abord une sélection', shortcutContextOpenBlueprint: 'Ouvrez d\'abord un aperçu de plan', shortcutContextNothingToUndo: 'Rien à annuler', shortcutContextNothingToRedo: 'Rien à rétablir', shortcutContextShowEditableCard: 'Affichez d\'abord une carte de sélection ou de plan'
+			}),
+			nl: Object.freeze({
+				shortcutCategoryWorldEditing: 'Wereldbewerking', shortcutToggleEditor: 'Wereldeditor openen of sluiten', shortcutCancelLayer: 'Huidige actie annuleren of editor sluiten', shortcutAddSelection: 'Selectie toevoegen', shortcutRemovePrimarySelection: 'Primaire selectie verwijderen', shortcutDisassembleSelection: 'Geselecteerde objecten veilig demonteren', shortcutGenerateBlueprint: 'Blauwdruk van selectie maken', shortcutCutSelection: 'Selectie naar blauwdruk knippen', shortcutPlaceBlueprint: 'Actieve blauwdruk plaatsen', shortcutRotateClockwise: 'Blauwdruk rechtsom draaien', shortcutRotateCounterclockwise: 'Blauwdruk linksom draaien', shortcutMirrorU: 'Blauwdruk horizontaal spiegelen', shortcutMirrorV: 'Blauwdruk verticaal spiegelen', shortcutTemporaryPin: 'Ingedrukt houden om blauwdruk tijdelijk vast te zetten', shortcutUndo: 'Laatste bewerking ongedaan maken', shortcutRedo: 'Laatste bewerking opnieuw uitvoeren', shortcutCardOpacity: 'Kaartdoorzichtigheid aanpassen', shortcutContextOpenEditor: 'Open eerst de Wereldeditor', shortcutContextCreateSelection: 'Maak eerst een selectie', shortcutContextOpenBlueprint: 'Open eerst een blauwdrukvoorbeeld', shortcutContextNothingToUndo: 'Niets om ongedaan te maken', shortcutContextNothingToRedo: 'Niets om opnieuw uit te voeren', shortcutContextShowEditableCard: 'Toon eerst een selectie- of blauwdrukkaart'
+			}),
+			cz: Object.freeze({
+				shortcutCategoryWorldEditing: 'Úpravy světa', shortcutToggleEditor: 'Otevřít nebo zavřít Editor světa', shortcutCancelLayer: 'Zrušit aktuální akci nebo zavřít editor', shortcutAddSelection: 'Přidat výběr', shortcutRemovePrimarySelection: 'Odebrat hlavní výběr', shortcutDisassembleSelection: 'Bezpečně rozebrat vybrané objekty', shortcutGenerateBlueprint: 'Vytvořit plán z výběru', shortcutCutSelection: 'Vyjmout výběr do plánu', shortcutPlaceBlueprint: 'Umístit aktivní plán', shortcutRotateClockwise: 'Otočit plán po směru hodin', shortcutRotateCounterclockwise: 'Otočit plán proti směru hodin', shortcutMirrorU: 'Zrcadlit plán vodorovně', shortcutMirrorV: 'Zrcadlit plán svisle', shortcutTemporaryPin: 'Podržením dočasně připnout plán', shortcutUndo: 'Vrátit poslední úpravu', shortcutRedo: 'Znovu provést poslední úpravu', shortcutCardOpacity: 'Upravit průhlednost karty', shortcutContextOpenEditor: 'Nejprve otevřete Editor světa', shortcutContextCreateSelection: 'Nejprve vytvořte výběr', shortcutContextOpenBlueprint: 'Nejprve otevřete náhled plánu', shortcutContextNothingToUndo: 'Není co vrátit', shortcutContextNothingToRedo: 'Není co opakovat', shortcutContextShowEditableCard: 'Nejprve zobrazte kartu výběru nebo plánu'
+			}),
+			pl: Object.freeze({
+				shortcutCategoryWorldEditing: 'Edycja świata', shortcutToggleEditor: 'Otwórz lub zamknij Edytor świata', shortcutCancelLayer: 'Anuluj bieżącą czynność lub zamknij edytor', shortcutAddSelection: 'Dodaj zaznaczenie', shortcutRemovePrimarySelection: 'Usuń główne zaznaczenie', shortcutDisassembleSelection: 'Bezpiecznie rozmontuj zaznaczone obiekty', shortcutGenerateBlueprint: 'Utwórz schemat z zaznaczenia', shortcutCutSelection: 'Wytnij zaznaczenie do schematu', shortcutPlaceBlueprint: 'Umieść aktywny schemat', shortcutRotateClockwise: 'Obróć schemat zgodnie z ruchem wskazówek', shortcutRotateCounterclockwise: 'Obróć schemat przeciwnie do ruchu wskazówek', shortcutMirrorU: 'Odbij schemat poziomo', shortcutMirrorV: 'Odbij schemat pionowo', shortcutTemporaryPin: 'Przytrzymaj, aby tymczasowo przypiąć schemat', shortcutUndo: 'Cofnij ostatnią zmianę', shortcutRedo: 'Ponów ostatnią zmianę', shortcutCardOpacity: 'Dostosuj przezroczystość karty', shortcutContextOpenEditor: 'Najpierw otwórz Edytor świata', shortcutContextCreateSelection: 'Najpierw utwórz zaznaczenie', shortcutContextOpenBlueprint: 'Najpierw otwórz podgląd schematu', shortcutContextNothingToUndo: 'Nie ma czego cofnąć', shortcutContextNothingToRedo: 'Nie ma czego ponowić', shortcutContextShowEditableCard: 'Najpierw pokaż kartę zaznaczenia lub schematu'
+			}),
+			jp: Object.freeze({
+				shortcutCategoryWorldEditing: 'ワールド編集', shortcutToggleEditor: 'ワールドエディターを開閉', shortcutCancelLayer: '現在の操作をキャンセル、またはエディターを閉じる', shortcutAddSelection: '選択範囲を追加', shortcutRemovePrimarySelection: 'メインの選択範囲を削除', shortcutDisassembleSelection: '選択したオブジェクトを安全に解体', shortcutGenerateBlueprint: '選択範囲から設計図を作成', shortcutCutSelection: '選択範囲を設計図として切り取り', shortcutPlaceBlueprint: '有効な設計図を配置', shortcutRotateClockwise: '設計図を時計回りに回転', shortcutRotateCounterclockwise: '設計図を反時計回りに回転', shortcutMirrorU: '設計図を左右反転', shortcutMirrorV: '設計図を上下反転', shortcutTemporaryPin: '長押しして設計図を一時固定', shortcutUndo: '最後の編集を元に戻す', shortcutRedo: '最後の編集をやり直す', shortcutCardOpacity: 'カードの透明度を調整', shortcutContextOpenEditor: '先にワールドエディターを開いてください', shortcutContextCreateSelection: '先に選択範囲を作成してください', shortcutContextOpenBlueprint: '先に設計図プレビューを開いてください', shortcutContextNothingToUndo: '元に戻す操作はありません', shortcutContextNothingToRedo: 'やり直す操作はありません', shortcutContextShowEditableCard: '先に選択または設計図カードを表示してください'
+			}),
+			kr: Object.freeze({
+				shortcutCategoryWorldEditing: '월드 편집', shortcutToggleEditor: '월드 에디터 열기 또는 닫기', shortcutCancelLayer: '현재 작업 취소 또는 에디터 닫기', shortcutAddSelection: '선택 영역 추가', shortcutRemovePrimarySelection: '기본 선택 영역 제거', shortcutDisassembleSelection: '선택한 개체 안전하게 해체', shortcutGenerateBlueprint: '선택 영역으로 청사진 만들기', shortcutCutSelection: '선택 영역을 청사진으로 잘라내기', shortcutPlaceBlueprint: '활성 청사진 배치', shortcutRotateClockwise: '청사진을 시계 방향으로 회전', shortcutRotateCounterclockwise: '청사진을 반시계 방향으로 회전', shortcutMirrorU: '청사진을 가로로 뒤집기', shortcutMirrorV: '청사진을 세로로 뒤집기', shortcutTemporaryPin: '길게 눌러 청사진 임시 고정', shortcutUndo: '마지막 편집 실행 취소', shortcutRedo: '마지막 편집 다시 실행', shortcutCardOpacity: '카드 투명도 조절', shortcutContextOpenEditor: '먼저 월드 에디터를 여세요', shortcutContextCreateSelection: '먼저 선택 영역을 만드세요', shortcutContextOpenBlueprint: '먼저 청사진 미리보기를 여세요', shortcutContextNothingToUndo: '실행 취소할 항목이 없습니다', shortcutContextNothingToRedo: '다시 실행할 항목이 없습니다', shortcutContextShowEditableCard: '먼저 선택 또는 청사진 카드를 표시하세요'
+			}),
+			sch: Object.freeze({
+				shortcutCategoryWorldEditing: '世界编辑', shortcutToggleEditor: '打开或关闭世界编辑器', shortcutCancelLayer: '取消当前操作或关闭编辑器', shortcutAddSelection: '添加选区', shortcutRemovePrimarySelection: '移除主选区', shortcutDisassembleSelection: '安全拆解选中对象', shortcutGenerateBlueprint: '从选区创建蓝图', shortcutCutSelection: '将选区剪切为蓝图', shortcutPlaceBlueprint: '放置当前蓝图', shortcutRotateClockwise: '顺时针旋转蓝图', shortcutRotateCounterclockwise: '逆时针旋转蓝图', shortcutMirrorU: '水平镜像蓝图', shortcutMirrorV: '垂直镜像蓝图', shortcutTemporaryPin: '按住以临时固定蓝图', shortcutUndo: '撤销上一次编辑', shortcutRedo: '重做上一次编辑', shortcutCardOpacity: '调整卡片透明度', shortcutContextOpenEditor: '请先打开世界编辑器', shortcutContextCreateSelection: '请先创建选区', shortcutContextOpenBlueprint: '请先打开蓝图预览', shortcutContextNothingToUndo: '没有可撤销的编辑', shortcutContextNothingToRedo: '没有可重做的编辑', shortcutContextShowEditableCard: '请先显示选区或蓝图卡片'
+			}),
+			tch: Object.freeze({
+				shortcutCategoryWorldEditing: '世界編輯', shortcutToggleEditor: '開啟或關閉世界編輯器', shortcutCancelLayer: '取消目前操作或關閉編輯器', shortcutAddSelection: '新增選區', shortcutRemovePrimarySelection: '移除主要選區', shortcutDisassembleSelection: '安全拆解選取物件', shortcutGenerateBlueprint: '從選區建立藍圖', shortcutCutSelection: '將選區剪下為藍圖', shortcutPlaceBlueprint: '放置目前藍圖', shortcutRotateClockwise: '順時針旋轉藍圖', shortcutRotateCounterclockwise: '逆時針旋轉藍圖', shortcutMirrorU: '水平鏡像藍圖', shortcutMirrorV: '垂直鏡像藍圖', shortcutTemporaryPin: '按住以暫時固定藍圖', shortcutUndo: '復原上一次編輯', shortcutRedo: '重做上一次編輯', shortcutCardOpacity: '調整卡片透明度', shortcutContextOpenEditor: '請先開啟世界編輯器', shortcutContextCreateSelection: '請先建立選區', shortcutContextOpenBlueprint: '請先開啟藍圖預覽', shortcutContextNothingToUndo: '沒有可復原的編輯', shortcutContextNothingToRedo: '沒有可重做的編輯', shortcutContextShowEditableCard: '請先顯示選區或藍圖卡片'
+			}),
+			thai: Object.freeze({
+				shortcutCategoryWorldEditing: 'การแก้ไขโลก', shortcutToggleEditor: 'เปิดหรือปิดตัวแก้ไขโลก', shortcutCancelLayer: 'ยกเลิกการทำงานปัจจุบันหรือปิดตัวแก้ไข', shortcutAddSelection: 'เพิ่มพื้นที่เลือก', shortcutRemovePrimarySelection: 'ลบพื้นที่เลือกหลัก', shortcutDisassembleSelection: 'รื้อวัตถุที่เลือกอย่างปลอดภัย', shortcutGenerateBlueprint: 'สร้างพิมพ์เขียวจากพื้นที่เลือก', shortcutCutSelection: 'ตัดพื้นที่เลือกเป็นพิมพ์เขียว', shortcutPlaceBlueprint: 'วางพิมพ์เขียวที่ใช้งาน', shortcutRotateClockwise: 'หมุนพิมพ์เขียวตามเข็มนาฬิกา', shortcutRotateCounterclockwise: 'หมุนพิมพ์เขียวทวนเข็มนาฬิกา', shortcutMirrorU: 'กลับพิมพ์เขียวแนวนอน', shortcutMirrorV: 'กลับพิมพ์เขียวแนวตั้ง', shortcutTemporaryPin: 'กดค้างเพื่อตรึงพิมพ์เขียวชั่วคราว', shortcutUndo: 'เลิกทำการแก้ไขล่าสุด', shortcutRedo: 'ทำการแก้ไขล่าสุดซ้ำ', shortcutCardOpacity: 'ปรับความโปร่งใสของการ์ด', shortcutContextOpenEditor: 'เปิดตัวแก้ไขโลกก่อน', shortcutContextCreateSelection: 'สร้างพื้นที่เลือกก่อน', shortcutContextOpenBlueprint: 'เปิดตัวอย่างพิมพ์เขียวก่อน', shortcutContextNothingToUndo: 'ไม่มีสิ่งที่จะเลิกทำ', shortcutContextNothingToRedo: 'ไม่มีสิ่งที่จะทำซ้ำ', shortcutContextShowEditableCard: 'แสดงการ์ดพื้นที่เลือกหรือพิมพ์เขียวก่อน'
+			}),
+			hu: Object.freeze({
+				shortcutCategoryWorldEditing: 'Világszerkesztés', shortcutToggleEditor: 'Világszerkesztő megnyitása vagy bezárása', shortcutCancelLayer: 'Jelenlegi művelet megszakítása vagy a szerkesztő bezárása', shortcutAddSelection: 'Kijelölés hozzáadása', shortcutRemovePrimarySelection: 'Elsődleges kijelölés eltávolítása', shortcutDisassembleSelection: 'Kijelölt objektumok biztonságos lebontása', shortcutGenerateBlueprint: 'Tervrajz készítése a kijelölésből', shortcutCutSelection: 'Kijelölés kivágása tervrajzba', shortcutPlaceBlueprint: 'Aktív tervrajz elhelyezése', shortcutRotateClockwise: 'Tervrajz forgatása jobbra', shortcutRotateCounterclockwise: 'Tervrajz forgatása balra', shortcutMirrorU: 'Tervrajz vízszintes tükrözése', shortcutMirrorV: 'Tervrajz függőleges tükrözése', shortcutTemporaryPin: 'Tartsa lenyomva a tervrajz ideiglenes rögzítéséhez', shortcutUndo: 'Utolsó szerkesztés visszavonása', shortcutRedo: 'Utolsó szerkesztés ismétlése', shortcutCardOpacity: 'Kártya átlátszóságának beállítása', shortcutContextOpenEditor: 'Előbb nyissa meg a Világszerkesztőt', shortcutContextCreateSelection: 'Előbb hozzon létre kijelölést', shortcutContextOpenBlueprint: 'Előbb nyisson meg tervrajz-előnézetet', shortcutContextNothingToUndo: 'Nincs mit visszavonni', shortcutContextNothingToRedo: 'Nincs mit ismételni', shortcutContextShowEditableCard: 'Előbb jelenítsen meg kijelölés- vagy tervrajzkártyát'
+			}),
+			lv: Object.freeze({
+				shortcutCategoryWorldEditing: 'Pasaules rediģēšana', shortcutToggleEditor: 'Atvērt vai aizvērt Pasaules redaktoru', shortcutCancelLayer: 'Atcelt pašreizējo darbību vai aizvērt redaktoru', shortcutAddSelection: 'Pievienot atlasi', shortcutRemovePrimarySelection: 'Noņemt galveno atlasi', shortcutDisassembleSelection: 'Droši demontēt atlasītos objektus', shortcutGenerateBlueprint: 'Izveidot rasējumu no atlases', shortcutCutSelection: 'Izgriezt atlasi rasējumā', shortcutPlaceBlueprint: 'Novietot aktīvo rasējumu', shortcutRotateClockwise: 'Pagriezt rasējumu pulksteņrādītāja virzienā', shortcutRotateCounterclockwise: 'Pagriezt rasējumu pretēji pulksteņrādītāja virzienam', shortcutMirrorU: 'Spoguļot rasējumu horizontāli', shortcutMirrorV: 'Spoguļot rasējumu vertikāli', shortcutTemporaryPin: 'Turēt, lai īslaicīgi piespraustu rasējumu', shortcutUndo: 'Atsaukt pēdējo labojumu', shortcutRedo: 'Atkārtot pēdējo labojumu', shortcutCardOpacity: 'Pielāgot kartītes caurspīdīgumu', shortcutContextOpenEditor: 'Vispirms atveriet Pasaules redaktoru', shortcutContextCreateSelection: 'Vispirms izveidojiet atlasi', shortcutContextOpenBlueprint: 'Vispirms atveriet rasējuma priekšskatījumu', shortcutContextNothingToUndo: 'Nav ko atsaukt', shortcutContextNothingToRedo: 'Nav ko atkārtot', shortcutContextShowEditableCard: 'Vispirms parādiet atlases vai rasējuma kartīti'
+			}),
+			ro: Object.freeze({
+				shortcutCategoryWorldEditing: 'Editarea lumii', shortcutToggleEditor: 'Deschide sau închide Editorul de lume', shortcutCancelLayer: 'Anulează acțiunea curentă sau închide editorul', shortcutAddSelection: 'Adaugă o selecție', shortcutRemovePrimarySelection: 'Elimină selecția principală', shortcutDisassembleSelection: 'Demontează în siguranță obiectele selectate', shortcutGenerateBlueprint: 'Creează schiță din selecție', shortcutCutSelection: 'Decupează selecția într-o schiță', shortcutPlaceBlueprint: 'Plasează schița activă', shortcutRotateClockwise: 'Rotește schița în sens orar', shortcutRotateCounterclockwise: 'Rotește schița în sens antiorar', shortcutMirrorU: 'Oglindește schița orizontal', shortcutMirrorV: 'Oglindește schița vertical', shortcutTemporaryPin: 'Ține apăsat pentru a fixa temporar schița', shortcutUndo: 'Anulează ultima editare', shortcutRedo: 'Refă ultima editare', shortcutCardOpacity: 'Reglează opacitatea cardului', shortcutContextOpenEditor: 'Deschide mai întâi Editorul de lume', shortcutContextCreateSelection: 'Creează mai întâi o selecție', shortcutContextOpenBlueprint: 'Deschide mai întâi o previzualizare a schiței', shortcutContextNothingToUndo: 'Nimic de anulat', shortcutContextNothingToRedo: 'Nimic de refăcut', shortcutContextShowEditableCard: 'Afișează mai întâi un card de selecție sau schiță'
+			}),
+			no: Object.freeze({
+				shortcutCategoryWorldEditing: 'Verdensredigering', shortcutToggleEditor: 'Åpne eller lukk Verdensredigerer', shortcutCancelLayer: 'Avbryt gjeldende handling eller lukk redigereren', shortcutAddSelection: 'Legg til et utvalg', shortcutRemovePrimarySelection: 'Fjern hovedutvalget', shortcutDisassembleSelection: 'Demonter valgte objekter trygt', shortcutGenerateBlueprint: 'Lag blåkopi fra utvalget', shortcutCutSelection: 'Klipp utvalget til en blåkopi', shortcutPlaceBlueprint: 'Plasser aktiv blåkopi', shortcutRotateClockwise: 'Roter blåkopi med klokken', shortcutRotateCounterclockwise: 'Roter blåkopi mot klokken', shortcutMirrorU: 'Speil blåkopi vannrett', shortcutMirrorV: 'Speil blåkopi loddrett', shortcutTemporaryPin: 'Hold for å feste blåkopien midlertidig', shortcutUndo: 'Angre siste redigering', shortcutRedo: 'Gjør om siste redigering', shortcutCardOpacity: 'Juster kortets gjennomsiktighet', shortcutContextOpenEditor: 'Åpne Verdensredigerer først', shortcutContextCreateSelection: 'Lag et utvalg først', shortcutContextOpenBlueprint: 'Åpne en blåkopiforhåndsvisning først', shortcutContextNothingToUndo: 'Ingenting å angre', shortcutContextNothingToRedo: 'Ingenting å gjøre om', shortcutContextShowEditableCard: 'Vis et utvalgs- eller blåkopikort først'
+			}),
+			modsch: Object.freeze({
+				shortcutCategoryWorldEditing: '世界编辑', shortcutToggleEditor: '打开或关闭世界编辑器', shortcutCancelLayer: '取消当前操作或关闭编辑器', shortcutAddSelection: '添加选区', shortcutRemovePrimarySelection: '移除主选区', shortcutDisassembleSelection: '安全拆解选中对象', shortcutGenerateBlueprint: '从选区创建蓝图', shortcutCutSelection: '将选区剪切为蓝图', shortcutPlaceBlueprint: '放置当前蓝图', shortcutRotateClockwise: '顺时针旋转蓝图', shortcutRotateCounterclockwise: '逆时针旋转蓝图', shortcutMirrorU: '水平镜像蓝图', shortcutMirrorV: '垂直镜像蓝图', shortcutTemporaryPin: '按住以临时固定蓝图', shortcutUndo: '撤销上一次编辑', shortcutRedo: '重做上一次编辑', shortcutCardOpacity: '调整卡片透明度', shortcutContextOpenEditor: '请先打开世界编辑器', shortcutContextCreateSelection: '请先创建选区', shortcutContextOpenBlueprint: '请先打开蓝图预览', shortcutContextNothingToUndo: '没有可撤销的编辑', shortcutContextNothingToRedo: '没有可重做的编辑', shortcutContextShowEditableCard: '请先显示选区或蓝图卡片'
+			})
+		})
 		for (const language of Object.keys(TEXT)) {
 			Object.assign(
 				TEXT[language],
@@ -4552,6 +4823,7 @@ ModLoader.register({
 				PAINT_PALETTE_TEXT[language],
 				PAINTED_BLUEPRINT_TEXT[language] || PAINTED_BLUEPRINT_TEXT.en,
 				SELECTION_PAINTED_COMPAT_TEXT[language] || SELECTION_PAINTED_COMPAT_TEXT.en,
+				SHORTCUT_TEXT[language] || SHORTCUT_TEXT.en,
 				{ toolbarCardCut: CUT_TOOLBAR_TEXT[language] || CUT_TOOLBAR_TEXT.en }
 			)
 		}
@@ -4600,11 +4872,13 @@ ModLoader.register({
 			'cutCubeSourceRetain',
 			'cutSuccessRetainedCubes'
 		])
+		const PRIVATE_SHORTCUT_KEYS = new Set(Object.keys(SHORTCUT_TEXT.en))
 		const KEYS = Object.freeze(Object.keys(TEXT.en).filter(function (key) {
 			return !TOOLBAR_KEYS.includes(key) &&
 				!HISTORY_KEYS.includes(key) &&
 				!PAINT_PALETTE_KEYS.includes(key) &&
-				!PRIVATE_SELECTION_COMPAT_KEYS.has(key)
+				!PRIVATE_SELECTION_COMPAT_KEYS.has(key) &&
+				!PRIVATE_SHORTCUT_KEYS.has(key)
 		}))
 
 		for (const language of LANGUAGES) Object.freeze(TEXT[language])
@@ -4619,6 +4893,10 @@ ModLoader.register({
 			paintPaletteKeys: PAINT_PALETTE_KEYS,
 			t(languageOrGame, key) {
 				const language = typeof languageOrGame === 'string' ? languageOrGame : languageOrGame?.language
+				const copyTable = CREATIVE_COPY_PRIVATE_TEXT[language] || CREATIVE_COPY_PRIVATE_TEXT.en
+				if (Object.prototype.hasOwnProperty.call(copyTable, key)) return copyTable === CREATIVE_COPY_PRIVATE_TEXT.en ? titleCaseEnglish(copyTable[key]) : copyTable[key]
+				const nativeTable = NATIVE_CREATIVE_TEXT[language] || NATIVE_CREATIVE_TEXT.en
+				if (Object.prototype.hasOwnProperty.call(nativeTable, key)) return nativeTable[key]
 				const economyTable = CREATIVE_ECONOMY_TEXT[language] || CREATIVE_ECONOMY_TEXT.en
 				if (Object.prototype.hasOwnProperty.call(economyTable, key)) {
 					return economyTable === CREATIVE_ECONOMY_TEXT.en ? titleCaseEnglish(economyTable[key]) : economyTable[key]

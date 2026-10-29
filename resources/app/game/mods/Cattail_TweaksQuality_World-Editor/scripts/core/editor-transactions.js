@@ -18,6 +18,8 @@ ModLoader.register({
 		let loadedSaveGame = null
 
 		api.on('beforeSaveLoad', function (save, game) {
+			const previous = globalThis[TRANSACTIONS_KEY]
+			if (previous?.game === game) previous.dispose('save-load')
 			loadedSaveIdentity = normalizeSaveIdentity(save?.modloader?.saveInstanceId)
 			loadedSaveGame = game || null
 			return save
@@ -38,6 +40,11 @@ ModLoader.register({
 
 		function createService(game) {
 			const snapshots = api.storage?.snapshots
+			const saveAdapter = globalThis[Symbol.for('cattail.world-editor.save-adapter')]
+			const native = !!saveAdapter?.isNative(game)
+			let boundContext = null
+			let editLease = null
+			if (native) { try { boundContext = saveAdapter.capture(game) } catch (_) {} }
 			const listeners = new Set()
 			const adapters = new Map()
 			const undoStack = []
@@ -60,6 +67,41 @@ ModLoader.register({
 			let identifierSequence = 0
 			let boundSaveInstanceId = readKnownSaveIdentity(game) || readCurrentSaveIdentity(game)
 
+			function nativeContextCurrent() {
+				return !native || saveAdapter.isCurrent(game, boundContext)
+			}
+
+			function nativeEntryReason(request) {
+				if (!native) return null
+				if (!nativeContextCurrent()) { clearHistoryInternal(); return 'SAVE_CONTEXT_CHANGED' }
+				if (saveAdapter.isSavingBlocked(game)) return 'ROLLBACK_FAILED'
+				const cut = globalThis[Symbol.for('cattail.world-editor.selection-cut')]
+				if (cut?.game === game && cut.isInputBlocked?.() && !(request?.kind === 'selection-delete' && request?.payload?.origin === 'cut')) return 'BUSY'
+				const mode = globalThis[Symbol.for('cattail.world-editor.creative-mode')]
+				const economy = globalThis[Symbol.for('cattail.world-editor.creative-economy')]
+				if (mode?.game === game && mode.isInputBlocked?.()) return 'BUSY'
+				if (economy?.game === game && (economy.snapshot?.().busy || economy.isWriteBlocked?.())) return 'BUSY'
+				return null
+			}
+
+			async function acquireNativeEdit(token) {
+				if (!native) return
+				editLease = await saveAdapter.acquireEdit(game, boundContext)
+				assertCurrent(token)
+			}
+
+			function nativeEntryMessage(reason) {
+				if (reason === 'BUSY') return 'Another editor operation or confirmation dialog is active.'
+				if (reason === 'ROLLBACK_FAILED') return 'An earlier edit could not be restored. Reload before trying again.'
+				return 'The active save context changed. Reload before trying again.'
+			}
+
+			function releaseNativeEdit(blocked) {
+				if (native && blocked) saveAdapter.blockSaving(game, boundContext)
+				editLease?.release()
+				editLease = null
+			}
+
 			function isReady() {
 				return !!(
 					!disposed &&
@@ -69,7 +111,7 @@ ModLoader.register({
 					typeof game.decodeSave === 'function' &&
 					typeof snapshots?.create === 'function' &&
 					typeof snapshots?.remove === 'function' &&
-					boundSaveInstanceId
+					boundSaveInstanceId && nativeContextCurrent()
 				)
 			}
 
@@ -104,6 +146,7 @@ ModLoader.register({
 
 			function writeBlockedReason() {
 				if (disposed || disposeRequested) return 'NOT_READY'
+				if (!nativeContextCurrent()) return 'SAVE_CONTEXT_CHANGED'
 				return terminalBlockedReason
 			}
 
@@ -128,6 +171,7 @@ ModLoader.register({
 			}
 
 			function basicBlockedReason(nextDirection) {
+				if (!nativeContextCurrent()) return 'SAVE_CONTEXT_CHANGED'
 				if (disposed || disposeRequested) return 'NOT_READY'
 				if (terminalBlockedReason) return terminalBlockedReason
 				if (busy) return 'BUSY'
@@ -169,6 +213,8 @@ ModLoader.register({
 					return rejectResult('forward', terminalBlockedReason, 'The transaction engine is blocked until reload.')
 				}
 				if (busy) return rejectResult('forward', 'BUSY', 'The transaction engine is busy.')
+				const nativeReason = nativeEntryReason(request)
+				if (nativeReason) return rejectResult('forward', nativeReason, nativeEntryMessage(nativeReason))
 
 				let kind
 				let input
@@ -209,6 +255,7 @@ ModLoader.register({
 				let saveEnvelope = null
 
 				try {
+					await acquireNativeEdit(token)
 					const prepared = await adapter.prepare(
 						createContext(token, transactionId, operationId, 'forward', input, plane, null),
 						inputPayload
@@ -302,6 +349,8 @@ ModLoader.register({
 					return rejectResult('forward', terminalBlockedReason, 'The transaction engine is blocked until reload.')
 				}
 				if (busy) return rejectResult('forward', 'BUSY', 'The transaction engine is busy.')
+				const nativeReason = nativeEntryReason()
+				if (nativeReason) return rejectResult('forward', nativeReason, nativeEntryMessage(nativeReason))
 
 				let kind
 				let input
@@ -338,6 +387,7 @@ ModLoader.register({
 				let closed = false
 
 				try {
+					await acquireNativeEdit(token)
 					const saveEnvelope = readCurrentSaveEnvelope(game)
 					if (!saveEnvelope) {
 						throw createError('SAVE_IDENTITY_UNAVAILABLE', 'The active save payload or identity is unavailable.')
@@ -424,6 +474,12 @@ ModLoader.register({
 						},
 						async cancel(reason) {
 							if (closed) return false
+							if (!nativeContextCurrent()) {
+								closed = true
+								finishIdle('transaction-save-context-changed', createError('SAVE_CONTEXT_CHANGED', 'The active save changed; the safety snapshot was retained.'))
+								finishDisposeIfRequested()
+								return false
+							}
 							closed = true
 							if (snapshotRecord) await removeUnusedSnapshot(snapshotRecord)
 							finishIdle('transaction-forward-live-' + reasonForError(createError(reason || 'INVALIDATED')), null)
@@ -434,6 +490,7 @@ ModLoader.register({
 							if (closed) return failureResult('forward', createError('ROLLBACK_FAILED', message), snapshotRecord?.id || null, true)
 							closed = true
 							const terminalError = createError('ROLLBACK_FAILED', String(message || 'The live transaction rollback failed.'))
+							releaseNativeEdit(true)
 							terminalBlockedReason = 'ROLLBACK_FAILED'
 							error = terminalError
 							busy = false
@@ -472,6 +529,8 @@ ModLoader.register({
 					return rejectResult(nextDirection, terminalBlockedReason, 'The transaction engine is blocked until reload.')
 				}
 				if (busy) return rejectResult(nextDirection, 'BUSY', 'The transaction engine is busy.')
+				const nativeReason = nativeEntryReason()
+				if (nativeReason) return rejectResult(nextDirection, nativeReason, nativeEntryMessage(nativeReason))
 
 				let input
 				try {
@@ -524,6 +583,7 @@ ModLoader.register({
 				let snapshotRecord = null
 
 				try {
+					await acquireNativeEdit(token)
 					currentEnvelope = currentEnvelope || readCurrentSaveEnvelope(game)
 					if (!currentEnvelope) {
 						throw createError('SAVE_IDENTITY_UNAVAILABLE', 'The active save identity is unavailable.')
@@ -634,6 +694,7 @@ ModLoader.register({
 				}
 
 				try {
+					if (!nativeContextCurrent()) throw createError('SAVE_CONTEXT_CHANGED', 'The active save changed; the original safety snapshot was retained without touching the new world.')
 					setPhase('rolling-back', 'transaction-' + failedDirection + '-rolling-back')
 					const restoreResult = await adapter.restore(
 						createContext(
@@ -649,6 +710,7 @@ ModLoader.register({
 						record,
 						rollbackTarget
 					)
+					if (!nativeContextCurrent()) throw createError('SAVE_CONTEXT_CHANGED', 'The active save changed during recovery.')
 					requireRestoreSuccess(restoreResult)
 					const restored = await captureGuard(
 						adapter,
@@ -660,6 +722,7 @@ ModLoader.register({
 						true,
 						true
 					)
+					if (!nativeContextCurrent()) throw createError('SAVE_CONTEXT_CHANGED', 'The active save changed during recovery verification.')
 					const expected = rollbackTarget === 'before' ? record?.before : record?.after
 					if (!plainEqual(expected, restored)) {
 						throw createError('ROLLBACK_FAILED', 'The transaction rollback did not restore the recorded state.')
@@ -672,6 +735,7 @@ ModLoader.register({
 						'ROLLBACK_FAILED',
 						String(rollbackError?.message || 'The transaction rollback failed.')
 					)
+					releaseNativeEdit(true)
 					terminalBlockedReason = 'ROLLBACK_FAILED'
 					error = terminalError
 					busy = false
@@ -697,6 +761,7 @@ ModLoader.register({
 			}
 
 			function finishIdle(reason, nextError) {
+				releaseNativeEdit(false)
 				busy = false
 				applyStarted = false
 				phase = 'idle'
@@ -709,6 +774,7 @@ ModLoader.register({
 
 			async function validateOperationState(token, adapter, record, nextDirection, input, snapshotId, operationEnvelope) {
 				assertCurrent(token)
+				if (native) saveAdapter.assertCurrent(game, boundContext)
 				if (adapters.get(record.kind) !== adapter) {
 					throw createError('ADAPTER_UNAVAILABLE', 'The transaction adapter changed during the operation.')
 				}
@@ -899,6 +965,7 @@ ModLoader.register({
 			}
 
 			function isOperationCurrent(token, recovery) {
+				if (!nativeContextCurrent()) return false
 				if (disposed || operationToken !== token) return false
 				if (terminalBlockedReason && !recovery) return false
 				if (disposeRequested && !applyStarted && !recovery) return false
@@ -1153,6 +1220,11 @@ ModLoader.register({
 				return null
 			}
 			try {
+				const adapter = globalThis[Symbol.for('cattail.world-editor.save-adapter')]
+				if (adapter?.isNative(game)) {
+					const context = adapter.capture(game)
+					return { data: adapter.encodeSnapshot(game, context), saveInstanceId: context.saveId }
+				}
 				const data = game.assembleSave(true)
 				if (typeof data !== 'string' && !(data instanceof Uint8Array)) return null
 				const decoded = game.decodeSave(data)
@@ -1169,6 +1241,10 @@ ModLoader.register({
 		}
 
 		function readKnownSaveIdentity(game) {
+			const adapter = globalThis[Symbol.for('cattail.world-editor.save-adapter')]
+			if (adapter?.isNative(game)) {
+				try { return adapter.capture(game).saveId } catch (_) { return null }
+			}
 			const direct = normalizeSaveIdentity(game?.saveInstanceId || game?.saveId)
 			if (direct) return direct
 			if (loadedSaveGame && loadedSaveGame !== game) return null

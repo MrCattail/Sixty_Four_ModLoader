@@ -233,7 +233,7 @@ function createEnvironment() {
 
 function testManifestAndReadOnlyBoundary() {
 	assert.equal(manifest.version, '0.6.0')
-	assert.equal(manifest.entry.length, 45)
+	assert.equal(manifest.entry.length, 47)
 	const selectionCursorIndex = manifest.entry.indexOf('scripts/render/selection-cursor.js')
 	const paintCursorIndex = manifest.entry.indexOf('scripts/render/paint-cube-cursor.js')
 	const thumbnailIndex = manifest.entry.indexOf('scripts/render/blueprint-thumbnail.js')

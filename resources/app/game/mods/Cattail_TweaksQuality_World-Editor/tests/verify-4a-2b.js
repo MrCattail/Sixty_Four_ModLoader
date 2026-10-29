@@ -4,6 +4,7 @@ const path = require('node:path')
 const vm = require('node:vm')
 
 const MOD_ROOT = path.resolve(__dirname, '..')
+const SAVE_ADAPTER_SOURCE = 'scripts/core/save-adapter.js'
 const ECONOMY_SOURCE = 'scripts/core/creative-economy.js'
 const CREATIVE_SOURCE = 'scripts/core/creative-mode.js'
 const SHARED_SOURCE = 'scripts/core/shared.js'
@@ -484,8 +485,6 @@ function createRuntime() {
 	}
 	sandbox.globalThis = sandbox
 	vm.createContext(sandbox)
-	vm.runInContext(source(ECONOMY_SOURCE), sandbox, { filename: ECONOMY_SOURCE })
-	assert.ok(definition)
 	const api = {
 		id: 'Cattail_TweaksQuality_World-Editor',
 		on(name, listener) {
@@ -507,7 +506,12 @@ function createRuntime() {
 		},
 		storage: { snapshots }
 	}
-	definition.init(api)
+	// The native adapter must leave the legacy economy runtime unchanged.
+	for (const file of [SAVE_ADAPTER_SOURCE, ECONOMY_SOURCE]) {
+		vm.runInContext(source(file), sandbox, { filename: file })
+		assert.ok(definition)
+		definition.init(api)
+	}
 	return {
 		sandbox,
 		hooks,

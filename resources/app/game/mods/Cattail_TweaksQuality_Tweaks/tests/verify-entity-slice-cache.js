@@ -3,7 +3,7 @@ const fs = require('fs')
 const path = require('path')
 const vm = require('vm')
 
-const scriptPath = path.resolve(__dirname, '..', 'scripts', 'entity-slice-cache.js')
+const scriptPath = path.resolve(__dirname, '..', 'scripts', 'building-batch-cache.js')
 const source = fs.readFileSync(scriptPath, 'utf8')
 const handlers = {}
 let canvasCreateCount = 0

@@ -22,7 +22,7 @@ assert.deepEqual(manifest.config.growDurationSeconds, {
 	description: 'Seconds for a Painted Cube to Grow from Empty to Stable, Including Its Final Reveal.',
 	reloadPolicy: 'hot'
 })
-assert.equal(manifest.entry.length, 45)
+assert.equal(manifest.entry.length, 47)
 const stateIndex = manifest.entry.indexOf('scripts/core/paint-cube-state.js')
 const blueprintPaintedIndex = manifest.entry.indexOf('scripts/core/blueprint-painted.js')
 const growthIndex = manifest.entry.indexOf('scripts/core/paint-cube-growth.js')

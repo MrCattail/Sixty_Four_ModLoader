@@ -1,11 +1,31 @@
 (function () {
+	// Publish one canonical API and a synchronized legacy alias. Never replace a foreign root.
+	const tweaksNamespace = (function () {
+		let namespace = window.CattailTweaks
+		if (namespace === undefined) namespace = window.CattailTweaks = {}
+		if (!namespace || typeof namespace !== 'object' || Array.isArray(namespace)) {
+			console.warn('[Tweaks] CattailTweaks namespace is occupied; retaining legacy access')
+			namespace = {}
+		}
+		const legacy = 'CattailTweaksCubeResourceCache'
+		if (namespace.cubeResourceCache === undefined && window[legacy] !== undefined) namespace.cubeResourceCache = window[legacy]
+		const descriptor = Object.getOwnPropertyDescriptor(window, legacy)
+		if (!descriptor || descriptor.configurable) Object.defineProperty(window, legacy, {
+			configurable: true, enumerable: true,
+			get() { return namespace.cubeResourceCache },
+			set(value) { namespace.cubeResourceCache = value }
+		})
+		else console.warn('[Tweaks] Legacy API alias is not configurable: ' + legacy)
+		return namespace
+	})()
+
 	const MOD_ID = 'Cattail_TweaksQuality_Tweaks'
-	const installedKey = '__cattailCubeResourceCacheInstalled'
-	const cacheKey = '__cattailCubeResourceRenderCache'
-	const apiKey = 'CattailTweaksCubeResourceCache'
-	const configKey = 'enableCubeResourceRenderCache'
-	const damagedConfigKey = 'enableDamagedCubeResourceRenderCache'
-	const dynamicCubeProjectionApiKey = '__cattailDynamicCameraCubeProjectionV1'
+	const installedKey = '__cattailTweaksCubeResourceCacheInstalled'
+	const cacheKey = '__cattailTweaksCubeResourceCache'
+	const apiKey = 'cubeResourceCache'
+	const configKey = 'enableStableCubeResourceCache'
+	const damagedConfigKey = 'enableDamagedCubeResourceCache'
+	const dynamicCubeProjectionApiKey = 'cameraCubeProjectionV1'
 	const visibleResourceSlots = [12, 13, 14, 3, 7, 11, 15, 28, 29, 30, 19, 23, 27, 31, 44, 45, 46, 35, 39, 43, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63]
 	const cachePadding = 4
 	const maxCacheSide = 1024
@@ -69,7 +89,7 @@
 					previewDamagedEnabled = detail.value !== false
 					clearAllCaches(activeGame)
 				}
-				if (detail.key === 'enableDynamicCamera') {
+				if (detail.key === 'enableCameraAngle') {
 					previewDynamicCameraEnabled = detail.value !== false
 					clearAllCaches(activeGame)
 				}
@@ -122,7 +142,7 @@
 	}
 
 	function installDebugApi(api) {
-		window[apiKey] = {
+		tweaksNamespace[apiKey] = {
 			stats() {
 				const totalCached = stats.hits + stats.misses
 				const atlas = inspectDynamicAtlas()
@@ -629,11 +649,11 @@
 
 	function getDynamicCameraEnabled(api) {
 		if (previewDynamicCameraEnabled !== null) return previewDynamicCameraEnabled !== false
-		return api?.config?.get('enableDynamicCamera', true) !== false
+		return api?.config?.get('enableCameraAngle', true) !== false
 	}
 
 	function getDynamicCameraState(game, api) {
-		const state = game?.__cattailDynamicCameraState || {}
+		const state = game?.__cattailTweaksCameraAngleState || {}
 		const savedPitch = previewCameraPitch !== null ? previewCameraPitch : api?.config?.get('cameraPitch', .5)
 		const savedYaw = previewCameraYaw !== null ? previewCameraYaw : api?.config?.get('cameraYaw', 0)
 		const pitch = Number.isFinite(Number(state.pitch)) ? Number(state.pitch) : Number(savedPitch)
@@ -699,7 +719,7 @@
 
 	function getDynamicCubeProjection(cube) {
 		try {
-			const projection = window?.[dynamicCubeProjectionApiKey]
+			const projection = window.CattailTweaks?.[dynamicCubeProjectionApiKey] || window.__cattailDynamicCameraCubeProjectionV1
 			if (!projection || projection.version !== 1 || typeof projection.isActive !== 'function') return null
 			return projection.isActive(cube) ? projection : null
 		} catch (error) {

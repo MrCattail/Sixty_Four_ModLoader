@@ -1,6 +1,7 @@
 ModLoader.register({
 	id: 'Cattail_TweaksQuality_Better-UIs',
 	init(api) {
+		if (api.config.get('shopVersion', '1.3') !== '1.2.1') return
 		if (api.config.get('enableShopCategories', true) === false) return
 
 		const storageKey = 'cattailShopCategoriesCompressed'
@@ -247,54 +248,37 @@ ModLoader.register({
 		}
 
 		api.on('afterVanillaScripts', function () {
-			if (typeof Shop === 'undefined') return
-
-			installStyles()
-
-			api.patch(Shop.prototype, 'init', function (original) {
-				return function (...args) {
-					const result = original.apply(this, args)
-					attachToggle(this)
-					syncToggleVisibility(this)
-					resetPanel(this)
-					setCompressed(this, readCompressedState(this), { silent: true, skipStorage: true })
-					return result
-				}
-			})
-
-			api.patch(Shop.prototype, 'check', function (original) {
-				return function (...args) {
-					const result = original.apply(this, args)
-					attachToggle(this)
-					syncToggleVisibility(this)
-					if (isCompressed(this)) renderCompressedShop(this)
-					return result
-				}
-			})
-
-			api.patch(Shop.prototype, 'centerItem', function (original) {
-				return function (name) {
-					if (!isCompressed(this)) return original.call(this, name)
-					const category = findCategoryForItem(this, name)
-					if (!category) return original.call(this, name)
-					this[expandedKey] = category.id
-					renderCompressedShop(this, true)
-					const row = this[panelKey]?.querySelector('[data-shop-item="' + cssEscape(name) + '"]')
-					if (row) row.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'nearest' })
-					return undefined
-				}
-			})
-
-
-			if (typeof Game !== 'undefined') {
-				api.patch(Game.prototype, 'changeLanguage', function (original) {
-					return function (...args) {
-						const result = original.apply(this, args)
-						refreshShopLanguage(this.shop)
-						return result
-					}
+			const service = window[Symbol.for('cattail.better-uis.classic-shop')]
+			if (!service) return
+			service.subscribe(function (shop) {
+				installStyles()
+				attachToggle(shop)
+				shop.onRebuild(() => resetPanel(shop))
+				shop.onSync(() => {
+					updateToggleLabel(shop)
+					syncToggleVisibility(shop)
+					if (isCompressed(shop)) renderCompressedShop(shop)
 				})
-			}
+				shop.onDispose(() => {
+					resetPanel(shop)
+					api.ui?.unregisterCornerButton('shop-categories')
+					shop[toggleKey]?.remove()
+				})
+				shop.centerCategory = function (name) {
+					if (!isCompressed(shop)) return false
+					const category = findCategoryForItem(shop, name)
+					if (!category) return false
+					shop[expandedKey] = category.id
+					renderCompressedShop(shop, true)
+					const row = shop[panelKey]?.querySelector('[data-shop-item="' + cssEscape(name) + '"]')
+					if (row) shop.scrollToItem(row)
+					return true
+				}
+				shop.closeCategories = () => {
+					shop[expandedKey] = ''
+					updateExpandedState(shop)
+				}
+			})
 		})
 
 		function attachToggle(shop) {
@@ -348,7 +332,11 @@ ModLoader.register({
 			syncToggleVisibility(shop)
 			if (!options.skipStorage) localStorage.setItem(storageKey, next ? '1' : '0')
 			if (next) renderCompressedShop(shop, true)
-			else if (shop[panelKey]) shop[panelKey].classList.add('cattail-shop-category-panel-hidden')
+			else if (shop[panelKey]) {
+				releaseItemTooltips(shop)
+				shop[panelKey].classList.add('cattail-shop-category-panel-hidden')
+			}
+			if (!next) shop.store.isOpen = false
 			if (!options.silent) shop.vessel.scrollTop = 0
 		}
 
@@ -391,7 +379,7 @@ ModLoader.register({
 		function collectVisibleCategories(shop) {
 			const byName = new Map()
 			for (const item of shop.items) {
-				if (!item?.name || !item.html || item.html.classList.contains('hidden')) continue
+				if (!item?.name || !item.html || item.visible === false || item.html.classList.contains('hidden')) continue
 				byName.set(item.name, item)
 			}
 
@@ -412,7 +400,7 @@ ModLoader.register({
 
 			let other = result.find((category) => category.id === 'other')
 			for (const item of shop.items) {
-				if (!item?.name || assigned.has(item.name) || item.html.classList.contains('hidden')) continue
+				if (!item?.name || assigned.has(item.name) || item.visible === false || item.html.classList.contains('hidden')) continue
 				if (other) other.items.push(item)
 				else {
 					other = { id: 'other', title: '其他', description: '', items: [item] }
@@ -428,7 +416,13 @@ ModLoader.register({
 			return 'language:' + (shop?.master?.language || 'en') + '|' + visibleCategories.map((category) => {
 				const items = category.items.map((item) => {
 					const disabled = item.html.classList.contains('disabled') ? 'd' : 'a'
-					const price = item.priceHtml?.textContent || ''
+					// Countdown changes update the price in place, without replacing rows/tooltips.
+					let price = item.priceHtml?.innerHTML || ''
+					if (item.priceHtml?.querySelector('.cattail-build-countdown')) {
+						const cleanPrice = item.priceHtml.cloneNode(true)
+						for (const countdown of cleanPrice.querySelectorAll('.cattail-build-countdown')) countdown.remove()
+						price = cleanPrice.innerHTML
+					}
 					const count = item.counter?.textContent || ''
 					const isNew = item.html.classList.contains('newItem') ? 'n' : 'o'
 					return item.name + ':' + disabled + ':' + isNew + ':' + price + ':' + count
@@ -495,7 +489,7 @@ ModLoader.register({
 			const isNew = item.html.classList.contains('newItem')
 			if (disabled) {
 				row.classList.add('disabled')
-				row.disabled = true
+				row.setAttribute('aria-disabled', 'true')
 			}
 			if (isNew) row.classList.add('newItem')
 
@@ -563,10 +557,7 @@ ModLoader.register({
 		}
 
 		function activateItem(shop, item) {
-			if (!item?.name || item.html.classList.contains('disabled') || item.html.classList.contains('hidden')) return
-			shop.master.pickupItem(item.name)
-			shop.master.processMousemove2()
-			if (shop.master.isMobile) shop.vessel.classList.toggle('visible')
+			if (item?.name) shop.activate(item.name)
 		}
 
 		function createIcon(item) {
@@ -581,11 +572,14 @@ ModLoader.register({
 			const panel = shop?.[panelKey]
 			if (!panel) return
 			const current = shop[expandedKey] || ''
+			let anyExpanded = false
 			for (const block of panel.querySelectorAll('.cattail-shop-category')) {
 				const expanded = block.dataset.categoryId === current
+				anyExpanded = anyExpanded || expanded
 				block.classList.toggle('expanded', expanded)
 				block.querySelector('.cattail-shop-category-head')?.setAttribute('aria-expanded', expanded ? 'true' : 'false')
 			}
+			shop.store.isOpen = isCompressed(shop) && anyExpanded
 		}
 
 		function findCategoryForItem(shop, name) {
@@ -593,13 +587,6 @@ ModLoader.register({
 			return visibleCategories.find((category) => category.items.some((item) => item.name === name))
 		}
 
-
-		function refreshShopLanguage(shop) {
-			if (!shop) return
-			updateToggleLabel(shop)
-			shop[signatureKey] = ''
-			if (isCompressed(shop)) renderCompressedShop(shop, true)
-		}
 
 		function updateToggleLabel(shop) {
 			const toggle = shop?.[toggleKey]
@@ -612,8 +599,8 @@ ModLoader.register({
 		function syncToggleVisibility(shop) {
 			const toggle = shop?.[toggleKey]
 			if (!toggle) return
-			toggle.style.display = ''
-			const hidden = !!api.ui?.isVanillaGameHudHidden?.(shop?.master)
+			const hidden = shop.vessel.hidden || !!api.ui?.isVanillaGameHudHidden?.(shop?.master)
+			toggle.style.display = hidden ? 'none' : ''
 			toggle.setAttribute('aria-hidden', hidden ? 'true' : 'false')
 		}
 
@@ -809,7 +796,7 @@ ModLoader.register({
 	transition: max-height .26s ease, opacity .2s ease, transform .26s ease;
 }
 .cattail-shop-category.expanded .cattail-shop-category-body {
-	max-height: calc(var(--unit) * 80);
+	max-height: none;
 	opacity: 1;
 	transform: translateY(0);
 }

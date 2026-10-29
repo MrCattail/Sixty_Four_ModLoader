@@ -54,6 +54,8 @@ function patchMessenger(api) {
 
 			const imported = this.master?.__chatTimestampMessageTimestamps
 			const restored = timestamps !== undefined ? timestamps : imported !== undefined ? imported : existing
+			// A newly restored history must not inherit another history's cursor.
+			if (timestamps !== undefined || imported !== undefined) delete this.__chatTimestampCursorDate
 			this.messageTimestamps = expandSavedMessageTimestamps(restored)
 			fillMissingMessageTimestamps(this)
 
@@ -62,6 +64,8 @@ function patchMessenger(api) {
 				ensureTimestampNode(bubbles[i], this.messageTimestamps[i])
 			}
 			refreshTimestampCursor(this)
+			// Consume loaded data once. Later UI/language refreshes retain live times.
+			if (imported !== undefined) delete this.master.__chatTimestampMessageTimestamps
 		}
 	})
 

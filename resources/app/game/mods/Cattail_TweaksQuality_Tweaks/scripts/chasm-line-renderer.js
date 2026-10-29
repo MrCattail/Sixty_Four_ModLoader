@@ -1,16 +1,16 @@
 (function () {
 	const MOD_ID = 'Cattail_TweaksQuality_Tweaks'
-	const installedKey = '__cattailChasmLineRendererInstalled'
-	const rendererKey = '__cattailChasmLineRenderer'
-	const rendererFailedKey = '__cattailChasmLineRendererFailed'
-	const enableConfigKey = 'enableChasmLineRenderer'
-	const modeConfigKey = 'chasmLineRendererMode'
-	const ignoreDistanceConfigKey = 'enableChasmLineDistanceOverride'
+	const installedKey = '__cattailTweaksChasmLineRendererInstalled'
+	const rendererKey = '__cattailTweaksChasmLineRenderer'
+	const rendererFailedKey = '__cattailTweaksChasmLineRendererFailed'
+	const enableConfigKey = 'enableChasmLineWebGL'
+	const legacyModeConfigKey = 'chasmLineRendererMode'
+	const ignoreDistanceConfigKey = 'enableChasmLineAlwaysVisible'
 	const modeCanvas = 0
 	const modeWebgl = 1
-	const renderLayerId = 'chasm-lines'
-	const renderCallbackId = 'chasm-line-renderer-lines'
-	const uiDemandCallbackId = 'chasm-line-renderer-ui-demand'
+	const renderLayerId = 'tweaks-chasm-line'
+	const renderCallbackId = 'tweaks-chasm-line-render'
+	const uiDemandCallbackId = 'tweaks-chasm-line-ui-demand'
 	const curveSegments = 64
 	let renderApiRegistered = false
 
@@ -31,12 +31,11 @@
 			return function (...args) {
 				const ignoreDistance = shouldIgnoreChasmLineDistance(this, api)
 				const rendererEnabled = isChasmLineRendererEnabled(api)
-				const mode = normalizeChasmLineMode(api.config.get(modeConfigKey, modeWebgl))
 				if (!rendererEnabled && !ignoreDistance) return original.apply(this, args)
 				const segments = collectChasmLineSegments(this, { ignoreDistance })
 				if (!segments) return original.apply(this, args)
-				if (shouldUseChasmLineRenderApi(api, this) && shouldReplaceChasmLines(rendererEnabled, ignoreDistance, mode)) return
-				if (rendererEnabled && mode === modeWebgl && renderChasmLineSegmentsWebgl(this, segments)) return
+				if (shouldUseChasmLineRenderApi(api, this) && shouldReplaceChasmLines(rendererEnabled, ignoreDistance)) return
+				if (rendererEnabled && renderChasmLineSegmentsWebgl(this, segments)) return
 				if (ignoreDistance) {
 					drawChasmLineSegmentsCanvas(this, segments)
 					return
@@ -89,24 +88,22 @@
 		if (!shouldUseChasmLineRenderApi(api, game) || game.plane || !game.chasm) return false
 		const ignoreDistance = shouldIgnoreChasmLineDistance(game, api)
 		const rendererEnabled = isChasmLineRendererEnabled(api)
-		const mode = normalizeChasmLineMode(api.config.get(modeConfigKey, modeWebgl))
-		return shouldReplaceChasmLines(rendererEnabled, ignoreDistance, mode)
+		return shouldReplaceChasmLines(rendererEnabled, ignoreDistance)
 	}
 
 	function renderChasmLinesForRenderApi(api, game, ctx) {
 		if (!game || !ctx || game.plane) return
 		const ignoreDistance = shouldIgnoreChasmLineDistance(game, api)
 		const rendererEnabled = isChasmLineRendererEnabled(api)
-		const mode = normalizeChasmLineMode(api.config.get(modeConfigKey, modeWebgl))
-		if (!shouldReplaceChasmLines(rendererEnabled, ignoreDistance, mode)) return
+		if (!shouldReplaceChasmLines(rendererEnabled, ignoreDistance)) return
 		const segments = collectChasmLineSegments(game, { ignoreDistance })
 		if (!segments) return
-		if (rendererEnabled && mode === modeWebgl && renderChasmLineSegmentsWebgl(game, segments, ctx)) return
+		if (rendererEnabled && renderChasmLineSegmentsWebgl(game, segments, ctx)) return
 		if (ignoreDistance || rendererEnabled) drawChasmLineSegmentsCanvas(game, segments, ctx)
 	}
 
-	function shouldReplaceChasmLines(rendererEnabled, ignoreDistance, mode) {
-		return !!(ignoreDistance || (rendererEnabled && mode === modeWebgl))
+	function shouldReplaceChasmLines(rendererEnabled, ignoreDistance) {
+		return !!(ignoreDistance || rendererEnabled)
 	}
 
 	function isChasmLineRendererEnabled(api) {
@@ -117,6 +114,8 @@
 		return !!game && api.config.get(ignoreDistanceConfigKey, false) === true
 	}
 
+	// Legacy boolean/mode resolution is now a side-effect-free Loader read.
+	// Keep old storage intact; an explicitly saved new key always wins.
 	function normalizeChasmLineMode(value) {
 		const text = String(value ?? '').trim().toLowerCase()
 		if (text === '0' || text === 'canvas' || text === 'canvas2d' || text === 'canvas 2d' || text === 'vanilla') return modeCanvas

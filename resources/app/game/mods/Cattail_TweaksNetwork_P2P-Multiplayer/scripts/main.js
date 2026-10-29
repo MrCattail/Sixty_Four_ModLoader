@@ -43,23 +43,30 @@ ModLoader.register({
             return result.length ? result : [{ id: protocol.MOD_ID, version: protocol.MOD_VERSION }]
         }
 
+        function assertReady() {
+            if (!runtime.game?.version) throw new Error('Game is not ready.')
+            if (config.desktop13) safety.context.assertReady()
+        }
+
         function getHandshake() {
+            assertReady()
             const signalState = runtime.signaling.getState()
             return protocol.buildHandshake({
                 role: signalState.role,
                 peerId: signalState.peerId,
                 roomCode: signalState.roomCode,
-                gameVersion: runtime.game?.version || '1.2.1',
+                gameVersion: runtime.game.version,
                 loaderVersion: api.version || api.state?.version || 'unknown',
                 mods: loadedModList()
             })
         }
 
-        runtime.signaling = signalingModule.create({ protocol, config, audit })
-        runtime.transport = transportModule.create({ protocol, signaling: runtime.signaling, config, audit, getHandshake })
+        runtime.signaling = signalingModule.create({ protocol, config, audit, assertReady, context: safety.context })
+        runtime.transport = transportModule.create({ protocol, signaling: runtime.signaling, config, audit, getHandshake, context: safety.context })
         runtime.page = uiModule.install(api, runtime)
 
         api.on('afterGameInit', function (payload, game) {
+            if (config.desktop13) safety.context.markReady(game)
             runtime.game = game
             audit.record('game-ready', { gameVersion: game?.version || 'unknown' })
             runtime.page?.refresh()
@@ -73,6 +80,7 @@ ModLoader.register({
 
         window.CattailP2PPhase2 = Object.freeze({
             config: Object.freeze({
+                localOnly: config.localOnly,
                 safeTest: config.safeTest,
                 role: config.role,
                 sessionId: config.sessionId,
@@ -81,16 +89,21 @@ ModLoader.register({
             }),
             getStatus() {
                 return {
+                    ready: !!runtime.game?.version && (!config.desktop13 || safety.context.ready),
                     signaling: runtime.signaling.getState(),
                     transport: runtime.transport.getState()
                 }
             },
-            createRoom() { return runtime.signaling.createRoom() },
-            joinRoom(roomCode) { return runtime.signaling.joinRoom(roomCode) },
+            createRoom() { assertReady(); return runtime.signaling.createRoom() },
+            joinRoom(roomCode) { assertReady(); return runtime.signaling.joinRoom(roomCode) },
             runLoopback() { return runtime.transport.runLoopback() },
             sendProbeToAll() { return runtime.transport.sendProbeToAll(4096) },
             getAuditEntries() { return runtime.audit.entries() },
-            openPage() { return runtime.page.open() }
+            openPage() {
+                assertReady()
+                if (runtime.game.splash && !runtime.game.splash.isShown) runtime.game.splash.show()
+                return runtime.page.open(runtime.game.splash)
+            }
         })
         audit.record('phase2-initialized', {
             modVersion: protocol.MOD_VERSION,

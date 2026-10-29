@@ -32,7 +32,10 @@
 		const roleValue = (parseArgument(args, 'p2p-role') || sourceEnv.CATTAIL_P2P_ROLE || '').toLowerCase()
 		const role = roleValue === 'host' || roleValue === 'guest' ? roleValue : 'none'
 		const envSafeTest = String(sourceEnv.CATTAIL_P2P_SAFE_TEST || '').toLowerCase()
+		const desktop13 = sourceEnv.CATTAIL_P2P_DESKTOP13 === '1'
 		return Object.freeze({
+			desktop13,
+			localOnly: desktop13,
 			safeTest: args.includes('--p2p-safe-test') || envSafeTest === '1' || envSafeTest === 'true',
 			role,
 			sessionId: parseArgument(args, 'p2p-session') || String(sourceEnv.CATTAIL_P2P_SESSION || 'phase2-local'),
@@ -181,6 +184,13 @@
 		if (!config.safeTest) {
 			audit.record('safe-mode-inactive', { reason: 'missing --p2p-safe-test' })
 			return Object.freeze({ config, audit, ipc: { installed: false }, game: { installed: [] }, dispose() {} })
+		}
+		if (config.desktop13) {
+			const context = root.CattailP2PEarlySession
+			if (!context || context.protocol !== 'p2p-desktop-13-v1' || context.localOnly !== true) throw new Error('Valid early P2P session required.')
+			context.validate(config)
+			audit.record('early-session-reused', { role: config.role, localOnly: true })
+			return Object.freeze({ config, audit, context, ipc: { installed: true }, game: { installed: ['early-session'] }, dispose() {} })
 		}
 		const ipc = installIpcGuard(options?.ipcRenderer, config, audit)
 		const game = installGameGuards(options?.api, options?.GameClass, config, audit)

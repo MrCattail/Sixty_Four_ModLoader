@@ -3,7 +3,7 @@ const fs = require('fs')
 const path = require('path')
 const vm = require('vm')
 
-const dynamicCameraPath = path.resolve(__dirname, '..', 'scripts', 'dynamic-camera.js')
+const dynamicCameraPath = path.resolve(__dirname, '..', 'scripts', 'camera-angles.js')
 const cubeCachePath = path.resolve(__dirname, '..', 'scripts', 'cube-resource-cache.js')
 const dynamicCameraSource = fs.readFileSync(dynamicCameraPath, 'utf8')
 const cubeCacheSource = fs.readFileSync(cubeCachePath, 'utf8')
@@ -11,11 +11,11 @@ const handlers = {}
 const listeners = {}
 const createdCanvases = []
 const config = new Map([
-	['enableDynamicCamera', true],
+	['enableCameraAngle', true],
 	['cameraPitch', .5],
 	['cameraYaw', 0],
-	['enableCubeResourceRenderCache', true],
-	['enableDamagedCubeResourceRenderCache', true]
+	['enableStableCubeResourceCache', true],
+	['enableDamagedCubeResourceCache', true]
 ])
 
 function makeContext() {
@@ -238,7 +238,7 @@ cube.drawResources()
 assert.strictEqual(cube.originalDraws, 1, 'the exact vanilla camera must keep the original sprite renderer')
 assert.strictEqual(game.ctx.fills.length, 0, 'the vanilla camera must not draw procedural voxel faces')
 
-game.__cattailDynamicCameraState = { pitch: .5, yaw: Math.PI / 4 }
+game.__cattailTweaksCameraAngleState = { pitch: .5, yaw: Math.PI / 4 }
 cube.drawResources()
 assert.strictEqual(cube.originalDraws, 1, 'a rotated camera should use the projection-aware renderer')
 assert(game.ctx.fills.length > 100, 'the projection-aware renderer should draw the visible voxel faces')
@@ -257,7 +257,7 @@ assert(bounds.maxY - bounds.minY < game.unit * 2.5, 'rotated voxel layers should
 
 for (const pitch of [.18, .5, 1.15]) {
 	for (let step = -8; step <= 8; step++) {
-		game.__cattailDynamicCameraState = { pitch, yaw: step * Math.PI / 8 }
+		game.__cattailTweaksCameraAngleState = { pitch, yaw: step * Math.PI / 8 }
 		const slots = projection.getVisibleSlots(cube)
 		const cameraBounds = projection.getBounds(cube)
 		assert.strictEqual(slots.length, 37, 'every supported camera angle should expose 37 surface voxels')
@@ -272,7 +272,7 @@ for (const pitch of [.18, .5, 1.15]) {
 	}
 }
 
-game.__cattailDynamicCameraState = { pitch: .5, yaw: -Math.PI / 4 }
+game.__cattailTweaksCameraAngleState = { pitch: .5, yaw: -Math.PI / 4 }
 const negativeYawSlots = projection.getVisibleSlots(cube)
 assert.notDeepStrictEqual(negativeYawSlots, positiveYawSlots, 'the visible cube sides should follow camera rotation')
 
@@ -322,7 +322,7 @@ stats = cache.stats()
 assert.strictEqual(stats.activeDynamicAtlasEntries, 2, 'an invalidated Cube should reclaim a shared atlas entry')
 assert.strictEqual(createdCanvases.length, canvasCountBeforeReuse, 'rebuilding a same-size Cube should reuse the atlas page')
 
-game.__cattailDynamicCameraState.yaw = Math.PI / 3
+game.__cattailTweaksCameraAngleState.yaw = Math.PI / 3
 cube.drawResources()
 stats = cache.stats()
 assert.strictEqual(stats.misses, 4, 'camera rotation should rebuild projection-dependent cube geometry')
@@ -349,7 +349,7 @@ cache.clear()
 game.unit = 45.677519967556
 game.zoom = .24167999982833863
 game.pixelRatio = 1.5
-game.__cattailDynamicCameraState = { pitch: .87, yaw: -2.321287905152458 }
+game.__cattailTweaksCameraAngleState = { pitch: .87, yaw: -2.321287905152458 }
 const denseCubes = Array.from({ length: 71 }, () => new sandbox.Cube(game))
 game.stuff = denseCubes
 const denseCanvasStart = createdCanvases.length
@@ -366,11 +366,11 @@ assert.strictEqual(denseSources.size, 1, 'the 71-Cube problem view should draw f
 
 cache.clear()
 cache.resetStats()
-config.set('enableDynamicCamera', false)
+config.set('enableCameraAngle', false)
 game.unit = 27.4428
 game.zoom = .1452
 game.pixelRatio = 1
-game.__cattailDynamicCameraState = { pitch: .5, yaw: 0 }
+game.__cattailTweaksCameraAngleState = { pitch: .5, yaw: 0 }
 const vanillaCube = new sandbox.Cube(game)
 const secondVanillaCube = new sandbox.Cube(game)
 secondVanillaCube.position = [12, 20]
@@ -405,8 +405,8 @@ assert.strictEqual(stats.dynamicAtlasDraws, 3)
 assert.strictEqual(stats.sharedAtlasDraws, 3)
 
 cache.resetStats()
-config.set('enableDynamicCamera', true)
-game.__cattailDynamicCameraState = { pitch: .5, yaw: Math.PI / 4 }
+config.set('enableCameraAngle', true)
+game.__cattailTweaksCameraAngleState = { pitch: .5, yaw: Math.PI / 4 }
 vanillaCube.drawResources()
 stats = cache.stats()
 assert.strictEqual(stats.clears, 1, 'switching from vanilla to dynamic projection should replace stale atlas pages')
@@ -414,8 +414,8 @@ assert.strictEqual(stats.activeSharedAtlasPages, 1)
 assert.strictEqual(stats.activeSharedAtlasEntries, 1)
 assert.strictEqual(stats.privateCanvasBuilds, 0)
 
-config.set('enableDynamicCamera', false)
-game.__cattailDynamicCameraState = { pitch: .5, yaw: 0 }
+config.set('enableCameraAngle', false)
+game.__cattailTweaksCameraAngleState = { pitch: .5, yaw: 0 }
 vanillaCube.drawResources()
 stats = cache.stats()
 assert.strictEqual(stats.clears, 2, 'switching back to vanilla projection should replace stale atlas pages')

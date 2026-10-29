@@ -27,6 +27,9 @@
 	let scannerWebglUnavailable = false
 	let pendingShopRefresh = null
 	let pendingShopRefreshTimer = null
+	let activeStoreState = null
+	let previewEnabled = null
+	let previewBaseEnabled = null
 
 	const UI_TEXT = {
 		en: {
@@ -187,9 +190,22 @@
 	ModLoader.register({
 		id: MOD_ID,
 		init(api) {
+			window.addEventListener('modloader:config-preview', function (event) {
+				const detail = event?.detail || {}
+				if (detail.modId !== MOD_ID || detail.key !== ENABLE_CONFIG_KEY) return
+				previewBaseEnabled = api.config.get(ENABLE_CONFIG_KEY, true) !== false
+			previewEnabled = typeof detail.value === 'boolean' ? detail.value : null
+				previewDiameter = null
+				publishSharedScanTuning(api)
+				const game = api.state?.game || activeStoreState?.store.master
+				if (game?.store) scheduleStoreSync(game.store, api)
+				else if (game?.shop) {
+					syncScanControls(game.shop, api, { skipPrice: true })
+					scheduleShopRefresh(game.shop)
+				}
+			})
 			api.on('afterVanillaScripts', function () {
-				if (typeof Game === 'undefined' || typeof Shop === 'undefined' || typeof Scan === 'undefined') return
-
+				if (typeof Game === 'undefined' || typeof Scan === 'undefined') return
 				publishSharedScanTuning(api)
 				installStyles()
 				patchScanPrice(api)
@@ -197,13 +213,24 @@
 				patchScanUpdate(api)
 				patchScanCreation(api)
 				patchScannerWebglOverlay(api)
-				patchShop(api)
+				if (typeof Shop !== 'undefined') patchShop(api)
+				patchCurrentStore(api)
+			})
+			api.on('afterGameInit', function (_, game) {
+				game = game || api.state?.game
+				if (game?.store) scheduleStoreSync(game.store, api)
+				else {
+					disposeStoreState()
+					if (game?.shop) attachScanControls(game.shop, api)
+				}
 			})
 		}
 	})
 
 	function isFeatureEnabled(api) {
-		return api.config.get(ENABLE_CONFIG_KEY, true) !== false
+		const configured = api.config.get(ENABLE_CONFIG_KEY, true) !== false
+		if (previewEnabled !== null && configured !== previewBaseEnabled) previewEnabled = null
+		return previewEnabled === null ? configured : previewEnabled
 	}
 
 	function patchScanPrice(api) {
@@ -270,6 +297,105 @@
 		})
 	}
 
+	function patchCurrentStore(api) {
+		if (typeof Store === 'undefined' || typeof DesktopStoreVersion === 'undefined') return
+		for (const [prototype, method] of [
+			[DesktopStoreVersion.prototype, 'init'],
+			[Store.prototype, 'compositionUpdate'],
+			[DesktopStoreVersion.prototype, 'visibilityUpdate'],
+			[Store.prototype, 'reinit']
+		]) {
+			if (typeof prototype[method] !== 'function') continue
+			api.patch(prototype, method, function (original) {
+				return function (...args) {
+					const result = original.apply(this, args)
+					scheduleStoreSync(this, api)
+					return result
+				}
+			})
+		}
+	}
+
+	function isCurrentStore(store, api) {
+		return !!store?.master && !store.master.isMobile && !!store.html?.items &&
+			typeof store.compositionUpdate === 'function' &&
+			(!store.master.store || store.master.store === store) &&
+			(!api.state?.game || api.state.game === store.master)
+	}
+
+	function scheduleStoreSync(store, api) {
+		if (!isCurrentStore(store, api)) return
+		if (activeStoreState?.store !== store) {
+			disposeStoreState()
+			previewDiameter = null
+			activeStoreState = {
+				store, api, frame: null, roots: [], observers: [], controls: new Set(), enabled: null,
+				shop: { store, master: store.master, vessel: store.vessel, items: [] }
+			}
+			activeStoreState.shop.scanState = activeStoreState
+		}
+		const state = activeStoreState
+		if (state.frame !== null) return
+		const run = function () {
+			state.frame = null
+			if (activeStoreState !== state) return
+			if (!isCurrentStore(state.store, state.api)) { disposeStoreState(); return }
+			syncCurrentStore(state)
+		}
+		state.frame = typeof requestAnimationFrame === 'function' ?
+			{ raf: true, id: requestAnimationFrame(run) } : { raf: false, id: setTimeout(run, 0) }
+	}
+
+	function syncCurrentStore(state) {
+		const { store, api, shop } = state
+		const item = store.html.items.scan
+		const classic = item?.closest?.('.cattail-classic-shop')
+		const roots = [...new Set([store.vessel, classic].filter(root => root?.isConnected))]
+		if (roots.length !== state.roots.length || roots.some((root, i) => root !== state.roots[i])) {
+			for (const observer of state.observers) observer.disconnect()
+			state.observers = []
+			state.roots = roots
+			if (typeof MutationObserver === 'function') for (const root of roots) {
+				const observer = new MutationObserver(() => scheduleStoreSync(store, api))
+				observer.observe(root, { childList: true, subtree: true })
+				state.observers.push(observer)
+			}
+		}
+		shop.vessel = classic || store.vessel
+		shop.items = item ? [{ name: 'scan', html: item, counter: store.html.counters.scan, existed: store.html.existeds?.scan }] : []
+		for (const control of state.controls) if (!control.isConnected) {
+			control.remove()
+			state.controls.delete(control)
+		}
+		const enabled = isFeatureEnabled(api)
+		const changed = state.enabled !== null && state.enabled !== enabled
+		state.enabled = enabled
+		if (!enabled) {
+			previewDiameter = null
+			publishSharedScanTuning(api, null, false)
+			for (const control of state.controls) control.remove()
+			state.controls.clear()
+		} else {
+			attachScanControls(shop, api)
+			syncScanControls(shop, api)
+		}
+		if (changed) scheduleShopRefresh(shop)
+	}
+
+	function disposeStoreState() {
+		const state = activeStoreState
+		if (!state) return
+		activeStoreState = null
+		if (state.frame !== null) {
+			if (state.frame.raf && typeof cancelAnimationFrame === 'function') cancelAnimationFrame(state.frame.id)
+			else clearTimeout(state.frame.id)
+		}
+		for (const observer of state.observers) observer.disconnect()
+		for (const control of state.controls) control.remove()
+		state.controls.clear()
+		if (pendingShopRefresh?.store === state.store) pendingShopRefresh = null
+	}
+
 	function patchShop(api) {
 		api.patch(Shop.prototype, 'addItem', function (original) {
 			return function (...args) {
@@ -332,7 +458,7 @@
 	function attachVanillaScanControl(shop, item, api) {
 		if (item.html.querySelector('.cattail-scan-reality-slider[data-context="shop"]')) return
 		const control = createScanControl(shop, api, 'shop')
-		const before = item.counter || item.existed || null
+		const before = [item.counter, item.existed].find(node => node?.parentNode === item.html) || null
 		item.html.insertBefore(control, before)
 	}
 
@@ -351,6 +477,7 @@
 		const root = document.createElement('div')
 		root.className = 'cattail-scan-reality-slider cattail-scan-reality-slider-' + context
 		root.dataset.context = context
+		shop.scanState?.controls.add(root)
 		if (context === 'category') root.classList.add('cattail-scan-category-control')
 
 		const diameter = document.createElement('div')
@@ -404,7 +531,7 @@
 	}
 
 	function stopShopActivation(root) {
-		for (const eventName of ['mousedown', 'mouseup', 'click', 'dblclick', 'pointerdown', 'pointerup', 'touchstart', 'touchend']) {
+		for (const eventName of ['mousedown', 'mouseup', 'click', 'dblclick', 'wheel', 'pointerdown', 'pointerup', 'touchstart', 'touchend']) {
 			root.addEventListener(eventName, function (event) {
 				event.stopPropagation()
 			})
@@ -415,7 +542,6 @@
 		const diameter = clampDiameter(value)
 		if (options.light) {
 			previewDiameter = diameter
-			publishSharedDiameter(diameter, true)
 			syncScanControls(shop, api)
 			return
 		}
@@ -440,9 +566,13 @@
 
 	function refreshShopPrices(shop) {
 		if (!shop) return
-		if (typeof shop.updateElements === 'function') shop.updateElements()
-		if (typeof shop.check === 'function') shop.check()
-		refreshHeldScanPrice(shop.master)
+		const target = shop.store || shop
+		if (shop.store && (activeStoreState?.store !== target || target.master.store !== target)) return
+		if (typeof target.compositionUpdate === 'function') target.compositionUpdate()
+		else if (typeof target.updateElements === 'function') target.updateElements()
+		if (typeof target.visibilityUpdate === 'function') target.visibilityUpdate()
+		else if (typeof target.check === 'function') target.check()
+		refreshHeldScanPrice(target.master)
 	}
 
 	function scheduleShopRefresh(shop) {
@@ -508,13 +638,14 @@
 		if (diameter) setSliderValueText(diameter, text.diameterShort || text.diameter, formatNumber(game, tuning.diameter), text.diameter)
 		if (reality) setSliderValueText(reality, text.realityShort || text.reality, formatNumber(game, tuning.reality), text.reality)
 		if (reset) {
-			reset.textContent = text.reset
+			if (reset.textContent !== text.reset) reset.textContent = text.reset
 			reset.title = text.reset
 			reset.setAttribute('aria-label', text.reset)
 		}
 	}
 
 	function setSliderValueText(element, label, value, fullLabel) {
+		value = String(value)
 		let labelNode = element.querySelector('.cattail-scan-slider-value-label')
 		let valueNode = element.querySelector('.cattail-scan-slider-value-number')
 		if (!labelNode || !valueNode) {
@@ -524,8 +655,8 @@
 			valueNode.className = 'cattail-scan-slider-value-number'
 			element.replaceChildren(labelNode, valueNode)
 		}
-		labelNode.textContent = label
-		valueNode.textContent = value
+		if (labelNode.textContent !== label) labelNode.textContent = label
+		if (valueNode.textContent !== value) valueNode.textContent = value
 		element.title = (fullLabel || label) + ' ' + value
 		element.setAttribute('aria-label', (fullLabel || label) + ' ' + value)
 	}
@@ -544,9 +675,11 @@
 		const price = game.getRealPrice('scan')
 		const signature = price.join(',')
 		if (game[HELD_PRICE_SIGNATURE_KEY] === signature) return
+		let tag = new Cloud({ master: game })
+		if (tag.master !== game) tag = new Cloud(game)
+		tag.addResourceList(price)
+		game.itemInHandPriceTag = tag
 		game[HELD_PRICE_SIGNATURE_KEY] = signature
-		game.itemInHandPriceTag = new Cloud(game)
-		game.itemInHandPriceTag.addResourceList(price)
 	}
 
 	function findScanItem(shop) {
@@ -572,7 +705,9 @@
 
 	function readStoredDiameter() {
 		if (typeof localStorage === 'undefined') return VANILLA_DIAMETER
-		return clampDiameter(localStorage.getItem(STORAGE_DIAMETER_KEY))
+		const stored = localStorage.getItem(STORAGE_DIAMETER_KEY)
+		if (stored === null || stored.trim() === '' || !Number.isFinite(Number(stored)) || Number(stored) <= 0) return VANILLA_DIAMETER
+		return clampDiameter(stored)
 	}
 
 	function writeStoredDiameter(diameter) {
@@ -1251,26 +1386,33 @@
 }
 .shop .shopItem.disabled .cattail-scan-reality-slider,
 .shop .shopItem.disabled .cattail-scan-slider-input,
-.shop .shopItem.disabled .cattail-scan-slider-reset {
+.shop .shopItem.disabled .cattail-scan-slider-reset,
+.store .item.disabled .cattail-scan-reality-slider,
+.store .item.disabled .cattail-scan-slider-input,
+.store .item.disabled .cattail-scan-slider-reset {
 	pointer-events: auto;
 }
 .shop .shopItem.disabled .cattail-scan-slider-value {
 	pointer-events: none;
 }
-.shop.darkShop .cattail-scan-reality-slider {
+.shop.darkShop .cattail-scan-reality-slider,
+.store .item.dark .cattail-scan-reality-slider {
 	color: #fff;
 }
-.shop.darkShop .cattail-scan-slider-value {
+.shop.darkShop .cattail-scan-slider-value,
+.store .item.dark .cattail-scan-slider-value {
 	color: #5c5c5c;
 }
-.shop.darkShop .cattail-scan-slider-input {
+.shop.darkShop .cattail-scan-slider-input,
+.store .item.dark .cattail-scan-slider-input {
 	background:
 		linear-gradient(to right, #d9d9d6 0 var(--cattail-scan-slider-progress, 10%), #4d4d4d var(--cattail-scan-slider-progress, 10%) 100%);
 	box-shadow:
 		inset 0 calc(var(--unit) * .1) calc(var(--unit) * .22) rgba(0,0,0,.78),
 		inset 0 calc(var(--unit) * -.045) calc(var(--unit) * .09) rgba(255,255,255,.2);
 }
-.shop.darkShop .cattail-scan-slider-input::-webkit-slider-thumb {
+.shop.darkShop .cattail-scan-slider-input::-webkit-slider-thumb,
+.store .item.dark .cattail-scan-slider-input::-webkit-slider-thumb {
 	background: #fbfbf6;
 	box-shadow:
 		0 calc(var(--unit) * .18) calc(var(--unit) * .3) rgba(0,0,0,.56),
@@ -1278,7 +1420,8 @@
 		inset 0 calc(var(--unit) * .085) calc(var(--unit) * .065) rgba(255,255,255,.97),
 		inset 0 calc(var(--unit) * -.095) calc(var(--unit) * .12) rgba(0,0,0,.22);
 }
-.shop.darkShop .cattail-scan-slider-reset {
+.shop.darkShop .cattail-scan-slider-reset,
+.store .item.dark .cattail-scan-slider-reset {
 	background: #111114;
 	color: #5c5c5c;
 	box-shadow:
@@ -1287,7 +1430,8 @@
 		inset 0 calc(var(--unit) * .045) calc(var(--unit) * .045) rgba(255,255,255,.11),
 		inset 0 calc(var(--unit) * -.055) calc(var(--unit) * .075) rgba(0,0,0,.58);
 }
-.shop.darkShop .cattail-scan-slider-reset:hover {
+.shop.darkShop .cattail-scan-slider-reset:hover,
+.store .item.dark .cattail-scan-slider-reset:hover {
 	color: #5c5c5c;
 }
 `

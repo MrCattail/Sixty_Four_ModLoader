@@ -3,10 +3,12 @@ param(
 	[string]$SourceRoot,
 	[switch]$Force,
 	[switch]$SkipMods,
-	[switch]$ReplaceMods
+	[switch]$ReplaceMods,
+	[switch]$FullVerification
 )
 
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'filesystem.ps1')
 
 function Resolve-GameRoot {
 	param([string]$Path)
@@ -55,9 +57,84 @@ function Find-SourceRoot {
 function New-DirectoryIfMissing {
 	param([string]$Path)
 
-	if (-not (Test-Path -LiteralPath $Path)) {
-		New-Item -ItemType Directory -Force -Path $Path | Out-Null
+	New-InstallerDirectory $Path
+}
+
+try {
+	$script:installerAnimationEnabled = -not [Console]::IsOutputRedirected
+} catch {
+	$script:installerAnimationEnabled = $false
+}
+$script:installerSpinnerFrames = @('|', '/', '-', '\')
+$script:installerSpinnerIndex = 0
+$script:installerActivityWidth = 0
+$script:installerActivityActive = $false
+$script:installerLastFrameAt = [DateTime]::MinValue
+
+function Write-InstallerActivityFrame {
+	param(
+		[string]$Message,
+		[switch]$Force
+	)
+
+	if (-not $script:installerActivityActive -or -not $script:installerAnimationEnabled) { return }
+	$now = [DateTime]::UtcNow
+	if (-not $Force -and ($now - $script:installerLastFrameAt).TotalMilliseconds -lt 80) { return }
+	$frame = $script:installerSpinnerFrames[$script:installerSpinnerIndex % $script:installerSpinnerFrames.Count]
+	$script:installerSpinnerIndex++
+	$script:installerLastFrameAt = $now
+	$text = "$frame $Message"
+	$padding = ' ' * [Math]::Max(0, $script:installerActivityWidth - $text.Length)
+	[Console]::Write("`r$text$padding")
+	$script:installerActivityWidth = [Math]::Max($script:installerActivityWidth, $text.Length)
+}
+
+function Start-InstallerActivity {
+	param([string]$Message)
+
+	$script:installerSpinnerIndex = 0
+	$script:installerActivityWidth = 0
+	$script:installerActivityActive = $true
+	$script:installerLastFrameAt = [DateTime]::MinValue
+	if ($script:installerAnimationEnabled) {
+		Write-InstallerActivityFrame -Message $Message -Force
+	} else {
+		Write-Host $Message
 	}
+}
+
+function Update-InstallerActivity {
+	param([string]$Message)
+
+	Write-InstallerActivityFrame -Message $Message
+}
+
+function Complete-InstallerActivity {
+	param([string]$Message)
+
+	if (-not $script:installerActivityActive) { return }
+	if ($script:installerAnimationEnabled) {
+		$text = "[OK] $Message"
+		$padding = ' ' * [Math]::Max(0, $script:installerActivityWidth - $text.Length)
+		[Console]::Write("`r$text$padding")
+		[Console]::WriteLine()
+	}
+	$script:installerActivityActive = $false
+	$script:installerActivityWidth = 0
+}
+
+function Stop-InstallerActivity {
+	param([string]$Message = 'Installation step stopped.')
+
+	if (-not $script:installerActivityActive) { return }
+	if ($script:installerAnimationEnabled) {
+		$text = "[!] $Message"
+		$padding = ' ' * [Math]::Max(0, $script:installerActivityWidth - $text.Length)
+		[Console]::Write("`r$text$padding")
+		[Console]::WriteLine()
+	}
+	$script:installerActivityActive = $false
+	$script:installerActivityWidth = 0
 }
 
 
@@ -65,7 +142,9 @@ function Copy-DirectoryContents {
 	param(
 		[string]$Source,
 		[string]$Target,
-		[string[]]$ExcludeRelative = @()
+		[string[]]$ExcludeRelative = @(),
+		[string]$ActivityLabel,
+		[switch]$SkipDevelopmentCaches
 	)
 
 	New-DirectoryIfMissing -Path $Target
@@ -75,16 +154,36 @@ function Copy-DirectoryContents {
 		$exclude[$item.ToLowerInvariant()] = $true
 	}
 
-	Get-ChildItem -LiteralPath $Source -Recurse -File | ForEach-Object {
-		$relative = $_.FullName.Substring($sourceRoot.Length).TrimStart('\')
-		if ($exclude[$relative.ToLowerInvariant()]) { return }
+	if ($ActivityLabel) { Start-InstallerActivity -Message "${ActivityLabel}: scanning files..." }
+	$files = @(Get-InstallerFiles $Source -ExcludeRelative $ExcludeRelative -SkipDevelopmentCaches:$SkipDevelopmentCaches)
+	$index = 0
+	$copiedCount = 0
+	try {
+		foreach ($file in $files) {
+			$index++
+			if ($ActivityLabel) { Update-InstallerActivity -Message "$ActivityLabel ($index/$($files.Count) checked; $copiedCount copied)" }
+			$relative = $file.FullName.Substring($sourceRoot.Length).TrimStart('\')
+			if ($exclude[$relative.ToLowerInvariant()]) { continue }
+			$excludedByPrefix = $false
+			foreach ($prefix in $ExcludeRelative) {
+				if ($prefix.EndsWith('\') -and $relative.StartsWith($prefix, [StringComparison]::OrdinalIgnoreCase)) {
+					$excludedByPrefix = $true
+					break
+				}
+			}
+			if ($excludedByPrefix) { continue }
 
-		$destination = Join-Path $Target $relative
-		$resolvedDestination = Resolve-Path -LiteralPath $destination -ErrorAction SilentlyContinue
-		if ($resolvedDestination -and $resolvedDestination.Path -eq $_.FullName) { return }
-		New-DirectoryIfMissing -Path (Split-Path -Parent $destination)
-		Copy-Item -LiteralPath $_.FullName -Destination $destination -Force
+			$destination = Join-Path $Target $relative
+			if ([IO.Path]::GetFullPath($destination).Equals($file.FullName, [StringComparison]::OrdinalIgnoreCase)) { continue }
+			New-DirectoryIfMissing -Path (Split-Path -Parent $destination)
+			Copy-InstallerFile $file.FullName $destination
+			$copiedCount++
+		}
+	} catch {
+		Stop-InstallerActivity
+		throw
 	}
+	if ($ActivityLabel) { Complete-InstallerActivity -Message "$ActivityLabel complete ($copiedCount files copied)." }
 }
 
 function Restore-InstallBackup {
@@ -99,12 +198,14 @@ function Restore-InstallBackup {
 		$target = Join-Path $TargetRoot $relativePath
 		if ($entry.exists) {
 			$backup = Join-Path $BackupPath $relativePath
-			if (Test-Path -LiteralPath $backup) {
+			if (Test-InstallerPath $backup) {
 				New-DirectoryIfMissing -Path (Split-Path -Parent $target)
-				Copy-Item -LiteralPath $backup -Destination $target -Force
+				Copy-InstallerFile $backup $target
+			} else {
+				throw "Cannot restore missing backup file: $backup"
 			}
-		} elseif (Test-Path -LiteralPath $target) {
-			Remove-Item -LiteralPath $target -Force
+		} elseif (Test-InstallerPath $target) {
+			Remove-InstallerFile $target
 		}
 	}
 }
@@ -117,9 +218,25 @@ if ($SkipMods -and $ReplaceMods) {
 
 $targetGame = Join-Path $targetRoot 'resources\app\game'
 $sourceGame = Join-Path $sourceRoot 'resources\app\game'
+if ($ReplaceMods -and $sourceGame.Equals($targetGame, [StringComparison]::OrdinalIgnoreCase)) {
+	throw 'Cannot replace Mods from the same folder. Extract the package into a separate directory first.'
+}
+$developmentVerifier = Join-Path $sourceGame 'modloader/tools/verify-development.ps1'
+if ($FullVerification) {
+    if (-not (Test-Path -LiteralPath $developmentVerifier)) { throw 'FullVerification requires development source; target was not changed.' }
+    & powershell -NoProfile -ExecutionPolicy Bypass -File $developmentVerifier -CheckInputsOnly
+    if ($LASTEXITCODE) { throw 'FullVerification inputs incomplete; target was not changed.' }
+}
+$sourceLoaderText = Get-Content -LiteralPath (Join-Path $sourceGame 'modloader/loader.js') -Raw -Encoding UTF8
+$expectedLoaderVersion = if ($sourceLoaderText -match 'version\s*:\s*[''"]([^''"]+)[''"]') { $Matches[1] } else { '' }
+$patcher = Join-Path $sourceRoot 'modloader-installer\patch-source.ps1'
+# Complete the source plan before creating backups, copying runtime files, or replacing mods.
+& powershell -NoProfile -ExecutionPolicy Bypass -File $patcher -GameRoot $targetRoot -CheckOnly
+if ($LASTEXITCODE) { throw "ModLoader 1.3 preflight failed (exit $LASTEXITCODE); target was not changed." }
+Start-InstallerActivity -Message 'Preparing installation file list...'
 $stateRoot = Join-Path $targetGame 'modloader\state'
 $backupRoot = Join-Path $stateRoot 'install-backups'
-$stamp = Get-Date -Format 'yyyyMMdd-HHmmss'
+$stamp = (Get-Date -Format 'yyyyMMdd-HHmmss-fff') + '-' + [Guid]::NewGuid().ToString('N').Substring(0,8)
 $backupPath = Join-Path $backupRoot $stamp
 
 $trackedFiles = @(
@@ -130,41 +247,86 @@ $trackedFiles = @(
 	'resources\app\game\scripts\sprites.js',
 	'resources\app\game\mods\enabled.json'
 )
+$uninstallFiles = $trackedFiles.Clone()
+# Back up every file the installer can overwrite, not just the five game hooks.
+$copyRoots = @('resources\app\game\modloader', 'modloader-installer')
+if (-not $SkipMods) { $copyRoots += 'resources\app\game\mods' }
+try {
+	$scannedFileCount = 0
+	foreach ($relativeRoot in $copyRoots) {
+		$copySource = Join-Path $sourceRoot $relativeRoot
+		$scanExclusions = if ($relativeRoot -eq 'resources\app\game\modloader') { @('state', 'backups', 'translations.json') } else { @() }
+		Get-InstallerFiles $copySource -ExcludeRelative $scanExclusions -SkipDevelopmentCaches | ForEach-Object {
+			$scannedFileCount++
+			Update-InstallerActivity -Message "Preparing installation file list ($scannedFileCount checked; $($trackedFiles.Count) selected)..."
+			$relative = $_.FullName.Substring($sourceRoot.Length).TrimStart('\')
+			if ($relative -like 'resources\app\game\modloader\state\*' -or $relative -like 'resources\app\game\modloader\backups\*') { return }
+			$trackedFiles += $relative
+		}
+	}
+	$trackedFiles = @($trackedFiles | Select-Object -Unique)
+} catch {
+	Stop-InstallerActivity
+	throw
+}
+Complete-InstallerActivity -Message "Installation file list ready ($($trackedFiles.Count) files)."
 
 if ((Test-Path -LiteralPath (Join-Path $targetGame 'modloader\loader.js')) -and -not $Force) {
 	throw 'ModLoader appears to be installed already. Re-run with -Force to reinstall after backing up current files.'
 }
 
+# Freeze metadata for exactly the files this operation will copy.
+$copyVerificationPlan = @()
+foreach ($relative in $trackedFiles) {
+    if ($relative -in $uninstallFiles -and $relative -ne 'resources\app\game\mods\enabled.json') { continue }
+    if ($relative -eq 'resources\app\game\mods\enabled.json' -and ($SkipMods -or ((Test-InstallerPath (Join-Path $targetRoot $relative)) -and -not $ReplaceMods))) { continue }
+    $sourceFile = Join-Path $sourceRoot $relative
+    if (Test-InstallerPath $sourceFile) {
+        $metadata = Get-InstallerFileMetadata $sourceFile
+        $copyVerificationPlan += @{relative=$relative; length=$metadata.Length; hash=$metadata.Hash}
+    }
+}
 New-DirectoryIfMissing -Path $backupPath
 
 $manifestFiles = @()
-foreach ($relativePath in $trackedFiles) {
-	$target = Join-Path $targetRoot $relativePath
-	$exists = Test-Path -LiteralPath $target
-	$entry = [ordered]@{
-		relativePath = $relativePath
-		exists = $exists
-	}
+$trackedIndex = 0
+Start-InstallerActivity -Message "Checking and backing up files (0/$($trackedFiles.Count))..."
+try {
+	foreach ($relativePath in $trackedFiles) {
+		$trackedIndex++
+		Update-InstallerActivity -Message "Checking and backing up files ($trackedIndex/$($trackedFiles.Count))..."
+		$target = Join-Path $targetRoot $relativePath
+		$exists = Test-InstallerPath $target
+		$entry = [ordered]@{
+			relativePath = $relativePath
+			exists = $exists
+		}
 
-	if ($exists) {
-		$backupTarget = Join-Path $backupPath $relativePath
-		New-DirectoryIfMissing -Path (Split-Path -Parent $backupTarget)
-		Copy-Item -LiteralPath $target -Destination $backupTarget -Force
-		$item = Get-Item -LiteralPath $target
-		$hash = Get-FileHash -LiteralPath $target -Algorithm SHA256
-		$entry.length = $item.Length
-		$entry.sha256 = $hash.Hash
-	}
+		if ($exists) {
+			$backupTarget = Join-Path $backupPath $relativePath
+			New-DirectoryIfMissing -Path (Split-Path -Parent $backupTarget)
+			Copy-InstallerFile $target $backupTarget
+			$item = Get-InstallerFileMetadata $target
+			$entry.length = $item.Length
+			$entry.sha256 = $item.Hash
+            $backupMetadata = Get-InstallerFileMetadata $backupTarget
+            if ($backupMetadata.Length -ne $item.Length -or $backupMetadata.Hash -cne $item.Hash) { throw "Backup integrity mismatch: $relativePath" }
+		}
 
-	$manifestFiles += $entry
+		$manifestFiles += $entry
+	}
+} catch {
+	Stop-InstallerActivity
+	throw
 }
+Complete-InstallerActivity -Message "Backup check complete ($($trackedFiles.Count) files)."
 
 $fullModsBackup = $null
 if ($ReplaceMods -and -not $SkipMods) {
 	$targetModsForBackup = Join-Path $targetGame 'mods'
 	if (Test-Path -LiteralPath $targetModsForBackup) {
 		$fullModsBackup = 'resources\app\game\mods'
-		Copy-DirectoryContents -Source $targetModsForBackup -Target (Join-Path $backupPath $fullModsBackup)
+		Copy-DirectoryContents -Source $targetModsForBackup -Target (Join-Path $backupPath $fullModsBackup) -ActivityLabel 'Backing up the existing Mods folder'
 	}
 }
 
@@ -173,7 +335,10 @@ $manifest = [ordered]@{
 	backupId = $stamp
 	gameRoot = $targetRoot
 	sourceRoot = $sourceRoot
-	files = $manifestFiles
+	# Keep ordinary uninstall limited to the established core/enabled list.
+	# Installation failure recovery additionally restores every overwritten file.
+	files = @($manifestFiles | Where-Object { $_.relativePath -in $uninstallFiles })
+	rollbackFiles = $manifestFiles
 	fullModsBackup = $fullModsBackup
 }
 
@@ -183,10 +348,11 @@ $stamp | Set-Content -LiteralPath (Join-Path $backupRoot 'latest-install.txt') -
 
 try {
 Copy-DirectoryContents -Source (Join-Path $sourceGame 'modloader') -Target (Join-Path $targetGame 'modloader') -ExcludeRelative @(
-	'state\install-backups\latest-install.txt'
-)
+	'state\', 'backups\', 'translations.json'
+) -SkipDevelopmentCaches -ActivityLabel 'Copying ModLoader files'
 
 $patcher = Join-Path $sourceRoot 'modloader-installer\patch-source.ps1'
+Write-Host 'Patching game files...'
 & powershell -NoProfile -ExecutionPolicy Bypass -File $patcher -GameRoot $targetRoot
 if ($LASTEXITCODE) {
 	throw "patch-source.ps1 failed with exit code $LASTEXITCODE"
@@ -207,21 +373,21 @@ if ($SkipMods) {
 		if (-not $resolvedTargetMods.StartsWith($targetGamePrefix, [System.StringComparison]::OrdinalIgnoreCase)) {
 			throw "Refusing to replace mods folder outside game root: $resolvedTargetMods"
 		}
-		Remove-Item -LiteralPath $targetMods -Recurse -Force
+		Remove-InstallerDirectory $resolvedTargetMods
 		Write-Host 'Replaced existing mods folder.'
 	}
 	New-DirectoryIfMissing -Path $targetMods
-	Get-ChildItem -LiteralPath $sourceMods -Directory | ForEach-Object {
+	Get-InstallerDirectories $sourceMods | ForEach-Object {
 		$destination = Join-Path $targetMods $_.Name
-		Copy-DirectoryContents -Source $_.FullName -Target $destination
+		Copy-DirectoryContents -Source $_.FullName -Target $destination -SkipDevelopmentCaches -ActivityLabel "Copying Mod files: $($_.Name)"
 	}
 
 	$sourceEnabled = Join-Path $sourceMods 'enabled.json'
 	$targetEnabled = Join-Path $targetMods 'enabled.json'
 	if (-not (Test-Path -LiteralPath $targetEnabled)) {
-		Copy-Item -LiteralPath $sourceEnabled -Destination $targetEnabled -Force
+		Copy-InstallerFile $sourceEnabled $targetEnabled
 	} elseif ($ReplaceMods) {
-		Copy-Item -LiteralPath $sourceEnabled -Destination $targetEnabled -Force
+		Copy-InstallerFile $sourceEnabled $targetEnabled
 	} else {
 		Write-Host 'Keeping existing mods\enabled.json.'
 	}
@@ -230,20 +396,45 @@ if ($SkipMods) {
 $sourceInstaller = Join-Path $sourceRoot 'modloader-installer'
 $targetInstaller = Join-Path $targetRoot 'modloader-installer'
 if (Test-Path -LiteralPath $sourceInstaller) {
-	Copy-DirectoryContents -Source $sourceInstaller -Target $targetInstaller
+	Copy-DirectoryContents -Source $sourceInstaller -Target $targetInstaller -SkipDevelopmentCaches -ActivityLabel 'Copying installer files'
 	Write-Host 'Updated modloader-installer files.'
 }
 
+foreach ($entry in $copyVerificationPlan) {
+    $copied = Get-InstallerFileMetadata (Join-Path $targetRoot $entry.relative)
+    if ($copied.Length -ne $entry.length -or $copied.Hash -cne $entry.hash) { throw "Copied file integrity mismatch: $($entry.relative)" }
+}
+Write-Host "Copied file integrity passed: $($copyVerificationPlan.Count) files."
 $verify = Join-Path $targetGame 'modloader\tools\verify.ps1'
 if (Test-Path -LiteralPath $verify) {
-	& powershell -NoProfile -ExecutionPolicy Bypass -File $verify
+	Write-Host 'Running installed Loader verification...'
+	$savedExpectedVersion = $env:MODLOADER_EXPECTED_VERSION
+    try {
+        $env:MODLOADER_EXPECTED_VERSION = $expectedLoaderVersion
+        & powershell -NoProfile -ExecutionPolicy Bypass -File $verify -LoaderOnly
+        if ($LASTEXITCODE) { throw "Installed verification failed (exit $LASTEXITCODE)." }
+    } finally { $env:MODLOADER_EXPECTED_VERSION = $savedExpectedVersion }
+    if ($FullVerification) { & powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $targetGame 'modloader/tools/verify-development.ps1') }
+	if ($LASTEXITCODE) { throw "Installed verification failed (exit $LASTEXITCODE)." }
+} else {
+	throw 'Installed verification tool is missing.'
 }
 } catch {
+	Stop-InstallerActivity
 	Write-Host ""
 	Write-Host "ModLoader install failed: $($_.Exception.Message)" -ForegroundColor Red
 	Write-Host "Restoring backed-up core files from: $backupPath"
-	Restore-InstallBackup -ManifestFiles $manifestFiles -TargetRoot $targetRoot -BackupPath $backupPath
-	throw
+    $installationFailure = $_
+    try {
+    Restore-InstallBackup -ManifestFiles $manifestFiles -TargetRoot $targetRoot -BackupPath $backupPath
+	if ($fullModsBackup) {
+		# Recreate all pre-existing files removed by -ReplaceMods. Each destination
+		# is an original backup entry underneath the explicit game directory.
+		Copy-DirectoryContents -Source (Join-Path $backupPath $fullModsBackup) -Target (Join-Path $targetRoot $fullModsBackup)
+	}
+    Write-Host 'Installation failed; backup restoration completed.'
+    } catch { throw "Installation failed and restoration is INCOMPLETE. Backup: $backupPath. Installation error: $installationFailure. Restore error: $_" }
+    throw $installationFailure
 }
 
 Write-Host ""

@@ -58,13 +58,14 @@
                 runtime.refreshPage = ctx.refresh
                 const signal = runtime.signaling.getState()
                 const transport = runtime.transport.getState()
-                const safe = runtime.config.safeTest
+                const ready = !!runtime.game?.version && (!runtime.config.desktop13 || runtime.safety.context.ready)
+                const safe = runtime.config.safeTest && ready
                 const host = runtime.config.role === 'host'
                 const guest = runtime.config.role === 'guest'
                 const rootNode = element('div', null, { display: 'grid', gap: '11px', color: 'inherit' })
                 rootNode.append(element('div', safe
-                    ? 'SAFE TEST MODE: Phase 2 may signal and probe, but persistence, Steam stats, achievements, reset and import/restore writes are blocked.'
-                    : 'SAFE TEST MODE IS OFF. Phase 2 room operations are disabled.', {
+                    ? runtime.config.localOnly ? 'LOCAL TEST: progress commits to session memory only; same-machine host ICE only. Reset, import and slot changes are restricted.' : 'SAFE TEST MODE: Phase 2 may signal and probe, but persistence, Steam stats, achievements, reset and import/restore writes are blocked.'
+                    : runtime.config.safeTest ? 'Waiting for game and early protection readiness. Room operations are disabled.' : 'SAFE TEST MODE IS OFF. Phase 2 room operations are disabled.', {
                         padding: '9px', border: '1px solid rgba(255,190,80,.45)', borderRadius: '6px',
                         background: 'rgba(255,190,80,.12)'
                     }))
@@ -73,7 +74,7 @@
                 summary.append(
                     row('Role', runtime.config.role.toUpperCase()),
                     row('Signaling', signal.status),
-                    row('Room code', signal.roomCode || 'not created/joined'),
+                    row('Room code', runtime.config.localOnly && signal.roomCode ? 'local room (copy to join)' : signal.roomCode || 'not created/joined'),
                     row('ICE mode', signal.iceMode),
                     row('WebRTC peers', `${transport.connectedPeers} connected / ${transport.peers.length} known`),
                     row('Audit log', runtime.audit.path || 'memory only')

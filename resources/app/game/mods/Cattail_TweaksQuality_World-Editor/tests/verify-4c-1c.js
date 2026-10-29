@@ -561,7 +561,7 @@ function testUiLocalizationDocumentationAndManifestContracts() {
 	const manifest = JSON.parse(fs.readFileSync(path.join(MOD_ROOT, 'mod.json'), 'utf8'))
 
 	assert.equal(manifest.version, '0.6.0')
-	assert.equal(manifest.entry.length, 45)
+	assert.equal(manifest.entry.length, 47)
 	assert.match(sessionSource, /const schemaVersion = stabilizerLinkCount \? 8 : paintedRecords\.length \? 7 : 6/)
 	assert.match(sessionSource, /emptyCells/)
 	assert.match(sessionSource, /confirmPlacementOptions/)

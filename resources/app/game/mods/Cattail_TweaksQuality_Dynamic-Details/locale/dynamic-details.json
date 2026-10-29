@@ -64,6 +64,19 @@
     },
     "cattailBuildCountdown": {
       "buildableIn": "Buildable"
+    },
+    "cattailMineDistribution": {
+      "title": "Mineral depth distribution",
+      "depth": "Depth",
+      "probability": "Probability",
+      "nonlinear": "Nonlinear depth axis",
+      "current": "Current depth",
+      "unknown": "Unknown mineral",
+      "hidden": "Undiscovered minerals are hidden; probabilities are not rescaled.",
+      "empty": "No minerals discovered yet.",
+      "unitNote": "Theoretical probability per resource unit; actual cubes vary.",
+      "widthNote": "Band width uses the same 0–100% probability scale.",
+      "unavailable": "Distribution unavailable"
     }
   },
   "sch": {
@@ -131,6 +144,19 @@
     },
     "cattailBuildCountdown": {
       "buildableIn": "可建造"
+    },
+    "cattailMineDistribution": {
+      "title": "矿物深度分布",
+      "depth": "深度",
+      "probability": "概率",
+      "nonlinear": "非线性深度轴",
+      "current": "当前深度",
+      "unknown": "未知矿物",
+      "hidden": "未显示尚未发现的矿物，概率未重新归一化。",
+      "empty": "尚未发现矿物。",
+      "unitNote": "单个资源单位的理论生成概率，实际方块组成会随机波动。",
+      "widthNote": "各矿物带宽采用相同的0–100%概率标尺。",
+      "unavailable": "暂无分布数据"
     }
   },
   "modsch": {
@@ -198,6 +224,19 @@
     },
     "cattailBuildCountdown": {
       "buildableIn": "可建造"
+    },
+    "cattailMineDistribution": {
+      "title": "矿物深度分布",
+      "depth": "深度",
+      "probability": "概率",
+      "nonlinear": "非线性深度轴",
+      "current": "当前深度",
+      "unknown": "未知矿物",
+      "hidden": "未显示尚未发现的矿物，概率未重新归一化。",
+      "empty": "尚未发现矿物。",
+      "unitNote": "单个资源单位的理论生成概率，实际方块组成会随机波动。",
+      "widthNote": "各矿物带宽采用相同的0–100%概率标尺。",
+      "unavailable": "暂无分布数据"
     }
   },
   "tch": {
@@ -265,6 +304,259 @@
     },
     "cattailBuildCountdown": {
       "buildableIn": "可建造"
+    },
+    "cattailMineDistribution": {
+      "title": "礦物深度分布",
+      "depth": "深度",
+      "probability": "機率",
+      "nonlinear": "非線性深度軸",
+      "current": "目前深度",
+      "unknown": "未知礦物",
+      "hidden": "尚未發現的礦物已隱藏，機率未重新正規化。",
+      "empty": "尚未發現礦物。",
+      "unitNote": "單個資源單位的理論生成機率，實際方塊組成會隨機波動。",
+      "widthNote": "各礦物帶寬採用相同的0–100%機率標尺。",
+      "unavailable": "暫無分布資料"
+    }
+  },
+  "ru": {
+    "cattailMineDistribution": {
+      "title": "Распределение минералов по глубине",
+      "depth": "Глубина",
+      "probability": "Вероятность",
+      "nonlinear": "Нелинейная шкала глубины",
+      "current": "Текущая глубина",
+      "unknown": "Неизвестный минерал",
+      "hidden": "Неоткрытые минералы скрыты; вероятности не перенормированы.",
+      "empty": "Минералы пока не открыты.",
+      "unitNote": "Теоретическая вероятность на единицу ресурса; состав кубов случаен.",
+      "widthNote": "Ширина полос использует общую шкалу вероятности 0–100%.",
+      "unavailable": "Данные о распределении недоступны"
+    }
+  },
+  "de": {
+    "cattailMineDistribution": {
+      "title": "Mineralverteilung nach Tiefe",
+      "depth": "Tiefe",
+      "probability": "Wahrscheinlichkeit",
+      "nonlinear": "Nichtlineare Tiefenachse",
+      "current": "Aktuelle Tiefe",
+      "unknown": "Unbekanntes Mineral",
+      "hidden": "Unentdeckte Minerale sind ausgeblendet; die Wahrscheinlichkeiten werden nicht neu normiert.",
+      "empty": "Noch keine Minerale entdeckt.",
+      "unitNote": "Theoretische Wahrscheinlichkeit je Ressourceneinheit; die Würfelzusammensetzung variiert.",
+      "widthNote": "Die Bandbreiten verwenden dieselbe Wahrscheinlichkeitsskala von 0–100%.",
+      "unavailable": "Verteilung nicht verfügbar"
+    }
+  },
+  "ptbr": {
+    "cattailMineDistribution": {
+      "title": "Distribuição de minerais por profundidade",
+      "depth": "Profundidade",
+      "probability": "Probabilidade",
+      "nonlinear": "Eixo de profundidade não linear",
+      "current": "Profundidade atual",
+      "unknown": "Mineral desconhecido",
+      "hidden": "Minerais não descobertos estão ocultos; as probabilidades não são renormalizadas.",
+      "empty": "Nenhum mineral descoberto ainda.",
+      "unitNote": "Probabilidade teórica por unidade de recurso; a composição dos cubos varia.",
+      "widthNote": "A largura das faixas usa a mesma escala de probabilidade de 0–100%.",
+      "unavailable": "Distribuição indisponível"
+    }
+  },
+  "it": {
+    "cattailMineDistribution": {
+      "title": "Distribuzione dei minerali per profondità",
+      "depth": "Profondità",
+      "probability": "Probabilità",
+      "nonlinear": "Asse della profondità non lineare",
+      "current": "Profondità attuale",
+      "unknown": "Minerale sconosciuto",
+      "hidden": "I minerali non scoperti sono nascosti; le probabilità non vengono rinormalizzate.",
+      "empty": "Nessun minerale ancora scoperto.",
+      "unitNote": "Probabilità teorica per unità di risorsa; la composizione dei cubi varia.",
+      "widthNote": "La larghezza delle bande usa la stessa scala di probabilità da 0 a 100%.",
+      "unavailable": "Distribuzione non disponibile"
+    }
+  },
+  "es": {
+    "cattailMineDistribution": {
+      "title": "Distribución de minerales por profundidad",
+      "depth": "Profundidad",
+      "probability": "Probabilidad",
+      "nonlinear": "Eje de profundidad no lineal",
+      "current": "Profundidad actual",
+      "unknown": "Mineral desconocido",
+      "hidden": "Los minerales sin descubrir están ocultos; las probabilidades no se renormalizan.",
+      "empty": "Aún no se han descubierto minerales.",
+      "unitNote": "Probabilidad teórica por unidad de recurso; la composición de los cubos varía.",
+      "widthNote": "El ancho de las bandas usa la misma escala de probabilidad del 0 al 100%.",
+      "unavailable": "Distribución no disponible"
+    }
+  },
+  "fr": {
+    "cattailMineDistribution": {
+      "title": "Répartition des minéraux selon la profondeur",
+      "depth": "Profondeur",
+      "probability": "Probabilité",
+      "nonlinear": "Axe de profondeur non linéaire",
+      "current": "Profondeur actuelle",
+      "unknown": "Minéral inconnu",
+      "hidden": "Les minéraux non découverts sont masqués ; les probabilités ne sont pas renormalisées.",
+      "empty": "Aucun minéral découvert pour le moment.",
+      "unitNote": "Probabilité théorique par unité de ressource ; la composition des cubes varie.",
+      "widthNote": "La largeur des bandes utilise la même échelle de probabilité de 0 à 100 %.",
+      "unavailable": "Répartition indisponible"
+    }
+  },
+  "nl": {
+    "cattailMineDistribution": {
+      "title": "Mineraalverdeling per diepte",
+      "depth": "Diepte",
+      "probability": "Kans",
+      "nonlinear": "Niet-lineaire diepteas",
+      "current": "Huidige diepte",
+      "unknown": "Onbekend mineraal",
+      "hidden": "Niet-ontdekte mineralen zijn verborgen; de kansen worden niet opnieuw genormaliseerd.",
+      "empty": "Nog geen mineralen ontdekt.",
+      "unitNote": "Theoretische kans per grondstofeenheid; de samenstelling van blokken varieert.",
+      "widthNote": "De bandbreedte gebruikt dezelfde kansschaal van 0–100%.",
+      "unavailable": "Verdeling niet beschikbaar"
+    }
+  },
+  "cz": {
+    "cattailMineDistribution": {
+      "title": "Rozložení minerálů podle hloubky",
+      "depth": "Hloubka",
+      "probability": "Pravděpodobnost",
+      "nonlinear": "Nelineární osa hloubky",
+      "current": "Aktuální hloubka",
+      "unknown": "Neznámý minerál",
+      "hidden": "Neobjevené minerály jsou skryté; pravděpodobnosti nejsou znovu normalizovány.",
+      "empty": "Zatím nebyly objeveny žádné minerály.",
+      "unitNote": "Teoretická pravděpodobnost na jednotku suroviny; složení krychlí se náhodně mění.",
+      "widthNote": "Šířka pásem používá stejnou stupnici pravděpodobnosti 0–100 %.",
+      "unavailable": "Rozložení není k dispozici"
+    }
+  },
+  "pl": {
+    "cattailMineDistribution": {
+      "title": "Rozkład minerałów według głębokości",
+      "depth": "Głębokość",
+      "probability": "Prawdopodobieństwo",
+      "nonlinear": "Nieliniowa oś głębokości",
+      "current": "Bieżąca głębokość",
+      "unknown": "Nieznany minerał",
+      "hidden": "Nieodkryte minerały są ukryte; prawdopodobieństwa nie są ponownie normalizowane.",
+      "empty": "Nie odkryto jeszcze żadnych minerałów.",
+      "unitNote": "Teoretyczne prawdopodobieństwo na jednostkę surowca; skład kostek jest losowy.",
+      "widthNote": "Szerokość pasm używa wspólnej skali prawdopodobieństwa 0–100%.",
+      "unavailable": "Rozkład niedostępny"
+    }
+  },
+  "jp": {
+    "cattailMineDistribution": {
+      "title": "鉱物の深度分布",
+      "depth": "深度",
+      "probability": "確率",
+      "nonlinear": "非線形の深度軸",
+      "current": "現在の深度",
+      "unknown": "未発見の鉱物",
+      "hidden": "未発見の鉱物は非表示です。確率の再正規化は行いません。",
+      "empty": "まだ鉱物を発見していません。",
+      "unitNote": "資源1単位あたりの理論的な生成確率です。実際のキューブの組成はランダムに変動します。",
+      "widthNote": "各鉱物帯の幅には共通の0～100%の確率目盛りを使用します。",
+      "unavailable": "分布データがありません"
+    }
+  },
+  "kr": {
+    "cattailMineDistribution": {
+      "title": "광물 깊이별 분포",
+      "depth": "깊이",
+      "probability": "확률",
+      "nonlinear": "비선형 깊이 축",
+      "current": "현재 깊이",
+      "unknown": "알 수 없는 광물",
+      "hidden": "미발견 광물은 숨겨지며 확률은 다시 정규화하지 않습니다.",
+      "empty": "아직 발견한 광물이 없습니다.",
+      "unitNote": "자원 한 단위당 이론적 생성 확률이며 실제 큐브 구성은 무작위로 달라집니다.",
+      "widthNote": "모든 광물 띠의 너비에 동일한 0–100% 확률 척도를 적용합니다.",
+      "unavailable": "분포 데이터를 사용할 수 없음"
+    }
+  },
+  "thai": {
+    "cattailMineDistribution": {
+      "title": "การกระจายแร่ตามความลึก",
+      "depth": "ความลึก",
+      "probability": "ความน่าจะเป็น",
+      "nonlinear": "แกนความลึกแบบไม่เชิงเส้น",
+      "current": "ความลึกปัจจุบัน",
+      "unknown": "แร่ที่ไม่รู้จัก",
+      "hidden": "ซ่อนแร่ที่ยังไม่ค้นพบ โดยไม่ปรับสัดส่วนความน่าจะเป็นใหม่",
+      "empty": "ยังไม่ค้นพบแร่",
+      "unitNote": "ความน่าจะเป็นทางทฤษฎีต่อทรัพยากรหนึ่งหน่วย องค์ประกอบของก้อนจริงจะแตกต่างกันแบบสุ่ม",
+      "widthNote": "ความกว้างของแถบใช้มาตราส่วนความน่าจะเป็นเดียวกันที่ 0–100%",
+      "unavailable": "ไม่มีข้อมูลการกระจาย"
+    }
+  },
+  "hu": {
+    "cattailMineDistribution": {
+      "title": "Ásványok mélység szerinti eloszlása",
+      "depth": "Mélység",
+      "probability": "Valószínűség",
+      "nonlinear": "Nemlineáris mélységtengely",
+      "current": "Jelenlegi mélység",
+      "unknown": "Ismeretlen ásvány",
+      "hidden": "A fel nem fedezett ásványok rejtve vannak; a valószínűségeket nem normalizáljuk újra.",
+      "empty": "Még nincs felfedezett ásvány.",
+      "unitNote": "Elméleti keletkezési valószínűség erőforrásegységenként; a kockák összetétele véletlenszerűen változik.",
+      "widthNote": "A sávok szélessége azonos, 0–100%-os valószínűségi skálát használ.",
+      "unavailable": "Az eloszlás nem érhető el"
+    }
+  },
+  "lv": {
+    "cattailMineDistribution": {
+      "title": "Minerālu sadalījums pēc dziļuma",
+      "depth": "Dziļums",
+      "probability": "Varbūtība",
+      "nonlinear": "Nelineāra dziļuma ass",
+      "current": "Pašreizējais dziļums",
+      "unknown": "Nezināms minerāls",
+      "hidden": "Neatklātie minerāli ir paslēpti; varbūtības netiek normalizētas atkārtoti.",
+      "empty": "Vēl nav atklāts neviens minerāls.",
+      "unitNote": "Teorētiskā varbūtība uz vienu resursa vienību; kubu sastāvs nejauši atšķiras.",
+      "widthNote": "Joslu platumam izmanto vienotu 0–100% varbūtības skalu.",
+      "unavailable": "Sadalījums nav pieejams"
+    }
+  },
+  "ro": {
+    "cattailMineDistribution": {
+      "title": "Distribuția mineralelor în funcție de adâncime",
+      "depth": "Adâncime",
+      "probability": "Probabilitate",
+      "nonlinear": "Axă neliniară a adâncimii",
+      "current": "Adâncimea curentă",
+      "unknown": "Mineral necunoscut",
+      "hidden": "Mineralele nedescoperite sunt ascunse; probabilitățile nu sunt renormalizate.",
+      "empty": "Nu au fost descoperite minerale încă.",
+      "unitNote": "Probabilitate teoretică pe unitate de resursă; compoziția cuburilor variază aleatoriu.",
+      "widthNote": "Lățimea benzilor folosește aceeași scară de probabilitate de 0–100%.",
+      "unavailable": "Distribuție indisponibilă"
+    }
+  },
+  "no": {
+    "cattailMineDistribution": {
+      "title": "Mineralfordeling etter dybde",
+      "depth": "Dybde",
+      "probability": "Sannsynlighet",
+      "nonlinear": "Ikke-lineær dybdeakse",
+      "current": "Nåværende dybde",
+      "unknown": "Ukjent mineral",
+      "hidden": "Uoppdagede mineraler er skjult; sannsynlighetene normaliseres ikke på nytt.",
+      "empty": "Ingen mineraler er oppdaget ennå.",
+      "unitNote": "Teoretisk sannsynlighet per ressursenhet; sammensetningen av kubene varierer tilfeldig.",
+      "widthNote": "Båndbredden bruker samme sannsynlighetsskala fra 0 til 100%.",
+      "unavailable": "Fordeling utilgjengelig"
     }
   }
 }
